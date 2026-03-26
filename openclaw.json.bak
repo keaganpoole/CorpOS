@@ -1,0 +1,133 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.3.23",
+    "lastTouchedAt": "2026-03-25T00:23:56.020Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-03-24T00:23:12.668Z",
+    "lastRunVersion": "2026.3.23",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
+  },
+  "auth": {
+    "profiles": {
+      "openrouter:default": {
+        "provider": "openrouter",
+        "mode": "api_key"
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/stepfun/step-3.5-flash:free"
+      },
+      "models": {
+        "openrouter/auto": {
+          "alias": "OpenRouter"
+        },
+        "openrouter/stepfun/step-3.5-flash:free": {}
+      },
+      "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max"
+    },
+    "list": [
+      {
+        "id": "main"
+      },
+      {
+        "id": "lauren",
+        "name": "lauren",
+        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-research",
+        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\lauren",
+        "model": "openrouter/stepfun/step-3.5-flash:free"
+      }
+    ]
+  },
+  "tools": {
+    "profile": "coding"
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "boot-md": {
+          "enabled": true
+        },
+        "bootstrap-extra-files": {
+          "enabled": true
+        },
+        "command-logger": {
+          "enabled": true
+        },
+        "session-memory": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "groups": {
+        "*": {
+          "requireMention": true
+        }
+      },
+      "groupPolicy": "allowlist",
+      "accounts": {
+        "default": {
+          "dmPolicy": "allowlist",
+          "botToken": "8621566826:AAHU2dxOWjwaxY9ZMkX_q7-gih5ce2QJ_yk",
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        },
+        "lauren": {
+          "name": "Lauren",
+          "enabled": true,
+          "dmPolicy": "pairing",
+          "botToken": "8777471205:AAGhr78pLIQglAyK706-yBIabMCe_rVqThs",
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        }
+      },
+      "streaming": "partial"
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "9385154d61c3abe554633ed6e57c415da142ddfb98a6a0c4"
+    },
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    },
+    "nodes": {
+      "denyCommands": [
+        "camera.snap",
+        "camera.clip",
+        "screen.record",
+        "contacts.add",
+        "calendar.add",
+        "reminders.add",
+        "sms.send"
+      ]
+    }
+  }
+}

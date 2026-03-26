@@ -1,0 +1,250 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.3.23",
+    "lastTouchedAt": "2026-03-25T00:24:04.843Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-03-24T00:23:12.668Z",
+    "lastRunVersion": "2026.3.23",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
+  },
+  "auth": {
+    "profiles": {
+      "openrouter:default": {
+        "provider": "openrouter",
+        "mode": "api_key"
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/minimax/minimax-m2.5"
+      },
+      "models": {
+        "openrouter/auto": {
+          "alias": "OpenRouter"
+        },
+        "openrouter/stepfun/step-3.5-flash:free": {}
+      },
+      "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max"
+    },
+    "list": [
+      {
+        "id": "main"
+      },
+      {
+        "id": "lauren",
+        "name": "lauren",
+        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-research",
+        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\lauren",
+        "model": "openrouter/stepfun/step-3.5-flash:free"
+      },
+      {
+        "id": "brian",
+        "name": "brian",
+        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-sales",
+        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\brian",
+        "model": "openrouter/stepfun/step-3.5-flash:free"
+      },
+      {
+        "id": "allie",
+        "name": "allie",
+        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-marketing",
+        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\allie",
+        "model": "openrouter/stepfun/step-3.5-flash:free"
+      },
+      {
+        "id": "devan",
+        "name": "devan",
+        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-dev",
+        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\devan",
+        "model": "openrouter/stepfun/step-3.5-flash:free"
+      },
+      {
+        "id": "leah",
+        "name": "leah",
+        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-care",
+        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\leah",
+        "model": "openrouter/stepfun/step-3.5-flash:free"
+      }
+    ]
+  },
+  "tools": {
+    "profile": "coding"
+  },
+  "bindings": [
+    {
+      "type": "route",
+      "agentId": "lauren",
+      "match": {
+        "channel": "telegram",
+        "accountId": "lauren"
+      }
+    },
+    {
+      "type": "route",
+      "agentId": "brian",
+      "match": {
+        "channel": "telegram",
+        "accountId": "brian"
+      }
+    },
+    {
+      "type": "route",
+      "agentId": "allie",
+      "match": {
+        "channel": "telegram",
+        "accountId": "allie"
+      }
+    },
+    {
+      "type": "route",
+      "agentId": "devan",
+      "match": {
+        "channel": "telegram",
+        "accountId": "devan"
+      }
+    },
+    {
+      "type": "route",
+      "agentId": "leah",
+      "match": {
+        "channel": "telegram",
+        "accountId": "leah"
+      }
+    }
+  ],
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "boot-md": {
+          "enabled": true
+        },
+        "bootstrap-extra-files": {
+          "enabled": true
+        },
+        "command-logger": {
+          "enabled": true
+        },
+        "session-memory": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "groups": {
+        "*": {
+          "requireMention": true
+        }
+      },
+      "groupPolicy": "allowlist",
+      "streaming": "partial",
+      "accounts": {
+        "default": {
+          "dmPolicy": "allowlist",
+          "botToken": "8621566826:AAHU2dxOWjwaxY9ZMkX_q7-gih5ce2QJ_yk",
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        },
+        "lauren": {
+          "name": "Lauren",
+          "enabled": true,
+          "dmPolicy": "allowlist",
+          "botToken": "8777471205:AAGhr78pLIQglAyK706-yBIabMCe_rVqThs",
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        },
+        "brian": {
+          "name": "Brian",
+          "enabled": true,
+          "dmPolicy": "allowlist",
+          "botToken": "8731998873:AAEWpZJ2mu15bz-yjAXh64G1-qSE8YintkQ",
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        },
+        "allie": {
+          "name": "Allie",
+          "enabled": true,
+          "dmPolicy": "allowlist",
+          "botToken": "8027398701:AAGtvp9dB048MWmBvzACHJFVWlM4zKD8b-k",
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        },
+        "devan": {
+          "name": "Devan",
+          "enabled": true,
+          "dmPolicy": "allowlist",
+          "botToken": "8732952550:AAFJUVkVyZJkaIpEby-X9qpndlHrqvrBbDs",
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        },
+        "leah": {
+          "name": "Leah",
+          "enabled": true,
+          "dmPolicy": "allowlist",
+          "botToken": "8740363547:AAGiTl9w3mlOpDpvMG_AkEz4BbzVLYoY9-M",
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        }
+      }
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "9385154d61c3abe554633ed6e57c415da142ddfb98a6a0c4"
+    },
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    },
+    "nodes": {
+      "denyCommands": [
+        "camera.snap",
+        "camera.clip",
+        "screen.record",
+        "contacts.add",
+        "calendar.add",
+        "reminders.add",
+        "sms.send"
+      ]
+    }
+  }
+}
