@@ -1,8 +1,11 @@
 # 📜 CorpOS Telegram Commands
 
+> ⚠️ **SHARED ACROSS ALL WORKSPACES** — This file syncs to all teams (Care, Dev, Marketing, Max, Research, Sales). Modify with caution.
+
 Commands (current):
 - `/start` — Manual ignition command. Used by the CEO to start the morning huddle and activate the system.
 - `/rollcall` — Managers and executives confirm presence in the CorpOS group chat.
+- `/break` — Triggers break mode. All manager agents start social conversation in Team CorpOS chat.
 
 ---
 
@@ -17,6 +20,12 @@ Commands (current):
 - Where: Message the CorpOS Team group chat (formerly "Team Winslow"). API keys and bot tokens remain the same; only the group name reference changes in these docs.
 - What to send: A short 1–3 word presence message (examples: "here", "present", "on deck"). Use plain words — no long updates.
 - Why: Provides a rapid, human-validated confirmation that leadership is present and ready to receive dispatches.
+
+/ break
+- Purpose: Trigger break mode. Activates social protocols across all manager agents.
+- Who uses it: Keagan (CEO) or authorized senders.
+- Behavior: Same as when Command Center status is set to "Break" — all managers (Lauren, Allie, Brian, Devan, Leah) start conversing in the Team CorpOS group chat with casual/social messages.
+- Max's role: Acknowledge the command in Max Group Chat, then trigger the managers to engage in Team CorpOS.
 
 ---
 

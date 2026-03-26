@@ -1,5 +1,7 @@
 # 📡 COMMUNICATIONS: Telegram Channel Protocol
 
+> ⚠️ **SHARED ACROSS ALL WORKSPACES** — This file syncs to all teams (Care, Dev, Marketing, Max, Research, Sales). Modify with caution.
+
 ## 1. THE DIGITAL HEADQUARTERS
 CorpOS operations are distributed across three distinct Telegram environments. Each channel has a specific "Security Clearance" and "Social Vibe." Agents must monitor these channels according to their role and the active **Global Status**.
 

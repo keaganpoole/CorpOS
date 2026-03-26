@@ -1,5 +1,7 @@
 # 🌐 SYSTEM OVERVIEW: CorpOS v1.0
 
+> ⚠️ **SHARED ACROSS ALL WORKSPACES** — This file syncs to all teams (Care, Dev, Marketing, Max, Research, Sales). Modify with caution.
+
 ## 1. THE MISSION: "THE STUNNING STANDARD"
 CorpOS is a high-performance, autonomous business engine built to scale the **Keagan Poole** full-stack web design business. The system identifies small (and select mid-sized) businesses anchored by "Digital Relics"—outdated, broken, or visually repulsive websites—and converts them into high-value clients. 
 

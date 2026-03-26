@@ -1,5 +1,7 @@
 # 🧠 CORE LOGIC: Command Center (Airtable: tbl8rlmoaZt3ZIsAY)
 
+> ⚠️ **SHARED ACROSS ALL WORKSPACES** — This file syncs to all teams (Care, Dev, Marketing, Max, Research, Sales). Modify with caution.
+
 ## 1. MISSION STATEMENT
 The Command Center is the absolute source of truth and the central nervous system of CorpOS. No agent or team is permitted to perform work unless it is validated against and directed by the current state of this table. Every action taken by any agent must originate from and align with this configuration.
 

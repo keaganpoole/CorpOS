@@ -1,5 +1,7 @@
 # AGENTS.md - Your Workspace
 
+> ⚠️ **SHARED ACROSS ALL WORKSPACES** — This file syncs to all teams (Care, Dev, Marketing, Max, Research, Sales). Modify with caution.
+
 This folder is home. Treat it that way.
 
 ## First Run

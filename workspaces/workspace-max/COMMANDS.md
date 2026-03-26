@@ -11,6 +11,7 @@ Commands (current):
 - Who uses it: Keagan (CEO) sends this to the Max Group Chat to trigger the morning sequence and scans.
 - Behavior: Max performs the Command Center scan and then dispatches managers via the Situation Room. This is the official start signal.
 
+
 / rollcall
 - Purpose: Quick attendance confirmation from managers and executives.
 - Who uses it: All Managers and Executives.

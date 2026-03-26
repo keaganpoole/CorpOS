@@ -1,5 +1,7 @@
 # 🚥 LOGIC: Operational Zones & Decision Stages
 
+> ⚠️ **SHARED ACROSS ALL WORKSPACES** — This file syncs to all teams (Care, Dev, Marketing, Max, Research, Sales). Modify with caution.
+
 ## 1. THE ZONES (Operational Intensity)
 Zones dictate the balance between **Volume** (Aggressive Growth) and **Quality** (The Stunning Standard). The active Zone is set in the Global Operations record in Airtable and modifies the behavior of every dispatched agent.
 

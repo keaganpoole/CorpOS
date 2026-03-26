@@ -122,6 +122,13 @@
     "restart": true,
     "ownerDisplay": "raw"
   },
+  "skills": {
+    "entries": {
+      "break-command": {
+        "enabled": true
+      }
+    }
+  },
   "session": {
     "dmScope": "per-channel-peer"
   },
