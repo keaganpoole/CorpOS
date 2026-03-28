@@ -1,4 +1,10 @@
 {
+  "wizard": {
+    "lastRunAt": "2026-03-24T00:23:12.668Z",
+    "lastRunVersion": "2026.3.23",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
+  },
   "auth": {
     "profiles": {
       "openrouter:default": {
@@ -32,6 +38,25 @@
   },
   "session": {
     "dmScope": "per-channel-peer"
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "boot-md": {
+          "enabled": true
+        },
+        "bootstrap-extra-files": {
+          "enabled": true
+        },
+        "command-logger": {
+          "enabled": true
+        },
+        "session-memory": {
+          "enabled": true
+        }
+      }
+    }
   },
   "channels": {
     "telegram": {
@@ -76,6 +101,6 @@
   },
   "meta": {
     "lastTouchedVersion": "2026.3.23",
-    "lastTouchedAt": "2026-03-24T00:22:33.479Z"
+    "lastTouchedAt": "2026-03-24T00:23:12.685Z"
   }
 }

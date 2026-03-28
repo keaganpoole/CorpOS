@@ -1,7 +1,7 @@
 {
   "meta": {
     "lastTouchedVersion": "2026.3.23",
-    "lastTouchedAt": "2026-03-25T00:23:44.043Z"
+    "lastTouchedAt": "2026-03-25T00:23:56.020Z"
   },
   "wizard": {
     "lastRunAt": "2026-03-24T00:23:12.668Z",
@@ -77,17 +77,32 @@
   "channels": {
     "telegram": {
       "enabled": true,
-      "dmPolicy": "allowlist",
-      "botToken": "8621566826:AAHU2dxOWjwaxY9ZMkX_q7-gih5ce2QJ_yk",
+      "dmPolicy": "pairing",
       "groups": {
         "*": {
           "requireMention": true
         }
       },
-      "allowFrom": [
-        "6416153554"
-      ],
       "groupPolicy": "allowlist",
+      "accounts": {
+        "default": {
+          "dmPolicy": "allowlist",
+          "botToken": "8621566826:AAHU2dxOWjwaxY9ZMkX_q7-gih5ce2QJ_yk",
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        },
+        "lauren": {
+          "name": "Lauren",
+          "enabled": true,
+          "dmPolicy": "pairing",
+          "botToken": "8777471205:AAGhr78pLIQglAyK706-yBIabMCe_rVqThs",
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        }
+      },
       "streaming": "partial"
     }
   },
