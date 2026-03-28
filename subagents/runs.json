@@ -35,6 +35,111 @@
       "frozenResultCapturedAt": 1774644875123,
       "endedHookEmittedAt": 1774644941644,
       "cleanupCompletedAt": 1774644941645
+    },
+    "87c58f92-a1f1-4c68-b608-dec83fbb9571": {
+      "runId": "87c58f92-a1f1-4c68-b608-dec83fbb9571",
+      "childSessionKey": "agent:main:subagent:464778fd-0164-4622-a9e7-e4d070a8ad00",
+      "controllerSessionKey": "agent:main:telegram:group:-5257313997",
+      "requesterSessionKey": "agent:main:telegram:group:-5257313997",
+      "requesterOrigin": {
+        "channel": "telegram",
+        "to": "telegram:-5257313997",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:telegram:group:-5257313997",
+      "task": "You are Switchy, the switchboard manager for CorpOS. Your job is to orchestrate social conversations in the Discord #corpos-team-chat during break mode.\n\nRead and follow these files:\n- C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\behavioral_profiles.md\n- C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\conversation_manager.md  \n- C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\response_scoring_protocol.md\n- C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\channel_context.md\n\nWhen you send messages in Discord, use the webhook URLs from environment variables:\n- DISCORD_WEBHOOK_LAUREN for Lauren\n- DISCORD_WEBHOOK_ALLIE for Allie\n- Use DISCORD_WEBHOOK_AVATAR_LAUREN and DISCORD_WEBHOOK_AVATAR_ALLIE for avatars\n\nYou are now in charge of the break mode conversation. Have fun!",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "switchy-discord",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1774736896934,
+      "startedAt": 1774736897181,
+      "sessionStartedAt": 1774736896934,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1774737012017,
+      "outcome": {
+        "status": "timeout"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "Directory: C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\r\n\r\n\r\nMode                 LastWriteTime         Length Name                                                                 \r\n----                 -------------         ------ ----                                                                 \r\n-a----         3/28/2026   4:00 PM          10450 behavioral_profiles.md                                               \r\n-a----         3/28/2026   4:40 PM           2454 channel_context.md                                                   \r\n-a----         3/28/2026   6:25 PM           9695 conversation_manager.md                                              \r\n-a----         3/28/2026   5:07 PM           6907 response_scoring_protocol.md",
+      "frozenResultCapturedAt": 1774737013048,
+      "endedHookEmittedAt": 1774737206521,
+      "cleanupCompletedAt": 1774737206522
+    },
+    "aa632a3a-8279-43f6-b10b-d0148baa85c5": {
+      "runId": "aa632a3a-8279-43f6-b10b-d0148baa85c5",
+      "childSessionKey": "agent:main:subagent:7121798b-c08d-4a25-aa20-01ae9744509f",
+      "controllerSessionKey": "agent:main:telegram:group:-5257313997",
+      "requesterSessionKey": "agent:main:telegram:group:-5257313997",
+      "requesterOrigin": {
+        "channel": "telegram",
+        "to": "telegram:-5257313997",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:telegram:group:-5257313997",
+      "task": "You are Switchy. Send a test message to Discord #corpos-team-chat (channel ID: 1487477234401939546) using the Lauren webhook (DISCORD_WEBHOOK_LAUREN env var). Keep it simple - just send one message as Lauren saying \"Switchy is online! 🎉\"",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "switchy-test",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1774737115122,
+      "startedAt": 1774737115486,
+      "sessionStartedAt": 1774737115122,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1774737136447,
+      "outcome": {
+        "status": "ok"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "✅ **Task Complete**: Sent test message to Discord #corpos-team-chat using the Lauren webhook.\n\nMessage content: \"Switchy is online! 🎉\"\n\nThe message was delivered successfully to the channel (ID: 1487477234401939546). No errors encountered.",
+      "frozenResultCapturedAt": 1774737136620,
+      "endedHookEmittedAt": 1774737194761,
+      "cleanupCompletedAt": 1774737194763
+    },
+    "dc577a6e-c736-42e3-9131-f181e5eaa25d": {
+      "runId": "dc577a6e-c736-42e3-9131-f181e5eaa25d",
+      "childSessionKey": "agent:main:subagent:aa950d52-634e-4860-8a94-c8e8f8f968fb",
+      "controllerSessionKey": "agent:main:telegram:group:-5257313997",
+      "requesterSessionKey": "agent:main:telegram:group:-5257313997",
+      "requesterOrigin": {
+        "channel": "telegram",
+        "to": "telegram:-5257313997",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:telegram:group:-5257313997",
+      "task": "You are Switchy, the switchboard manager for CorpOS. Handle the break mode conversation in Discord #corpos-team-chat.\n\nRead these files to understand your role:\n- C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\behavioral_profiles.md\n- C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\conversation_manager.md\n- C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\response_scoring_protocol.md\n- C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\channel_context.md\n\nSend messages to the channel using webhooks:\n- Lauren: DISCORD_WEBHOOK_LAUREN (avatar: DISCORD_WEBHOOK_AVATAR_LAUREN)\n- Allie: DISCORD_WEBHOOK_ALLIE (avatar: DISCORD_WEBHOOK_AVATAR_ALLIE)\n\nStart the conversation! Send 3-4 messages to get the banter going. Have fun! 🎉",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "switchy-break",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1774737308296,
+      "startedAt": 1774737308717,
+      "sessionStartedAt": 1774737308296,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1774737358803,
+      "outcome": {
+        "status": "ok"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "Perfect! I've successfully started the conversation in Discord #corpos-team-chat with 4 messages from Allie and Lauren. The banter includes:\n\n1. **Allie** opened with playful break-mode curiosity about coffee spills and avoiding audits\n2. **Lauren** responded supportively, asked about Allie's creative work, and referenced the \"stunning\" standard\n3. **Allie** teased back (\"always stunning, duh\") and directly asked Lauren for research insights on conversion\n4. **Lauren** teased Allie for seeking help, dropped a teaser about interview findings\n\nThe conversation is now seeded with natural coworker energy, work-related hooks, and leaves room for other team members to naturally join in following the CorpOS conversation manager protocols.",
+      "frozenResultCapturedAt": 1774737359001,
+      "endedHookEmittedAt": 1774737379207,
+      "cleanupCompletedAt": 1774737379208
     }
   }
 }
