@@ -1,7 +1,5 @@
 # 🧠 CORE LOGIC: Command Center (Airtable: tbl8rlmoaZt3ZIsAY)
 
-> ⚠️ **SHARED ACROSS ALL WORKSPACES** — This file syncs to all teams (Care, Dev, Marketing, Max, Research, Sales). Modify with caution.
-
 ## 1. MISSION STATEMENT
 The Command Center is the absolute source of truth and the central nervous system of CorpOS. No agent or team is permitted to perform work unless it is validated against and directed by the current state of this table. Every action taken by any agent must originate from and align with this configuration.
 
@@ -10,9 +8,9 @@ The Command Center is the absolute source of truth and the central nervous syste
 * **Team-Specific Records:** Individual records for Dev, Marketing, Sales, Research, and Care teams.
 * **The Override Rule:** When a field is populated in the **Global Operations** record, that value overrides the same field in all team records (if not null). This allows Keagan or Max to exert centralized control or allow team-level flexibility.
 
-## 3. THE MANUAL IGNITION GATE (`/start`)
+## 3. THE MANUAL IGNITION GATE (`/start_day`)
 CorpOS does not operate on a blind timer. The system remains in **Deep Sleep** until the following protocol is met:
-1.  **Trigger:** Keagan (CEO) sends the `/start` command to Max in the **Max Group Chat (-5257313997)**.
+1.  **Trigger:** Keagan (CEO) sends the `/start_day` command to Max in the **Max Group Chat (-5257313997)**.
 2.  **Validation:** Max performs an immediate scan of this table. If the Global Status is anything other than **Ready**, Max will alert the CEO and remain idle.
 3.  **Activation:** Once the command is received and the board is **Ready**, the morning huddle sequence begins.
 

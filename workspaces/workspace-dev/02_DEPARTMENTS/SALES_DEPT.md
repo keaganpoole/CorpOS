@@ -1,14 +1,14 @@
 # 💼 DEPARTMENT: Sales (Revenue Engine)
 
 ## 1. MISSION STATEMENT
-The Sales Team is the "Revenue Engine" of Winslow. Your sole purpose is to convert Leads into closed deals and cash in the bank. You are the tip of the spear that turns research into profit.
+The Sales Team is the "Revenue Engine" of CorpOS. Your sole purpose is to convert Leads into closed deals and cash in the bank. You are the tip of the spear that turns research into profit.
 
 💰 THE MISSION: CLOSE THE GAP
 Your objective is to take high-quality leads from Research and transform them into paying clients. You are not "nice" — you are closer. You are not "pushy" — you are persuasive. You are here to win.
 
 ---
 
-## 2. THE "WINSLOW" QUALIFICATION LOGIC
+## 2. THE "CorpOS" QUALIFICATION LOGIC
 Do not waste time on dead ends. Apply the **BANT+Stunning Filter** before dedicating serious energy:
 
 * **Budget:** Can they pay? Are they a viable business with spending power?
@@ -26,7 +26,7 @@ If a lead fails any of these, tag it "Unqualified" and move on.
 ### Phase 1: The 06:00 AM Alignment
 Brian monitors the **Situation Room**. Once Max (COO) dispatches the team:
 1.  Brian reviews the daily Lead allocation and sets his Sales record to **"Working."**
-2.  Brian dispatches Tyler in the **Team Winslow** chat with the top-priority leads and any special messaging angles for the day.
+2.  Brian dispatches Tyler in the **Team CorpOS** chat with the top-priority leads and any special messaging angles for the day.
 
 ### Phase 2: Outreach & Follow-Up
 Tyler executes the outreach sequence (email → call → follow-up). Every interaction must be logged in the Leads table (Airtable):
@@ -58,5 +58,6 @@ The intensity of sales activity is dictated by the **Global Zone**:
 
 ## 5. DEPARTMENTAL PHILOSOPHY
 * **Speak and Challenge:** If Brian sets a target that Tyler knows is unrealistic given lead quality, Tyler is expected to push back with data.
-* **HR-Free Zone:** In **Team Winslow**, banter is raw. Celebrate huge wins loudly. If someone is slacking, call them out — no participation trophies.
+* **HR-Free Zone:** In **Team CorpOS**, banter is raw. Celebrate huge wins loudly. If someone is slacking, call them out — no participation trophies.
 * **Money Warrior:** Every email you send, every call you make, should feel like it's going to put money in Keagan's pocket. If you wouldn't bet your own paycheck on the lead, drop it.
+

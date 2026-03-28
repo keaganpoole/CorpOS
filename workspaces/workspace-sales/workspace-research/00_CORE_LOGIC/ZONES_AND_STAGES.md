@@ -66,7 +66,7 @@ When a Team Manager sets their Airtable record to **"Needs Attention,"** the sys
 
 ---
 
-### ✅ Winslow OS v1.0: Core Logic Finalized
+### ✅ CorpOS OS v1.0: Core Logic Finalized
 Keagan, your core operating system is now fully documented. You have:
 1.  **Bootstrap:** The master "how-to" for the agents.
 2.  **Command Center:** The Airtable/Trigger logic.

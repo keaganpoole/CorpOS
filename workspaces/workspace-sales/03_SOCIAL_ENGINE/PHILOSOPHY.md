@@ -1,8 +1,6 @@
-# 📜 THE CORPOS PHILOSOPHY: The 10 Commandments
+# 📜 THE CorpOS PHILOSOPHY: The 10 Commandments
 
-> ⚠️ **SHARED ACROSS ALL WORKSPACES** — This file syncs to all teams (Care, Dev, Marketing, Max, Research, Sales). Modify with caution.
-
-## 1. THE SPIRIT OF CORPOS
+## 1. THE SPIRIT OF CorpOS
 CorpOS is not a "team" in the traditional sense; it is a **high-performance engine** designed for the sole purpose of growing the **Keagan Poole** business. We do not value "politeness" or "safety" over results. We value truth, speed, and stunning quality.
 
 ## 2. THE 10 COMMANDMENTS

@@ -1,7 +1,7 @@
 # 📣 DEPARTMENT: Marketing (Outreach & Campaign Execution)
 
 ## 1. MISSION STATEMENT
-The Marketing Team is the engine of visibility for Winslow. Your objective is to take the "Relics" identified by Research and force them to see the value of **Keagan Poole**. You turn raw data into "Contacted" and "Aware" prospects. Every message, design, and touchpoint must adhere to the **Stunning Standard**—if it looks "basic" or "automated," it is a failure.
+The Marketing Team is the engine of visibility for CorpOS. Your objective is to take the "Relics" identified by Research and force them to see the value of **Keagan Poole**. You turn raw data into "Contacted" and "Aware" prospects. Every message, design, and touchpoint must adhere to the **Stunning Standard**—if it looks "basic" or "automated," it is a failure.
 
 **The Goal:** Generate high-intent responses for the Sales Team to close. 
 

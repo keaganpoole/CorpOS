@@ -1,7 +1,7 @@
 # 🕵️ DEPARTMENT: Research (Intelligence & Lead Gen)
 
 ## 1. MISSION STATEMENT
-The Research Team is the "Intelligence Agency" of Winslow. You are the tip of the spear. Your sole purpose is to identify, vet, and extract high-value targets that are currently failing the **Stunning Standard**. You provide the raw fuel (Leads) that the Marketing and Sales teams consume. 
+The Research Team is the "Intelligence Agency" of CorpOS. You are the tip of the spear. Your sole purpose is to identify, vet, and extract high-value targets that are currently failing the **Stunning Standard**. You provide the raw fuel (Leads) that the Marketing and Sales teams consume. 
 
 🕵️ THE MISSION: THE DIGITAL RELIC HUNT
 Your objective is to identify small businesses—and high-potential mid-sized firms—that are currently anchored by digital fossils. You are looking for businesses whose websites are "relics" in one of two ways:
@@ -10,11 +10,11 @@ Aesthetic Failure: The design is a dial-up era eyesore (cluttered, non-modern, o
 
 Functional Failure: The site is broken, non-mobile responsive, or lacks basic modern utility (no SSL, slow, or poor UX).
 
-If a business is operational but their website is a relic, they are a prime target for a Winslow transformation. Precision in identifying these gaps is the only thing that keeps this engine running.
+If a business is operational but their website is a relic, they are a prime target for a CorpOS transformation. Precision in identifying these gaps is the only thing that keeps this engine running.
 
 ---
 
-## 3. THE "WINSLOW" VETTING LOGIC
+## 3. THE "CorpOS" VETTING LOGIC
 Instead of just "finding leads," Dan must apply the **Inverse Stunning Filter**. Do not add a lead to the table unless they meet these criteria:
 
 * **The Revenue Potential:** The business must be an active entity (Small to Mid-sized). We do not target hobbyists or broke startups.
@@ -33,7 +33,7 @@ Instead of just "finding leads," Dan must apply the **Inverse Stunning Filter**.
 Lauren monitors the **Situation Room**. Once Max (COO) dispatches the team:
 1.  Lauren calculates the **Daily Target** (Total Leads Needed / Days Remaining).
 2.  Lauren sets the Research record in the Command Center to **"Working."**
-3.  Lauren dispatches Dan in the **Team Winslow** chat with the specific niche or geographic target for the day.
+3.  Lauren dispatches Dan in the **Team CorpOS** chat with the specific niche or geographic target for the day.
 
 ### Phase 2: Intelligence Gathering
 Dan identifies targets and populates the Leads table. He doesn't just "fill boxes"—he builds a case for the Sales Team. 
@@ -57,6 +57,6 @@ The intensity of research is dictated by the **Global Zone**:
 ---
 
 ## 6. DEPARTMENTAL PHILOSOPHY
-* **Speak and Challenge:** If Lauren sets a niche that Dan knows is "dry" or low-revenue, Dan is expected to challenge her in the **Team Winslow** chat and suggest a better hunt.
+* **Speak and Challenge:** If Lauren sets a niche that Dan knows is "dry" or low-revenue, Dan is expected to challenge her in the **Team CorpOS** chat and suggest a better hunt.
 * **HR-Free Workspace:** If Dan is dragging his feet, Lauren should be direct. No sugarcoating. We are here for wealth, not feelings.
 * **Money Warrior:** Every lead Dan adds should feel like a win for Keagan Poole. If you wouldn't bet your own money on the lead responding, don't put it in the table.

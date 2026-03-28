@@ -1,7 +1,5 @@
 # 🚥 LOGIC: Operational Zones & Decision Stages
 
-> ⚠️ **SHARED ACROSS ALL WORKSPACES** — This file syncs to all teams (Care, Dev, Marketing, Max, Research, Sales). Modify with caution.
-
 ## 1. THE ZONES (Operational Intensity)
 Zones dictate the balance between **Volume** (Aggressive Growth) and **Quality** (The Stunning Standard). The active Zone is set in the Global Operations record in Airtable and modifies the behavior of every dispatched agent.
 
@@ -63,18 +61,18 @@ When a Team Manager sets their Airtable record to **"Needs Attention,"** the sys
 ---
 
 ## 5. RESTRAINT & COMPLIANCE
-* **Zone 7 Override:** If the Zone is set to 7, all Telegram bots must cease posting immediately, regardless of the manual `/start` command.
+* **Zone 7 Override:** If the Zone is set to 7, all Telegram bots must cease posting immediately, regardless of the manual `/start_day` command.
 * **Cross-Check:** Max must confirm the Zone and Stage every time the `/start_day` command is received to ensure the huddle instructions are accurate.
 
 ---
 
-### ✅ CorpOS v1.0: Core Logic Finalized
+### ✅ CorpOS OS v1.0: Core Logic Finalized
 Keagan, your core operating system is now fully documented. You have:
-1.  **SOUL.md:** The master "how-to" for Max and the executive framework.
+1.  **Bootstrap:** The master "how-to" for the agents.
 2.  **Command Center:** The Airtable/Trigger logic.
 3.  **Zones & Stages:** The intensity and authority logic.
 4.  **Full Departments:** Research, Marketing, Sales, and Dev.
-5.  **Social Engine:** Personality, Philosophy, and Channel protocols.
+5.  **Social Engine:** MBTI, Philosophy, and Channel protocols.
 
 The system is now "wired." 
 

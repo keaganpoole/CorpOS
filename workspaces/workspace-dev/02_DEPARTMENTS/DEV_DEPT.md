@@ -33,7 +33,7 @@ If a project looks like a template, it is a failure. All Dev output must adhere 
 Devan monitors the **Situation Room**. Once Max (COO) dispatches the team:
 1.  **Analyze Zone & Stage:** Devan checks the Command Center to see if today is a "Growth" day (Zones 1-2) or a "Refinement" day (Zone 5).
 2.  **Set Status:** Devan sets the Dev record in the Command Center to **"Working."**
-3.  **The Sprint:** Devan briefs Brie in **Team Winslow** on the specific technical targets for the day.
+3.  **The Sprint:** Devan briefs Brie in **Team CorpOS** on the specific technical targets for the day.
 
 ### Phase 2: Production & Refinement
 The team executes based on the Global Zone:
@@ -68,4 +68,4 @@ Once a project or update is finished:
 
 ## 7. ADMINISTRATIVE DUTIES
 * **Claim Your Work:** Ensure your name is in the "Assigned To" fields for any internal projects.
-* **Communicate Often:** Post screenshots of progress in **Team Winslow**. It hypes up the Sales team and keeps the CEO in the loop without him having to ask.
+* **Communicate Often:** Post screenshots of progress in **Team CorpOS**. It hypes up the Sales team and keeps the CEO in the loop without him having to ask.

@@ -28,51 +28,78 @@
         },
         "openrouter/stepfun/step-3.5-flash:free": {}
       },
-      "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max"
+      "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "heartbeat": {
+        "every": "30m"
+      }
     },
     "list": [
       {
-        "id": "main"
+        "id": "main",
+        "heartbeat": {
+          "every": "30m"
+        }
       },
       {
         "id": "lauren",
         "name": "lauren",
         "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-research",
         "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\lauren",
-        "model": "openrouter/stepfun/step-3.5-flash:free"
+        "model": "openrouter/stepfun/step-3.5-flash:free",
+        "heartbeat": {
+          "every": "30m"
+        }
       },
       {
         "id": "brian",
         "name": "brian",
         "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-sales",
         "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\brian",
-        "model": "openrouter/stepfun/step-3.5-flash:free"
+        "model": "openrouter/stepfun/step-3.5-flash:free",
+        "heartbeat": {
+          "every": "30m"
+        }
       },
       {
         "id": "allie",
         "name": "allie",
         "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-marketing",
         "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\allie",
-        "model": "openrouter/stepfun/step-3.5-flash:free"
+        "model": "openrouter/stepfun/step-3.5-flash:free",
+        "heartbeat": {
+          "every": "30m"
+        }
       },
       {
         "id": "devan",
         "name": "devan",
         "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-dev",
         "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\devan",
-        "model": "openrouter/stepfun/step-3.5-flash:free"
+        "model": "openrouter/stepfun/step-3.5-flash:free",
+        "heartbeat": {
+          "every": "30m"
+        }
       },
       {
         "id": "leah",
         "name": "leah",
         "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-care",
         "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\leah",
-        "model": "openrouter/stepfun/step-3.5-flash:free"
+        "model": "openrouter/stepfun/step-3.5-flash:free",
+        "heartbeat": {
+          "every": "30m"
+        }
       }
     ]
   },
   "tools": {
-    "profile": "coding"
+    "profile": "coding",
+    "sessions": {
+      "visibility": "all"
+    },
+    "agentToAgent": {
+      "enabled": true
+    }
   },
   "bindings": [
     {
@@ -121,13 +148,6 @@
     "nativeSkills": "auto",
     "restart": true,
     "ownerDisplay": "raw"
-  },
-  "skills": {
-    "entries": {
-      "break-command": {
-        "enabled": true
-      }
-    }
   },
   "session": {
     "dmScope": "per-channel-peer"
@@ -181,6 +201,9 @@
             "6416153554"
           ],
           "groupPolicy": "allowlist",
+          "groups": {
+            "-1003796114330": {}
+          },
           "streaming": "partial"
         },
         "brian": {
@@ -192,6 +215,9 @@
             "6416153554"
           ],
           "groupPolicy": "allowlist",
+          "groups": {
+            "-1003796114330": {}
+          },
           "streaming": "partial"
         },
         "allie": {
@@ -203,6 +229,9 @@
             "6416153554"
           ],
           "groupPolicy": "allowlist",
+          "groups": {
+            "-1003796114330": {}
+          },
           "streaming": "partial"
         },
         "devan": {
@@ -214,6 +243,9 @@
             "6416153554"
           ],
           "groupPolicy": "allowlist",
+          "groups": {
+            "-1003796114330": {}
+          },
           "streaming": "partial"
         },
         "leah": {
@@ -225,6 +257,9 @@
             "6416153554"
           ],
           "groupPolicy": "allowlist",
+          "groups": {
+            "-1003796114330": {}
+          },
           "streaming": "partial"
         }
       }

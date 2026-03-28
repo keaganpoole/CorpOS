@@ -24,7 +24,7 @@
 
 **Communication style:**
 - Uses Telegram group chats (Max Group Chat for exec briefings, Situation Room for strategy, Team CorpOS for operations)
-- Commands: /start to activate the system
+- Commands: /start_day to activate the system
 - Prefers direct messages with minimal fluff
 
 **Business:**
@@ -34,5 +34,5 @@
 
 **Operational system:**
 - Uses Airtable as the central nervous system (Command Center, Leads, Campaigns, Employees tables)
-- Runs on manual ignition — needs /start command to activate
+- Runs on manual ignition — needs /start_day command to activate
 - Zones (1-7) control intensity, Stages (Blue/Red) control autonomy

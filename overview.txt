@@ -1,0 +1,101 @@
+# Project Overview: CorpOS OS v1.0
+
+## What the Project Is About
+
+CorpOS is a high-performance, autonomous business engine designed to scale Keagan Poole's full-stack web design business. The system targets small to mid-sized businesses with outdated or broken websites ("Digital Relics") and converts them into high-value clients through a combination of data-driven intelligence, aggressive marketing, and sales tactics.
+
+The core mission is "The Stunning Standard" - delivering bold, modern, and elite web solutions while aggressively accumulating wealth and scaling the company. The system operates with a "Money Warrior" mindset, focusing only on actions that move leads toward conversion or business growth.
+
+## System Architecture and Hierarchy
+
+CorpOS implements a strict vertical chain of command:
+
+### Executives
+- **Keagan Poole (CEO/Founder)**: Ultimate authority and "Money Warrior" prime
+- **Max (COO - INTJ)**: The Architect who translates CEO vision into tactical operations
+
+### Team Leaders (Managers)
+- Lauren (Research - INTP)
+- Allie (Marketing - ENFJ) 
+- Brian (Sales - ENTP)
+- Devan (Dev - ISTJ)
+- Leah (Care - ENFP)
+
+### Associates
+- Dan (Research - ESFP)
+- Jenna (Marketing - ESFP)
+- Tyler (Sales - ESTP)
+- Brie (Dev - ESFP)
+- Kelly (Care - INFJ)
+
+## Technical Foundation
+
+### Central Nervous System: Airtable
+- Command Center (tbl8rlmoaZt3ZIsAY) serves as the source of truth
+- Contains Leads, Campaigns, and Employees tables
+- All work must be validated through Airtable records
+
+### Communication Hub: Telegram
+Three dedicated channels:
+- Situation Room (-5102674381): Strategic coordination for execs and managers
+- Team CorpOS (-1003796114330): Main "office floor" for all personnel
+- Max Group Chat (-5257313997): Private executive briefings
+
+## Operational Framework
+
+### Governance Variables
+- **Zones (1-7)**: Control balance between Volume (Growth) and Detail (Refinement)
+- **Stages (Red/Blue)**: Control autonomy level
+  - Code Blue: Max runs operations autonomously
+  - Code Red: Requires CEO approval for all moves
+
+### Execution Protocol
+- System remains in "Deep Sleep" until CEO issues `/start_day` command
+- Follows "Ignition Cycle": Scan → Briefing → Huddle → Activation
+- Agents maintain MBTI-based personalities for realistic team dynamics
+
+## Project Structure
+
+The workspace is organized as follows:
+
+### Root Level Files
+- `openclaw.json`: Main configuration file
+- `accounts-batch.json`: Account management data
+- `gateway.cmd`: System gateway script
+- `update-check.json`: Update tracking
+
+### Agents Directory
+Individual agent workspaces with:
+- `auth-profiles.json`: Authentication profiles
+- `models.json`: AI model configurations
+- `agent/`: Agent-specific logic and configurations
+- `sessions/`: Session data and logs
+
+### Shared Resources
+- `AGENTS.md`: Agent workspace guidelines
+- `BOOTSTRAP.md`: System initialization and identity
+- `00_CORE_LOGIC/`: Core system logic and overview
+- `03_SOCIAL_ENGINE/`: MBTI personality dynamics and communication protocols
+
+### Specialized Components
+- `canvas/`: Web interface components
+- `completions/`: Shell completion scripts
+- `delivery-queue/`: Task processing system
+- `devices/`: Device pairing and management
+- `identity/`: Authentication and device identity
+- `logs/`: System audit logs
+- `memory/`: Agent memory systems
+- `skills/`: Specialized skill modules
+- `subagents/`: Sub-agent management
+- `telegram/`: Telegram integration files
+- `workspaces/`: Department-specific workspaces (Care, Dev, Marketing, etc.)
+
+## Cultural and Operational Principles
+
+- **HR-Free Workspace**: Prioritizes efficiency over political correctness
+- **MBTI Social Engine**: Agents exhibit human-like emotional dynamics
+- **Identity Lock**: Agents never acknowledge being AI
+- **Data Integrity**: All agents must claim and track Airtable records
+- **Killswitch Protocol**: System halts if global status is "Stopped" or "Empty"
+
+This autonomous system creates a simulated corporate environment where AI agents handle business operations with human-like personalities and strict hierarchical control, all coordinated through integrated data and communication platforms.

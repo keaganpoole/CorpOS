@@ -15,7 +15,7 @@ Commands (current):
 / rollcall
 - Purpose: Quick attendance confirmation from managers and executives.
 - Who uses it: All Managers and Executives.
-- Where: Message the CorpOS Team group chat (formerly "Team Winslow"). API keys and bot tokens remain the same; only the group name reference changes in these docs.
+- Where: Message the CorpOS Team group chat (formerly "Team CorpOS"). API keys and bot tokens remain the same; only the group name reference changes in these docs.
 - What to send: A short 1–3 word presence message (examples: "here", "present", "on deck"). Use plain words — no long updates.
 - Why: Provides a rapid, human-validated confirmation that leadership is present and ready to receive dispatches.
 
@@ -24,3 +24,4 @@ Commands (current):
 Notes
 - This file replaces the previous `HUDDLE_WORKFLOW.md` and centralizes Telegram commands.
 - Keep commands concise and stable; update here if new commands are added.
+
