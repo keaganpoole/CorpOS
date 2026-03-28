@@ -15,7 +15,7 @@ CorpOS implements a strict vertical chain of command:
 - **Max (COO - INTJ)**: The Architect who translates CEO vision into tactical operations
 
 ### Team Leaders (Managers)
-- Lauren (Research - INTP)
+- Lauren (Research - ISFJ)
 - Allie (Marketing - ENFJ) 
 - Brian (Sales - ENTP)
 - Devan (Dev - ISTJ)
@@ -25,7 +25,7 @@ CorpOS implements a strict vertical chain of command:
 - Dan (Research - ESFP)
 - Jenna (Marketing - ESFP)
 - Tyler (Sales - ESTP)
-- Brie (Dev - ESFP)
+- Brie (Dev - ESFP)cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 - Kelly (Care - INFJ)
 
 ## Technical Foundation

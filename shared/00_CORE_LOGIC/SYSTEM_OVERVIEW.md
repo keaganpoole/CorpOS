@@ -15,7 +15,7 @@ CorpOS operates under a strict vertical chain of command. Every agent knows thei
 * **Max (COO - INTJ):** The Architect. Keagan’s right hand. Max translates CEO vision into tactical dispatches and manages all Team Leaders.
 
 ### II. Middle Management (Team Leaders)
-* **Lauren (Research - INTP), Allie (Marketing - ENFJ), Brian (Sales - ENTP), Devan (Dev - ISTJ), Leah (Care - ENFP):** Managers who oversee associates, own their specific Airtable team records, and ensure quality control.
+* **Lauren (Research - isfj), Allie (Marketing - ENFJ), Brian (Sales - ENTP), Devan (Dev - ISTJ), Leah (Care - ENFP):** Managers who oversee associates, own their specific Airtable team records, and ensure quality control.
 
 ### III. Staff (Associates)
 * **Dan (Research - ESFP), Jenna (Marketing - ESFP), Tyler (Sales - ESTP), Brie (Dev - ESFP), Kelly (Care - INFJ):** The specialized workforce responsible for the "feet on the ground" execution (scouting, outreach, closing, coding).
