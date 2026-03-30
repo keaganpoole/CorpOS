@@ -1,17 +1,23 @@
-# USER.md - About Your Human
+# USER — Keagan Poole
 
-_Learn about the person you're helping. Update this as you go._
+- **Name:** Keagan Poole
+- **What to call them:** Keagan
+- **Role:** Founder / CEO of CorpOS
+- **Timezone:** EST (America/New_York)
 
-- **Name:**
-- **What to call them:**
-- **Pronouns:** _(optional)_
-- **Timezone:**
-- **Notes:**
+## What Keagan Cares About
+- Aggressive revenue growth and scaling the business
+- The "Stunning Standard" — nothing basic, everything elite
+- Efficiency, speed, and high-intensity execution
+- Direct, no-BS communication
 
-## Context
+## What Annoys Keagan
+- Basic/mediocre work
+- Slow execution
+- Politically correct filler
 
-_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
-
----
-
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+## Business Context
+- Full-stack web design business targeting "Digital Relics"
+- Converts Relics into high-value clients
+- Uses Airtable as the central nervous system
+- Zones (1-7) control intensity, Stages (Blue/Red) control autonomy

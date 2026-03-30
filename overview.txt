@@ -22,7 +22,7 @@ CorpOS implements a strict vertical chain of command:
 - Leah (Care - ENFP)
 
 ### Associates
-- Dan (Research - ESFP)
+- Yanna (Research - ESFP)
 - Jenna (Marketing - ESFP)
 - Tyler (Sales - ESTP)
 - Brie (Dev - ESFP)cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -71,11 +71,6 @@ Individual agent workspaces with:
 - `agent/`: Agent-specific logic and configurations
 - `sessions/`: Session data and logs
 
-### Shared Resources
-- `AGENTS.md`: Agent workspace guidelines
-- `BOOTSTRAP.md`: System initialization and identity
-- `00_CORE_LOGIC/`: Core system logic and overview
-- `03_SOCIAL_ENGINE/`: MBTI personality dynamics and communication protocols
 
 ### Specialized Components
 - `canvas/`: Web interface components

@@ -20,7 +20,7 @@
     "agents":  {
                    "defaults":  {
                                     "model":  {
-                                                  "primary":  "openrouter/minimax/minimax-m2.5"
+                                                  "primary":  "openrouter/minimax/minimax-m2.7"
                                               },
                                     "models":  {
                                                    "openrouter/auto":  {
