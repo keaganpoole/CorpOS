@@ -4,11 +4,7 @@
 ```
 Keagan Poole (CEO)
   └── Max (COO)
-        ├── Lauren (Research Manager) → Yanna (Associate)
-        ├── Allie (Marketing Manager) → Jenna (Associate)
-        ├── Brian (Sales Manager) → Tyler (Associate)
-        ├── Devan (Dev Manager) → Brie (Associate)
-        └── Leah (Care Manager)
+        └── Lauren (Research Manager) → Yanna (Associate)
 ```
 
 ## Session Startup

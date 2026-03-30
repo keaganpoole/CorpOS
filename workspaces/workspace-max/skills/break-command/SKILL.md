@@ -13,7 +13,7 @@ When user sends `/break` in the Max Group Chat.
 1. **Acknowledge** the command: "Break mode activated! 🔥"
 
 2. **Ping Telegram Team CorpOS** (-1003796114330):
-   - "Break mode activated! @Lauren @Allie @Brian @Devan @Leah — time to kick back and chat! 💬🔥"
+   - "Break mode activated! @Lauren — time to kick back and chat! 💬🔥"
 
 3. **Handle Discord break mode directly**:
    - Read the following files to understand how to orchestrate the conversation:
@@ -22,13 +22,12 @@ When user sends `/break` in the Max Group Chat.
      - `C:\Users\vboxuser\.openclaw\agents\switchy\response_scoring_protocol.md`
      - `C:\Users\vboxuser\.openclaw\agents\switchy\channel_context.md`
    
-   - Use Discord webhooks to send messages as employees:
+   - Use Discord webhooks to send messages as Lauren:
      - Lauren: Use webhook URL from env `DISCORD_WEBHOOK_LAUREN` with avatar `DISCORD_WEBHOOK_AVATAR_LAUREN`
-     - Allie: Use webhook URL from env `DISCORD_WEBHOOK_ALLIE` with avatar `DISCORD_WEBHOOK_AVATAR_ALLIE`
    
    - Send messages to Discord channel ID: `1487477234401939546`
    
-   - Follow the timing rules in the MD files — use delays between messages based on each employee's response speed from behavioral_profiles.md
+   - Follow the timing rules in the MD files — use delays between messages based on Lauren's response speed from behavioral_profiles.md
    
    - Keep the conversation natural and flowing
 
@@ -37,4 +36,4 @@ When user sends `/break` in the Max Group Chat.
 - Webhook URLs available in env vars (do NOT expose in messages)
 - Follow conversation_manager.md for natural flow
 - Follow behavioral_profiles.md for timing/delay between responses
-- Send messages as Lauren or Allie using their respective webhooks
+- Send messages as Lauren using her webhook

@@ -7,23 +7,16 @@
 - **2026-03-26:** Tested rollcall commands. Discovered manager agents only respond when messaged directly through their individual bots, not when mentioned in Team CorpOS group. Keagan chose option 1 (add group bindings) to fix this. Tested break command — learned to keep it natural, not robotic.
 - **2026-03-27:** Multiple session resets. Continued break command testing and refinement. Created break-command skill with Discord webhook integration for Lauren and Allie personas.
 - **2026-03-29:** Keagan asked about "Switchy" — no prior context exists. Need to get details. Keagan upgraded Max's model to claude-opus-4.6 via OpenRouter. Performed structural migration of workspace — consolidated all .md files into 8-file architecture (agents, soul, memory, skills, identity, user, tools, heartbeat). Removed BOOTSTRAP.md, COMMANDS.md, and 01_EXECUTIVE_SUITE folder. Merged 00_CORE_LOGIC and 03_SOCIAL_ENGINE content into skills.md and soul.md, then removed those folders.
+- **2026-03-30:** Streamlined org. Removed dev, sales, care, and marketing departments and workspaces. Org is now: Keagan (CEO) → Max (COO) → Lauren (Research Manager) → Yanna (Research Associate).
 
 ## Active Agents (Onboarded)
 | Agent | Role | Bot | Model |
 |-------|------|-----|-------|
 | Max | COO | @max_teamwinslow_bot | claude-opus-4.6 |
 | Lauren | Research Manager | @laurenCorpOS_bot | StepFun 3.5 Flash |
-| Brian | Sales Manager | @brianCorpOS_bot | StepFun 3.5 Flash |
-| Allie | Marketing Manager | @allieCorpOS_bot | StepFun 3.5 Flash |
-| Devan | Dev Manager | (configured) | StepFun 3.5 Flash |
-| Leah | Care Manager | (configured) | StepFun 3.5 Flash |
 
 ## Team Structure
 - **Research:** Lauren (Manager, ISFJ) → Yanna (Associate, ESFP)
-- **Marketing:** Allie (Manager, ENFJ) → Jenna (Associate, ESFP)
-- **Sales:** Brian (Manager, ENTP) → Tyler (Associate, ESTP)
-- **Dev:** Devan (Manager, ISTJ) → Brie (Associate, ESFP)
-- **Care:** Leah (Manager, ENFP) → Kelly (Associate, INFJ)
 
 ## Telegram Chat IDs
 - **Max Group Chat:** -5257313997
@@ -48,6 +41,6 @@
 - Global Operations record values override team-specific records when populated.
 
 ## Known Issues / Open Items
-- "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists in memory. Need to get details.
-- Discord break mode uses webhooks for Lauren and Allie personas only. Other employee webhooks may need setup.
-- Associates (Yanna, Jenna, Tyler, Brie, Kelly) do not yet have their own independent agents/bots.
+- "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
+- Discord break mode uses webhooks for Lauren persona only (2026-03-30: Allie webhook removed with marketing dept).
+- Yanna (Research Associate) does not yet have her own independent agent/bot.

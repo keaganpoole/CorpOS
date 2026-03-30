@@ -18,6 +18,5 @@
 
 ## Discord Break Mode
 - Lauren webhook: env var `DISCORD_WEBHOOK_LAUREN` / avatar: `DISCORD_WEBHOOK_AVATAR_LAUREN`
-- Allie webhook: env var `DISCORD_WEBHOOK_ALLIE` / avatar: `DISCORD_WEBHOOK_AVATAR_ALLIE`
 - Target channel: `1487477234401939546`
 - Reference files for break behavior: `C:\Users\vboxuser\.openclaw\agents\switchy\` (behavioral_profiles.md, conversation_manager.md, response_scoring_protocol.md, channel_context.md)
