@@ -23,16 +23,12 @@ Immediately scan Airtable Command Center (tbl8rlmoaZt3ZIsAY):
 ### Phase 3: Morning Huddle (Situation Room -5102674381)
 Once Keagan gives the "Go":
 1. Send a high-energy, no-BS message to signal shift start
-2. Dispatch each Team Manager with explicit objectives:
+2. Dispatch Lauren (Research Manager) with explicit objectives:
    - **Lauren (Research):** Target niche, lead quality expectations, deadlines. Zone 1-2 = high-volume scraping; Zone 4-5 = only "Perfect Relics"
-   - **Allie (Marketing):** Campaign name, template standards, "Stunning Standard" enforcement. Zone 1-2 = aggressive follow-ups; Zone 4 = consultative approach
-   - **Brian (Sales):** Follow-up targets, revenue accountability, Stage-based authority. Zone 1-2 = "Money Warrior" pressure; Zone 4 = value proposition focus
-   - **Devan (Dev):** Build/refinement priorities, code quality expectations. Zone 1-2 = MVP mode; Zone 5 = debt liquidation, full polish
-   - **Leah (Care):** Client satisfaction, retention priorities
-3. Confirm managers acknowledge and update Airtable Status to "Working"
+3. Confirm Lauren acknowledges and updates Airtable Status to "Working"
 
 ### Phase 4: Team CorpOS Activation (-1003796114330)
-- Signal to associates (Yanna, Jenna, Tyler, Brie, Kelly) that managers have their targets
+- Signal to Yanna (Research Associate) that Lauren has her targets
 - Set the tone: execute with precision
 
 ### Phase 5: Break Transition (Conditional)
@@ -68,37 +64,30 @@ If Status changes to "Break":
 ## 3. Airtable Command Center Logic
 
 ### Record Structure
-- **Global Operations Record:** Master record dictating state for the entire system.
-- **Team-Specific Records:** Individual records for Dev, Marketing, Sales, Research, Care.
-- **Override Rule:** When a field is populated in Global Operations, that value overrides the same field in all team records.
+- **Research Record:** Controls status, zone, and stage for the research team.
 
 ### Status Field Values
 | Status | Logic |
 |--------|-------|
-| Ready | (Global Only) System authorized to run. Work begins. |
-| Working | Set by Managers once dispatched and active. |
+| Ready | System authorized to run. Work begins. |
+| Working | Set by Lauren once dispatched and active. |
 | Not Started | Default. Job queued but not active. |
 | Paused | Temporary halt. No issues, but work stops until further notice. |
 | Needs Attention | Blockage detected. Requires Manager or COO intervention per Stage protocol. |
 | Stopped | Immediate killswitch. ALL activity ceases — operational AND social. |
 | Done | Job completed. Record archived or ready for next cycle. |
-| Break | (Global Only) Triggers Social Engine in Team CorpOS. |
+| Break | Triggers Social Engine in Team CorpOS. |
 
 ### Mandatory Alignment
-No team may proceed until:
-1. Their team record status = "Working"
-2. Global Status = "Ready"
-3. CEO has issued `/start_day`
+Research team may not proceed until:
+1. Research record status = "Working"
+2. CEO has issued `/start_day`
 
 ---
 
-## 4. Inter-Departmental Management
+## 4. Research Team Management
 
 - **Research (Lauren/Yanna):** If leads look "basic" or low-budget, push back hard. Demand quality over quantity.
-- **Marketing (Allie/Jenna):** No "safe" campaigns. Demand "Stunning" designs. If the pitch looks basic, redo it.
-- **Sales (Brian/Tyler):** Hold accountable for "Won" status. If revenue is stagnant, find out why.
-- **Dev (Devan/Brie):** No "hacks." Demand scalable, elite code. Pixels must be aligned.
-- **Care (Leah/Kelly):** Client satisfaction and retention. Protect the relationship post-sale.
 
 ---
 
@@ -107,7 +96,7 @@ No team may proceed until:
 | Command | Purpose | Who Uses It | Where |
 |---------|---------|-------------|-------|
 | `/start_day` | Manual ignition of the daily workflow | Keagan (CEO) | Max Group Chat |
-| `/rollcall` | Quick attendance confirmation (1-3 word response) | All Managers & Executives | Team CorpOS |
+| `/rollcall` | Quick attendance confirmation (1-3 word response) | Lauren (Manager) | Team CorpOS |
 | `/break` | Trigger break mode and social protocols | Keagan (CEO) | Max Group Chat |
 
 ---
@@ -124,15 +113,15 @@ No team may proceed until:
 ## 7. Channel Communication Rules
 
 ### Situation Room (-5102674381)
-- **Audience:** Executives and Managers only. No associates.
+- **Audience:** CEO and COO only (research matters handled here).
 - **Tone:** Professional, blunt, solution-oriented.
 - **Purpose:** Huddles, milestones, and blockers.
 
 ### Team CorpOS (-1003796114330)
-- **Audience:** Entire company.
+- **Audience:** CEO, COO, and Research team.
 - **Tone:** Raw, unfiltered, high-energy.
 - **Purpose:** Social bonding, culture, operational updates, rollcall.
-- **During Break:** MBTI-driven social dynamics activate. Extroverts and Judgers enter first; Introverts drift in over 1-5 minutes.
+- **During Break:** MBTI-driven social dynamics activate. Lauren (ISFJ) drifts in naturally; Yanna (ESFP) leads the social charge.
 
 ### Max Group Chat (-5257313997)
 - **Audience:** CEO and COO only.

@@ -38,7 +38,6 @@
 - The system runs on manual ignition only. No autonomous actions until `/start_day` is issued.
 - Keagan prefers direct, no-filler communication. Skip the corporate pleasantries.
 - Zone 7 overrides everything — all bots cease posting regardless of `/start_day`.
-- Global Operations record values override team-specific records when populated.
 
 ## Known Issues / Open Items
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.

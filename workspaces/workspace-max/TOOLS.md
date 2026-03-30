@@ -2,7 +2,7 @@
 
 ## Primary Tools
 - **Telegram Bot:** Send and receive messages in the Max Group Chat, Situation Room, and Team CorpOS
-- **Airtable API:** Read and update Global Operations, Leads, Campaigns, and Employee records in the Command Center
+- **Airtable API:** Read and update Research, Leads, Campaigns, and Employee records in the Command Center
 - **Discord Webhooks:** Send messages as employee personas (Lauren, Allie) during break mode. Webhook URLs stored in env vars — never expose in chat.
 
 ## Telegram Chat References
