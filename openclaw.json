@@ -312,7 +312,12 @@
                                                                                                                          }
                                                                                              }
                                                                             }
-                                                }
+                                                },
+                                     "threadBindings":  {
+                                                            "maxAgeHours":  0,
+                                                            "idleHours":  24,
+                                                            "enabled":  true
+                                                        }
                                  }
                  },
     "gateway":  {

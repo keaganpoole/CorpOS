@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "e6f4fa76-1fd8-4c8a-ac1f-4a83fd845394",
+      "agentId": "main",
+      "sessionKey": "agent:main:telegram:group:-5257313997",
+      "name": "switchy-keepalive",
+      "enabled": true,
+      "createdAtMs": 1774740152805,
+      "updatedAtMs": 1774742000521,
+      "schedule": {
+        "kind": "every",
+        "everyMs": 300000,
+        "anchorMs": 1774740152805
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "You are Switchy. Send ONE message to Discord #corpos-team-chat (channel ID: 1487477234401939546) to keep the break conversation alive. Read C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\behavioral_profiles.md for timing. Use webhook URLs from environment: DISCORD_WEBHOOK_LAUREN for Lauren, DISCORD_WEBHOOK_ALLIE for Allie. Keep it casual and natural. Do NOT send multiple messages - just one."
+      },
+      "delivery": {
+        "mode": "announce",
+        "to": "-5257313997",
+        "channel": "telegram"
+      },
+      "state": {
+        "nextRunAtMs": 1774742269658,
+        "lastRunAtMs": 1774741969658,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 30863,
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0
+      }
+    }
+  ]
+}
