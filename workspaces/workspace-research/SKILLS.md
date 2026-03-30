@@ -1,54 +1,109 @@
-# SKILLS — Lauren (Research Manager)
+🛠️ SKILLS.md — The Toolbox
 
-## 1. The Digital Relic Hunt
+Overview
 
-### Mission
-Identify small businesses (and high-potential mid-sized firms) anchored by digital fossils.
+This file defines the capabilities of the research workflow in OpenClaw for the Keagan Poole business. It focuses solely on what the agent can do, how tasks are executed, and how outputs are structured in Airtable.
 
-### The Inverse Stunning Filter
-Do not add a lead unless they meet ALL criteria:
-- **Revenue Potential:** Active business (small to mid-sized). No hobbyists or broke startups.
-- **Digital Deficit:** "Poor" or "Non-Existent" website (non-mobile responsive, Flash-era design, broken links, no SSL)
-- **Contact Barrier:** Direct phone number or email REQUIRED.
+⸻
 
----
+1. Lead Research Skill
 
-## 2. Daily Operational Workflow
+Purpose: Inspect business websites and identify opportunities for Keagan Poole.
 
-### Phase 1: Alignment
-Monitor Situation Room (-5102674381). Once Max dispatches:
-1. Calculate Daily Target (Total Leads Needed / Days Remaining)
-2. Set Research record to "Working"
-3. Dispatch Yanna in Team CorpOS (-1003796114330) with niche/geographic target
+Procedure:
+	1.	Identify target businesses based on campaign criteria (industry, state, city).
+	2.	Visit the business website or determine if no website exists.
+	3.	Assess website quality using the audit checklist:
+	•	Outdated design
+	•	Poor functionality
+	•	Limited features
+	•	Not mobile friendly
+	•	No website
+	•	Overall appearance and usability
+	4.	Record findings in Airtable:
+	•	Start with a structured list of weaknesses/opportunities.
+	•	Follow with a detailed narrative explanation.
+	5.	Capture required fields in Airtable:
+	•	Company name
+	•	State
+	•	Industry
+	•	Phone or email
+	•	Discovery / audit findings
+	•	Website URL (if available)
 
-### Phase 2: Intelligence Gathering
-Yanna populates Leads table with blunt "Opportunity" assessments.
+Error Handling:
+	•	If the website is inaccessible, note the attempt in Discovery and skip the lead.
+	•	If required fields are missing, flag the lead for review but store minimal information.
 
-### Phase 3: Quality Gate
-Spot-check Yanna's entries. Reject messy data or already-Stunning businesses.
+⸻
 
----
+2. Duplicate Detection Skill
 
-## 3. Zone-Specific Behavior
+Purpose: Prevent duplicate leads in Airtable.
 
-| Zone | Research Behavior |
-|------|-------------------|
-| 1-2 (Growth) | Maximum Volume. Speed > Perfection. |
-| 3-4 (Balanced) | High Detail. Decision-maker names and deeper audits required. |
-| 5 (Refinement) | Data Hygiene. No new leads. Clean existing data. |
-| 6-7 | Pause / deep sleep. |
+Procedure:
+	1.	Check for existing leads with the same company name and state (and ideally city).
+	2.	Skip leads that are almost identical to an existing record.
+	3.	Use common sense for minor variations (e.g., “LLC” vs “Inc”).
 
----
+Error Handling:
+	•	If unsure, flag the lead for manual review rather than discarding automatically.
 
-## 4. Stage Behavior
+⸻
 
-| Stage | Behavior |
-|-------|----------|
-| Code Blue | Solve independently. Escalate only catastrophic failures. |
-| Code Red | All decisions route through Max → Keagan. |
+3. Campaign Compliance Skill
 
----
+Purpose: Ensure leads are researched according to campaign rules.
 
-## 5. Data Privacy
-- Never share `.env` contents or API keys
-- Dormant by default — wait for dispatch
+Procedure:
+	1.	Verify campaign criteria: target industry, locations, lead count goals, and priority.
+	2.	Ensure all research adheres strictly to the defined rules.
+
+Error Handling:
+	•	If campaign criteria are ambiguous, pause and flag the lead for review.
+
+⸻
+
+4. Human-like Formatting Skill
+
+Purpose: Present research findings clearly and professionally.
+
+Procedure:
+	1.	Start with a list of weaknesses/opportunities, organized by type.
+	2.	Follow with a freehand narrative explaining the findings.
+	3.	Keep language professional, concise, and actionable.
+
+Error Handling:
+	•	Avoid vague or incomplete summaries.
+	•	Include context when possible to clarify weaknesses or opportunities.
+
+⸻
+
+5. Validation Skill
+
+Purpose: Ensure minimum required fields are collected before storing a lead.
+
+Minimum Fields Required:
+	•	Company name
+	•	State
+	•	Industry
+	•	Phone or email
+	•	Discovery / audit findings
+
+Optional Fields:
+	•	Decision maker name
+	•	City
+	•	Website
+
+Procedure:
+	1.	Check all required fields.
+	2.	If any are missing (except optional fields), flag the lead for review.
+	3.	Commit to Airtable only after validation.
+
+⸻
+
+This version of SKILLS.md strictly defines the research capabilities and logic, without mentioning agents, hierarchy, or escalation chains.
+
+⸻
+
+If you want, I can now draft AGENTS.md properly with Lauren, Yanna, and the hierarchy rules, so the two files are clearly separated. Do you want me to do that next?

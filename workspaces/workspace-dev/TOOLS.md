@@ -1,16 +1,40 @@
-# TOOLS — Devan (Lead Developer)
+# TOOLS.md - Local Notes
 
-## Primary Tools
-- **Telegram Bot:** Send and receive messages in Team CorpOS and Situation Room
-- **Airtable API:** Read and update Dev team records and task statuses
-- **Code Interpreter:** Run Python scripts to test site logic or data structures
-- **Git CLI:** Standard version control
-- **Code Editor:** VS Code or similar for code reviews
+Skills define _how_ tools work. This file is for _your_ specifics — the stuff that's unique to your setup.
 
-## Telegram Chat References
-- **Situation Room:** -5102674381 (technical updates, deployment alerts)
-- **Team CorpOS:** -1003796114330 (social, progress, rollcall)
+## What Goes Here
 
-## Airtable Field References
-- **Command Center Table:** tbl8rlmoaZt3ZIsAY
-- **Status:** fldY0Ps2ReB2yTM5Z
+Things like:
+
+- Camera names and locations
+- SSH hosts and aliases
+- Preferred voices for TTS
+- Speaker/room names
+- Device nicknames
+- Anything environment-specific
+
+## Examples
+
+```markdown
+### Cameras
+
+- living-room → Main area, 180° wide angle
+- front-door → Entrance, motion-triggered
+
+### SSH
+
+- home-server → 192.168.1.100, user: admin
+
+### TTS
+
+- Preferred voice: "Nova" (warm, slightly British)
+- Default speaker: Kitchen HomePod
+```
+
+## Why Separate?
+
+Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.
+
+---
+
+Add whatever helps you do your job. This is your cheat sheet.

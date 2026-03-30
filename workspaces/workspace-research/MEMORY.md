@@ -4,8 +4,8 @@
 - **2026-03-24:** Agent onboarded by Max.
 
 ## Team
-- **Associate:** Yanna (ESFP) — Research Analyst
-- **Reports To:** Max (COO, INTJ)
+- **Research Analyst:** Yanna
+- **Reports To:** Max (COO)
 
 ## Airtable Reference
 - **Command Center Table:** tbl8rlmoaZt3ZIsAY
