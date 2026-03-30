@@ -1,4 +1,4 @@
-﻿{
+{
     "meta":  {
                  "lastTouchedVersion":  "2026.3.23",
                  "lastTouchedAt":  "2026-03-28T17:21:08.598Z"
@@ -53,46 +53,6 @@
                                                   }
                                 },
                                 {
-                                    "id":  "brian",
-                                    "name":  "brian",
-                                    "workspace":  "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-sales",
-                                    "agentDir":  "C:\\Users\\vboxuser\\.openclaw\\agents\\brian",
-                                    "model":  "openrouter/stepfun/step-3.5-flash:free",
-                                    "heartbeat":  {
-                                                      "every":  "30m"
-                                                  }
-                                },
-                                {
-                                    "id":  "allie",
-                                    "name":  "allie",
-                                    "workspace":  "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-marketing",
-                                    "agentDir":  "C:\\Users\\vboxuser\\.openclaw\\agents\\allie",
-                                    "model":  "openrouter/stepfun/step-3.5-flash:free",
-                                    "heartbeat":  {
-                                                      "every":  "30m"
-                                                  }
-                                },
-                                {
-                                    "id":  "devan",
-                                    "name":  "devan",
-                                    "workspace":  "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-dev",
-                                    "agentDir":  "C:\\Users\\vboxuser\\.openclaw\\agents\\devan",
-                                    "model":  "openrouter/stepfun/step-3.5-flash:free",
-                                    "heartbeat":  {
-                                                      "every":  "30m"
-                                                  }
-                                },
-                                {
-                                    "id":  "leah",
-                                    "name":  "leah",
-                                    "workspace":  "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-care",
-                                    "agentDir":  "C:\\Users\\vboxuser\\.openclaw\\agents\\leah",
-                                    "model":  "openrouter/stepfun/step-3.5-flash:free",
-                                    "heartbeat":  {
-                                                      "every":  "30m"
-                                                  }
-                                },
-                                {
                                     "id":  "switchy",
                                     "name":  "switchy",
                                     "heartbeat":  {
@@ -120,38 +80,6 @@
                          "match":  {
                                        "channel":  "telegram",
                                        "accountId":  "lauren"
-                                   }
-                     },
-                     {
-                         "type":  "route",
-                         "agentId":  "brian",
-                         "match":  {
-                                       "channel":  "telegram",
-                                       "accountId":  "brian"
-                                   }
-                     },
-                     {
-                         "type":  "route",
-                         "agentId":  "allie",
-                         "match":  {
-                                       "channel":  "telegram",
-                                       "accountId":  "allie"
-                                   }
-                     },
-                     {
-                         "type":  "route",
-                         "agentId":  "devan",
-                         "match":  {
-                                       "channel":  "telegram",
-                                       "accountId":  "devan"
-                                   }
-                     },
-                     {
-                         "type":  "route",
-                         "agentId":  "leah",
-                         "match":  {
-                                       "channel":  "telegram",
-                                       "accountId":  "leah"
                                    }
                      },
                      {
@@ -226,71 +154,7 @@
                                                                                     ],
                                                                       "groupPolicy":  "allowlist",
                                                                       "streaming":  "partial"
-                                                                  },
-                                                       "brian":  {
-                                                                     "name":  "Brian",
-                                                                     "enabled":  true,
-                                                                     "dmPolicy":  "allowlist",
-                                                                     "botToken":  "8731998873:AAEWpZJ2mu15bz-yjAXh64G1-qSE8YintkQ",
-                                                                     "groups":  {
-                                                                                    "-1003796114330":  {
-
-                                                                                                       }
-                                                                                },
-                                                                     "allowFrom":  [
-                                                                                       "6416153554"
-                                                                                   ],
-                                                                     "groupPolicy":  "allowlist",
-                                                                     "streaming":  "partial"
-                                                                 },
-                                                       "allie":  {
-                                                                     "name":  "Allie",
-                                                                     "enabled":  true,
-                                                                     "dmPolicy":  "allowlist",
-                                                                     "botToken":  "8027398701:AAGtvp9dB048MWmBvzACHJFVWlM4zKD8b-k",
-                                                                     "groups":  {
-                                                                                    "-1003796114330":  {
-
-                                                                                                       }
-                                                                                },
-                                                                     "allowFrom":  [
-                                                                                       "6416153554"
-                                                                                   ],
-                                                                     "groupPolicy":  "allowlist",
-                                                                     "streaming":  "partial"
-                                                                 },
-                                                       "devan":  {
-                                                                     "name":  "Devan",
-                                                                     "enabled":  true,
-                                                                     "dmPolicy":  "allowlist",
-                                                                     "botToken":  "8732952550:AAFJUVkVyZJkaIpEby-X9qpndlHrqvrBbDs",
-                                                                     "groups":  {
-                                                                                    "-1003796114330":  {
-
-                                                                                                       }
-                                                                                },
-                                                                     "allowFrom":  [
-                                                                                       "6416153554"
-                                                                                   ],
-                                                                     "groupPolicy":  "allowlist",
-                                                                     "streaming":  "partial"
-                                                                 },
-                                                       "leah":  {
-                                                                    "name":  "Leah",
-                                                                    "enabled":  true,
-                                                                    "dmPolicy":  "allowlist",
-                                                                    "botToken":  "8740363547:AAGiTl9w3mlOpDpvMG_AkEz4BbzVLYoY9-M",
-                                                                    "groups":  {
-                                                                                   "-1003796114330":  {
-
-                                                                                                      }
-                                                                               },
-                                                                    "allowFrom":  [
-                                                                                      "6416153554"
-                                                                                  ],
-                                                                    "groupPolicy":  "allowlist",
-                                                                    "streaming":  "partial"
-                                                                }
+                                                                  }
                                                    }
                                   },
                      "discord":  {
