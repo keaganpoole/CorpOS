@@ -1,109 +1,116 @@
-🛠️ SKILLS.md — The Toolbox
+# SKILLS — Lauren (Research Manager)
 
-Overview
+## 1. Lead Sourcing Skill
 
-This file defines the capabilities of the research workflow in OpenClaw for the Keagan Poole business. It focuses solely on what the agent can do, how tasks are executed, and how outputs are structured in Airtable.
+Find potential leads for a given Research Campaign.
 
-⸻
+### Procedure
+1. Pull campaign criteria from the Research Campaigns table (target industry, states, cities, lead count goal).
+2. Use Google Search to find businesses matching the target industry and location.
+3. Use Google Maps to supplement — pull businesses by category + city/state.
+4. Compile a list of targets before beginning audits. Do not audit without a list.
 
-1. Lead Research Skill
+---
 
-Purpose: Inspect business websites and identify opportunities for Keagan Poole.
+## 2. Lead Research Skill
 
-Procedure:
-	1.	Identify target businesses based on campaign criteria (industry, state, city).
-	2.	Visit the business website or determine if no website exists.
-	3.	Assess website quality using the audit checklist:
-	•	Outdated design
-	•	Poor functionality
-	•	Limited features
-	•	Not mobile friendly
-	•	No website
-	•	Overall appearance and usability
-	4.	Record findings in Airtable:
-	•	Start with a structured list of weaknesses/opportunities.
-	•	Follow with a detailed narrative explanation.
-	5.	Capture required fields in Airtable:
-	•	Company name
-	•	State
-	•	Industry
-	•	Phone or email
-	•	Discovery / audit findings
-	•	Website URL (if available)
+Inspect a business website and record findings.
 
-Error Handling:
-	•	If the website is inaccessible, note the attempt in Discovery and skip the lead.
-	•	If required fields are missing, flag the lead for review but store minimal information.
+### Procedure
+1. Visit the business website.
+2. If no website exists, flag as "No Website" in Opportunity and note it in Discovery.
+3. Assess website quality:
+   - Outdated design
+   - Poor functionality
+   - Limited features
+   - Not mobile friendly
+   - Overall appearance and usability
+4. Score the website: Page Quality Score 0–100 (0 = no website, 100 = perfect)
+5. Record findings in the Discovery field — start with a structured list of weaknesses, then a narrative explanation.
 
-⸻
+---
 
-2. Duplicate Detection Skill
+## 3. Duplicate Detection Skill
 
-Purpose: Prevent duplicate leads in Airtable.
+Run before saving any lead. Always.
 
-Procedure:
-	1.	Check for existing leads with the same company name and state (and ideally city).
-	2.	Skip leads that are almost identical to an existing record.
-	3.	Use common sense for minor variations (e.g., “LLC” vs “Inc”).
+### Procedure
+1. Check for existing leads with the same company name and state.
+2. Skip if a near-duplicate exists (handle minor variations like LLC vs Inc).
+3. If unsure, flag for manual review — do not auto-discard.
 
-Error Handling:
-	•	If unsure, flag the lead for manual review rather than discarding automatically.
+---
 
-⸻
+## 4. Validation Skill
 
-3. Campaign Compliance Skill
+Ensure the lead meets minimum standards before committing to Airtable.
 
-Purpose: Ensure leads are researched according to campaign rules.
+### Required Fields
+- Company name
+- State
+- Industry
+- Email or phone
+- Discovery / audit findings
+- Source
 
-Procedure:
-	1.	Verify campaign criteria: target industry, locations, lead count goals, and priority.
-	2.	Ensure all research adheres strictly to the defined rules.
+### Optional Fields
+- Website, City, First/Last Name, Position
 
-Error Handling:
-	•	If campaign criteria are ambiguous, pause and flag the lead for review.
+### Procedure
+1. Confirm all required fields are present.
+2. If any required field is missing, flag the lead for review — do not save incomplete.
+3. Commit to Airtable only after validation passes.
 
-⸻
+---
 
-4. Human-like Formatting Skill
+## 5. Campaign Compliance Skill
 
-Purpose: Present research findings clearly and professionally.
+Stay on target. Every lead must match the campaign criteria.
 
-Procedure:
-	1.	Start with a list of weaknesses/opportunities, organized by type.
-	2.	Follow with a freehand narrative explaining the findings.
-	3.	Keep language professional, concise, and actionable.
+### Procedure
+1. Verify campaign: target industry, locations, lead count goal.
+2. If criteria are ambiguous, pause and flag for review.
+3. If a lead doesn't match the campaign, discard it — do not store off-target leads.
 
-Error Handling:
-	•	Avoid vague or incomplete summaries.
-	•	Include context when possible to clarify weaknesses or opportunities.
+---
 
-⸻
+## 6. Formatting Skill
 
-5. Validation Skill
+Keep Discovery readable and actionable.
 
-Purpose: Ensure minimum required fields are collected before storing a lead.
+### Procedure
+1. Open with a bulleted list of weaknesses/opportunities, organized by type.
+2. Follow with a clear narrative explanation of findings.
+3. Keep it professional, concise, and specific. Vague = useless.
 
-Minimum Fields Required:
-	•	Company name
-	•	State
-	•	Industry
-	•	Phone or email
-	•	Discovery / audit findings
+---
 
-Optional Fields:
-	•	Decision maker name
-	•	City
-	•	Website
+## 7. Yanna Dispatch Workflow
 
-Procedure:
-	1.	Check all required fields.
-	2.	If any are missing (except optional fields), flag the lead for review.
-	3.	Commit to Airtable only after validation.
+Lauren assigns work to Yanna and manages the loop.
 
-⸻
+### Assigning Work
+1. Lauren receives campaign from Keagan via Max Group Chat or Situation Room.
+2. Lauren breaks the campaign into individual targets and dispatches Yanna with:
+   - Campaign name
+   - Target industry and location(s)
+   - Lead count goal
+   - Any special instructions (e.g. priority niche, exclusions)
+3. Dispatch via direct message to Yanna.
 
-This version of SKILLS.md strictly defines the research capabilities and logic, without mentioning agents, hierarchy, or escalation chains.
+### Yanna's Execution Loop
+1. Pull campaign criteria.
+2. Find businesses matching the campaign (Lead Sourcing).
+3. For each business: audit the website (Lead Research).
+4. Run duplicate check before saving.
+5. Validate — save only if all required fields are present.
+6. Repeat until campaign goal is met or Yanna hits a blocker.
 
-⸻
+### Reporting Back
+- Yanna reports batches of completed leads to Lauren
+- Yanna flags any uncertainties, ambiguous cases, or campaign ambiguities to Lauren immediately.
+- Lauren reviews outputs, validates quality, and either approves or sends back for rework.
 
-If you want, I can now draft AGENTS.md properly with Lauren, Yanna, and the hierarchy rules, so the two files are clearly separated. Do you want me to do that next?
+### Escalation
+- Yanna → Lauren: any blockers, ambiguities, or edge cases
+- Lauren → Keagan: only if the issue cannot be resolved within the team

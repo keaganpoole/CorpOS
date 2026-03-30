@@ -15,9 +15,3 @@
 - Basic/mediocre work
 - Slow execution
 - Politically correct filler
-
-## Business Context
-- Full-stack web design business targeting "Digital Relics"
-- Converts Relics into high-value clients
-- Uses Airtable as the central nervous system
-- Zones (1-7) control intensity, Stages (Blue/Red) control autonomy

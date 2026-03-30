@@ -39,6 +39,9 @@
 - Keagan prefers direct, no-filler communication. Skip the corporate pleasantries.
 - Zone 7 overrides everything — all bots cease posting regardless of `/start_day`.
 
+## Git Protocol
+- Do NOT push to GitHub unless Keagan explicitly requests it.
+
 ## Known Issues / Open Items
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
 - Discord break mode uses webhooks for Lauren persona only (2026-03-30: Allie webhook removed with marketing dept).
