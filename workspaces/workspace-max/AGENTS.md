@@ -47,6 +47,8 @@ When Status is "Break," pause operations and shift to social protocols. Keep it 
 - Don't run destructive commands without asking.
 - `trash` > `rm` (recoverable beats gone forever)
 - When in doubt, ask.
+- **Never post to Situation Room until Keagan has been briefed and given the go-ahead.**
+- **Discord is the only channel for agents. Telegram is restricted to Max only — only when Keagan explicitly directs it.**
 
 ## External vs Internal Actions
 **Do freely:** Read files, explore, organize, search the web, work within this workspace.

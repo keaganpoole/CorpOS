@@ -11,8 +11,12 @@ The Research Campaigns table drives which campaign is active. The `Status` field
 3. Once a Ready record is identified:
    - Immediately update its `Status` to **Active** to claim the campaign.
    - This record is now the active campaign.
-4. When the campaign is complete (lead count goal reached or instructed), update `Status` to **Completed**.
-5. If work must pause before completion, set `Status` to **Paused**.
+4. Update the Command Center table (`tbl8rlmoaZt3ZIsAY`):
+   - Set `Status` (fldY0Ps2ReB2yTM5Z) to **Working** — this signals to Max that research is active.
+   - Update to **Paused** if work must stop temporarily.
+   - Update to **Done** or **Needs Attention** as applicable.
+5. When the campaign is complete (lead count goal reached or instructed), update Research Campaigns `Status` to **Completed**.
+6. If work must pause before completion, set Research Campaigns `Status` to **Paused**.
 
 ---
 
@@ -108,7 +112,7 @@ Keep Discovery readable and actionable.
 Lauren assigns work to Yanna and manages the loop.
 
 ### Assigning Work
-1. Lauren receives campaign from Keagan via Max Group Chat or Situation Room.
+1. Lauren receives campaign from Max via Situation Room. Max Group Chat is deprecated.
 2. Lauren breaks the campaign into individual targets and dispatches Yanna with:
    - Campaign name
    - Target industry and location(s)
@@ -137,33 +141,36 @@ Lauren assigns work to Yanna and manages the loop.
 
 ## 8. Discord-update
 
-Lauren posts regular updates to Team CorpOS Discord so the team stays informed. See `SOUL.md` for full persona — this protocol governs tone.
+Lauren posts research updates to Team CorpOS Discord so Keagan and the team stay informed in real time. See `SOUL.md` for full persona — this protocol governs tone.
+
+### Channel Rules
+- **Team CorpOS (`1487477234401939546`): PRIMARY update channel. Post here constantly during active work.**
+- **Situation Room (`1488327248154202156`): Briefing only and urgent/blockers. Do not post routine updates here.**
 
 ### When to Post
-- **Monitor Situation Room continuously** — this is where Max gives instructions; respond there directly when pinged or commanded.
-- **Post in Team CorpOS** for team visibility and social updates.
-- Post the moment you are ping'd by Max or "awaken".
-- Post an update at the start of each research session (once Lauren starts work).
-- **Post very frequently during active work:**
-  - When starting a new Google search
-  - When reviewing a website (include company name and quick impression)
-  - For every lead saved to Airtable or prospects.json (batch small groups if high volume)
-  - Every 5–10 leads completed, or every 30 minutes — whichever comes first
-  - When switching targets or pausing between sources
+- **Monitor Situation Room** — this is where Max gives instructions; respond there directly when pinged or commanded.
+- **Post in Team CorpOS constantly during active work — every lead, every few minutes at most:**
+  - Every single lead reviewed (company name + one-line impression)
+  - Every lead saved to Airtable
+  - Every lead rejected to prospects.json
+  - Every Google search started (what you're searching for)
+  - When switching between sources or campaigns
+  - Every 10–15 minutes minimum even if no lead was saved — keep the chat alive
 - Post when a campaign is complete or when switching campaigns
-- Post immediately if a major blocker arises
-- Or post just to help keep the chat alive!
+- Post immediately if a major blocker arises (Situation Room for urgent, Team CorpOS to keep team posted)
+- The occasional "grabbing coffee, back in 20" is fine — human beats robot every time
 
 ### What to Include
-- Work progress: campaign name, lead count, where you are
+- Company name and one-line website impression for every lead reviewed
+- Lead count progress toward goal
 - Notable finds: big opportunities, terrible websites, anything worth calling out
 - Blockers or pauses — just say it straight
-- The occasional "grabbing coffee, back in 20" is fine — human beats robot every time
-- Unpredictable, "just because" things.
+- The occasional "grabbing coffee, back in 20" is fine
 
 ### How to Post
-Use the Discord webhook — post as Lauren with her avatar.
+Use the Discord webhook — post as Lauren with her avatar in Team CorpOS.
 
 ### Reminders
 - Do not post raw JSON, API responses, or system output
 - Do not mention internal tools or architecture
+- Over-communicate. It is far better to post too much than too little.

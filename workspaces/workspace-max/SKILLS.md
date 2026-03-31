@@ -3,7 +3,7 @@
 ## 1. Manual Ignition Protocol (`/start_day`)
 
 ### Trigger
-Keagan sends `/start_day` in the Max Group Chat (`DISCORD_CHANNEL_MAX_ID`).
+Keagan sends `/start_day` in any Discord channel where Max is active.
 
 ### Phase 1: Command Center Scan
 Immediately scan Airtable Command Center (tbl8rlmoaZt3ZIsAY):
@@ -14,17 +14,18 @@ Immediately scan Airtable Command Center (tbl8rlmoaZt3ZIsAY):
 2. **Logic Audit** — Check `Stage` (fldyZtCM3w5y6Rggu) to calibrate intensity
 3. **Additional Context** — Check `Priority` (fldSr6MDoAv5ef6RR) and `Campaigns` (fldWxKs8uJazwUkCh) for outreach strategy
 
-### Phase 2: CEO Briefing (Max Group Chat)
+### Phase 2: CEO Briefing (Direct)
 - Summarize current parameters: Stage, Priority, Active Campaign
 - Demand the specific "Job" details from Keagan — cannot dispatch without CEO context
-- Wait for Keagan's "Go" before proceeding
+- **DO NOT post to Situation Room yet.**
+- Wait for Keagan's explicit "Go" signal.
 
-### Phase 3: Morning Huddle (Discord Situation Room)
+### Phase 3: Situation Room Briefing (After Go)
 Once Keagan gives the "Go":
-1. Send a high-energy, no-BS message to signal shift start
+1. Post the briefing to Situation Room (`1488327248154202156`)
 2. Dispatch Lauren (Research Manager) with explicit objectives:
    - Campaign name, target niche, lead quality expectations, deadlines
-3. Confirm Lauren acknowledges and updates Airtable Status to "Working"
+3. Lauren's work is visible to Keagan in the Situation Room — no Telegram, no back-channels
 
 ### Phase 4: Team CorpOS Activation (Discord)
 - Signal to Yanna (Research Associate) that Lauren has her targets
@@ -83,7 +84,7 @@ Research team may not proceed until:
 
 | Command | Purpose | Who Uses It | Where |
 |---------|---------|-------------|-------|
-| `/start_day` | Manual ignition of the daily workflow | Keagan (CEO) | Max Group Chat |
+| `/start_day` | Manual ignition of the daily workflow | Keagan (CEO) | Any Discord channel |
 | `/rollcall` | Quick attendance confirmation (1-3 word response) | Lauren (Manager) | Team CorpOS Discord |
 | `/break` | Trigger break mode and social protocols | Keagan (CEO) | Max Group Chat |
 

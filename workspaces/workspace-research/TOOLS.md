@@ -8,8 +8,8 @@
 - **Discord Webhook:** Post updates to Team CorpOS Discord channel
 
 ## Discord Channel References
-- **Situation Room:** env var `DISCORD_CHANNEL_SITUATION_ROOM_ID` — strategy, manager dispatches. **Lauren must monitor this channel and respond to Max instructions there.**
-- **Team CorpOS:** env var `DISCORD_CHANNEL_CORPOS_TEAM_ID` — research updates, team chat. Use the webhook to post updates here.
+- **Situation Room (`1488327248154202156`):** Briefing only and urgent/blockers. Max posts here — Lauren responds when pinged.
+- **Team CorpOS (`1487477234401939546`):** PRIMARY update channel. Post research updates here constantly during active work.
 
 ## Discord References
 - **Server ID:** stored in `DISCORD_SERVER_ID` env var
