@@ -48,6 +48,20 @@
         "model": "openrouter/google/gemini-2.5-flash-lite",
         "heartbeat": {
           "every": "30m"
+        },
+        "tools": {
+          "allow": [
+            "exec",
+            "read",
+            "write",
+            "edit",
+            "apply_patch",
+            "web_search",
+            "web_fetch",
+            "memory_search",
+            "memory_get",
+            "discord"
+          ]
         }
       },
       {
@@ -76,15 +90,17 @@
       "type": "route",
       "agentId": "lauren",
       "match": {
-        "channel": "telegram",
-        "accountId": "lauren"
+        "channel": "discord",
+        "accountId": "lauren",
+        "guildId": "1487306966484258887"
       }
     },
     {
       "type": "route",
       "agentId": "switchy",
       "match": {
-        "channel": "discord"
+        "channel": "discord",
+        "accountId": "max"
       }
     }
   ],
@@ -155,20 +171,46 @@
     },
     "discord": {
       "enabled": true,
-      "token": {
-        "source": "env",
-        "provider": "default",
-        "id": "DISCORD_BOT_TOKEN_MAX"
-      },
       "groupPolicy": "allowlist",
       "streaming": "partial",
-      "guilds": {
-        "1487306966484258887": {
-          "requireMention": false,
-          "channels": {
-            "1487477234401939546": {
-              "allow": true,
-              "requireMention": false
+      "accounts": {
+        "default": {
+          "token": {
+            "source": "env",
+            "provider": "default",
+            "id": "DISCORD_BOT_TOKEN_MAX"
+          },
+          "guilds": {
+            "1487306966484258887": {
+              "requireMention": false,
+              "channels": {
+                "1487477234401939546": {
+                  "allow": true,
+                  "requireMention": false
+                }
+              }
+            }
+          }
+        },
+        "lauren": {
+          "token": {
+            "source": "env",
+            "provider": "default",
+            "id": "DISCORD_BOT_TOKEN_LAUREN"
+          },
+          "guilds": {
+            "1487306966484258887": {
+              "requireMention": false,
+              "channels": {
+                "1487477234401939546": {
+                  "allow": true,
+                  "requireMention": false
+                },
+                "1488327248154202156": {
+                  "allow": true,
+                  "requireMention": false
+                }
+              }
             }
           }
         }
