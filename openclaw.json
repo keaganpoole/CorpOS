@@ -1,211 +1,207 @@
 {
-    "meta":  {
-                 "lastTouchedVersion":  "2026.3.23",
-                 "lastTouchedAt":  "2026-03-28T17:21:08.598Z"
-             },
-    "wizard":  {
-                   "lastRunAt":  "2026-03-24T00:23:12.668Z",
-                   "lastRunVersion":  "2026.3.23",
-                   "lastRunCommand":  "onboard",
-                   "lastRunMode":  "local"
-               },
-    "auth":  {
-                 "profiles":  {
-                                  "openrouter:default":  {
-                                                             "provider":  "openrouter",
-                                                             "mode":  "api_key"
-                                                         }
-                              }
-             },
-    "agents":  {
-                   "defaults":  {
-                                    "model":  {
-                                                  "primary":  "openrouter/minimax/minimax-m2.7"
-                                              },
-                                    "models":  {
-                                                   "openrouter/auto":  {
-                                                                           "alias":  "OpenRouter"
-                                                                       },
-                                                   "openrouter/stepfun/step-3.5-flash:free":  {
-
-                                                                                              }
-                                               },
-                                    "workspace":  "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
-                                    "heartbeat":  {
-                                                      "every":  "30m"
-                                                  }
-                                },
-                   "list":  [
-                                {
-                                    "id":  "main",
-                                    "heartbeat":  {
-                                                      "every":  "30m"
-                                                  }
-                                },
-                                {
-                                    "id":  "lauren",
-                                    "name":  "lauren",
-                                    "workspace":  "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-research",
-                                    "agentDir":  "C:\\Users\\vboxuser\\.openclaw\\agents\\lauren",
-                                    "model":  "openrouter/google/gemini-2.5-flash-lite",
-                                    "heartbeat":  {
-                                                      "every":  "30m"
-                                                  }
-                                },
-                                {
-                                    "id":  "switchy",
-                                    "name":  "switchy",
-                                    "heartbeat":  {
-                                                      "every":  "30m"
-                                                  },
-                                    "model":  "openrouter/stepfun/step-3.5-flash:free",
-                                    "workspace":  "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
-                                    "agentDir":  "C:\\Users\\vboxuser\\.openclaw\\agents\\switchy"
-                                }
-                            ]
-               },
-    "tools":  {
-                  "profile":  "coding",
-                  "sessions":  {
-                                   "visibility":  "all"
-                               },
-                  "agentToAgent":  {
-                                       "enabled":  true
-                                   }
-              },
-    "bindings":  [
-                     {
-                         "type":  "route",
-                         "agentId":  "lauren",
-                         "match":  {
-                                       "channel":  "telegram",
-                                       "accountId":  "lauren"
-                                   }
-                     },
-                     {
-                         "match":  {
-                                       "channel":  "discord"
-                                   },
-                         "agentId":  "switchy",
-                         "type":  "route"
-                     }
-                 ],
-    "commands":  {
-                     "native":  "auto",
-                     "nativeSkills":  "auto",
-                     "restart":  true,
-                     "ownerDisplay":  "raw"
-                 },
-    "session":  {
-                    "dmScope":  "per-channel-peer"
-                },
-    "hooks":  {
-                  "internal":  {
-                                   "enabled":  true,
-                                   "entries":  {
-                                                   "boot-md":  {
-                                                                   "enabled":  true
-                                                               },
-                                                   "bootstrap-extra-files":  {
-                                                                                 "enabled":  true
-                                                                             },
-                                                   "command-logger":  {
-                                                                          "enabled":  true
-                                                                      },
-                                                   "session-memory":  {
-                                                                          "enabled":  true
-                                                                      }
-                                               }
-                               }
-              },
-    "channels":  {
-                     "telegram":  {
-                                      "enabled":  true,
-                                      "dmPolicy":  "pairing",
-                                      "groups":  {
-                                                     "*":  {
-                                                               "requireMention":  true
-                                                           }
-                                                 },
-                                      "groupPolicy":  "allowlist",
-                                      "streaming":  "partial",
-                                      "accounts":  {
-                                                       "default":  {
-                                                                       "dmPolicy":  "allowlist",
-                                                                       "botToken":  "8621566826:AAHU2dxOWjwaxY9ZMkX_q7-gih5ce2QJ_yk",
-                                                                       "allowFrom":  [
-                                                                                         "6416153554"
-                                                                                     ],
-                                                                       "groupPolicy":  "allowlist",
-                                                                       "streaming":  "partial"
-                                                                   },
-                                                       "lauren":  {
-                                                                      "name":  "Lauren",
-                                                                      "enabled":  true,
-                                                                      "dmPolicy":  "allowlist",
-                                                                      "botToken":  "8777471205:AAGhr78pLIQglAyK706-yBIabMCe_rVqThs",
-                                                                      "groups":  {
-                                                                                     "-1003796114330":  {
-
-                                                                                                        }
-                                                                                 },
-                                                                      "allowFrom":  [
-                                                                                        "6416153554"
-                                                                                    ],
-                                                                      "groupPolicy":  "allowlist",
-                                                                      "streaming":  "partial"
-                                                                  }
-                                                   }
-                                  },
-                     "discord":  {
-                                     "enabled":  true,
-                                     "token":  {
-                                                   "source":  "env",
-                                                   "provider":  "default",
-                                                   "id":  "DISCORD_BOT_TOKEN_MAX"
-                                               },
-                                     "groupPolicy":  "allowlist",
-                                     "streaming":  "partial",
-                                     "guilds":  {
-                                                    "1487306966484258887":  {
-                                                                                "requireMention":  false,
-                                                                                "channels":  {
-                                                                                                 "1487477234401939546":  {
-                                                                                                                             "allow":  true,
-                                                                                                                             "requireMention":  false
-                                                                                                                         }
-                                                                                             }
-                                                                            }
-                                                },
-                                     "threadBindings":  {
-                                                            "maxAgeHours":  0,
-                                                            "idleHours":  24,
-                                                            "enabled":  true
-                                                        }
-                                 }
-                 },
-    "gateway":  {
-                    "port":  18789,
-                    "mode":  "local",
-                    "bind":  "loopback",
-                    "auth":  {
-                                 "mode":  "token",
-                                 "token":  "9385154d61c3abe554633ed6e57c415da142ddfb98a6a0c4"
-                             },
-                    "tailscale":  {
-                                      "mode":  "off",
-                                      "resetOnExit":  false
-                                  },
-                    "nodes":  {
-                                  "denyCommands":  [
-                                                       "camera.snap",
-                                                       "camera.clip",
-                                                       "screen.record",
-                                                       "contacts.add",
-                                                       "calendar.add",
-                                                       "reminders.add",
-                                                       "sms.send"
-                                                   ]
-                              }
-                }
+  "meta": {
+    "lastTouchedVersion": "2026.3.23",
+    "lastTouchedAt": "2026-03-31T18:00:53.335Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-03-24T00:23:12.668Z",
+    "lastRunVersion": "2026.3.23",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
+  },
+  "auth": {
+    "profiles": {
+      "openrouter:default": {
+        "provider": "openrouter",
+        "mode": "api_key"
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/minimax/minimax-m2.7"
+      },
+      "models": {
+        "openrouter/auto": {
+          "alias": "OpenRouter"
+        },
+        "openrouter/stepfun/step-3.5-flash:free": {}
+      },
+      "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "heartbeat": {
+        "every": "30m"
+      }
+    },
+    "list": [
+      {
+        "id": "main",
+        "heartbeat": {
+          "every": "30m"
+        }
+      },
+      {
+        "id": "lauren",
+        "name": "lauren",
+        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-research",
+        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\lauren",
+        "model": "openrouter/google/gemini-2.5-flash-lite",
+        "heartbeat": {
+          "every": "30m"
+        }
+      },
+      {
+        "id": "switchy",
+        "name": "switchy",
+        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\switchy",
+        "model": "openrouter/stepfun/step-3.5-flash:free",
+        "heartbeat": {
+          "every": "30m"
+        }
+      }
+    ]
+  },
+  "tools": {
+    "profile": "coding",
+    "sessions": {
+      "visibility": "all"
+    },
+    "agentToAgent": {
+      "enabled": true
+    }
+  },
+  "bindings": [
+    {
+      "type": "route",
+      "agentId": "lauren",
+      "match": {
+        "channel": "telegram",
+        "accountId": "lauren"
+      }
+    },
+    {
+      "type": "route",
+      "agentId": "switchy",
+      "match": {
+        "channel": "discord"
+      }
+    }
+  ],
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "boot-md": {
+          "enabled": true
+        },
+        "bootstrap-extra-files": {
+          "enabled": true
+        },
+        "command-logger": {
+          "enabled": true
+        },
+        "session-memory": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "groups": {
+        "*": {
+          "requireMention": true
+        }
+      },
+      "groupPolicy": "allowlist",
+      "streaming": "partial",
+      "accounts": {
+        "default": {
+          "dmPolicy": "allowlist",
+          "botToken": "8621566826:AAHU2dxOWjwaxY9ZMkX_q7-gih5ce2QJ_yk",
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        },
+        "lauren": {
+          "name": "Lauren",
+          "enabled": true,
+          "dmPolicy": "allowlist",
+          "botToken": "8777471205:AAGhr78pLIQglAyK706-yBIabMCe_rVqThs",
+          "groups": {
+            "-1003796114330": {}
+          },
+          "allowFrom": [
+            "6416153554"
+          ],
+          "groupPolicy": "allowlist",
+          "streaming": "partial"
+        }
+      }
+    },
+    "discord": {
+      "enabled": true,
+      "token": {
+        "source": "env",
+        "provider": "default",
+        "id": "DISCORD_BOT_TOKEN_MAX"
+      },
+      "groupPolicy": "allowlist",
+      "streaming": "partial",
+      "guilds": {
+        "1487306966484258887": {
+          "requireMention": false,
+          "channels": {
+            "1487477234401939546": {
+              "allow": true,
+              "requireMention": false
+            }
+          }
+        }
+      },
+      "threadBindings": {
+        "enabled": true,
+        "idleHours": 24,
+        "maxAgeHours": 0
+      }
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "9385154d61c3abe554633ed6e57c415da142ddfb98a6a0c4"
+    },
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    },
+    "nodes": {
+      "denyCommands": [
+        "camera.snap",
+        "camera.clip",
+        "screen.record",
+        "contacts.add",
+        "calendar.add",
+        "reminders.add",
+        "sms.send"
+      ]
+    }
+  }
 }

@@ -6,12 +6,10 @@
 - **Discord Webhooks:** Send messages as Lauren during break mode. Webhook URLs stored in env vars — never expose in chat.
 
 ## Discord Channel References
-- **Max Group Chat:** `DISCORD_CHANNEL_MAX_ID` — CEO briefings, activation commands
-- **Situation Room:** `DISCORD_CHANNEL_SITUATION_ROOM_ID` — strategy, manager dispatches
-- **Team CorpOS:** `DISCORD_CHANNEL_CORPOS_TEAM_ID` — operations, social, research updates
+- **Situation Room:** `1488327248154202156` — strategy, manager dispatches
+- **Team CorpOS:** `1487477234401939546` — operations, social, research updates
 
 ## Discord Webhooks
-- **Max (Max Group Chat):** `DISCORD_WEBHOOK_MAX`
 - **Max (Situation Room):** `DISCORD_WEBHOOK_MAX_SITUATION_ROOM`
 - **Lauren (Team CorpOS):** `DISCORD_WEBHOOK_LAUREN`
 - **Lauren (Situation Room):** `DISCORD_WEBHOOK_LAUREN_SITUATION_ROOM`

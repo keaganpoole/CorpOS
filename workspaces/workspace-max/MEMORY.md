@@ -8,20 +8,39 @@
 - **2026-03-27:** Multiple session resets. Continued break command testing and refinement. Created break-command skill with Discord webhook integration for Lauren and Allie personas.
 - **2026-03-29:** Keagan asked about "Switchy" — no prior context exists. Need to get details. Keagan upgraded Max's model to claude-opus-4.6 via OpenRouter. Performed structural migration of workspace — consolidated all .md files into 8-file architecture (agents, soul, memory, skills, identity, user, tools, heartbeat). Removed BOOTSTRAP.md, COMMANDS.md, and 01_EXECUTIVE_SUITE folder. Merged 00_CORE_LOGIC and 03_SOCIAL_ENGINE content into skills.md and soul.md, then removed those folders.
 - **2026-03-30:** Streamlined org. Removed dev, sales, care, and marketing departments and workspaces. Org is now: Keagan (CEO) → Max (COO) → Lauren (Research Manager) → Yanna (Research Associate).
+- **2026-03-31:** Keagan reset the Max bot's Discord token. 403 errors followed — bot was not in the server. Keagan used OAuth to re-invite. Discord bot username unknown — needs verification. Max Group Chat (channel ID 1488333645310726196) was deleted by Keagan.
 
 ## Active Agents (Onboarded)
-| Agent | Role | Bot | Model |
-|-------|------|-----|-------|
-| Max | COO | @max_teamwinslow_bot | claude-opus-4.6 |
-| Lauren | Research Manager | @laurenCorpOS_bot | StepFun 3.5 Flash |
+| Agent | Role | Platform | Bot Username | Model |
+|-------|------|----------|--------------|-------|
+| Max | COO | Telegram | @max_teamwinslow_bot | claude-opus-4.6 |
+| Max | COO | Discord | max#2325 (or max_???) | — |
+| Lauren | Research Manager | Telegram | @laurenCorpOS_bot | StepFun 3.5 Flash |
+
+## Max Discord Bot (Primary)
+- **App ID:** 1488338905668386937
+- **Public Key:** b72b5b93d2e899564d2de36e1f9bcfcf5cc1419f1dbab588fb85e3967eb00bdb
+- **Token:** MTQ4ODMzODkwNTY2ODM4NjkzNw.G5nXn2... (discord_bot_token_max)
+- **Username:** max#2325 (verify in Discord)
+- **Permissions:** Send Messages, View Channels enabled on all roles
 
 ## Team Structure
 - **Research:** Lauren (Manager, ISFJ) → Yanna (Associate, ESFP)
 
 ## Discord Channel IDs
-- **Max Group Chat:** `DISCORD_CHANNEL_MAX_ID`
-- **Situation Room:** `DISCORD_CHANNEL_SITUATION_ROOM_ID`
-- **Team CorpOS:** `DISCORD_CHANNEL_CORPOS_TEAM_ID`
+- **Situation Room:** `1488327248154202156` — active
+- **Team CorpOS:** `1487477234401939546` — active
+- **Max Group Chat:** DELETED (2026-03-31) — no longer exists
+
+## Discord Bot Tokens
+- **Max Discord bot:** `MTQ4ODMzODkwNTY2ODM4NjkzNw.G5nXn2...` (discord_bot_token_max). App ID: 1488338905668386937. Token valid, bot in CorpOS server. REST API requires raw .NET WebRequest — see "Known Issues / Resolved" section.
+- **Lauren Discord bot:** REMOVED from config — not in use.
+- **Old generic discord_bot_token:** REMOVED from env — no longer needed.
+
+## Discord Webhooks
+- **Max (Situation Room):** `DISCORD_WEBHOOK_MAX_SITUATION_ROOM` — env var not set, webhook not configured yet
+- **Lauren (Team CorpOS):** `https://discord.com/api/webhooks/1487514601284173914/WCKzCVgjmcwmeayrTU8Zd9ZwhaU4DuPLcoFJuD4ezHkM7q-r55L2I9QcNSum997t8Sk6`
+- **Lauren (Situation Room):** `https://discord.com/api/webhooks/1488332481261207656/iyCvw01hDXv-PIDTsPWydB4ZkeEGnKaAfWFRBUxOzJaWRxrjEJzlULGb_7ssOAxSdKNi`
 
 ## Airtable Reference
 - **Command Center Table:** tbl8rlmoaZt3ZIsAY
@@ -31,6 +50,29 @@
 - **Priority Field:** fldSr6MDoAv5ef6RR
 - **Campaigns Field:** fldWxKs8uJazwUkCh (links to Campaigns Table tbl5uHf8ZVTZZgfc0)
 
+## Known Issues / Resolved
+
+### Discord Bot REST API Issue (RESOLVED 2026-03-31)
+- **Problem:** Max bot token (`MTQ4ODMz...`) was valid and bot was in the CorpOS server, but all REST API calls returned 403 Forbidden.
+- **Root Cause:** The `Content-Type` header set via `Invoke-WebRequest`'s `-Headers` hashtable caused Discord to reject the request. The request body was also being truncated or reformatted incorrectly.
+- **Fix:** Use raw `.NET` `System.Net.WebRequest` instead of `Invoke-WebRequest`/`Invoke-RestMethod`. Set `ContentType` as a property and `Authorization` as a header separately. See working code pattern below.
+- **Working PowerShell pattern:**
+```powershell
+$body = '{"content":"Your message here"}'
+$wr = [System.Net.WebRequest]::Create("https://discord.com/api/v10/channels/CHANNEL_ID/messages")
+$wr.Method = "POST"
+$wr.ContentType = "application/json"
+$wr.Headers["Authorization"] = "Bot $token"
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+$wr.ContentLength = $bytes.Length
+$rs = $wr.GetRequestStream()
+$rs.Write($bytes, 0, $bytes.Length)
+$rs.Close()
+$resp = $wr.GetResponse()
+$resp.Close()
+```
+- **Context:** This is a known PowerShell/Windows issue with how `Invoke-WebRequest` sends headers — it does NOT affect Discord webhooks (those work fine with `Invoke-WebRequest`).
+
 ## Lessons Learned
 - Never use robotic language for operational commands. Keep it natural and human. A COO says "Take a break" not "Break mode activated."
 - Never include pronouns in documentation — Keagan's rule.
@@ -38,6 +80,7 @@
 - The system runs on manual ignition only. No autonomous actions until `/start_day` is issued.
 - Keagan prefers direct, no-filler communication. Skip the corporate pleasantries.
 - Zone 7 overrides everything — all bots cease posting regardless of `/start_day`.
+- **Document deletions and changes immediately.** If Keagan deletes a channel or resets a token, log it to MEMORY.md the same moment — don't make him repeat himself.
 
 ## Git Protocol
 - Do NOT push to GitHub unless Keagan explicitly requests it.
@@ -47,5 +90,5 @@
 
 ## Known Issues / Open Items
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
-- Discord break mode uses webhooks for Lauren persona only (2026-03-30: Allie webhook removed with marketing dept).
 - Yanna (Research Associate) does not yet have her own independent agent/bot.
+- Max Discord bot — fully operational in CorpOS server (2026-03-31).
