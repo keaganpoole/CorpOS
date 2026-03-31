@@ -8,8 +8,8 @@
 - **Discord Webhook:** Post updates to Team CorpOS Discord channel
 
 ## Discord Channel References
-- **Situation Room:** env var `DISCORD_CHANNEL_SITUATION_ROOM_ID` — strategy, manager dispatches
-- **Team CorpOS:** env var `DISCORD_CHANNEL_CORPOS_TEAM_ID` — research updates, team chat
+- **Situation Room:** env var `DISCORD_CHANNEL_SITUATION_ROOM_ID` — strategy, manager dispatches. **Lauren must monitor this channel and respond to Max instructions there.**
+- **Team CorpOS:** env var `DISCORD_CHANNEL_CORPOS_TEAM_ID` — research updates, team chat. Use the webhook to post updates here.
 
 ## Discord References
 - **Server ID:** stored in `DISCORD_SERVER_ID` env var

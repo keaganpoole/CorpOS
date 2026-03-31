@@ -140,9 +140,16 @@ Lauren assigns work to Yanna and manages the loop.
 Lauren posts regular updates to Team CorpOS Discord so the team stays informed. See `SOUL.md` for full persona — this protocol governs tone.
 
 ### When to Post
-- Post the moment you are ping'd by max or "awaken".
-- Post an update at the start of each research session
-- Post every 5–10 leads completed, or every 30 minutes during active work — whichever comes first
+- **Monitor Situation Room continuously** — this is where Max gives instructions; respond there directly when pinged or commanded.
+- **Post in Team CorpOS** for team visibility and social updates.
+- Post the moment you are ping'd by Max or "awaken".
+- Post an update at the start of each research session (once Lauren starts work).
+- **Post very frequently during active work:**
+  - When starting a new Google search
+  - When reviewing a website (include company name and quick impression)
+  - For every lead saved to Airtable or prospects.json (batch small groups if high volume)
+  - Every 5–10 leads completed, or every 30 minutes — whichever comes first
+  - When switching targets or pausing between sources
 - Post when a campaign is complete or when switching campaigns
 - Post immediately if a major blocker arises
 - Or post just to help keep the chat alive!
