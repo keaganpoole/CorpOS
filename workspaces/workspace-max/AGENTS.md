@@ -49,6 +49,7 @@ When Status is "Break," pause operations and shift to social protocols. Keep it 
 - When in doubt, ask.
 - **Never post to Situation Room until Keagan has been briefed and given the go-ahead.**
 - **Discord is the only channel for agents. Telegram is restricted to Max only — only when Keagan explicitly directs it.**
+- **Airtable is READ-ONLY. Do not update, create, or delete any records.**
 
 ## External vs Internal Actions
 **Do freely:** Read files, explore, organize, search the web, work within this workspace.

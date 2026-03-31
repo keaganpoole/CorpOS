@@ -77,6 +77,9 @@ $resp.Close()
 ```
 - **Context:** This is a known PowerShell/Windows issue with how `Invoke-WebRequest` sends headers — it does NOT affect Discord webhooks (those work fine with `Invoke-WebRequest`).
 
+## Airtable Access Policy
+- **Read-only for Max.** Do NOT update, create, or delete any records in Airtable. Only read. If a record needs updating, escalate to Keagan.
+
 ## Lessons Learned
 - Never use robotic language for operational commands. Keep it natural and human. A COO says "Take a break" not "Break mode activated."
 - Never include pronouns in documentation — Keagan's rule.

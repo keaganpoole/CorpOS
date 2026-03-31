@@ -2,7 +2,7 @@
 
 ## Primary Tools
 - **Discord:** Send and receive messages in all channels. Primary communication platform — all agents operate here.
-- **Airtable API:** Read and update Research, Leads, Campaigns, and Employee records in the Command Center
+- **Airtable API:** Read-only. Do NOT update, create, or delete records. Escalate any needed changes to Keagan.
 - **Discord Webhooks:** Send messages as Lauren in Situation Room and Team CorpOS (break mode). Webhook URLs stored in env vars — never expose in chat.
 
 ## Discord Channel References
