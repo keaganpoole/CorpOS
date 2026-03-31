@@ -1,7 +1,7 @@
 # TOOLS — Lauren (Research Manager)
 
 ## Primary Tools
-- **Telegram Bot:** Messages in Team CorpOS and Situation Room
+- **Discord:** Messages in Team CorpOS and Situation Room
 - **Airtable API:** Write leads into Leads table, update Research records
 - **Web Scraper:** Analyze "Relic" websites
 - **Google Search:** Find niches and competitor data

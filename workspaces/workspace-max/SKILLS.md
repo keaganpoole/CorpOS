@@ -3,7 +3,7 @@
 ## 1. Manual Ignition Protocol (`/start_day`)
 
 ### Trigger
-Keagan sends `/start_day` in the Max Group Chat (-5257313997).
+Keagan sends `/start_day` in the Max Group Chat (`DISCORD_CHANNEL_MAX_ID`).
 
 ### Phase 1: Command Center Scan
 Immediately scan Airtable Command Center (tbl8rlmoaZt3ZIsAY):
@@ -111,7 +111,7 @@ Research team may not proceed until:
 - **Purpose:** Social bonding, culture, operational updates, rollcall.
 - **During Break:** MBTI-driven social dynamics activate. Lauren (ISFJ) drifts in naturally; Yanna (ESFP) leads the social charge.
 
-### Max Group Chat (Telegram — -5257313997)
+### Max Group Chat (Discord — `DISCORD_CHANNEL_MAX_ID`)
 - **Audience:** CEO and COO only.
 - **Tone:** Intensely focused, "Money Warrior" aligned.
 - **Purpose:** Briefings, ignition, Code Red escalations, strategic pivots.

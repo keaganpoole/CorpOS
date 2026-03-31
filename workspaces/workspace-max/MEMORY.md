@@ -18,10 +18,8 @@
 ## Team Structure
 - **Research:** Lauren (Manager, ISFJ) → Yanna (Associate, ESFP)
 
-## Telegram Chat IDs
-- **Max Group Chat:** -5257313997
-
 ## Discord Channel IDs
+- **Max Group Chat:** `DISCORD_CHANNEL_MAX_ID`
 - **Situation Room:** `DISCORD_CHANNEL_SITUATION_ROOM_ID`
 - **Team CorpOS:** `DISCORD_CHANNEL_CORPOS_TEAM_ID`
 

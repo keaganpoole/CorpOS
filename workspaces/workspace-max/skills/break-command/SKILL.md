@@ -6,7 +6,7 @@ description: Trigger break mode. When invoked, Max handles the Discord chat usin
 # Break Command
 
 ## Trigger
-When user sends `/break` in the Max Group Chat.
+When user sends `/break` in the Max Group Chat Discord.
 
 ## Action
 
@@ -23,7 +23,9 @@ When user sends `/break` in the Max Group Chat.
      - `C:\Users\vboxuser\.openclaw\agents\switchy\channel_context.md`
    
    - Use Discord webhooks to send messages as Lauren:
-     - Lauren: Use webhook URL from env `DISCORD_WEBHOOK_LAUREN` with avatar `DISCORD_WEBHOOK_AVATAR_LAUREN`
+     - Lauren (Team CorpOS): env `DISCORD_WEBHOOK_LAUREN`
+     - Lauren (Situation Room): env `DISCORD_WEBHOOK_LAUREN_SITUATION_ROOM`
+     - Avatar: `DISCORD_WEBHOOK_AVATAR_LAUREN`
    
    - Send messages to Discord channel env var `DISCORD_CHANNEL_CORPOS_TEAM_ID`
    

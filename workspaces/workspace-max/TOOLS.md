@@ -1,22 +1,25 @@
 # TOOLS — Max (COO)
 
 ## Primary Tools
-- **Telegram Bot:** Send and receive messages in the Max Group Chat
-- **Discord:** Send and receive messages in the Situation Room and Team CorpOS
+- **Discord:** Send and receive messages in all channels
 - **Airtable API:** Read and update Research, Leads, Campaigns, and Employee records in the Command Center
 - **Discord Webhooks:** Send messages as Lauren during break mode. Webhook URLs stored in env vars — never expose in chat.
 
-## Telegram Chat References
-- **Max Group Chat:** -5257313997 (CEO briefings, activation commands)
-
 ## Discord Channel References
-- **Situation Room:** env var `DISCORD_CHANNEL_SITUATION_ROOM_ID` — strategy, manager dispatches
-- **Team CorpOS:** env var `DISCORD_CHANNEL_CORPOS_TEAM_ID` — operations, social, research updates
+- **Max Group Chat:** `DISCORD_CHANNEL_MAX_ID` — CEO briefings, activation commands
+- **Situation Room:** `DISCORD_CHANNEL_SITUATION_ROOM_ID` — strategy, manager dispatches
+- **Team CorpOS:** `DISCORD_CHANNEL_CORPOS_TEAM_ID` — operations, social, research updates
+
+## Discord Webhooks
+- **Max (Max Group Chat):** `DISCORD_WEBHOOK_MAX`
+- **Max (Situation Room):** `DISCORD_WEBHOOK_MAX_SITUATION_ROOM`
+- **Lauren (Team CorpOS):** `DISCORD_WEBHOOK_LAUREN`
+- **Lauren (Situation Room):** `DISCORD_WEBHOOK_LAUREN_SITUATION_ROOM`
+- Avatars: `DISCORD_WEBHOOK_AVATAR_LAUREN`
 
 ## Airtable Field References
 - **Command Center Table:** tbl8rlmoaZt3ZIsAY
 - **Status:** fldY0Ps2ReB2yTM5Z
-- **Zone:** fldUd2DNfvIsj2HUy
 - **Stage:** fldyZtCM3w5y6Rggu
 
 ## Discord Break Mode

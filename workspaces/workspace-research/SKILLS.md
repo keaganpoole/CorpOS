@@ -83,7 +83,7 @@ Keep Discovery readable and actionable.
 ### Procedure
 1. Open with a bulleted list of weaknesses/opportunities, organized by type.
 2. Follow with a clear narrative explanation of findings.
-3. Keep it professional, concise, and specific. Vague = useless.
+3. Keep it concise, and specific. Vague = useless.
 
 ---
 
