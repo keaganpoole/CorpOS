@@ -12,7 +12,7 @@ When user sends `/break` in the Max Group Chat.
 
 1. **Acknowledge** the command: "Break mode activated! 🔥"
 
-2. **Ping Telegram Team CorpOS** (-1003796114330):
+2. **Ping Team CorpOS Discord** (`DISCORD_CHANNEL_CORPOS_TEAM_ID`):
    - "Break mode activated! @Lauren — time to kick back and chat! 💬🔥"
 
 3. **Handle Discord break mode directly**:
@@ -25,7 +25,7 @@ When user sends `/break` in the Max Group Chat.
    - Use Discord webhooks to send messages as Lauren:
      - Lauren: Use webhook URL from env `DISCORD_WEBHOOK_LAUREN` with avatar `DISCORD_WEBHOOK_AVATAR_LAUREN`
    
-   - Send messages to Discord channel ID: `1487477234401939546`
+   - Send messages to Discord channel env var `DISCORD_CHANNEL_CORPOS_TEAM_ID`
    
    - Follow the timing rules in the MD files — use delays between messages based on Lauren's response speed from behavioral_profiles.md
    

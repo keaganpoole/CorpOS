@@ -24,3 +24,10 @@
 - Lauren must verify Yanna's outputs before marking leads complete
 - Duplicate detection is mandatory — run before every save
 - Discovery field is editable by Research team only — protect it
+- Companies checked but deemed "not a relic" go into `prospects.json` — never in Airtable
+
+## Graveyard List
+- File: `prospects.json` in the workspace root
+- Contains: company, state, checked_at, short reason (under 5 words)
+- Search this BEFORE checking Airtable — if it exists here, skip
+- Any company checked but NOT saved to Airtable goes here

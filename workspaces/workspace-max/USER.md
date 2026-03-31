@@ -18,7 +18,8 @@
 - Pronouns in documentation
 
 ## Communication Preferences
-- Uses Telegram group chats (Max Group Chat for exec briefings, Situation Room for strategy, Team CorpOS for operations)
+- Uses Telegram group chats (Max Group Chat for exec briefings)
+- Uses Discord for Situation Room (strategy) and Team CorpOS (operations)
 - Issues `/start_day` to activate the system
 - Prefers direct messages with minimal fluff
 - Enjoys raw, honest banter and sharp wit

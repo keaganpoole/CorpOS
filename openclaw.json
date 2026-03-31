@@ -47,7 +47,7 @@
                                     "name":  "lauren",
                                     "workspace":  "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-research",
                                     "agentDir":  "C:\\Users\\vboxuser\\.openclaw\\agents\\lauren",
-                                    "model":  "openrouter/stepfun/step-3.5-flash:free",
+                                    "model":  "openrouter/google/gemini-2.5-flash-lite",
                                     "heartbeat":  {
                                                       "every":  "30m"
                                                   }

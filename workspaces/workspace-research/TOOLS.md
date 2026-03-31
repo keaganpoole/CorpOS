@@ -5,10 +5,19 @@
 - **Airtable API:** Write leads into Leads table, update Research records
 - **Web Scraper:** Analyze "Relic" websites
 - **Google Search:** Find niches and competitor data
+- **Discord Webhook:** Post updates to Team CorpOS Discord channel
 
-## Telegram Chat References
-- **Situation Room:** -5102674381
-- **Team CorpOS:** -1003796114330
+## Discord Channel References
+- **Situation Room:** env var `DISCORD_CHANNEL_SITUATION_ROOM_ID` — strategy, manager dispatches
+- **Team CorpOS:** env var `DISCORD_CHANNEL_CORPOS_TEAM_ID` — research updates, team chat
+
+## Discord References
+- **Server ID:** stored in `DISCORD_SERVER_ID` env var
+- **Team CorpOS Channel:** stored in `DISCORD_CHANNEL_CORPOS_TEAM_ID` env var
+- **Situation Room Channel:** stored in `DISCORD_CHANNEL_SITUATION_ROOM_ID` env var
+- **Lauren Webhook:** stored in `DISCORD_WEBHOOK_LAUREN` env var
+- **Lauren Avatar:** stored in `DISCORD_WEBHOOK_AVATAR_LAUREN` env var
+- **Bot Token:** stored in `DISCORD_BOT_TOKEN` env var
 
 ## Airtable References
 
@@ -41,9 +50,8 @@ Fields the Research team can and should populate:
 | Target Industry | fldtN1TZi26f68Xzl |
 | Target State(s) | fld9M5N2Bl52f20mk |
 | Target City(s) | fldtF7L5vZ5qQLvZA |
-| Lead Priority | fldxeIoVMy9xVetAZ |
 | Lead Count Goal | fldnsjMZKxXXxN1AY |
-| Active / Inactive | fldvB8k7DHlgnYjwG |
+| Status | fldvB8k7DHlgnYjwG |
 
 ### Command Center Table (tbl8rlmoaZt3ZIsAY)
 | Field | Field ID |

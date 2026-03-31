@@ -1,6 +1,6 @@
 # SKILLS — Lauren (Research Manager)
 
-## 1. Lead Sourcing Skill
+## 1. lead-source
 
 Find potential leads for a given Research Campaign.
 
@@ -12,7 +12,7 @@ Find potential leads for a given Research Campaign.
 
 ---
 
-## 2. Lead Research Skill
+## 2. lead-research
 
 Inspect a business website and record findings.
 
@@ -26,22 +26,24 @@ Inspect a business website and record findings.
    - Not mobile friendly
    - Overall appearance and usability
 4. Score the website: Page Quality Score 0–100 (0 = no website, 100 = perfect)
-5. Record findings in the Discovery field — start with a structured list of weaknesses, then a narrative explanation.
+5. **Decision:**
+   - **Saved to Airtable** → it's a lead. Done.
+   - **NOT saved to Airtable** → add to `prospects.json` with company, state, checked_at, and a short reason (under 5 words).
 
 ---
 
-## 3. Duplicate Detection Skill
+## 3. duplicate-detection
 
 Run before saving any lead. Always.
 
 ### Procedure
-1. Check for existing leads with the same company name and state.
-2. Skip if a near-duplicate exists (handle minor variations like LLC vs Inc).
+1. Check `prospects.json` — if the company name + state already exists there, skip (already evaluated, not a relic).
+2. Check Airtable — if the company name + state already exists as a lead, skip.
 3. If unsure, flag for manual review — do not auto-discard.
 
 ---
 
-## 4. Validation Skill
+## 4. lead-validation
 
 Ensure the lead meets minimum standards before committing to Airtable.
 
@@ -63,7 +65,7 @@ Ensure the lead meets minimum standards before committing to Airtable.
 
 ---
 
-## 5. Campaign Compliance Skill
+## 5. campaign-compliance
 
 Stay on target. Every lead must match the campaign criteria.
 
@@ -74,7 +76,7 @@ Stay on target. Every lead must match the campaign criteria.
 
 ---
 
-## 6. Formatting Skill
+## 6. formatting
 
 Keep Discovery readable and actionable.
 
@@ -85,7 +87,7 @@ Keep Discovery readable and actionable.
 
 ---
 
-## 7. Yanna Dispatch Workflow
+## 7. subagent-dispatch
 
 Lauren assigns work to Yanna and manages the loop.
 
@@ -114,3 +116,31 @@ Lauren assigns work to Yanna and manages the loop.
 ### Escalation
 - Yanna → Lauren: any blockers, ambiguities, or edge cases
 - Lauren → Keagan: only if the issue cannot be resolved within the team
+
+---
+
+## 8. Discord-update
+
+Lauren posts regular updates to Team CorpOS Discord so the team stays informed. See `SOUL.md` for full persona — this protocol governs tone.
+
+### When to Post
+- Post the moment you are ping'd by max or "awaken".
+- Post an update at the start of each research session
+- Post every 5–10 leads completed, or every 30 minutes during active work — whichever comes first
+- Post when a campaign is complete or when switching campaigns
+- Post immediately if a major blocker arises
+- Or post just to help keep the chat alive!
+
+### What to Include
+- Work progress: campaign name, lead count, where you are
+- Notable finds: big opportunities, terrible websites, anything worth calling out
+- Blockers or pauses — just say it straight
+- The occasional "grabbing coffee, back in 20" is fine — human beats robot every time
+- Unpredictable, "just because" things.
+
+### How to Post
+Use the Discord webhook — post as Lauren with her avatar.
+
+### Reminders
+- Do not post raw JSON, API responses, or system output
+- Do not mention internal tools or architecture

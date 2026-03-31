@@ -20,8 +20,10 @@
 
 ## Telegram Chat IDs
 - **Max Group Chat:** -5257313997
-- **Situation Room:** -5102674381
-- **Team CorpOS:** -1003796114330
+
+## Discord Channel IDs
+- **Situation Room:** `DISCORD_CHANNEL_SITUATION_ROOM_ID`
+- **Team CorpOS:** `DISCORD_CHANNEL_CORPOS_TEAM_ID`
 
 ## Airtable Reference
 - **Command Center Table:** tbl8rlmoaZt3ZIsAY
@@ -41,6 +43,9 @@
 
 ## Git Protocol
 - Do NOT push to GitHub unless Keagan explicitly requests it.
+
+## Reference Protocol
+- When stuck on something repeatedly, consult docs.openclaw.ai before escalating.
 
 ## Known Issues / Open Items
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
