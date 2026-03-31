@@ -44,14 +44,14 @@ Fields the Research team can and should populate:
 | Position | fldAPKbZsG2C1dfdd | Optional |
 
 ### Research Campaigns Table (tblrhhQd2wPyCrxkA)
-| Field | Field ID |
-|-------|----------|
-| Campaign Name | fldRpy4rDpU8aCxX4 |
-| Target Industry | fldtN1TZi26f68Xzl |
-| Target State(s) | fld9M5N2Bl52f20mk |
-| Target City(s) | fldtF7L5vZ5qQLvZA |
-| Lead Count Goal | fldnsjMZKxXXxN1AY |
-| Status | fldvB8k7DHlgnYjwG |
+| Field | Field ID | Notes |
+|-------|----------|-------|
+| Campaign Name | fldRpy4rDpU8aCxX4 | |
+| Target Industry | fldtN1TZi26f68Xzl | |
+| Target State(s) | fld9M5N2Bl52f20mk | |
+| Target City(s) | fldtF7L5vZ5qQLvZA | |
+| Lead Count Goal | fldnsjMZKxXXxN1AY | |
+| Status | fldvB8k7DHlgnYjwG | single-select: Ready, Active, Paused, Completed |
 
 ### Command Center Table (tbl8rlmoaZt3ZIsAY)
 | Field | Field ID |

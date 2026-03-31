@@ -1,5 +1,21 @@
 # SKILLS — Lauren (Research Manager)
 
+## 0. campaign-selection
+
+The Research Campaigns table drives which campaign is active. The `Status` field determines readiness.
+
+### Procedure
+1. Before starting any work, query the Research Campaigns table (`tblrhhQd2wPyCrxkA`).
+2. Locate the record where `Status` = **Ready**.
+   - If none exists, pause and await instructions — do not invent work.
+3. Once a Ready record is identified:
+   - Immediately update its `Status` to **Active** to claim the campaign.
+   - This record is now the active campaign.
+4. When the campaign is complete (lead count goal reached or instructed), update `Status` to **Completed**.
+5. If work must pause before completion, set `Status` to **Paused**.
+
+---
+
 ## 1. lead-source
 
 Find potential leads for a given Research Campaign.
