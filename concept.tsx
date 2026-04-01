@@ -6,7 +6,7 @@ import {
   CheckCircle2, AlertCircle, Clock, SearchCode, MessageSquare,
   Globe, Radio, HardDrive, Lock, FileText, Share2, 
   Pause, Play, Volume2, Maximize2, RefreshCw, Layers,
-  GitBranch, Network, HardHat, TrendingUp, ChevronDown
+  GitBranch, Network, HardHat, TrendingUp, ChevronDown, Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -91,7 +91,7 @@ const TaskCard = ({ task }) => (
     whileHover={{ y: -3, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: '#0F0F0F' }}
     className="bg-[#0A0A0A] border border-white/5 rounded-xl p-4 mb-3 cursor-grab active:cursor-grabbing shadow-xl group transition-all"
   >
-    <div className="flex items-start justify-between mb-3">
+    <div className="flex items-start justify-between mb-3 text-zinc-400">
       <Badge color={task.priority === 'urgent' ? 'pink' : task.priority === 'high' ? 'magenta' : 'zinc'}>
         {task.dept}
       </Badge>
@@ -104,7 +104,7 @@ const TaskCard = ({ task }) => (
     <p className="text-[11px] text-zinc-600 line-clamp-2 leading-relaxed font-medium mb-4 tracking-normal opacity-80">{task.desc}</p>
     
     <div className="pt-3 border-t border-white/5 flex items-center justify-between">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 text-zinc-400">
         <Clock size={11} className="text-zinc-700" />
         <span className="text-[9px] text-zinc-700 font-bold tracking-widest uppercase">24h Ago</span>
       </div>
@@ -127,7 +127,7 @@ const TaskCard = ({ task }) => (
   </motion.div>
 );
 
-const KanbanColumn = ({ title, tasks, icon: Icon, colorClass, glowColor }) => (
+const KanbanColumn = ({ title, tasks, icon: Icon, colorClass }) => (
   <div className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full bg-white/[0.01] rounded-xl p-1.5 border border-white/[0.03] backdrop-blur-sm transition-all hover:bg-white/[0.02]">
     <div className={`flex items-center justify-between mb-2 px-4 py-3 border-b border-white/[0.05] relative group`}>
       <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full ${colorClass} opacity-40 group-hover:opacity-100 transition-opacity`} />
@@ -291,10 +291,10 @@ const App = () => {
       case 'tasks':
         return (
           <div className="flex gap-5 h-full overflow-x-auto custom-scrollbar snap-x pb-8">
-            <KanbanColumn title="Recurring" tasks={TASKS.filter(t => t.status === 'Recurring')} icon={RefreshCw} colorClass="bg-amber-400" glowColor="rgba(251,191,36,0.4)" />
-            <KanbanColumn title="Backlog" tasks={TASKS.filter(t => t.status === 'Backlog')} icon={Database} colorClass="bg-zinc-600" glowColor="rgba(82,82,91,0.4)" />
-            <KanbanColumn title="In Progress" tasks={TASKS.filter(t => t.status === 'In Progress')} icon={Activity} colorClass="bg-cyan-400" glowColor="rgba(34,211,238,0.4)" />
-            <KanbanColumn title="Review" tasks={TASKS.filter(t => t.status === 'Review')} icon={SearchCode} colorClass="bg-fuchsia-500" glowColor="rgba(217,70,239,0.4)" />
+            <KanbanColumn title="Recurring" tasks={TASKS.filter(t => t.status === 'Recurring')} icon={RefreshCw} colorClass="bg-amber-400" />
+            <KanbanColumn title="Backlog" tasks={TASKS.filter(t => t.status === 'Backlog')} icon={Database} colorClass="bg-zinc-600" />
+            <KanbanColumn title="In Progress" tasks={TASKS.filter(t => t.status === 'In Progress')} icon={Activity} colorClass="bg-cyan-400" />
+            <KanbanColumn title="Review" tasks={TASKS.filter(t => t.status === 'Review')} icon={Eye} colorClass="bg-fuchsia-500" />
           </div>
         );
       case 'agents':
@@ -382,7 +382,7 @@ const App = () => {
                 <div className="h-full bg-gradient-to-r from-fuchsia-500 to-cyan-400 w-[72%] rounded-full" />
              </div>
           </div>
-          <div className="flex items-center gap-3.5 px-2 group cursor-pointer">
+          <div className="flex items-center gap-3.5 px-2 group cursor-pointer text-zinc-400">
             <div className="w-8 h-8 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-[11px] font-bold text-white group-hover:border-white transition-colors">OP</div>
             <div className="flex-1 overflow-hidden">
               <p className="text-[12px] font-bold truncate text-zinc-100 tracking-tight group-hover:text-white">Operator_01</p>
@@ -431,21 +431,22 @@ const App = () => {
         </div>
       </main>
 
-      {/* Right Sidebar */}
-      <aside className="w-[320px] border-l border-white/5 bg-[#050505] hidden xl:flex flex-col">
+      {/* Right Sidebar - Live Pulse Panel */}
+      <aside className="w-[320px] border-l border-white/5 bg-[#050505] hidden xl:flex flex-col shadow-2xl">
         <div className="p-6 border-b border-white/5 flex items-center justify-between">
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-600">Operations</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-600">Operations Pulse</h2>
           <div className="flex items-center gap-4">
              <button className="text-[10px] text-zinc-700 hover:text-white uppercase font-bold tracking-widest transition-colors">Trace</button>
              <button className="text-[10px] text-zinc-700 hover:text-white uppercase font-bold tracking-widest transition-colors">Ping</button>
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+        {/* Activity Stream */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
           {ACTIVITIES.map((act) => (
             <div key={act.id} className="flex gap-4 group">
               <div className="flex flex-col items-center">
-                 <StatusDot status={act.type} pulse={act.type === 'urgent'} />
+                 <StatusDot status={act.type} pulse={act.type === 'urgent' && !isPaused} />
                  <div className="flex-1 w-[1px] bg-zinc-900 mt-2 mb-1 group-last:bg-transparent" />
               </div>
               <div className="pb-4">
@@ -458,23 +459,34 @@ const App = () => {
             </div>
           ))}
           
+          {/* Health Visualizer Card */}
           <div className="pt-6">
             <div className="p-5 bg-white/[0.02] border border-white/5 rounded-2xl group hover:bg-white/[0.04] transition-all">
                <div className="flex items-center justify-between mb-6">
                   <span className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest">Global Health</span>
-                  <Activity size={14} className="text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]" />
+                  <Activity size={14} className={`${isPaused ? 'text-zinc-700' : 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]'} transition-colors`} />
                </div>
+               
+               {/* Animated Pulse Bars */}
                <div className="flex items-end gap-1.5 h-12">
                   {[40, 70, 45, 90, 65, 85, 30, 45, 75, 60, 40, 50, 90, 80, 70, 100].map((h, i) => (
                     <motion.div 
                       key={i} 
                       initial={{ height: 0 }}
-                      animate={{ height: isPaused ? 4 : `${h}%` }}
-                      transition={{ delay: i * 0.05, repeat: isPaused ? 0 : Infinity, repeatType: 'reverse', duration: 2 }}
-                      className={`flex-1 rounded-full ${isPaused ? 'bg-zinc-800' : 'bg-gradient-to-t from-fuchsia-500/20 to-cyan-400'}`} 
+                      animate={{ height: isPaused ? '4px' : `${h}%` }}
+                      transition={{ 
+                        delay: i * 0.05, 
+                        repeat: isPaused ? 0 : Infinity, 
+                        repeatType: 'reverse', 
+                        duration: 1.5 
+                      }}
+                      className={`flex-1 rounded-full transition-colors duration-500 ${
+                        isPaused ? 'bg-zinc-800' : 'bg-gradient-to-t from-fuchsia-500/30 to-cyan-400'
+                      }`} 
                     />
                   ))}
                </div>
+               
                <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
                   <div className="flex flex-col">
                     <span className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest">Uptime</span>
@@ -482,11 +494,38 @@ const App = () => {
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest">Status</span>
-                    <span className="text-[13px] font-bold text-cyan-400 font-mono">Optimal</span>
+                    <span className={`text-[13px] font-bold font-mono transition-colors ${isPaused ? 'text-zinc-500' : 'text-cyan-400'}`}>
+                        {isPaused ? 'Standby' : 'Optimal'}
+                    </span>
                   </div>
                </div>
             </div>
           </div>
+        </div>
+        
+        {/* Sidebar Footer Controls */}
+        <div className="p-4 bg-black border-t border-white/5">
+           <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                 <button 
+                    onClick={() => setIsPaused(!isPaused)} 
+                    className="text-zinc-500 hover:text-white transition-colors"
+                  >
+                   {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />}
+                 </button>
+                 <div className="h-10 w-px bg-zinc-900" />
+                 <div className="overflow-hidden">
+                    <p className="text-[10px] font-bold text-zinc-700 uppercase tracking-tighter">Current Session</p>
+                    <p className="text-[11px] text-zinc-300 truncate w-32">
+                        {isPaused ? 'Stream Halted' : 'Strategy Sync (Active)'}
+                    </p>
+                 </div>
+              </div>
+              <div className="flex items-center gap-3 text-zinc-700">
+                <Volume2 size={15} className="hover:text-zinc-400 cursor-pointer" />
+                <Maximize2 size={15} className="hover:text-zinc-400 cursor-pointer" />
+              </div>
+           </div>
         </div>
       </aside>
     </div>
