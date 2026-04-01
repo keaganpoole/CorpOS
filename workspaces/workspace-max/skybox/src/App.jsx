@@ -365,7 +365,7 @@ const App = () => {
     { id: 'tasks', icon: <Layers size={18} />, label: 'Tasks' },
     { id: 'agents', icon: <Users size={18} />, label: 'Agents' },
     { id: 'system', icon: <Activity size={18} />, label: 'System' },
-    { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'Pipeline' },
+    { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'Leads' },
     { id: 'memory', icon: <Database size={18} />, label: 'Memory' },
     { id: 'council', icon: <Gavel size={18} />, label: 'Council' },
   ];
@@ -506,7 +506,7 @@ const App = () => {
 
       <aside className="w-[320px] border-l border-white/5 bg-[#050505] hidden xl:flex flex-col shadow-2xl">
         <div className="p-6 pt-10 border-b border-white/5 flex items-center justify-between">
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-600">Operations Pulse</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-600">LIVE Pulse</h2>
           <div className="flex items-center gap-4">
             <button className="no-drag text-[10px] text-zinc-700 hover:text-white uppercase font-bold tracking-widest transition-colors">Trace</button>
             <button className="no-drag text-[10px] text-zinc-700 hover:text-white uppercase font-bold tracking-widest transition-colors">Ping</button>
