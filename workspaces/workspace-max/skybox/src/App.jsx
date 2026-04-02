@@ -437,7 +437,7 @@ const SystemHealthMonitor = ({ summary }) => {
   return (
     <div
       className="relative w-full h-[200px] rounded-3xl border border-white/10 bg-black/60 backdrop-blur-2xl shadow-2xl overflow-hidden group cursor-pointer transition-all duration-700"
-      style={{ boxShadow: `0 0 60px -15px ${config.glow}` }}
+      style={{ boxShadow: `0 0 60px -40px ${config.glow}` }}
     >
       {/* CRT Scanline overlay */}
       <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.05] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%]" />
