@@ -380,93 +380,91 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect }) => 
     setTimeout(() => setIsSweeping(false), 800);
   };
 
-  // Format display label
-  const displayLabel = value
-    ? (trigger === 'Zone' ? `0${value}` : value)
-    : null;
+  const getExpansionClass = () => {
+    switch (variant) {
+      case 'elastic': return 'ease-[cubic-bezier(0.68,-0.6,0.32,1.6)] duration-700';
+      default: return 'ease-[cubic-bezier(0.23,1,0.32,1)] duration-700';
+    }
+  };
+
+  const borderBackground = variant === 'prism'
+    ? `linear-gradient(to right, ${activeColor}, #00ffff, #ff00ff, ${activeColor})`
+    : `linear-gradient(to right, ${activeColor}, #a855f7, #ec4899)`;
+
+  const borderStyle = {
+    backgroundImage: borderBackground,
+    backgroundSize: variant === 'prism' ? '200% 100%' : 'auto',
+  };
+
+  const sweepBackground = `linear-gradient(to right, transparent 0%, ${activeColor}22 45%, ${activeColor}66 50%, ${activeColor}22 55%, transparent 100%)`;
+
+  const displayLabel = value ? `${trigger} ${value}` : trigger;
 
   return (
     <div className="relative">
-      {/* Sweep overlay */}
+      <div className="flex items-center">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`no-drag flex items-center gap-2 px-4 py-2 font-bold transition-colors duration-500 z-10 text-[11px] uppercase tracking-widest ${isOpen ? '' : 'hover:text-zinc-200'}`}
+          style={{ color: !isOpen && value ? activeColor : (isOpen ? activeColor : undefined) }}
+        >
+          {icon} {displayLabel}
+        </button>
+
+        <div
+          className={`flex gap-6 items-center overflow-hidden transition-all z-10 ${getExpansionClass()} ${
+            isOpen ? 'max-w-4xl opacity-100 pl-3' : 'max-w-0 opacity-0'
+          }`}
+          style={{
+            filter: variant === 'elastic' && !isOpen ? 'blur(10px)' : 'blur(0px)',
+            transitionProperty: 'all, filter',
+          }}
+        >
+          {options.map((o) => (
+            <button
+              key={o}
+              onClick={() => handleSelect(o)}
+              className={`no-drag text-[11px] font-black tracking-widest transition-all duration-500 uppercase ${
+                variant === 'elastic' ? '' : 'hover:scale-110'
+              }`}
+              style={{ color: value === o ? activeColor : undefined }}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Liquid Gradient Underline */}
       <div
-        className="absolute inset-0 rounded-lg z-10 pointer-events-none"
-        style={{
-          background: `linear-gradient(90deg, transparent, ${activeColor}22, transparent)`,
-          animation: isSweeping ? 'sweep 0.8s ease-out forwards' : 'none',
-          opacity: isSweeping ? 1 : 0,
-        }}
+        className={`absolute bottom-0 left-0 h-[2px] transition-all z-20 ${getExpansionClass()} ${
+          isOpen ? 'w-full opacity-100' : 'w-0 opacity-0'
+        } ${variant === 'prism' && isOpen ? 'animate-skyPrism' : ''}`}
+        style={borderStyle}
       />
 
-      <motion.div
-        layout
-        className="flex items-center gap-1 relative"
-        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      >
-        {/* Trigger / Selected display */}
-        <motion.button
-          layout
-          onClick={() => setIsOpen(!isOpen)}
-          className="no-drag flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all relative overflow-hidden"
-          style={{
-            backgroundColor: `${activeColor}08`,
-            border: `1px solid ${activeColor}30`,
-          }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <span style={{ color: activeColor }}>{icon}</span>
-          <span className="text-zinc-500 uppercase tracking-widest">{trigger}</span>
-          {displayLabel && (
-            <span className="font-mono" style={{ color: activeColor }}>{displayLabel}</span>
-          )}
-        </motion.button>
+      {/* Sweep overlay */}
+      {isSweeping && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl z-0">
+          <div
+            className="absolute inset-0 w-[200%] -skew-x-12 translate-x-[-100%] animate-skySweep"
+            style={{ backgroundImage: sweepBackground }}
+          />
+        </div>
+      )}
 
-        {/* Options expansion */}
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              layout
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 'auto', opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              className="flex items-center gap-1 overflow-hidden"
-            >
-              {options.map((option, i) => {
-                const optColor = colorMap[option] || '#6366f1';
-                return (
-                  <motion.button
-                    key={option}
-                    initial={{ opacity: 0, scale: 0.8, x: -10 }}
-                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.8, x: -10 }}
-                    transition={{ delay: i * 0.03, type: 'spring', stiffness: 500, damping: 25 }}
-                    onClick={() => handleSelect(option)}
-                    className="no-drag flex items-center justify-center px-2.5 py-1.5 rounded-lg text-[10px] font-bold font-mono whitespace-nowrap transition-all hover:scale-105 active:scale-95"
-                    style={{
-                      backgroundColor: `${optColor}10`,
-                      border: `1px solid ${optColor}25`,
-                      color: optColor,
-                    }}
-                    whileHover={{
-                      boxShadow: `0 0 12px ${optColor}30`,
-                    }}
-                  >
-                    {trigger === 'Zone' ? `0${option}` : option}
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-
-      <style>{`
-        @keyframes sweep {
-          0% { transform: translateX(-100%); opacity: 1; }
-          100% { transform: translateX(200%); opacity: 0; }
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes skySweep {
+          0% { transform: translateX(-100%) skewX(-12deg); }
+          100% { transform: translateX(100%) skewX(-12deg); }
         }
-      `}</style>
+        @keyframes skyPrism {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 200% 50%; }
+        }
+        .animate-skySweep { animation: skySweep 0.8s ease-in-out forwards; }
+        .animate-skyPrism { animation: skyPrism 2s linear infinite; }
+      `}} />
     </div>
   );
 };
