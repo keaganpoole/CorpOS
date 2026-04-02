@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Layers,
   Eye,
+  Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSkyboxState } from './hooks/useSkyboxState';
@@ -352,6 +353,124 @@ const PlaceholderView = ({ title, body }) => (
   </div>
 );
 
+const GradientBleed = ({ trigger, options, icon, variant, value, onSelect }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSweeping, setIsSweeping] = useState(false);
+
+  const colorMap = {
+    'RED': '#ef4444',
+    'BLUE': '#3b82f6',
+    '7': '#f87171',
+    '6': '#fb923c',
+    '5': '#facc15',
+    '4': '#4ade80',
+    '3': '#22d3ee',
+    '2': '#818cf8',
+    '1': '#c084fc',
+    'Code': '#6366f1',
+    'Zone': '#6366f1',
+  };
+
+  const activeColor = value ? (colorMap[value] || '#6366f1') : (colorMap[trigger] || '#6366f1');
+
+  const handleSelect = (option) => {
+    onSelect(option);
+    setIsOpen(false);
+    setIsSweeping(true);
+    setTimeout(() => setIsSweeping(false), 800);
+  };
+
+  // Format display label
+  const displayLabel = value
+    ? (trigger === 'Zone' ? `0${value}` : value)
+    : null;
+
+  return (
+    <div className="relative">
+      {/* Sweep overlay */}
+      <div
+        className="absolute inset-0 rounded-lg z-10 pointer-events-none"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${activeColor}22, transparent)`,
+          animation: isSweeping ? 'sweep 0.8s ease-out forwards' : 'none',
+          opacity: isSweeping ? 1 : 0,
+        }}
+      />
+
+      <motion.div
+        layout
+        className="flex items-center gap-1 relative"
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      >
+        {/* Trigger / Selected display */}
+        <motion.button
+          layout
+          onClick={() => setIsOpen(!isOpen)}
+          className="no-drag flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all relative overflow-hidden"
+          style={{
+            backgroundColor: `${activeColor}08`,
+            border: `1px solid ${activeColor}30`,
+          }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <span style={{ color: activeColor }}>{icon}</span>
+          <span className="text-zinc-500 uppercase tracking-widest">{trigger}</span>
+          {displayLabel && (
+            <span className="font-mono" style={{ color: activeColor }}>{displayLabel}</span>
+          )}
+        </motion.button>
+
+        {/* Options expansion */}
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              layout
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 'auto', opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="flex items-center gap-1 overflow-hidden"
+            >
+              {options.map((option, i) => {
+                const optColor = colorMap[option] || '#6366f1';
+                return (
+                  <motion.button
+                    key={option}
+                    initial={{ opacity: 0, scale: 0.8, x: -10 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, x: -10 }}
+                    transition={{ delay: i * 0.03, type: 'spring', stiffness: 500, damping: 25 }}
+                    onClick={() => handleSelect(option)}
+                    className="no-drag flex items-center justify-center px-2.5 py-1.5 rounded-lg text-[10px] font-bold font-mono whitespace-nowrap transition-all hover:scale-105 active:scale-95"
+                    style={{
+                      backgroundColor: `${optColor}10`,
+                      border: `1px solid ${optColor}25`,
+                      color: optColor,
+                    }}
+                    whileHover={{
+                      boxShadow: `0 0 12px ${optColor}30`,
+                    }}
+                  >
+                    {trigger === 'Zone' ? `0${option}` : option}
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      <style>{`
+        @keyframes sweep {
+          0% { transform: translateX(-100%); opacity: 1; }
+          100% { transform: translateX(200%); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 const App = () => {
   const [currentRoute, setCurrentRoute] = useState('tasks');
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -369,6 +488,8 @@ const App = () => {
     wsStatus,
     isPaused,
     toggleRuntime,
+    setStage,
+    setZone,
     pingMax,
   } = useSkyboxState();
 
@@ -503,15 +624,22 @@ const App = () => {
       <main className="flex-1 flex flex-col min-w-0 bg-black relative">
         <header className="h-14 border-b border-white/5 bg-black/60 backdrop-blur-2xl sticky top-0 z-20 flex items-center justify-between px-10 pt-2">
           <div className="flex items-center gap-4">
-            <button className="no-drag flex items-center gap-3 px-3.5 py-1.5 bg-white/[0.03] border border-white/5 rounded-lg text-[10px] font-bold">
-              <span className="text-zinc-500 uppercase tracking-widest">Zone</span>
-              <span className="text-white font-mono">0{displayZone}</span>
-            </button>
-            <button className="no-drag flex items-center gap-3 px-3.5 py-1.5 bg-white/[0.03] border border-white/5 rounded-lg text-[10px] font-bold">
-              <span className="text-zinc-500 uppercase tracking-widest">Stage</span>
-              <div className={`w-2 h-2 rounded-full ${displayStage === 'Red' ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]' : 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]'}`} />
-              <span className={displayStage === 'Red' ? 'text-rose-400 font-mono' : 'text-cyan-400 font-mono'}>{displayStage}</span>
-            </button>
+            <GradientBleed
+              trigger="Zone"
+              options={['7', '6', '5', '4', '3', '2', '1']}
+              variant="prism"
+              icon={<Sparkles size={12} />}
+              value={String(displayZone)}
+              onSelect={(val) => setZone(parseInt(val))}
+            />
+            <GradientBleed
+              trigger="Code"
+              options={['RED', 'BLUE']}
+              variant="elastic"
+              icon={<Cpu size={12} />}
+              value={displayStage === 'Red' ? 'RED' : displayStage === 'Blue' ? 'BLUE' : null}
+              onSelect={(val) => setStage(val === 'RED' ? 'code_red' : 'code_blue')}
+            />
             <span className="text-[10px] text-zinc-700 font-mono font-bold">{currentTime.toLocaleTimeString('en-US', { hour12: true, timeZone: 'America/New_York' })}</span>
           </div>
 
