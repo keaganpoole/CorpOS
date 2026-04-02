@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users,
   Activity,
@@ -20,6 +20,9 @@ import {
   Layers,
   Eye,
   Sparkles,
+  Heart,
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSkyboxState } from './hooks/useSkyboxState';
@@ -234,32 +237,334 @@ const AgentsHierarchy = ({ agents }) => {
   );
 };
 
-const SystemView = ({ summary, systemLogs }) => {
-  const displayStatus = summary.status || 'Operational';
-  const statusBadgeColor = displayStatus === 'Operational' ? 'cyan' : displayStatus === 'Degraded' ? 'orange' : 'pink';
+/*
+ * STATUS_CONFIG — ECG Health Visualization
+ * FINE / CAUTION / DANGER driven by real system data
+ */
+const STATUS_CONFIG = {
+  FINE: {
+    label: 'FINE',
+    color: '#00ffaa',
+    glow: 'rgba(0, 255, 170, 0.5)',
+    bg: 'rgba(2, 8, 4, 0.9)',
+    bpmRange: [68, 74],
+    speed: 2.8,
+    amplitude: 0.32,
+    noise: 0.02,
+    iconType: 'shield',
+    restingPeriod: 0.6,
+  },
+  CAUTION: {
+    label: 'CAUTION',
+    color: '#ffcc00',
+    glow: 'rgba(255, 204, 0, 0.5)',
+    bg: 'rgba(10, 8, 0, 0.9)',
+    bpmRange: [95, 105],
+    speed: 4.2,
+    amplitude: 0.45,
+    noise: 0.12,
+    iconType: 'alert',
+    restingPeriod: 0.35,
+  },
+  DANGER: {
+    label: 'DANGER',
+    color: '#ff3333',
+    glow: 'rgba(255, 51, 51, 0.5)',
+    bg: 'rgba(10, 2, 2, 0.9)',
+    bpmRange: [140, 160],
+    speed: 6.5,
+    amplitude: 0.75,
+    noise: 0.35,
+    iconType: 'zap',
+    restingPeriod: 0.15,
+  },
+};
+
+/*
+ * ECG_TEMPLATE — Medical P-Q-R-S-T wave points
+ */
+const ECG_TEMPLATE = [
+  { x: 0, y: 0 },
+  { x: 0.1, y: -0.05 },
+  { x: 0.15, y: 0 },
+  { x: 0.18, y: 0.1 },
+  { x: 0.22, y: -0.9 },
+  { x: 0.26, y: 0.3 },
+  { x: 0.3, y: 0 },
+  { x: 0.45, y: -0.15 },
+  { x: 0.55, y: 0 },
+];
+
+const getHeartbeatY = (progress, restingThreshold) => {
+  const activeRange = 1 - restingThreshold;
+  if (progress > activeRange) return 0;
+  const p = progress / activeRange;
+  for (let i = 0; i < ECG_TEMPLATE.length - 1; i++) {
+    const start = ECG_TEMPLATE[i];
+    const end = ECG_TEMPLATE[i + 1];
+    if (p >= start.x && p <= end.x) {
+      const segmentProgress = (p - start.x) / (end.x - start.x);
+      return start.y + (end.y - start.y) * segmentProgress;
+    }
+  }
+  return 0;
+};
+
+/*
+ * ECGCanvas — Pure canvas ECG renderer
+ * Renders the heartbeat line on a canvas element
+ */
+const ECGCanvas = ({ status, mini = false }) => {
+  const canvasRef = useRef(null);
+  const requestRef = useRef();
+  const animState = useRef({ status, xPos: 0, prevY: 0 });
+
+  useEffect(() => {
+    animState.current.status = status;
+  }, [status]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: false });
+
+    const dpr = window.devicePixelRatio || 1;
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.fillStyle = '#020404';
+      ctx.fillRect(0, 0, rect.width, rect.height);
+    };
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    let bpm = STATUS_CONFIG[status].bpmRange[0];
+
+    const render = () => {
+      const { status: currentStatus, xPos, prevY } = animState.current;
+      const config = STATUS_CONFIG[currentStatus];
+      const now = Date.now();
+
+      const width = canvas.width / dpr;
+      const height = canvas.height / dpr;
+      const centerY = height / 2;
+
+      // Phosphor trail
+      ctx.fillStyle = mini ? 'rgba(2, 5, 5, 0.1)' : 'rgba(2, 5, 5, 0.06)';
+      ctx.fillRect(0, 0, width, height);
+
+      // Wave
+      const beatDuration = 60000 / bpm;
+      const progress = (now % beatDuration) / beatDuration;
+      const amplitude = height * config.amplitude;
+      const jitter = (Math.random() - 0.5) * config.noise * 30;
+      const waveValue = getHeartbeatY(progress, config.restingPeriod);
+      const targetY = centerY + (waveValue * amplitude) + jitter;
+
+      // Draw line
+      ctx.beginPath();
+      ctx.strokeStyle = config.color;
+      ctx.lineWidth = mini ? 2 : 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.shadowBlur = mini ? 8 : 12;
+      ctx.shadowColor = config.color;
+
+      const pX = xPos - config.speed;
+      ctx.moveTo(pX, prevY || centerY);
+      ctx.lineTo(xPos, targetY);
+      ctx.stroke();
+
+      animState.current.prevY = targetY;
+      animState.current.xPos += config.speed;
+
+      // Wrap
+      if (animState.current.xPos > width) {
+        animState.current.xPos = 0;
+        ctx.fillStyle = '#020404';
+        ctx.fillRect(0, 0, 20, height);
+      }
+
+      // Clear ahead
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#020404';
+      ctx.fillRect(animState.current.xPos + 2, 0, 45, height);
+
+      // Natural BPM jitter
+      if (Math.random() > 0.993) {
+        const [min, max] = config.bpmRange;
+        bpm = Math.min(Math.max(bpm + (Math.random() > 0.5 ? 1 : -1), min), max);
+      }
+
+      requestRef.current = requestAnimationFrame(render);
+    };
+
+    requestRef.current = requestAnimationFrame(render);
+    return () => {
+      cancelAnimationFrame(requestRef.current);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: 'OK', val: String(summary.ok || 0), status: 'success', icon: <Cpu size={16} />, color: 'text-cyan-400' },
-          { label: 'Warnings', val: String(summary.warnings || 0), status: 'success', icon: <Shield size={16} />, color: 'text-cyan-400' },
-          { label: 'Errors', val: String(summary.errors || 0), status: 'info', icon: <Activity size={16} />, color: 'text-indigo-400' },
-        ].map((s, i) => (
-          <div key={i} className="bg-[#0A0A0A] border border-white/5 p-6 rounded-2xl shadow-xl group">
-            <div className="flex items-center gap-3 mb-4 text-zinc-600">
-              <span className={s.color}>{s.icon}</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest">{s.label}</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <span className="text-2xl font-bold text-zinc-100 tracking-tight">{s.val}</span>
-              <Badge color={statusBadgeColor}>{displayStatus}</Badge>
-            </div>
+    <canvas
+      ref={canvasRef}
+      className="w-full h-full block"
+      style={{ filter: mini ? 'contrast(1.1) brightness(1.05)' : 'contrast(1.15) brightness(1.1) blur(0.4px)' }}
+    />
+  );
+};
+
+/*
+ * SystemHealthMonitor — Full ECG health display
+ * Replaces the old OK/Warnings/Errors stat boxes
+ */
+const SystemHealthMonitor = ({ summary }) => {
+  const { ok = 0, warnings = 0, errors = 0, activeAgents = 0, totalAgents = 0 } = summary;
+
+  // Derive status from real data
+  let status = 'FINE';
+  if (errors > 0) status = 'DANGER';
+  else if (warnings > 0) status = 'CAUTION';
+
+  const config = STATUS_CONFIG[status];
+  const total = ok + warnings + errors;
+  const successRate = total > 0 ? Math.round((ok / total) * 100) : 0;
+
+  return (
+    <div
+      className="relative w-full h-[200px] rounded-3xl border border-white/10 bg-black/60 backdrop-blur-2xl shadow-2xl overflow-hidden group cursor-pointer transition-all duration-700"
+      style={{ boxShadow: `0 0 60px -15px ${config.glow}` }}
+    >
+      {/* CRT Scanline overlay */}
+      <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.05] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%]" />
+      <div className="absolute inset-0 pointer-events-none z-40 bg-[radial-gradient(circle,transparent_70%,rgba(0,0,0,0.8)_100%)]" />
+
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-start z-30">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3 text-[9px] tracking-[0.5em] text-white/40 font-bold">
+            <Activity size={12} className="animate-pulse" />
+            System
           </div>
-        ))}
+          <div
+            className="text-3xl font-black italic tracking-tighter transition-all duration-500 flex items-center gap-4"
+            style={{ color: config.color, textShadow: `0 0 30px ${config.glow}` }}
+          >
+            <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 shadow-inner">
+              {status === 'FINE' && <Shield size={24} />}
+              {status === 'CAUTION' && <AlertTriangle size={24} />}
+              {status === 'DANGER' && <Zap size={24} className="fill-current" />}
+            </div>
+            <span>{config.label}</span>
+          </div>
+        </div>
+
+        <div className="text-right flex flex-col items-end gap-2">
+          <div className="text-[9px] uppercase tracking-[0.4em] text-white/30 font-bold">Agents</div>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div
+                key={i}
+                className="h-1.5 w-8 rounded-sm transition-all duration-500"
+                style={{
+                  backgroundColor: i <= activeAgents ? config.color : 'rgba(255,255,255,0.05)',
+                  boxShadow: i <= activeAgents ? `0 0 15px ${config.color}` : 'none',
+                }}
+              />
+            ))}
+          </div>
+          <div className="text-[8px] text-white/20 font-mono">ACTIVE: {activeAgents}/{totalAgents}</div>
+        </div>
       </div>
 
-      <div className="bg-[#0A0A0A] border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
+      {/* Footer */}
+      <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-between items-end z-30">
+        <div className="flex flex-col gap-0.5">
+          <div className="text-[10px] text-white/30 font-mono tracking-widest flex items-center gap-2">
+            <Info size={10} /> CorpOS
+          </div>
+          <div className="text-[9px] text-white/10 font-mono tracking-tighter">
+            EVENTS: {total} | OK: {ok} | WARN: {warnings} | ERR: {errors}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-8">
+          <div className="flex flex-col items-end">
+            <span className="text-[9px] uppercase tracking-[0.4em] text-white/40 font-bold mb-1">Success Rate</span>
+            <div className="flex items-baseline gap-2">
+              <span
+                className="text-5xl font-black font-mono transition-colors duration-500 tabular-nums leading-none"
+                style={{ color: config.color }}
+              >
+                {total > 0 ? successRate : '—'}
+              </span>
+              <span className="text-xs font-bold text-white/30 tracking-[0.2em]">%</span>
+            </div>
+          </div>
+          <div
+            className="w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all duration-500"
+            style={{
+              borderColor: `${config.color}44`,
+              color: config.color,
+              boxShadow: `0 0 25px ${config.color}22, inset 0 0 15px ${config.color}22`,
+              transform: `scale(${1 + (status === 'DANGER' ? 0.05 : 0)})`,
+            }}
+          >
+            <Heart
+              fill={status === 'DANGER' ? 'currentColor' : 'none'}
+              size={24}
+              className={`transition-all duration-300 ${status === 'DANGER' ? 'animate-bounce' : 'animate-pulse'}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Main ECG Canvas */}
+      <ECGCanvas status={status} />
+
+      {/* Edge glows */}
+      <div className="absolute top-0 left-0 w-full h-px z-[100]" style={{ background: `linear-gradient(90deg, transparent, ${config.color}, transparent)` }} />
+      <div className="absolute bottom-0 left-0 w-full h-px z-[100]" style={{ background: `linear-gradient(90deg, transparent, ${config.color}, transparent)` }} />
+    </div>
+  );
+};
+
+/*
+ * SidebarHeartbeat — Mini ECG strip for the left sidebar
+ */
+const SidebarHeartbeat = ({ summary }) => {
+  const { errors = 0, warnings = 0 } = summary;
+  let status = 'FINE';
+  if (errors > 0) status = 'DANGER';
+  else if (warnings > 0) status = 'CAUTION';
+
+  const config = STATUS_CONFIG[status];
+
+  return (
+    <div
+      className="relative w-full h-16 rounded-xl overflow-hidden"
+      style={{ background: `linear-gradient(180deg, ${config.color}08, transparent)`, border: `1px solid ${config.color}15` }}
+    >
+      <ECGCanvas status={status} mini />
+      <div className="absolute bottom-1 right-2 text-[7px] font-mono tracking-widest uppercase z-10" style={{ color: `${config.color}60` }}>
+        {config.label}
+      </div>
+    </div>
+  );
+};
+
+const SystemView = ({ summary, systemLogs }) => {
+  return (
+    <div className="h-full flex flex-col gap-4">
+      <div className="shrink-0 px-2 pt-2">
+        <SystemHealthMonitor summary={summary} />
+      </div>
+
+      <div className="flex-1 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl min-h-0 mx-2 mb-2">
         <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-black/40">
           <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Operation Log</h3>
           <div className="flex items-center gap-3">
@@ -267,8 +572,10 @@ const SystemView = ({ summary, systemLogs }) => {
             <span className="text-[10px] text-white font-bold tracking-widest uppercase">Live</span>
           </div>
         </div>
-        <div className="p-5 bg-black/20 font-mono text-[11px] h-[300px] overflow-y-auto space-y-2 custom-scrollbar">
-          {systemLogs.map((log, i) => (
+        <div className="p-5 bg-black/20 font-mono text-[11px] h-full overflow-y-auto space-y-2 custom-scrollbar" style={{ maxHeight: 'calc(100% - 52px)' }}>
+          {systemLogs.length === 0 ? (
+            <p className="text-zinc-800 text-[10px] uppercase tracking-widest font-bold">No log entries yet</p>
+          ) : systemLogs.map((log, i) => (
             <p key={log.timestamp + '-' + i} className="text-zinc-600">
               <span className="opacity-30 mr-3">{log.timestamp ? new Date(log.timestamp + 'Z').toLocaleTimeString('en-US', { hour12: true, timeZone: 'America/New_York' }) : '—:—:—'}</span>
               <span className={"font-bold mr-3 " + (log.level === 'ok' ? 'text-cyan-400' : log.level === 'critical' ? 'text-rose-500' : log.level === 'cmd' ? 'text-fuchsia-500' : log.level === 'warning' ? 'text-amber-400' : 'text-indigo-400')}>
@@ -598,16 +905,8 @@ const App = () => {
           </nav>
         </div>
 
-        <div className="mt-auto p-6 space-y-6">
-          <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl shadow-xl">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest">Agents</span>
-              <span className="text-[11px] text-cyan-400 font-bold tracking-tight">{summary.activeAgents || 0}/{summary.totalAgents || 0}</span>
-            </div>
-            <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-fuchsia-500 to-cyan-400 rounded-full" style={{ width: `${summary.totalAgents ? (summary.activeAgents / summary.totalAgents) * 100 : 0}%` }} />
-            </div>
-          </div>
+        <div className="mt-auto p-6 space-y-4">
+          <SidebarHeartbeat summary={summary} />
           <div className="flex items-center gap-3.5 px-2 group cursor-pointer text-zinc-400">
             <div className="w-8 h-8 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-[11px] font-bold text-white group-hover:border-white transition-colors">KP</div>
             <div className="flex-1 overflow-hidden">
