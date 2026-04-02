@@ -1,0 +1,224 @@
+/**
+ * useSkyboxState — React hook for live backend state
+ * Connects to WebSocket on mount, manages all operational data
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { api, connectWebSocket, addMessageListener, disconnectWebSocket } from '../lib/api';
+
+export function useSkyboxState() {
+  const [tasks, setTasks] = useState([]);
+  const [agents, setAgents] = useState([]);
+  const [controlState, setControlState] = useState({ runtime_mode: 'running', stage: 'code_blue', zone: 1 });
+  const [session, setSession] = useState(null);
+  const [livePulse, setLivePulse] = useState([]);
+  const [systemLogs, setSystemLogs] = useState([]);
+  const [pipeline, setPipeline] = useState({ stages: [], totalRelics: 0, qualifiedLeads: 0, activeOutreach: 0 });
+  const [summary, setSummary] = useState({ ok: 0, warnings: 0, errors: 0, activeAgents: 0, totalAgents: 0 });
+  const [wsStatus, setWsStatus] = useState('disconnected');
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Load initial data via REST
+  const loadInitialData = useCallback(async () => {
+    const [tasksData, agentsData, controlData, sessionData, pulseData, logsData, summaryData, pipelineData] = await Promise.all([
+      api.getTasks(),
+      api.getAgents(),
+      api.getControlState(),
+      api.getSession(),
+      api.getLivePulse(30),
+      api.getLogs(50),
+      api.getSystemSummary(),
+      api.getPipeline(),
+    ]);
+
+    if (tasksData) setTasks(tasksData);
+    if (agentsData) setAgents(agentsData);
+    if (controlData) {
+      setControlState(controlData);
+      setIsPaused(controlData.runtime_mode === 'paused');
+    }
+    if (sessionData) setSession(sessionData);
+    if (pulseData) setLivePulse(pulseData);
+    if (logsData) setSystemLogs(logsData);
+    if (summaryData) setSummary(summaryData);
+    if (pipelineData) setPipeline(pipelineData);
+  }, []);
+
+  // Handle incoming WebSocket messages
+  const handleWsMessage = useCallback((data) => {
+    switch (data.type) {
+      case 'initial_state':
+        setTasks(data.tasks || []);
+        setAgents(data.agents || []);
+        setControlState(data.control || {});
+        setSession(data.session);
+        setLivePulse(data.recentEvents || []);
+        setSystemLogs(data.systemLogs || []);
+        setSummary(data.summary || {});
+        if (data.pipeline) setPipeline(data.pipeline);
+        setIsPaused(data.control?.runtime_mode === 'paused');
+        break;
+
+      case 'event':
+        // Add to live pulse
+        setLivePulse(prev => [data, ...prev].slice(0, 50));
+
+        // Refresh affected data based on event type
+        if (data.event_type?.startsWith('task_')) {
+          setTasks(prev => {
+            const idx = prev.findIndex(t => t.id === data.task_id);
+            if (idx === -1) return prev;
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], status: mapTaskStatus(data.event_type), latest_update: data.message, latest_update_at: data.timestamp };
+            return updated;
+          });
+        }
+
+        if (data.event_type?.startsWith('agent_')) {
+          setAgents(prev => {
+            const idx = prev.findIndex(a => a.id === data.agent_id);
+            if (idx === -1) return prev;
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], status: mapAgentStatus(data.event_type), current_activity: data.message, last_heartbeat_at: data.timestamp };
+            return updated;
+          });
+        }
+
+        if (data.event_type === 'runtime_paused') {
+          setIsPaused(true);
+          setControlState(prev => ({ ...prev, runtime_mode: 'paused' }));
+        } else if (data.event_type === 'runtime_resumed') {
+          setIsPaused(false);
+          setControlState(prev => ({ ...prev, runtime_mode: 'running' }));
+        } else if (data.event_type === 'stage_changed') {
+          setControlState(prev => ({ ...prev, stage: data.payload?.stage || prev.stage }));
+        } else if (data.event_type === 'zone_changed') {
+          setControlState(prev => ({ ...prev, zone: data.payload?.zone || prev.zone }));
+        }
+
+        // Refresh pipeline on lead events
+        if (data.event_type?.startsWith('lead_')) {
+          api.getPipeline().then(d => { if (d) setPipeline(d); });
+        }
+
+        if (data.event_type?.startsWith('system_') || data.event_type === 'log_entry') {
+          setSystemLogs(prev => [{
+            timestamp: data.timestamp,
+            level: data.severity || 'info',
+            source: data.source || 'system',
+            message: data.message,
+          }, ...prev].slice(0, 50));
+        }
+        break;
+
+      case 'session_change':
+        setSession(data.session);
+        break;
+    }
+  }, []);
+
+  // Connect on mount
+  useEffect(() => {
+    loadInitialData();
+    connectWebSocket(setWsStatus);
+    const removeListener = addMessageListener(handleWsMessage);
+
+    return () => {
+      removeListener();
+      disconnectWebSocket();
+    };
+  }, [loadInitialData, handleWsMessage]);
+
+  // Control actions — prefer IPC if available, fallback to REST
+  const toggleRuntime = useCallback(async () => {
+    const newMode = isPaused ? 'running' : 'paused';
+    if (window.skybox?.control) {
+      const result = await window.skybox.control.setRuntime(newMode);
+      if (result) {
+        setIsPaused(newMode === 'paused');
+        setControlState(result);
+      }
+    } else {
+      const result = await api.setRuntime(newMode);
+      if (result) {
+        setIsPaused(newMode === 'paused');
+        setControlState(result);
+      }
+    }
+  }, [isPaused]);
+
+  const setStage = useCallback(async (stage) => {
+    if (window.skybox?.control) {
+      const result = await window.skybox.control.setStage(stage);
+      if (result) setControlState(result);
+    } else {
+      const result = await api.setStage(stage);
+      if (result) setControlState(result);
+    }
+  }, []);
+
+  const setZone = useCallback(async (zone) => {
+    if (window.skybox?.control) {
+      const result = await window.skybox.control.setZone(zone);
+      if (result) setControlState(result);
+    } else {
+      const result = await api.setZone(zone);
+      if (result) setControlState(result);
+    }
+  }, []);
+
+  const pingMax = useCallback(async () => {
+    if (window.skybox?.control) {
+      await window.skybox.control.pingMax();
+    } else {
+      await api.pingMax();
+    }
+  }, []);
+
+  return {
+    tasks,
+    agents,
+    controlState,
+    session,
+    livePulse,
+    systemLogs,
+    pipeline,
+    summary,
+    wsStatus,
+    isPaused,
+    toggleRuntime,
+    setStage,
+    setZone,
+    pingMax,
+    refresh: loadInitialData,
+  };
+}
+
+// Map backend task statuses to frontend-friendly values
+function mapTaskStatus(eventType) {
+  const map = {
+    task_created: 'queued',
+    task_queued: 'queued',
+    task_started: 'In Progress',
+    task_progress: 'In Progress',
+    task_completed: 'completed',
+    task_failed: 'failed',
+    task_warning: 'warning',
+    task_paused: 'paused',
+  };
+  return map[eventType] || 'queued';
+}
+
+// Map backend agent statuses to frontend-friendly values
+function mapAgentStatus(eventType) {
+  const map = {
+    agent_idle: 'idle',
+    agent_active: 'active',
+    agent_waiting: 'waiting',
+    agent_paused: 'paused',
+    agent_warning: 'warning',
+    agent_error: 'error',
+    agent_heartbeat: 'active',
+  };
+  return map[eventType] || 'idle';
+}

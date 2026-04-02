@@ -21,15 +21,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  AGENTS,
-  TASKS,
-  ACTIVITIES,
-  SYSTEM_METRICS,
-  OPERATION_LOGS,
-  PIPELINE,
-  COMMAND_CENTER,
-} from './data/corpOS.js';
+import { useSkyboxState } from './hooks/useSkyboxState';
 
 const StatusDot = ({ status, pulse = false }) => {
   const colors = {
@@ -41,6 +33,18 @@ const StatusDot = ({ status, pulse = false }) => {
     success: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]',
     info: 'bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.6)]',
     recurring: 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.6)]',
+    InProgress: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]',
+    in_progress: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]',
+    completed: 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.6)]',
+    failed: 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]',
+    warning: 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.6)]',
+    paused: 'bg-zinc-500',
+    queued: 'bg-zinc-700',
+    offline: 'bg-zinc-800',
+    error: 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]',
+    waiting: 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.6)]',
+    ok: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]',
+    critical: 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]',
   };
 
   return (
@@ -58,7 +62,7 @@ const Badge = ({ children, color = 'zinc' }) => {
     magenta: 'text-fuchsia-400 bg-fuchsia-500/5 border-fuchsia-500/20 shadow-[inset_0_0_10px_rgba(217,70,239,0.05)]',
     cyan: 'text-cyan-400 bg-cyan-500/5 border-cyan-500/20 shadow-[inset_0_0_10px_rgba(34,211,238,0.05)]',
     indigo: 'text-indigo-400 bg-indigo-500/5 border-indigo-500/20 shadow-[inset_0_0_10px_rgba(99,102,241,0.05)]',
-    orange: 'text-amber-400 bg-amber-500/5 border-amber-500/20 shadow-[inset_0_0_10px_rgba(245,158,11,0.05)]',
+    orange: 'text-amber-400 bg-amber-500/5 border-amber-500/20 shadow-[inset_0_0_10px_rgba(251,191,36,0.05)]',
     zinc: 'text-zinc-500 bg-white/5 border-white/10',
     pink: 'text-pink-400 bg-pink-500/5 border-pink-500/20 shadow-[inset_0_0_10px_rgba(236,72,153,0.05)]',
     green: 'text-emerald-400 bg-emerald-500/5 border-emerald-500/20 shadow-[inset_0_0_10px_rgba(52,211,153,0.05)]',
@@ -71,53 +75,59 @@ const Badge = ({ children, color = 'zinc' }) => {
   );
 };
 
-const TaskCard = ({ task }) => (
-  <motion.div
-    layout
-    whileHover={{ y: -3, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: '#0F0F0F' }}
-    className="bg-[#0A0A0A] border border-white/5 rounded-xl p-4 mb-3 cursor-grab active:cursor-grabbing shadow-xl group transition-all"
-  >
-    <div className="flex items-start justify-between mb-3 text-zinc-400">
-      <Badge color={task.priority === 'urgent' ? 'pink' : task.priority === 'high' ? 'magenta' : 'zinc'}>
-        {task.department}
-      </Badge>
-      <div className="flex items-center gap-1.5 bg-zinc-900/50 px-1.5 py-0.5 rounded border border-white/5">
-        <span className="text-[9px] font-bold text-zinc-500 tracking-tighter">{task.assignedAgent[0]}</span>
-      </div>
-    </div>
+// Get first letter of owner for badge display
+const ownerInitial = (owner) => {
+  if (!owner) return '?';
+  return owner.charAt(0).toUpperCase();
+};
 
-    <h4 className="text-[13px] font-bold text-zinc-100 mb-1 leading-tight tracking-tight">{task.title}</h4>
-    <p className="text-[11px] text-zinc-600 line-clamp-2 leading-relaxed font-medium mb-4 tracking-normal opacity-80">{task.description}</p>
+const TaskCard = ({ task }) => {
+  const priorityColor = task.priority === 'urgent' ? 'pink' : task.priority === 'high' ? 'magenta' : 'zinc';
+  const statusClass = task.status === 'in_progress' || task.status === 'In Progress'
+    ? 'active'
+    : task.status === 'completed' ? 'success'
+    : task.status === 'warning' ? 'urgent'
+    : task.status === 'failed' ? 'blocked'
+    : task.status === 'paused' ? 'idle'
+    : 'idle';
 
-    <div className="pt-3 border-t border-white/5 flex items-center justify-between">
-      <div className="flex items-center gap-2 text-zinc-400">
-        <Clock size={11} className="text-zinc-700" />
-        <span className="text-[9px] text-zinc-700 font-bold tracking-widest uppercase">{task.lastUpdated}</span>
+  return (
+    <motion.div
+      layout
+      whileHover={{ y: -3, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: '#0F0F0F' }}
+      className="bg-[#0A0A0A] border border-white/5 rounded-xl p-4 mb-3 cursor-grab active:cursor-grabbing shadow-xl group transition-all"
+    >
+      <div className="flex items-start justify-between mb-3 text-zinc-400">
+        <Badge color={priorityColor}>
+          {task.department}
+        </Badge>
+        <div className="flex items-center gap-1.5 bg-zinc-900/50 px-1.5 py-0.5 rounded border border-white/5">
+          <span className="text-[9px] font-bold text-zinc-500 tracking-tighter">{ownerInitial(task.owner)}</span>
+        </div>
       </div>
-      <div className="flex items-center gap-2.5">
-        {task.status === 'In Progress' && (
-          <div className="flex gap-1">
-            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
-          </div>
-        )}
-        {task.status === 'Recurring' && (
-          <RefreshCw size={11} className="text-amber-400/60 animate-[spin_6s_linear_infinite]" />
-        )}
-        <StatusDot
-          status={
-            task.status === 'Recurring'
-              ? 'recurring'
-              : task.status === 'In Progress'
-                ? 'active'
-                : task.status === 'Review'
-                  ? 'urgent'
-                  : 'idle'
-          }
-        />
+
+      <h4 className="text-[13px] font-bold text-zinc-100 mb-1 leading-tight tracking-tight">{task.title}</h4>
+      <p className="text-[11px] text-zinc-600 line-clamp-2 leading-relaxed font-medium mb-4 tracking-normal opacity-80">{task.description}</p>
+
+      <div className="pt-3 border-t border-white/5 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-zinc-400">
+          <Clock size={11} className="text-zinc-700" />
+          <span className="text-[9px] text-zinc-700 font-bold tracking-widest uppercase">
+            {task.latest_update_at ? new Date(task.latest_update_at + 'Z').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York' }) : '—'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2.5">
+          {(task.status === 'in_progress' || task.status === 'In Progress') && (
+            <div className="flex gap-1">
+              <div className="w-1 h-1 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+            </div>
+          )}
+          <StatusDot status={statusClass} />
+        </div>
       </div>
-    </div>
-  </motion.div>
-);
+    </motion.div>
+  );
+};
 
 const KanbanColumn = ({ title, tasks, icon: Icon, colorClass }) => (
   <div className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full bg-white/[0.01] rounded-xl p-1.5 border border-white/[0.03] backdrop-blur-sm transition-all hover:bg-white/[0.02]">
@@ -125,7 +135,7 @@ const KanbanColumn = ({ title, tasks, icon: Icon, colorClass }) => (
       <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full ${colorClass} opacity-40 group-hover:opacity-100 transition-opacity`} />
 
       <div className="flex items-center gap-3">
-        <div className={`p-1.5 rounded-lg bg-black/40 border border-white/10 ${colorClass.replace('bg-', 'text-')}`}>
+        <div className={"p-1.5 rounded-lg bg-black/40 border border-white/10 " + colorClass.replace('bg-', 'text-')}>
           <Icon size={14} strokeWidth={2.5} />
         </div>
         <div className="flex flex-col">
@@ -150,41 +160,48 @@ const KanbanColumn = ({ title, tasks, icon: Icon, colorClass }) => (
   </div>
 );
 
-const AgentNode = ({ agent, isActive = false }) => (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.98 }}
-    animate={{ opacity: 1, scale: 1 }}
-    className={`bg-[#0A0A0A] border ${isActive ? 'border-fuchsia-500/30' : 'border-white/5'} rounded-xl p-4 w-[260px] flex flex-col hover:border-white transition-all relative group overflow-hidden`}
-  >
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center gap-3.5">
-        <div className={`w-9 h-9 rounded-lg ${isActive ? 'bg-fuchsia-500/10 text-fuchsia-400' : 'bg-zinc-900 text-zinc-400'} border border-white/5 flex items-center justify-center text-sm font-bold group-hover:text-white transition-all duration-300`}>
-          {agent.name[0]}
-        </div>
-        <div className="flex flex-col">
-          <h4 className="text-[13px] font-bold text-zinc-100 tracking-tight group-hover:text-white transition-colors leading-none">{agent.name}</h4>
-          <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1 opacity-60 leading-none">{agent.role}</p>
-        </div>
-      </div>
-      <StatusDot status={agent.status} pulse={agent.status === 'active'} />
-    </div>
+const AgentNode = ({ agent, isActive = false }) => {
+  const borderClass = isActive ? 'border-fuchsia-500/30' : 'border-white/5';
+  const iconBg = isActive ? 'bg-fuchsia-500/10 text-fuchsia-400' : 'bg-zinc-900 text-zinc-400';
 
-    <div className="flex items-center justify-between pt-3 border-t border-white/5">
-      <div className="flex items-center gap-2 max-w-[180px]">
-        <Terminal size={10} className="text-zinc-700 shrink-0" />
-        <span className="text-[10px] text-zinc-500 font-medium truncate italic opacity-80">{agent.lastAction}</span>
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={"bg-[#0A0A0A] border " + borderClass + " rounded-xl p-4 w-[260px] flex flex-col hover:border-white transition-all relative group overflow-hidden"}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3.5">
+          <div className={"w-9 h-9 rounded-lg " + iconBg + " border border-white/5 flex items-center justify-center text-sm font-bold group-hover:text-white transition-all duration-300"}>
+            {agent.name[0]}
+          </div>
+          <div className="flex flex-col">
+            <h4 className="text-[13px] font-bold text-zinc-100 tracking-tight group-hover:text-white transition-colors leading-none">{agent.name}</h4>
+            <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1 opacity-60 leading-none">{agent.role}</p>
+          </div>
+        </div>
+        <StatusDot status={agent.status} pulse={agent.status === 'active'} />
       </div>
-      <Badge color={agent.department === 'Executive' ? 'magenta' : agent.department === 'Research' ? 'cyan' : 'indigo'}>
-        {agent.department[0]}
-      </Badge>
-    </div>
-  </motion.div>
-);
 
-const AgentsHierarchy = () => {
-  const architect = AGENTS.find((a) => a.hierarchyLevel === 1);
-  const leads = AGENTS.filter((a) => a.hierarchyLevel === 2);
-  const getReports = (leadId) => AGENTS.filter((a) => a.reportsTo === leadId);
+      <div className="flex items-center justify-between pt-3 border-t border-white/5">
+        <div className="flex items-center gap-2 max-w-[180px]">
+          <Terminal size={10} className="text-zinc-700 shrink-0" />
+          <span className="text-[10px] text-zinc-500 font-medium truncate italic opacity-80">{agent.current_activity || 'Idle'}</span>
+        </div>
+        <Badge color={agent.department === 'Executive' ? 'magenta' : agent.department === 'Research' ? 'cyan' : 'indigo'}>
+          {agent.department ? agent.department[0] : 'O'}
+        </Badge>
+      </div>
+    </motion.div>
+  );
+};
+
+const AgentsHierarchy = ({ agents }) => {
+  const architect = agents.find((a) => a.hierarchy_level === 1);
+  const leads = agents.filter((a) => a.hierarchy_level === 2);
+  const getReports = (leadId) => agents.filter((a) => a.reports_to === leadId);
+
+  if (!architect) return <div className="flex items-center justify-center h-full text-zinc-600">No agent data</div>;
 
   return (
     <div className="min-w-fit px-12 py-10 flex flex-col items-center gap-16 select-none">
@@ -216,35 +233,17 @@ const AgentsHierarchy = () => {
   );
 };
 
-const SystemView = () => {
-  const [logs, setLogs] = useState(OPERATION_LOGS);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const newLog = {
-        time: new Date().toLocaleTimeString('en-US', { hour12: false }),
-        level: ['INFO', 'OK', 'CMD'][Math.floor(Math.random() * 3)],
-        message: [
-          'Heartbeat check — all agents nominal',
-          'Airtable read cycle — Command Center OK',
-          'Discord gateway ping — 42ms',
-          'Memory usage stable — 72%',
-          'Research sweep cycle — Lauren active',
-        ][Math.floor(Math.random() * 5)],
-      };
-      setLogs((prev) => [newLog, ...prev].slice(0, 20));
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
+const SystemView = ({ summary, systemLogs }) => {
+  const displayStatus = summary.status || 'Operational';
+  const statusBadgeColor = displayStatus === 'Operational' ? 'cyan' : displayStatus === 'Degraded' ? 'orange' : 'pink';
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: 'OK', val: String(SYSTEM_METRICS.ok), status: 'success', icon: <Cpu size={16} />, color: 'text-cyan-400' },
-          { label: 'Warnings', val: String(SYSTEM_METRICS.warnings), status: 'success', icon: <Shield size={16} />, color: 'text-cyan-400' },
-          { label: 'Errors', val: String(SYSTEM_METRICS.errors), status: 'info', icon: <Activity size={16} />, color: 'text-indigo-400' },
+          { label: 'OK', val: String(summary.ok || 0), status: 'success', icon: <Cpu size={16} />, color: 'text-cyan-400' },
+          { label: 'Warnings', val: String(summary.warnings || 0), status: 'success', icon: <Shield size={16} />, color: 'text-cyan-400' },
+          { label: 'Errors', val: String(summary.errors || 0), status: 'info', icon: <Activity size={16} />, color: 'text-indigo-400' },
         ].map((s, i) => (
           <div key={i} className="bg-[#0A0A0A] border border-white/5 p-6 rounded-2xl shadow-xl group">
             <div className="flex items-center gap-3 mb-4 text-zinc-600">
@@ -253,7 +252,7 @@ const SystemView = () => {
             </div>
             <div className="flex items-end justify-between">
               <span className="text-2xl font-bold text-zinc-100 tracking-tight">{s.val}</span>
-              <Badge color={s.status === 'success' ? 'cyan' : 'indigo'}>Operational</Badge>
+              <Badge color={statusBadgeColor}>{displayStatus}</Badge>
             </div>
           </div>
         ))}
@@ -264,15 +263,15 @@ const SystemView = () => {
           <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Operation Log</h3>
           <div className="flex items-center gap-3">
             <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="text-[10px] text-white font-bold tracking-widest uppercase">{SYSTEM_METRICS.packetsPerSec} Pkt/Sec</span>
+            <span className="text-[10px] text-white font-bold tracking-widest uppercase">Live</span>
           </div>
         </div>
         <div className="p-5 bg-black/20 font-mono text-[11px] h-[300px] overflow-y-auto space-y-2 custom-scrollbar">
-          {logs.map((log, i) => (
-            <p key={`${log.time}-${i}`} className="text-zinc-600">
-              <span className="opacity-30 mr-3">{log.time}</span>
-              <span className={`font-bold mr-3 ${log.level === 'OK' ? 'text-cyan-400' : log.level === 'ERR' ? 'text-rose-500' : log.level === 'CMD' ? 'text-fuchsia-500' : 'text-indigo-400'}`}>
-                {log.level}
+          {systemLogs.map((log, i) => (
+            <p key={log.timestamp + '-' + i} className="text-zinc-600">
+              <span className="opacity-30 mr-3">{log.timestamp ? new Date(log.timestamp + 'Z').toLocaleTimeString('en-US', { hour12: true, timeZone: 'America/New_York' }) : '—:—:—'}</span>
+              <span className={"font-bold mr-3 " + (log.level === 'ok' ? 'text-cyan-400' : log.level === 'critical' ? 'text-rose-500' : log.level === 'cmd' ? 'text-fuchsia-500' : log.level === 'warning' ? 'text-amber-400' : 'text-indigo-400')}>
+                {(log.level || 'INFO').toUpperCase()}
               </span>
               {log.message}
             </p>
@@ -284,7 +283,9 @@ const SystemView = () => {
   );
 };
 
-const PipelineView = () => {
+const PipelineView = ({ pipeline }) => {
+  const { stages = [], totalRelics = 0, qualifiedLeads = 0, activeOutreach = 0 } = pipeline || {};
+
   const stageColors = {
     indigo: { bar: 'bg-indigo-500', text: 'text-indigo-400', glow: 'shadow-[0_0_15px_rgba(99,102,241,0.3)]' },
     cyan: { bar: 'bg-cyan-400', text: 'text-cyan-400', glow: 'shadow-[0_0_15px_rgba(34,211,238,0.3)]' },
@@ -293,15 +294,15 @@ const PipelineView = () => {
     green: { bar: 'bg-emerald-400', text: 'text-emerald-400', glow: 'shadow-[0_0_15px_rgba(52,211,153,0.3)]' },
   };
 
-  const maxCount = Math.max(...PIPELINE.stages.map((s) => s.count));
+  const maxCount = Math.max(...stages.map((s) => s.count), 1);
 
   return (
     <div className="h-full flex flex-col gap-8">
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Total Relics', val: PIPELINE.totalRelics, color: 'text-indigo-400' },
-          { label: 'Qualified Leads', val: PIPELINE.qualifiedLeads, color: 'text-cyan-400' },
-          { label: 'Active Outreach', val: PIPELINE.activeOutreach, color: 'text-fuchsia-400' },
+          { label: 'Total Relics', val: totalRelics, color: 'text-indigo-400' },
+          { label: 'Qualified Leads', val: qualifiedLeads, color: 'text-cyan-400' },
+          { label: 'Active Outreach', val: activeOutreach, color: 'text-fuchsia-400' },
         ].map((s, i) => (
           <div key={i} className="bg-[#0A0A0A] border border-white/5 p-6 rounded-2xl shadow-xl">
             <p className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest mb-3">{s.label}</p>
@@ -317,7 +318,7 @@ const PipelineView = () => {
         </div>
 
         <div className="flex items-end gap-6 h-[200px]">
-          {PIPELINE.stages.map((stage) => {
+          {stages.map((stage) => {
             const c = stageColors[stage.color] || stageColors.cyan;
             const heightPct = Math.round((stage.count / maxCount) * 100);
             return (
@@ -353,8 +354,23 @@ const PlaceholderView = ({ title, body }) => (
 
 const App = () => {
   const [currentRoute, setCurrentRoute] = useState('tasks');
-  const [isPaused, setIsPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Live backend state
+  const {
+    tasks,
+    agents,
+    controlState,
+    session,
+    livePulse,
+    systemLogs,
+    pipeline,
+    summary,
+    wsStatus,
+    isPaused,
+    toggleRuntime,
+    pingMax,
+  } = useSkyboxState();
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -370,27 +386,40 @@ const App = () => {
     { id: 'council', icon: <Gavel size={18} />, label: 'Council' },
   ];
 
+  // Map backend status to Kanban columns
+  const kanbanColumns = [
+    { title: 'Queued', statuses: ['queued'], icon: Database, colorClass: 'bg-zinc-600' },
+    { title: 'In Progress', statuses: ['in_progress', 'In Progress'], icon: Activity, colorClass: 'bg-cyan-400' },
+    { title: 'Warning', statuses: ['warning'], icon: Eye, colorClass: 'bg-amber-400' },
+    { title: 'Completed', statuses: ['completed', 'failed', 'paused'], icon: Shield, colorClass: 'bg-emerald-400' },
+  ];
+
   const renderView = () => {
     switch (currentRoute) {
       case 'tasks':
         return (
           <div className="flex gap-5 h-full overflow-x-auto custom-scrollbar snap-x pb-8">
-            <KanbanColumn title="Recurring" tasks={TASKS.filter((t) => t.status === 'Recurring')} icon={RefreshCw} colorClass="bg-amber-400" />
-            <KanbanColumn title="Backlog" tasks={TASKS.filter((t) => t.status === 'Backlog')} icon={Database} colorClass="bg-zinc-600" />
-            <KanbanColumn title="In Progress" tasks={TASKS.filter((t) => t.status === 'In Progress')} icon={Activity} colorClass="bg-cyan-400" />
-            <KanbanColumn title="Review" tasks={TASKS.filter((t) => t.status === 'Review')} icon={Eye} colorClass="bg-fuchsia-500" />
+            {kanbanColumns.map(col => (
+              <KanbanColumn
+                key={col.title}
+                title={col.title}
+                tasks={tasks.filter(t => col.statuses.includes(t.status))}
+                icon={col.icon}
+                colorClass={col.colorClass}
+              />
+            ))}
           </div>
         );
       case 'agents':
         return (
           <div className="h-full overflow-auto custom-scrollbar bg-[#050505] flex justify-center items-start pt-6">
-            <AgentsHierarchy />
+            <AgentsHierarchy agents={agents} />
           </div>
         );
       case 'system':
-        return <SystemView />;
+        return <SystemView summary={summary} systemLogs={systemLogs} />;
       case 'pipeline':
-        return <PipelineView />;
+        return <PipelineView pipeline={pipeline} />;
       case 'memory':
         return <PlaceholderView title="Memory Grid" body="Curated recall layer ready for OpenClaw memory wiring" />;
       case 'council':
@@ -399,6 +428,10 @@ const App = () => {
         return <div className="flex items-center justify-center h-full text-zinc-800 uppercase font-bold text-xs tracking-[0.5em] animate-pulse">Offline</div>;
     }
   };
+
+  // Format control state for display
+  const displayStage = controlState?.stage === 'code_red' ? 'Red' : controlState?.stage === 'code_blue' ? 'Blue' : controlState?.stage || 'Blue';
+  const displayZone = controlState?.zone || 1;
 
   return (
     <div className="flex h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
@@ -423,7 +456,7 @@ const App = () => {
             </div>
             <div>
               <h1 className="text-[15px] font-bold tracking-tight uppercase leading-none">Skybox</h1>
-              <p className="text-[9px] text-white uppercase tracking-widest font-bold mt-1.5 opacity-80">CorpOS v1.0</p>
+              <p className="text-[9px] text-white uppercase tracking-widest font-bold mt-1.5 opacity-80">CorpOS v2.0</p>
             </div>
           </div>
 
@@ -449,18 +482,18 @@ const App = () => {
         <div className="mt-auto p-6 space-y-6">
           <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl shadow-xl">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest">Memory</span>
-              <span className="text-[11px] text-cyan-400 font-bold tracking-tight">{SYSTEM_METRICS.memoryUsage}%</span>
+              <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest">Agents</span>
+              <span className="text-[11px] text-cyan-400 font-bold tracking-tight">{summary.activeAgents || 0}/{summary.totalAgents || 0}</span>
             </div>
             <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-fuchsia-500 to-cyan-400 rounded-full" style={{ width: `${SYSTEM_METRICS.memoryUsage}%` }} />
+              <div className="h-full bg-gradient-to-r from-fuchsia-500 to-cyan-400 rounded-full" style={{ width: `${summary.totalAgents ? (summary.activeAgents / summary.totalAgents) * 100 : 0}%` }} />
             </div>
           </div>
           <div className="flex items-center gap-3.5 px-2 group cursor-pointer text-zinc-400">
             <div className="w-8 h-8 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-[11px] font-bold text-white group-hover:border-white transition-colors">KP</div>
             <div className="flex-1 overflow-hidden">
               <p className="text-[12px] font-bold truncate text-zinc-100 tracking-tight group-hover:text-white">Keagan Poole</p>
-              <p className="text-[9px] text-zinc-600 truncate font-bold uppercase tracking-widest mt-1 opacity-60">CEO — Connected</p>
+              <p className="text-[9px] text-zinc-600 truncate font-bold uppercase tracking-widest mt-1 opacity-60">CEO — {wsStatus === 'connected' ? 'Connected' : 'Offline'}</p>
             </div>
             <Settings size={15} className="no-drag text-zinc-700 hover:text-white transition-colors" />
           </div>
@@ -472,24 +505,24 @@ const App = () => {
           <div className="flex items-center gap-4">
             <button className="no-drag flex items-center gap-3 px-3.5 py-1.5 bg-white/[0.03] border border-white/5 rounded-lg text-[10px] font-bold">
               <span className="text-zinc-500 uppercase tracking-widest">Zone</span>
-              <span className="text-white font-mono">0{COMMAND_CENTER.zone}</span>
+              <span className="text-white font-mono">0{displayZone}</span>
             </button>
             <button className="no-drag flex items-center gap-3 px-3.5 py-1.5 bg-white/[0.03] border border-white/5 rounded-lg text-[10px] font-bold">
               <span className="text-zinc-500 uppercase tracking-widest">Stage</span>
-              <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
-              <span className="text-cyan-400 font-mono">{COMMAND_CENTER.stage}</span>
+              <div className={`w-2 h-2 rounded-full ${displayStage === 'Red' ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]' : 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]'}`} />
+              <span className={displayStage === 'Red' ? 'text-rose-400 font-mono' : 'text-cyan-400 font-mono'}>{displayStage}</span>
             </button>
-            <span className="text-[10px] text-zinc-700 font-mono font-bold">{currentTime.toLocaleTimeString('en-US', { hour12: false })}</span>
+            <span className="text-[10px] text-zinc-700 font-mono font-bold">{currentTime.toLocaleTimeString('en-US', { hour12: true, timeZone: 'America/New_York' })}</span>
           </div>
 
           <div className="flex items-center gap-6">
-            <button onClick={() => setIsPaused(!isPaused)} className="no-drag flex items-center gap-3 group cursor-pointer">
+            <button onClick={toggleRuntime} className="no-drag flex items-center gap-3 group cursor-pointer">
               <StatusDot status={isPaused ? 'idle' : 'active'} pulse={!isPaused} />
               <span className="text-[10px] font-bold uppercase tracking-widest text-white">{isPaused ? 'Paused' : 'Live'}</span>
               {isPaused ? <Play size={11} className="text-white" fill="currentColor" /> : <Pause size={11} className="text-white" fill="currentColor" />}
             </button>
 
-            <button className="no-drag w-9 h-9 flex items-center justify-center bg-white text-black rounded-full hover:bg-cyan-400 transition-all active:scale-95 shadow-xl">
+            <button onClick={pingMax} className="no-drag w-9 h-9 flex items-center justify-center bg-white text-black rounded-full hover:bg-cyan-400 transition-all active:scale-95 shadow-xl">
               <Zap size={16} fill="black" />
             </button>
           </div>
@@ -507,25 +540,27 @@ const App = () => {
       <aside className="w-[320px] border-l border-white/5 bg-[#050505] hidden xl:flex flex-col shadow-2xl">
         <div className="p-6 pt-10 border-b border-white/5 flex items-center justify-between">
           <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-600">LIVE Pulse</h2>
-          <div className="flex items-center gap-4">
-            <button className="no-drag text-[10px] text-zinc-700 hover:text-white uppercase font-bold tracking-widest transition-colors">Trace</button>
-            <button className="no-drag text-[10px] text-zinc-700 hover:text-white uppercase font-bold tracking-widest transition-colors">Ping</button>
+          <div className="flex items-center gap-3">
+            <div className={`h-1.5 w-1.5 rounded-full ${wsStatus === 'connected' ? 'bg-cyan-400 animate-pulse' : 'bg-zinc-700'}`} />
+            <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">{wsStatus}</span>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
-          {ACTIVITIES.map((act) => (
-            <div key={act.id} className="flex gap-4 group">
+          {livePulse.map((evt) => (
+            <div key={evt.id || `${evt.timestamp}-${evt.message}`} className="flex gap-4 group">
               <div className="flex flex-col items-center">
-                <StatusDot status={act.type} pulse={act.type === 'urgent' && !isPaused} />
+                <StatusDot status={evt.severity || 'info'} pulse={evt.severity === 'critical' && !isPaused} />
                 <div className="flex-1 w-[1px] bg-zinc-900 mt-2 mb-1 group-last:bg-transparent" />
               </div>
               <div className="pb-4">
                 <div className="flex items-baseline gap-3 mb-1.5">
-                  <span className="text-[12px] font-bold text-zinc-200 group-hover:text-white transition-colors">{act.agent}</span>
-                  <span className="text-[9px] text-zinc-800 font-bold">{act.time}</span>
+                  <span className="text-[12px] font-bold text-zinc-200 group-hover:text-white transition-colors">{evt.actor || 'System'}</span>
+                  <span className="text-[9px] text-zinc-800 font-bold">
+                    {evt.timestamp ? new Date(evt.timestamp + 'Z').toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' }) : '—'}
+                  </span>
                 </div>
-                <p className="text-[11px] text-zinc-600 font-medium leading-relaxed group-hover:text-zinc-400 transition-colors">{act.action}</p>
+                <p className="text-[11px] text-zinc-600 font-medium leading-relaxed group-hover:text-zinc-400 transition-colors">{evt.message}</p>
               </div>
             </div>
           ))}
@@ -538,26 +573,36 @@ const App = () => {
               </div>
 
               <div className="flex items-end gap-1.5 h-12">
-                {[40, 70, 45, 90, 65, 85, 30, 45, 75, 60, 40, 50, 90, 80, 70, 100].map((h, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ height: 0 }}
-                    animate={{ height: isPaused ? '4px' : `${h}%` }}
-                    transition={{ delay: i * 0.05, repeat: isPaused ? 0 : Infinity, repeatType: 'reverse', duration: 1.5 }}
-                    className={`flex-1 rounded-full transition-colors duration-500 ${isPaused ? 'bg-zinc-800' : 'bg-gradient-to-t from-fuchsia-500/30 to-cyan-400'}`}
-                  />
-                ))}
+                {(() => {
+                  const total = (summary.ok || 0) + (summary.warnings || 0) + (summary.errors || 0) || 1;
+                  const bars = livePulse.slice(0, 16).map((evt) => {
+                    if (evt.severity === 'critical') return 95;
+                    if (evt.severity === 'warning') return 60;
+                    return 35;
+                  });
+                  // Pad to 16 if fewer events
+                  while (bars.length < 16) bars.push(10);
+                  return bars.map((h, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ height: 0 }}
+                      animate={{ height: isPaused ? '4px' : `${h}%` }}
+                      transition={{ delay: i * 0.05, duration: 0.6 }}
+                      className={`flex-1 rounded-full transition-colors duration-500 ${isPaused ? 'bg-zinc-800' : h > 80 ? 'bg-gradient-to-t from-rose-500/40 to-amber-400' : h > 50 ? 'bg-gradient-to-t from-amber-500/30 to-cyan-400' : 'bg-gradient-to-t from-fuchsia-500/30 to-cyan-400'}`}
+                    />
+                  ));
+                })()}
               </div>
 
               <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
                 <div className="flex flex-col">
                   <span className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest">Uptime</span>
-                  <span className="text-[13px] font-bold text-zinc-300 font-mono">{SYSTEM_METRICS.uptime}</span>
+                  <span className="text-[13px] font-bold text-zinc-300 font-mono">{summary.uptime || '99.99%'}</span>
                 </div>
                 <div className="flex flex-col items-end">
                   <span className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest">Status</span>
                   <span className={`text-[13px] font-bold font-mono transition-colors ${isPaused ? 'text-zinc-500' : 'text-cyan-400'}`}>
-                    {isPaused ? 'Standby' : SYSTEM_METRICS.status}
+                    {isPaused ? 'Standby' : (summary.status || 'Operational')}
                   </span>
                 </div>
               </div>
@@ -568,13 +613,13 @@ const App = () => {
         <div className="p-4 bg-black border-t border-white/5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <button onClick={() => setIsPaused(!isPaused)} className="no-drag text-zinc-500 hover:text-white transition-colors">
+              <button onClick={toggleRuntime} className="no-drag text-zinc-500 hover:text-white transition-colors">
                 {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />}
               </button>
               <div className="h-10 w-px bg-zinc-900" />
               <div className="overflow-hidden">
                 <p className="text-[10px] font-bold text-zinc-700 uppercase tracking-tighter">Current Session</p>
-                <p className="text-[11px] text-zinc-300 truncate w-32">{isPaused ? 'Stream Halted' : 'CorpOS — Active'}</p>
+                <p className="text-[11px] text-zinc-300 truncate w-32">{isPaused ? 'Stream Halted' : (session?.id ? 'CorpOS — Active' : 'No Session')}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 text-zinc-700">

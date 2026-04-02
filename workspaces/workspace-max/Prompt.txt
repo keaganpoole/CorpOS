@@ -1,0 +1,1014 @@
+Absolutely — and this needs to be **very explicit**, because if Max improvises here, he’ll build a dashboard hookup instead of a real operational layer.
+
+Below is the prompt you should give him **exactly for this phase**.
+
+---
+
+Max, for this session you are acting as a **senior systems architect + full stack engineer** responsible for building the **backend operational logic layer** for the Skybox Electron app inside OpenClaw.
+
+Your job in this session is **NOT** to work on frontend visuals, styling, UI redesign, animations, spacing, or aesthetics.
+The frontend shell is already built.
+
+Your job is to build the **real-time data/control infrastructure** that plugs into Skybox so that the frontend can display **actual live OpenClaw state**.
+
+This is a **logic-only / architecture-only** build session.
+
+---
+
+# PRIMARY GOAL
+
+Build the backend/runtime layer that allows Skybox to become a **live mission control system** for OpenClaw.
+
+Skybox must become a **real operational console** that can:
+
+1. Read **live task state**
+2. Read **live agent state**
+3. Read **live system/log state**
+4. Send **control commands** back into OpenClaw
+
+The system must be structured in a way that is:
+
+* local-first
+* fast
+* cost-effective
+* low token overhead
+* scalable later if needed
+* easy to debug
+* easy to migrate to Postgres/Supabase later if needed
+
+---
+
+# IMPORTANT CONSTRAINTS
+
+## DO NOT:
+
+* redesign the frontend
+* alter the frontend visual structure unless absolutely required for logic hookup
+* create mock data
+* leave placeholder fake state
+* wire Skybox directly to Airtable as the permanent solution
+* make the frontend the source of truth
+* make random direct DB writes from every process
+* overcomplicate with unnecessary cloud infrastructure
+
+## DO:
+
+* build the backend/data/control architecture properly
+* use **SQLite** as the current local source-of-truth database
+* structure it in a way that can later migrate to Postgres/Supabase if needed
+* build a **small local backend/controller service**
+* implement **structured event ingestion**
+* implement **real-time update broadcasting**
+* implement **command/control endpoints**
+* hook the existing frontend to real data
+
+---
+
+# HIGH LEVEL ARCHITECTURE TO BUILD
+
+Implement this architecture:
+
+## OpenClaw Runtime / Agents
+
+→ emit structured events
+
+## Local Controller / Operational Backend
+
+→ receives those events
+→ stores them in SQLite
+→ derives current state
+→ exposes API routes
+→ broadcasts live updates to Skybox
+→ accepts control commands from Skybox
+
+## Skybox Electron App
+
+→ fetches current state on load
+→ subscribes to live updates
+→ displays live operational truth
+→ sends commands back to backend
+
+Skybox must **read from the backend/controller**, not directly from Airtable, not directly from markdown files, and not directly from agent internals.
+
+---
+
+# TECH STACK TO USE
+
+Use the existing project structure if appropriate, but implement the logic using the following stack:
+
+* **Electron** (already exists)
+* **React/Vite frontend** (already exists)
+* **Node.js + TypeScript backend/controller**
+* **SQLite** for local operational storage
+* **WebSocket** for live real-time updates
+* **REST API** for initial data loading and command actions
+
+If TypeScript is already in place, keep everything in TypeScript.
+
+If there is already an Electron main process and preload architecture, respect it and extend it cleanly.
+
+---
+
+# WHAT THIS SYSTEM MUST SUPPORT
+
+We are ONLY implementing logic for these areas right now:
+
+1. **Tasks page**
+2. **Agents page**
+3. **System page**
+4. **Operational control buttons**
+
+We are **NOT** implementing logic right now for:
+
+* leads
+* council
+* memory
+* Discord monitoring
+
+Do not spend time wiring anything unrelated to the above.
+
+---
+
+# CORE LOGIC DOMAINS TO IMPLEMENT
+
+---
+
+# 1) TASKS PAGE LOGIC
+
+Skybox has a Tasks page.
+You must make it source live real data.
+
+Each task card should ultimately be powered by real backend state.
+
+## Each task must support:
+
+* unique task ID
+* task title / label
+* owner / assigned worker
+* whether it is being performed by:
+
+  * **A** = Agent
+  * **SA** = Sub-Agent
+* current status
+* latest update message
+* latest update timestamp
+* optional parent task / session linkage if useful
+
+## Task statuses that should be supported:
+
+* `queued`
+* `in_progress`
+* `completed`
+* `warning`
+* `failed`
+* `paused` (if relevant)
+
+These statuses should drive the frontend task card state.
+
+## The frontend currently has:
+
+* a glowing colored dot
+* a date
+* a top-right letter badge
+
+### Those should be fed logically as:
+
+* glowing dot = current task status
+* date = latest task update timestamp
+* letter badge = `A` or `SA`
+
+Do not redesign the visuals.
+Only provide the real logic/data.
+
+---
+
+## TASK LIVE PULSE SECTION
+
+There is a **Live Pulse** section inside the Tasks page.
+
+This should be a **live operational event feed** of what all employees are doing in real time.
+
+This is **NOT** just a task table.
+This should be powered by a **structured event stream**.
+
+Each Live Pulse entry should support:
+
+* event ID
+* timestamp
+* actor
+* severity
+* message
+* optional task reference
+* optional event type
+
+## Severity levels:
+
+* `ok`
+* `warning`
+* `critical`
+
+These should map to the existing frontend logic for:
+
+* green-ish status = normal / ok
+* yellow-ish status = warning
+* red-ish status = critical / issue
+
+Again: do not redesign colors, only provide the logic/state.
+
+---
+
+# 2) AGENTS PAGE LOGIC
+
+Skybox has an Agents page with employee cards.
+
+Each card must display **real current agent state**.
+
+We are only concerned right now with:
+
+* Max
+* Research
+* any sub-agents spawned under them if relevant
+
+Do not build extra team logic beyond what is actually needed.
+
+---
+
+## Each agent card should support:
+
+* agent ID
+* display name
+* role/team metadata
+* current status
+* current activity description
+* last heartbeat timestamp
+* whether the card should show a team initial or not
+
+## Agent statuses to support:
+
+* `idle`
+* `active`
+* `waiting`
+* `paused`
+* `warning`
+* `error`
+* `offline`
+
+These statuses should drive the glowing dot on the agent card.
+
+## Current activity description:
+
+This should be a short human-readable sentence describing what the agent is currently doing.
+
+Examples:
+
+* “Reviewing task queue”
+* “Researching competitors”
+* “Waiting for instruction”
+* “Paused by command center”
+
+This should come from actual backend state, not mock strings.
+
+## Team letter logic:
+
+* if an agent belongs to a team that should show a letter, provide the appropriate letter
+* if the agent is an executive like Max, no letter should appear
+
+Do not redesign the cards.
+Only feed them real data.
+
+---
+
+# 3) SYSTEM PAGE LOGIC
+
+Skybox has a System page.
+
+You must make it reflect actual OpenClaw operational state.
+
+This includes:
+
+## A) Summary counters since current session start
+
+The frontend has boxes for:
+
+* total OKs
+* total warnings
+* total critical errors
+
+These must be backed by real system log activity **since the current OpenClaw session started**.
+
+These are **session-scoped counters**, not all-time counters.
+
+---
+
+## B) Live OpenClaw Log
+
+There is also a **live log feed** on the System page.
+
+This should mimic terminal-like live system activity.
+
+This feed should be driven by structured system log events and/or captured runtime log output where appropriate.
+
+Each log entry should support:
+
+* timestamp
+* level (`ok`, `warning`, `critical`, `info` if needed)
+* source/component
+* message
+* optional metadata
+
+This feed must update in real time.
+
+---
+
+# 4) OPERATIONAL CONTROL BUTTONS
+
+The frontend already contains visuals for the following controls.
+
+Your job is to make them **actually functional** through the backend.
+
+These controls must not just toggle frontend state.
+
+They must go through the backend/controller and update real OpenClaw state.
+
+---
+
+## CONTROL 1 — STOP / RUN BUTTON
+
+### Goal:
+
+Pause or resume all OpenClaw agents **except Max**.
+
+This should affect all non-Max workers.
+
+### Required behavior:
+
+* Clicking stop should set a real paused runtime state
+* Clicking run should resume the runtime state
+* This must be represented in backend state and logs
+* This should emit operational events
+* This should update Skybox live
+
+### Important:
+
+Do not kill Max.
+Max remains the default active operator/controller.
+
+Implement this as a real command flow.
+
+Suggested logical states:
+
+* `running`
+* `paused`
+
+---
+
+## CONTROL 2 — STAGE
+
+This already exists conceptually in the Airtable command center.
+
+Max already knows what this means.
+
+### Goal:
+
+Allow Skybox to set/read the current global stage state.
+
+### Current stage values:
+
+* `code_red`
+* `code_blue`
+
+### Required behavior:
+
+* backend stores current stage state
+* frontend can read it
+* changing it updates backend state
+* changing it emits a live event
+* changing it updates Skybox immediately
+* optionally support temporary Airtable sync only if necessary, but SQLite/backend should be primary
+
+Do not make Airtable the permanent source of truth.
+
+---
+
+## CONTROL 3 — ZONE
+
+This already exists conceptually in the Airtable command center.
+
+### Goal:
+
+Allow Skybox to set/read the current global zone value.
+
+### Required behavior:
+
+* zone is a number
+* backend stores current zone state
+* frontend can read it
+* changing it updates backend state
+* changing it emits a live event
+* changing it updates Skybox immediately
+
+Again, SQLite/backend should be primary.
+
+---
+
+## CONTROL 4 — PING MAX BUTTON
+
+### Goal:
+
+Clicking this should start a new session with Max.
+
+### Required behavior:
+
+* create a new session record or wake event
+* log that the ping occurred
+* emit a real event
+* update Skybox live
+* hook into the existing OpenClaw/Max session model if one exists
+
+If there is already an existing internal session/bootstrap mechanism, integrate with that instead of inventing something disconnected.
+
+This should be a real operational action, not a cosmetic frontend button.
+
+---
+
+# VERY IMPORTANT: EVENT-DRIVEN ARCHITECTURE
+
+This system must be built around **structured events**.
+
+Do not just write random direct status fields everywhere.
+
+We need a real event pipeline.
+
+---
+
+# BUILD A STRUCTURED EVENT MODEL
+
+Create a normalized event system that captures meaningful OpenClaw runtime activity.
+
+## Required event categories:
+
+### Task Events
+
+* `task_created`
+* `task_queued`
+* `task_started`
+* `task_progress`
+* `task_completed`
+* `task_failed`
+* `task_warning`
+* `task_paused`
+
+### Agent Events
+
+* `agent_idle`
+* `agent_active`
+* `agent_waiting`
+* `agent_paused`
+* `agent_warning`
+* `agent_error`
+* `agent_heartbeat`
+
+### System Events
+
+* `system_ok`
+* `system_warning`
+* `system_error`
+* `session_started`
+* `session_ended`
+* `log_entry`
+
+### Control Events
+
+* `runtime_paused`
+* `runtime_resumed`
+* `stage_changed`
+* `zone_changed`
+* `ping_max_requested`
+
+You may add other event types if needed, but do not overcomplicate.
+
+---
+
+# CRITICAL ARCHITECTURE RULE
+
+## DO NOT let every process write directly to SQLite in random ways.
+
+Instead:
+
+### Build a central event ingestion / controller layer.
+
+That controller should:
+
+* receive events
+* validate them
+* write them to SQLite
+* update current-state tables
+* broadcast them to Skybox
+
+This is important for:
+
+* consistency
+* debugging
+* avoiding SQLite lock chaos
+* future migration
+
+---
+
+# DATABASE REQUIREMENT
+
+Use **SQLite** as the current operational database.
+
+But design the schema in a clean enough way that it could later migrate to Postgres/Supabase if needed.
+
+---
+
+# SQLITE REQUIREMENTS
+
+When implementing SQLite:
+
+## You MUST:
+
+* enable **WAL mode**
+* structure writes cleanly
+* avoid sloppy concurrent write patterns
+* use current-state tables where appropriate for fast reads
+* use append-style event logging for historical tracking
+
+---
+
+# REQUIRED DATABASE TABLES / DATA MODEL
+
+Implement a practical schema that supports this system.
+
+At minimum, create tables (or equivalent schema structures) for:
+
+## 1) `sessions`
+
+Tracks OpenClaw runtime sessions.
+
+Suggested fields:
+
+* `id`
+* `started_at`
+* `ended_at`
+* `trigger_source`
+* `status`
+
+---
+
+## 2) `events`
+
+Master operational event stream.
+
+Suggested fields:
+
+* `id`
+* `session_id`
+* `timestamp`
+* `event_type`
+* `severity`
+* `actor`
+* `actor_type`
+* `source`
+* `message`
+* `task_id` (nullable)
+* `agent_id` (nullable)
+* `payload_json` (nullable)
+
+This is the heart of the system.
+
+---
+
+## 3) `tasks`
+
+Current task state table.
+
+Suggested fields:
+
+* `id`
+* `title`
+* `owner`
+* `actor_type` (`A` or `SA`)
+* `status`
+* `latest_update`
+* `latest_update_at`
+* `session_id`
+* `parent_task_id` (nullable)
+* `created_at`
+* `updated_at`
+
+This should represent current task state for fast UI reads.
+
+---
+
+## 4) `task_updates`
+
+Historical task update stream.
+
+Suggested fields:
+
+* `id`
+* `task_id`
+* `timestamp`
+* `status`
+* `message`
+* `severity`
+* `actor`
+
+---
+
+## 5) `agents`
+
+Current agent state table.
+
+Suggested fields:
+
+* `id`
+* `name`
+* `role`
+* `team`
+* `status`
+* `current_activity`
+* `last_heartbeat_at`
+* `show_team_letter`
+* `team_letter`
+* `updated_at`
+
+---
+
+## 6) `system_logs`
+
+Operational system log feed.
+
+Suggested fields:
+
+* `id`
+* `session_id`
+* `timestamp`
+* `level`
+* `source`
+* `message`
+* `metadata_json` (nullable)
+
+This can overlap with events conceptually, but maintain whatever structure is most practical for clean reads.
+
+---
+
+## 7) `control_state`
+
+Current global operational control values.
+
+Suggested fields:
+
+* `id`
+* `runtime_mode` (`running` / `paused`)
+* `stage` (`code_red` / `code_blue`)
+* `zone`
+* `updated_at`
+
+This should store the live operational control state.
+
+---
+
+# BACKEND / CONTROLLER REQUIREMENTS
+
+Build a small local backend/controller service that does the following:
+
+---
+
+## A) EVENT INGESTION
+
+Implement a clean way for OpenClaw runtime logic to emit structured events into the system.
+
+Examples:
+
+* task starts
+* task progresses
+* task completes
+* warning raised
+* error raised
+* stage changed
+* runtime paused
+* Max pinged
+
+This should be easy to call programmatically from other parts of OpenClaw.
+
+Examples of possible implementation patterns:
+
+* internal service module
+* local HTTP endpoint
+* shared event bus module
+* controller method layer
+
+Choose the cleanest practical option for this codebase.
+
+---
+
+## B) CURRENT STATE DERIVATION
+
+Whenever events are ingested, update the appropriate current-state tables:
+
+* tasks
+* agents
+* system logs
+* control state
+* session state
+
+Skybox should be able to load current state quickly without replaying the full event log every time.
+
+---
+
+## C) API ENDPOINTS
+
+Implement REST endpoints for initial data load.
+
+At minimum, provide clean routes for:
+
+* current tasks
+* current agents
+* current system summary
+* recent live pulse events
+* recent logs
+* current control state
+* session info
+
+Suggested route ideas (adapt as appropriate):
+
+* `/api/tasks`
+* `/api/agents`
+* `/api/system/summary`
+* `/api/events/live-pulse`
+* `/api/logs`
+* `/api/control-state`
+* `/api/session`
+
+Do not obsess over route naming, but keep it clean and consistent.
+
+---
+
+## D) COMMAND ENDPOINTS
+
+Implement backend command handlers for the control actions.
+
+At minimum:
+
+* pause runtime
+* resume runtime
+* set stage
+* set zone
+* ping Max / create session
+
+Suggested route ideas:
+
+* `POST /api/control/runtime`
+* `POST /api/control/stage`
+* `POST /api/control/zone`
+* `POST /api/control/ping-max`
+
+Each command should:
+
+* update backend state
+* log the action
+* emit an event
+* broadcast to frontend
+* integrate with runtime behavior where applicable
+
+---
+
+# REAL-TIME UPDATE REQUIREMENT
+
+Implement **WebSocket-based live updates**.
+
+This is required.
+
+Skybox should not rely only on polling.
+
+---
+
+## WebSocket should push live updates for:
+
+* task changes
+* task pulse events
+* agent status changes
+* system log entries
+* control state changes
+* session changes
+
+When something changes in backend state, Skybox should receive it and update immediately.
+
+---
+
+# FRONTEND INTEGRATION REQUIREMENTS
+
+You are allowed to modify frontend data hookup code as necessary, but not redesign the UI.
+
+The goal is to connect the existing Skybox visuals to real backend logic.
+
+---
+
+## Frontend integration must support:
+
+### On app load:
+
+* fetch current tasks
+* fetch current agents
+* fetch current logs/system summary
+* fetch current control state
+* fetch current session
+
+### After load:
+
+* subscribe to WebSocket updates
+* patch/update local UI state in real time
+
+### Control buttons:
+
+* call backend command endpoints
+* update only after backend confirms or broadcasts real state
+
+Do not fake frontend state transitions.
+
+---
+
+# ELECTRON INTEGRATION REQUIREMENTS
+
+Since this is an Electron app:
+
+Make sure the architecture works cleanly inside the local desktop environment.
+
+Use the cleanest practical integration between:
+
+* Electron main process
+* preload if applicable
+* frontend renderer
+* local backend/controller
+
+If a local internal backend process needs to be launched alongside Electron, implement that cleanly.
+
+If it can live within the existing Electron/Node architecture cleanly, do that.
+
+Do not make this brittle.
+
+---
+
+# AIRTABLE REQUIREMENT
+
+Airtable is temporary and should NOT remain the long-term source of truth.
+
+If any current operational concepts such as:
+
+* stage
+* zone
+* command center state
+
+already exist in Airtable and need temporary compatibility, you may support transitional sync logic if necessary.
+
+But the system you build must treat:
+
+## SQLite + local backend/controller
+
+as the real operational source of truth.
+
+Do not architect this around Airtable.
+
+---
+
+# TOKEN / COST AWARENESS REQUIREMENT
+
+This system should be designed so that Skybox itself does **not** require ongoing LLM calls just to function.
+
+Meaning:
+
+## DO NOT:
+
+* call an LLM to determine live statuses
+* call an LLM to summarize every event
+* call an LLM to render operational state
+
+## DO:
+
+* rely on structured runtime events
+* keep operational telemetry machine-driven
+* only trigger model usage when actual agent reasoning is intentionally invoked elsewhere
+
+This is important for efficiency and cost control.
+
+---
+
+# IMPLEMENTATION PRIORITY ORDER
+
+Build this in the correct order:
+
+## Priority 1
+
+Structured event system
+
+## Priority 2
+
+SQLite schema + operational storage layer
+
+## Priority 3
+
+Backend/controller API + command handlers
+
+## Priority 4
+
+WebSocket live update layer
+
+## Priority 5
+
+Hook existing OpenClaw runtime / Max / research task flows into event emission
+
+## Priority 6
+
+Wire existing Skybox frontend pages/buttons to real backend data
+
+This order matters.
+
+Do not start by hacking UI state.
+
+---
+
+# DELIVERABLES REQUIRED FROM YOU
+
+At the end of this session, I want you to produce and/or implement the following:
+
+---
+
+## 1) A clear explanation of the architecture you implemented
+
+In plain English:
+
+* how data flows
+* what the source of truth is
+* how real-time updates work
+* how controls work
+
+---
+
+## 2) The actual backend/controller implementation
+
+Including:
+
+* event system
+* DB layer
+* API routes
+* WebSocket logic
+* command handling
+
+---
+
+## 3) The SQLite schema / migration files
+
+So I can inspect the actual data structure.
+
+---
+
+## 4) The frontend integration hookup
+
+So the existing Skybox frontend reads real backend data.
+
+---
+
+## 5) A concise “how it works” developer note
+
+Tell me:
+
+* how to run it
+* how to inspect DB state
+* how to test events
+* how to trigger a sample task update
+* how to verify live updates are working
+
+---
+
+# IMPORTANT IMPLEMENTATION QUALITY RULES
+
+Build this like a **real operator-grade internal control system**, not a hacky demo.
+
+That means:
+
+* clean file organization
+* understandable naming
+* maintainable code
+* comments where needed
+* no fake placeholder glue
+* no magical hidden assumptions
+
+If there are architectural decisions you need to make, choose the option that is:
+
+* simpler
+* cleaner
+* more robust
+* more migration-friendly
+
+---
+
+# FINAL DIRECTIVE
+
+Your mission in this session is to transform Skybox from a frontend shell into a **real operational interface for OpenClaw** by implementing the backend runtime/data/control layer described above.
+
+Do this cleanly, thoroughly, and in the correct architecture.
+
+Focus only on logic and backend operational wiring.
+

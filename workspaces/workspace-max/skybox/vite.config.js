@@ -7,6 +7,13 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Proxy API + WebSocket to backend controller during dev
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:7878',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',
