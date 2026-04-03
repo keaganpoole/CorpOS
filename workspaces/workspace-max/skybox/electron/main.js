@@ -21,7 +21,7 @@ async function startBackend() {
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1440,
+    width: 1700,
     height: 900,
     minWidth: 1100,
     minHeight: 700,

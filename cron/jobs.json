@@ -1,4 +1,58 @@
 {
   "version": 1,
-  "jobs": []
+  "jobs": [
+    {
+      "id": "a5b65cf3-7a40-426b-813f-f774348e7a34",
+      "agentId": "lauren",
+      "name": "Test Lauren Agent Route",
+      "enabled": false,
+      "deleteAfterRun": true,
+      "createdAtMs": 1775172929271,
+      "updatedAtMs": 1775178030508,
+      "schedule": {
+        "kind": "at",
+        "at": "2026-04-03T01:00:00.000Z"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Research local businesses in the HVAC sector with outdated websites."
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "last"
+      },
+      "state": {
+        "lastRunAtMs": 1775178000019,
+        "lastRunStatus": "error",
+        "lastStatus": "error",
+        "lastDurationMs": 30489,
+        "lastError": "Channel is required when multiple channels are configured: telegram, discord Set delivery.channel explicitly or use a main session with a previous channel.",
+        "lastDeliveryStatus": "unknown",
+        "consecutiveErrors": 1
+      }
+    },
+    {
+      "id": "7df5b351-1aaf-48e4-818a-67c07f384c81",
+      "name": "Test job",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1775175504575,
+      "updatedAtMs": 1775175504575,
+      "schedule": {
+        "kind": "at",
+        "at": "2026-04-03T22:00:00.000Z"
+      },
+      "sessionTarget": "main",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "systemEvent",
+        "text": "Message keagan on telegram and discord."
+      },
+      "state": {
+        "nextRunAtMs": 1775253600000
+      }
+    }
+  ]
 }

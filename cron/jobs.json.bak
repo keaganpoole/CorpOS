@@ -2,38 +2,73 @@
   "version": 1,
   "jobs": [
     {
-      "id": "e6f4fa76-1fd8-4c8a-ac1f-4a83fd845394",
-      "agentId": "main",
-      "sessionKey": "agent:main:telegram:group:-5257313997",
-      "name": "switchy-keepalive",
+      "id": "a5b65cf3-7a40-426b-813f-f774348e7a34",
+      "agentId": "lauren",
+      "name": "Test Lauren Agent Route",
       "enabled": true,
-      "createdAtMs": 1774740152805,
-      "updatedAtMs": 1774742000521,
+      "deleteAfterRun": true,
+      "createdAtMs": 1775172929271,
+      "updatedAtMs": 1775172929271,
       "schedule": {
-        "kind": "every",
-        "everyMs": 300000,
-        "anchorMs": 1774740152805
+        "kind": "at",
+        "at": "2026-04-03T01:00:00.000Z"
       },
       "sessionTarget": "isolated",
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "You are Switchy. Send ONE message to Discord #corpos-team-chat (channel ID: 1487477234401939546) to keep the break conversation alive. Read C:\\Users\\vboxuser\\.openclaw\\agents\\switchy\\behavioral_profiles.md for timing. Use webhook URLs from environment: DISCORD_WEBHOOK_LAUREN for Lauren, DISCORD_WEBHOOK_ALLIE for Allie. Keep it casual and natural. Do NOT send multiple messages - just one."
+        "message": "Research local businesses in the HVAC sector with outdated websites."
       },
       "delivery": {
         "mode": "announce",
-        "to": "-5257313997",
-        "channel": "telegram"
+        "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1774742269658,
-        "lastRunAtMs": 1774741969658,
-        "lastRunStatus": "ok",
-        "lastStatus": "ok",
-        "lastDurationMs": 30863,
-        "lastDelivered": true,
-        "lastDeliveryStatus": "delivered",
-        "consecutiveErrors": 0
+        "nextRunAtMs": 1775178000000,
+        "runningAtMs": 1775178000015
+      }
+    },
+    {
+      "id": "12d428eb-811e-45d6-9d95-06c423b9cda3",
+      "name": "debug test",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1775175119375,
+      "updatedAtMs": 1775175119375,
+      "schedule": {
+        "kind": "at",
+        "at": "2026-04-03T01:00:00.000Z"
+      },
+      "sessionTarget": "main",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "systemEvent",
+        "text": "test"
+      },
+      "state": {
+        "nextRunAtMs": 1775178000000,
+        "runningAtMs": 1775178000015
+      }
+    },
+    {
+      "id": "7df5b351-1aaf-48e4-818a-67c07f384c81",
+      "name": "Test job",
+      "enabled": true,
+      "deleteAfterRun": true,
+      "createdAtMs": 1775175504575,
+      "updatedAtMs": 1775175504575,
+      "schedule": {
+        "kind": "at",
+        "at": "2026-04-03T22:00:00.000Z"
+      },
+      "sessionTarget": "main",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "systemEvent",
+        "text": "Message keagan on telegram and discord."
+      },
+      "state": {
+        "nextRunAtMs": 1775253600000
       }
     }
   ]

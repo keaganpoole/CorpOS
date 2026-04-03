@@ -28,6 +28,9 @@ export const api = {
   getControlState: () => fetchJSON('/api/control-state'),
   getSession: () => fetchJSON('/api/session'),
   getPipeline: () => fetchJSON('/api/pipeline'),
+  getCronJobs: () => fetchJSON('/api/cron'),
+  createCronJob: (job) => postJSON('/api/cron', job),
+  deleteCronJob: (id) => deleteJSON(`/api/cron/${id}`),
 
   // Control commands via REST (fallback when IPC unavailable)
   setRuntime: (mode) => postJSON('/api/control/runtime', { mode }),
@@ -47,6 +50,19 @@ async function postJSON(endpoint, body) {
     return await res.json();
   } catch (err) {
     console.error(`[SkyboxAPI] POST failed: ${endpoint}`, err.message);
+    return null;
+  }
+}
+
+async function deleteJSON(endpoint) {
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error(`[SkyboxAPI] DELETE failed: ${endpoint}`, err.message);
     return null;
   }
 }

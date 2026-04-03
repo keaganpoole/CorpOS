@@ -16,6 +16,14 @@ class Controller {
     this.port = port;
     this.app = express();
     this.app.use(express.json());
+    // CORS for Electron dev mode (Vite on :5173 → backend on :7878)
+    this.app.use((req, res, next) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type');
+      if (req.method === 'OPTIONS') return res.sendStatus(200);
+      next();
+    });
     this.server = http.createServer(this.app);
     this.wss = new WebSocket.Server({ server: this.server });
     this.clients = new Set();
@@ -300,6 +308,131 @@ class Controller {
     // --- Health check ---
     this.app.get('/api/health', (req, res) => {
       res.json({ status: 'ok', uptime: process.uptime() });
+    });
+
+    // --- Cron Jobs (Chronos) ---
+    this.app.get('/api/cron', (req, res) => {
+      const jobs = this.db.prepare('SELECT * FROM cron_jobs ORDER BY next_run_at ASC').all();
+      res.json(jobs);
+    });
+
+    this.app.post('/api/cron/sync', (req, res) => {
+      const { jobs } = req.body;
+      if (!Array.isArray(jobs)) return res.status(400).json({ error: 'jobs array required' });
+
+      const upsert = this.db.prepare(`
+        INSERT INTO cron_jobs (id, name, schedule_kind, schedule_value, payload_kind, payload_text, session_target, status, enabled, assigned_agent, department, next_run_at, updated_at)
+        VALUES (@id, @name, @schedule_kind, @schedule_value, @payload_kind, @payload_text, @session_target, @status, @enabled, @assigned_agent, @department, @next_run_at, datetime('now'))
+        ON CONFLICT(id) DO UPDATE SET
+          name = @name, schedule_kind = @schedule_kind, schedule_value = @schedule_value,
+          payload_kind = @payload_kind, payload_text = @payload_text, session_target = @session_target,
+          status = @status, enabled = @enabled, assigned_agent = @assigned_agent,
+          department = @department, next_run_at = @next_run_at, updated_at = datetime('now')
+      `);
+
+      const syncAll = this.db.transaction((items) => {
+        for (const j of items) {
+          upsert.run(j);
+        }
+      });
+
+      syncAll(jobs);
+      const result = this.db.prepare('SELECT * FROM cron_jobs ORDER BY next_run_at ASC').all();
+      res.json({ success: true, jobs: result });
+    });
+
+    // Create a new cron job (Skybox + OpenClaw)
+    this.app.post('/api/cron', (req, res) => {
+      const { name, schedule_kind, schedule_value, payload_text, assigned_agent, department } = req.body;
+      if (!name || !schedule_kind || !schedule_value) {
+        return res.status(400).json({ error: 'name, schedule_kind, and schedule_value are required' });
+      }
+
+      const { execSync } = require('child_process');
+      const crypto = require('crypto');
+      const jobId = crypto.randomUUID();
+
+      // Compute next_run_at
+      let nextRunAt;
+      if (schedule_kind === 'at') {
+        nextRunAt = schedule_value;
+      } else if (schedule_kind === 'every') {
+        nextRunAt = new Date(Date.now() + parseInt(schedule_value)).toISOString();
+      } else {
+        // For cron expressions, set next_run_at to now (OpenClaw handles actual scheduling)
+        nextRunAt = new Date().toISOString();
+      }
+
+      // Build openclaw cron add command
+      const isMainAgent = !assigned_agent || assigned_agent === 'Max';
+      let cmd = 'openclaw cron add';
+      cmd += ` --name "${name.replace(/"/g, '\\"')}"`;
+
+      if (schedule_kind === 'at') {
+        cmd += ` --at "${schedule_value}"`;
+      } else if (schedule_kind === 'every') {
+        cmd += ` --every "${schedule_value}"`;
+      } else if (schedule_kind === 'cron') {
+        cmd += ` --cron "${schedule_value}"`;
+      }
+
+      if (isMainAgent) {
+        // Max = main session system event
+        cmd += ` --session main`;
+        if (payload_text) {
+          cmd += ` --system-event "${payload_text.replace(/"/g, '\\"')}"`;
+        }
+        cmd += ` --wake now`;
+      } else {
+        // Lauren / Yanna = isolated agent turn
+        cmd += ` --session isolated`;
+        cmd += ` --agent ${assigned_agent.toLowerCase()}`;
+        if (payload_text) {
+          cmd += ` --message "${payload_text.replace(/"/g, '\\"')}"`;
+        }
+        cmd += ` --announce`;
+      }
+
+      // Execute OpenClaw cron add
+      let openclawJobId = null;
+      let openclawError = null;
+      try {
+        const output = execSync(cmd, { encoding: 'utf8', timeout: 10000 });
+        // Parse job ID from output (format: "Created job <id>")
+        const match = output.match(/(?:Created job|jobId)[:\s]+([a-f0-9-]+)/i) || output.match(/([a-f0-9-]{36})/);
+        if (match) openclawJobId = match[1];
+      } catch (err) {
+        openclawError = err.message;
+        console.error('[Skybox] OpenClaw cron add failed:', err.message);
+      }
+
+      // Save to Skybox DB
+      this.db.prepare(`
+        INSERT INTO cron_jobs (id, name, schedule_kind, schedule_value, payload_kind, payload_text, session_target, status, enabled, assigned_agent, department, next_run_at)
+        VALUES (?, ?, ?, ?, 'systemEvent', ?, 'main', 'queued', 1, ?, ?, ?)
+      `).run(jobId, name, schedule_kind, schedule_value, payload_text || '', assigned_agent || 'Max', department || 'Operations', nextRunAt);
+
+      const job = this.db.prepare('SELECT * FROM cron_jobs WHERE id = ?').get(jobId);
+      res.json({ success: true, job, openclawJobId, openclawError });
+    });
+
+    // Delete a cron job (Skybox + OpenClaw)
+    this.app.delete('/api/cron/:id', (req, res) => {
+      const jobId = req.params.id;
+      const { execSync } = require('child_process');
+
+      // Remove from OpenClaw
+      let openclawError = null;
+      try {
+        execSync(`openclaw cron remove ${jobId}`, { encoding: 'utf8', timeout: 10000 });
+      } catch (err) {
+        openclawError = err.message;
+      }
+
+      // Remove from Skybox DB
+      this.db.prepare('DELETE FROM cron_jobs WHERE id = ?').run(jobId);
+
+      res.json({ success: true, openclawError });
     });
   }
 
