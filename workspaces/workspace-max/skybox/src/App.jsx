@@ -341,7 +341,7 @@ const ECGCanvas = ({ status, mini = false }) => {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: false });
+    const ctx = canvas.getContext('2d', { alpha: true });
 
     const dpr = window.devicePixelRatio || 1;
     const resize = () => {
@@ -349,8 +349,7 @@ const ECGCanvas = ({ status, mini = false }) => {
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
       ctx.scale(dpr, dpr);
-      ctx.fillStyle = '#020404';
-      ctx.fillRect(0, 0, rect.width, rect.height);
+      ctx.clearRect(0, 0, rect.width, rect.height);
     };
 
     window.addEventListener('resize', resize);
@@ -368,7 +367,7 @@ const ECGCanvas = ({ status, mini = false }) => {
       const centerY = height / 2;
 
       // Phosphor trail
-      ctx.fillStyle = mini ? 'rgba(2, 5, 5, 0.1)' : 'rgba(2, 5, 5, 0.06)';
+      ctx.fillStyle = mini ? 'rgba(2, 2, 2, 0.1)' : 'rgba(2, 2, 2, 0.06)';
       ctx.fillRect(0, 0, width, height);
 
       // Wave
@@ -399,14 +398,12 @@ const ECGCanvas = ({ status, mini = false }) => {
       // Wrap
       if (animState.current.xPos > width) {
         animState.current.xPos = 0;
-        ctx.fillStyle = '#020404';
-        ctx.fillRect(0, 0, 20, height);
+        ctx.clearRect(0, 0, 20, height);
       }
 
       // Clear ahead
       ctx.shadowBlur = 0;
-      ctx.fillStyle = '#020404';
-      ctx.fillRect(animState.current.xPos + 2, 0, 45, height);
+      ctx.clearRect(animState.current.xPos + 2, 0, 45, height);
 
       // Natural BPM jitter
       if (Math.random() > 0.993) {
@@ -447,10 +444,7 @@ const SidebarHeartbeat = ({ summary }) => {
   const config = STATUS_CONFIG[status];
 
   return (
-    <div
-      className="relative w-full h-16 rounded-xl overflow-hidden"
-      style={{ background: `linear-gradient(180deg, ${config.color}08, transparent)`, border: `1px solid ${config.color}15` }}
-    >
+    <div className="relative w-full h-16 rounded-xl overflow-hidden">
       <ECGCanvas status={status} mini />
       <div className="absolute bottom-1 right-2 text-[7px] font-mono tracking-widest uppercase z-10" style={{ color: `${config.color}60` }}>
         {config.label}
@@ -669,9 +663,15 @@ const PlaceholderView = ({ title, body }) => (
   </div>
 );
 
-const GradientBleed = ({ trigger, options, icon, variant, value, onSelect }) => {
+const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpenChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
+
+  const toggleOpen = () => {
+    const next = !isOpen;
+    setIsOpen(next);
+    if (onOpenChange) onOpenChange(next);
+  };
 
   const colorMap = {
     'RED': '#ef4444',
@@ -692,6 +692,7 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect }) => 
   const handleSelect = (option) => {
     onSelect(option);
     setIsOpen(false);
+    if (onOpenChange) onOpenChange(false);
     setIsSweeping(true);
     setTimeout(() => setIsSweeping(false), 800);
   };
@@ -717,10 +718,10 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect }) => 
   const displayLabel = value ? `${trigger} ${value}` : trigger;
 
   return (
-    <div className="relative">
+    <div className="relative inline-flex items-center">
       <div className="flex items-center">
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => toggleOpen()}
           className={`no-drag flex items-center gap-2 px-4 py-2 font-bold transition-colors duration-500 z-10 text-[11px] uppercase tracking-widest ${isOpen ? '' : 'hover:text-zinc-200'}`}
         >
           {icon}
@@ -1549,6 +1550,11 @@ const NavButton = ({ item, isActive, onClick }) => {
           50% { background-position: 100% 0; }
           100% { background-position: 0% 0; }
         }
+        @keyframes gradientMove {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
         .nav-sweep {
           animation: navSweep 1s ease-in-out forwards;
         }
@@ -1564,6 +1570,9 @@ const NavButton = ({ item, isActive, onClick }) => {
 const App = () => {
   const [currentRoute, setCurrentRoute] = useState('tasks');
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [glitch, setGlitch] = useState(false);
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const [codeOpen, setCodeOpen] = useState(false);
 
   // Live backend state
   const {
@@ -1588,6 +1597,17 @@ const App = () => {
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  // Occasional logo glitch
+  useEffect(() => {
+    const g = setInterval(() => {
+      if (Math.random() > 0.97) {
+        setGlitch(true);
+        setTimeout(() => setGlitch(false), 120);
+      }
+    }, 2500);
+    return () => clearInterval(g);
   }, []);
 
   const navItems = [
@@ -1650,7 +1670,7 @@ const App = () => {
   const displayZone = controlState?.zone || 1;
 
   return (
-    <div className="flex h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -1664,18 +1684,91 @@ const App = () => {
 
       <div className="drag-region fixed top-0 left-0 right-0 h-8 z-50 pointer-events-none" />
 
-      <aside className="w-[240px] flex flex-col border-r border-white/5 bg-[#050505] transition-all">
-        <div className="p-6 pt-10">
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:scale-105 transition-transform cursor-pointer">
-              <Shield size={20} className="text-black" />
+      {/* Full-width toolbar */}
+      <header className="shrink-0 h-14 border-b border-white/5 bg-black/60 backdrop-blur-2xl flex items-center px-10 z-30 relative">
+        {/* CRT Scanlines */}
+        <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.03]">
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
+        </div>
+
+        {/* Ghost glitch flash */}
+        <div className={`absolute inset-0 bg-white/5 pointer-events-none z-[60] transition-opacity duration-75 ${glitch ? 'opacity-100' : 'opacity-0'}`} />
+
+        {/* Bottom scan trace */}
+        <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+        {/* Left: CorpOS Logo */}
+        <div className={`relative z-10 transition-transform duration-75 ${glitch ? 'translate-x-[1px] skew-x-[1px]' : ''}`}>
+          <h1 className="text-[22px] font-bold tracking-tighter select-none leading-none">
+            <span className="text-white">Corp</span>
+            <span className="bg-gradient-to-r from-[#22d3ee] via-[#a855f7] to-[#ec4899] bg-clip-text text-transparent" style={{ backgroundSize: '200% 200%', animation: 'gradientMove 3s ease infinite' }}>OS</span>
+          </h1>
+          {glitch && (
+            <div className="absolute inset-0 text-[22px] font-bold tracking-tighter opacity-30 blur-[2px] pointer-events-none select-none leading-none">
+              <span className="text-[#ff00ff] absolute top-[-2px] left-[-2px]">CorpOS</span>
+              <span className="text-[#00ffff] absolute top-[2px] left-[2px]">CorpOS</span>
             </div>
-            <div>
-              <h1 className="text-[15px] font-bold tracking-tight uppercase leading-none">Skybox</h1>
-              <p className="text-[9px] text-white tracking-widest font-bold mt-1.5 opacity-80">CorpOS v2.0</p>
+          )}
+        </div>
+
+        {/* Center: Zone + Code + SKYBOX + Live + Ping */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center z-10">
+          {/* Zone */}
+          <div className="relative" style={{ width: '120px', textAlign: 'center' }}>
+            <GradientBleed
+              trigger="Zone"
+              options={['7', '6', '5', '4', '3', '2', '1']}
+              variant="prism"
+              icon={<Sparkles size={12} />}
+              value={String(displayZone)}
+              onSelect={(val) => setZone(parseInt(val))}
+              onOpenChange={(open) => setZoneOpen(open)}
+            />
+          </div>
+
+          {/* Code — fades when Zone is open */}
+          <div className={`relative transition-opacity duration-500 ${zoneOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ width: '120px', textAlign: 'center' }}>
+            <GradientBleed
+              trigger="Code"
+              options={['RED', 'BLUE']}
+              variant="elastic"
+              icon={<Cpu size={12} />}
+              value={displayStage === 'Red' ? 'RED' : displayStage === 'Blue' ? 'BLUE' : null}
+              onSelect={(val) => setStage(val === 'RED' ? 'code_red' : 'code_blue')}
+              onOpenChange={(open) => setCodeOpen(open)}
+            />
+          </div>
+
+          {/* SKYBOX Logo — fades when either dropdown is open */}
+          <div className={`relative flex flex-col items-center transition-opacity duration-500 mx-20 ${zoneOpen || codeOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            <div className={`relative transition-all duration-700 transform ${glitch ? 'opacity-10 scale-[1.05] blur-sm' : 'opacity-100 scale-100'}`}>
+              <div className="absolute -left-6 inset-y-0 w-[1px] bg-white/10" />
+              <div className="absolute -right-6 inset-y-0 w-[1px] bg-white/10" />
+              <h1 className="text-2xl font-light tracking-[0.6em] text-white/15 uppercase leading-none hover:text-white/30 transition-colors cursor-default">
+                SKYBOX
+              </h1>
             </div>
           </div>
 
+          {/* Live + Ping */}
+          <div className="relative flex items-center gap-6" style={{ width: '180px' }}>
+            <button onClick={toggleRuntime} className="no-drag flex items-center gap-3 group cursor-pointer">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white">{isPaused ? 'Paused' : 'Live'}</span>
+              {isPaused ? <Play size={11} className="text-white" fill="currentColor" /> : <Pause size={11} className="text-white" fill="currentColor" />}
+            </button>
+
+            <button onClick={pingMax} className="no-drag w-9 h-9 flex items-center justify-center bg-white rounded-full hover:bg-cyan-400 transition-all active:scale-95 shadow-xl">
+              <Zap size={16} className="text-white" fill="black" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Columns row */}
+      <div className="flex flex-1 min-h-0">
+
+      <aside className="w-[240px] flex flex-col border-r border-white/5 bg-[#020202] transition-all">
+        <div className="p-6 pt-10">
           <nav className="space-y-1">
             {navItems.map((item) => (
               <NavButton
@@ -1701,44 +1794,7 @@ const App = () => {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col min-w-0 bg-black relative">
-        <header className="h-14 border-b border-white/5 bg-black/60 backdrop-blur-2xl sticky top-0 z-20 flex items-center justify-between px-10 pt-2">
-          <div className="flex items-center gap-4">
-            <GradientBleed
-              trigger="Zone"
-              options={['7', '6', '5', '4', '3', '2', '1']}
-              variant="prism"
-              icon={<Sparkles size={12} />}
-              value={String(displayZone)}
-              onSelect={(val) => setZone(parseInt(val))}
-            />
-            <GradientBleed
-              trigger="Code"
-              options={['RED', 'BLUE']}
-              variant="elastic"
-              icon={<Cpu size={12} />}
-              value={displayStage === 'Red' ? 'RED' : displayStage === 'Blue' ? 'BLUE' : null}
-              onSelect={(val) => setStage(val === 'RED' ? 'code_red' : 'code_blue')}
-            />
-            <span className="text-[10px] text-zinc-700 font-mono font-bold">{currentTime.toLocaleTimeString('en-US', { hour12: true, timeZone: 'America/New_York' })}</span>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <button onClick={toggleRuntime} className="no-drag flex items-center gap-3 group cursor-pointer">
-              <div className="relative flex items-center justify-center">
-                <div className={`h-2 w-2 rounded-full ${isPaused ? 'bg-zinc-500' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]'}`} />
-                {!isPaused && <div className="absolute h-2 w-2 rounded-full bg-red-500 animate-ping opacity-50" />}
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-white">{isPaused ? 'Paused' : 'Live'}</span>
-              {isPaused ? <Play size={11} className="text-white" fill="currentColor" /> : <Pause size={11} className="text-white" fill="currentColor" />}
-            </button>
-
-            <button onClick={pingMax} className="no-drag w-9 h-9 flex items-center justify-center bg-white text-black rounded-full hover:bg-cyan-400 transition-all active:scale-95 shadow-xl">
-              <Zap size={16} fill="black" />
-            </button>
-          </div>
-        </header>
-
+      <main className="flex-1 flex flex-col min-w-0 bg-[#020202] relative">
         <div className="flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div key={currentRoute} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }} className="h-full">
@@ -1748,7 +1804,7 @@ const App = () => {
         </div>
       </main>
 
-      <aside className="w-[320px] border-l border-white/5 bg-[#050505] hidden xl:flex flex-col shadow-2xl">
+      <aside className="w-[320px] border-l border-white/5 bg-[#020202] hidden xl:flex flex-col shadow-2xl">
         <div className="p-6 pt-10 border-b border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-600">LIVE Pulse</h2>
@@ -1855,6 +1911,7 @@ const App = () => {
           </div>
         </div>
       </aside>
+      </div>
     </div>
   );
 };
