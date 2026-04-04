@@ -15,13 +15,14 @@ export function useSkyboxState() {
   const [systemLogs, setSystemLogs] = useState([]);
   const [pipeline, setPipeline] = useState({ stages: [], totalRelics: 0, qualifiedLeads: 0, activeOutreach: 0 });
   const [cronJobs, setCronJobs] = useState([]);
+const [reactions, setReactions] = useState([]);
   const [summary, setSummary] = useState({ ok: 0, warnings: 0, errors: 0, activeAgents: 0, totalAgents: 0 });
   const [wsStatus, setWsStatus] = useState('disconnected');
   const [isPaused, setIsPaused] = useState(false);
 
   // Load initial data via REST
   const loadInitialData = useCallback(async () => {
-    const [tasksData, agentsData, controlData, sessionData, pulseData, logsData, summaryData, pipelineData, cronData] = await Promise.all([
+    const [tasksData, agentsData, controlData, sessionData, pulseData, logsData, summaryData, pipelineData, cronData, reactionsData] = await Promise.all([
       api.getTasks(),
       api.getAgents(),
       api.getControlState(),
@@ -31,6 +32,7 @@ export function useSkyboxState() {
       api.getSystemSummary(),
       api.getPipeline(),
       api.getCronJobs(),
+      api.getReactions(),
     ]);
 
     if (tasksData) setTasks(tasksData);
@@ -45,6 +47,7 @@ export function useSkyboxState() {
     if (summaryData) setSummary(summaryData);
     if (pipelineData) setPipeline(pipelineData);
     if (cronData) setCronJobs(cronData);
+    if (reactionsData) setReactions(reactionsData);
   }, []);
 
   // Handle incoming WebSocket messages
@@ -187,6 +190,7 @@ export function useSkyboxState() {
     systemLogs,
     pipeline,
     cronJobs,
+    reactions,
     summary,
     wsStatus,
     isPaused,

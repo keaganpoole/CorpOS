@@ -434,6 +434,31 @@ class Controller {
 
       res.json({ success: true, openclawError });
     });
+
+    // Reactions — get counts per agent
+    this.app.get('/api/reactions', (req, res) => {
+      const counts = this.db.prepare(`
+        SELECT agent_name,
+          SUM(CASE WHEN reaction_type = 'compliment' THEN 1 ELSE 0 END) as compliments,
+          SUM(CASE WHEN reaction_type = 'complaint' THEN 1 ELSE 0 END) as complaints
+        FROM reactions GROUP BY agent_name
+      `).all();
+      res.json(counts);
+    });
+
+    // Reactions — add a new reaction
+    this.app.post('/api/reactions', (req, res) => {
+      const { agent_name, reaction_type, context } = req.body;
+      if (!agent_name || !reaction_type) return res.status(400).json({ error: 'agent_name and reaction_type required' });
+      this.db.prepare('INSERT INTO reactions (agent_name, reaction_type, context) VALUES (?, ?, ?)').run(agent_name, reaction_type, context || '');
+      const counts = this.db.prepare(`
+        SELECT agent_name,
+          SUM(CASE WHEN reaction_type = 'compliment' THEN 1 ELSE 0 END) as compliments,
+          SUM(CASE WHEN reaction_type = 'complaint' THEN 1 ELSE 0 END) as complaints
+        FROM reactions WHERE agent_name = ? GROUP BY agent_name
+      `).get(agent_name);
+      res.json({ success: true, ...counts });
+    });
   }
 
   _ensureSession() {

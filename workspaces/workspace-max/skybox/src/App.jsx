@@ -172,48 +172,101 @@ const KanbanColumn = ({ title, tasks, icon: Icon, colorClass }) => (
   </div>
 );
 
-const AgentNode = ({ agent, isActive = false }) => {
-  const borderClass = isActive ? 'border-fuchsia-500/30' : 'border-white/5';
-  const iconBg = isActive ? 'bg-fuchsia-500/10 text-fuchsia-400' : 'bg-zinc-900 text-zinc-400';
+const AgentNode = ({ agent, isActive = false, reactions = {} }) => {
+  const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
+
+  // Mock stats — front end only for now (except reactions which comes from DB)
+  const baseStats = {
+    Max: { memory: 47, tasks: 156, model: 'claude-opus-4.6', modelUsage: '2.4M tokens' },
+    Lauren: { memory: 23, tasks: 89, model: 'StepFun 3.5 Flash', modelUsage: '1.1M tokens' },
+    Yanna: { memory: 12, tasks: 34, model: 'StepFun 3.5 Flash', modelUsage: '480K tokens' },
+  }[agent.name] || { memory: 0, tasks: 0, model: 'Unknown', modelUsage: '0' };
+
+  const stats = {
+    ...baseStats,
+    compliments: reactions.compliments || 0,
+    complaints: reactions.complaints || 0,
+  };
+
+  const isOnline = agent.status === 'active';
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={"bg-[#0A0A0A] border " + borderClass + " rounded-xl p-4 w-[260px] flex flex-col hover:border-white transition-all relative group overflow-hidden"}
+      className={`bg-[#0A0A0A] border ${borderClass} rounded-2xl w-[320px] flex flex-col hover:border-white/10 transition-all duration-500 relative group overflow-hidden`}
     >
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-9 h-9 rounded-lg overflow-hidden border border-white/5 group-hover:border-white/20 transition-all duration-300 bg-zinc-900">
-            <img
-              src={`${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
-              alt={agent.name}
-              className="w-full h-full object-cover"
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
+      {/* Avatar — large, dominant */}
+      <div className="relative h-[200px] overflow-hidden">
+        <img
+          src={`${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
+          alt={agent.name}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          onError={(e) => {
+            e.target.style.display = 'none';
+            e.target.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
+          }}
+        />
+        {/* Gradient fade */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/40 to-transparent" />
+
+        {/* Status badge */}
+        <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xl border border-white/[0.06]">
+          <div className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-600'}`}>
+            {isOnline && <div className="absolute h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping opacity-40" />}
           </div>
-          <div className="flex flex-col">
-            <h4 className="text-[13px] font-bold text-zinc-100 tracking-tight group-hover:text-white transition-colors leading-none">{agent.name}</h4>
-            <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1 opacity-60 leading-none">{agent.role}</p>
-          </div>
+          <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">{isOnline ? 'Active' : 'Idle'}</span>
         </div>
-        <StatusDot status={agent.status} pulse={agent.status === 'active'} />
+
+        {/* Name overlay */}
+        <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
+          <h3 className="text-xl font-bold text-white tracking-tight leading-none">{agent.name}</h3>
+          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-[0.2em] mt-1">{agent.role}</p>
+        </div>
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-white/5">
-        <div className="flex items-center gap-2 max-w-[180px]">
-          <Terminal size={10} className="text-zinc-700 shrink-0" />
-          <span className="text-[10px] text-zinc-500 font-medium truncate italic opacity-80">{agent.current_activity || 'Idle'}</span>
+      {/* Stats */}
+      <div className="p-5 space-y-3">
+        {/* Current Activity */}
+        <div className="flex items-center gap-2 text-zinc-500">
+          <Terminal size={11} className="shrink-0 text-zinc-700" />
+          <span className="text-[11px] font-medium truncate italic">{agent.current_activity || 'Idle'}</span>
         </div>
-        <Badge color={agent.department === 'Executive' ? 'magenta' : agent.department === 'Research' ? 'cyan' : 'indigo'}>
-          {agent.department ? agent.department[0] : 'O'}
-        </Badge>
+
+        {/* Stat grid */}
+        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/[0.04]">
+          <div>
+            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Memory</p>
+            <p className="text-[14px] font-bold text-zinc-300 mt-0.5">{stats.memory} <span className="text-[10px] text-zinc-600">items</span></p>
+          </div>
+          <div>
+            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Tasks Done</p>
+            <p className="text-[14px] font-bold text-zinc-300 mt-0.5">{stats.tasks}</p>
+          </div>
+          <div>
+            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Compliments</p>
+            <p className="text-[14px] font-bold text-emerald-400 mt-0.5">{stats.compliments}</p>
+          </div>
+          <div>
+            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Complaints</p>
+            <p className="text-[14px] font-bold text-rose-400 mt-0.5">{stats.complaints}</p>
+          </div>
+        </div>
+
+        {/* Model info */}
+        <div className="pt-3 border-t border-white/[0.04]">
+          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Language Model</p>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-cyan-400/80 truncate">{stats.model}</span>
+            <span className="text-[9px] text-zinc-600 font-mono shrink-0 ml-2">{stats.modelUsage}</span>
+          </div>
+        </div>
       </div>
     </motion.div>
   );
 };
 
-const AgentBranch = ({ agent, agents, depth = 0 }) => {
+const AgentBranch = ({ agent, agents, reactionsMap, depth = 0 }) => {
   const directReports = agents.filter((a) => a.reports_to === agent.id);
 
   return (
@@ -221,7 +274,7 @@ const AgentBranch = ({ agent, agents, depth = 0 }) => {
       {depth > 0 && (
         <div className="absolute left-1/2 -translate-x-1/2 w-[1px] bg-zinc-800" style={{ height: '40px', top: '-40px' }} />
       )}
-      <AgentNode agent={agent} isActive={depth === 0} />
+      <AgentNode agent={agent} isActive={depth === 0} reactions={reactionsMap[agent.name] || {}} />
 
       {directReports.length > 0 && (
         <div className="mt-8 flex flex-col items-center">
@@ -232,7 +285,7 @@ const AgentBranch = ({ agent, agents, depth = 0 }) => {
               <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] bg-zinc-800" style={{ width: 'calc(100% - 260px)' }} />
             )}
             {directReports.map((report) => (
-              <AgentBranch key={report.id} agent={report} agents={agents} depth={depth + 1} />
+              <AgentBranch key={report.id} agent={report} agents={agents} reactionsMap={reactionsMap} depth={depth + 1} />
             ))}
           </div>
         </div>
@@ -241,13 +294,19 @@ const AgentBranch = ({ agent, agents, depth = 0 }) => {
   );
 };
 
-const AgentsHierarchy = ({ agents }) => {
+const AgentsHierarchy = ({ agents, reactions = [] }) => {
   const root = agents.find((a) => a.hierarchy_level === 1);
   if (!root) return <div className="flex items-center justify-center h-full text-zinc-600">No agent data</div>;
 
+  // Build reactions lookup map
+  const reactionsMap = {};
+  for (const r of reactions) {
+    reactionsMap[r.agent_name] = r;
+  }
+
   return (
     <div className="min-w-fit px-12 pt-10 flex flex-col items-center select-none">
-      <AgentBranch agent={root} agents={agents} depth={0} />
+      <AgentBranch agent={root} agents={agents} reactionsMap={reactionsMap} depth={0} />
     </div>
   );
 };
@@ -1584,6 +1643,7 @@ const App = () => {
     systemLogs,
     pipeline,
     cronJobs,
+    reactions,
     summary,
     wsStatus,
     isPaused,
@@ -1647,7 +1707,7 @@ const App = () => {
       case 'agents':
         return (
           <div className="h-full overflow-auto custom-scrollbar bg-[#020202] flex justify-center items-start pt-6">
-            <AgentsHierarchy agents={agents} />
+            <AgentsHierarchy agents={agents} reactions={reactions} />
           </div>
         );
       case 'chronos':
@@ -1757,8 +1817,8 @@ const App = () => {
               {isPaused ? <Play size={11} className="text-white" fill="currentColor" /> : <Pause size={11} className="text-white" fill="currentColor" />}
             </button>
 
-            <button onClick={pingMax} className="no-drag w-9 h-9 flex items-center justify-center bg-white rounded-full hover:bg-cyan-400 transition-all active:scale-95 shadow-xl">
-              <Zap size={16} className="text-white" fill="black" />
+            <button onClick={pingMax} className="no-drag px-4 py-1.5 bg-white rounded-full text-[10px] font-black uppercase tracking-widest text-black hover:bg-cyan-400 transition-all active:scale-95 shadow-xl">
+              Ping
             </button>
           </div>
         </div>
@@ -1888,25 +1948,6 @@ const App = () => {
                   </span>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4 bg-black border-t border-white/5">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <button onClick={toggleRuntime} className="no-drag text-zinc-500 hover:text-white transition-colors">
-                {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />}
-              </button>
-              <div className="h-10 w-px bg-zinc-900" />
-              <div className="overflow-hidden">
-                <p className="text-[10px] font-bold text-zinc-700 uppercase tracking-tighter">Current Session</p>
-                <p className="text-[11px] text-zinc-300 truncate w-32">{isPaused ? 'Stream Halted' : (session?.id ? 'CorpOS — Active' : 'No Session')}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 text-zinc-700">
-              <Volume2 size={15} className="no-drag hover:text-zinc-400 cursor-pointer" />
-              <Maximize2 size={15} className="no-drag hover:text-zinc-400 cursor-pointer" />
             </div>
           </div>
         </div>

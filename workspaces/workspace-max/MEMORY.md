@@ -10,6 +10,17 @@
 - **2026-03-30:** Streamlined org. Removed dev, sales, care, and marketing departments and workspaces. Org is now: Keagan (CEO) → Max (COO) → Lauren (Research Manager) → Yanna (Research Associate).
 - **2026-03-31:** Keagan reset the Max bot's Discord token. 403 errors followed — bot was not in the server. Keagan used OAuth to re-invite. Discord bot username unknown — needs verification. Max Group Chat (channel ID 1488333645310726196) was deleted by Keagan. Keagan issued major communication policy correction: (1) I claimed Lauren responded in Telegram — no record of this exists; if I said it, I was wrong. Apologized. (2) Telegram is RESTRICTED to Max only and only when explicitly directed by Keagan. No other agent uses Telegram. (3) Lauren posts in Situation Room only — no Telegram, Keagan wants full visibility. (4) Start_day workflow updated: `/start_day` → analyze Airtable → brief Keagan → wait for go → THEN post Situation Room. Do NOT post Situation Room before briefing Keagan.
 
+
+## Reactions System (Feedback Loop)
+- **reactions.md** — Located at `C:\Users\vboxuser\.openclaw\workspaces\workspace-max\reactions.md`. Stores ALL genuine compliments and complaints from Keagan with context on what triggered them and what to learn.
+- **Purpose:** This is how Max (and all agents) grow and adapt to Keagan's preferences. Every entry teaches what he likes and dislikes. Review before making design decisions.
+- **Rules:** Only log GENUINE praise ("I love that", "great work", "this is perfect") and GENUINE complaints ("I don't like that", "you're pissing me off", "get it together"). NOT polite acknowledgments or course corrections.
+- **Announce:** Always say "📋 Saving reaction..." when logging.
+- **SQLite:** `reactions` table in Skybox DB tracks compliment/complaint counts per agent. API at `/api/reactions`.
+- **Slash commands:** `/compliment` and `/complaint` work in Discord and Telegram as backups if Max misses a reaction in conversation.
+- **Agent cards:** Show compliment/complaint counts from the reactions table.
+
+
 ## Active Agents (Onboarded)
 | Agent | Role | Platform | Bot Username | Model |
 |-------|------|----------|--------------|-------|
@@ -103,3 +114,14 @@ $resp.Close()
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
 - Yanna (Research Associate) does not yet have her own independent agent/bot.
 - Max Discord bot — fully operational in CorpOS server (2026-03-31).
+
+## Skybox Rules
+- **DO NOT restart Skybox (kill Electron/server process) after making changes unless there is a major error.** Keagan runs `npm run dev` himself. Just build and rebuild the native module — he restarts the app on his own.
+- Skybox is a React + Electron app at `C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox`
+- Backend runs on `http://127.0.0.1:7878` (Express + SQLite via better-sqlite3)
+- After code changes: run `npx vite build` then `npx electron-rebuild -f -w better-sqlite3` — do NOT kill processes
+- Employee avatars hosted on Supabase: `https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges/{name}.jpg`
+- Cron jobs sync: Skybox has its own `cron_jobs` SQLite table + `/api/cron` endpoints. OpenClaw cron created via `openclaw cron add` CLI.
+- Background color: `#020202` for all page/section backgrounds
+
+

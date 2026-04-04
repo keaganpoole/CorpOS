@@ -31,6 +31,8 @@ export const api = {
   getCronJobs: () => fetchJSON('/api/cron'),
   createCronJob: (job) => postJSON('/api/cron', job),
   deleteCronJob: (id) => deleteJSON(`/api/cron/${id}`),
+  getReactions: () => fetchJSON('/api/reactions'),
+  addReaction: (data) => postJSON('/api/reactions', data),
 
   // Control commands via REST (fallback when IPC unavailable)
   setRuntime: (mode) => postJSON('/api/control/runtime', { mode }),
