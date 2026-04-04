@@ -386,23 +386,25 @@ const getHeartbeatY = (progress, restingThreshold) => {
 
 /*
  * ECGCanvas — Pure canvas ECG renderer
- * Renders the heartbeat line on a canvas element
+ * Renders the heartbeat line on a canvas element.
+ * All animation state lives in a single stable ref — no state, no re-renders,
+ * no animation restart when React re-renders the tree.
  */
 const ECGCanvas = ({ status, mini = false }) => {
   const canvasRef = useRef(null);
-  const requestRef = useRef();
-  const animState = useRef({ status, xPos: 0, prevY: 0 });
+  const animRef = useRef(null);
 
-  useEffect(() => {
-    animState.current.status = status;
-  }, [status]);
-
+  // Kick off / restart the animation when status changes.
+  // Since animRef is stable, we restart by simply starting a new loop.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d', { alpha: true });
-
     const dpr = window.devicePixelRatio || 1;
+
+    // Cancel any previous loop
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
       canvas.width = rect.width * dpr;
@@ -410,15 +412,15 @@ const ECGCanvas = ({ status, mini = false }) => {
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, rect.width, rect.height);
     };
-
     window.addEventListener('resize', resize);
     resize();
 
     let bpm = STATUS_CONFIG[status].bpmRange[0];
+    let xPos = 0;
+    let prevY = 0;
 
     const render = () => {
-      const { status: currentStatus, xPos, prevY } = animState.current;
-      const config = STATUS_CONFIG[currentStatus];
+      const config = STATUS_CONFIG[status];
       const now = Date.now();
 
       const width = canvas.width / dpr;
@@ -426,7 +428,7 @@ const ECGCanvas = ({ status, mini = false }) => {
       const centerY = height / 2;
 
       // Phosphor trail
-      ctx.fillStyle = mini ? 'rgba(2, 2, 2, 0.1)' : 'rgba(2, 2, 2, 0.06)';
+      ctx.fillStyle = mini ? 'rgba(2, 2, 2, 0.12)' : 'rgba(2, 2, 2, 0.06)';
       ctx.fillRect(0, 0, width, height);
 
       // Wave
@@ -451,34 +453,34 @@ const ECGCanvas = ({ status, mini = false }) => {
       ctx.lineTo(xPos, targetY);
       ctx.stroke();
 
-      animState.current.prevY = targetY;
-      animState.current.xPos += config.speed;
+      prevY = targetY;
+      xPos += config.speed;
 
       // Wrap
-      if (animState.current.xPos > width) {
-        animState.current.xPos = 0;
+      if (xPos > width) {
+        xPos = 0;
         ctx.clearRect(0, 0, 20, height);
       }
 
       // Clear ahead
       ctx.shadowBlur = 0;
-      ctx.clearRect(animState.current.xPos + 2, 0, 45, height);
+      ctx.clearRect(xPos + 2, 0, 45, height);
 
       // Natural BPM jitter
       if (Math.random() > 0.993) {
-        const [min, max] = config.bpmRange;
-        bpm = Math.min(Math.max(bpm + (Math.random() > 0.5 ? 1 : -1), min), max);
+        const [bpmMin, bpmMax] = config.bpmRange;
+        bpm = Math.min(Math.max(bpm + (Math.random() > 0.5 ? 1 : -1), bpmMin), bpmMax);
       }
 
-      requestRef.current = requestAnimationFrame(render);
+      animRef.current = requestAnimationFrame(render);
     };
 
-    requestRef.current = requestAnimationFrame(render);
+    animRef.current = requestAnimationFrame(render);
     return () => {
-      cancelAnimationFrame(requestRef.current);
+      if (animRef.current) cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
     };
-  }, []);
+  }, [status]); // ← restart loop when status changes; mini is cosmetic only so omitted
 
   return (
     <canvas
