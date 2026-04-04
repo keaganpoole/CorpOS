@@ -393,10 +393,15 @@ const getHeartbeatY = (progress, restingThreshold) => {
 const ECGCanvas = ({ status, mini = false }) => {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
+  const prevStatusRef = useRef(status);
 
-  // Kick off / restart the animation when status changes.
-  // Since animRef is stable, we restart by simply starting a new loop.
+  // Kick off / restart the animation only when the STATUS VALUE actually changes.
+  // Normal React re-renders (same status value) are ignored — no loop restart.
   useEffect(() => {
+    const didChange = prevStatusRef.current !== status;
+    prevStatusRef.current = status;
+    if (!didChange) return; // same status, keep the running loop
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d', { alpha: true });
@@ -480,7 +485,7 @@ const ECGCanvas = ({ status, mini = false }) => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
     };
-  }, [status]); // ← restart loop when status changes; mini is cosmetic only so omitted
+  }, [status]);
 
   return (
     <canvas
