@@ -35,7 +35,6 @@ import {
   Search,
   Star,
   X,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSkyboxState } from './hooks/useSkyboxState';
