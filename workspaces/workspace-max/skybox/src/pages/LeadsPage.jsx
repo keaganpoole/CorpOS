@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useLeads } from '../hooks/useLeads';
 import LeadsTable from './LeadsTable';
@@ -36,12 +36,21 @@ const LeadsPage = () => {
     return await updateLead(selectedId, updates);
   };
 
+  // Inline edit autosave — no debounce, instant save
+  const handleInlineUpdate = useCallback(async (leadId, updates) => {
+    try {
+      await updateLead(leadId, updates);
+    } catch (err) {
+      console.error('[LeadsPage] Autosave failed:', err.message);
+    }
+  }, [updateLead]);
+
   const handleDelete = async () => { if (!selectedId) return; await deleteLead(selectedId); setSelectedId(null); };
   const handleClosePanel = () => { setSelectedId(null); setCreating(false); };
 
   return (
     <div className="flex h-full bg-[#020202] relative overflow-hidden">
-      {/* Background atmospheric effects (from concept) */}
+      {/* Background atmospheric effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/[0.03] blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/[0.03] blur-[120px] rounded-full" />
@@ -66,9 +75,10 @@ const LeadsPage = () => {
         sourceFilter={sourceFilter} onSourceFilterChange={setSourceFilter}
         sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
         onCreateNew={handleCreateNew} totalCount={allLeads.length}
+        onUpdateLead={handleInlineUpdate}
       />
 
-      {/* Detail Panel (full overlay) */}
+      {/* Detail Panel (no backdrop blur) */}
       <AnimatePresence>
         {(selectedLead || creating) && (
           <LeadDetailPanel

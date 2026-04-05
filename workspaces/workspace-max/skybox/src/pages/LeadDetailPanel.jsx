@@ -213,10 +213,10 @@ const LeadDetailPanel = ({ lead, onSave, onDelete, onClose, isNew = false }) => 
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop (no blur) */}
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-md z-[50]"
+        className="fixed inset-0 bg-black/60 z-[50]"
         onClick={onClose}
       />
 
@@ -224,7 +224,7 @@ const LeadDetailPanel = ({ lead, onSave, onDelete, onClose, isNew = false }) => 
       <motion.div
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed top-0 right-0 bottom-0 w-full max-w-[500px] bg-[#0d0d0f]/95 backdrop-blur-2xl border-l border-white/[0.06] shadow-[0_0_80px_rgba(0,0,0,0.8)] z-[60] overflow-hidden flex flex-col"
+        className="fixed top-0 right-0 bottom-0 w-full max-w-[500px] bg-[#0d0d0f] border-l border-white/[0.06] shadow-[0_0_80px_rgba(0,0,0,0.8)] z-[60] overflow-hidden flex flex-col"
       >
         {/* ── Panel Header ────────────────────────────────────────────── */}
         <div className="shrink-0 p-8 pb-10 border-b border-white/[0.04] relative overflow-hidden">

@@ -12,6 +12,11 @@
 
 ## Compliments
 
+### 2026-04-05 | Leads page build — concept-aligned UI + clean execution
+**Trigger:** Keagan said "That looks really good. And you followed directions well."
+**What I did right:** Built the full Leads page with Supabase integration, premium dark table, detail panel, validation, and then upgraded the visual layer to match the concept.tsx reference — sparklines, shimmer bars, colored avatars, full-overlay dossier. Followed the prompt precisely without over-engineering or cutting corners.
+**Lesson:** When given a detailed spec with a visual reference, match the reference's energy. Don't stop at "works" — push to "stunning." Follow the exact instructions (env vars, modularity, validation) and the polish follows naturally.
+
 ### 2026-04-04 | Confronting irrelevant input before acting
 **Trigger:** Keagan accidentally pasted terminal text into the chat instead of his actual message. Rather than commenting on the pasted text or acting on it, I pointed it out and asked for clarification first.
 **What I did right:** Used common sense. Assumed the paste was accidental and asked for the real message instead of trying to interpret or act on it.
