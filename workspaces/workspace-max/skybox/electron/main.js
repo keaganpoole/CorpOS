@@ -98,6 +98,27 @@ ipcMain.handle('control:zone', async (event, { zone }) => {
   return controller.db.prepare('SELECT * FROM control_state WHERE id = 1').get();
 });
 
+ipcMain.handle('control:set-model', async (_, { agentId, agentName, model }) => {
+  if (!controller) return { error: 'Controller not running' };
+
+  const { exec } = require('child_process');
+  const util = require('util');
+  const execAsync = util.promisify(exec);
+
+  try {
+    // Strip openrouter/ prefix since openclaw uses short model IDs internally
+    const modelForOpenClaw = model.replace(/^openrouter\//i, '');
+    await execAsync(`openclaw models set "${modelForOpenClaw}"`, { timeout: 15000 });
+
+    // Update Skybox DB
+    controller.db.prepare("UPDATE agents SET model = ?, updated_at = datetime('now') WHERE id = ?").run(model, agentId);
+
+    return { success: true, model };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle('control:ping-max', async () => {
   if (!controller) return { error: 'Controller not running' };
 
@@ -116,6 +137,11 @@ ipcMain.handle('control:ping-max', async () => {
   const results = [];
   for (const item of pending) {
     try {
+      // 1. Set the new model in openclaw.json (strip openrouter/ prefix)
+      const modelForOpenClaw = item.new_model.replace(/^openrouter\//i, '');
+      await execAsync(`openclaw models set "${modelForOpenClaw}"`, { timeout: 15000 });
+
+      // 2. Find Max's active Discord session
       const { stdout } = await execAsync('openclaw sessions', { timeout: 10000 });
       const lines = stdout.split('\n');
       let sessionKey = null;
@@ -125,12 +151,20 @@ ipcMain.handle('control:ping-max', async () => {
           if (match) { sessionKey = match[2]; break; }
         }
       }
+
       if (!sessionKey) {
         results.push({ agent: item.agent_name, model: item.new_model, error: 'No active Discord session found' });
         continue;
       }
-      await execAsync(`openclaw sessions restart "${sessionKey}" --model "${item.new_model}"`, { timeout: 30000 });
+
+      // 3. Restart the session with the new model
+      await execAsync(`openclaw sessions restart "${sessionKey}"`, { timeout: 30000 });
       results.push({ agent: item.agent_name, model: item.new_model, restarted: true });
+
+      // 4. Update Skybox DB to match
+      controller.db.prepare("UPDATE agents SET model = ?, updated_at = datetime('now') WHERE id = ?").run(item.new_model, item.agent_id);
+
+      // 5. Clear pending restart
       controller.db.prepare('DELETE FROM pending_restarts WHERE id = ?').run(item.id);
     } catch (err) {
       results.push({ agent: item.agent_name, model: item.new_model, error: err.message });

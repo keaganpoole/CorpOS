@@ -1,7 +1,7 @@
 {
   "meta": {
     "lastTouchedVersion": "2026.3.23",
-    "lastTouchedAt": "2026-03-25T00:24:04.843Z"
+    "lastTouchedAt": "2026-04-05T02:14:56.156Z"
   },
   "wizard": {
     "lastRunAt": "2026-03-24T00:23:12.668Z",
@@ -20,13 +20,16 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "openrouter/minimax/minimax-m2.5"
+        "primary": "openrouter/minimax/m2.7"
       },
       "models": {
         "openrouter/auto": {
           "alias": "OpenRouter"
         },
-        "openrouter/stepfun/step-3.5-flash:free": {}
+        "openrouter/stepfun/step-3.5-flash:free": {},
+        "deepseek/deepseek-chat-v3-0324": {},
+        "openai/gpt-4o": {},
+        "openrouter/minimax/m2.7": {}
       },
       "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
       "heartbeat": {
@@ -45,46 +48,30 @@
         "name": "lauren",
         "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-research",
         "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\lauren",
-        "model": "openrouter/stepfun/step-3.5-flash:free",
+        "model": "openrouter/google/gemini-2.5-flash-lite",
         "heartbeat": {
           "every": "30m"
+        },
+        "tools": {
+          "allow": [
+            "exec",
+            "read",
+            "write",
+            "edit",
+            "apply_patch",
+            "web_search",
+            "web_fetch",
+            "memory_search",
+            "memory_get",
+            "discord"
+          ]
         }
       },
       {
-        "id": "brian",
-        "name": "brian",
-        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-sales",
-        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\brian",
-        "model": "openrouter/stepfun/step-3.5-flash:free",
-        "heartbeat": {
-          "every": "30m"
-        }
-      },
-      {
-        "id": "allie",
-        "name": "allie",
-        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-marketing",
-        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\allie",
-        "model": "openrouter/stepfun/step-3.5-flash:free",
-        "heartbeat": {
-          "every": "30m"
-        }
-      },
-      {
-        "id": "devan",
-        "name": "devan",
-        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-dev",
-        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\devan",
-        "model": "openrouter/stepfun/step-3.5-flash:free",
-        "heartbeat": {
-          "every": "30m"
-        }
-      },
-      {
-        "id": "leah",
-        "name": "leah",
-        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-care",
-        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\leah",
+        "id": "switchy",
+        "name": "switchy",
+        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\switchy",
         "model": "openrouter/stepfun/step-3.5-flash:free",
         "heartbeat": {
           "every": "30m"
@@ -106,40 +93,17 @@
       "type": "route",
       "agentId": "lauren",
       "match": {
-        "channel": "telegram",
-        "accountId": "lauren"
+        "channel": "discord",
+        "accountId": "lauren",
+        "guildId": "1487306966484258887"
       }
     },
     {
       "type": "route",
-      "agentId": "brian",
+      "agentId": "switchy",
       "match": {
-        "channel": "telegram",
-        "accountId": "brian"
-      }
-    },
-    {
-      "type": "route",
-      "agentId": "allie",
-      "match": {
-        "channel": "telegram",
-        "accountId": "allie"
-      }
-    },
-    {
-      "type": "route",
-      "agentId": "devan",
-      "match": {
-        "channel": "telegram",
-        "accountId": "devan"
-      }
-    },
-    {
-      "type": "route",
-      "agentId": "leah",
-      "match": {
-        "channel": "telegram",
-        "accountId": "leah"
+        "channel": "discord",
+        "accountId": "max"
       }
     }
   ],
@@ -197,70 +161,70 @@
           "enabled": true,
           "dmPolicy": "allowlist",
           "botToken": "8777471205:AAGhr78pLIQglAyK706-yBIabMCe_rVqThs",
+          "groups": {
+            "-1003796114330": {}
+          },
           "allowFrom": [
             "6416153554"
           ],
           "groupPolicy": "allowlist",
-          "groups": {
-            "-1003796114330": {}
-          },
           "streaming": "partial"
+        }
+      }
+    },
+    "discord": {
+      "enabled": true,
+      "groupPolicy": "allowlist",
+      "streaming": "partial",
+      "threadBindings": {
+        "enabled": true,
+        "idleHours": 24,
+        "maxAgeHours": 0
+      },
+      "accounts": {
+        "default": {
+          "token": {
+            "source": "env",
+            "provider": "default",
+            "id": "DISCORD_BOT_TOKEN_MAX"
+          },
+          "groupPolicy": "allowlist",
+          "streaming": "off",
+          "guilds": {
+            "1487306966484258887": {
+              "requireMention": false,
+              "channels": {
+                "1487477234401939546": {
+                  "allow": true,
+                  "requireMention": false
+                }
+              }
+            }
+          }
         },
-        "brian": {
-          "name": "Brian",
-          "enabled": true,
-          "dmPolicy": "allowlist",
-          "botToken": "8731998873:AAEWpZJ2mu15bz-yjAXh64G1-qSE8YintkQ",
-          "allowFrom": [
-            "6416153554"
-          ],
-          "groupPolicy": "allowlist",
-          "groups": {
-            "-1003796114330": {}
+        "lauren": {
+          "token": {
+            "source": "env",
+            "provider": "default",
+            "id": "DISCORD_BOT_TOKEN_LAUREN"
           },
-          "streaming": "partial"
-        },
-        "allie": {
-          "name": "Allie",
-          "enabled": true,
-          "dmPolicy": "allowlist",
-          "botToken": "8027398701:AAGtvp9dB048MWmBvzACHJFVWlM4zKD8b-k",
-          "allowFrom": [
-            "6416153554"
-          ],
           "groupPolicy": "allowlist",
-          "groups": {
-            "-1003796114330": {}
-          },
-          "streaming": "partial"
-        },
-        "devan": {
-          "name": "Devan",
-          "enabled": true,
-          "dmPolicy": "allowlist",
-          "botToken": "8732952550:AAFJUVkVyZJkaIpEby-X9qpndlHrqvrBbDs",
-          "allowFrom": [
-            "6416153554"
-          ],
-          "groupPolicy": "allowlist",
-          "groups": {
-            "-1003796114330": {}
-          },
-          "streaming": "partial"
-        },
-        "leah": {
-          "name": "Leah",
-          "enabled": true,
-          "dmPolicy": "allowlist",
-          "botToken": "8740363547:AAGiTl9w3mlOpDpvMG_AkEz4BbzVLYoY9-M",
-          "allowFrom": [
-            "6416153554"
-          ],
-          "groupPolicy": "allowlist",
-          "groups": {
-            "-1003796114330": {}
-          },
-          "streaming": "partial"
+          "streaming": "off",
+          "guilds": {
+            "1487306966484258887": {
+              "requireMention": false,
+              "channels": {
+                "1487477234401939546": {
+                  "allow": true,
+                  "requireMention": false
+                },
+                "1488327248154202156": {
+                  "allow": true,
+                  "requireMention": false
+                }
+              }
+            }
+          }
         }
       }
     }

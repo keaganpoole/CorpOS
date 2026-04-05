@@ -12,6 +12,11 @@
 
 ## Compliments
 
+### 2026-04-04 | Confronting irrelevant input before acting
+**Trigger:** Keagan accidentally pasted terminal text into the chat instead of his actual message. Rather than commenting on the pasted text or acting on it, I pointed it out and asked for clarification first.
+**What I did right:** Used common sense. Assumed the paste was accidental and asked for the real message instead of trying to interpret or act on it.
+**Lesson:** When input looks unintentional or irrelevant, address it directly before doing anything else. Don't force unrelated content into the flow.
+
 ### 2026-04-04 | Env loader for Skybox backend
 **Trigger:** OpenRouter API key wasn't visible to the Skybox backend process.
 **What I did:** Added a manual `.env` loader at the top of controller.js that reads from `~/.openclaw/.env` and sets `process.env` vars before the app starts.

@@ -1,7 +1,7 @@
 {
   "meta": {
     "lastTouchedVersion": "2026.3.23",
-    "lastTouchedAt": "2026-03-31T18:00:53.335Z"
+    "lastTouchedAt": "2026-04-05T02:39:03.196Z"
   },
   "wizard": {
     "lastRunAt": "2026-03-24T00:23:12.668Z",
@@ -20,13 +20,17 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "Openrouter/minimax/minimax-m2.7"
+        "primary": "Openrouter/xiaomi/mimo-v2-pro"
       },
       "models": {
         "openrouter/auto": {
           "alias": "OpenRouter"
         },
-        "openrouter/stepfun/step-3.5-flash:free": {}
+        "openrouter/stepfun/step-3.5-flash:free": {},
+        "deepseek/deepseek-chat-v3-0324": {},
+        "openai/gpt-4o": {},
+        "openrouter/minimax/m2.7": {},
+        "xiaomi/mimo-v2-pro": {}
       },
       "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
       "heartbeat": {
@@ -173,6 +177,11 @@
       "enabled": true,
       "groupPolicy": "allowlist",
       "streaming": "partial",
+      "threadBindings": {
+        "enabled": true,
+        "idleHours": 24,
+        "maxAgeHours": 0
+      },
       "accounts": {
         "default": {
           "token": {
@@ -180,6 +189,8 @@
             "provider": "default",
             "id": "DISCORD_BOT_TOKEN_MAX"
           },
+          "groupPolicy": "allowlist",
+          "streaming": "off",
           "guilds": {
             "1487306966484258887": {
               "requireMention": false,
@@ -198,6 +209,8 @@
             "provider": "default",
             "id": "DISCORD_BOT_TOKEN_LAUREN"
           },
+          "groupPolicy": "allowlist",
+          "streaming": "off",
           "guilds": {
             "1487306966484258887": {
               "requireMention": false,
@@ -214,11 +227,6 @@
             }
           }
         }
-      },
-      "threadBindings": {
-        "enabled": true,
-        "idleHours": 24,
-        "maxAgeHours": 0
       }
     }
   },

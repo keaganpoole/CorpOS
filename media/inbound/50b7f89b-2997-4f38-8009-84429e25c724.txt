@@ -1,0 +1,153 @@
+{
+    "name": "Leads",
+    "primaryFieldId": "Company",
+    "fields": [
+        {
+            "type": "singleLineText",
+            "name": "Company"
+        },
+        {
+            "type": "singleLineText",
+            "name": "First Name"
+        },
+        {
+            "type": "singleLineText",
+            "name": "Last Name"
+        },
+        {
+            "type": "singleLineText",
+            "name": "Position"
+        },
+        {
+            "type": "singleSelect",
+            "options": {
+                "choices": [
+                    { "name": "Won", "color": "cyanLight2" },
+                    { "name": "Interested", "color": "greenLight2" },
+                    { "name": "Aware", "color": "yellowLight2" },
+                    { "name": "Contacted", "color": "yellowLight2" },
+                    { "name": "Not contacted", "color": "grayLight2" },
+                    { "name": "Not interested", "color": "redLight2" },
+                    { "name": "DNC", "color": "redLight2" }
+                ]
+            },
+            "name": "Status"
+        },
+        {
+            "type": "multilineText",
+            "name": "Discovery",
+            "description": "**Editable ONLY by the Research team**\n\nInitial findings about the company from the Research team to help other departments through the pipeline."
+        },
+        {
+            "type": "singleLineText",
+            "name": "Industry"
+        },
+        {
+            "type": "url",
+            "name": "Website"
+        },
+        {
+            "type": "currency",
+            "options": { "precision": 2, "symbol": "$" },
+            "name": "Proposal Value"
+        },
+        {
+            "type": "currency",
+            "options": { "precision": 2, "symbol": "$" },
+            "name": "Revenue"
+        },
+        {
+            "type": "singleLineText",
+            "name": "Email"
+        },
+        {
+            "type": "singleSelect",
+            "options": {
+                "choices": [
+                    { "name": "LinkedIn", "color": "blueLight2" },
+                    { "name": "Google Search", "color": "blueLight2" },
+                    { "name": "Google Maps", "color": "blueLight2" },
+                    { "name": "Manual Web Search", "color": "blueLight2" }
+                ]
+            },
+            "name": "Source",
+            "description": "Where the lead came from"
+        },
+        {
+            "type": "singleLineText",
+            "name": "City"
+        },
+        {
+            "type": "singleLineText",
+            "name": "State",
+            "description": "Abbrevation only"
+        },
+        {
+            "type": "phoneNumber",
+            "name": "Phone"
+        },
+        {
+            "type": "dateTime",
+            "options": {
+                "dateFormat": { "name": "friendly", "format": "LL" },
+                "timeFormat": { "name": "12hour", "format": "h:mma" },
+                "timeZone": "America/New_York"
+            },
+            "name": "Date Created"
+        },
+        {
+            "type": "multilineText",
+            "name": "Notes",
+            "description": "**Editable ONLY by the Sales and Marketing Teams**\n\nNotes from the Sales and Marketing team. This must be insightful to perfect the quality of the data pipeline. When updating this, never replace, just add to the end."
+        },
+        {
+            "type": "dateTime",
+            "options": {
+                "dateFormat": { "name": "local", "format": "l" },
+                "timeFormat": { "name": "12hour", "format": "h:mma" },
+                "timeZone": "client"
+            },
+            "name": "Last Responded"
+        },
+        {
+            "type": "dateTime",
+            "options": {
+                "dateFormat": { "name": "friendly", "format": "LL" },
+                "timeFormat": { "name": "12hour", "format": "h:mma" },
+                "timeZone": "utc"
+            },
+            "name": "Last Contacted"
+        },
+        {
+            "type": "multilineText",
+            "name": "Last Interaction",
+            "description": "A summary of the last interaction."
+        },
+        {
+            "type": "number",
+            "options": { "precision": 0 },
+            "name": "Page Quality Score",
+            "description": "A score of the overall appearance and functionality of the website. Be specific and accurate."
+        },
+        {
+            "type": "multipleSelects",
+            "options": {
+                "choices": [
+                    { "name": "Outdated Website", "color": "grayLight2" },
+                    { "name": "Ugly Website", "color": "grayLight2" },
+                    { "name": "Poor Functionality", "color": "grayLight2" },
+                    { "name": "Limited Features", "color": "grayLight2" },
+                    { "name": "No Website", "color": "grayLight2" },
+                    { "name": "Not Mobile Friendly", "color": "grayLight2" }
+                ]
+            },
+            "name": "Opportunity"
+        }
+    ],
+    "views": [
+        {
+            "name": "Grid view",
+            "type": "grid"
+        }
+    ]
+}

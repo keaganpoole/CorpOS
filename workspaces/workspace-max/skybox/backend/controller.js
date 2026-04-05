@@ -400,7 +400,15 @@ class Controller {
       const agent = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
       if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
-      this.db.prepare('UPDATE agents SET model = ?, updated_at = datetime("now") WHERE id = ?').run(model, req.params.id);
+      this.db.prepare("UPDATE agents SET model = ?, updated_at = datetime('now') WHERE id = ?").run(model, req.params.id);
+
+      // Immediately update openclaw.json so the new model is active
+      try {
+        const { execSync } = require('child_process');
+        execSync(`openclaw models set "${model}"`, { encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
+      } catch (err) {
+        console.error('[Skybox] openclaw models set failed:', err.message);
+      }
 
       // Queue a pending restart so Max can pick it up via polling
       this.db.prepare(

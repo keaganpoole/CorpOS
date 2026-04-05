@@ -40,6 +40,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSkyboxState } from './hooks/useSkyboxState';
 import { api } from './lib/api';
+import LeadsPage from './pages/LeadsPage';
 
 const StatusDot = ({ status, pulse = false }) => {
   const colors = {
@@ -2182,7 +2183,7 @@ const App = () => {
       case 'system':
         return <SystemView summary={summary} systemLogs={systemLogs} />;
       case 'pipeline':
-        return <div className="h-full p-8 overflow-auto"><PipelineView pipeline={pipeline} /></div>;
+        return <LeadsPage />;
       case 'memory':
         return <PlaceholderView title="Memory Grid" body="Curated recall layer ready for OpenClaw memory wiring" />;
       case 'council':
