@@ -2162,8 +2162,26 @@ const App = () => {
         );
       case 'agents':
         return (
-          <div className={`h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex justify-center items-start pt-6 relative`}>
-            <AgentsHierarchy agents={agents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} />
+          <div className={`h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col items-center relative`}>
+            {/* Team Cover Image */}
+            <div className="w-full relative shrink-0" style={{ height: '280px' }}>
+              <img
+                src={`${AVATAR_BASE}/team3.jpg`}
+                alt="CorpOS Team"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-900', 'via-zinc-950', 'to-black');
+                }}
+              />
+              {/* Gradient fade into page */}
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#020202]/30 to-[#020202]" />
+              {/* Side vignettes */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#020202]/60 via-transparent to-[#020202]/60" />
+            </div>
+            <div className="w-full flex justify-center pt-6 relative -mt-16 z-10">
+              <AgentsHierarchy agents={agents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} />
+            </div>
             <AnimatePresence>
               {marketplaceAgent && (
                 <ModelMarketplace

@@ -2,12 +2,39 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, ChevronUp, ChevronDown, X,
-  Building2, MoreHorizontal, Check, GripHorizontal, GripVertical,
+  Building2, MoreHorizontal, Check, GripVertical, Settings2, Wand2,
+  Building, User, Briefcase, Factory, Flag, Compass, Target,
+  DollarSign, TrendingUp, Mail, Phone, Globe, MapPin, MapIcon,
+  Calendar, Clock, MessageSquare, SearchIcon, FileText, Gauge,
+  Star, Heart, Zap, Shield, Award, Bookmark, Tag, Layers,
+  Database, Cpu, Settings, Wrench, Package, Truck, Users,
+  BarChart3, PieChart, Activity, Wifi, Anchor, Aperture,
 } from 'lucide-react';
 import {
   STATUS_OPTIONS, SOURCE_OPTIONS, OPPORTUNITY_OPTIONS,
   formatCurrency, formatTimestamp, getStatusColor, getScoreColor,
 } from '../lib/leadSchema';
+import {
+  loadFieldConfig, saveFieldConfig, loadColorbarRules, saveColorbarRules,
+  evaluateColorbar, CONDITIONAL_FIELDS,
+} from '../lib/fieldConfig';
+import FieldSettingsModal from './FieldSettingsModal';
+import ColorbarConfigModal from './ColorbarConfigModal';
+
+// Icon map for field labels
+const FIELD_ICON_MAP = {
+  building: Building, user: User, briefcase: Briefcase, factory: Factory,
+  flag: Flag, compass: Compass, target: Target, 'dollar-sign': DollarSign,
+  'trending-up': TrendingUp, mail: Mail, phone: Phone, globe: Globe,
+  'map-pin': MapPin, map: MapIcon, calendar: Calendar, clock: Clock,
+  'message-square': MessageSquare, search: SearchIcon, 'file-text': FileText,
+  gauge: Gauge, star: Star, heart: Heart, zap: Zap, shield: Shield,
+  award: Award, bookmark: Bookmark, tag: Tag, layers: Layers,
+  database: Database, cpu: Cpu, settings: Settings, tool: Wrench,
+  package: Package, truck: Truck, users: Users, 'bar-chart': BarChart3,
+  'pie-chart': PieChart, activity: Activity, wifi: Wifi, anchor: Anchor,
+  aperture: Aperture,
+};
 
 // ─── Sparkline ─────────────────────────────────────────────────────────────
 const Sparkline = ({ data, color = '#6366f1', width = 80, height = 28 }) => {
@@ -174,7 +201,7 @@ const InlineNumber = ({ value, onSave, min = 0, max = 100 }) => {
   );
 };
 
-const InlineSelect = ({ value, options, onSave, type = 'status' }) => {
+const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = {} }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -184,48 +211,84 @@ const InlineSelect = ({ value, options, onSave, type = 'status' }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
   const handleSelect = (val) => { setOpen(false); if (val !== value) onSave(val); };
-  if (type === 'status') {
-    return (
-      <div className="relative" ref={ref}>
-        <StatusBadge status={value} onClick={(e) => { e?.stopPropagation?.(); setOpen(!open); }} editing={open} />
-        {open && (
-          <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden min-w-[140px] py-1"
-            onClick={e => e.stopPropagation()}>
-            {STATUS_OPTIONS.map(opt => (
-              <button key={opt.value} onClick={() => handleSelect(opt.value)}
-                className={`w-full text-left px-3 py-2 text-[11px] font-bold transition-all hover:bg-white/[0.06] flex items-center justify-between ${value === opt.value ? 'text-white' : 'text-zinc-400'}`}>
-                <StatusBadge status={opt.value} />
-                {value === opt.value && <Check size={11} className="text-cyan-400" />}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
+
+  // Filter out removed options
+  const filteredOptions = options.filter(opt => {
+    const val = typeof opt === 'string' ? opt : opt.value;
+    return val !== 'Won' && val !== 'LinkedIn';
+  });
+
+  // Color for current value
+  const currentColor = optionColors[value] || (type === 'status' ? getStatusColor(value) : '#3b82f6');
+  const colorStyles = {
+    emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', dot: '#10b981' },
+    green:   { bg: 'bg-green-500/10',   text: 'text-green-400',   border: 'border-green-500/20',   dot: '#22c55e' },
+    amber:   { bg: 'bg-amber-500/10',   text: 'text-amber-400',   border: 'border-amber-500/20',   dot: '#f59e0b' },
+    yellow:  { bg: 'bg-yellow-500/10',  text: 'text-yellow-400',  border: 'border-yellow-500/20',  dot: '#eab308' },
+    zinc:    { bg: 'bg-white/5',        text: 'text-zinc-500',    border: 'border-white/10',       dot: '#71717a' },
+    rose:    { bg: 'bg-rose-500/10',    text: 'text-rose-400',    border: 'border-rose-500/20',    dot: '#f43f5e' },
+    red:     { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/20',     dot: '#ef4444' },
+    blue:    { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/20',    dot: '#3b82f6' },
+  };
+
+  const getOptStyle = (val) => {
+    if (type === 'status') {
+      const c = getStatusColor(val);
+      return colorStyles[c] || colorStyles.zinc;
+    }
+    // Source type - use custom color or default blue
+    const customColor = optionColors[val];
+    if (customColor) return { bg: 'bg-white/[0.04]', text: 'text-white', border: 'border-white/[0.08]', dot: customColor };
+    return colorStyles.blue;
+  };
+
+  const currentStyle = getOptStyle(value);
+
   return (
     <div className="relative" ref={ref}>
-      <span onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400 font-medium">
-        {value || <span className="text-zinc-700">—</span>}
-      </span>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden min-w-[160px] py-1"
-          onClick={e => e.stopPropagation()}>
-          {SOURCE_OPTIONS.map(opt => (
-            <button key={opt.value} onClick={() => handleSelect(opt.value)}
-              className={`w-full text-left px-3 py-2 text-[11px] font-bold transition-all hover:bg-white/[0.06] flex items-center justify-between ${value === opt.value ? 'text-white' : 'text-zinc-400'}`}>
-              {opt.value}
-              {value === opt.value && <Check size={11} className="text-cyan-400" />}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Current Value Pill */}
+      <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all hover:brightness-125 cursor-pointer ${currentStyle.bg} ${currentStyle.text} ${currentStyle.border}`}>
+        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: currentStyle.dot, boxShadow: `0 0 6px ${currentStyle.dot}60` }} />
+        <span className="whitespace-nowrap">{value || '—'}</span>
+      </button>
+
+      {/* Dropdown with fade cascade */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-full left-0 mt-1.5 z-50 bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden min-w-[160px] py-1"
+            onClick={e => e.stopPropagation()}>
+            {filteredOptions.map((opt, i) => {
+              const val = typeof opt === 'string' ? opt : opt.value;
+              const isActive = val === value;
+              const s = getOptStyle(val);
+              return (
+                <motion.button
+                  key={val}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.03, duration: 0.15 }}
+                  onClick={() => handleSelect(val)}
+                  className={`w-full text-left px-3 py-2 text-[11px] font-bold transition-all hover:bg-white/[0.06] flex items-center gap-2 ${isActive ? 'text-white' : 'text-zinc-400'}`}>
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.dot, boxShadow: isActive ? `0 0 8px ${s.dot}60` : 'none' }} />
+                  {val}
+                  {isActive && <Check size={11} className="text-cyan-400 ml-auto" />}
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
-const InlineMultiSelect = ({ value, onSave }) => {
+const InlineMultiSelect = ({ value, onSave, optionColors = {} }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const selected = Array.isArray(value) ? value : [];
@@ -241,6 +304,9 @@ const InlineMultiSelect = ({ value, onSave }) => {
   };
   const display = selected.slice(0, 2);
   const extra = selected.length - display.length;
+
+  const tagColor = (opt) => optionColors[opt] || '#71717a';
+
   return (
     <div className="relative" ref={ref}>
       <div onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="cursor-pointer flex items-center gap-1 flex-wrap">
@@ -248,25 +314,42 @@ const InlineMultiSelect = ({ value, onSave }) => {
           <span className="text-zinc-700 text-[12px]">—</span>
         ) : (
           display.map(opp => (
-            <span key={opp} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/5 text-zinc-400 border border-white/5 whitespace-nowrap">
+            <span key={opp} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-bold border whitespace-nowrap bg-white/[0.04] text-zinc-300 border-white/[0.06]">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(opp) }} />
               {opp}
             </span>
           ))
         )}
         {extra > 0 && <span className="text-[9px] text-zinc-600 font-bold">+{extra}</span>}
       </div>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden min-w-[180px] py-1"
-          onClick={e => e.stopPropagation()}>
-          {OPPORTUNITY_OPTIONS.map(opt => (
-            <button key={opt} onClick={() => toggle(opt)}
-              className={`w-full text-left px-3 py-2 text-[11px] font-bold transition-all hover:bg-white/[0.06] flex items-center justify-between ${selected.includes(opt) ? 'text-cyan-400' : 'text-zinc-400'}`}>
-              {opt}
-              {selected.includes(opt) && <Check size={11} className="text-cyan-400" />}
-            </button>
-          ))}
-        </div>
-      )}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-full left-0 mt-1.5 z-50 bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden min-w-[180px] py-1"
+            onClick={e => e.stopPropagation()}>
+            {OPPORTUNITY_OPTIONS.map((opt, i) => (
+              <motion.button key={opt}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.03, duration: 0.15 }}
+                onClick={() => toggle(opt)}
+                className={`w-full text-left px-3 py-2 text-[11px] font-bold transition-all hover:bg-white/[0.06] flex items-center gap-2 ${selected.includes(opt) ? 'text-cyan-400' : 'text-zinc-400'}`}>
+                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${
+                  selected.includes(opt) ? 'bg-cyan-500/20 border-cyan-500/40' : 'border-white/10'
+                }`}>
+                  {selected.includes(opt) && <Check size={9} className="text-cyan-400" />}
+                </div>
+                <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tagColor(opt) }} />
+                {opt}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -335,33 +418,46 @@ const InlineDate = ({ value, onSave }) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // DRAGGABLE COLUMN HEADER
 // ═══════════════════════════════════════════════════════════════════════════
-const DraggableHeader = ({ col, index, sortBy, sortDir, onSort, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, dragOverIndex }) => {
+const DraggableHeader = ({ col, index, sortBy, sortDir, onSort, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, dragOverIndex, fieldConfig = {}, onFieldSettings }) => {
+  const displayName = fieldConfig[col.id]?.name || col.label;
+  const iconName = fieldConfig[col.id]?.icon;
+  const IconComp = iconName ? FIELD_ICON_MAP[iconName] : null;
+
   return (
     <div
-      draggable
-      onDragStart={(e) => onDragStart(e, index)}
+      draggable={col.id !== 'avatar'}
+      onDragStart={(e) => col.id !== 'avatar' && onDragStart(e, index)}
       onDragOver={(e) => onDragOver(e, index)}
       onDrop={(e) => onDrop(e, index)}
       onDragEnd={onDragEnd}
       style={{ width: col.width, minWidth: col.width }}
-      className={`shrink-0 flex items-center transition-all duration-200 cursor-grab active:cursor-grabbing relative group/header ${
+      className={`shrink-0 flex items-center gap-1 transition-all duration-200 cursor-grab active:cursor-grabbing relative group/header ${
         isDragging ? 'opacity-30' : ''
       } ${dragOverIndex === index && !isDragging ? 'translate-x-1' : ''}`}
     >
-      {/* Drag handle — invisible until hover, takes no space by default */}
-      <div className="w-0 overflow-hidden group-hover/header:w-3 group-hover/header:mr-1 transition-all duration-200 shrink-0 flex items-center">
+      {/* Drag handle — invisible until hover */}
+      <div className="w-0 overflow-hidden group-hover/header:w-3 transition-all duration-200 shrink-0 flex items-center">
         <GripVertical size={10} className="text-zinc-800 group-hover/header:text-zinc-500 transition-colors shrink-0" />
       </div>
 
-      {/* Sort button — always aligned at left edge of column */}
+      {/* Label — click to sort, click icon to edit */}
       {col.label ? (
         <button onClick={() => col.sortKey && onSort(col.sortKey)}
-          className="flex items-center gap-1 text-[9px] font-black text-zinc-600 uppercase tracking-widest hover:text-zinc-300 transition-colors whitespace-nowrap">
-          {col.label}
+          className="flex items-center gap-1.5 text-[9px] font-black text-zinc-600 uppercase tracking-widest hover:text-zinc-300 transition-colors whitespace-nowrap group/label">
+          {IconComp && <IconComp size={10} className="text-zinc-700 group-hover/label:text-zinc-400 transition-colors" />}
+          {displayName}
           {sortBy === col.sortKey && (sortDir === 'asc' ? <ChevronUp size={9} /> : <ChevronDown size={9} />)}
         </button>
       ) : (
         <div className="w-full" />
+      )}
+
+      {/* Settings gear — always visible on hover, or for fields without label */}
+      {col.id !== 'avatar' && col.label && (
+        <button onClick={(e) => { e.stopPropagation(); onFieldSettings(col.id); }}
+          className="p-1 rounded text-zinc-800 hover:text-white hover:bg-white/5 transition-all opacity-0 group-hover/header:opacity-100">
+          <Settings2 size={10} />
+        </button>
       )}
 
       {/* Drop indicator */}
@@ -375,7 +471,7 @@ const DraggableHeader = ({ col, index, sortBy, sortDir, onSort, onDragStart, onD
 // ═══════════════════════════════════════════════════════════════════════════
 // RENDER CELL BY COLUMN ID
 // ═══════════════════════════════════════════════════════════════════════════
-const LeadCell = ({ colId, lead, dc, autoSave, onSelect }) => {
+const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {} }) => {
   switch (colId) {
     case 'avatar':
       return (
@@ -432,7 +528,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect }) => {
 
     case 'opportunity':
       return dc.showOpportunity ? (
-        <InlineMultiSelect value={lead.opportunity} onSave={v => autoSave(lead.id, 'opportunity', v)} />
+        <InlineMultiSelect value={lead.opportunity} onSave={v => autoSave(lead.id, 'opportunity', v)} optionColors={fieldConfig.opportunity?.optionColors || {}} />
       ) : (
         <span className="text-zinc-700 text-[12px]">
           {lead.opportunity?.length ? `${lead.opportunity.length} tags` : '—'}
@@ -440,7 +536,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect }) => {
       );
 
     case 'status':
-      return <InlineSelect value={lead.status} options={STATUS_OPTIONS} type="status" onSave={v => autoSave(lead.id, 'status', v)} />;
+      return <InlineSelect value={lead.status} options={STATUS_OPTIONS} type="status" onSave={v => autoSave(lead.id, 'status', v)} optionColors={fieldConfig.status?.optionColors || {}} />;
 
     case 'health':
       return <InlineNumber value={lead.page_quality_score} onSave={v => autoSave(lead.id, 'page_quality_score', v)} />;
@@ -460,7 +556,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect }) => {
       return <InlineEmail value={lead.email} onSave={v => autoSave(lead.id, 'email', v)} />;
 
     case 'source':
-      return <InlineSelect value={lead.source} options={SOURCE_OPTIONS} type="source" onSave={v => autoSave(lead.id, 'source', v)} />;
+      return <InlineSelect value={lead.source} options={SOURCE_OPTIONS} type="source" onSave={v => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
 
     case 'location':
       return (
@@ -509,9 +605,27 @@ const LeadsTable = ({
   const [density, setDensity] = useState(4);
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
 
+  // Field config & colorbar
+  const [fieldConfig, setFieldConfig] = useState(() => loadFieldConfig());
+  const [colorbarRules, setColorbarRules] = useState(() => loadColorbarRules());
+  const [settingsField, setSettingsField] = useState(null); // field key for FieldSettingsModal
+  const [showColorbarStudio, setShowColorbarStudio] = useState(false);
+
   // Drag state
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+
+  const handleFieldSave = (key, config) => {
+    const next = { ...fieldConfig, [key]: { ...fieldConfig[key], ...config } };
+    setFieldConfig(next);
+    saveFieldConfig(next);
+    setSettingsField(null);
+  };
+
+  const handleColorbarRulesChange = (rules) => {
+    setColorbarRules(rules);
+    saveColorbarRules(rules);
+  };
 
   // Density config
   const getDensityConfig = (d) => {
@@ -578,10 +692,32 @@ const LeadsTable = ({
     <div className="flex-1 flex flex-col min-w-0 h-full">
       {/* ── Toolbar ───────────────────────────────────────────────────── */}
       <div className="shrink-0 px-8 py-5 flex items-center gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">Lead Intelligence</h2>
-          <p className="text-[11px] text-zinc-600 mt-0.5">{leads.length} of {totalCount} leads</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-white tracking-tight">Lead Intelligence</h2>
+            <p className="text-[11px] text-zinc-600 mt-0.5">{leads.length} of {totalCount} leads</p>
+          </div>
+
+          {/* Colorbar Studio Button — rotating gradient border outline on hover */}
+          <button onClick={() => setShowColorbarStudio(true)}
+            className="group/colorbar relative ml-2 flex items-center gap-2 px-4 py-2 rounded-xl text-zinc-400 text-[10px] font-bold transition-all hover:text-white"
+            title="Colorbar Studio">
+            {/* Sweeping gradient border — no rotation, just flow */}
+            <div className="absolute rounded-xl opacity-0 group-hover/colorbar:opacity-100 transition-opacity duration-300 pointer-events-none overflow-hidden"
+              style={{ inset: '-0.7px' }}>
+              <div className="absolute inset-0 animate-[colorbarFlow_3s_linear_infinite]"
+                style={{ background: 'linear-gradient(90deg, #22d3ee, #d946ef, #f59e0b, #22d3ee, #22d3ee, #d946ef, #f59e0b)', backgroundSize: '300% 100%' }} />
+            </div>
+            {/* Inner background to mask the fill */}
+            <div className="absolute rounded-[11px] bg-[#0a0a0a] pointer-events-none"
+              style={{ inset: '0.7px' }} />
+            {/* Default border */}
+            <div className="absolute inset-0 rounded-xl border border-white/[0.06] group-hover/colorbar:opacity-0 transition-opacity duration-300 pointer-events-none" />
+            <Wand2 size={12} className="relative z-10 text-cyan-400 group-hover/colorbar:text-white transition-colors group-hover/colorbar:rotate-12 duration-300" />
+            <span className="relative z-10">Colorbar</span>
+          </button>
         </div>
+
         <div className="flex-1" />
 
         <div className="relative w-[260px]">
@@ -591,29 +727,10 @@ const LeadsTable = ({
           {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
         </div>
 
-        <select value={statusFilter} onChange={e => onStatusFilterChange(e.target.value)}
-          className="appearance-none bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 px-3 text-[11px] text-zinc-400 font-bold focus:outline-none focus:border-white/20 transition-colors cursor-pointer">
-          {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.value}</option>)}
-        </select>
-
-        <select value={sourceFilter} onChange={e => onSourceFilterChange(e.target.value)}
-          className="appearance-none bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 px-3 text-[11px] text-zinc-400 font-bold focus:outline-none focus:border-white/20 transition-colors cursor-pointer">
-          {SOURCE_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.value}</option>)}
-        </select>
-
-        {/* Density slider */}
-        <div className="flex items-center gap-1.5 ml-1 group/density" title="Row density">
-          <GripHorizontal size={12} className="text-zinc-700 group-hover/density:text-zinc-500 transition-colors shrink-0" />
-          <input type="range" min="0" max="8" step="1" value={density} onChange={e => setDensity(parseInt(e.target.value))}
-            className="w-16 h-1 bg-white/[0.06] rounded-full appearance-none cursor-pointer
-              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5
-              [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-zinc-500
-              [&::-webkit-slider-thumb]:hover:bg-white [&::-webkit-slider-thumb]:transition-colors" />
-        </div>
-
+        {/* New Lead — plus icon only, rotates on hover */}
         <button onClick={onCreateNew}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white rounded-xl text-black text-[10px] font-black uppercase tracking-wider hover:bg-cyan-400 transition-all active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-          <Plus size={13} /> New Lead
+          className="w-10 h-10 flex items-center justify-center bg-white rounded-xl text-black hover:bg-cyan-400 transition-all active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)] group/newlead">
+          <Plus size={16} className="transition-transform duration-300 group-hover/newlead:rotate-90" />
         </button>
       </div>
 
@@ -643,6 +760,8 @@ const LeadsTable = ({
                         onDragEnd={handleDragEnd}
                         isDragging={dragIndex === index}
                         dragOverIndex={dragOverIndex}
+                        fieldConfig={fieldConfig}
+                        onFieldSettings={setSettingsField}
                       />
                     ))}
                   </div>
@@ -670,10 +789,45 @@ const LeadsTable = ({
                           transition={{ delay: Math.min(idx * 0.012, 0.35) }}
                           onMouseEnter={() => setHoveredRow(lead.id)}
                           onMouseLeave={() => setHoveredRow(null)}
-                          className={`group px-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 ${isSelected ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'}`}>
+                          className={`group px-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${isSelected ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'}`}>
+                          {/* Colorbar — absolutely positioned, doesn't affect height */}
+                          {(() => {
+                            const matchedRule = evaluateColorbar(lead, colorbarRules);
+                            if (!matchedRule) return null;
+                            const colors = matchedRule.colors || ['#6366f1'];
+                            const animation = matchedRule.animation || 'none';
+                            const gradId = `cb-${lead.id}`;
+                            return (
+                              <div className="absolute left-0 top-0 bottom-0 w-[4px] rounded-full overflow-hidden pointer-events-none">
+                                <svg width="4" height="100%" className="block">
+                                  <defs>
+                                    {colors.length > 1 && (
+                                      <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                                        {colors.map((c, i) => (
+                                          <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={c}>
+                                            {animation === 'sweep' && (
+                                              <animate attributeName="stop-color" values={`${c};${colors[(i + 1) % colors.length]};${c}`}
+                                                dur="3s" repeatCount="indefinite" begin={`${i * 0.5}s`} />
+                                            )}
+                                          </stop>
+                                        ))}
+                                      </linearGradient>
+                                    )}
+                                  </defs>
+                                  <rect width="4" height="100%" rx="2"
+                                    fill={colors.length > 1 ? `url(#${gradId})` : colors[0]}
+                                    opacity={animation === 'pulse' ? undefined : 1}>
+                                    {animation === 'pulse' && (
+                                      <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
+                                    )}
+                                  </rect>
+                                </svg>
+                              </div>
+                            );
+                          })()}
                           {columns.map(col => (
                             <div key={col.id} style={{ width: col.width, minWidth: col.width }} className="shrink-0">
-                              <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} />
+                              <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} />
                             </div>
                           ))}
                         </motion.div>
@@ -687,10 +841,36 @@ const LeadsTable = ({
         </div>
       </div>
 
+      {/* Modals */}
+      <AnimatePresence>
+        {settingsField && (
+          <FieldSettingsModal
+            fieldKey={settingsField}
+            fieldConfig={fieldConfig[settingsField] || {}}
+            fieldMeta={(() => {
+              const field = CONDITIONAL_FIELDS.find(f => f.key === settingsField);
+              return { options: field?.options };
+            })()}
+            onSave={(config) => handleFieldSave(settingsField, config)}
+            onClose={() => setSettingsField(null)}
+          />
+        )}
+        {showColorbarStudio && (
+          <ColorbarConfigModal
+            onClose={() => setShowColorbarStudio(false)}
+            onRulesChange={handleColorbarRulesChange}
+          />
+        )}
+      </AnimatePresence>
+
       <style>{`
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
+        }
+        @keyframes colorbarFlow {
+          0% { background-position: 0% 0; }
+          100% { background-position: 300% 0; }
         }
       `}</style>
     </div>
