@@ -164,6 +164,16 @@ function initDatabase(dbPath) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_cron_status ON cron_jobs(status);
+
+    -- 10) Pending Agent Restarts: model changes awaiting session restart via OpenClaw
+    CREATE TABLE IF NOT EXISTS pending_restarts (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id    TEXT NOT NULL,
+      agent_name  TEXT NOT NULL,
+      new_model   TEXT NOT NULL,
+      session_key TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Seed control_state if empty

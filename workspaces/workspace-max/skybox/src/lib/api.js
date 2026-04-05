@@ -33,6 +33,10 @@ export const api = {
   deleteCronJob: (id) => deleteJSON(`/api/cron/${id}`),
   getReactions: () => fetchJSON('/api/reactions'),
   addReaction: (data) => postJSON('/api/reactions', data),
+  getOpenRouterModels: () => fetchJSON('/api/openrouter/models'),
+  updateAgentModel: (agentId, model) => postJSON(`/api/agents/${agentId}/model`, { model }),
+  getPendingRestarts: () => fetchJSON('/api/pending-restarts'),
+  clearPendingRestart: (id) => del(`/api/pending-restarts/${id}`),
 
   // Control commands via REST (fallback when IPC unavailable)
   setRuntime: (mode) => postJSON('/api/control/runtime', { mode }),

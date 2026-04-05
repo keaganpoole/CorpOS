@@ -100,15 +100,44 @@ ipcMain.handle('control:zone', async (event, { zone }) => {
 
 ipcMain.handle('control:ping-max', async () => {
   if (!controller) return { error: 'Controller not running' };
-  controller.events.emit({
-    event_type: 'ping_max_requested',
-    message: 'Ping Max requested from Skybox UI',
-    actor: 'user',
-    actor_type: 'user',
-    source: 'skybox_ui',
-    severity: 'info',
-  });
-  return { success: true };
+
+  const { exec } = require('child_process');
+  const util = require('util');
+  const execAsync = util.promisify(exec);
+
+  const pending = controller.db.prepare(
+    'SELECT * FROM pending_restarts ORDER BY created_at ASC LIMIT 10'
+  ).all();
+
+  if (pending.length === 0) {
+    return { success: true, message: 'No pending restarts', restarted: [] };
+  }
+
+  const results = [];
+  for (const item of pending) {
+    try {
+      const { stdout } = await execAsync('openclaw sessions', { timeout: 10000 });
+      const lines = stdout.split('\n');
+      let sessionKey = null;
+      for (const line of lines) {
+        if (line.includes('direct') && line.includes('discord') && line.includes('main')) {
+          const match = line.match(/(direct|group)\s+(agent:[^\s]+)\s+/);
+          if (match) { sessionKey = match[2]; break; }
+        }
+      }
+      if (!sessionKey) {
+        results.push({ agent: item.agent_name, model: item.new_model, error: 'No active Discord session found' });
+        continue;
+      }
+      await execAsync(`openclaw sessions restart "${sessionKey}" --model "${item.new_model}"`, { timeout: 30000 });
+      results.push({ agent: item.agent_name, model: item.new_model, restarted: true });
+      controller.db.prepare('DELETE FROM pending_restarts WHERE id = ?').run(item.id);
+    } catch (err) {
+      results.push({ agent: item.agent_name, model: item.new_model, error: err.message });
+    }
+  }
+
+  return { success: true, restarted: results };
 });
 
 // App lifecycle

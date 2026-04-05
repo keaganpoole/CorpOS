@@ -26,10 +26,16 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   AlertCircle,
   Repeat,
   Timer,
   Navigation,
+  Search,
+  Star,
+  X,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSkyboxState } from './hooks/useSkyboxState';
@@ -125,7 +131,7 @@ const TaskCard = ({ task }) => {
         <div className="flex items-center gap-2 text-zinc-400">
           <Clock size={11} className="text-zinc-700" />
           <span className="text-[9px] text-zinc-700 font-bold tracking-widest uppercase">
-            {task.latest_update_at ? new Date(task.latest_update_at + 'Z').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York' }) : '—'}
+            {task.latest_update_at ? new Date(task.latest_update_at + 'Z').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York' }) : '-'}
           </span>
         </div>
         <div className="flex items-center gap-2.5">
@@ -172,18 +178,18 @@ const KanbanColumn = ({ title, tasks, icon: Icon, colorClass }) => (
   </div>
 );
 
-const AgentNode = ({ agent, isActive = false, reactions = {} }) => {
+const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
 
-  // Mock stats — front end only for now (except reactions which comes from DB)
-  const baseStats = {
-    Max: { memory: 47, tasks: 156, model: 'claude-opus-4.6', modelUsage: '2.4M tokens' },
-    Lauren: { memory: 23, tasks: 89, model: 'StepFun 3.5 Flash', modelUsage: '1.1M tokens' },
-    Yanna: { memory: 12, tasks: 34, model: 'StepFun 3.5 Flash', modelUsage: '480K tokens' },
-  }[agent.name] || { memory: 0, tasks: 0, model: 'Unknown', modelUsage: '0' };
+  // Determine if this agent has a pending model change
+  const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
+  // Show the pending model if one exists, otherwise show the current model
+  const displayModel = pending || agent.model || 'Not set';
 
+  // Stats from DB + reactions
   const stats = {
-    ...baseStats,
+    memory: agent.memory_items || 0,
+    tasks: agent.tasks_done || 0,
     compliments: reactions.compliments || 0,
     complaints: reactions.complaints || 0,
   };
@@ -196,7 +202,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {} }) => {
       animate={{ opacity: 1, scale: 1 }}
       className={`bg-[#0A0A0A] border ${borderClass} rounded-2xl w-[320px] flex flex-col hover:border-white/10 transition-all duration-500 relative group overflow-hidden`}
     >
-      {/* Avatar — large, dominant */}
+      {/* Avatar - large, dominant */}
       <div className="relative h-[200px] overflow-hidden">
         <img
           src={`${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
@@ -256,17 +262,35 @@ const AgentNode = ({ agent, isActive = false, reactions = {} }) => {
         {/* Model info */}
         <div className="pt-3 border-t border-white/[0.04]">
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Language Model</p>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-cyan-400/80 truncate">{stats.model}</span>
-            <span className="text-[9px] text-zinc-600 font-mono shrink-0 ml-2">{stats.modelUsage}</span>
-          </div>
+          <button
+            onClick={() => onOpenMarketplace && onOpenMarketplace(agent)}
+            className="w-full flex items-center justify-between group cursor-pointer"
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className={`text-[11px] font-bold truncate transition-colors ${pending ? 'text-amber-400/80' : 'text-cyan-400/80 group-hover:text-cyan-400'}`}>
+                {displayModel}
+              </span>
+              {pending ? (
+                <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                  <div className="h-1 w-1 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="text-[7px] font-black uppercase tracking-widest text-amber-400">Pending</span>
+                </span>
+              ) : (
+                <span className="shrink-0 text-emerald-400">✓</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">Change</span>
+              <Cpu size={11} className="text-cyan-500/60" />
+            </div>
+          </button>
         </div>
       </div>
     </motion.div>
   );
 };
 
-const AgentBranch = ({ agent, agents, reactionsMap, depth = 0 }) => {
+const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onOpenMarketplace }) => {
   const directReports = agents.filter((a) => a.reports_to === agent.id);
 
   return (
@@ -274,7 +298,7 @@ const AgentBranch = ({ agent, agents, reactionsMap, depth = 0 }) => {
       {depth > 0 && (
         <div className="absolute left-1/2 -translate-x-1/2 w-[1px] bg-zinc-800" style={{ height: '40px', top: '-40px' }} />
       )}
-      <AgentNode agent={agent} isActive={depth === 0} reactions={reactionsMap[agent.name] || {}} />
+      <AgentNode agent={agent} isActive={depth === 0} reactions={reactionsMap[agent.name] || {}} pendingModel={pendingModel} onOpenMarketplace={onOpenMarketplace} />
 
       {directReports.length > 0 && (
         <div className="mt-8 flex flex-col items-center">
@@ -285,7 +309,7 @@ const AgentBranch = ({ agent, agents, reactionsMap, depth = 0 }) => {
               <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] bg-zinc-800" style={{ width: 'calc(100% - 260px)' }} />
             )}
             {directReports.map((report) => (
-              <AgentBranch key={report.id} agent={report} agents={agents} reactionsMap={reactionsMap} depth={depth + 1} />
+              <AgentBranch key={report.id} agent={report} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={depth + 1} onOpenMarketplace={onOpenMarketplace} />
             ))}
           </div>
         </div>
@@ -294,7 +318,7 @@ const AgentBranch = ({ agent, agents, reactionsMap, depth = 0 }) => {
   );
 };
 
-const AgentsHierarchy = ({ agents, reactions = [] }) => {
+const AgentsHierarchy = ({ agents, reactions = [], pendingModel = null, onOpenMarketplace }) => {
   const root = agents.find((a) => a.hierarchy_level === 1);
   if (!root) return <div className="flex items-center justify-center h-full text-zinc-600">No agent data</div>;
 
@@ -306,13 +330,415 @@ const AgentsHierarchy = ({ agents, reactions = [] }) => {
 
   return (
     <div className="min-w-fit px-12 pt-10 flex flex-col items-center select-none">
-      <AgentBranch agent={root} agents={agents} reactionsMap={reactionsMap} depth={0} />
+      <AgentBranch agent={root} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={0} onOpenMarketplace={onOpenMarketplace} />
     </div>
   );
 };
 
+// ─── Model Marketplace ─────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmtPrice = (n) => {
+  const val = parseFloat(n);
+  return (!n && n !== 0) || val === 0 ? 'Free' : '$' + (val * 1000000).toFixed(2) + '/M';
+};
+const fmtCtx = (n) => !n ? '-' : n >= 1e6 ? (n/1e6).toFixed(0)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n;
+
+// Price → color class based on input cost per million
+const priceColor = (n) => {
+  const val = parseFloat(n);
+  if (!n && n !== 0) return 'text-emerald-400';
+  if (val === 0) return 'text-emerald-400';
+  const p = val * 1000000;
+  if (p < 1.00) return 'text-white/70';
+  if (p < 2.00) return 'text-amber-400';
+  if (p < 3.50) return 'text-orange-400';
+  return 'text-rose-400';
+};
+
+// ─── Model Marketplace ─────────────────────────────────────────────────────────
+const ModelMarketplace = ({ agent, currentModel, onClose, onSelect }) => {
+  const [models, setModels]     = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
+  const [search, setSearch]     = useState('');
+  const [provider, setProvider] = useState('All');
+  const [sort, setSort]         = useState('popularity');
+  const [selected, setSelected] = useState(null);
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied]   = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
+
+  const [ctxMin, setCtxMin] = useState(0);
+  const [ctxMax, setCtxMax] = useState(2000000);
+
+  // Store original API order as ranking
+  const [rankMap, setRankMap] = useState({});
+
+  useEffect(() => {
+    api.getOpenRouterModels()
+      .then(d => {
+        const list = d?.models || [];
+        setModels(list);
+        const maxCtx = Math.max(...list.map(m => m.contextLength || 0));
+        if (maxCtx > 0) setCtxMax(maxCtx);
+        // Build rank map from original API order
+        const r = {};
+        list.forEach((m, i) => { r[m.id] = i + 1; });
+        setRankMap(r);
+        setLoading(false);
+      })
+      .catch(e => { setError(e.message); setLoading(false); });
+  }, []);
+
+  useEffect(() => {
+    setIsFiltering(true);
+    const t = setTimeout(() => setIsFiltering(false), 300);
+    return () => clearTimeout(t);
+  }, [ctxMin, ctxMax, search]);
+
+  const allProviders = ['All', ...new Set(
+    Object.entries(
+      models.reduce((acc, m) => {
+        const p = m.id.split('/')[0];
+        acc[p] = (acc[p] || 0) + 1;
+        return acc;
+      }, {})
+    )
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([p]) => p)
+  )];
+
+  // Popularity order = original API order (rankMap)
+  let sorted = [...models];
+  if (sort === 'context') sorted.sort((a, b) => (b.contextLength||0) - (a.contextLength||0));
+  else if (sort === 'price') sorted.sort((a, b) => (a.promptPrice||0) - (b.promptPrice||0));
+  // else 'popularity' → keep original order
+
+  let filtered = sorted.filter(m => {
+    const q = search.toLowerCase();
+    const match = !q
+      || m.name.toLowerCase().includes(q)
+      || m.id.toLowerCase().includes(q)
+      || m.description?.toLowerCase().includes(q);
+    const prov = provider === 'All' || m.id.startsWith(provider + '/');
+    const inRange = (m.contextLength || 0) >= ctxMin && (m.contextLength || 0) <= ctxMax;
+    return match && prov && inRange;
+  });
+
+  const maxCtx = Math.max(...models.map(m => m.contextLength || 0), 2000000);
+
+  const handleApply = async () => {
+    if (!selected) return;
+    setApplying(true);
+    try {
+      await api.updateAgentModel(agent.id, selected.id);
+      setApplied(true);
+      onSelect(agent.id, selected.id, selected.name);
+      setTimeout(onClose, 1200);
+    } catch {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl"
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      {/* Ambient glows */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className={`absolute top-1/4 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-cyan-500/[0.04] blur-[100px] rounded-full transition-opacity duration-700 ${isFiltering ? 'opacity-80' : 'opacity-30'}`} />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+        className="relative w-[920px] h-[680px] bg-zinc-950 border border-white/[0.07] rounded-3xl flex flex-col overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.9)]"
+      >
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="shrink-0 px-7 py-4 border-b border-white/[0.05] flex items-center gap-4">
+          {/* Left: Icon + Title */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <h2 className="text-[13px] font-black text-white tracking-tight uppercase leading-none">OpenWar</h2>
+          </div>
+
+          {/* Sort toggles - right of title */}
+          <div className="flex items-center gap-1">
+            {[
+              { key: 'popularity', label: 'Popularity', icon: '🔥' },
+              { key: 'context', label: 'Context', icon: null },
+              { key: 'price', label: 'Cost', icon: null },
+            ].map(s => (
+              <button
+                key={s.key}
+                onClick={() => setSort(s.key)}
+                className={`px-2.5 pb-1 text-[9px] font-bold uppercase tracking-wider transition-all ${
+                  sort === s.key
+                    ? 'text-white border-b border-white'
+                    : 'text-zinc-600 hover:text-zinc-300 border-b border-transparent'
+                }`}
+              >
+                {s.icon && <span className="mr-1">{s.icon}</span>}{s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search - right section */}
+          <div className="relative max-w-[200px] flex-1 ml-auto">
+            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+            <input
+              value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="w-full bg-white/[0.03] border border-white/20 rounded-xl py-2 pl-9 pr-3 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-white/40 transition-colors"
+            />
+          </div>
+
+          {/* Agent + Apply + Close */}
+          <div className="flex items-center gap-2 shrink-0">
+            {applied ? (
+              <span className="text-[10px] text-cyan-500 font-bold animate-pulse">Restarting...</span>
+            ) : selected ? (
+              <button
+                onClick={handleApply}
+                disabled={applying}
+                className="px-4 py-2 bg-white text-black text-[10px] font-black rounded-xl hover:bg-zinc-200 active:scale-95 transition-all disabled:opacity-40"
+              >
+                {applying ? 'Applying...' : 'Apply'}
+              </button>
+            ) : null}
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-600 hover:text-white hover:bg-white/[0.06] transition-colors"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Provider Tabs ─────────────────────────────────────────────── */}
+        <div className="shrink-0 px-7 pt-3 pb-0 flex items-center gap-1 overflow-x-auto custom-scrollbar border-b border-white/[0.03]">
+          {allProviders.map(p => (
+            <button
+              key={p}
+              onClick={() => setProvider(p)}
+              className={`shrink-0 px-3 pb-1 text-[9px] font-bold uppercase tracking-wider transition-all border-b -mb-px ${
+                provider === p ? 'text-white border-white' : 'text-zinc-600 hover:text-zinc-300 border-transparent'
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Control Strip (Slider) ─────────────────────────────────────── */}
+        <div className="shrink-0 px-7 py-4 border-b border-white/[0.04]">
+          <div className="relative px-2">
+            <div className="flex items-baseline justify-between mb-3">
+              <span className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.3em]">Context Window</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black text-white tabular-nums leading-none">{fmtCtx(ctxMin)}</span>
+                <span className="text-sm font-bold text-zinc-600 mx-2">–</span>
+                <span className="text-3xl font-black text-white tabular-nums leading-none">{fmtCtx(ctxMax)}</span>
+              </div>
+            </div>
+
+            <div className="relative h-12">
+              <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                <div
+                  className="absolute h-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 transition-all duration-300"
+                  style={{
+                    left: `${(ctxMin / maxCtx) * 100}%`,
+                    width: `${((ctxMax - ctxMin) / maxCtx) * 100}%`,
+                  }}
+                />
+              </div>
+
+              <input
+                type="range" min="0" max={maxCtx} step="1000"
+                value={ctxMin}
+                onChange={e => setCtxMin(Math.min(Number(e.target.value), ctxMax - 1000))}
+                className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full bg-transparent appearance-none cursor-pointer z-20 pointer-events-none
+                  [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7
+                  [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-xl [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-cyan-500
+                  [&::-webkit-slider-thumb]:shadow-[0_0_15px_rgba(34,211,238,0.3)] [&::-webkit-slider-thumb]:transition-transform hover:[&::-webkit-slider-thumb]:scale-110"
+              />
+              <input
+                type="range" min="0" max={maxCtx} step="1000"
+                value={ctxMax}
+                onChange={e => setCtxMax(Math.max(Number(e.target.value), ctxMin + 1000))}
+                className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full bg-transparent appearance-none cursor-pointer z-10 pointer-events-none
+                  [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7
+                  [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-xl [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-fuchsia-500
+                  [&::-webkit-slider-thumb]:shadow-[0_0_15px_rgba(217,70,239,0.3)] [&::-webkit-slider-thumb]:transition-transform hover:[&::-webkit-slider-thumb]:scale-110"
+              />
+
+              <div className="flex justify-between mt-8 px-1">
+                {['0', '512K', '1M', '1.5M', '2M+'].map(l => (
+                  <span key={l} className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">{l}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Column Headers ─────────────────────────────────────────────── */}
+        <div className="shrink-0 px-7 py-2 flex items-center gap-4 border-b border-white/[0.03]">
+          <div className="flex-1 min-w-0 pl-7">
+            <span className="text-[8px] font-black text-zinc-800 uppercase tracking-widest">Model</span>
+          </div>
+          <div className="w-16 shrink-0 text-right">
+            <span className="text-[8px] font-black text-zinc-800 uppercase tracking-widest">Context</span>
+          </div>
+          <div className="w-16 shrink-0 text-right">
+            <span className="text-[8px] font-black text-zinc-800 uppercase tracking-widest">Prompt</span>
+          </div>
+          <div className="w-16 shrink-0 text-right">
+            <span className="text-[8px] font-black text-zinc-800 uppercase tracking-widest">Output</span>
+          </div>
+          <div className="w-4 shrink-0" />
+        </div>
+
+        {/* ── Model Rows ─────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+          {loading ? (
+            <div className="h-full flex flex-col items-center justify-center gap-4 pt-12">
+              <div className="w-10 h-10 rounded-full border-2 border-white/10 border-t-cyan-500/60 animate-spin" />
+              <p className="text-[12px] text-zinc-600 font-medium">Connecting to marketplace...</p>
+            </div>
+          ) : error ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 pt-12">
+              <AlertCircle size={22} className="text-zinc-700" />
+              <p className="text-[12px] text-zinc-600">{error}</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center gap-2 pt-12">
+              <p className="text-[13px] text-zinc-600 italic">No models in range</p>
+              <button
+                onClick={() => { setCtxMin(0); setCtxMax(maxCtx); setSearch(''); setProvider('All'); }}
+                className="mt-3 text-[10px] text-cyan-500/60 border border-cyan-500/20 px-4 py-1.5 rounded-xl hover:text-cyan-400 transition-colors"
+              >
+                Reset
+              </button>
+            </div>
+          ) : (
+            <div className="px-4 py-2 flex flex-col gap-0.5">
+              {filtered.map((m, idx) => {
+                const isSel = selected?.id === m.id;
+                const isCur = currentModel === m.id;
+                const isLarge = (m.contextLength || 0) >= 1000000;
+                const rank = rankMap[m.id];
+                const isTop = rank <= 10;
+
+                return (
+                  <motion.button
+                    key={m.id}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(idx * 0.005, 0.25) }}
+                    onClick={() => setSelected(isSel ? null : m)}
+                    className={`
+                      relative w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all duration-150 cursor-pointer group overflow-hidden
+                      ${isSel ? 'bg-cyan-500/[0.04] border border-cyan-500/25' : 'hover:bg-white/[0.03] border border-transparent'}
+                    `}
+                  >
+                    {/* Gradient sweep line for #1 ranked models */}
+                    {isTop ? (
+                      <div className="absolute left-0 top-0 bottom-0 w-0.5 overflow-hidden">
+                        <div className="absolute inset-0 w-full bg-gradient-to-b from-cyan-400 via-fuchsia-400 to-cyan-400 rounded-full"
+                          style={{
+                            backgroundSize: '100% 200%',
+                            animation: 'sweep 1.8s linear infinite',
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-full ${isLarge ? 'bg-fuchsia-500/60' : 'bg-cyan-500/40'}`} />
+                    )}
+
+                    {/* Provider initial */}
+                    <div className="w-7 h-7 rounded-lg bg-white/[0.05] flex items-center justify-center text-[11px] font-bold text-zinc-500 group-hover:bg-cyan-500/15 group-hover:text-cyan-400 transition-colors shrink-0">
+                      {m.id.split('/')[0][0].toUpperCase()}
+                    </div>
+
+                    {/* Model info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">{m.id.split('/')[0]}</span>
+                        {isCur && (
+                          <span className="text-[7px] font-bold uppercase tracking-widest text-cyan-500/60 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">Active</span>
+                        )}
+                        {rank <= 10 && (
+                          <span className="text-[7px] font-black text-amber-400 border border-amber-400/20 px-1.5 py-0.5 rounded-full">🔥 #{rank}</span>
+                        )}
+                      </div>
+                      <p className="text-[12px] font-semibold text-zinc-300 leading-none mt-0.5 truncate group-hover:text-white transition-colors">
+                        {m.name}
+                      </p>
+                    </div>
+
+                    {/* Context */}
+                    <div className="w-16 shrink-0 text-right">
+                      <p className="text-[13px] font-bold text-white/80 leading-none">{fmtCtx(m.contextLength)}</p>
+                      <div className="w-full h-0.5 bg-white/10 rounded-full mt-1.5 overflow-hidden max-w-[36px] ml-auto">
+                        <div className="h-full bg-cyan-500/50 rounded-full" style={{ width: `${Math.min(((m.contextLength || 0) / maxCtx) * 100, 100)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Prompt price */}
+                    <div className="w-16 shrink-0 text-right">
+                      <p className={`text-[12px] font-bold leading-none ${priceColor(m.promptPrice)}`}>{fmtPrice(m.promptPrice)}</p>
+                      <p className="text-[8px] text-zinc-700 mt-1">prompt</p>
+                    </div>
+
+                    {/* Output price */}
+                    <div className="w-16 shrink-0 text-right">
+                      <p className={`text-[12px] font-bold leading-none ${priceColor(m.completionPrice)}`}>{fmtPrice(m.completionPrice)}</p>
+                      <p className="text-[8px] text-zinc-700 mt-1">output</p>
+                    </div>
+
+                    {/* Chevron */}
+                    <ChevronRight size={13} className="text-zinc-700 group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </motion.button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Footer ──────────────────────────────────────────────────────── */}
+        {selected && !applied && (
+          <motion.div
+            initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+            className="shrink-0 px-7 py-3 border-t border-white/[0.05] flex items-center justify-between"
+          >
+            <span className="text-[11px] text-zinc-500">{agent?.name} is using <span className="text-zinc-300 font-semibold">{currentModel}</span></span>
+            <div className="flex items-center gap-4 text-[10px] text-zinc-500 font-mono">
+              <span>{fmtCtx(selected.contextLength)} ctx</span>
+              <span className="text-zinc-800">·</span>
+              <span className={priceColor(selected.promptPrice)}>{fmtPrice(selected.promptPrice)} in</span>
+              <span className="text-zinc-800">·</span>
+              <span className={priceColor(selected.completionPrice)}>{fmtPrice(selected.completionPrice)} out</span>
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
+
+      <style>{`
+        @keyframes sweep {
+          0%   { background-position: 0% -100%; }
+          100% { background-position: 0% 200%; }
+        }
+      `}</style>
+    </motion.div>
+  );
+};
+
 /*
- * STATUS_CONFIG — ECG Health Visualization
+ * STATUS_CONFIG - ECG Health Visualization
  * FINE / CAUTION / DANGER driven by real system data
  */
 const STATUS_CONFIG = {
@@ -355,7 +781,7 @@ const STATUS_CONFIG = {
 };
 
 /*
- * ECG_TEMPLATE — Medical P-Q-R-S-T wave points
+ * ECG_TEMPLATE - Medical P-Q-R-S-T wave points
  */
 const ECG_TEMPLATE = [
   { x: 0, y: 0 },
@@ -385,30 +811,35 @@ const getHeartbeatY = (progress, restingThreshold) => {
 };
 
 /*
- * ECGCanvas — Pure canvas ECG renderer
- * Renders the heartbeat line on a canvas element.
- * All animation state lives in a single stable ref — no state, no re-renders,
- * no animation restart when React re-renders the tree.
+ * ECGCanvas - Pure canvas ECG renderer
+ * Each canvas element gets its own self-contained animation engine stored at
+ * module level, keyed by a stable numeric ID. Completely decoupled from
+ * React's render cycle - re-renders cannot touch the animation.
  */
+
+// Module-level engine registry - lives outside React entirely
+const _ecgEngines = {};
+let _ecgIdCounter = 0;
+
 const ECGCanvas = ({ status, mini = false }) => {
   const canvasRef = useRef(null);
-  const animRef = useRef(null);
-  const prevStatusRef = useRef(status);
+  const idRef = useRef(`ecg_${++_ecgIdCounter}`);
 
-  // Kick off / restart the animation only when the STATUS VALUE actually changes.
-  // Normal React re-renders (same status value) are ignored — no loop restart.
+  // Mount-only effect: start the animation engine
   useEffect(() => {
-    const didChange = prevStatusRef.current !== status;
-    prevStatusRef.current = status;
-    if (!didChange) return; // same status, keep the running loop
+    const id = idRef.current;
+    _ecgEngines[id] = {
+      rafId: null,
+      status,
+      bpm: STATUS_CONFIG[status].bpmRange[0],
+      xPos: 0,
+      prevY: 0,
+    };
 
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d', { alpha: true });
     const dpr = window.devicePixelRatio || 1;
-
-    // Cancel any previous loop
-    if (animRef.current) cancelAnimationFrame(animRef.current);
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -420,12 +851,10 @@ const ECGCanvas = ({ status, mini = false }) => {
     window.addEventListener('resize', resize);
     resize();
 
-    let bpm = STATUS_CONFIG[status].bpmRange[0];
-    let xPos = 0;
-    let prevY = 0;
+    const eng = _ecgEngines[id];
 
     const render = () => {
-      const config = STATUS_CONFIG[status];
+      const config = STATUS_CONFIG[eng.status] || STATUS_CONFIG.FINE;
       const now = Date.now();
 
       const width = canvas.width / dpr;
@@ -437,7 +866,7 @@ const ECGCanvas = ({ status, mini = false }) => {
       ctx.fillRect(0, 0, width, height);
 
       // Wave
-      const beatDuration = 60000 / bpm;
+      const beatDuration = 60000 / eng.bpm;
       const progress = (now % beatDuration) / beatDuration;
       const amplitude = height * config.amplitude;
       const jitter = (Math.random() - 0.5) * config.noise * 30;
@@ -453,38 +882,45 @@ const ECGCanvas = ({ status, mini = false }) => {
       ctx.shadowBlur = mini ? 8 : 12;
       ctx.shadowColor = config.color;
 
-      const pX = xPos - config.speed;
-      ctx.moveTo(pX, prevY || centerY);
-      ctx.lineTo(xPos, targetY);
+      const pX = eng.xPos - config.speed;
+      ctx.moveTo(pX, eng.prevY || centerY);
+      ctx.lineTo(eng.xPos, targetY);
       ctx.stroke();
 
-      prevY = targetY;
-      xPos += config.speed;
+      eng.prevY = targetY;
+      eng.xPos += config.speed;
 
       // Wrap
-      if (xPos > width) {
-        xPos = 0;
+      if (eng.xPos > width) {
+        eng.xPos = 0;
         ctx.clearRect(0, 0, 20, height);
       }
 
       // Clear ahead
       ctx.shadowBlur = 0;
-      ctx.clearRect(xPos + 2, 0, 45, height);
+      ctx.clearRect(eng.xPos + 2, 0, 45, height);
 
       // Natural BPM jitter
       if (Math.random() > 0.993) {
         const [bpmMin, bpmMax] = config.bpmRange;
-        bpm = Math.min(Math.max(bpm + (Math.random() > 0.5 ? 1 : -1), bpmMin), bpmMax);
+        eng.bpm = Math.min(Math.max(eng.bpm + (Math.random() > 0.5 ? 1 : -1), bpmMin), bpmMax);
       }
 
-      animRef.current = requestAnimationFrame(render);
+      eng.rafId = requestAnimationFrame(render);
     };
 
-    animRef.current = requestAnimationFrame(render);
+    eng.rafId = requestAnimationFrame(render);
     return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (eng.rafId) cancelAnimationFrame(eng.rafId);
+      delete _ecgEngines[id];
       window.removeEventListener('resize', resize);
     };
+  }, []); // mount-only - animation never restarts due to React re-renders
+
+  // Sync status separately - no loop restart, just updates eng.status
+  useEffect(() => {
+    const id = idRef.current;
+    if (_ecgEngines[id]) _ecgEngines[id].status = status;
   }, [status]);
 
   return (
@@ -499,7 +935,7 @@ const ECGCanvas = ({ status, mini = false }) => {
 
 
 /*
- * SidebarHeartbeat — Mini ECG strip for the left sidebar
+ * SidebarHeartbeat - Mini ECG strip for the left sidebar
  */
 const SidebarHeartbeat = ({ summary }) => {
   const { errors = 0, warnings = 0 } = summary;
@@ -532,7 +968,7 @@ const SystemView = ({ summary, systemLogs }) => {
 
   return (
     <div className="h-full flex flex-col px-2 pt-2 pb-2">
-      {/* Unified System Card — ECG header + log body */}
+      {/* Unified System Card - ECG header + log body */}
       <div
         className="flex-1 flex flex-col rounded-3xl border border-white/10 bg-black/60 backdrop-blur-2xl shadow-2xl overflow-hidden min-h-0"
         style={{ boxShadow: `0 0 30px -20px ${config.glow}` }}
@@ -600,7 +1036,7 @@ const SystemView = ({ summary, systemLogs }) => {
                     className="text-5xl font-black font-mono transition-colors duration-500 tabular-nums leading-none"
                     style={{ color: config.color }}
                   >
-                    {total > 0 ? successRate : '—'}
+                    {total > 0 ? successRate : '-'}
                   </span>
                   <span className="text-xs font-bold text-white/30 tracking-[0.2em]">%</span>
                 </div>
@@ -630,7 +1066,7 @@ const SystemView = ({ summary, systemLogs }) => {
           <div className="absolute top-0 left-0 w-full h-px z-[100]" style={{ background: `linear-gradient(90deg, transparent, ${config.color}, transparent)` }} />
         </div>
 
-        {/* Operation Log — seamless continuation, no separate box */}
+        {/* Operation Log - seamless continuation, no separate box */}
         <div className="flex-1 flex flex-col min-h-0">
           <div className="px-6 py-3 border-t border-white/5 flex items-center justify-between bg-black/40">
             <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Operation Log</h3>
@@ -644,7 +1080,7 @@ const SystemView = ({ summary, systemLogs }) => {
               <p className="text-zinc-800 text-[10px] uppercase tracking-widest font-bold">No log entries yet</p>
             ) : systemLogs.map((log, i) => (
               <p key={log.timestamp + '-' + i} className="text-zinc-600">
-                <span className="opacity-30 mr-3">{log.timestamp ? new Date(log.timestamp + 'Z').toLocaleTimeString('en-US', { hour12: true, timeZone: 'America/New_York' }) : '—:—:—'}</span>
+                <span className="opacity-30 mr-3">{log.timestamp ? new Date(log.timestamp + 'Z').toLocaleTimeString('en-US', { hour12: true, timeZone: 'America/New_York' }) : '-:-:-'}</span>
                 <span className={"font-bold mr-3 " + (log.level === 'ok' ? 'text-cyan-400' : log.level === 'critical' ? 'text-rose-500' : log.level === 'cmd' ? 'text-fuchsia-500' : log.level === 'warning' ? 'text-amber-400' : 'text-indigo-400')}>
                   {(log.level || 'INFO').toUpperCase()}
                 </span>
@@ -690,7 +1126,7 @@ const PipelineView = ({ pipeline }) => {
 
       <div className="flex-1 bg-[#0A0A0A] border border-white/5 rounded-2xl p-8 shadow-2xl">
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Relic Pipeline — Signal Scoring Map</h3>
+          <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Relic Pipeline - Signal Scoring Map</h3>
           <Badge color="cyan">Live</Badge>
         </div>
 
@@ -974,7 +1410,7 @@ const CronCard = ({ job, onDelete }) => {
         <span className="text-[11px] font-bold leading-none">&times;</span>
       </button>
 
-      {/* Identity Row — Avatar replaces Navigation icon */}
+      {/* Identity Row - Avatar replaces Navigation icon */}
       <div className="flex items-center gap-3 mb-4">
         <AgentAvatar name={job.assigned_agent} />
         <div>
@@ -1297,7 +1733,7 @@ const ChronosView = ({ cronJobs, onRefresh }) => {
                   />
                 </div>
 
-                {/* Schedule — Date & Time Picker */}
+                {/* Schedule - Date & Time Picker */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">When</label>
@@ -1320,7 +1756,7 @@ const ChronosView = ({ cronJobs, onRefresh }) => {
                       />
                     </div>
 
-                    {/* Time — Hour : Minute AM/PM */}
+                    {/* Time - Hour : Minute AM/PM */}
                     <div className="flex items-center gap-1.5 bg-black/60 border border-white/5 rounded-xl px-3 py-3">
                       <select
                         value={form.hour}
@@ -1421,7 +1857,7 @@ const ChronosView = ({ cronJobs, onRefresh }) => {
                   </button>
                 </div>
 
-                {/* Agent Picker — Tinder-style card cycling */}
+                {/* Agent Picker - Tinder-style card cycling */}
                 <AnimatePresence>
                   {showAgentPicker && (
                     <motion.div
@@ -1515,7 +1951,7 @@ const ChronosView = ({ cronJobs, onRefresh }) => {
                           })}
                         </div>
 
-                        {/* Footer — dots + select */}
+                        {/* Footer - dots + select */}
                         <div className="shrink-0 px-8 py-5 flex items-center justify-between border-t border-white/[0.04]">
                           <div className="flex gap-2">
                             {agentOptions.map((_, idx) => (
@@ -1639,6 +2075,8 @@ const App = () => {
   const [glitch, setGlitch] = useState(false);
   const [zoneOpen, setZoneOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [marketplaceAgent, setMarketplaceAgent] = useState(null); // agent object for marketplace
+  const [pendingModel, setPendingModel] = useState(null); // { agentId, model } pending confirmation
 
   // Live backend state
   const {
@@ -1660,6 +2098,16 @@ const App = () => {
     pingMax,
     refresh,
   } = useSkyboxState();
+
+  // Clear pendingModel once the agents data confirms the new model is loaded
+  useEffect(() => {
+    if (!pendingModel || !agents) return;
+    const updated = agents.find(a => a.id === pendingModel.agentId);
+    if (updated && updated.model === pendingModel.model) {
+      // Backend confirmed — Max has loaded the new model
+      setPendingModel(null);
+    }
+  }, [agents, pendingModel]);
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -1713,8 +2161,20 @@ const App = () => {
         );
       case 'agents':
         return (
-          <div className="h-full overflow-auto custom-scrollbar bg-[#020202] flex justify-center items-start pt-6">
-            <AgentsHierarchy agents={agents} reactions={reactions} />
+          <div className={`h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex justify-center items-start pt-6 relative`}>
+            <AgentsHierarchy agents={agents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} />
+            <AnimatePresence>
+              {marketplaceAgent && (
+                <ModelMarketplace
+                  agent={marketplaceAgent}
+                  currentModel={marketplaceAgent.model}
+                  onClose={() => setMarketplaceAgent(null)}
+                  onSelect={(agentId, modelId) => {
+                    setPendingModel({ agentId, model: modelId });
+                  }}
+                />
+              )}
+            </AnimatePresence>
           </div>
         );
       case 'chronos':
@@ -1793,7 +2253,7 @@ const App = () => {
             />
           </div>
 
-          {/* Code — fades when Zone is open */}
+          {/* Code - fades when Zone is open */}
           <div className={`relative transition-opacity duration-500 ${zoneOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ width: '120px', textAlign: 'center' }}>
             <GradientBleed
               trigger="Code"
@@ -1806,7 +2266,7 @@ const App = () => {
             />
           </div>
 
-          {/* SKYBOX Logo — fades when either dropdown is open */}
+          {/* SKYBOX Logo - fades when either dropdown is open */}
           <div className={`relative flex flex-col items-center transition-opacity duration-500 mx-20 ${zoneOpen || codeOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
             <div className={`relative transition-all duration-700 transform ${glitch ? 'opacity-10 scale-[1.05] blur-sm' : 'opacity-100 scale-100'}`}>
               <div className="absolute -left-6 inset-y-0 w-[1px] bg-white/10" />
@@ -1824,7 +2284,13 @@ const App = () => {
               {isPaused ? <Play size={11} className="text-white" fill="currentColor" /> : <Pause size={11} className="text-white" fill="currentColor" />}
             </button>
 
-            <button onClick={pingMax} className="no-drag px-4 py-1.5 bg-white rounded-full text-[10px] font-black uppercase tracking-widest text-black hover:bg-cyan-400 transition-all active:scale-95 shadow-xl">
+            <button
+              onClick={async () => {
+                await pingMax();
+                setTimeout(() => refresh(), 3500);
+              }}
+              className="no-drag px-4 py-1.5 bg-white rounded-full text-[10px] font-black uppercase tracking-widest text-black hover:bg-cyan-400 transition-all active:scale-95 shadow-xl"
+            >
               Ping
             </button>
           </div>
@@ -1854,7 +2320,7 @@ const App = () => {
             <div className="w-8 h-8 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-[11px] font-bold text-white group-hover:border-white transition-colors">KP</div>
             <div className="flex-1 overflow-hidden">
               <p className="text-[12px] font-bold truncate text-zinc-100 tracking-tight group-hover:text-white">Keagan Poole</p>
-              <p className="text-[9px] text-zinc-600 truncate font-bold uppercase tracking-widest mt-1 opacity-60">CEO — {wsStatus === 'connected' ? 'Connected' : 'Offline'}</p>
+              <p className="text-[9px] text-zinc-600 truncate font-bold uppercase tracking-widest mt-1 opacity-60">CEO - {wsStatus === 'connected' ? 'Connected' : 'Offline'}</p>
             </div>
             <Settings size={15} className="no-drag text-zinc-700 hover:text-white transition-colors" />
           </div>
@@ -1891,7 +2357,7 @@ const App = () => {
 
             return (
             <div key={evt.id || `${evt.timestamp}-${evt.message}`} className="flex gap-3 group">
-              {/* Small avatar — left side */}
+              {/* Small avatar - left side */}
               <div className="flex flex-col items-center pt-0.5">
                 <div className="w-6 h-6 rounded-full overflow-hidden border border-white/[0.06] bg-zinc-900 shrink-0">
                   <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
@@ -1899,13 +2365,13 @@ const App = () => {
                 <div className="flex-1 w-[1px] bg-zinc-900/50 mt-2 mb-1 group-last:bg-transparent" />
               </div>
 
-              {/* Content — dot + text */}
+              {/* Content - dot + text */}
               <div className="pb-4 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <StatusDot status={evt.severity || 'info'} pulse={evt.severity === 'critical' && !isPaused} />
                   <span className="text-[12px] font-bold text-zinc-200 group-hover:text-white transition-colors">{evt.actor || 'System'}</span>
                   <span className="text-[9px] text-zinc-700 font-bold">
-                    {evt.timestamp ? new Date(evt.timestamp + 'Z').toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' }) : '—'}
+                    {evt.timestamp ? new Date(evt.timestamp + 'Z').toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' }) : '-'}
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500 font-medium leading-relaxed group-hover:text-zinc-400 transition-colors">{evt.message}</p>

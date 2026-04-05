@@ -32,27 +32,6 @@
         "lastDeliveryStatus": "unknown",
         "consecutiveErrors": 1
       }
-    },
-    {
-      "id": "7df5b351-1aaf-48e4-818a-67c07f384c81",
-      "name": "Test job",
-      "enabled": true,
-      "deleteAfterRun": true,
-      "createdAtMs": 1775175504575,
-      "updatedAtMs": 1775175504575,
-      "schedule": {
-        "kind": "at",
-        "at": "2026-04-03T22:00:00.000Z"
-      },
-      "sessionTarget": "main",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "systemEvent",
-        "text": "Message keagan on telegram and discord."
-      },
-      "state": {
-        "nextRunAtMs": 1775253600000
-      }
     }
   ]
 }

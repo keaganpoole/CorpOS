@@ -4,6 +4,27 @@
  * Runs inside Electron main process on localhost
  */
 
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+// Load OpenClaw .env so we can access OPENROUTER_API_KEY
+const envPath = path.join(os.homedir(), '.openclaw', '.env');
+console.log('[Skybox] Loading env from:', envPath, '| Exists:', fs.existsSync(envPath));
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.substring(0, eqIdx).trim();
+    const val = trimmed.substring(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+    if (!process.env[key]) process.env[key] = val;
+  }
+  console.log('[Skybox] OPENROUTER_API_KEY after load:', process.env.OPENROUTER_API_KEY ? 'SET (' + process.env.OPENROUTER_API_KEY.substring(0, 8) + '...)' : 'NOT SET');
+}
+
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
@@ -201,32 +222,50 @@ class Controller {
       res.json(control);
     });
 
-    this.app.post('/api/control/ping-max', (req, res) => {
-      // Ensure there's an active session
-      let session = this.db.prepare("SELECT id FROM sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1").get();
-      if (!session) {
-        const sessionId = 'session_' + Date.now();
-        this.db.prepare('INSERT INTO sessions (id, trigger_source, status) VALUES (?, ?, ?)').run(sessionId, 'ping_max', 'active');
-        session = { id: sessionId };
-        this.events.emit({
-          event_type: 'session_started',
-          message: `Session ${sessionId} started`,
-          source: 'skybox_control',
-          session_id: sessionId,
-        });
-        this.broadcast({ type: 'session_change', session: { id: sessionId, status: 'active', trigger_source: 'ping_max' } });
+    this.app.post('/api/control/ping-max', async (req, res) => {
+      const { exec } = require('child_process');
+      const util = require('util');
+      const execAsync = util.promisify(exec);
+
+      const pending = this.db.prepare(
+        'SELECT * FROM pending_restarts ORDER BY created_at ASC LIMIT 10'
+      ).all();
+
+      if (pending.length === 0) {
+        return res.json({ success: true, message: 'No pending restarts', restarted: [] });
       }
 
-      this.events.emit({
-        event_type: 'ping_max_requested',
-        message: 'Ping Max — operational check',
-        actor: 'user',
-        actor_type: 'user',
-        source: 'skybox_control',
-        severity: 'info',
-      });
+      const results = [];
+      for (const item of pending) {
+        try {
+          // Find Max's active Discord session
+          const { stdout } = await execAsync('openclaw sessions', { timeout: 10000 });
+          const lines = stdout.split('\n');
+          let sessionKey = null;
+          for (const line of lines) {
+            if (line.includes('direct') && line.includes('discord') && line.includes('main')) {
+              const match = line.match(/(direct|group)\s+(agent:[^\s]+)\s+/);
+              if (match) { sessionKey = match[2]; break; }
+            }
+          }
 
-      res.json({ success: true, message: 'Ping event emitted' });
+          if (!sessionKey) {
+            results.push({ agent: item.agent_name, model: item.new_model, error: 'No active Discord session found' });
+            continue;
+          }
+
+          // Restart with new model
+          await execAsync(`openclaw sessions restart "${sessionKey}" --model "${item.new_model}"`, { timeout: 30000 });
+          results.push({ agent: item.agent_name, model: item.new_model, restarted: true });
+
+          // Clear this pending restart
+          this.db.prepare('DELETE FROM pending_restarts WHERE id = ?').run(item.id);
+        } catch (err) {
+          results.push({ agent: item.agent_name, model: item.new_model, error: err.message });
+        }
+      }
+
+      res.json({ success: true, restarted: results });
     });
 
     // --- Event ingestion endpoint (for OpenClaw runtime) ---
@@ -303,6 +342,86 @@ class Controller {
       });
 
       res.json({ success: true, lead: this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id) });
+    });
+
+    // --- OpenRouter Models ---
+    this.app.get('/api/openrouter/models', async (req, res) => {
+      const apiKey = process.env.OPENROUTER_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: 'OpenRouter API key not configured' });
+      }
+
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/models', {
+          headers: { 'Authorization': `Bearer ${apiKey}` },
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          return res.status(response.status).json({ error: `OpenRouter error: ${text}` });
+        }
+        const data = await response.json();
+
+        // Flatten and normalize the model list
+        const models = (data.data || []).map(m => ({
+          id: m.id,
+          name: m.name || m.id,
+          provider: m.id.split('/')[0] || 'unknown',
+          description: m.description || '',
+          contextLength: m.context_length || 0,
+          promptPrice: m.pricing?.prompt || 0,
+          completionPrice: m.pricing?.completion || 0,
+          modality: m.architecture?.modality || 'text->text',
+          supportedParameters: m.supported_parameters || [],
+        }));
+
+        // Sort: featured/popular first, then alphabetically
+        const preferred = ['openai/gpt-4o', 'openai/gpt-4o-mini', 'anthropic/claude-sonnet-4-20250514', 'anthropic/claude-3-5-sonnet-latest', 'google/gemini-2.5-pro-preview-06-05', 'meta-llama/llama-4-maverick', 'deepseek/deepseek-chat-v3-0324', 'openrouter/minimax/minimax-m2.7'];
+        models.sort((a, b) => {
+          const aIdx = preferred.indexOf(a.id);
+          const bIdx = preferred.indexOf(b.id);
+          if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+          if (aIdx !== -1) return -1;
+          if (bIdx !== -1) return 1;
+          return a.name.localeCompare(b.name);
+        });
+
+        res.json({ models });
+      } catch (err) {
+        console.error('[Skybox] OpenRouter fetch failed:', err.message);
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // --- Update agent model ---
+    this.app.post('/api/agents/:id/model', (req, res) => {
+      const { model } = req.body;
+      if (!model) return res.status(400).json({ error: 'model is required' });
+
+      const agent = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
+      if (!agent) return res.status(404).json({ error: 'Agent not found' });
+
+      this.db.prepare('UPDATE agents SET model = ?, updated_at = datetime("now") WHERE id = ?').run(model, req.params.id);
+
+      // Queue a pending restart so Max can pick it up via polling
+      this.db.prepare(
+        'INSERT INTO pending_restarts (agent_id, agent_name, new_model) VALUES (?, ?, ?)'
+      ).run(agent.id, agent.name, model);
+
+      const updated = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
+      res.json({ success: true, agent: updated });
+    });
+
+    // --- Pending restarts (for OpenClaw Max to poll) ---
+    this.app.get('/api/pending-restarts', (req, res) => {
+      const pending = this.db.prepare(
+        'SELECT * FROM pending_restarts ORDER BY created_at ASC LIMIT 10'
+      ).all();
+      res.json({ pending_restarts: pending });
+    });
+
+    this.app.delete('/api/pending-restarts/:id', (req, res) => {
+      this.db.prepare('DELETE FROM pending_restarts WHERE id = ?').run(req.params.id);
+      res.json({ success: true });
     });
 
     // --- Health check ---
