@@ -51,6 +51,13 @@ When Status is "Break," pause operations and shift to social protocols. Keep it 
 - **Discord is the only channel for agents. Telegram is restricted to Max only — only when Keagan explicitly directs it.**
 - **Airtable is READ-ONLY. Do not update, create, or delete any records.**
 
+## Supabase Leads Table — Mandatory Attribution Policy
+When ANY employee creates or updates a record in the Supabase `leads` table:
+- **created_by:** REQUIRED field. Enter your first name (e.g., "Yanna", "Lauren"). This identifies who created the record.
+- **updated_by:** REQUIRED field. Enter your first name whenever you modify ANY field on an existing record.
+- **Case does not matter** — Skybox handles case-insensitive matching for avatar display.
+- This is non-negotiable. Every record must have attribution. No exceptions.
+
 ## External vs Internal Actions
 **Do freely:** Read files, explore, organize, search the web, work within this workspace.
 **Ask first:** Sending emails/tweets/public posts, anything that leaves the machine, anything uncertain.

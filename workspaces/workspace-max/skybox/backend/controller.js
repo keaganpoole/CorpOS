@@ -1,5 +1,5 @@
 /**
- * Skybox Controller — Local Backend Service
+ * Skybox Controller - Local Backend Service
  * Express REST API + WebSocket broadcast layer
  * Runs inside Electron main process on localhost
  */
@@ -128,6 +128,93 @@ class Controller {
       if (!task) return res.status(404).json({ error: 'Task not found' });
       const updates = this.db.prepare('SELECT * FROM task_updates WHERE task_id = ? ORDER BY timestamp DESC').all(req.params.id);
       res.json({ ...task, updates });
+    });
+
+    // Create a new task
+    this.app.post('/api/tasks', (req, res) => {
+      const { id, title, description, owner, actor_type, department, priority, status } = req.body;
+      if (!title || !owner) return res.status(400).json({ error: 'title and owner are required' });
+
+      const taskId = id || 'task_' + Date.now();
+      const taskStatus = status || 'queued';
+
+      this.db.prepare(`
+        INSERT INTO tasks (id, title, description, owner, actor_type, status, department, priority)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(taskId, title, description || '', owner, actor_type || 'A', taskStatus, department || 'Operations', priority || 'medium');
+
+      this.events.emit({
+        event_type: 'task_created',
+        message: `Task created: ${title}`,
+        actor: owner,
+        actor_type: 'system',
+        source: 'skybox_tasks',
+        task_id: taskId,
+        severity: 'ok',
+        payload: { taskId, title, owner, priority: priority || 'medium' },
+      });
+
+      res.json({ success: true, task: this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId) });
+    });
+
+    // Update task status
+    this.app.put('/api/tasks/:id', (req, res) => {
+      const task = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+      if (!task) return res.status(404).json({ error: 'Task not found' });
+
+      const { status, latest_update, priority, title, description } = req.body;
+      const changes = [];
+
+      if (status && status !== task.status) changes.push(`${task.status} → ${status}`);
+      if (priority && priority !== task.priority) changes.push(`priority: ${priority}`);
+      if (title && title !== task.title) changes.push(`title updated`);
+
+      this.db.prepare(`
+        UPDATE tasks SET
+          status = COALESCE(?, status),
+          latest_update = COALESCE(?, latest_update),
+          latest_update_at = datetime('now'),
+          priority = COALESCE(?, priority),
+          title = COALESCE(?, title),
+          description = COALESCE(?, description),
+          updated_at = datetime('now')
+        WHERE id = ?
+      `).run(status || null, latest_update || null, priority || null, title || null, description || null, req.params.id);
+
+      // Emit appropriate event
+      const eventType = status ? `task_${status}` : 'task_updated';
+      this.events.emit({
+        event_type: eventType,
+        message: latest_update || `Task "${task.title}" ${changes.length > 0 ? changes.join(', ') : 'updated'}`,
+        actor: task.owner,
+        actor_type: 'system',
+        source: 'skybox_tasks',
+        task_id: req.params.id,
+        severity: status === 'failed' ? 'critical' : status === 'warning' ? 'warning' : 'ok',
+      });
+
+      res.json({ success: true, task: this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id) });
+    });
+
+    // Delete a task
+    this.app.delete('/api/tasks/:id', (req, res) => {
+      const task = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+      if (!task) return res.status(404).json({ error: 'Task not found' });
+
+      this.db.prepare('DELETE FROM task_updates WHERE task_id = ?').run(req.params.id);
+      this.db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+
+      this.events.emit({
+        event_type: 'task_deleted',
+        message: `Task deleted: ${task.title}`,
+        actor: 'user',
+        actor_type: 'user',
+        source: 'skybox_tasks',
+        severity: 'warning',
+        payload: { taskId: req.params.id, title: task.title },
+      });
+
+      res.json({ success: true });
     });
 
     this.app.get('/api/agents', (req, res) => {
@@ -265,6 +352,16 @@ class Controller {
         }
       }
 
+      this.events.emit({
+        event_type: 'system_ping',
+        message: `Ping Max - ${results.filter(r => r.restarted).length}/${results.length} restart(s) processed`,
+        actor: 'user',
+        actor_type: 'user',
+        source: 'skybox_control',
+        severity: results.some(r => r.error) ? 'warning' : 'ok',
+        payload: { results },
+      });
+
       res.json({ success: true, restarted: results });
     });
 
@@ -274,7 +371,19 @@ class Controller {
       res.json(result);
     });
 
-    // --- Pipeline endpoint (live from leads table) ---
+    // --- Batch event ingestion (for OpenClaw bulk pushes) ---
+    this.app.post('/api/events/batch', (req, res) => {
+      const { events: eventList } = req.body;
+      if (!Array.isArray(eventList)) return res.status(400).json({ error: 'events array required' });
+
+      const results = [];
+      for (const evt of eventList) {
+        results.push(this.events.emit(evt));
+      }
+      res.json({ success: true, emitted: results.length, results });
+    });
+
+    // --- Lead CRUD ---
 
     this.app.get('/api/pipeline', (req, res) => {
       const stages = this.db.prepare(`
@@ -344,7 +453,101 @@ class Controller {
       res.json({ success: true, lead: this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id) });
     });
 
-    // --- OpenRouter Models ---
+    // Create a new lead
+    this.app.post('/api/leads', (req, res) => {
+      const { id, business_name, url, stage, score, notes, assigned_agent } = req.body;
+      if (!business_name) return res.status(400).json({ error: 'business_name is required' });
+
+      const leadId = id || 'lead_' + Date.now();
+      const leadStage = stage || 'discovery';
+
+      this.db.prepare(`
+        INSERT INTO leads (id, business_name, url, stage, score, notes, assigned_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(leadId, business_name, url || '', leadStage, score || 0, notes || '', assigned_agent || '');
+
+      this.events.emit({
+        event_type: 'lead_created',
+        message: `New lead: ${business_name} → ${leadStage}`,
+        actor: 'system',
+        actor_type: 'system',
+        source: 'skybox_leads',
+        severity: 'ok',
+        payload: { leadId, business_name, stage: leadStage },
+      });
+
+      res.json({ success: true, lead: this.db.prepare('SELECT * FROM leads WHERE id = ?').get(leadId) });
+    });
+
+    // Update a lead
+    this.app.put('/api/leads/:id', (req, res) => {
+      const lead = this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id);
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+      const { business_name, url, score, notes, assigned_agent, stage } = req.body;
+      const changes = [];
+
+      if (business_name && business_name !== lead.business_name) changes.push(`name: "${lead.business_name}" → "${business_name}"`);
+      if (stage && stage !== lead.stage) changes.push(`stage: ${lead.stage} → ${stage}`);
+      if (score !== undefined && score !== lead.score) changes.push(`score: ${lead.score} → ${score}`);
+      if (assigned_agent && assigned_agent !== lead.assigned_agent) changes.push(`agent: ${lead.assigned_agent || 'none'} → ${assigned_agent}`);
+
+      this.db.prepare(`
+        UPDATE leads SET
+          business_name = COALESCE(?, business_name),
+          url = COALESCE(?, url),
+          stage = COALESCE(?, stage),
+          score = COALESCE(?, score),
+          notes = COALESCE(?, notes),
+          assigned_agent = COALESCE(?, assigned_agent),
+          updated_at = datetime('now')
+        WHERE id = ?
+      `).run(
+        business_name || null,
+        url || null,
+        stage || null,
+        score !== undefined ? score : null,
+        notes !== undefined ? notes : null,
+        assigned_agent || null,
+        req.params.id
+      );
+
+      if (changes.length > 0) {
+        this.events.emit({
+          event_type: 'lead_updated',
+          message: `${lead.business_name} updated: ${changes.join(', ')}`,
+          actor: 'user',
+          actor_type: 'user',
+          source: 'skybox_leads',
+          severity: 'info',
+          payload: { leadId: req.params.id, changes },
+        });
+      }
+
+      res.json({ success: true, lead: this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id) });
+    });
+
+    // Delete a lead
+    this.app.delete('/api/leads/:id', (req, res) => {
+      const lead = this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id);
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+      this.db.prepare('DELETE FROM leads WHERE id = ?').run(req.params.id);
+
+      this.events.emit({
+        event_type: 'lead_deleted',
+        message: `Lead deleted: ${lead.business_name}`,
+        actor: 'user',
+        actor_type: 'user',
+        source: 'skybox_leads',
+        severity: 'warning',
+        payload: { leadId: req.params.id, business_name: lead.business_name },
+      });
+
+      res.json({ success: true });
+    });
+
+    // --- Pipeline endpoint (live from leads table) ---
     this.app.get('/api/openrouter/models', async (req, res) => {
       const apiKey = process.env.OPENROUTER_API_KEY;
       if (!apiKey) {
@@ -397,15 +600,18 @@ class Controller {
       const { model } = req.body;
       if (!model) return res.status(400).json({ error: 'model is required' });
 
+      // Prepend 'openrouter/' if not already present
+      const normalizedModel = model.startsWith('openrouter/') ? model : `openrouter/${model}`;
+
       const agent = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
       if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
-      this.db.prepare("UPDATE agents SET model = ?, updated_at = datetime('now') WHERE id = ?").run(model, req.params.id);
+      this.db.prepare("UPDATE agents SET model = ?, updated_at = datetime('now') WHERE id = ?").run(normalizedModel, req.params.id);
 
       // Immediately update openclaw.json so the new model is active
       try {
         const { execSync } = require('child_process');
-        execSync(`openclaw models set "${model}"`, { encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
+        execSync(`openclaw models set "${normalizedModel}"`, { encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
       } catch (err) {
         console.error('[Skybox] openclaw models set failed:', err.message);
       }
@@ -413,7 +619,18 @@ class Controller {
       // Queue a pending restart so Max can pick it up via polling
       this.db.prepare(
         'INSERT INTO pending_restarts (agent_id, agent_name, new_model) VALUES (?, ?, ?)'
-      ).run(agent.id, agent.name, model);
+      ).run(agent.id, agent.name, normalizedModel);
+
+      this.events.emit({
+        event_type: 'agent_model_changed',
+        message: `${agent.name} model → ${normalizedModel}`,
+        actor: 'user',
+        actor_type: 'user',
+        source: 'skybox_control',
+        agent_id: agent.id,
+        severity: 'ok',
+        payload: { agent: agent.name, model: normalizedModel },
+      });
 
       const updated = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
       res.json({ success: true, agent: updated });
@@ -437,7 +654,156 @@ class Controller {
       res.json({ status: 'ok', uptime: process.uptime() });
     });
 
-    // --- Cron Jobs (Chronos) ---
+    // --- Webhook endpoint to handle Supabase leads table changes ---
+    this.app.post('/api/webhook/leads', (req, res) => {
+      const { type, record, old_record } = req.body;
+      if (!type || !record || !record.id) {
+        return res.status(400).json({ error: 'Invalid webhook payload' });
+      }
+
+      const leadId = record.id;
+      const eventType = {
+        INSERT: 'lead_created',
+        UPDATE: 'lead_updated',
+        DELETE: 'lead_deleted',
+      }[type];
+
+      const companyName = record.company || old_record?.company || 'Unknown Company';
+      const actorName = (type === 'INSERT' ? record.created_by : (record.updated_by || old_record?.updated_by)) || 'system';
+
+      if (type === 'INSERT') {
+        this.events.emit({
+          event_type: 'lead_created',
+          message: `Created a new lead for ${companyName} 🆕`,
+          actor: actorName,
+          actor_type: actorName === 'system' ? 'system' : 'user',
+          source: 'supabase_leads_webhook',
+          severity: 'ok',
+          payload: { leadId, actor: actorName, time: new Date().toISOString() },
+        });
+        return res.json({ success: true });
+      }
+
+      if (type === 'DELETE') {
+        this.events.emit({
+          event_type: 'lead_deleted',
+          message: `Deleted the lead for ${companyName} 🗑️`,
+          actor: actorName,
+          actor_type: actorName === 'system' ? 'system' : 'user',
+          source: 'supabase_leads_webhook',
+          severity: 'warning',
+          payload: { leadId, actor: actorName, time: new Date().toISOString() },
+        });
+        return res.json({ success: true });
+      }
+
+      if (!eventType) {
+        return res.status(400).json({ error: 'Unsupported event type' });
+      }
+
+      let changeParts = [];
+
+      // Smart emoji picker — returns an emoji based on field + direction, or nothing 60% of the time
+      const shouldEmoji = () => Math.random() < 0.4;
+      function pickEmoji(field, oldVal, newVal) {
+        if (!shouldEmoji()) return '';
+        const f = field.toLowerCase();
+
+        // Score/quality fields — direction matters
+        const numericFields = ['score', 'page_quality_score', 'value', 'revenue', 'traffic', 'rating'];
+        if (numericFields.some(n => f.includes(n)) || f.endsWith('_score')) {
+          const oldNum = parseFloat(oldVal);
+          const newNum = parseFloat(newVal);
+          if (!isNaN(oldNum) && !isNaN(newNum)) {
+            if (newNum > oldNum) return ' 💰';
+            if (newNum < oldNum) return ' 📉';
+          } else if (!oldVal || oldVal === 'empty' || oldVal === 'null') {
+            return ' 💰'; // filled in an empty value = good
+          }
+          return '';
+        }
+
+        // Contact fields
+        if (f.includes('phone') || f.includes('mobile') || f.includes('tel')) return ' 📱';
+        if (f.includes('email') || f.includes('mail')) return ' 📧';
+        if (f.includes('website') || f.includes('url') || f.includes('site')) return ' 🌐';
+        if (f.includes('address') || f.includes('city') || f.includes('state') || f.includes('zip')) return ' 📍';
+
+        // Status/stage changes
+        if (f === 'status' || f === 'stage') return '';
+
+        // Assignment
+        if (f.includes('assigned') || f.includes('agent')) return '';
+
+        return '';
+      }
+
+      // Compare every field dynamically
+      if (type === 'UPDATE' && record && old_record) {
+        const fieldLabels = {
+          company: 'company name',
+          status: 'status',
+          phone: 'phone number',
+          email: 'email',
+          website: 'website',
+          address: 'address',
+          city: 'city',
+          state: 'state',
+          zip: 'zip code',
+          notes: 'notes',
+          score: 'score',
+          stage: 'stage',
+          assigned_agent: 'assigned agent',
+        };
+
+        // Skip metadata fields — not worth showing in live pulse
+        const skipFields = ['created_by', 'updated_by', 'id'];
+
+        for (const [field, label] of Object.entries(fieldLabels)) {
+          const oldVal = old_record[field];
+          const newVal = record[field];
+          if (oldVal !== newVal) {
+            const emoji = pickEmoji(field, oldVal, newVal);
+            if (field === 'company') {
+              changeParts.push(`renamed from "${oldVal}" to "${newVal}"${emoji}`);
+            } else {
+              changeParts.push(`${label} from ${oldVal || 'empty'} to ${newVal || 'empty'}${emoji}`);
+            }
+          }
+        }
+
+        // Catch any other changed fields not in the labels map
+        for (const field of Object.keys(record)) {
+          if (skipFields.includes(field) || field in fieldLabels) continue;
+          if (String(record[field]) !== String(old_record[field])) {
+            const emoji = pickEmoji(field, old_record[field], record[field]);
+            changeParts.push(`${field} from ${old_record[field] || 'empty'} to ${record[field] || 'empty'}${emoji}`);
+          }
+        }
+      }
+
+      let message;
+      if (changeParts.length > 0) {
+        const changeStr = changeParts.length === 1
+          ? changeParts[0]
+          : changeParts.slice(0, -1).join(', ') + ' and ' + changeParts[changeParts.length - 1];
+        message = `Updated ${companyName}'s ${changeStr}`;
+      } else {
+        message = `Updated ${companyName}'s record`;
+      }
+
+      this.events.emit({
+        event_type: eventType,
+        message: `${message}.`,
+        actor: actorName,
+        actor_type: actorName === 'system' ? 'system' : 'user',
+        source: 'supabase_leads_webhook',
+        severity: 'ok',
+        payload: { leadId, actor: actorName, changes: changeParts, time: new Date().toISOString() },
+      });
+
+      res.json({ success: true });
+    });
     this.app.get('/api/cron', (req, res) => {
       const jobs = this.db.prepare('SELECT * FROM cron_jobs ORDER BY next_run_at ASC').all();
       res.json(jobs);
@@ -465,6 +831,17 @@ class Controller {
 
       syncAll(jobs);
       const result = this.db.prepare('SELECT * FROM cron_jobs ORDER BY next_run_at ASC').all();
+
+      this.events.emit({
+        event_type: 'cron_synced',
+        message: `Cron synced - ${jobs.length} job(s) updated`,
+        actor: 'system',
+        actor_type: 'system',
+        source: 'skybox_cron',
+        severity: 'ok',
+        payload: { count: jobs.length },
+      });
+
       res.json({ success: true, jobs: result });
     });
 
@@ -540,6 +917,17 @@ class Controller {
       `).run(jobId, name, schedule_kind, schedule_value, payload_text || '', assigned_agent || 'Max', department || 'Operations', nextRunAt);
 
       const job = this.db.prepare('SELECT * FROM cron_jobs WHERE id = ?').get(jobId);
+
+      this.events.emit({
+        event_type: 'cron_created',
+        message: `Cron job "${name}" created - ${schedule_kind}: ${schedule_value}`,
+        actor: assigned_agent || 'Max',
+        actor_type: 'system',
+        source: 'skybox_cron',
+        severity: 'ok',
+        payload: { jobId, name, schedule_kind, schedule_value, assigned_agent, openclawJobId },
+      });
+
       res.json({ success: true, job, openclawJobId, openclawError });
     });
 
@@ -557,12 +945,23 @@ class Controller {
       }
 
       // Remove from Skybox DB
+      const deletedJob = this.db.prepare('SELECT name FROM cron_jobs WHERE id = ?').get(jobId);
       this.db.prepare('DELETE FROM cron_jobs WHERE id = ?').run(jobId);
+
+      this.events.emit({
+        event_type: 'cron_deleted',
+        message: `Cron job "${deletedJob?.name || jobId}" deleted`,
+        actor: 'user',
+        actor_type: 'user',
+        source: 'skybox_cron',
+        severity: 'warning',
+        payload: { jobId, name: deletedJob?.name },
+      });
 
       res.json({ success: true, openclawError });
     });
 
-    // Reactions — get counts per agent
+    // Reactions - get counts per agent
     this.app.get('/api/reactions', (req, res) => {
       const counts = this.db.prepare(`
         SELECT agent_name,
@@ -573,11 +972,22 @@ class Controller {
       res.json(counts);
     });
 
-    // Reactions — add a new reaction
+    // Reactions - add a new reaction
     this.app.post('/api/reactions', (req, res) => {
       const { agent_name, reaction_type, context } = req.body;
       if (!agent_name || !reaction_type) return res.status(400).json({ error: 'agent_name and reaction_type required' });
       this.db.prepare('INSERT INTO reactions (agent_name, reaction_type, context) VALUES (?, ?, ?)').run(agent_name, reaction_type, context || '');
+
+      this.events.emit({
+        event_type: reaction_type === 'compliment' ? 'reaction_compliment' : 'reaction_complaint',
+        message: `${reaction_type === 'compliment' ? '👏' : '⚠️'} ${agent_name}: ${context || reaction_type}`,
+        actor: 'user',
+        actor_type: 'user',
+        source: 'skybox_reactions',
+        severity: reaction_type === 'compliment' ? 'ok' : 'warning',
+        payload: { agent_name, reaction_type, context },
+      });
+
       const counts = this.db.prepare(`
         SELECT agent_name,
           SUM(CASE WHEN reaction_type = 'compliment' THEN 1 ELSE 0 END) as compliments,
@@ -640,7 +1050,7 @@ class Controller {
     let okCount = 0, warnCount = 0, errCount = 0;
     if (sessionId) {
       const counts = this.db.prepare(`
-        SELECT 
+        SELECT
           SUM(CASE WHEN severity = 'ok' THEN 1 ELSE 0 END) as ok,
           SUM(CASE WHEN severity = 'warning' THEN 1 ELSE 0 END) as warnings,
           SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as errors

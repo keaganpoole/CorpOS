@@ -2188,7 +2188,8 @@ const App = () => {
                   currentModel={marketplaceAgent.model}
                   onClose={() => setMarketplaceAgent(null)}
                   onSelect={(agentId, modelId) => {
-                    setPendingModel({ agentId, model: modelId });
+                    const normalized = modelId.startsWith('openrouter/') ? modelId : `openrouter/${modelId}`;
+                    setPendingModel({ agentId, model: normalized });
                   }}
                 />
               )}
@@ -2225,6 +2226,39 @@ const App = () => {
         body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.015em; }
         .drag-region { -webkit-app-region: drag; }
         .no-drag { -webkit-app-region: no-drag; }
+
+        /* Live Pulse — Masked Reveal (from concept.tsx) */
+        @keyframes pulseReveal {
+          from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-10px); }
+          to   { opacity: 1; clip-path: inset(0 0 0 0);    transform: translateX(0); }
+        }
+        @keyframes pulseAvatarUp {
+          from { opacity: 0; transform: translateY(12px) scale(0.85); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes avatarSweep {
+          0%   { opacity: 0; transform: rotate(0deg); }
+          15%  { opacity: 1; }
+          85%  { opacity: 1; }
+          100% { opacity: 0; transform: rotate(720deg); }
+        }
+        .pulse-reveal    { animation: pulseReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .pulse-avatar-up { animation: pulseAvatarUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .avatar-ring {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .avatar-ring::before {
+          content: '';
+          position: absolute;
+          inset: -1.7px;
+          border-radius: 50%;
+          background: conic-gradient(from 0deg, #f87171, #fb923c, #facc15, #4ade80, #22d3ee, #818cf8, #c084fc, #f87171);
+          animation: avatarSweep 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          pointer-events: none;
+        }
       `}</style>
 
       <div className="drag-region fixed top-0 left-0 right-0 h-8 z-50 pointer-events-none" />
@@ -2375,19 +2409,21 @@ const App = () => {
 
             return (
             <div key={evt.id || `${evt.timestamp}-${evt.message}`} className="flex gap-3 group">
-              {/* Small avatar - left side */}
-              <div className="flex flex-col items-center pt-0.5">
-                <div className="w-6 h-6 rounded-full overflow-hidden border border-white/[0.06] bg-zinc-900 shrink-0">
-                  <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+              {/* Small avatar — floats UP after bubble */}
+              <div className="flex flex-col items-center pt-0.5 opacity-0 pulse-avatar-up" style={{ animationDelay: '350ms' }}>
+                <div className="w-6 h-6 rounded-full shrink-0 avatar-ring">
+                  <div className="w-full h-full rounded-full overflow-hidden bg-zinc-900 relative z-[1]">
+                    <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                  </div>
                 </div>
                 <div className="flex-1 w-[1px] bg-zinc-900/50 mt-2 mb-1 group-last:bg-transparent" />
               </div>
 
-              {/* Content - dot + text */}
-              <div className="pb-4 min-w-0">
+              {/* Content — clip-path reveal */}
+              <div className="pb-4 min-w-0 opacity-0 pulse-reveal">
                 <div className="flex items-center gap-2 mb-1">
                   <StatusDot status={evt.severity || 'info'} pulse={evt.severity === 'critical' && !isPaused} />
-                  <span className="text-[12px] font-bold text-zinc-200 group-hover:text-white transition-colors">{evt.actor || 'System'}</span>
+                  <span className="text-[12px] font-bold text-zinc-200 group-hover:text-white transition-colors">{(evt.actor || 'System').charAt(0).toUpperCase() + (evt.actor || 'System').slice(1)}</span>
                   <span className="text-[9px] text-zinc-700 font-bold">
                     {evt.timestamp ? new Date(evt.timestamp + 'Z').toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' }) : '-'}
                   </span>
