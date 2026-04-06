@@ -28,6 +28,7 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  GripHorizontal,
   AlertCircle,
   Repeat,
   Timer,
@@ -37,11 +38,13 @@ import {
   X,
   Target,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSkyboxState } from './hooks/useSkyboxState';
+import { useTasks } from './hooks/useTasks';
 import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
 import CampaignsModal from './pages/CampaignsModal';
+import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 
 const StatusDot = ({ status, pulse = false }) => {
   const colors = {
@@ -101,84 +104,198 @@ const ownerInitial = (owner) => {
   return owner.charAt(0).toUpperCase();
 };
 
-const TaskCard = ({ task }) => {
-  const priorityColor = task.priority === 'urgent' ? 'pink' : task.priority === 'high' ? 'magenta' : 'zinc';
-  const statusClass = task.status === 'in_progress' || task.status === 'In Progress'
-    ? 'active'
-    : task.status === 'completed' ? 'success'
-    : task.status === 'warning' ? 'urgent'
-    : task.status === 'failed' ? 'blocked'
-    : task.status === 'paused' ? 'idle'
-    : 'idle';
+const TaskCard = ({ task, columnColor }) => {
+  const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+  const completedCount = subtasks.filter(s => s.status === 'done').length;
+  const totalSubtasks = subtasks.length;
+
+  // Priority color from accent
+  const accentColor = columnColor || '#6B7280';
 
   return (
     <motion.div
       layout
-      whileHover={{ y: -3, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: '#0F0F0F' }}
-      className="bg-[#0A0A0A] border border-white/5 rounded-xl p-4 mb-3 cursor-grab active:cursor-grabbing shadow-xl group transition-all"
+      whileHover={{ y: -3, borderColor: `${accentColor}40`, backgroundColor: '#0F0F0F' }}
+      className="bg-[#0A0A0A] border border-white/5 rounded-xl mb-3 cursor-grab active:cursor-grabbing shadow-xl group transition-all overflow-hidden"
     >
-      <div className="flex items-start justify-between mb-3 text-zinc-400">
-        <Badge color={priorityColor}>
-          {task.department}
-        </Badge>
-        <div className="flex items-center gap-1.5 bg-zinc-900/50 px-1.5 py-0.5 rounded border border-white/5">
-          <span className="text-[9px] font-bold text-zinc-500 tracking-tighter">{ownerInitial(task.owner)}</span>
-        </div>
-      </div>
+      {/* Accent bar at top */}
+      <div className="h-[2px] w-full opacity-40 group-hover:opacity-80 transition-opacity" style={{ backgroundColor: accentColor }} />
 
-      <h4 className="text-[13px] font-bold text-zinc-100 mb-1 leading-tight tracking-tight">{task.title}</h4>
-      <p className="text-[11px] text-zinc-600 line-clamp-2 leading-relaxed font-medium mb-4 tracking-normal opacity-80">{task.description}</p>
-
-      <div className="pt-3 border-t border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-zinc-400">
-          <Clock size={11} className="text-zinc-700" />
-          <span className="text-[9px] text-zinc-700 font-bold tracking-widest uppercase">
-            {task.latest_update_at ? new Date(task.latest_update_at + 'Z').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York' }) : '-'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2.5">
-          {(task.status === 'in_progress' || task.status === 'In Progress') && (
-            <div className="flex gap-1">
-              <div className="w-1 h-1 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+      <div className="p-4 pt-3">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-2">
+          {task.assigned_team && (
+            <span className="px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider border" style={{ color: accentColor, borderColor: `${accentColor}30`, backgroundColor: `${accentColor}08` }}>
+              {task.assigned_team}
+            </span>
+          )}
+          {task.assigned_to && (
+            <div className="flex items-center gap-1.5 bg-zinc-900/50 px-1.5 py-0.5 rounded border border-white/5 ml-auto">
+              <span className="text-[9px] font-bold text-zinc-500 tracking-tighter">{task.assigned_to.charAt(0).toUpperCase()}</span>
             </div>
           )}
-          <StatusDot status={statusClass} />
+        </div>
+
+        {/* Task name */}
+        <h4 className="text-[13px] font-bold text-zinc-100 mb-1 leading-tight tracking-tight">{task.task}</h4>
+
+        {/* Notes */}
+        {task.notes && (
+          <p className="text-[11px] text-zinc-600 line-clamp-2 leading-relaxed font-medium mb-3 tracking-normal opacity-80">{task.notes}</p>
+        )}
+
+        {/* Subtasks */}
+        {totalSubtasks > 0 && (
+          <div className="mt-3 mb-3 space-y-1.5">
+            {subtasks.map((sub, idx) => (
+              <div key={idx} className="flex items-center gap-2 group/sub">
+                <SubtaskStatusIcon status={sub.status} />
+                <span className={`text-[11px] font-medium flex-1 leading-tight ${
+                  sub.status === 'done' ? 'text-zinc-600 line-through decoration-zinc-700' :
+                  sub.status === 'skipped' ? 'text-zinc-700 line-through decoration-zinc-800' :
+                  sub.status === 'working' ? 'text-cyan-400/80' :
+                  'text-zinc-400'
+                }`}>
+                  {sub.task}
+                </span>
+              </div>
+            ))}
+            {/* Progress bar */}
+            <div className="flex items-center gap-2 mt-2 pt-1.5">
+              <div className="flex-1 h-1 bg-white/[0.04] rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${totalSubtasks > 0 ? (completedCount / totalSubtasks) * 100 : 0}%` }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: accentColor }}
+                />
+              </div>
+              <span className="text-[8px] font-bold text-zinc-700 tabular-nums">{completedCount}/{totalSubtasks}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="pt-3 border-t border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-zinc-400">
+            <Clock size={11} className="text-zinc-700" />
+            <span className="text-[9px] text-zinc-700 font-bold tracking-widest uppercase">
+              {task.due_date ? new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) :
+               task.created_at ? new Date(task.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '-'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <StatusDot status={task.status === 'in_progress' ? 'active' : task.status === 'warning' ? 'warning' : task.status === 'completed' ? 'success' : 'idle'} />
+          </div>
         </div>
       </div>
     </motion.div>
   );
 };
 
-const KanbanColumn = ({ title, tasks, icon: Icon, colorClass }) => (
-  <div className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full bg-white/[0.01] rounded-xl p-1.5 border border-white/[0.03] backdrop-blur-sm transition-all hover:bg-white/[0.02]">
-    <div className="flex items-center justify-between mb-2 px-4 py-3 border-b border-white/[0.05] relative group">
-      <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full ${colorClass} opacity-40 group-hover:opacity-100 transition-opacity`} />
+const KanbanColumn = ({ column, tasks, onEditColumn }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(column.display_name);
+  const [editColor, setEditColor] = useState(column.color);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
-      <div className="flex items-center gap-3">
-        <div className={"p-1.5 rounded-lg bg-black/40 border border-white/10 " + colorClass.replace('bg-', 'text-')}>
-          <Icon size={14} strokeWidth={2.5} />
+  const accentColor = column.color || '#6B7280';
+
+  const handleSave = () => {
+    if (editName.trim()) {
+      onEditColumn(column.id, { display_name: editName.trim(), color: editColor });
+    }
+    setIsEditing(false);
+  };
+
+  const presetColors = ['#6B7280', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316', '#14B8A6'];
+
+  return (
+    <div className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full bg-white/[0.01] rounded-xl p-1.5 border border-white/[0.03] backdrop-blur-sm transition-all hover:bg-white/[0.02] group/col">
+      {/* Column Header */}
+      <div className="flex items-center justify-between mb-2 px-4 py-3 border-b border-white/[0.05] relative">
+        {/* Accent bar + color palette — hover to reveal */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-5 z-10 flex items-center"
+          onMouseEnter={() => setShowColorPicker(true)}
+          onMouseLeave={() => setShowColorPicker(false)}
+        >
+          <div
+            className="w-[2px] h-4 rounded-full opacity-40 group-hover/col:opacity-100 hover:w-[3px] hover:h-6 transition-all cursor-pointer ml-[3px]"
+            style={{ backgroundColor: accentColor }}
+          />
+
+          {/* Color palette — flies out from bar */}
+          <AnimatePresence>
+            {showColorPicker && (
+              <motion.div
+                initial={{ opacity: 0, x: -6, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -6, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="absolute left-5 top-1/2 -translate-y-1/2 ml-1 px-2 py-1.5 bg-zinc-900/95 border border-white/[0.08] rounded-lg flex gap-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl"
+              >
+                {presetColors.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      setEditColor(c);
+                      onEditColumn(column.id, { color: c });
+                      setShowColorPicker(false);
+                    }}
+                    className={`w-4 h-4 rounded-full transition-all hover:scale-125 ${c === accentColor ? 'ring-2 ring-white/40 scale-110' : ''}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-        <div className="flex flex-col">
-          <h3 className="text-[11px] font-bold text-zinc-300 tracking-[0.1em] uppercase">{title}</h3>
-          <span className="text-[9px] text-zinc-600 font-bold mt-0.5 tracking-tight uppercase opacity-50">{tasks.length} Threads</span>
+
+        <div className="flex items-center gap-3 flex-1 min-w-0 pl-2">
+          <div className="flex flex-col min-w-0">
+            {isEditing ? (
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onBlur={handleSave}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setIsEditing(false); }}
+                autoFocus
+                className="text-[11px] font-bold text-zinc-200 tracking-[0.1em] uppercase bg-transparent border-none focus:outline-none w-full"
+              />
+            ) : (
+              <button
+                onDoubleClick={() => setIsEditing(true)}
+                className="text-left"
+              >
+                <h3 className="text-[11px] font-bold text-zinc-300 tracking-[0.1em] uppercase truncate">{column.display_name}</h3>
+              </button>
+            )}
+            <span className="text-[9px] text-zinc-600 font-bold mt-0.5 tracking-tight uppercase opacity-50">{tasks.length} Thread{tasks.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+
+        {/* Drag handle */}
+        <div className="ml-2 opacity-0 group-hover/col:opacity-40 hover:!opacity-80 transition-opacity cursor-grab active:cursor-grabbing">
+          <GripHorizontal size={14} className="text-zinc-600" />
         </div>
       </div>
-      <button className="w-6 h-6 flex items-center justify-center rounded-full bg-white/5 text-zinc-600 hover:text-white transition-all">
-        <Plus size={14} />
-      </button>
-    </div>
 
-    <div className="flex-1 overflow-y-auto px-1 pt-2 custom-scrollbar space-y-1">
-      {tasks.length > 0 ? (
-        tasks.map((task) => <TaskCard key={task.id} task={task} />)
-      ) : (
-        <div className="h-24 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-xl m-2 bg-black/10">
-          <span className="text-[10px] text-zinc-800 font-bold uppercase tracking-widest">Idle</span>
-        </div>
-      )}
+      {/* Task list */}
+      <div className="flex-1 overflow-y-auto px-1 pt-2 custom-scrollbar space-y-1">
+        {tasks.length > 0 ? (
+          tasks.map((task) => <TaskCard key={task.id} task={task} columnColor={accentColor} />)
+        ) : (
+          <div className="h-24 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-xl m-2 bg-black/10">
+            <span className="text-[10px] text-zinc-800 font-bold uppercase tracking-widest">Idle</span>
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenCampaigns }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
@@ -291,16 +408,25 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         {/* Campaigns — only show for departments with campaigns */}
         {agent.department === 'Research' && (
         <div className="pt-3 border-t border-white/[0.04]">
+          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Campaign</p>
           <button
             onClick={() => onOpenCampaigns && onOpenCampaigns(agent)}
             className="w-full flex items-center justify-between group cursor-pointer"
           >
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 min-w-0">
               <Target size={11} className="text-indigo-400/60" />
-              <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Campaigns</span>
+              {(agent.campaign_name || agent._campaign?.['Campaign Name']) ? (
+                <span className="text-[11px] font-bold text-indigo-400/80 truncate group-hover:text-indigo-400 transition-colors">
+                  {agent.campaign_name || agent._campaign?.['Campaign Name']}
+                </span>
+              ) : (
+                <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Campaigns</span>
+              )}
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">View</span>
+            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
+                {(agent.campaign_name || agent._campaign?.['Campaign Name']) ? 'Change' : 'Assign'}
+              </span>
               <ChevronRight size={11} className="text-indigo-500/60" />
             </div>
           </button>
@@ -2098,6 +2224,37 @@ const App = () => {
   const [marketplaceAgent, setMarketplaceAgent] = useState(null); // agent object for marketplace
   const [pendingModel, setPendingModel] = useState(null); // { agentId, model } pending confirmation
   const [campaignsAgent, setCampaignsAgent] = useState(null); // agent object for campaigns modal
+  const [showCommander, setShowCommander] = useState(false); // Commander task creation modal
+
+  // Agent campaigns — loaded from Supabase to display on agent cards
+  const [agentCampaigns, setAgentCampaigns] = useState({});
+
+  const loadAgentCampaigns = async () => {
+    try {
+      const resp = await fetch('https://jspksetkrprvomilgtyj.supabase.co/rest/v1/research_campaigns?select=*', {
+        headers: {
+          'apikey': 'sb_publishable_LjxUo8j__ixUP6iWdf_DBQ_CMuSxAa3',
+          'Authorization': 'Bearer sb_publishable_LjxUo8j__ixUP6iWdf_DBQ_CMuSxAa3',
+        },
+      });
+      const data = await resp.json();
+      // Build map: agent name (lowercase) -> assigned campaign
+      const map = {};
+      if (Array.isArray(data)) {
+        data.forEach(c => {
+          if (c.assigned_to && c.assigned_to.trim()) {
+            map[c.assigned_to.trim().toLowerCase()] = c;
+          }
+        });
+      }
+      setAgentCampaigns(map);
+    } catch (err) { console.error('[App] Failed to load campaigns:', err); }
+  };
+
+  // Load campaigns when switching to agents page
+  useEffect(() => {
+    if (currentRoute === 'agents') loadAgentCampaigns();
+  }, [currentRoute]);
 
   // Live backend state
   const {
@@ -2119,6 +2276,27 @@ const App = () => {
     pingMax,
     refresh,
   } = useSkyboxState();
+
+  // Supabase-backed tasks + dynamic columns
+  const {
+    tasks: supabaseTasks,
+    columns: taskColumns,
+    loading: tasksLoading,
+    createTask,
+    updateTask,
+    deleteTask,
+    updateColumn,
+    reorderColumns,
+  } = useTasks();
+
+  // Enrich agents with campaign data from Supabase (matched by assigned_to)
+  const enrichedAgents = agents.map(a => {
+    const campaign = agentCampaigns[a.name.toLowerCase()];
+    if (campaign) {
+      return { ...a, _campaign: campaign, campaign_name: campaign['Campaign Name'], campaign_id: campaign.id };
+    }
+    return { ...a, _campaign: null, campaign_name: null, campaign_id: null };
+  });
 
   // Clear pendingModel once the agents data confirms the new model is loaded
   useEffect(() => {
@@ -2156,31 +2334,80 @@ const App = () => {
     { id: 'council', icon: <Gavel size={18} />, label: 'Council' },
   ];
 
-  // Map backend status to Kanban columns
-  const kanbanColumns = [
-    { title: 'Queued', statuses: ['queued'], icon: Database, colorClass: 'bg-zinc-600' },
-    { title: 'In Progress', statuses: ['in_progress', 'In Progress'], icon: Activity, colorClass: 'bg-cyan-400' },
-    { title: 'Warning', statuses: ['warning'], icon: Eye, colorClass: 'bg-amber-400' },
-    { title: 'Completed', statuses: ['completed', 'failed', 'paused'], icon: Shield, colorClass: 'bg-emerald-400' },
-  ];
-
   const renderView = () => {
     switch (currentRoute) {
       case 'tasks':
         return (
-          <div className="flex gap-5 h-full overflow-x-auto custom-scrollbar snap-x p-8">
-            {kanbanColumns.map(col => (
-              <KanbanColumn
-                key={col.title}
-                title={col.title}
-                tasks={tasks.filter(t => col.statuses.includes(t.status))}
-                icon={col.icon}
-                colorClass={col.colorClass}
-              />
-            ))}
+          <div className="relative h-full flex flex-col">
+            {/* Board area — reorderable columns */}
+            <Reorder.Group
+              axis="x"
+              values={taskColumns}
+              onReorder={(newOrder) => {
+                // Optimistic: update local state immediately (Reorder.Group handles this)
+                // Persist to Supabase
+                reorderColumns(newOrder);
+              }}
+              className="flex-1 flex gap-5 overflow-x-auto custom-scrollbar snap-x p-8 pb-2"
+            >
+              {taskColumns.map(col => (
+                <Reorder.Item
+                  key={col.id}
+                  value={col}
+                  className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full"
+                  style={{ listStyle: 'none' }}
+                  whileDrag={{ scale: 1.02, zIndex: 50, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+                >
+                  <KanbanColumn
+                    column={col}
+                    tasks={supabaseTasks.filter(t => t.status === col.status_value)}
+                    onEditColumn={updateColumn}
+                  />
+                </Reorder.Item>
+              ))}
+              {/* Uncategorized column — tasks with no matching column (not draggable) */}
+              {(() => {
+                const knownStatuses = new Set(taskColumns.map(c => c.status_value));
+                const orphaned = supabaseTasks.filter(t => !knownStatuses.has(t.status));
+                if (orphaned.length === 0) return null;
+                return (
+                  <div key="uncategorized" className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full" style={{ listStyle: 'none' }}>
+                    <KanbanColumn
+                      column={{ id: 'uncategorized', display_name: 'Other', color: '#71717A', status_value: '__other__' }}
+                      tasks={orphaned}
+                      onEditColumn={() => {}}
+                    />
+                  </div>
+                );
+              })()}
+            </Reorder.Group>
+
+            {/* Bottom-left: Commander launch button */}
+            <div className="absolute bottom-6 left-6 z-20">
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowCommander(true)}
+                className="w-12 h-12 rounded-2xl bg-white border border-white flex items-center justify-center shadow-[0_0_40px_rgba(255,255,255,0.15)] hover:shadow-[0_0_50px_rgba(99,102,241,0.25)] hover:bg-indigo-50 transition-all group"
+              >
+                <Plus size={22} className="text-black group-hover:text-indigo-600 transition-colors" />
+              </motion.button>
+            </div>
+
+            {/* Commander Modal */}
+            <AnimatePresence>
+              {showCommander && (
+                <CommanderModal
+                  columns={taskColumns}
+                  onClose={() => setShowCommander(false)}
+                  onSubmit={createTask}
+                />
+              )}
+            </AnimatePresence>
           </div>
         );
       case 'agents':
+
         return (
           <div className={`h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col items-center relative`}>
             {/* Team Cover Image */}
@@ -2200,7 +2427,7 @@ const App = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-[#020202]/60 via-transparent to-[#020202]/60" />
             </div>
             <div className="w-full flex justify-center pt-6 relative -mt-16 z-10">
-              <AgentsHierarchy agents={agents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} onOpenCampaigns={setCampaignsAgent} />
+              <AgentsHierarchy agents={enrichedAgents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} onOpenCampaigns={setCampaignsAgent} />
             </div>
             <AnimatePresence>
               {marketplaceAgent && (
@@ -2218,7 +2445,9 @@ const App = () => {
             <AnimatePresence>
               {campaignsAgent && (
                 <CampaignsModal
+                  agent={campaignsAgent}
                   onClose={() => setCampaignsAgent(null)}
+                  onCampaignAssigned={() => { refresh(); loadAgentCampaigns(); }}
                 />
               )}
             </AnimatePresence>

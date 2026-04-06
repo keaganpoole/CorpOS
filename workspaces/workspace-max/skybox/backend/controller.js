@@ -53,6 +53,10 @@ class Controller {
     const dbPath = require('path').join(__dirname, '..', 'data', 'skybox.db');
     this.db = initDatabase(dbPath);
 
+    // Migrations for existing databases
+    try { this.db.exec("ALTER TABLE agents ADD COLUMN campaign_id TEXT"); } catch(e) {}
+    try { this.db.exec("ALTER TABLE agents ADD COLUMN campaign_name TEXT"); } catch(e) {}
+
     // Init event system
     this.events = new EventSystem(this.db, this.broadcast.bind(this));
 
@@ -244,7 +248,7 @@ class Controller {
       const updates = req.body;
       const agent = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
       if (!agent) return res.status(404).json({ error: 'Agent not found' });
-      const fields = ['name','role','team','status','current_activity','reports_to','department','model','platform','hierarchy_level'];
+      const fields = ['name','role','team','status','current_activity','reports_to','department','model','platform','hierarchy_level','campaign_id','campaign_name'];
       const setClauses = [];
       const values = [];
       for (const f of fields) {
@@ -644,15 +648,17 @@ class Controller {
 
       this.db.prepare("UPDATE agents SET model = ?, updated_at = datetime('now') WHERE id = ?").run(normalizedModel, req.params.id);
 
-      // Immediately update openclaw.json so the new model is active
-      try {
-        const { execSync } = require('child_process');
-        execSync(`openclaw models set "${normalizedModel}"`, { encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
-      } catch (err) {
-        console.error('[Skybox] openclaw models set failed:', err.message);
+      // Only update global OpenClaw model for Max (main agent)
+      if (req.params.id === 'max') {
+        try {
+          const { execSync } = require('child_process');
+          execSync(`openclaw models set "${normalizedModel}"`, { encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
+        } catch (err) {
+          console.error('[Skybox] openclaw models set failed:', err.message);
+        }
       }
 
-      // Queue a pending restart so Max can pick it up via polling
+      // Queue a pending restart for model change tracking
       this.db.prepare(
         'INSERT INTO pending_restarts (agent_id, agent_name, new_model) VALUES (?, ?, ?)'
       ).run(agent.id, agent.name, normalizedModel);
@@ -836,6 +842,109 @@ class Controller {
         source: 'supabase_leads_webhook',
         severity: 'ok',
         payload: { leadId, actor: actorName, changes: changeParts, time: new Date().toISOString() },
+      });
+
+      res.json({ success: true });
+    });
+
+    // --- Webhook endpoint to handle Supabase tasks table changes ---
+    this.app.post('/api/webhook/tasks', (req, res) => {
+      const { type, record, old_record } = req.body;
+      if (!type || !record || !record.id) {
+        return res.status(400).json({ error: 'Invalid webhook payload' });
+      }
+
+      const taskId = record.id;
+      const taskName = record.task || old_record?.task || 'Unknown Task';
+      const actorName = (type === 'INSERT' ? record.created_by : (record.updated_by || old_record?.updated_by)) || 'system';
+
+      const eventType = {
+        INSERT: 'task_created',
+        UPDATE: 'task_updated',
+        DELETE: 'task_deleted',
+      }[type];
+
+      if (!eventType) {
+        return res.status(400).json({ error: 'Unsupported event type' });
+      }
+
+      if (type === 'INSERT') {
+        this.events.emit({
+          event_type: 'task_created',
+          message: `New task created: ${taskName} 📋`,
+          actor: actorName,
+          actor_type: actorName === 'system' ? 'system' : 'user',
+          source: 'supabase_tasks_webhook',
+          severity: 'ok',
+          payload: { taskId, actor: actorName, time: new Date().toISOString() },
+        });
+        return res.json({ success: true });
+      }
+
+      if (type === 'DELETE') {
+        this.events.emit({
+          event_type: 'task_deleted',
+          message: `Deleted task: ${taskName} 🗑️`,
+          actor: actorName,
+          actor_type: actorName === 'system' ? 'system' : 'user',
+          source: 'supabase_tasks_webhook',
+          severity: 'warning',
+          payload: { taskId, actor: actorName, time: new Date().toISOString() },
+        });
+        return res.json({ success: true });
+      }
+
+      // UPDATE — compare fields dynamically
+      let changeParts = [];
+
+      const fieldLabels = {
+        task: 'title',
+        status: 'status',
+        assigned_to: 'assigned to',
+        assigned_team: 'team',
+        notes: 'notes',
+        due_date: 'due date',
+        start_date: 'start date',
+        completion_date: 'completion date',
+        subtasks: 'subtasks',
+      };
+
+      const skipFields = ['created_by', 'updated_by', 'id', 'created_at', 'updated_at'];
+
+      for (const [field, label] of Object.entries(fieldLabels)) {
+        const oldVal = old_record?.[field];
+        const newVal = record[field];
+        const oldStr = typeof oldVal === 'object' && oldVal !== null ? JSON.stringify(oldVal) : String(oldVal ?? '');
+        const newStr = typeof newVal === 'object' && newVal !== null ? JSON.stringify(newVal) : String(newVal ?? '');
+        if (oldStr !== newStr) {
+          if (field === 'task') {
+            changeParts.push(`renamed from "${oldStr}" to "${newStr}"`);
+          } else if (field === 'subtasks') {
+            changeParts.push(`subtasks updated`);
+          } else {
+            changeParts.push(`${label} from ${oldStr || 'empty'} to ${newStr || 'empty'}`);
+          }
+        }
+      }
+
+      let message;
+      if (changeParts.length > 0) {
+        const changeStr = changeParts.length === 1
+          ? changeParts[0]
+          : changeParts.slice(0, -1).join(', ') + ' and ' + changeParts[changeParts.length - 1];
+        message = `Updated task "${taskName}": ${changeStr}`;
+      } else {
+        message = `Updated task "${taskName}"`;
+      }
+
+      this.events.emit({
+        event_type: eventType,
+        message: `${message}.`,
+        actor: actorName,
+        actor_type: actorName === 'system' ? 'system' : 'user',
+        source: 'supabase_tasks_webhook',
+        severity: 'ok',
+        payload: { taskId, actor: actorName, changes: changeParts, time: new Date().toISOString() },
       });
 
       res.json({ success: true });

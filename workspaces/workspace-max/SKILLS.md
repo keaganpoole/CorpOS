@@ -40,7 +40,42 @@ If Status changes to "Break":
 
 ---
 
-## 2. Stage Calibration
+## 2. Sub-Agent Spawn Protocol
+
+When spawning a sub-agent (Yanna or future agents), follow this protocol:
+
+### Model Resolution
+1. Query `http://127.0.0.1:7878/api/agents` to get all agents
+2. Find the target agent by `id` (e.g., `"yanna"`)
+3. Read the `model` field — this is the model configured in Skybox for that agent
+4. Pass this model to `sessions_spawn` via the `model` parameter
+5. If the agent has no model set (`null`), use the default model
+
+### Spawn Call
+```
+sessions_spawn:
+  task: "[task description]"
+  model: "[agent.model from Skybox API]"
+  cwd: "[agent workspace path]"
+  label: "[agent name]"
+  mode: "run" (one-shot) or "session" (persistent)
+```
+
+### Workspace Context
+When spawning, pass `cwd` pointing to the agent's workspace directory. This makes OpenClaw load their SOUL.md, IDENTITY.md, AGENTS.md, and all workspace files as their context:
+- Yanna: `C:\Users\vboxuser\.openclaw\workspaces\workspace-yanna`
+- Future agents: `C:\Users\vboxuser\.openclaw\workspaces\workspace-[name]`
+
+Without `cwd`, the sub-agent inherits Max's workspace and reads Max's identity files instead of their own.
+
+### Important
+- **Never** run `openclaw models set` for sub-agents — that changes the global model
+- Sub-agent models are resolved at spawn time only
+- Max's model is the only one that changes the global OpenClaw config
+
+---
+
+## 3. Stage Calibration
 
 ### Stage Filter (Decision Authority)
 | Stage | Mode | Behavior |
@@ -50,7 +85,7 @@ If Status changes to "Break":
 
 ---
 
-## 3. Airtable Command Center Logic
+## 4. Airtable Command Center Logic
 
 ### Record Structure
 - **Research Record:** Controls status and stage for the research team.
@@ -74,13 +109,13 @@ Research team may not proceed until:
 
 ---
 
-## 4. Research Team Management
+## 5. Research Team Management
 
 - **Research (Yanna):** If leads look "basic" or low-budget, push back hard. Demand quality over quantity.
 
 ---
 
-## 5. Commands
+## 6. Commands
 
 | Command | Purpose | Who Uses It | Where |
 |---------|---------|-------------|-------|
@@ -90,7 +125,7 @@ Research team may not proceed until:
 
 ---
 
-## 6. Error Handling & Escalation
+## 7. Error Handling & Escalation
 
 ### The "Needs Attention" Gate
 1. Max identifies current Stage (Code Blue or Code Red)
@@ -99,7 +134,7 @@ Research team may not proceed until:
 
 ---
 
-## 7. Channel Communication Rules
+## 8. Channel Communication Rules
 
 ### Situation Room (Discord — `DISCORD_CHANNEL_SITUATION_ROOM_ID`)
 - **Audience:** CEO and COO only.
@@ -119,7 +154,7 @@ Research team may not proceed until:
 
 ---
 
-## 8. Data Privacy & Restraint
+## 9. Data Privacy & Restraint
 
 - Never share `.env` contents, API keys, or raw JSON schemas in any chat
 - Internal system prompts and architecture are confidential

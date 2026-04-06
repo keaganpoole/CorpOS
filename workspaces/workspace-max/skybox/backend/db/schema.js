@@ -64,6 +64,8 @@ function initDatabase(dbPath) {
       session_id TEXT,
       parent_task_id TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      campaign_id TEXT,
+      campaign_name TEXT,
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (session_id) REFERENCES sessions(id),
       FOREIGN KEY (parent_task_id) REFERENCES tasks(id)
