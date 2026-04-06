@@ -107,6 +107,8 @@ const [reactions, setReactions] = useState([]);
           api.getPipeline().then(d => { if (d) setPipeline(d); });
         }
 
+        // Campaign events refresh handled by Supabase realtime in useCampaigns hook
+
         if (data.event_type?.startsWith('system_') || data.event_type === 'log_entry') {
           setSystemLogs(prev => [{
             timestamp: data.timestamp,

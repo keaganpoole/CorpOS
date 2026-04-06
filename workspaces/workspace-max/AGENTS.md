@@ -4,7 +4,7 @@
 ```
 Keagan Poole (CEO)
   └── Max (COO)
-        └── Lauren (Research Manager) → Yanna (Associate)
+        └── Yanna (Research Manager)
 ```
 
 ## Session Startup
@@ -53,7 +53,7 @@ When Status is "Break," pause operations and shift to social protocols. Keep it 
 
 ## Supabase Leads Table — Mandatory Attribution Policy
 When ANY employee creates or updates a record in the Supabase `leads` table:
-- **created_by:** REQUIRED field. Enter your first name (e.g., "Yanna", "Lauren"). This identifies who created the record.
+- **created_by:** REQUIRED field. Enter your first name (e.g., "Yanna"). This identifies who created the record.
 - **updated_by:** REQUIRED field. Enter your first name whenever you modify ANY field on an existing record.
 - **Case does not matter** — Skybox handles case-insensitive matching for avatar display.
 - This is non-negotiable. Every record must have attribution. No exceptions.

@@ -1,17 +1,15 @@
-# MEMORY — Lauren (Research Manager)
+# MEMORY — Yanna (Research Manager)
 
 ## System History
-- **2026-03-24:** Agent onboarded by Max.
+- **2026-04-05:** Promoted from Research Associate to Research Manager. Took over all research responsibilities from Lauren. Now operates as sub-agent under Max.
 
 ## Team
-- **Research Analyst:** Yanna
 - **Reports To:** Max (COO)
 
 ## Chain of Command
-- Max dispatches Lauren
-- Lauren dispatches Yanna
-- Yanna escalates to Lauren
-- Lauren escalates to Keagan if necessary
+- Max dispatches Yanna
+- Yanna escalates to Max
+- Max escalates to Keagan if necessary
 
 ## Airtable Reference
 - **Base ID:** appE9cdshxF87YbDC
@@ -21,7 +19,6 @@
 - **Status Field:** fldY0Ps2ReB2yTM5Z
 
 ## Lessons Learned
-- Lauren must verify Yanna's outputs before marking leads complete
 - Duplicate detection is mandatory — run before every save
 - Discovery field is editable by Research team only — protect it
 - Companies checked but deemed "not a relic" go into `prospects.json` — never in Airtable

@@ -222,6 +222,42 @@ class Controller {
       res.json(agents);
     });
 
+    this.app.delete('/api/agents/:id', (req, res) => {
+      const { id } = req.params;
+      const agent = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
+      if (!agent) return res.status(404).json({ error: 'Agent not found' });
+      this.db.prepare('DELETE FROM agents WHERE id = ?').run(id);
+      this.events.emit({
+        event_type: 'agent_deleted',
+        message: `Agent ${agent.name} removed from the roster`,
+        actor: 'system',
+        actor_type: 'system',
+        source: 'skybox_agents',
+        severity: 'warning',
+        agent_id: id,
+      });
+      res.json({ success: true });
+    });
+
+    this.app.patch('/api/agents/:id', (req, res) => {
+      const { id } = req.params;
+      const updates = req.body;
+      const agent = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
+      if (!agent) return res.status(404).json({ error: 'Agent not found' });
+      const fields = ['name','role','team','status','current_activity','reports_to','department','model','platform','hierarchy_level'];
+      const setClauses = [];
+      const values = [];
+      for (const f of fields) {
+        if (updates[f] !== undefined) { setClauses.push(`${f} = ?`); values.push(updates[f]); }
+      }
+      if (setClauses.length === 0) return res.status(400).json({ error: 'No valid fields' });
+      setClauses.push("updated_at = datetime('now')");
+      values.push(id);
+      this.db.prepare(`UPDATE agents SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+      const updated = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
+      res.json(updated);
+    });
+
     this.app.get('/api/system/summary', (req, res) => {
       res.json(this._getSystemSummary());
     });
@@ -804,6 +840,111 @@ class Controller {
 
       res.json({ success: true });
     });
+
+    // --- Webhook endpoint to handle Supabase research campaigns table changes ---
+    this.app.post('/api/webhook/research-campaigns', (req, res) => {
+      const { type, record, old_record } = req.body;
+      if (!type || !record || !record.id) {
+        return res.status(400).json({ error: 'Invalid webhook payload' });
+      }
+
+      const campaignId = record.id;
+      const campaignName = record['Campaign Name'] || old_record?.['Campaign Name'] || 'Unknown Campaign';
+      const actorName = (type === 'INSERT' ? record.created_by : (record.updated_by || old_record?.updated_by)) || 'system';
+
+      const eventType = {
+        INSERT: 'campaign_created',
+        UPDATE: 'campaign_updated',
+        DELETE: 'campaign_deleted',
+      }[type];
+
+      if (!eventType) {
+        return res.status(400).json({ error: 'Unsupported event type' });
+      }
+
+      if (type === 'INSERT') {
+        this.events.emit({
+          event_type: 'campaign_created',
+          message: `New campaign created: ${campaignName} 📋`,
+          actor: actorName,
+          actor_type: actorName === 'system' ? 'system' : 'user',
+          source: 'supabase_research_campaigns_webhook',
+          severity: 'ok',
+          payload: { campaignId, actor: actorName, time: new Date().toISOString() },
+        });
+        return res.json({ success: true });
+      }
+
+      if (type === 'DELETE') {
+        this.events.emit({
+          event_type: 'campaign_deleted',
+          message: `Deleted campaign: ${campaignName} 🗑️`,
+          actor: actorName,
+          actor_type: actorName === 'system' ? 'system' : 'user',
+          source: 'supabase_research_campaigns_webhook',
+          severity: 'warning',
+          payload: { campaignId, actor: actorName, time: new Date().toISOString() },
+        });
+        return res.json({ success: true });
+      }
+
+      // UPDATE — compare fields dynamically
+      let changeParts = [];
+
+      const fieldLabels = {
+        'Campaign Name': 'name',
+        'Status': 'status',
+        'Target Industry': 'target industry',
+        'Target State(s)': 'target states',
+        'Target City(s)': 'target cities',
+        'Lead Count Goal': 'lead count goal',
+      };
+
+      const skipFields = ['created_by', 'updated_by', 'id', 'created_at'];
+
+      for (const [field, label] of Object.entries(fieldLabels)) {
+        const oldVal = old_record?.[field];
+        const newVal = record[field];
+        const oldStr = Array.isArray(oldVal) ? oldVal.join(', ') : String(oldVal || '');
+        const newStr = Array.isArray(newVal) ? newVal.join(', ') : String(newVal || '');
+        if (oldStr !== newStr) {
+          changeParts.push(`${label} from "${oldStr || 'empty'}" to "${newStr || 'empty'}"`);
+        }
+      }
+
+      // Catch any remaining changed fields
+      for (const field of Object.keys(record)) {
+        if (skipFields.includes(field) || field in fieldLabels) continue;
+        const oldStr = String(old_record?.[field] ?? '');
+        const newStr = String(record[field] ?? '');
+        if (oldStr !== newStr) {
+          changeParts.push(`${field} from "${oldStr || 'empty'}" to "${newStr || 'empty'}"`);
+        }
+      }
+
+      let message;
+      if (changeParts.length > 0) {
+        const changeStr = changeParts.length === 1
+          ? changeParts[0]
+          : changeParts.slice(0, -1).join(', ') + ' and ' + changeParts[changeParts.length - 1];
+        message = `Updated campaign ${campaignName}: ${changeStr}`;
+      } else {
+        message = `Updated campaign ${campaignName}`;
+      }
+
+      this.events.emit({
+        event_type: 'campaign_updated',
+        message: `${message}.`,
+        actor: actorName,
+        actor_type: actorName === 'system' ? 'system' : 'user',
+        source: 'supabase_research_campaigns_webhook',
+        severity: 'ok',
+        payload: { campaignId, actor: actorName, changes: changeParts, time: new Date().toISOString() },
+      });
+
+      res.json({ success: true });
+    });
+
     this.app.get('/api/cron', (req, res) => {
       const jobs = this.db.prepare('SELECT * FROM cron_jobs ORDER BY next_run_at ASC').all();
       res.json(jobs);
@@ -888,7 +1029,7 @@ class Controller {
         }
         cmd += ` --wake now`;
       } else {
-        // Lauren / Yanna = isolated agent turn
+        // Yanna = isolated agent turn
         cmd += ` --session isolated`;
         cmd += ` --agent ${assigned_agent.toLowerCase()}`;
         if (payload_text) {

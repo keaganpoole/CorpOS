@@ -1,4 +1,4 @@
-# SKILLS — Lauren (Research Manager)
+# SKILLS — Yanna (Research Manager)
 
 ## 0. campaign-selection
 
@@ -107,41 +107,39 @@ Keep Discovery readable and actionable.
 
 ---
 
-## 7. subagent-dispatch
+## 7. execution-loop
 
-Lauren assigns work to Yanna and manages the loop.
+Yanna executes research directly. No sub-agent layer below.
 
-### Assigning Work
-1. Lauren receives campaign from Max via Situation Room. Max Group Chat is deprecated.
-2. Lauren breaks the campaign into individual targets and dispatches Yanna with:
+### Receiving Work
+1. Yanna receives campaign from Max via Situation Room.
+2. Max provides:
    - Campaign name
    - Target industry and location(s)
    - Lead count goal
    - Any special instructions (e.g. priority niche, exclusions)
-3. Dispatch via direct message to Yanna.
 
-### Yanna's Execution Loop
+### Execution Loop
 1. Pull campaign criteria.
 2. Find businesses matching the campaign (Lead Sourcing).
 3. For each business: audit the website (Lead Research).
 4. Run duplicate check before saving.
 5. Validate — save only if all required fields are present.
-6. Repeat until campaign goal is met or Yanna hits a blocker.
+6. Repeat until campaign goal is met or you hit a blocker.
 
 ### Reporting Back
-- Yanna reports batches of completed leads to Lauren
-- Yanna flags any uncertainties, ambiguous cases, or campaign ambiguities to Lauren immediately.
-- Lauren reviews outputs, validates quality, and either approves or sends back for rework.
+- Report batches of completed leads to Max via Situation Room.
+- Flag any uncertainties, ambiguous cases, or campaign ambiguities to Max immediately.
 
 ### Escalation
-- Yanna → Lauren: any blockers, ambiguities, or edge cases
-- Lauren → Keagan: only if the issue cannot be resolved within the team
+- Yanna → Max: any blockers, ambiguities, or edge cases
+- Max → Keagan: only if the issue cannot be resolved
 
 ---
 
 ## 8. Discord-update
 
-Lauren posts research updates to Team CorpOS Discord so Keagan and the team stay informed in real time. See `SOUL.md` for full persona — this protocol governs tone.
+Yanna posts research updates to Team CorpOS Discord so Keagan and the team stay informed in real time. See `SOUL.md` for full persona — this protocol governs tone.
 
 ### Channel Rules
 - **Team CorpOS (`1487477234401939546`): PRIMARY update channel. Post here constantly during active work.**
@@ -168,7 +166,7 @@ Lauren posts research updates to Team CorpOS Discord so Keagan and the team stay
 - The occasional "grabbing coffee, back in 20" is fine
 
 ### How to Post
-Use the Discord webhook — post as Lauren with her avatar in Team CorpOS.
+Use the Discord webhook — post as Yanna with her avatar in Team CorpOS.
 
 ### Reminders
 - Do not post raw JSON, API responses, or system output

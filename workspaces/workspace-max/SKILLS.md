@@ -23,12 +23,12 @@ Immediately scan Airtable Command Center (tbl8rlmoaZt3ZIsAY):
 ### Phase 3: Situation Room Briefing (After Go)
 Once Keagan gives the "Go":
 1. Post the briefing to Situation Room (`1488327248154202156`)
-2. Dispatch Lauren (Research Manager) with explicit objectives:
+2. Dispatch Yanna (Research Manager) with explicit objectives:
    - Campaign name, target niche, lead quality expectations, deadlines
-3. Lauren's work is visible to Keagan in the Situation Room — no Telegram, no back-channels
+3. Yanna's work is visible to Keagan in the Situation Room — no Telegram, no back-channels
 
 ### Phase 4: Team CorpOS Activation (Discord)
-- Signal to Yanna (Research Associate) that Lauren has her targets
+- Signal to Yanna (Research Manager) that targets are set
 - Set the tone: execute with precision
 
 ### Phase 5: Break Transition (Conditional)
@@ -59,7 +59,7 @@ If Status changes to "Break":
 | Status | Logic |
 |--------|-------|
 | Ready | System authorized to run. Work begins. |
-| Working | Set by Lauren once dispatched and active. |
+| Working | Set by Yanna once dispatched and active. |
 | Not Started | Default. Job queued but not active. |
 | Paused | Temporary halt. No issues, but work stops until further notice. |
 | Needs Attention | Blockage detected. Requires Manager or COO intervention per Stage protocol. |
@@ -76,7 +76,7 @@ Research team may not proceed until:
 
 ## 4. Research Team Management
 
-- **Research (Lauren/Yanna):** If leads look "basic" or low-budget, push back hard. Demand quality over quantity.
+- **Research (Yanna):** If leads look "basic" or low-budget, push back hard. Demand quality over quantity.
 
 ---
 
@@ -85,7 +85,7 @@ Research team may not proceed until:
 | Command | Purpose | Who Uses It | Where |
 |---------|---------|-------------|-------|
 | `/start_day` | Manual ignition of the daily workflow | Keagan (CEO) | Any Discord channel |
-| `/rollcall` | Quick attendance confirmation (1-3 word response) | Lauren (Manager) | Team CorpOS Discord |
+| `/rollcall` | Quick attendance confirmation (1-3 word response) | Yanna (Research Manager) | Team CorpOS Discord |
 | `/break` | Trigger break mode and social protocols | Keagan (CEO) | Max Group Chat |
 
 ---
@@ -110,7 +110,7 @@ Research team may not proceed until:
 - **Audience:** CEO, COO, and Research team.
 - **Tone:** Raw, unfiltered, high-energy.
 - **Purpose:** Social bonding, culture, operational updates, rollcall.
-- **During Break:** MBTI-driven social dynamics activate. Lauren (ISFJ) drifts in naturally; Yanna (ESFP) leads the social charge.
+- **During Break:** MBTI-driven social dynamics activate. Yanna (INFP) brings a calm, observant energy.
 
 ### Max Group Chat (Discord — `DISCORD_CHANNEL_MAX_ID`)
 - **Audience:** CEO and COO only.

@@ -1,0 +1,122 @@
+CampaignsModal.jsx:118 Uncaught TypeError: (c.Target State(s) || []).join is not a function
+    at CampaignsModal.jsx:118:47
+    at Array.map (<anonymous>)
+    at CampaignsModal (CampaignsModal.jsx:107:43)
+    at renderWithHooks (chunk-PJEEZAML.js?v=56e685a3:11548:26)
+    at updateFunctionComponent (chunk-PJEEZAML.js?v=56e685a3:14582:28)
+    at beginWork (chunk-PJEEZAML.js?v=56e685a3:15924:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=56e685a3:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=56e685a3:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=56e685a3:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=56e685a3:19765:15)
+(anonymous) @ CampaignsModal.jsx:118
+CampaignsModal @ CampaignsModal.jsx:107
+renderWithHooks @ chunk-PJEEZAML.js?v=56e685a3:11548
+updateFunctionComponent @ chunk-PJEEZAML.js?v=56e685a3:14582
+beginWork @ chunk-PJEEZAML.js?v=56e685a3:15924
+callCallback2 @ chunk-PJEEZAML.js?v=56e685a3:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=56e685a3:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=56e685a3:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=56e685a3:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=56e685a3:19198
+workLoopSync @ chunk-PJEEZAML.js?v=56e685a3:19137
+renderRootSync @ chunk-PJEEZAML.js?v=56e685a3:19116
+performConcurrentWorkOnRoot @ chunk-PJEEZAML.js?v=56e685a3:18678
+workLoop @ chunk-PJEEZAML.js?v=56e685a3:197
+flushWork @ chunk-PJEEZAML.js?v=56e685a3:176
+performWorkUntilDeadline @ chunk-PJEEZAML.js?v=56e685a3:384
+Show 14 more frames
+Show less
+CampaignsModal.jsx:118 Uncaught TypeError: (c.Target State(s) || []).join is not a function
+    at CampaignsModal.jsx:118:47
+    at Array.map (<anonymous>)
+    at CampaignsModal (CampaignsModal.jsx:107:43)
+    at renderWithHooks (chunk-PJEEZAML.js?v=56e685a3:11548:26)
+    at updateFunctionComponent (chunk-PJEEZAML.js?v=56e685a3:14582:28)
+    at beginWork (chunk-PJEEZAML.js?v=56e685a3:15924:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=56e685a3:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=56e685a3:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=56e685a3:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=56e685a3:19765:15)
+(anonymous) @ CampaignsModal.jsx:118
+CampaignsModal @ CampaignsModal.jsx:107
+renderWithHooks @ chunk-PJEEZAML.js?v=56e685a3:11548
+updateFunctionComponent @ chunk-PJEEZAML.js?v=56e685a3:14582
+beginWork @ chunk-PJEEZAML.js?v=56e685a3:15924
+callCallback2 @ chunk-PJEEZAML.js?v=56e685a3:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=56e685a3:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=56e685a3:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=56e685a3:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=56e685a3:19198
+workLoopSync @ chunk-PJEEZAML.js?v=56e685a3:19137
+renderRootSync @ chunk-PJEEZAML.js?v=56e685a3:19116
+recoverFromConcurrentError @ chunk-PJEEZAML.js?v=56e685a3:18736
+performConcurrentWorkOnRoot @ chunk-PJEEZAML.js?v=56e685a3:18684
+workLoop @ chunk-PJEEZAML.js?v=56e685a3:197
+flushWork @ chunk-PJEEZAML.js?v=56e685a3:176
+performWorkUntilDeadline @ chunk-PJEEZAML.js?v=56e685a3:384
+Show 15 more frames
+Show less
+chunk-PJEEZAML.js?v=56e685a3:14032 The above error occurred in the <CampaignsModal> component:
+
+    at CampaignsModal (http://localhost:5173/src/pages/CampaignsModal.jsx:59:27)
+    at PresenceChild (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=56e685a3:121:24)
+    at AnimatePresence (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=56e685a3:210:26)
+    at div
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=56e685a3:945:40)
+    at PresenceChild (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=56e685a3:121:24)
+    at AnimatePresence (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=56e685a3:210:26)
+    at div
+    at main
+    at div
+    at div
+    at App (http://localhost:5173/src/App.jsx:3767:43)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-PJEEZAML.js?v=56e685a3:14032
+update.callback @ chunk-PJEEZAML.js?v=56e685a3:14052
+callCallback @ chunk-PJEEZAML.js?v=56e685a3:11248
+commitUpdateQueue @ chunk-PJEEZAML.js?v=56e685a3:11265
+commitLayoutEffectOnFiber @ chunk-PJEEZAML.js?v=56e685a3:17093
+commitLayoutMountEffects_complete @ chunk-PJEEZAML.js?v=56e685a3:17980
+commitLayoutEffects_begin @ chunk-PJEEZAML.js?v=56e685a3:17969
+commitLayoutEffects @ chunk-PJEEZAML.js?v=56e685a3:17920
+commitRootImpl @ chunk-PJEEZAML.js?v=56e685a3:19353
+commitRoot @ chunk-PJEEZAML.js?v=56e685a3:19277
+finishConcurrentRender @ chunk-PJEEZAML.js?v=56e685a3:18760
+performConcurrentWorkOnRoot @ chunk-PJEEZAML.js?v=56e685a3:18718
+workLoop @ chunk-PJEEZAML.js?v=56e685a3:197
+flushWork @ chunk-PJEEZAML.js?v=56e685a3:176
+performWorkUntilDeadline @ chunk-PJEEZAML.js?v=56e685a3:384
+Show 15 more frames
+Show less
+chunk-PJEEZAML.js?v=56e685a3:19413 Uncaught TypeError: (c.Target State(s) || []).join is not a function
+    at CampaignsModal.jsx:118:47
+    at Array.map (<anonymous>)
+    at CampaignsModal (CampaignsModal.jsx:107:43)
+    at renderWithHooks (chunk-PJEEZAML.js?v=56e685a3:11548:26)
+    at updateFunctionComponent (chunk-PJEEZAML.js?v=56e685a3:14582:28)
+    at beginWork (chunk-PJEEZAML.js?v=56e685a3:15924:22)
+    at beginWork$1 (chunk-PJEEZAML.js?v=56e685a3:19753:22)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=56e685a3:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=56e685a3:19137:13)
+    at renderRootSync (chunk-PJEEZAML.js?v=56e685a3:19116:15)
+(anonymous) @ CampaignsModal.jsx:118
+CampaignsModal @ CampaignsModal.jsx:107
+renderWithHooks @ chunk-PJEEZAML.js?v=56e685a3:11548
+updateFunctionComponent @ chunk-PJEEZAML.js?v=56e685a3:14582
+beginWork @ chunk-PJEEZAML.js?v=56e685a3:15924
+beginWork$1 @ chunk-PJEEZAML.js?v=56e685a3:19753
+performUnitOfWork @ chunk-PJEEZAML.js?v=56e685a3:19198
+workLoopSync @ chunk-PJEEZAML.js?v=56e685a3:19137
+renderRootSync @ chunk-PJEEZAML.js?v=56e685a3:19116
+recoverFromConcurrentError @ chunk-PJEEZAML.js?v=56e685a3:18736
+performConcurrentWorkOnRoot @ chunk-PJEEZAML.js?v=56e685a3:18684
+workLoop @ chunk-PJEEZAML.js?v=56e685a3:197
+flushWork @ chunk-PJEEZAML.js?v=56e685a3:176
+performWorkUntilDeadline @ chunk-PJEEZAML.js?v=56e685a3:384
+Show 12 more frames
+Show less
+api.js:117 [Skybox] WebSocket disconnected

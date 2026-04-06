@@ -35,11 +35,13 @@ import {
   Search,
   Star,
   X,
+  Target,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSkyboxState } from './hooks/useSkyboxState';
 import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
+import CampaignsModal from './pages/CampaignsModal';
 
 const StatusDot = ({ status, pulse = false }) => {
   const colors = {
@@ -178,7 +180,7 @@ const KanbanColumn = ({ title, tasks, icon: Icon, colorClass }) => (
   </div>
 );
 
-const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace }) => {
+const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenCampaigns }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
 
   // Determine if this agent has a pending model change
@@ -285,12 +287,31 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
             </div>
           </button>
         </div>
+
+        {/* Campaigns — only show for departments with campaigns */}
+        {agent.department === 'Research' && (
+        <div className="pt-3 border-t border-white/[0.04]">
+          <button
+            onClick={() => onOpenCampaigns && onOpenCampaigns(agent)}
+            className="w-full flex items-center justify-between group cursor-pointer"
+          >
+            <div className="flex items-center gap-1.5">
+              <Target size={11} className="text-indigo-400/60" />
+              <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Campaigns</span>
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">View</span>
+              <ChevronRight size={11} className="text-indigo-500/60" />
+            </div>
+          </button>
+        </div>
+        )}
       </div>
     </motion.div>
   );
 };
 
-const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onOpenMarketplace }) => {
+const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onOpenMarketplace, onOpenCampaigns }) => {
   const directReports = agents.filter((a) => a.reports_to === agent.id);
 
   return (
@@ -298,7 +319,7 @@ const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onO
       {depth > 0 && (
         <div className="absolute left-1/2 -translate-x-1/2 w-[1px] bg-zinc-800" style={{ height: '40px', top: '-40px' }} />
       )}
-      <AgentNode agent={agent} isActive={depth === 0} reactions={reactionsMap[agent.name] || {}} pendingModel={pendingModel} onOpenMarketplace={onOpenMarketplace} />
+      <AgentNode agent={agent} isActive={depth === 0} reactions={reactionsMap[agent.name] || {}} pendingModel={pendingModel} onOpenMarketplace={onOpenMarketplace} onOpenCampaigns={onOpenCampaigns} />
 
       {directReports.length > 0 && (
         <div className="mt-8 flex flex-col items-center">
@@ -309,7 +330,7 @@ const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onO
               <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] bg-zinc-800" style={{ width: 'calc(100% - 260px)' }} />
             )}
             {directReports.map((report) => (
-              <AgentBranch key={report.id} agent={report} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={depth + 1} onOpenMarketplace={onOpenMarketplace} />
+              <AgentBranch key={report.id} agent={report} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={depth + 1} onOpenMarketplace={onOpenMarketplace} onOpenCampaigns={onOpenCampaigns} />
             ))}
           </div>
         </div>
@@ -318,7 +339,7 @@ const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onO
   );
 };
 
-const AgentsHierarchy = ({ agents, reactions = [], pendingModel = null, onOpenMarketplace }) => {
+const AgentsHierarchy = ({ agents, reactions = [], pendingModel = null, onOpenMarketplace, onOpenCampaigns }) => {
   const root = agents.find((a) => a.hierarchy_level === 1);
   if (!root) return <div className="flex items-center justify-center h-full text-zinc-600">No agent data</div>;
 
@@ -330,7 +351,7 @@ const AgentsHierarchy = ({ agents, reactions = [], pendingModel = null, onOpenMa
 
   return (
     <div className="min-w-fit px-12 pt-10 flex flex-col items-center select-none">
-      <AgentBranch agent={root} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={0} onOpenMarketplace={onOpenMarketplace} />
+      <AgentBranch agent={root} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={0} onOpenMarketplace={onOpenMarketplace} onOpenCampaigns={onOpenCampaigns} />
     </div>
   );
 };
@@ -1548,8 +1569,7 @@ const ChronosView = ({ cronJobs, onRefresh }) => {
 
   const agentOptions = [
     { name: 'Max', role: 'COO', department: 'Executive', reports_to: null },
-    { name: 'Lauren', role: 'Research Manager', department: 'Research', reports_to: 'Max' },
-    { name: 'Yanna', role: 'Research Associate', department: 'Research', reports_to: 'Lauren' },
+    { name: 'Yanna', role: 'Research Manager', department: 'Research', reports_to: 'Max' },
   ];
 
   const selectAgent = (agent) => {
@@ -2077,6 +2097,7 @@ const App = () => {
   const [codeOpen, setCodeOpen] = useState(false);
   const [marketplaceAgent, setMarketplaceAgent] = useState(null); // agent object for marketplace
   const [pendingModel, setPendingModel] = useState(null); // { agentId, model } pending confirmation
+  const [campaignsAgent, setCampaignsAgent] = useState(null); // agent object for campaigns modal
 
   // Live backend state
   const {
@@ -2179,7 +2200,7 @@ const App = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-[#020202]/60 via-transparent to-[#020202]/60" />
             </div>
             <div className="w-full flex justify-center pt-6 relative -mt-16 z-10">
-              <AgentsHierarchy agents={agents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} />
+              <AgentsHierarchy agents={agents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} onOpenCampaigns={setCampaignsAgent} />
             </div>
             <AnimatePresence>
               {marketplaceAgent && (
@@ -2191,6 +2212,13 @@ const App = () => {
                     const normalized = modelId.startsWith('openrouter/') ? modelId : `openrouter/${modelId}`;
                     setPendingModel({ agentId, model: normalized });
                   }}
+                />
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
+              {campaignsAgent && (
+                <CampaignsModal
+                  onClose={() => setCampaignsAgent(null)}
                 />
               )}
             </AnimatePresence>
@@ -2403,7 +2431,7 @@ const App = () => {
         <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
           {livePulse.map((evt) => {
             const actorLower = (evt.actor || 'system').toLowerCase();
-            const avatarUrl = ['max', 'lauren', 'yanna', 'allie', 'brian'].includes(actorLower)
+            const avatarUrl = ['max', 'yanna', 'allie', 'brian'].includes(actorLower)
               ? `${AVATAR_BASE}/${actorLower}.jpg`
               : `${AVATAR_BASE}/keagan.jpg`;
 

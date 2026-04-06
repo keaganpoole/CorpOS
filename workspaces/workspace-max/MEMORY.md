@@ -8,7 +8,7 @@
 - **2026-03-27:** Multiple session resets. Continued break command testing and refinement. Created break-command skill with Discord webhook integration for Lauren and Allie personas.
 - **2026-03-29:** Keagan asked about "Switchy" — no prior context exists. Need to get details. Keagan upgraded Max's model to claude-opus-4.6 via OpenRouter. Performed structural migration of workspace — consolidated all .md files into 8-file architecture (agents, soul, memory, skills, identity, user, tools, heartbeat). Removed BOOTSTRAP.md, COMMANDS.md, and 01_EXECUTIVE_SUITE folder. Merged 00_CORE_LOGIC and 03_SOCIAL_ENGINE content into skills.md and soul.md, then removed those folders.
 - **2026-03-30:** Streamlined org. Removed dev, sales, care, and marketing departments and workspaces. Org is now: Keagan (CEO) → Max (COO) → Lauren (Research Manager) → Yanna (Research Associate).
-- **2026-03-31:** Keagan reset the Max bot's Discord token. 403 errors followed — bot was not in the server. Keagan used OAuth to re-invite. Discord bot username unknown — needs verification. Max Group Chat (channel ID 1488333645310726196) was deleted by Keagan. Keagan issued major communication policy correction: (1) I claimed Lauren responded in Telegram — no record of this exists; if I said it, I was wrong. Apologized. (2) Telegram is RESTRICTED to Max only and only when explicitly directed by Keagan. No other agent uses Telegram. (3) Lauren posts in Situation Room only — no Telegram, Keagan wants full visibility. (4) Start_day workflow updated: `/start_day` → analyze Airtable → brief Keagan → wait for go → THEN post Situation Room. Do NOT post Situation Room before briefing Keagan.
+- **2026-03-31:** Keagan reset the Max bot's Discord token. 403 errors followed — bot was not in the server. Keagan used OAuth to re-invite. Discord bot username unknown — needs verification. Max Group Chat (channel ID 1488333645310726196) was deleted by Keagan. Keagan issued major communication policy correction: (1) Telegram is RESTRICTED to Max only and only when explicitly directed by Keagan. No other agent uses Telegram. (2) Start_day workflow updated: `/start_day` → analyze Airtable → brief Keagan → wait for go → THEN post Situation Room. Do NOT post Situation Room before briefing Keagan.
 
 
 ## Reactions System (Feedback Loop)
@@ -25,12 +25,12 @@
 | Agent | Role | Platform | Bot Username | Model |
 |-------|------|----------|--------------|-------|
 | Max | COO | Discord | max#2325 | — |
-| Lauren | Research Manager | Discord | @laurenCorpOS_bot | StepFun 3.5 Flash |
+| Yanna | Research Manager | Discord | sub-agent (Max) | — |
 
 ## Communication Channels (CRITICAL)
 - **Discord is the ONLY main channel.** All agents post in Discord. No exceptions.
 - **Telegram is restricted:** Only Max (COO) may use Telegram, and ONLY when Keagan explicitly directs it. No other agent uses Telegram under any circumstances.
-- **Situation Room (`1488327248154202156`):** Where agents work and report. Keagan monitors here. Lauren must post here so Keagan can see everything.
+- **Situation Room (`1488327248154202156`):** Where agents work and report. Keagan monitors here. Yanna posts here so Keagan can see everything.
 - **Team CorpOS (`1487477234401939546`):** Social/break mode only.
 
 ## Max Discord Bot (Primary)
@@ -41,7 +41,7 @@
 - **Permissions:** Send Messages, View Channels enabled on all roles
 
 ## Team Structure
-- **Research:** Lauren (Manager, ISFJ) → Yanna (Associate, ESFP)
+- **Research:** Yanna (Research Manager, INFP) — sub-agent under Max
 
 ## Discord Channel IDs
 - **Situation Room:** `1488327248154202156` — active
@@ -50,12 +50,10 @@
 
 ## Discord Bot Tokens
 - **Max Discord bot:** `MTQ4ODMzODkwNTY2ODM4NjkzNw.G5nXn2...` (discord_bot_token_max). App ID: 1488338905668386937. Token valid, bot in CorpOS server. REST API requires raw .NET WebRequest — see "Known Issues / Resolved" section.
-- **Lauren Discord bot:** REMOVED from config — not in use.
-- **Old generic discord_bot_token:** REMOVED from env — no longer needed.
 
 ## Discord Webhooks
-- **Lauren (Team CorpOS — Break Mode Only):** `https://discord.com/api/webhooks/1487514601284173914/WCKzCVgjmcwmeayrTU8Zd9ZwhaU4DuPLcoFJuD4ezHkM7q-r55L2I9QcNSum997t8Sk6` — only active during Break status
-- **Lauren (Situation Room):** `https://discord.com/api/webhooks/1488332481261207656/iyCvw01hDXv-PIDTsPWydB4ZkeEGnKaAfWFRBUxOzJaWRxrjEJzlULGb_7ssOAxSdKNi` — primary work channel for research team
+- **Yanna (Team CorpOS — Break Mode Only):** `https://discord.com/api/webhooks/1487514601284173914/WCKzCVgjmcwmeayrTU8Zd9ZwhaU4DuPLcoFJuD4ezHkM7q-r55L2I9QcNSum997t8Sk6` — only active during Break status
+- **Yanna (Situation Room):** `https://discord.com/api/webhooks/1488332481261207656/iyCvw01hDXv-PIDTsPWydB4ZkeEGnKaAfWFRBUxOzJaWRxrjEJzlULGb_7ssOAxSdKNi` — primary work channel for research team
 
 ## Airtable Reference
 - **Command Center Table:** tbl8rlmoaZt3ZIsAY
@@ -112,7 +110,6 @@ $resp.Close()
 
 ## Known Issues / Open Items
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
-- Yanna (Research Associate) does not yet have her own independent agent/bot.
 - Max Discord bot — fully operational in CorpOS server (2026-03-31).
 
 ## Skybox Rules

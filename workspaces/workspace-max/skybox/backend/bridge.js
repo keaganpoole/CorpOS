@@ -8,7 +8,7 @@
  *
  * Examples:
  *   node skybox-bridge.js agent_heartbeat "Max active"
- *   node skybox-bridge.js task_started "Research sweep" '{"task_id":"T-001","agent_id":"lauren"}'
+ *   node skybox-bridge.js task_started "Research sweep" '{"task_id":"T-001","agent_id":"yanna"}'
  *   node skybox-bridge.js system_status "OpenClaw gateway online"
  */
 
