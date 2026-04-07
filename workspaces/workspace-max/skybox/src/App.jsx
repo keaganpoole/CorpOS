@@ -2264,6 +2264,7 @@ const App = () => {
   const [pendingModel, setPendingModel] = useState(null); // { agentId, model } pending confirmation
   const [campaignsAgent, setCampaignsAgent] = useState(null); // agent object for campaigns modal
   const [showCommander, setShowCommander] = useState(false); // Commander task creation modal
+  const [logoHover, setLogoHover] = useState(false); // SKYBOX logo hover for New Task reveal
 
   // Agent campaigns — loaded from Supabase to display on agent cards
   const [agentCampaigns, setAgentCampaigns] = useState({});
@@ -2420,18 +2421,6 @@ const App = () => {
                 );
               })()}
             </Reorder.Group>
-
-            {/* Bottom-left: Commander launch button */}
-            <div className="absolute bottom-6 left-6 z-20">
-              <motion.button
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowCommander(true)}
-                className="w-12 h-12 rounded-2xl bg-white border border-white flex items-center justify-center shadow-[0_0_40px_rgba(255,255,255,0.15)] hover:shadow-[0_0_50px_rgba(99,102,241,0.25)] hover:bg-indigo-50 transition-all group"
-              >
-                <Plus size={22} className="text-black group-hover:text-indigo-600 transition-colors" />
-              </motion.button>
-            </div>
 
             {/* Commander Modal */}
             <AnimatePresence>
@@ -2614,15 +2603,45 @@ const App = () => {
             />
           </div>
 
-          {/* SKYBOX Logo - fades when either dropdown is open */}
-          <div className={`relative flex flex-col items-center transition-opacity duration-500 mx-20 ${zoneOpen || codeOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-            <div className={`relative transition-all duration-700 transform ${glitch ? 'opacity-10 scale-[1.05] blur-sm' : 'opacity-100 scale-100'}`}>
-              <div className="absolute -left-6 inset-y-0 w-[1px] bg-white/10" />
-              <div className="absolute -right-6 inset-y-0 w-[1px] bg-white/10" />
-              <h1 className="text-2xl font-light tracking-[0.6em] text-white/15 uppercase leading-none hover:text-white/30 transition-colors cursor-default">
-                SKYBOX
-              </h1>
+          {/* SKYBOX Logo - fades when either dropdown is open, reveals New Task on hover (tasks page) */}
+          <div 
+            className={`relative flex flex-col items-center transition-opacity duration-500 mx-20 ${zoneOpen || codeOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+            onMouseEnter={() => currentRoute === 'tasks' && setLogoHover(true)}
+            onMouseLeave={() => currentRoute === 'tasks' && setLogoHover(false)}
+            style={{ perspective: '1000px' }}
+          >
+            {/* Logo text */}
+            <div 
+              className={`relative transition-all duration-[1000ms] ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform
+                ${logoHover ? 'opacity-0 scale-50' : 'opacity-100 scale-100'}`}
+              style={{
+                transformStyle: 'preserve-3d',
+                transform: logoHover ? 'rotateX(90deg) rotateZ(45deg)' : 'rotateX(0deg) rotateZ(0deg)'
+              }}
+            >
+              <div className={`relative transition-all duration-700 transform ${glitch ? 'opacity-10 scale-[1.05] blur-sm' : 'opacity-100 scale-100'}`}>
+                <div className="absolute -left-6 inset-y-0 w-[1px] bg-white/10" />
+                <div className="absolute -right-6 inset-y-0 w-[1px] bg-white/10" />
+                <h1 className="text-2xl font-light tracking-[0.6em] text-white/15 uppercase leading-none cursor-default">
+                  SKYBOX
+                </h1>
+              </div>
             </div>
+
+            {/* New Task button - hidden behind logo, revealed on hover */}
+            {currentRoute === 'tasks' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <button
+                  onClick={() => setShowCommander(true)}
+                  className={`px-8 py-2 bg-white text-black font-black uppercase tracking-widest text-[10px] 
+                    transition-all duration-700 ease-[cubic-bezier(0.19,1,0.22,1)] transform
+                    ${logoHover ? 'opacity-100 translate-y-0 scale-100 delay-300' : 'opacity-0 translate-y-8 scale-90 pointer-events-none'}
+                    hover:bg-red-600 hover:text-white hover:tracking-[0.4em] active:scale-95`}
+                >
+                  New Task
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Live + Ping */}
