@@ -38,6 +38,19 @@ export function useLeads() {
     return () => { abortRef.current = true; };
   }, [fetchLeads]);
 
+  // Notify backend of lead changes for Live Pulse
+  const notifyBackend = useCallback(async (eventType, record, oldRecord) => {
+    try {
+      await fetch('http://127.0.0.1:7878/api/webhook/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: eventType, record, old_record: oldRecord }),
+      });
+    } catch (err) {
+      console.warn('[useLeads] Failed to notify backend:', err.message);
+    }
+  }, []);
+
   // ─── Realtime subscription ──────────────────────────────────────────────
   useEffect(() => {
     const channel = supabase
@@ -45,16 +58,20 @@ export function useLeads() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setLeads(prev => [payload.new, ...prev]);
+          notifyBackend('INSERT', payload.new, null);
         } else if (payload.eventType === 'UPDATE') {
           setLeads(prev => prev.map(l => l.id === payload.new.id ? payload.new : l));
+          // Note: old_record isn't available in realtime subscription
+          notifyBackend('UPDATE', payload.new, null);
         } else if (payload.eventType === 'DELETE') {
           setLeads(prev => prev.filter(l => l.id !== payload.old.id));
+          notifyBackend('DELETE', null, payload.old);
         }
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [notifyBackend]);
 
   // ─── CRUD ───────────────────────────────────────────────────────────────
   const createLead = async (leadData) => {

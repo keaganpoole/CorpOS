@@ -124,15 +124,25 @@ const TaskCard = ({ task, columnColor }) => {
       <div className="p-4 pt-3">
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
+          {task.assigned_to && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full overflow-hidden shrink-0">
+                <img 
+                  src={`${AVATAR_BASE}/${task.assigned_to.toLowerCase()}.jpg`}
+                  alt={task.assigned_to}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.classList.add('bg-zinc-700');
+                  }}
+                />
+              </div>
+            </div>
+          )}
           {task.assigned_team && (
             <span className="px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider border" style={{ color: accentColor, borderColor: `${accentColor}30`, backgroundColor: `${accentColor}08` }}>
               {task.assigned_team}
             </span>
-          )}
-          {task.assigned_to && (
-            <div className="flex items-center gap-1.5 bg-zinc-900/50 px-1.5 py-0.5 rounded border border-white/5 ml-auto">
-              <span className="text-[9px] font-bold text-zinc-500 tracking-tighter">{task.assigned_to.charAt(0).toUpperCase()}</span>
-            </div>
           )}
         </div>
 
@@ -387,7 +397,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <span className={`text-[11px] font-bold truncate transition-colors ${pending ? 'text-amber-400/80' : 'text-cyan-400/80 group-hover:text-cyan-400'}`}>
-                {displayModel}
+                {displayModel?.replace(/^openrouter\//, '') || displayModel}
               </span>
               {pending ? (
                 <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">

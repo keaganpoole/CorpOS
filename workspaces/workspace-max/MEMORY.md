@@ -100,6 +100,7 @@ $resp.Close()
 ## Known Issues / Open Items
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
 - Max Discord bot — fully operational in CorpOS server (2026-03-31).
+- **2026-04-07:** System ignited via `/start_day`. Current state: Code Red / Zone 4. Skybox backend on port 7878. API endpoints operational. Daily log created.
 
 ## Skybox Rules
 - **DO NOT restart Skybox (kill Electron/server process) after making changes unless there is a major error.** Keagan runs `npm run dev` himself. Just build and rebuild the native module — he restarts the app on his own.

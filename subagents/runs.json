@@ -210,6 +210,93 @@
       "frozenResultCapturedAt": 1774742583027,
       "endedHookEmittedAt": 1774742678387,
       "cleanupCompletedAt": 1774742678388
+    },
+    "84a1d5cc-a126-4f1b-86df-923d466b503d": {
+      "runId": "84a1d5cc-a126-4f1b-86df-923d466b503d",
+      "childSessionKey": "agent:main:subagent:d4fbf6f4-9139-4e3a-9a44-c9643c27e8ac",
+      "controllerSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "channel:1488359049891283105",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:discord:direct:289460310673195018",
+      "task": "Execute the queued task \"Keagan Queued Task\" (ID: task_1775535395364). Check the task details via curl http://127.0.0.1:7878/api/tasks/task_1775535395364, then investigate the task and complete it.",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "Yanna",
+      "model": "openrouter/xiaomi/mimo-v2-flash",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775535496143,
+      "startedAt": 1775535497500,
+      "sessionStartedAt": 1775535496143,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": false,
+      "retainAttachmentsOnKeep": false
+    },
+    "c32d0fa0-8e93-4471-9b64-f1f63ef3e315": {
+      "runId": "c32d0fa0-8e93-4471-9b64-f1f63ef3e315",
+      "childSessionKey": "agent:main:subagent:f27357b4-e407-46b5-b73a-5578bd8770e2",
+      "controllerSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "channel:1488359049891283105",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:discord:direct:289460310673195018",
+      "task": "Execute the queued task \"Keagan Queued Task\" (ID: task_1775535395364). Check the task details via curl http://127.0.0.1:7878/api/tasks/task_1775535395364, then investigate the task and complete it.",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "Yanna",
+      "model": "openrouter/xiaomi/mimo-v2-flash",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775536501245,
+      "startedAt": 1775536501672,
+      "sessionStartedAt": 1775536501245,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775536844547,
+      "outcome": {
+        "status": "ok"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "The task \"Keagan Queued Task\" (ID: task_1775535395364) was a queued research task owned by Keagan with high priority and no description. I investigated the task by fetching its details via the local API, then completed it by updating its status to `completed`. The task is now marked as completed in the SQLite database, and the `latest_update` field shows \"Task completed by subagent\". Verification confirmed the status change persisted.\n\nNo further action is required; the queued task has been executed and closed.",
+      "frozenResultCapturedAt": 1775536844698,
+      "endedHookEmittedAt": 1775536860568,
+      "cleanupCompletedAt": 1775536860569
+    },
+    "11866fc8-d19c-4b29-bba1-ce8b553b823c": {
+      "runId": "11866fc8-d19c-4b29-bba1-ce8b553b823c",
+      "childSessionKey": "agent:main:subagent:5b754ae5-7bda-459a-97b2-479313f15d3f",
+      "controllerSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "channel:1488359049891283105",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:discord:direct:289460310673195018",
+      "task": "Research lead fetching campaign for CorpOS. Fetch leads from Supabase leads table, analyze them, and post progress updates to Situation Room (1488327248154202156). Update queued tasks to 'in progress' when starting work. Ensure frequent updates to keep Keagan informed.",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "Yanna - Research Manager",
+      "model": "openrouter/xiaomi/mimo-v2-flash",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775536845527,
+      "startedAt": 1775536847615,
+      "sessionStartedAt": 1775536845527,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": false,
+      "retainAttachmentsOnKeep": false
     }
   }
 }
