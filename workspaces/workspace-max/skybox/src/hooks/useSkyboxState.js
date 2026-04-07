@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, connectWebSocket, addMessageListener, disconnectWebSocket } from '../lib/api';
+import { supabase } from '../lib/supabase';
 
 export function useSkyboxState() {
   const [tasks, setTasks] = useState([]);
@@ -131,47 +132,79 @@ const [reactions, setReactions] = useState([]);
     connectWebSocket(setWsStatus);
     const removeListener = addMessageListener(handleWsMessage);
 
+    // Supabase real-time subscriptions for state, agents, reactions
+    const stateSub = supabase
+      .channel('state-realtime')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'state' }, (payload) => {
+        const s = payload.new;
+        setControlState(s);
+        setIsPaused(s.runtime_mode === 'paused');
+      })
+      .subscribe();
+
+    const agentsSub = supabase
+      .channel('agents-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agents' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setAgents(prev => [...prev, payload.new]);
+        } else if (payload.eventType === 'UPDATE') {
+          setAgents(prev => prev.map(a => a.id === payload.new.id ? payload.new : a));
+        } else if (payload.eventType === 'DELETE') {
+          setAgents(prev => prev.filter(a => a.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    const reactionsSub = supabase
+      .channel('reactions-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, () => {
+        // Refresh reaction counts on any change
+        api.getReactions().then(d => { if (d) setReactions(d); });
+      })
+      .subscribe();
+
     return () => {
       removeListener();
       disconnectWebSocket();
+      supabase.removeChannel(stateSub);
+      supabase.removeChannel(agentsSub);
+      supabase.removeChannel(reactionsSub);
     };
   }, [loadInitialData, handleWsMessage]);
 
-  // Control actions — prefer IPC if available, fallback to REST
+  // Control actions — optimistic updates, API calls in background
   const toggleRuntime = useCallback(async () => {
     const newMode = isPaused ? 'running' : 'paused';
+    // Update UI immediately
+    setIsPaused(newMode === 'paused');
+    setControlState(prev => ({ ...prev, runtime_mode: newMode }));
+    // Sync to backend in background
     if (window.skybox?.control) {
-      const result = await window.skybox.control.setRuntime(newMode);
-      if (result) {
-        setIsPaused(newMode === 'paused');
-        setControlState(result);
-      }
+      window.skybox.control.setRuntime(newMode);
     } else {
-      const result = await api.setRuntime(newMode);
-      if (result) {
-        setIsPaused(newMode === 'paused');
-        setControlState(result);
-      }
+      api.setRuntime(newMode);
     }
   }, [isPaused]);
 
-  const setStage = useCallback(async (stage) => {
+  const setStage = useCallback((stage) => {
+    // Update UI immediately
+    setControlState(prev => ({ ...prev, stage }));
+    // Sync to backend in background
     if (window.skybox?.control) {
-      const result = await window.skybox.control.setStage(stage);
-      if (result) setControlState(result);
+      window.skybox.control.setStage(stage);
     } else {
-      const result = await api.setStage(stage);
-      if (result) setControlState(result);
+      api.setStage(stage);
     }
   }, []);
 
-  const setZone = useCallback(async (zone) => {
+  const setZone = useCallback((zone) => {
+    // Update UI immediately
+    setControlState(prev => ({ ...prev, zone }));
+    // Sync to backend in background
     if (window.skybox?.control) {
-      const result = await window.skybox.control.setZone(zone);
-      if (result) setControlState(result);
+      window.skybox.control.setZone(zone);
     } else {
-      const result = await api.setZone(zone);
-      if (result) setControlState(result);
+      api.setZone(zone);
     }
   }, []);
 

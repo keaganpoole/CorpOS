@@ -1,59 +1,22 @@
 /**
- * Event System — Central structured event ingestion
- * All events flow through here. Validates, stores, updates state, broadcasts.
+ * Event System — In-memory event stream + Supabase state updates
+ * Events flow through here. Broadcasts to frontend, updates state in Supabase.
  */
 
 class EventSystem {
-  constructor(db, broadcastFn) {
-    this.db = db;
+  constructor(broadcastFn, supabaseHelpers) {
     this.broadcast = broadcastFn || (() => {});
-
-    // Prepare statements for performance
-    this._prepareStatements();
-  }
-
-  _prepareStatements() {
-    this.stmts = {
-      insertEvent: this.db.prepare(`
-        INSERT INTO events (session_id, event_type, severity, actor, actor_type, source, message, task_id, agent_id, payload_json)
-        VALUES (@session_id, @event_type, @severity, @actor, @actor_type, @source, @message, @task_id, @agent_id, @payload_json)
-      `),
-
-      insertSystemLog: this.db.prepare(`
-        INSERT INTO system_logs (session_id, level, source, message, metadata_json)
-        VALUES (@session_id, @level, @source, @message, @metadata_json)
-      `),
-
-      updateTaskState: this.db.prepare(`
-        UPDATE tasks SET status = @status, latest_update = @message, latest_update_at = datetime('now'), updated_at = datetime('now')
-        WHERE id = @task_id
-      `),
-
-      insertTaskUpdate: this.db.prepare(`
-        INSERT INTO task_updates (task_id, status, message, severity, actor)
-        VALUES (@task_id, @status, @message, @severity, @actor)
-      `),
-
-      updateAgentState: this.db.prepare(`
-        UPDATE agents SET status = @status, current_activity = @activity, last_heartbeat_at = datetime('now'), updated_at = datetime('now')
-        WHERE id = @agent_id
-      `),
-
-      updateControlState: this.db.prepare(`
-        UPDATE control_state SET ${''} updated_at = datetime('now') WHERE id = 1
-      `),
-    };
+    this.sbQuery = supabaseHelpers?.sbQuery || (() => Promise.resolve());
+    this.events = []; // in-memory event buffer
+    this.maxEvents = 200;
   }
 
   /**
    * Main event ingestion method
-   * @param {Object} event - The event to ingest
    */
   emit(event) {
-    const session_id = event.session_id || this._getCurrentSessionId();
-
     const record = {
-      session_id,
+      id: Date.now() + Math.random(),
       event_type: event.event_type,
       severity: event.severity || this._deriveSeverity(event.event_type),
       actor: event.actor || 'system',
@@ -62,64 +25,39 @@ class EventSystem {
       message: event.message || '',
       task_id: event.task_id || null,
       agent_id: event.agent_id || null,
-      payload_json: event.payload ? JSON.stringify(event.payload) : null,
+      payload: event.payload || null,
+      timestamp: new Date().toISOString(),
     };
 
-    try {
-      // Store event
-      const result = this.stmts.insertEvent.run(record);
+    // Store in memory
+    this.events.unshift(record);
+    if (this.events.length > this.maxEvents) this.events = this.events.slice(0, this.maxEvents);
 
-      // Derive state updates based on event type
-      this._processEvent(event, session_id);
+    // Process side effects (async, non-blocking)
+    this._processEvent(event).catch(err => {
+      console.error('[EventSystem] Side effect failed:', err.message);
+    });
 
-      // Broadcast to frontend
-      this.broadcast({
-        type: 'event',
-        id: result.lastInsertRowid,
-        ...record,
-        timestamp: new Date().toISOString(),
-      });
+    // Broadcast to frontend
+    this.broadcast({
+      type: 'event',
+      ...record,
+    });
 
-      return { success: true, id: result.lastInsertRowid };
-    } catch (err) {
-      console.error('[EventSystem] Failed to emit event:', err.message);
-      return { success: false, error: err.message };
-    }
+    return { success: true };
   }
 
-  _processEvent(event, session_id) {
+  /**
+   * Get recent events from memory
+   */
+  getRecent(limit = 50) {
+    return this.events.slice(0, limit);
+  }
+
+  async _processEvent(event) {
     const type = event.event_type;
 
-    // Task events → update task state
-    if (type.startsWith('task_') && event.task_id) {
-      const statusMap = {
-        task_created: 'queued',
-        task_queued: 'queued',
-        task_started: 'in_progress',
-        task_progress: 'in_progress',
-        task_completed: 'completed',
-        task_failed: 'failed',
-        task_warning: 'warning',
-        task_paused: 'paused',
-      };
-      const newStatus = statusMap[type];
-      if (newStatus) {
-        this.stmts.updateTaskState.run({
-          task_id: event.task_id,
-          status: newStatus,
-          message: event.message || '',
-        });
-        this.stmts.insertTaskUpdate.run({
-          task_id: event.task_id,
-          status: newStatus,
-          message: event.message || '',
-          severity: event.severity || 'ok',
-          actor: event.actor || 'system',
-        });
-      }
-    }
-
-    // Agent events → update agent state
+    // Agent events → update agent state in Supabase
     if (type.startsWith('agent_') && event.agent_id) {
       const statusMap = {
         agent_idle: 'idle',
@@ -128,40 +66,47 @@ class EventSystem {
         agent_paused: 'paused',
         agent_warning: 'warning',
         agent_error: 'error',
-        agent_heartbeat: null, // just update heartbeat time
+        agent_heartbeat: 'active',
       };
       const newStatus = statusMap[type];
-      if (newStatus !== undefined) {
-        this.stmts.updateAgentState.run({
-          agent_id: event.agent_id,
-          status: newStatus || 'active',
-          activity: event.message || 'Active',
-        });
-      } else if (type === 'agent_heartbeat') {
-        this.db.prepare('UPDATE agents SET last_heartbeat_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?').run(event.agent_id);
+      if (newStatus) {
+        try {
+          await this.sbQuery('agents', 'PATCH', {
+            status: newStatus,
+            current_activity: event.message || 'Active',
+            last_heartbeat: new Date().toISOString(),
+          }, `?id=eq.${event.agent_id}`);
+        } catch (err) {
+          console.error('[EventSystem] Failed to update agent in Supabase:', err.message);
+        }
       }
     }
 
-    // System events → write to system log
-    if (type.startsWith('system_') || type === 'session_started' || type === 'session_ended' || type === 'log_entry') {
-      this.stmts.insertSystemLog.run({
-        session_id,
-        level: event.severity || 'info',
-        source: event.source || 'system',
-        message: event.message || '',
-        metadata_json: event.payload ? JSON.stringify(event.payload) : null,
-      });
-    }
-
-    // Control events → update control state
+    // Control events → update state in Supabase
     if (type === 'runtime_paused') {
-      this.db.prepare("UPDATE control_state SET runtime_mode = 'paused', updated_at = datetime('now') WHERE id = 1").run();
+      try {
+        await this.sbQuery('state', 'PATCH', { runtime_mode: 'paused', updated_at: new Date().toISOString() }, '?id=eq.1');
+      } catch (err) {
+        console.error('[EventSystem] Failed to update state:', err.message);
+      }
     } else if (type === 'runtime_resumed') {
-      this.db.prepare("UPDATE control_state SET runtime_mode = 'running', updated_at = datetime('now') WHERE id = 1").run();
+      try {
+        await this.sbQuery('state', 'PATCH', { runtime_mode: 'running', updated_at: new Date().toISOString() }, '?id=eq.1');
+      } catch (err) {
+        console.error('[EventSystem] Failed to update state:', err.message);
+      }
     } else if (type === 'stage_changed') {
-      this.db.prepare("UPDATE control_state SET stage = ?, updated_at = datetime('now') WHERE id = 1").run(event.payload?.stage || 'code_blue');
+      try {
+        await this.sbQuery('state', 'PATCH', { stage: event.payload?.stage || 'code_blue', updated_at: new Date().toISOString() }, '?id=eq.1');
+      } catch (err) {
+        console.error('[EventSystem] Failed to update state:', err.message);
+      }
     } else if (type === 'zone_changed') {
-      this.db.prepare("UPDATE control_state SET zone = ?, updated_at = datetime('now') WHERE id = 1").run(event.payload?.zone || 1);
+      try {
+        await this.sbQuery('state', 'PATCH', { zone: event.payload?.zone || 1, updated_at: new Date().toISOString() }, '?id=eq.1');
+      } catch (err) {
+        console.error('[EventSystem] Failed to update state:', err.message);
+      }
     }
   }
 
@@ -170,17 +115,6 @@ class EventSystem {
     if (eventType.includes('warning')) return 'warning';
     if (eventType.includes('completed') || eventType.includes('resumed')) return 'ok';
     return 'info';
-  }
-
-  _getCurrentSessionId() {
-    const session = this.db.prepare("SELECT id FROM sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1").get();
-    if (session) return session.id;
-
-    // Auto-create a session so events have somewhere to live
-    const sessionId = 'session_' + Date.now();
-    this.db.prepare('INSERT INTO sessions (id, trigger_source, status) VALUES (?, ?, ?)').run(sessionId, 'auto', 'active');
-    this.broadcast({ type: 'session_change', session: { id: sessionId, status: 'active', trigger_source: 'auto' } });
-    return sessionId;
   }
 }
 

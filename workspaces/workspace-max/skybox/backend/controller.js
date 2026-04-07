@@ -32,6 +32,29 @@ const { initDatabase } = require('./db/schema');
 const { EventSystem } = require('./events/EventSystem');
 const { seedData } = require('./seed');
 
+// ─── Supabase Helper ─────────────────────────────────────
+function getSBHeaders() {
+  return {
+    apikey: process.env.SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  };
+}
+
+async function sbQuery(table, method = 'GET', body = null, query = '') {
+  const url = `${process.env.SUPABASE_URL}/rest/v1/${table}${query}`;
+  const opts = { method, headers: getSBHeaders() };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase ${method} ${table}: ${res.status} ${text}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
 class Controller {
   constructor(port = 7878) {
     this.port = port;
@@ -40,7 +63,7 @@ class Controller {
     // CORS for Electron dev mode (Vite on :5173 → backend on :7878)
     this.app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+      res.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
       res.header('Access-Control-Allow-Headers', 'Content-Type');
       if (req.method === 'OPTIONS') return res.sendStatus(200);
       next();
@@ -49,16 +72,18 @@ class Controller {
     this.wss = new WebSocket.Server({ server: this.server });
     this.clients = new Set();
 
-    // Init DB
+    // Init DB (still needed for tasks, leads, cron_jobs tables)
     const dbPath = require('path').join(__dirname, '..', 'data', 'skybox.db');
     this.db = initDatabase(dbPath);
 
-    // Migrations for existing databases
-    try { this.db.exec("ALTER TABLE agents ADD COLUMN campaign_id TEXT"); } catch(e) {}
-    try { this.db.exec("ALTER TABLE agents ADD COLUMN campaign_name TEXT"); } catch(e) {}
+    // Init event system with Supabase helpers
+    this.events = new EventSystem(this.broadcast.bind(this), { sbQuery });
 
-    // Init event system
-    this.events = new EventSystem(this.db, this.broadcast.bind(this));
+    // In-memory agent state cache (seeded from Supabase)
+    this.agentCache = [];
+
+    // In-memory pending model restarts
+    this.pendingRestarts = [];
 
     // Setup routes
     this._setupRoutes();
@@ -75,7 +100,9 @@ class Controller {
       console.log('[Skybox] WebSocket client connected');
 
       // Send current state on connect
-      this._sendInitialState(ws);
+      this._sendInitialState(ws).catch(err => {
+        console.error('[Skybox] Failed to send initial state:', err.message);
+      });
 
       ws.on('close', () => {
         this.clients.delete(ws);
@@ -89,17 +116,28 @@ class Controller {
     });
   }
 
-  _sendInitialState(ws) {
+  async _sendInitialState(ws) {
     const pipelineData = this._getPipelineData();
+
+    // Fetch agents and state from Supabase
+    let agents = [];
+    let control = { runtime_mode: 'running', stage: 'code_blue', zone: 1 };
+    try {
+      agents = await sbQuery('agents', 'GET', null, '?order=hierarchy_level.asc') || [];
+      const stateRows = await sbQuery('state', 'GET', null, '?id=eq.1') || [];
+      if (stateRows.length > 0) control = stateRows[0];
+    } catch (err) {
+      console.error('[Skybox] Supabase fetch for initial state failed:', err.message);
+    }
 
     const state = {
       type: 'initial_state',
       tasks: this.db.prepare('SELECT * FROM tasks ORDER BY updated_at DESC').all(),
-      agents: this.db.prepare('SELECT * FROM agents ORDER BY hierarchy_level ASC').all(),
-      control: this.db.prepare('SELECT * FROM control_state WHERE id = 1').get(),
-      session: this.db.prepare("SELECT * FROM sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1").get(),
-      recentEvents: this.db.prepare('SELECT * FROM events ORDER BY timestamp DESC LIMIT 50').all(),
-      systemLogs: this.db.prepare('SELECT * FROM system_logs ORDER BY timestamp DESC LIMIT 50').all(),
+      agents: agents,
+      control: control,
+      session: { status: 'active' },
+      recentEvents: this.events.getRecent(50),
+      systemLogs: [],
       summary: this._getSystemSummary(),
       pipeline: pipelineData,
     };
@@ -211,7 +249,7 @@ class Controller {
       this.events.emit({
         event_type: 'task_deleted',
         message: `Task deleted: ${task.title}`,
-        actor: 'user',
+        actor: 'Keagan',
         actor_type: 'user',
         source: 'skybox_tasks',
         severity: 'warning',
@@ -221,45 +259,48 @@ class Controller {
       res.json({ success: true });
     });
 
-    this.app.get('/api/agents', (req, res) => {
-      const agents = this.db.prepare('SELECT * FROM agents ORDER BY hierarchy_level ASC').all();
-      res.json(agents);
-    });
-
-    this.app.delete('/api/agents/:id', (req, res) => {
-      const { id } = req.params;
-      const agent = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
-      if (!agent) return res.status(404).json({ error: 'Agent not found' });
-      this.db.prepare('DELETE FROM agents WHERE id = ?').run(id);
-      this.events.emit({
-        event_type: 'agent_deleted',
-        message: `Agent ${agent.name} removed from the roster`,
-        actor: 'system',
-        actor_type: 'system',
-        source: 'skybox_agents',
-        severity: 'warning',
-        agent_id: id,
-      });
-      res.json({ success: true });
-    });
-
-    this.app.patch('/api/agents/:id', (req, res) => {
-      const { id } = req.params;
-      const updates = req.body;
-      const agent = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
-      if (!agent) return res.status(404).json({ error: 'Agent not found' });
-      const fields = ['name','role','team','status','current_activity','reports_to','department','model','platform','hierarchy_level','campaign_id','campaign_name'];
-      const setClauses = [];
-      const values = [];
-      for (const f of fields) {
-        if (updates[f] !== undefined) { setClauses.push(`${f} = ?`); values.push(updates[f]); }
+    this.app.get('/api/agents', async (req, res) => {
+      try {
+        const agents = await sbQuery('agents', 'GET', null, '?order=id.asc') || [];
+        res.json(agents);
+      } catch (err) {
+        console.error('[Skybox] GET agents failed:', err.message);
+        res.status(500).json({ error: err.message });
       }
-      if (setClauses.length === 0) return res.status(400).json({ error: 'No valid fields' });
-      setClauses.push("updated_at = datetime('now')");
-      values.push(id);
-      this.db.prepare(`UPDATE agents SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
-      const updated = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
-      res.json(updated);
+    });
+
+    this.app.delete('/api/agents/:id', async (req, res) => {
+      try {
+        await sbQuery('agents', 'DELETE', null, `?id=eq.${req.params.id}`);
+        this.events.emit({
+          event_type: 'agent_deleted',
+          message: `Agent removed from the roster`,
+          actor: 'system',
+          actor_type: 'system',
+          source: 'skybox_agents',
+          severity: 'warning',
+          agent_id: req.params.id,
+        });
+        res.json({ success: true });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    this.app.patch('/api/agents/:id', async (req, res) => {
+      try {
+        const updates = req.body;
+        const allowed = ['name', 'status', 'current_activity', 'last_heartbeat'];
+        const payload = {};
+        for (const f of allowed) {
+          if (updates[f] !== undefined) payload[f] = updates[f];
+        }
+        if (Object.keys(payload).length === 0) return res.status(400).json({ error: 'No valid fields' });
+        const result = await sbQuery('agents', 'PATCH', payload, `?id=eq.${req.params.id}`);
+        res.json(result?.[0] || { success: true });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
     });
 
     this.app.get('/api/system/summary', (req, res) => {
@@ -268,50 +309,55 @@ class Controller {
 
     this.app.get('/api/events/live-pulse', (req, res) => {
       const limit = parseInt(req.query.limit) || 30;
-      const events = this.db.prepare('SELECT * FROM events ORDER BY timestamp DESC LIMIT ?').all(limit);
-      res.json(events);
+      res.json(this.events.getRecent(limit));
     });
 
     this.app.get('/api/logs', (req, res) => {
+      // Logs are now in-memory events filtered by severity
       const limit = parseInt(req.query.limit) || 50;
-      const logs = this.db.prepare('SELECT * FROM system_logs ORDER BY timestamp DESC LIMIT ?').all(limit);
-      res.json(logs);
+      res.json(this.events.getRecent(limit));
     });
 
-    this.app.get('/api/control-state', (req, res) => {
-      const state = this.db.prepare('SELECT * FROM control_state WHERE id = 1').get();
-      res.json(state);
+    this.app.get('/api/control-state', async (req, res) => {
+      try {
+        const rows = await sbQuery('state', 'GET', null, '?id=eq.1') || [];
+        res.json(rows[0] || { runtime_mode: 'running', stage: 'code_blue', zone: 1 });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
     });
 
     this.app.get('/api/session', (req, res) => {
-      const session = this.db.prepare("SELECT * FROM sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1").get();
-      res.json(session || { status: 'none' });
+      // Sessions removed — return placeholder
+      res.json({ status: 'active' });
     });
 
     // --- Command endpoints ---
 
-    this.app.post('/api/control/runtime', (req, res) => {
+    this.app.post('/api/control/runtime', async (req, res) => {
       const { mode } = req.body;
       if (!['running', 'paused'].includes(mode)) {
         return res.status(400).json({ error: 'Invalid mode. Use "running" or "paused"' });
       }
 
-      this._ensureSession();
-
       const eventType = mode === 'paused' ? 'runtime_paused' : 'runtime_resumed';
       this.events.emit({
         event_type: eventType,
         message: mode === 'paused' ? 'Runtime paused by command center' : 'Runtime resumed by command center',
-        actor: 'user',
+        actor: 'Keagan',
         actor_type: 'user',
         source: 'skybox_control',
       });
 
-      const control = this.db.prepare('SELECT * FROM control_state WHERE id = 1').get();
-      res.json(control);
+      try {
+        const rows = await sbQuery('state', 'PATCH', { runtime_mode: mode, updated_at: new Date().toISOString() }, '?id=eq.1');
+        res.json(rows?.[0] || { runtime_mode: mode });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
     });
 
-    this.app.post('/api/control/stage', (req, res) => {
+    this.app.post('/api/control/stage', async (req, res) => {
       const { stage } = req.body;
       if (!['code_red', 'code_blue'].includes(stage)) {
         return res.status(400).json({ error: 'Invalid stage. Use "code_red" or "code_blue"' });
@@ -320,17 +366,21 @@ class Controller {
       this.events.emit({
         event_type: 'stage_changed',
         message: `Stage changed to ${stage}`,
-        actor: 'user',
+        actor: 'Keagan',
         actor_type: 'user',
         source: 'skybox_control',
         payload: { stage },
       });
 
-      const control = this.db.prepare('SELECT * FROM control_state WHERE id = 1').get();
-      res.json(control);
+      try {
+        const rows = await sbQuery('state', 'PATCH', { stage, updated_at: new Date().toISOString() }, '?id=eq.1');
+        res.json(rows?.[0] || { stage });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
     });
 
-    this.app.post('/api/control/zone', (req, res) => {
+    this.app.post('/api/control/zone', async (req, res) => {
       const { zone } = req.body;
       if (typeof zone !== 'number' || zone < 1 || zone > 7) {
         return res.status(400).json({ error: 'Invalid zone. Must be 1-7' });
@@ -339,14 +389,18 @@ class Controller {
       this.events.emit({
         event_type: 'zone_changed',
         message: `Zone changed to ${zone}`,
-        actor: 'user',
+        actor: 'Keagan',
         actor_type: 'user',
         source: 'skybox_control',
         payload: { zone },
       });
 
-      const control = this.db.prepare('SELECT * FROM control_state WHERE id = 1').get();
-      res.json(control);
+      try {
+        const rows = await sbQuery('state', 'PATCH', { zone, updated_at: new Date().toISOString() }, '?id=eq.1');
+        res.json(rows?.[0] || { zone });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
     });
 
     this.app.post('/api/control/ping-max', async (req, res) => {
@@ -354,9 +408,7 @@ class Controller {
       const util = require('util');
       const execAsync = util.promisify(exec);
 
-      const pending = this.db.prepare(
-        'SELECT * FROM pending_restarts ORDER BY created_at ASC LIMIT 10'
-      ).all();
+      const pending = [...this.pendingRestarts];
 
       if (pending.length === 0) {
         return res.json({ success: true, message: 'No pending restarts', restarted: [] });
@@ -386,7 +438,7 @@ class Controller {
           results.push({ agent: item.agent_name, model: item.new_model, restarted: true });
 
           // Clear this pending restart
-          this.db.prepare('DELETE FROM pending_restarts WHERE id = ?').run(item.id);
+          this.pendingRestarts = this.pendingRestarts.filter(r => r !== item);
         } catch (err) {
           results.push({ agent: item.agent_name, model: item.new_model, error: err.message });
         }
@@ -395,7 +447,7 @@ class Controller {
       this.events.emit({
         event_type: 'system_ping',
         message: `Ping Max - ${results.filter(r => r.restarted).length}/${results.length} restart(s) processed`,
-        actor: 'user',
+        actor: 'Keagan',
         actor_type: 'user',
         source: 'skybox_control',
         severity: results.some(r => r.error) ? 'warning' : 'ok',
@@ -484,7 +536,7 @@ class Controller {
       this.events.emit({
         event_type: 'lead_stage_changed',
         message: `${lead.business_name} moved to ${stage}`,
-        actor: 'user',
+        actor: 'Keagan',
         actor_type: 'user',
         source: 'skybox_control',
         severity: 'ok',
@@ -556,7 +608,7 @@ class Controller {
         this.events.emit({
           event_type: 'lead_updated',
           message: `${lead.business_name} updated: ${changes.join(', ')}`,
-          actor: 'user',
+          actor: 'Keagan',
           actor_type: 'user',
           source: 'skybox_leads',
           severity: 'info',
@@ -577,7 +629,7 @@ class Controller {
       this.events.emit({
         event_type: 'lead_deleted',
         message: `Lead deleted: ${lead.business_name}`,
-        actor: 'user',
+        actor: 'Keagan',
         actor_type: 'user',
         source: 'skybox_leads',
         severity: 'warning',
@@ -636,58 +688,62 @@ class Controller {
     });
 
     // --- Update agent model ---
-    this.app.post('/api/agents/:id/model', (req, res) => {
+    this.app.post('/api/agents/:id/model', async (req, res) => {
       const { model } = req.body;
       if (!model) return res.status(400).json({ error: 'model is required' });
 
       // Prepend 'openrouter/' if not already present
       const normalizedModel = model.startsWith('openrouter/') ? model : `openrouter/${model}`;
 
-      const agent = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
-      if (!agent) return res.status(404).json({ error: 'Agent not found' });
+      try {
+        // Look up agent from Supabase
+        const agents = await sbQuery('agents', 'GET', null, `?id=eq.${req.params.id}`) || [];
+        if (agents.length === 0) return res.status(404).json({ error: 'Agent not found' });
+        const agent = agents[0];
 
-      this.db.prepare("UPDATE agents SET model = ?, updated_at = datetime('now') WHERE id = ?").run(normalizedModel, req.params.id);
-
-      // Only update global OpenClaw model for Max (main agent)
-      if (req.params.id === 'max') {
-        try {
-          const { execSync } = require('child_process');
-          execSync(`openclaw models set "${normalizedModel}"`, { encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
-        } catch (err) {
-          console.error('[Skybox] openclaw models set failed:', err.message);
+        // Only update global OpenClaw model for Max (main agent)
+        if (req.params.id === 'max') {
+          try {
+            const { execSync } = require('child_process');
+            execSync(`openclaw models set "${normalizedModel}"`, { encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
+          } catch (err) {
+            console.error('[Skybox] openclaw models set failed:', err.message);
+          }
         }
+
+        // Queue a pending restart for model change tracking
+        this.pendingRestarts.push({
+          agent_id: agent.id,
+          agent_name: agent.name,
+          new_model: normalizedModel,
+          created_at: new Date().toISOString(),
+        });
+
+        this.events.emit({
+          event_type: 'agent_model_changed',
+          message: `${agent.name} model → ${normalizedModel}`,
+          actor: 'Keagan',
+          actor_type: 'user',
+          source: 'skybox_control',
+          agent_id: agent.id,
+          severity: 'ok',
+          payload: { agent: agent.name, model: normalizedModel },
+        });
+
+        res.json({ success: true, agent: { ...agent, model: normalizedModel } });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
       }
-
-      // Queue a pending restart for model change tracking
-      this.db.prepare(
-        'INSERT INTO pending_restarts (agent_id, agent_name, new_model) VALUES (?, ?, ?)'
-      ).run(agent.id, agent.name, normalizedModel);
-
-      this.events.emit({
-        event_type: 'agent_model_changed',
-        message: `${agent.name} model → ${normalizedModel}`,
-        actor: 'user',
-        actor_type: 'user',
-        source: 'skybox_control',
-        agent_id: agent.id,
-        severity: 'ok',
-        payload: { agent: agent.name, model: normalizedModel },
-      });
-
-      const updated = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
-      res.json({ success: true, agent: updated });
     });
 
     // --- Pending restarts (for OpenClaw Max to poll) ---
     this.app.get('/api/pending-restarts', (req, res) => {
-      const pending = this.db.prepare(
-        'SELECT * FROM pending_restarts ORDER BY created_at ASC LIMIT 10'
-      ).all();
-      res.json({ pending_restarts: pending });
+      res.json({ pending_restarts: this.pendingRestarts });
     });
 
     this.app.delete('/api/pending-restarts/:id', (req, res) => {
-      this.db.prepare('DELETE FROM pending_restarts WHERE id = ?').run(req.params.id);
+      const idx = parseInt(req.params.id);
+      this.pendingRestarts = this.pendingRestarts.filter((_, i) => i !== idx);
       res.json({ success: true });
     });
 
@@ -1201,7 +1257,7 @@ class Controller {
       this.events.emit({
         event_type: 'cron_deleted',
         message: `Cron job "${deletedJob?.name || jobId}" deleted`,
-        actor: 'user',
+        actor: 'Keagan',
         actor_type: 'user',
         source: 'skybox_cron',
         severity: 'warning',
@@ -1212,57 +1268,48 @@ class Controller {
     });
 
     // Reactions - get counts per agent
-    this.app.get('/api/reactions', (req, res) => {
-      const counts = this.db.prepare(`
-        SELECT agent_name,
-          SUM(CASE WHEN reaction_type = 'compliment' THEN 1 ELSE 0 END) as compliments,
-          SUM(CASE WHEN reaction_type = 'complaint' THEN 1 ELSE 0 END) as complaints
-        FROM reactions GROUP BY agent_name
-      `).all();
-      res.json(counts);
+    this.app.get('/api/reactions', async (req, res) => {
+      try {
+        const reactions = await sbQuery('reactions', 'GET', null, '?select=agent_name,reaction_type') || [];
+        // Aggregate counts per agent
+        const counts = {};
+        for (const r of reactions) {
+          if (!counts[r.agent_name]) counts[r.agent_name] = { agent_name: r.agent_name, compliments: 0, complaints: 0 };
+          if (r.reaction_type === 'compliment') counts[r.agent_name].compliments++;
+          if (r.reaction_type === 'complaint') counts[r.agent_name].complaints++;
+        }
+        res.json(Object.values(counts));
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
     });
 
-    // Reactions - add a new reaction
-    this.app.post('/api/reactions', (req, res) => {
+    this.app.post('/api/reactions', async (req, res) => {
       const { agent_name, reaction_type, context } = req.body;
       if (!agent_name || !reaction_type) return res.status(400).json({ error: 'agent_name and reaction_type required' });
-      this.db.prepare('INSERT INTO reactions (agent_name, reaction_type, context) VALUES (?, ?, ?)').run(agent_name, reaction_type, context || '');
 
-      this.events.emit({
-        event_type: reaction_type === 'compliment' ? 'reaction_compliment' : 'reaction_complaint',
-        message: `${reaction_type === 'compliment' ? '👏' : '⚠️'} ${agent_name}: ${context || reaction_type}`,
-        actor: 'user',
-        actor_type: 'user',
-        source: 'skybox_reactions',
-        severity: reaction_type === 'compliment' ? 'ok' : 'warning',
-        payload: { agent_name, reaction_type, context },
-      });
+      try {
+        await sbQuery('reactions', 'POST', { agent_name, reaction_type, context: context || '' });
 
-      const counts = this.db.prepare(`
-        SELECT agent_name,
-          SUM(CASE WHEN reaction_type = 'compliment' THEN 1 ELSE 0 END) as compliments,
-          SUM(CASE WHEN reaction_type = 'complaint' THEN 1 ELSE 0 END) as complaints
-        FROM reactions WHERE agent_name = ? GROUP BY agent_name
-      `).get(agent_name);
-      res.json({ success: true, ...counts });
+        this.events.emit({
+          event_type: reaction_type === 'compliment' ? 'reaction_compliment' : 'reaction_complaint',
+          message: `${reaction_type === 'compliment' ? '👏' : '⚠️'} ${agent_name}: ${context || reaction_type}`,
+          actor: 'Keagan',
+          actor_type: 'user',
+          source: 'skybox_reactions',
+          severity: reaction_type === 'compliment' ? 'ok' : 'warning',
+          payload: { agent_name, reaction_type, context },
+        });
+
+        // Get updated counts for this agent
+        const reactions = await sbQuery('reactions', 'GET', null, `?agent_name=eq.${agent_name}&select=reaction_type`) || [];
+        const compliments = reactions.filter(r => r.reaction_type === 'compliment').length;
+        const complaints = reactions.filter(r => r.reaction_type === 'complaint').length;
+        res.json({ success: true, agent_name, compliments, complaints });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
     });
-  }
-
-  _ensureSession() {
-    let session = this.db.prepare("SELECT id FROM sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1").get();
-    if (!session) {
-      const sessionId = 'session_' + Date.now();
-      this.db.prepare('INSERT INTO sessions (id, trigger_source, status) VALUES (?, ?, ?)').run(sessionId, 'auto', 'active');
-      this.events.emit({
-        event_type: 'session_started',
-        message: `Session ${sessionId} started`,
-        source: 'controller',
-        session_id: sessionId,
-      });
-      this.broadcast({ type: 'session_change', session: { id: sessionId, status: 'active', trigger_source: 'auto' } });
-      return sessionId;
-    }
-    return session.id;
   }
 
   _getPipelineData() {
@@ -1294,25 +1341,18 @@ class Controller {
   }
 
   _getSystemSummary() {
-    const session = this.db.prepare("SELECT id, started_at FROM sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1").get();
-    const sessionId = session ? session.id : null;
-
+    // Compute from in-memory events
+    const allEvents = this.events.getRecent(200);
     let okCount = 0, warnCount = 0, errCount = 0;
-    if (sessionId) {
-      const counts = this.db.prepare(`
-        SELECT
-          SUM(CASE WHEN severity = 'ok' THEN 1 ELSE 0 END) as ok,
-          SUM(CASE WHEN severity = 'warning' THEN 1 ELSE 0 END) as warnings,
-          SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as errors
-        FROM events WHERE session_id = ?
-      `).get(sessionId);
-      okCount = counts.ok || 0;
-      warnCount = counts.warnings || 0;
-      errCount = counts.errors || 0;
+    for (const evt of allEvents) {
+      if (evt.severity === 'ok') okCount++;
+      else if (evt.severity === 'warning') warnCount++;
+      else if (evt.severity === 'critical') errCount++;
     }
 
-    const activeAgents = this.db.prepare("SELECT COUNT(*) as count FROM agents WHERE status = 'active'").get().count;
-    const totalAgents = this.db.prepare("SELECT COUNT(*) as count FROM agents").get().count;
+    // Agent counts from cache
+    const totalAgents = this.agentCache.length || 2;
+    const activeAgents = this.agentCache.filter(a => a.status === 'active').length || 0;
 
     // Derive status from error ratio
     const totalEvents = okCount + warnCount + errCount;
@@ -1324,18 +1364,15 @@ class Controller {
       else if (warnCount > 0 && (warnCount / totalEvents) > 0.5) status = 'Degraded';
     }
 
-    // Compute uptime from session start
+    // Uptime based on process
+    const uptimeSec = process.uptime();
+    const mins = Math.floor(uptimeSec / 60);
+    const hrs = Math.floor(mins / 60);
+    const days = Math.floor(hrs / 24);
     let uptime = '0m';
-    if (session && session.started_at) {
-      const startMs = new Date(session.started_at + 'Z').getTime();
-      const elapsed = Date.now() - startMs;
-      const mins = Math.floor(elapsed / 60000);
-      const hrs = Math.floor(mins / 60);
-      const days = Math.floor(hrs / 24);
-      if (days > 0) uptime = `${days}d ${hrs % 24}h`;
-      else if (hrs > 0) uptime = `${hrs}h ${mins % 60}m`;
-      else uptime = `${mins}m`;
-    }
+    if (days > 0) uptime = `${days}d ${hrs % 24}h`;
+    else if (hrs > 0) uptime = `${hrs}h ${mins % 60}m`;
+    else uptime = `${mins}m`;
 
     return {
       ok: okCount,
@@ -1360,34 +1397,12 @@ class Controller {
   }
 
   stop() {
-    // End active sessions
-    this.db.prepare("UPDATE sessions SET status = 'ended', ended_at = datetime('now') WHERE status = 'active'").run();
-
     for (const client of this.clients) {
       client.close();
     }
     this.wss.close();
     this.server.close();
     this.db.close();
-  }
-
-  /**
-   * Start a new session
-   */
-  startSession(id, triggerSource = 'manual') {
-    // End any existing active sessions
-    this.db.prepare("UPDATE sessions SET status = 'ended', ended_at = datetime('now') WHERE status = 'active'").run();
-
-    this.db.prepare('INSERT INTO sessions (id, trigger_source, status) VALUES (?, ?, ?)').run(id, triggerSource, 'active');
-
-    this.events.emit({
-      event_type: 'session_started',
-      message: `Session ${id} started`,
-      source: 'controller',
-      session_id: id,
-    });
-
-    this.broadcast({ type: 'session_change', session: { id, status: 'active', trigger_source: triggerSource } });
   }
 }
 

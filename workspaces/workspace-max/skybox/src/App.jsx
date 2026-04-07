@@ -1440,6 +1440,45 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
 
 // --- Chronos Components ---
 
+// ─── Relative Time ────────────────────────────────────────
+const timeAgo = (timestamp) => {
+  const ts = String(timestamp);
+  const date = ts.endsWith('Z') || ts.includes('+') ? new Date(ts) : new Date(ts + 'Z');
+  const now = new Date();
+
+  // Work in EST
+  const estOpts = { timeZone: 'America/New_York' };
+  const dateEST = new Date(date.toLocaleString('en-US', estOpts));
+  const nowEST = new Date(now.toLocaleString('en-US', estOpts));
+
+  const diffMs = nowEST - dateEST;
+  if (isNaN(diffMs)) return '-';
+  const diff = Math.max(0, diffMs);
+  const secs = Math.floor(diff / 1000);
+  const mins = Math.floor(secs / 60);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+
+  // Same day
+  if (secs < 10) return 'just now';
+  if (secs < 60) return `${secs}s ago`;
+  if (mins < 60) return `${mins}m ago`;
+  if (days === 0) return `${hrs}h ago`;
+
+  // Yesterday
+  if (days === 1) {
+    const hour = parseInt(date.toLocaleString('en-US', { ...estOpts, hour: 'numeric', hour12: false }));
+    if (hour >= 18 || hour < 5) return 'last night';
+    if (hour >= 12) return 'yesterday afternoon';
+    if (hour >= 5) return 'yesterday morning';
+    return 'yesterday';
+  }
+
+  if (days < 7) return `${days} days ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...estOpts });
+};
+
 const AVATAR_BASE = 'https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges';
 
 const getCountdown = (targetTimeStr) => {
@@ -2659,8 +2698,9 @@ const App = () => {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
           {livePulse.map((evt) => {
-            const actorLower = (evt.actor || 'system').toLowerCase();
-            const avatarUrl = ['max', 'yanna', 'allie', 'brian'].includes(actorLower)
+            const actorDisplay = (!evt.actor || evt.actor.toLowerCase() === 'user') ? 'Keagan' : evt.actor.charAt(0).toUpperCase() + evt.actor.slice(1);
+            const actorLower = (evt.actor || 'system').toLowerCase() === 'user' ? 'keagan' : (evt.actor || 'system').toLowerCase();
+            const avatarUrl = ['max', 'yanna', 'allie', 'brian', 'keagan'].includes(actorLower)
               ? `${AVATAR_BASE}/${actorLower}.jpg`
               : `${AVATAR_BASE}/keagan.jpg`;
 
@@ -2680,9 +2720,9 @@ const App = () => {
               <div className="pb-4 min-w-0 opacity-0 pulse-reveal">
                 <div className="flex items-center gap-2 mb-1">
                   <StatusDot status={evt.severity || 'info'} pulse={evt.severity === 'critical' && !isPaused} />
-                  <span className="text-[12px] font-bold text-zinc-200 group-hover:text-white transition-colors">{(evt.actor || 'System').charAt(0).toUpperCase() + (evt.actor || 'System').slice(1)}</span>
+                  <span className="text-[12px] font-bold text-zinc-200 group-hover:text-white transition-colors">{actorDisplay}</span>
                   <span className="text-[9px] text-zinc-700 font-bold">
-                    {evt.timestamp ? new Date(evt.timestamp + 'Z').toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' }) : '-'}
+                    {evt.timestamp ? timeAgo(evt.timestamp) : '-'}
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500 font-medium leading-relaxed group-hover:text-zinc-400 transition-colors">{evt.message}</p>
@@ -2690,50 +2730,6 @@ const App = () => {
             </div>
             );
           })}
-
-          <div className="pt-6">
-            <div className="p-5 bg-white/[0.02] border border-white/5 rounded-2xl group hover:bg-white/[0.04] transition-all">
-              <div className="flex items-center justify-between mb-6">
-                <span className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest">Global Health</span>
-                <Activity size={14} className={`${isPaused ? 'text-zinc-700' : 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]'} transition-colors`} />
-              </div>
-
-              <div className="flex items-end gap-1.5 h-12">
-                {(() => {
-                  const total = (summary.ok || 0) + (summary.warnings || 0) + (summary.errors || 0) || 1;
-                  const bars = livePulse.slice(0, 16).map((evt) => {
-                    if (evt.severity === 'critical') return 95;
-                    if (evt.severity === 'warning') return 60;
-                    return 35;
-                  });
-                  // Pad to 16 if fewer events
-                  while (bars.length < 16) bars.push(10);
-                  return bars.map((h, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ height: 0 }}
-                      animate={{ height: isPaused ? '4px' : `${h}%` }}
-                      transition={{ delay: i * 0.05, duration: 0.6 }}
-                      className={`flex-1 rounded-full transition-colors duration-500 ${isPaused ? 'bg-zinc-800' : h > 80 ? 'bg-gradient-to-t from-rose-500/40 to-amber-400' : h > 50 ? 'bg-gradient-to-t from-amber-500/30 to-cyan-400' : 'bg-gradient-to-t from-fuchsia-500/30 to-cyan-400'}`}
-                    />
-                  ));
-                })()}
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest">Uptime</span>
-                  <span className="text-[13px] font-bold text-zinc-300 font-mono">{summary.uptime || '99.99%'}</span>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest">Status</span>
-                  <span className={`text-[13px] font-bold font-mono transition-colors ${isPaused ? 'text-zinc-500' : 'text-cyan-400'}`}>
-                    {isPaused ? 'Standby' : (summary.status || 'Operational')}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </aside>
       </div>

@@ -115,10 +115,25 @@ $resp.Close()
 ## Skybox Rules
 - **DO NOT restart Skybox (kill Electron/server process) after making changes unless there is a major error.** Keagan runs `npm run dev` himself. Just build and rebuild the native module — he restarts the app on his own.
 - Skybox is a React + Electron app at `C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox`
-- Backend runs on `http://127.0.0.1:7878` (Express + SQLite via better-sqlite3)
+- Backend runs on `http://127.0.0.1:7878` (Express + better-sqlite3 + Supabase)
 - After code changes: run `npx vite build` then `npx electron-rebuild -f -w better-sqlite3` — do NOT kill processes
 - Employee avatars hosted on Supabase: `https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges/{name}.jpg`
 - Cron jobs sync: Skybox has its own `cron_jobs` SQLite table + `/api/cron` endpoints. OpenClaw cron created via `openclaw cron add` CLI.
 - Background color: `#020202` for all page/section backgrounds
+- Supabase URL: `https://jspksetkrprvomilgtyj.supabase.co` — credentials in `.openclaw/.env` as `SUPABASE_URL` and `SUPABASE_ANON_KEY`
+- **Skybox architecture (as of v15):** Supabase is the primary data store. SQLite only for tasks, task_updates, leads, cron_jobs (legacy, to be migrated). Agents, state, reactions in Supabase. Events in-memory.
+- **Supabase tables:** tasks, task_columns, research_campaigns, leads (existing), agents, state, reactions (new). Cron deferred.
+- RLS must be disabled on all Supabase tables for anon key access.
+- Backend reads `.env` from `~/.openclaw/.env` — Supabase creds loaded there. Always read `process.env` at call time, not module load time.
+
+## Lessons Learned (Updated)
+- Never use robotic language for operational commands. Keep it natural and human.
+- Never include pronouns in documentation — Keagan's rule.
+- Module-level env var reads fail when .env loads in a constructor. Always read process.env at call time.
+- Optimistic UI updates > waiting for API responses for control buttons.
+- Keagan doesn't like over-designed UI. Keep things clean and functional. The "spiced up" Commander was reverted.
+- Never add fields to Commander that agents should control (assigned_to, completion_date, status).
+- Supabase Realtime needs to be enabled per-table. Without it, subscriptions connect but get no events. Use polling fallback.
+- When consolidating data stores, ask "does this actually need persistence?" Most transient state (events, pending restarts) can be in-memory.
 
 
