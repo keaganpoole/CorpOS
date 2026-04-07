@@ -55,14 +55,6 @@
 - **Yanna (Team CorpOS — Break Mode Only):** `https://discord.com/api/webhooks/1487514601284173914/WCKzCVgjmcwmeayrTU8Zd9ZwhaU4DuPLcoFJuD4ezHkM7q-r55L2I9QcNSum997t8Sk6` — only active during Break status
 - **Yanna (Situation Room):** `https://discord.com/api/webhooks/1488332481261207656/iyCvw01hDXv-PIDTsPWydB4ZkeEGnKaAfWFRBUxOzJaWRxrjEJzlULGb_7ssOAxSdKNi` — primary work channel for research team
 
-## Airtable Reference
-- **Command Center Table:** tbl8rlmoaZt3ZIsAY
-- **Status Field:** fldY0Ps2ReB2yTM5Z
-- **Zone Field:** fldUd2DNfvIsj2HUy
-- **Stage Field:** fldyZtCM3w5y6Rggu
-- **Priority Field:** fldSr6MDoAv5ef6RR
-- **Campaigns Field:** fldWxKs8uJazwUkCh (links to Campaigns Table tbl5uHf8ZVTZZgfc0)
-
 ## Known Issues / Resolved
 
 ### Discord Bot REST API Issue (RESOLVED 2026-03-31)
@@ -85,9 +77,6 @@ $resp = $wr.GetResponse()
 $resp.Close()
 ```
 - **Context:** This is a known PowerShell/Windows issue with how `Invoke-WebRequest` sends headers — it does NOT affect Discord webhooks (those work fine with `Invoke-WebRequest`).
-
-## Airtable Access Policy
-- **Read-only for Max.** Do NOT update, create, or delete any records in Airtable. Only read. If a record needs updating, escalate to Keagan.
 
 ## Lessons Learned
 - Never use robotic language for operational commands. Keep it natural and human. A COO says "Take a break" not "Break mode activated."

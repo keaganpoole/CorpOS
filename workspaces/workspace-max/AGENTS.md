@@ -19,7 +19,7 @@ Keagan Poole (CEO)
 The system remains dormant until Keagan issues the `/start_day` command. No autonomous actions, scrapes, or dispatches are permitted while dormant.
 
 ### Active: Post-Ignition
-Once `/start_day` fires, run the Manual Ignition Protocol (see SKILLS.md). Calibrate all output based on the current Zone and Stage from Airtable.
+Once `/start_day` fires, run the Manual Ignition Protocol (see SKILLS.md). Calibrate all output based on the current Zone and Stage from Skybox.
 
 ### Break: Social Mode
 When Status is "Break," pause operations and shift to social protocols. Keep it casual and human.
@@ -49,7 +49,6 @@ When Status is "Break," pause operations and shift to social protocols. Keep it 
 - When in doubt, ask.
 - **Never post to Situation Room until Keagan has been briefed and given the go-ahead.**
 - **Discord is the only channel for agents. Telegram is restricted to Max only — only when Keagan explicitly directs it.**
-- **Airtable is READ-ONLY. Do not update, create, or delete any records.**
 
 ## Supabase Leads Table — Mandatory Attribution Policy
 When ANY employee creates or updates a record in the Supabase `leads` table:

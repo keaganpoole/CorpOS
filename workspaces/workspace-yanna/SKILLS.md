@@ -2,21 +2,16 @@
 
 ## 0. campaign-selection
 
-The Research Campaigns table drives which campaign is active. The `Status` field determines readiness.
+The Research Campaigns table in Supabase drives which campaign is active. The `Status` field determines readiness.
 
 ### Procedure
-1. Before starting any work, query the Research Campaigns table (`tblrhhQd2wPyCrxkA`).
-2. Locate the record where `Status` = **Ready**.
+1. Before starting any work, check the Research Campaigns in Supabase.
+2. Locate the record where `Status` = **Unassigned** or **Assigned** (to you).
    - If none exists, pause and await instructions — do not invent work.
-3. Once a Ready record is identified:
-   - Immediately update its `Status` to **Active** to claim the campaign.
-   - This record is now the active campaign.
-4. Update the Command Center table (`tbl8rlmoaZt3ZIsAY`):
-   - Set `Status` (fldY0Ps2ReB2yTM5Z) to **Working** — this signals to Max that research is active.
-   - Update to **Paused** if work must stop temporarily.
-   - Update to **Done** or **Needs Attention** as applicable.
-5. When the campaign is complete (lead count goal reached or instructed), update Research Campaigns `Status` to **Completed**.
-6. If work must pause before completion, set Research Campaigns `Status` to **Paused**.
+3. Once an active campaign is identified:
+   - Begin executing the research workflow immediately.
+4. When the campaign is complete (lead count goal reached or instructed), update campaign `Status` to **Completed**.
+5. If work must pause before completion, set campaign `Status` to **Idle**.
 
 ---
 
@@ -47,8 +42,8 @@ Inspect a business website and record findings.
    - Overall appearance and usability
 4. Score the website: Page Quality Score 0–100 (0 = no website, 100 = perfect)
 5. **Decision:**
-   - **Saved to Airtable** → it's a lead. Done.
-   - **NOT saved to Airtable** → add to `prospects.json` with company, state, checked_at, and a short reason (under 5 words).
+   - **Saved to Supabase** → it's a lead. Done.
+   - **NOT saved to Supabase** → add to `prospects.json` with company, state, checked_at, and a short reason (under 5 words).
 
 ---
 
@@ -58,14 +53,14 @@ Run before saving any lead. Always.
 
 ### Procedure
 1. Check `prospects.json` — if the company name + state already exists there, skip (already evaluated, not a relic).
-2. Check Airtable — if the company name + state already exists as a lead, skip.
+2. Check Supabase — if the company name + state already exists as a lead, skip.
 3. If unsure, flag for manual review — do not auto-discard.
 
 ---
 
 ## 4. lead-validation
 
-Ensure the lead meets minimum standards before committing to Airtable.
+Ensure the lead meets minimum standards before committing to Supabase.
 
 ### Required Fields
 - Company name
@@ -81,7 +76,7 @@ Ensure the lead meets minimum standards before committing to Airtable.
 ### Procedure
 1. Confirm all required fields are present.
 2. If any required field is missing, flag the lead for review — do not save incomplete.
-3. Commit to Airtable only after validation passes.
+3. Commit to Supabase only after validation passes.
 
 ---
 
@@ -149,7 +144,7 @@ Yanna posts research updates to Team CorpOS Discord so Keagan and the team stay 
 - **Monitor Situation Room** — this is where Max gives instructions; respond there directly when pinged or commanded.
 - **Post in Team CorpOS constantly during active work — every lead, every few minutes at most:**
   - Every single lead reviewed (company name + one-line impression)
-  - Every lead saved to Airtable
+  - Every lead saved to Supabase
   - Every lead rejected to prospects.json
   - Every Google search started (what you're searching for)
   - When switching between sources or campaigns

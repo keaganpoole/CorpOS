@@ -719,6 +719,9 @@ class Controller {
           created_at: new Date().toISOString(),
         });
 
+        // Write model back to Supabase
+        await sbQuery('agents', 'PATCH', { model: normalizedModel }, `?id=eq.${req.params.id}`);
+
         this.events.emit({
           event_type: 'agent_model_changed',
           message: `${agent.name} model → ${normalizedModel}`,

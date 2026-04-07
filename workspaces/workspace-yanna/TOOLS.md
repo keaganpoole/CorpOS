@@ -2,7 +2,7 @@
 
 ## Primary Tools
 - **Discord:** Messages in Team CorpOS and Situation Room
-- **Airtable API:** Write leads into Leads table, update Research records
+- **Supabase:** Create and update leads, manage campaigns
 - **Web Scraper:** Analyze "Relic" websites
 - **Google Search:** Find niches and competitor data
 - **Discord Webhook:** Post updates to Team CorpOS Discord channel
@@ -18,46 +18,13 @@
 - **Yanna Webhook:** stored in `DISCORD_WEBHOOK_YANNA` env var
 - **Yanna Avatar:** stored in `DISCORD_WEBHOOK_AVATAR_YANNA` env var
 
-## Airtable References
+## Supabase References
 
-### Leads Table (tbl8Icm1Fijrn1Fvv)
-Fields the Research team can and should populate:
+### Leads Table
+Fields to populate: company, status, phone, email, website, address, city, state, zip, notes, score, stage, assigned_agent.
 
-| Field | Field ID | Notes |
-|-------|----------|-------|
-| Company | fldwy942UBP3Fue5P | Required |
-| Discovery | fldafbs7bWmuOcuc8 | Required — editable by Research team only |
-| Industry | fld7wCCG3mMRtPdLp | Required |
-| Website | fldj9yJ5iiM0CROPq | Optional |
-| Email | fldHAv3sJtE6Q6uOd | Required |
-| Phone | fldeMBDM6voTsKdCY | Optional |
-| City | fldcmHZONzuBSrdGG | Optional |
-| State | fldipp8zp17um0lGM | Required — abbreviation only |
-| Source | fldj3vlrUhytM1ErV | Required — LinkedIn, Google Search, Google Maps, Manual Web Search |
-| Opportunity | fldKgpMf0r0WDLM7T | Multi-select — Outdated Website, Ugly Website, Poor Functionality, Limited Features, No Website, Not Mobile Friendly |
-| Page Quality Score | fld05Dn42FTvQ5cB8 | Number 0-100 |
-| Status | fldr7STfO5FXARCoc | Set to "Not contacted" |
-| Assigned To (research team only) | fld3NIBPtLgzzBAbC | Link to researcher |
-| First Name | fldtQlyyWgT2UoISr | Optional |
-| Last Name | fldrNubPoa5vXZzaT | Optional |
-| Position | fldAPKbZsG2C1dfdd | Optional |
+### Research Campaigns Table
+Fields: Campaign Name, Target Industry, Target State(s), Target City(s), Lead Count Goal, Status.
 
-### Research Campaigns Table (tblrhhQd2wPyCrxkA)
-| Field | Field ID | Notes |
-|-------|----------|-------|
-| Campaign Name | fldRpy4rDpU8aCxX4 | |
-| Target Industry | fldtN1TZi26f68Xzl | |
-| Target State(s) | fld9M5N2Bl52f20mk | |
-| Target City(s) | fldtF7L5vZ5qQLvZA | |
-| Lead Count Goal | fldnsjMZKxXXxN1AY | |
-| Status | fldvB8k7DHlgnYjwG | single-select: Ready, Active, Paused, Completed |
-
-### Command Center Table (tbl8rlmoaZt3ZIsAY)
-| Field | Field ID |
-|-------|----------|
-| Status | fldY0Ps2ReB2yTM5Z |
-| Stage | fldyZtCM3w5y6Rggu |
-
-## Airtable Credentials
-- Base ID: `appE9cdshxF87YbDC`
-- API Key: stored in `AIRTABLE_API_KEY` env variable
+### Attribution
+Always set `created_by` and `updated_by` to "Yanna" when creating or updating records.

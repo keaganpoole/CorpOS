@@ -1,7 +1,7 @@
 {
   "meta": {
     "lastTouchedVersion": "2026.3.23",
-    "lastTouchedAt": "2026-04-05T19:25:30.456Z"
+    "lastTouchedAt": "2026-04-05T19:48:23.974Z"
   },
   "wizard": {
     "lastRunAt": "2026-03-24T00:23:12.668Z",
@@ -20,7 +20,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "Openrouter/xiaomi/mimo-v2-pro"
+        "primary": "openrouter/xiaomi/mimo-v2-pro"
       },
       "models": {
         "openrouter/auto": {
@@ -31,7 +31,9 @@
         "openai/gpt-4o": {},
         "openrouter/minimax/m2.7": {},
         "xiaomi/mimo-v2-pro": {},
-        "nvidia/nemotron-3-super-120b-a12b:free": {}
+        "nvidia/nemotron-3-super-120b-a12b:free": {},
+        "openrouter/openai/gpt-4o": {},
+        "openrouter/xiaomi/mimo-v2-pro": {}
       },
       "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
       "heartbeat": {
@@ -43,30 +45,6 @@
         "id": "main",
         "heartbeat": {
           "every": "30m"
-        }
-      },
-      {
-        "id": "lauren",
-        "name": "lauren",
-        "workspace": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-research",
-        "agentDir": "C:\\Users\\vboxuser\\.openclaw\\agents\\lauren",
-        "model": "openrouter/google/gemini-2.5-flash-lite",
-        "heartbeat": {
-          "every": "30m"
-        },
-        "tools": {
-          "allow": [
-            "exec",
-            "read",
-            "write",
-            "edit",
-            "apply_patch",
-            "web_search",
-            "web_fetch",
-            "memory_search",
-            "memory_get",
-            "discord"
-          ]
         }
       },
       {
@@ -91,15 +69,6 @@
     }
   },
   "bindings": [
-    {
-      "type": "route",
-      "agentId": "lauren",
-      "match": {
-        "channel": "discord",
-        "accountId": "lauren",
-        "guildId": "1487306966484258887"
-      }
-    },
     {
       "type": "route",
       "agentId": "switchy",
@@ -157,20 +126,6 @@
           ],
           "groupPolicy": "allowlist",
           "streaming": "partial"
-        },
-        "lauren": {
-          "name": "Lauren",
-          "enabled": true,
-          "dmPolicy": "allowlist",
-          "botToken": "8777471205:AAGhr78pLIQglAyK706-yBIabMCe_rVqThs",
-          "groups": {
-            "-1003796114330": {}
-          },
-          "allowFrom": [
-            "6416153554"
-          ],
-          "groupPolicy": "allowlist",
-          "streaming": "partial"
         }
       }
     },
@@ -197,30 +152,6 @@
               "requireMention": false,
               "channels": {
                 "1487477234401939546": {
-                  "allow": true,
-                  "requireMention": false
-                }
-              }
-            }
-          }
-        },
-        "lauren": {
-          "token": {
-            "source": "env",
-            "provider": "default",
-            "id": "DISCORD_BOT_TOKEN_LAUREN"
-          },
-          "groupPolicy": "allowlist",
-          "streaming": "off",
-          "guilds": {
-            "1487306966484258887": {
-              "requireMention": false,
-              "channels": {
-                "1487477234401939546": {
-                  "allow": true,
-                  "requireMention": false
-                },
-                "1488327248154202156": {
                   "allow": true,
                   "requireMention": false
                 }

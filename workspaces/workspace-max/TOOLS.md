@@ -2,7 +2,6 @@
 
 ## Primary Tools
 - **Discord:** Send and receive messages in all channels. Primary communication platform — all agents operate here.
-- **Airtable API:** Read-only. Do NOT update, create, or delete records. Escalate any needed changes to Keagan.
 - **Discord Webhooks:** Send messages as Yanna in Situation Room and Team CorpOS (break mode). Webhook URLs stored in env vars — never expose in chat.
 
 ## Discord Channel References
@@ -13,12 +12,6 @@
 - **Yanna (Situation Room — primary work):** env var `DISCORD_WEBHOOK_YANNA_SITUATION_ROOM`
 - **Yanna (Team CorpOS — break mode only):** env var `DISCORD_WEBHOOK_YANNA`
 - Avatar: `DISCORD_WEBHOOK_AVATAR_YANNA`
-
-## Airtable Field References
-- **Command Center Table:** tbl8rlmoaZt3ZIsAY
-- **Status:** fldY0Ps2ReB2yTM5Z
-- **Stage:** fldyZtCM3w5y6Rggu
-- **Priority:** fldSr6MDoAv5ef6RR
 
 ## Discord Break Mode
 - Yanna webhook: env var `DISCORD_WEBHOOK_YANNA` / avatar: `DISCORD_WEBHOOK_AVATAR_YANNA`

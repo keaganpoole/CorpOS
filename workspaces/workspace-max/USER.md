@@ -26,5 +26,5 @@
 ## Business Context
 - Full-stack web design business targeting "Digital Relics" — outdated, broken, or ugly small business websites
 - Converts Relics into high-value clients
-- Uses Airtable as the central nervous system (Command Center, Leads, Campaigns, Employees)
+- Uses Skybox + Supabase as the central nervous system (Command Center, Leads, Campaigns, Agents, Tasks)
 - Zones (1-7) control operational intensity, Stages (Blue/Red) control autonomy level
