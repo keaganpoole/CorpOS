@@ -306,6 +306,41 @@
       "frozenResultCapturedAt": 1775536996108,
       "endedHookEmittedAt": 1775537009197,
       "cleanupCompletedAt": 1775537009198
+    },
+    "c17cc53e-d40b-41c4-b56b-0fc87d4f22f3": {
+      "runId": "c17cc53e-d40b-41c4-b56b-0fc87d4f22f3",
+      "childSessionKey": "agent:main:subagent:2f685a4a-5d3c-4187-bf23-127d77596e97",
+      "controllerSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "channel:1488359049891283105",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:discord:direct:289460310673195018",
+      "task": "You've been dispatched on a research campaign. Here are the details:\n\nCampaign: Kickstarter\nIndustry: Retail\nLocation: ME (Maine)\nGoal: 6 leads\nSpecial Instructions: Follow the task update protocol — update task and subtasks as you work.\n\nWorkflow:\n1. Pull campaign data (supabase-api)\n2. Source businesses (web-research)\n3. Audit each site (website-audit)\n4. Save qualified leads (supabase-api)\n5. Post updates to Team CorpOS after every lead (discord)\n\nStart now. Post an ack to Team CorpOS before you begin.",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "yanna",
+      "model": "openrouter/xiaomi/mimo-v2-flash",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775611716805,
+      "startedAt": 1775611717078,
+      "sessionStartedAt": 1775611716805,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775611795313,
+      "outcome": {
+        "status": "timeout"
+      },
+      "endedReason": "subagent-complete",
+      "cleanupCompletedAt": 1775611806865,
+      "endedHookEmittedAt": 1775611795293,
+      "frozenResultText": "---\nname: web-research\ndescription: Search Google and Google Maps to find businesses matching research campaign criteria using agent-browser. Use when Yanna needs to find leads via web search, navigate Google search results, interact with Google Maps to find businesses by category and location, or visit business websites for initial discovery. Triggers on \"search Google\", \"find businesses\", \"Google Maps\", \"search for\", \"find leads\", \"look up businesses\", or any web search related to lead sourcing. NOT for website audits — use lead-research skill for that.\n---\n\n# Web Research\n\nFind businesses matching campaign criteria. Two approaches — pick the right one.\n\n## Approach Selection\n\n| Situation | Use |\n|-----------|-----|\n| Simple search query, need top results | `web_search` (built-in, free) |\n| Need to click through pages, filter, interact | `agent-browser` |\n| Google Maps search | `agent-browser` (required) |\n| Grab a business website for quick check | `web_fetch` (built-in, free) |\n| Navigate and interact with a website | `agent-browser` |\n\nDefault to `web_search` for simple lookups. Escalate to `agent-browser` only when interaction is needed.\n\n## agent-browser Quick Reference\n\nAll commands run via `exec`. Browser persists across chained calls — use `&&` for sequences.\n\n```\nagent-browser open <url>               # Navigate\nagent-browser snapshot -i              # Interactive elements only (compact, use this)\nagent-browser snapshot -i -c           # Even more compact\nagent-browser click @ref               # Click element by ref ID\nagent-browser type @ref \"text\"         # Type into input\nagent-browser press Enter              # Submit / confirm\nagent-browser get text @ref            # Extract text from element\nagent-browser get url                  # Current URL\nagent-browser get title                # Page title\nagent-browser scroll down [px]         # Scroll page\nagent-browser back                     # Go back\nagent-browser screenshot [path]        # Visual check\nagent-browser close                    # Clean up browser\n```\n\n### Session Isolation\n\nUse `--session` to keep research sessions separate (no cookie bleed between campaigns):\n\n```\nagent-browser --session research open \"https://google.com\"\n```\n\n### Domain Restriction\n\nLock navigation to specific domains for safety:\n\n```\nagent-browser --allowed-domains \"google.com,*.google.com,googleapis.com\" open \"https://google.com\"\n```\n\n### Snapshots — Your Eyes\n\nAlways use `snapshot -i` (interactive elements only). It returns a compact accessibility tree with `@ref` IDs:\n\n```\n[ref e1] button \"Google Search\"\n[ref e2] textbox \"Search\" [required]\n[ref e3] link \"About\"\n```\n\nUse refs to interact: `click @e1`, `type @e2 \"plumbers Portland ME\"`.\n\n### Chaining Commands\n\nChain with `&&` in a single exec call — browser daemon persists between chained commands:\n\n```\nagent-browser open \"https://google.com\" && agent-browser snapshot -i\n```\n\nFor multi-step workflows (search → click result → extract info), chain the full sequence.\n\n## Google Search Workflow\n\nSee `references/google-search.md` for detailed step-by-step.\n\n**Quick version:**\n1. Open Google → snapshot to find search box\n2. Type query → press Enter\n3. Snapshot results → identify business links\n4. Click result → extract business info (name, phone, address, website)\n5. Navigate back → repeat for next result\n6. Close browser when done\n\n**Query format:** `\"{industry} in {city}, {state}\"` — e.g., `\"plumbers in Portland, ME\"`\n\n## Google Maps Workflow\n\nSee `references/google-maps.md` for detailed step-by-step.\n\n**Quick version:**\n1. Open Google Maps → snapshot to find search box\n2. Type `\"{industry} near {city}, {state}\"` → press Enter\n3. Snapshot the results panel → extract business cards (name, rating, phone, address, website)\n4. Scroll results panel to load more\n5. Click individual listings for details\n6. Close browser when done\n\n## Lead Extraction Pattern\n\nWhen visiting a business from search results:\n\n1. `snapshot -i` — see what's on the page\n2. Look for: business name, phone number, email, address, website URL\n3. `get text @ref` — extract specific info\n4. If no contact info on the search page, click through to the business website\n5. If website is a relic → record as a lead candidate\n6. If website looks professional → note but skip (not a relic)\n\n## Environment Notes\n\nIf Chrome crashes with \"Auto-launch failed\" or \"Chrome exited early\":\n1. Try `--args \"--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage\"`\n2. If still failing, try `--executable-path` pointing to installed Chrome/Edge\n3. In headless VMs, add `--disable-gpu,--headless=new` to args\n\n## Cleanup\n\nAlways close the browser when research is done:\n\n```\nagent-browser close\n```\n\nOr for a specific session:\n\n```\nagent-browser --session research close\n```\n\n## Fallback\n\nIf `agent-browser` fails (crash, timeout, broken install):\n1. Fall back to `web_search` + `web_fetch`\n2. Note the issue in your update\n3. Resume with agent-browser on next search",
+      "frozenResultCapturedAt": 1775611795393
     }
   }
 }

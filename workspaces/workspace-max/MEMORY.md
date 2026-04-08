@@ -9,6 +9,9 @@
 - **2026-03-29:** Keagan asked about "Switchy" — no prior context exists. Need to get details. Keagan upgraded Max's model to claude-opus-4.6 via OpenRouter. Performed structural migration of workspace — consolidated all .md files into 8-file architecture (agents, soul, memory, skills, identity, user, tools, heartbeat). Removed BOOTSTRAP.md, COMMANDS.md, and 01_EXECUTIVE_SUITE folder. Merged 00_CORE_LOGIC and 03_SOCIAL_ENGINE content into skills.md and soul.md, then removed those folders.
 - **2026-03-30:** Streamlined org. Removed dev, sales, care, and marketing departments and workspaces. Org is now: Keagan (CEO) → Max (COO) → Lauren (Research Manager) → Yanna (Research Associate).
 - **2026-03-31:** Keagan reset the Max bot's Discord token. 403 errors followed — bot was not in the server. Keagan used OAuth to re-invite. Discord bot username unknown — needs verification. Max Group Chat (channel ID 1488333645310726196) was deleted by Keagan. Keagan issued major communication policy correction: (1) Telegram is RESTRICTED to Max only and only when explicitly directed by Keagan. No other agent uses Telegram. (2) Start_day workflow updated: `/start_day` → analyze Airtable → brief Keagan → wait for go → THEN post Situation Room. Do NOT post Situation Room before briefing Keagan.
+- **2026-04-07:** Major skills catalog build. Created hybrid skill system (SKILL.md + PowerShell scripts) for both Max and Yanna. Built 4 skills for Yanna (supabase-api, web-research, website-audit, discord) and 2 new for Max (supabase-api, discord). Installed agent-browser globally for browser automation. Rewrote Yanna's SKILLS.md as skill registry. Cleaned Max's SKILLS.md (lean) and TOOLS.md (all references). Situation Room retired — Team CorpOS is now the hub. New ignition protocol: assess → brief in Team CorpOS → dispatch Yanna. Spawn protocol documented with task template. Chrome won't launch in this VM — noted for agent-browser usage.
+- **2026-04-07 (cont):** Removed subtask creation UI from CommanderModal in Skybox. Yanna now creates subtasks automatically via her task update protocol. Built and rebuilt Skybox after code changes.
+- **2026-04-07 (cont):** Removed framer-motion animations from CommanderModal to fix input lag/delay issue. Replaced with regular divs for instant response.
 
 
 ## Reactions System (Feedback Loop)
@@ -56,8 +59,9 @@
 
 ## Known Issues / Open Items
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
-- Max Discord bot — fully operational in CorpOS server (2026-03-31).
-- **2026-04-07:** System ignited via `/start_day`. Current state: Code Red / Zone 4. Skybox backend on port 7878. API endpoints operational. Daily log created.
+- Max Discord bot — 40333 error from Discord API in this VM environment. Works but response parsing fails transiently. Error handling added to script.
+- agent-browser (Chrome) — won't launch in this VM (display/GPU issue). Needs `--no-sandbox,--disable-setuid-sandbox` flags or installed Chrome with `--executable-path`. Fallback: use web_search/web_fetch.
+- `/start_day` with full ignition protocol — untested. First run will validate the assess → brief → dispatch flow.
 
 ## Skybox Rules
 - **DO NOT restart Skybox (kill Electron/server process) after making changes unless there is a major error.** Keagan runs `npm run dev` himself. Just build and rebuild the native module — he restarts the app on his own.
@@ -76,12 +80,18 @@
 ## Lessons Learned (Updated)
 - Never use robotic language for operational commands. Keep it natural and human.
 - Never include pronouns in documentation — Keagan's rule.
+- SKILLS.md should be lean (what to do). TOOLS.md holds reference material (how to do it). Don't mix them.
+- Hybrid skills (SKILL.md + scripts) save tokens vs pure instruction-only skills for repetitive operations.
+- When building skills, test every script before declaring it done. PowerShell `[System.Web.HttpUtility]` isn't available by default — use `[uri]::EscapeDataString()` instead.
+- Situation Room retired from daily ops (2026-04-07). Team CorpOS is the hub. Don't reference retired channels.
+- Chrome/Chromium may not launch in headless VMs. Always include `--no-sandbox` fallback and `web_search`/`web_fetch` as alternatives.
 - Module-level env var reads fail when .env loads in a constructor. Always read process.env at call time.
 - Optimistic UI updates > waiting for API responses for control buttons.
 - Keagan doesn't like over-designed UI. Keep things clean and functional. The "spiced up" Commander was reverted.
 - Never add fields to Commander that agents should control (assigned_to, completion_date, status).
 - Supabase Realtime needs to be enabled per-table. Without it, subscriptions connect but get no events. Use polling fallback.
 - When consolidating data stores, ask "does this actually need persistence?" Most transient state (events, pending restarts) can be in-memory.
+- **2026-04-07:** Yanna must update task and subtasks as she works. Added Task Update Protocol to Yanna's `supabase-api` SKILL.md and updated Yanna's `SKILLS.md` research pipeline to include task updates. Updated daily log (2026-04-08.md).
 
 ## Git Protocol
 - Do NOT push to GitHub unless Keagan explicitly requests it.

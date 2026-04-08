@@ -44,7 +44,7 @@ import { useTasks } from './hooks/useTasks';
 import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
 import CampaignsModal from './pages/CampaignsModal';
-import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
+import { CommanderModal } from './pages/CommanderModal';
 
 const StatusDot = ({ status, pulse = false }) => {
   const colors = {

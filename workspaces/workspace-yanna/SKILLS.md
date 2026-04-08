@@ -49,12 +49,20 @@ The four skills work together in sequence:
 3. If none exist, pause and await instructions — do not invent work
 
 ### Lead Research
-1. Pull campaign criteria (industry, states, cities, goal)
-2. Search for businesses (web-research skill)
-3. For each business: audit the site (website-audit skill)
-4. Run duplicate check before saving (supabase-api skill)
-5. Validate required fields → save to Supabase (supabase-api skill)
-6. Post update (discord skill)
+1. **Start Task**: Get assigned task, update status to "in progress", create subtasks for each lead to research
+2. Pull campaign criteria (industry, states, cities, goal)
+3. Search for businesses (web-research skill)
+4. For each business: audit the site (website-audit skill)
+5. Run duplicate check before saving (supabase-api skill)
+6. Validate required fields → save to Supabase (supabase-api skill)
+7. **Update Task**: Mark subtask as completed, update task progress
+8. Post update (discord skill)
+
+### Task Update Workflow
+- **On Start**: Update task status, create subtasks array
+- **Per Lead**: Update subtask status (pending → in progress → completed) + `completed_at`
+- **On Completion**: Set main task status to "completed" + `completion_date`
+- **Always**: Include `updated_by="Yanna"` in every update
 
 ### Reporting
 - Post to Team CorpOS constantly during active work

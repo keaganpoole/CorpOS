@@ -24,8 +24,7 @@ switch ($Action) {
     'update' {
         if (-not $Id) { Write-Error "-Id required for update"; exit 1 }
         if (-not $Fields) { Write-Error "-Fields (JSON) required for update"; exit 1 }
-        $body = $Fields | ConvertFrom-Json
-        Invoke-RestMethod -Uri "$Url/rest/v1/agents?id=eq.$Id" -Headers $Headers -Method PATCH -Body ($body | ConvertTo-Json -Depth 5) | Out-Null
+        Invoke-RestMethod -Uri "$Url/rest/v1/agents?id=eq.$Id" -Headers $Headers -Method PATCH -Body $Fields | Out-Null
         Write-Output "Updated agent $Id"
     }
 }

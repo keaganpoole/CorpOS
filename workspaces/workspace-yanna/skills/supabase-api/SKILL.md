@@ -83,6 +83,36 @@ powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action <action> [par
 powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<uuid>" -Fields '{"status":"in progress","updated_by":"Yanna"}'
 ```
 
+**Update subtasks (JSON array):**
+The `subtasks` field is a JSON array. Update it by fetching the current array, modifying it, then saving the entire array back.
+
+**Step 1: Get current task with subtasks**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action get -Id "<task_id>"
+```
+
+**Step 2: Modify subtasks array**
+Add new subtask, mark as complete, etc. Example subtask structure:
+```json
+{
+  "id": "subtask-uuid-or-string",
+  "title": "Audit website for Acme Co",
+  "status": "pending",
+  "completed_at": null,
+  "notes": ""
+}
+```
+
+**Step 3: Update task with new subtasks array**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","title":"Research businesses in ME","status":"completed"},{"id":"subtask-2","title":"Audit website for Acme Co","status":"in progress"}],"updated_by":"Yanna"}'
+```
+
+**Workflow:**
+- When starting a task: Create subtasks for each lead to research
+- As you complete each lead: Update subtask status to "completed" + set `completed_at`
+- Always include `updated_by="Yanna"` in every update
+
 ### agents.ps1 — Agents
 
 ```
@@ -116,6 +146,37 @@ $key = $env:SUPABASE_ANON_KEY
 Invoke-RestMethod -Uri "$($env:SUPABASE_URL)/rest/v1/leads?select=*&limit=10" -Headers @{"apikey"=$key;"Authorization"="Bearer $key"}
 ```
 
+## Task Update Protocol
+Yanna MUST update the task she is working on as she progresses. This is mandatory for transparency and tracking.
+
+**On Task Start:**
+1. Get the assigned task (list/filter by status "queued")
+2. Update task status to "in progress"
+3. Create subtasks array for each lead/business to research
+4. Set `updated_by="Yanna"`
+
+**As You Work:**
+- Update subtask status from "pending" → "in progress" → "completed"
+- Add `completed_at` timestamp when done
+- Keep `updated_by="Yanna"` on every update
+- Update main task status as you progress through subtasks
+
+**On Task Completion:**
+- Set main task status to "completed"
+- Set `completion_date` timestamp
+- Update `updated_by="Yanna"`
+
+Example subtask structure:
+```json
+{
+  "id": "subtask-uuid-or-string",
+  "title": "Audit website for Acme Co",
+  "status": "pending",
+  "completed_at": null,
+  "notes": ""
+}
+```
+
 ## Duplicate Detection (Cross-Table)
 
 Before saving any lead:
@@ -132,3 +193,65 @@ Full research loop:
 4. For each business: audit website → score → `check-duplicate` → `leads.ps1 create`
 5. Update campaign lead count or status as you go
 6. `campaigns.ps1 update -Id <id> -Status Completed` when goal met
+
+## Task & Subtask Updates
+
+### Update Task Status
+Always update task status as you work. Example:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"in progress","updated_by":"Yanna"}'
+```
+
+### Update Subtasks (JSON array)
+The `subtasks` field is a JSON array. Update it by fetching the current array, modifying it, then saving the entire array back.
+
+**Step 1: Get current task with subtasks**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action get -Id "<task_id>"
+```
+
+**Step 2: Modify subtasks array**
+Add new subtask, mark as complete, etc. Example subtask structure:
+```json
+{
+  "id": "subtask-uuid-or-string",
+  "title": "Audit website for Acme Co",
+  "status": "pending",
+  "completed_at": null,
+  "notes": ""
+}
+```
+
+**Step 3: Update task with new subtasks array**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","title":"Research businesses in ME","status":"completed"},{"id":"subtask-2","title":"Audit website for Acme Co","status":"in progress"}],"updated_by":"Yanna"}'
+```
+
+**Workflow:**
+- When starting a task: Create subtasks for each lead to research
+- As you complete each lead: Update subtask status to "completed" + set `completed_at`
+- Always include `updated_by="Yanna"` in every update
+
+### Example: Full task workflow
+```powershell
+# 1. Get assigned task
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action list -Team "Research Team" -Status "queued"
+
+# 2. Update task to "in progress" when starting
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"in progress","updated_by":"Yanna"}'
+
+# 3. Create subtasks for each business to research (example)
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"1","title":"Research: Find 5 retail businesses in ME","status":"in progress","started_at":"2026-04-07T21:20:00Z"},{"id":"2","title":"Audit: Website for Acme Co","status":"pending"},{"id":"3","title":"Audit: Website for Beta Inc","status":"pending"}],"updated_by":"Yanna"}'
+
+# 4. As you complete each: update subtask status + overall task progress
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"1","title":"Research: Find 5 retail businesses in ME","status":"completed","completed_at":"2026-04-07T21:30:00Z"},{"id":"2","title":"Audit: Website for Acme Co","status":"completed","completed_at":"2026-04-07T21:35:00Z"},{"id":"3","title":"Audit: Website for Beta Inc","status":"in progress"}],"updated_by":"Yanna"}'
+
+# 5. When task is fully complete
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"completed","completion_date":"2026-04-07T22:00:00Z","updated_by":"Yanna"}'
+```
+
+### Key Points
+- **Task status**: `queued`, `in progress`, `completed`, `failed`
+- **Subtask status**: `pending`, `in progress`, `completed`
+- **Always update**: Task progress and subtasks as you work — not just at the end
+- **Never skip**: Updating the task table is mandatory for transparency
