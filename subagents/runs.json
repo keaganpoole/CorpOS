@@ -295,8 +295,17 @@
       "startedAt": 1775536847615,
       "sessionStartedAt": 1775536845527,
       "accumulatedRuntimeMs": 0,
-      "cleanupHandled": false,
-      "retainAttachmentsOnKeep": false
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775536996046,
+      "outcome": {
+        "status": "ok"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "{\n  \"status\": \"yielded\",\n  \"message\": \"Research lead fetching campaign completed. Accomplishments:\\n\\n1. Fetched leads from Supabase leads table: 3 leads found.\\n2. Analyzed leads:\\n   - Status distribution: Unknown (1), Aware (1), Interested (1)\\n   - Source distribution: Unknown (1), Google Maps (1), Google Search (1)\\n   - Opportunities: Outdated Website, Poor Functionality, Limited Features, No Website\\n   - Industries: dfyhjn, Auto, Retail\\n   - Score distribution: Low (0), Medium (1), High (2)\\n3. Updated queued task \\\"Fetch leads\\\" (ID: c24f7f8c-e48e-4c0d-8425-59577f9fb525) to 'in progress' and added notes.\\n4. Posted frequent progress updates to Situation Room (channel 1488327248154202156) with initial and detailed analysis.\\n\\nAll leads show potential as Digital Relics due to opportunities like outdated websites. Next steps would be outreach and qualification.\\n\\nKeagan has been informed via Situation Room updates.\"\n}",
+      "frozenResultCapturedAt": 1775536996108,
+      "endedHookEmittedAt": 1775537009197,
+      "cleanupCompletedAt": 1775537009198
     }
   }
 }

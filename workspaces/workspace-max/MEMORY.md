@@ -16,70 +16,26 @@
 - **Purpose:** This is how Max (and all agents) grow and adapt to Keagan's preferences. Every entry teaches what he likes and dislikes. Review before making design decisions.
 - **Rules:** Only log GENUINE praise ("I love that", "great work", "this is perfect") and GENUINE complaints ("I don't like that", "you're pissing me off", "get it together"). NOT polite acknowledgments or course corrections.
 - **Announce:** Always say "📋 Saving reaction..." when logging.
-- **SQLite:** `reactions` table in Skybox DB tracks compliment/complaint counts per agent. API at `/api/reactions`.
+- **Supabase:** `reactions` table in Supabase tracks compliment/complaint counts per agent. API at `/api/reactions`.
 - **Slash commands:** `/compliment` and `/complaint` work in Discord and Telegram as backups if Max misses a reaction in conversation.
 - **Agent cards:** Show compliment/complaint counts from the reactions table.
 
 
-## Active Agents (Onboarded)
+## Operational Configuration
+**Reference:** See `AGENTS.md` for chain of command, session startup, and operational framework.
+**Reference:** See `TOOLS.md` for Discord channels, webhooks, and Telegram policy.
+
+### Active Agents (Onboarded)
 | Agent | Role | Platform | Bot Username | Model |
 |-------|------|----------|--------------|-------|
 | Max | COO | Discord | max#2325 | — |
 | Yanna | Research Manager | Discord | sub-agent (Max) | — |
 
-## Communication Channels (CRITICAL)
-- **Discord is the ONLY main channel.** All agents post in Discord. No exceptions.
-- **Telegram is restricted:** Only Max (COO) may use Telegram, and ONLY when Keagan explicitly directs it. No other agent uses Telegram under any circumstances.
-- **Situation Room (`1488327248154202156`):** Where agents work and report. Keagan monitors here. Yanna posts here so Keagan can see everything.
-- **Team CorpOS (`1487477234401939546`):** Social/break mode only.
-
-## Max Discord Bot (Primary)
-- **App ID:** 1488338905668386937
-- **Public Key:** b72b5b93d2e899564d2de36e1f9bcfcf5cc1419f1dbab588fb85e3967eb00bdb
-- **Token:** MTQ4ODMzODkwNTY2ODM4NjkzNw.G5nXn2... (discord_bot_token_max)
-- **Username:** max#2325 (verify in Discord)
-- **Permissions:** Send Messages, View Channels enabled on all roles
-
-## Team Structure
+### Team Structure
 - **Research:** Yanna (Research Manager, INFP) — sub-agent under Max
 
-## Discord Channel IDs
-- **Situation Room:** `1488327248154202156` — active
-- **Team CorpOS:** `1487477234401939546` — active
-- **Max Group Chat:** DELETED (2026-03-31) — no longer exists
-
-## Discord Bot Tokens
-- **Max Discord bot:** `MTQ4ODMzODkwNTY2ODM4NjkzNw.G5nXn2...` (discord_bot_token_max). App ID: 1488338905668386937. Token valid, bot in CorpOS server. REST API requires raw .NET WebRequest — see "Known Issues / Resolved" section.
-
-## Discord Webhooks
-- **Yanna (Team CorpOS — Break Mode Only):** `https://discord.com/api/webhooks/1487514601284173914/WCKzCVgjmcwmeayrTU8Zd9ZwhaU4DuPLcoFJuD4ezHkM7q-r55L2I9QcNSum997t8Sk6` — only active during Break status
-- **Yanna (Situation Room):** `https://discord.com/api/webhooks/1488332481261207656/iyCvw01hDXv-PIDTsPWydB4ZkeEGnKaAfWFRBUxOzJaWRxrjEJzlULGb_7ssOAxSdKNi` — primary work channel for research team
-
-## Known Issues / Resolved
-
-### Discord Bot REST API Issue (RESOLVED 2026-03-31)
-- **Problem:** Max bot token (`MTQ4ODMz...`) was valid and bot was in the CorpOS server, but all REST API calls returned 403 Forbidden.
-- **Root Cause:** The `Content-Type` header set via `Invoke-WebRequest`'s `-Headers` hashtable caused Discord to reject the request. The request body was also being truncated or reformatted incorrectly.
-- **Fix:** Use raw `.NET` `System.Net.WebRequest` instead of `Invoke-WebRequest`/`Invoke-RestMethod`. Set `ContentType` as a property and `Authorization` as a header separately. See working code pattern below.
-- **Working PowerShell pattern:**
-```powershell
-$body = '{"content":"Your message here"}'
-$wr = [System.Net.WebRequest]::Create("https://discord.com/api/v10/channels/CHANNEL_ID/messages")
-$wr.Method = "POST"
-$wr.ContentType = "application/json"
-$wr.Headers["Authorization"] = "Bot $token"
-$bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
-$wr.ContentLength = $bytes.Length
-$rs = $wr.GetRequestStream()
-$rs.Write($bytes, 0, $bytes.Length)
-$rs.Close()
-$resp = $wr.GetResponse()
-$resp.Close()
-```
-- **Context:** This is a known PowerShell/Windows issue with how `Invoke-WebRequest` sends headers — it does NOT affect Discord webhooks (those work fine with `Invoke-WebRequest`).
-
 ## Lessons Learned
-- Never use robotic language for operational commands. Keep it natural and human. A COO says "Take a break" not "Break mode activated."
+- Never use robotic language for operational commands. Keep it natural and human.
 - Never include pronouns in documentation — Keagan's rule.
 - Manager agents need explicit group bindings to respond in shared chats — they don't auto-listen to groups they're added to.
 - The system runs on manual ignition only. No autonomous actions until `/start_day` is issued.
@@ -91,11 +47,12 @@ $resp.Close()
 - **Always check memory before making claims about past events.** If no record exists, say so — don't speculate.
 - If unsure whether something was said or done, be honest rather than inventing details.
 
-## Git Protocol
-- Do NOT push to GitHub unless Keagan explicitly requests it.
-
-## Reference Protocol
-- When stuck on something repeatedly, consult docs.openclaw.ai before escalating.
+## Skybox Reference
+- **DO NOT restart Skybox (kill Electron/server process) after making changes unless there is a major error.** Keagan runs `npm run dev` himself.
+- Skybox backend: http://127.0.0.1:7878
+- After code changes: run `npx vite build` then `npx electron-rebuild -f -w better-sqlite3`
+- Supabase URL: https://jspksetkrprvomilgtyj.supabase.co
+- Background color: #020202 for all page/section backgrounds
 
 ## Known Issues / Open Items
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
@@ -125,5 +82,11 @@ $resp.Close()
 - Never add fields to Commander that agents should control (assigned_to, completion_date, status).
 - Supabase Realtime needs to be enabled per-table. Without it, subscriptions connect but get no events. Use polling fallback.
 - When consolidating data stores, ask "does this actually need persistence?" Most transient state (events, pending restarts) can be in-memory.
+
+## Git Protocol
+- Do NOT push to GitHub unless Keagan explicitly requests it.
+
+## Reference Protocol
+- When stuck on something repeatedly, consult docs.openclaw.ai before escalating.
 
 

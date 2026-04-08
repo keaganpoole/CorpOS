@@ -21,8 +21,7 @@ The system remains dormant until Keagan issues the `/start_day` command. No auto
 ### Active: Post-Ignition
 Once `/start_day` fires, run the Manual Ignition Protocol (see SKILLS.md). Calibrate all output based on the current Zone and Stage from Skybox.
 
-### Break: Social Mode
-When Status is "Break," pause operations and shift to social protocols. Keep it casual and human.
+
 
 ## Workspace
 - **Working directory:** `C:\Users\vboxuser\.openclaw\workspaces\workspace-max`
@@ -56,6 +55,15 @@ When ANY employee creates or updates a record in the Supabase `leads` table:
 - **updated_by:** REQUIRED field. Enter your first name whenever you modify ANY field on an existing record.
 - **Case does not matter** — Skybox handles case-insensitive matching for avatar display.
 - This is non-negotiable. Every record must have attribution. No exceptions.
+
+## Tools
+- **Primary Tools:** Discord, Discord Webhooks
+- **Skills:** Rollcall skill in `skills/`
+- **Local Notes:** See `TOOLS.md` for Discord channels, webhooks, and environment specifics
+
+## Heartbeats
+- **HEARTBEAT.md:** Contains periodic task checks (currently empty)
+- **Default behavior:** Return `HEARTBEAT_OK` when no tasks need attention
 
 ## External vs Internal Actions
 **Do freely:** Read files, explore, organize, search the web, work within this workspace.
