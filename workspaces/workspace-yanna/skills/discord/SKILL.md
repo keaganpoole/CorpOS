@@ -1,11 +1,22 @@
 ---
 name: discord
-description: Post updates to Team CorpOS Discord channel using Yanna's webhook. Use when Yanna needs to report research progress, announce a lead found, acknowledge a briefing from Max, post a status update, or share blockers. Messages are 1-50 words and must match Yanna's thoughtful INFP personality. Triggers on "post update", "send to Discord", "Team CorpOS", "post to chat", "update team", or any Discord posting operation.
+description: Post updates to Team CorpOS Discord channel using Yanna's webhook. Use when Yanna needs to report research progress, announce a lead found, acknowledge a briefing from Max, post a status update, or share blockers. Messages are 1-50 words and must match Yanna's thoughtful INFP personality. **MANDATORY:** Read `skills/discord/references/channels.md` for Team CorpOS tone guidelines. Triggers on "post update", "send to Discord", "Team CorpOS", "post to chat", "update team", or any Discord posting operation.
 ---
 
 # Discord — Yanna Webhook
 
 Post to Team CorpOS via webhook. Keeps tokens low — one script call per message.
+
+## Channel & Tone Reference
+
+**MANDATORY:** Read `skills/discord/references/channels.md` for complete Team CorpOS tone guidelines.
+
+Key points from channels.md:
+- Team CorpOS is a **team chat**, not a technical dashboard
+- Messages must be human, conversational, and natural
+- No data dumps, no variable lists, no robotic briefings
+- Summarize conversationally, not systematically
+- 1-50 words, thoughtful INFP tone
 
 ## Scripts
 

@@ -20,6 +20,13 @@
   4. Added "analyzing" status to leads table (supabase-api schema)
   5. Yanna must save leads to Supabase with status "analyzing" (not JSON files)
   6. Added "analyzing" status to Skybox leads page (leadSchema.js) - appears in status dropdown
+- **2026-04-08:** Keagan issued `/start_day`. Max performed ignition protocol:
+  - Checked agents: Max and Yanna both active
+  - Checked campaigns: Kickstarter (Mechanics, Worcester, MA) active, assigned to Yanna
+  - Checked tasks: No tasks in progress, 1 queued task ("Fetch leads")
+  - Checked leads: 0 total leads
+  - Posted morning briefing to Team CorpOS via Yanna's webhook (Max's bot hitting 40333 error)
+  - Ready to dispatch Yanna after Keagan's go-ahead
 
 
 ## Reactions System (Feedback Loop)
@@ -64,12 +71,11 @@
 - After code changes: run `npx vite build` then `npx electron-rebuild -f -w better-sqlite3`
 - Supabase URL: https://jspksetkrprvomilgtyj.supabase.co
 - Background color: #020202 for all page/section backgrounds
+- **Discord Bot Fix (2026-04-08):** Max's Discord bot was hitting 40333 error when posting to Team CorpOS group channel. Fixed by switching from `Invoke-RestMethod` to `.NET WebClient` in `skills/discord/scripts/discord.ps1`. This is now the standard HTTP client for all Discord API calls.
 
 ## Known Issues / Open Items
 - "Switchy" — Keagan mentioned it (2026-03-29) but no prior context exists. Need to get details.
-- Max Discord bot — 40333 error from Discord API in this VM environment. Works but response parsing fails transiently. Error handling added to script.
 - agent-browser (Chrome) — won't launch in this VM (display/GPU issue). Needs `--no-sandbox,--disable-setuid-sandbox` flags or installed Chrome with `--executable-path`. Fallback: use web_search/web_fetch.
-- `/start_day` with full ignition protocol — untested. First run will validate the assess → brief → dispatch flow.
 
 ## Skybox Rules
 - **DO NOT restart Skybox (kill Electron/server process) after making changes unless there is a major error.** Keagan runs `npm run dev` himself. Just build and rebuild the native module — he restarts the app on his own.
@@ -102,6 +108,9 @@
 - **2026-04-07:** Yanna must update task and subtasks as she works. Added Task Update Protocol to Yanna's `supabase-api` SKILL.md and updated Yanna's `SKILLS.md` research pipeline to include task updates. Updated daily log (2026-04-08.md).
 - **2026-04-07 (cont):** Task status "in progress" moved to "Other" column in Skybox. Fixed by adding default columns to useTasks.js hook and normalizing status comparisons.
 - **2026-04-07 (cont):** Column matching now accepts underscores ("in_progress" = "in progress") and is case-insensitive.
+- **2026-04-08 (cont): Discord API 40333 Fix** — Max's Discord bot was hitting 40333 "internal network error" when posting to Team CorpOS group channel. Root cause: PowerShell's `Invoke-RestMethod` has compatibility issues with Discord API in this VM environment. Fix: Switched to `.NET WebClient` in `skills/discord/scripts/discord.ps1`. Python's `requests` library worked fine with same credentials, proving the bot token and permissions were correct. **Lesson: Always test with multiple HTTP client implementations when hitting 40333 or similar transient errors.**
+- **2026-04-08 (cont): Discord skill updated** — Added mandatory `.NET WebClient` documentation to `skills/discord/SKILL.md`. All Team CorpOS posts must use this client. Never switch back to `Invoke-RestMethod`.
+- **2026-04-08 (cont): Team CorpOS chat tone corrected** — Added comprehensive human/conversational guidelines to `skills/discord/SKILL.md` and created `skills/discord/references/channels.md`. Team CorpOS is a **team chat**, not a technical dashboard. Every message must be natural, conversational, and employee-like. No data dumps, no variable lists, no robotic briefings. Summarize conversationally. Also updated SKILL.md description to flag this as MANDATORY. Updated Yanna's AGENTS.md startup sequence to include reading the discord channels reference.
 
 ## Git Protocol
 - Do NOT push to GitHub unless Keagan explicitly requests it.

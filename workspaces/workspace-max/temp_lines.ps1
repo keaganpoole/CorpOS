@@ -1,0 +1,1 @@
+Get-Content "C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skills\discord\scripts\discord.ps1" | ForEach-Object { $counter=1 } { Write-Output "$counter $_"; $counter++ } | Select-Object -Skip 82 -First 30
