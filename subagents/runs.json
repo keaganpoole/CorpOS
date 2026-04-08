@@ -420,6 +420,76 @@
       "frozenResultCapturedAt": 1775615470912,
       "endedHookEmittedAt": 1775615488107,
       "cleanupCompletedAt": 1775615488108
+    },
+    "c26ec658-95ad-4869-ae87-64a23149bebb": {
+      "runId": "c26ec658-95ad-4869-ae87-64a23149bebb",
+      "childSessionKey": "agent:main:subagent:372813ba-f706-4495-8698-abc918ed6001",
+      "controllerSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "channel:1488359049891283105",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:discord:direct:289460310673195018",
+      "task": "You've been dispatched on a research campaign. Here are the details:\n\nCampaign: Kickstarter\nIndustry: Mechanics\nLocation: Massachusetts (MA) — Worcester\nGoal: 5 leads\n\nWorkflow:\n1. Pull campaign data from Supabase (campaigns.ps1)\n2. Source Mechanics businesses in Worcester MA via web research\n3. Audit each business website — score ≤ 60 is a qualified lead\n4. Save qualified leads to Supabase with status \"analyzing\"\n5. Update task subtasks as you work (pending → working → done)\n6. Post updates to Team CorpOS after every lead\n\nStart immediately. Post an ack to Team CorpOS before you begin.",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "yanna",
+      "model": "openrouter/auto",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775618863313,
+      "startedAt": 1775618865060,
+      "sessionStartedAt": 1775618863313,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775618880454,
+      "outcome": {
+        "status": "ok"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "I've acknowledged the task in Team CorpOS and pulled the campaign details. The current active campaign for Kickstarter, Mechanics industry, with a goal of 5 leads in Worcester, MA, has been retrieved. I will now proceed to source Mechanics businesses in Worcester, MA via web research.",
+      "frozenResultCapturedAt": 1775618880511,
+      "endedHookEmittedAt": 1775618888770,
+      "cleanupCompletedAt": 1775618888774
+    },
+    "2822fd53-b43a-4999-8d30-6825cf4c6bb0": {
+      "runId": "2822fd53-b43a-4999-8d30-6825cf4c6bb0",
+      "childSessionKey": "agent:main:subagent:b914dac0-bd0f-4577-9e9a-972e74e8488c",
+      "controllerSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "channel:1488359049891283105",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:discord:direct:289460310673195018",
+      "task": "You've been dispatched on a research campaign. Here are the details:\n\nCampaign: Kickstarter\nIndustry: Mechanics\nLocation: Massachusetts (MA) — Worcester\nGoal: 5 leads\n\nWorkflow:\n1. Pull campaign data from Supabase (campaigns.ps1)\n2. Source Mechanics businesses in Worcester MA via web research\n3. Audit each business website — score ≤ 60 is a qualified lead\n4. Save qualified leads to Supabase with status \"analyzing\"\n5. Update task subtasks as you work (pending → working → done)\n6. Post updates to Team CorpOS after every lead\n\nStart immediately. Post an ack to Team CorpOS before you begin.",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "yanna",
+      "model": "openrouter/auto",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775619064268,
+      "startedAt": 1775619064737,
+      "sessionStartedAt": 1775619064268,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775619079429,
+      "outcome": {
+        "status": "ok"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "The ack has been posted to Team CorpOS. The campaign details for \"Kickstarter\" (Mechanics industry, Worcester MA, goal of 5 leads) have been retrieved.\n\nNow, I will begin sourcing Mechanics businesses in Worcester, MA.",
+      "frozenResultCapturedAt": 1775619079491,
+      "endedHookEmittedAt": 1775619092718,
+      "cleanupCompletedAt": 1775619092719
     }
   }
 }
