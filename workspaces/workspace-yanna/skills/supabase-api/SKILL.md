@@ -55,10 +55,16 @@ powershell -ExecutionPolicy Bypass -File scripts/leads.ps1 -Action check-duplica
 
 **Create a lead:**
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/leads.ps1 -Action create -Fields '{"company":"Acme","state":"ME","industry":"Retail","email":"x@x.com","phone":"555-0100","discovery":"Bad mobile site","source":"Google Maps","created_by":"Yanna","updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/leads.ps1 -Action create -Fields '{"company":"Acme","state":"ME","industry":"Retail","email":"x@x.com","phone":"555-0100","discovery":"Bad mobile site","source":"Google Maps","status":"analyzing","created_by":"Yanna","updated_by":"Yanna"}'
 ```
 
-**Required fields for create:** company, state, industry, email or phone, discovery, source, created_by, updated_by
+**Required fields for create:** company, state, industry, email or phone, discovery, source, status, created_by, updated_by
+
+**Lead Status:**
+- `Analyzing` — Lead just saved, being evaluated
+- `Aware` — Lead knows about us
+- `Contacted` — We've reached out
+- Other statuses as needed
 
 **Update a lead (e.g. change status, add notes):**
 ```powershell
@@ -80,7 +86,7 @@ powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action <action> [par
 
 **Update task status:**
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<uuid>" -Fields '{"status":"in progress","updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<uuid>" -Fields '{"status":"working","updated_by":"Yanna"}'
 ```
 
 **Update subtasks (JSON array):**
@@ -96,22 +102,22 @@ Add new subtask, mark as complete, etc. Example subtask structure:
 ```json
 {
   "id": "subtask-uuid-or-string",
-  "title": "Audit website for Acme Co",
-  "status": "pending",
-  "completed_at": null,
-  "notes": ""
+  "text": "Audit website for Acme Co",
+  "status": "pending"
 }
 ```
 
 **Step 3: Update task with new subtasks array**
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","title":"Research businesses in ME","status":"completed"},{"id":"subtask-2","title":"Audit website for Acme Co","status":"in progress"}],"updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","text":"Research businesses in ME","status":"done"},{"id":"subtask-2","text":"Audit website for Acme Co","status":"working"}],"updated_by":"Yanna"}'
 ```
 
-**Workflow:**
-- When starting a task: Create subtasks for each lead to research
-- As you complete each lead: Update subtask status to "completed" + set `completed_at`
-- Always include `updated_by="Yanna"` in every update
+**Mandatory Task Update Workflow:**
+1. **On Task Start**: Update status to "in progress", create subtasks array
+2. **Per Lead**: Update subtask status (pending → working → done)
+3. **On Completion**: Set main task status to "completed" + `completion_date`
+4. **If Blocked**: Set status to "warning" AND alert Max immediately
+5. **Always**: Include `updated_by="Yanna"` in every update
 
 ### agents.ps1 — Agents
 
@@ -156,7 +162,7 @@ Yanna MUST update the task she is working on as she progresses. This is mandator
 4. Set `updated_by="Yanna"`
 
 **As You Work:**
-- Update subtask status from "pending" → "in progress" → "completed"
+- Update subtask status from "pending" → "working" → "done"
 - Add `completed_at` timestamp when done
 - Keep `updated_by="Yanna"` on every update
 - Update main task status as you progress through subtasks
@@ -170,10 +176,9 @@ Example subtask structure:
 ```json
 {
   "id": "subtask-uuid-or-string",
-  "title": "Audit website for Acme Co",
+  "text": "Audit website for Acme Co",
   "status": "pending",
-  "completed_at": null,
-  "notes": ""
+  
 }
 ```
 
@@ -199,7 +204,7 @@ Full research loop:
 ### Update Task Status
 Always update task status as you work. Example:
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"in progress","updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"working","updated_by":"Yanna"}'
 ```
 
 ### Update Subtasks (JSON array)
@@ -215,21 +220,20 @@ Add new subtask, mark as complete, etc. Example subtask structure:
 ```json
 {
   "id": "subtask-uuid-or-string",
-  "title": "Audit website for Acme Co",
+  "text": "Audit website for Acme Co",
   "status": "pending",
-  "completed_at": null,
-  "notes": ""
+  
 }
 ```
 
 **Step 3: Update task with new subtasks array**
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","title":"Research businesses in ME","status":"completed"},{"id":"subtask-2","title":"Audit website for Acme Co","status":"in progress"}],"updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","text":"Research businesses in ME","status":"done"},{"id":"subtask-2","text":"Audit website for Acme Co","status":"working"}],"updated_by":"Yanna"}'
 ```
 
 **Workflow:**
 - When starting a task: Create subtasks for each lead to research
-- As you complete each lead: Update subtask status to "completed" + set `completed_at`
+- As you complete each lead: Update subtask status to "done"
 - Always include `updated_by="Yanna"` in every update
 
 ### Example: Full task workflow
@@ -238,20 +242,23 @@ powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<
 powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action list -Team "Research Team" -Status "queued"
 
 # 2. Update task to "in progress" when starting
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"in progress","updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"working","updated_by":"Yanna"}'
 
 # 3. Create subtasks for each business to research (example)
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"1","title":"Research: Find 5 retail businesses in ME","status":"in progress","started_at":"2026-04-07T21:20:00Z"},{"id":"2","title":"Audit: Website for Acme Co","status":"pending"},{"id":"3","title":"Audit: Website for Beta Inc","status":"pending"}],"updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"1","text":"Research: Find 5 retail businesses in ME","status":"working","started_at":"2026-04-07T21:20:00Z"},{"id":"2","text":"Audit: Website for Acme Co","status":"pending"},{"id":"3","text":"Audit: Website for Beta Inc","status":"pending"}],"updated_by":"Yanna"}'
 
 # 4. As you complete each: update subtask status + overall task progress
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"1","title":"Research: Find 5 retail businesses in ME","status":"completed","completed_at":"2026-04-07T21:30:00Z"},{"id":"2","title":"Audit: Website for Acme Co","status":"completed","completed_at":"2026-04-07T21:35:00Z"},{"id":"3","title":"Audit: Website for Beta Inc","status":"in progress"}],"updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"1","text":"Research: Find 5 retail businesses in ME","status":"done","completed_at":"2026-04-07T21:30:00Z"},{"id":"2","text":"Audit: Website for Acme Co","status":"done","completed_at":"2026-04-07T21:35:00Z"},{"id":"3","text":"Audit: Website for Beta Inc","status":"working"}],"updated_by":"Yanna"}'
 
 # 5. When task is fully complete
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"completed","completion_date":"2026-04-07T22:00:00Z","updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"done","completion_date":"2026-04-07T22:00:00Z","updated_by":"Yanna"}'
 ```
 
 ### Key Points
 - **Task status**: `queued`, `in progress`, `completed`, `failed`
-- **Subtask status**: `pending`, `in progress`, `completed`
+- **Subtask status**: `pending`, `working`, `done`, `skipped`
 - **Always update**: Task progress and subtasks as you work — not just at the end
 - **Never skip**: Updating the task table is mandatory for transparency
+
+
+

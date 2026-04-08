@@ -12,6 +12,14 @@
 - **2026-04-07:** Major skills catalog build. Created hybrid skill system (SKILL.md + PowerShell scripts) for both Max and Yanna. Built 4 skills for Yanna (supabase-api, web-research, website-audit, discord) and 2 new for Max (supabase-api, discord). Installed agent-browser globally for browser automation. Rewrote Yanna's SKILLS.md as skill registry. Cleaned Max's SKILLS.md (lean) and TOOLS.md (all references). Situation Room retired — Team CorpOS is now the hub. New ignition protocol: assess → brief in Team CorpOS → dispatch Yanna. Spawn protocol documented with task template. Chrome won't launch in this VM — noted for agent-browser usage.
 - **2026-04-07 (cont):** Removed subtask creation UI from CommanderModal in Skybox. Yanna now creates subtasks automatically via her task update protocol. Built and rebuilt Skybox after code changes.
 - **2026-04-07 (cont):** Removed framer-motion animations from CommanderModal to fix input lag/delay issue. Replaced with regular divs for instant response.
+- **2026-04-07 (cont):** Yanna spawned for Kickstarter campaign (Mechanics in Worcester, MA). After ~7.5 minutes, Yanna was stopped by Keagan. Also stopped an older Yanna session that had been running since earlier.
+- **2026-04-07 (cont):** Keagan identified issues with Yanna's workflow:
+  1. Task/subtask updates not happening (now mandatory in SKILLS.md)
+  2. Discord messages too infrequent (every lead + every 10-15 min minimum)
+  3. Messages too robotic (fixed in discord SKILL.md with tone guidelines)
+  4. Added "analyzing" status to leads table (supabase-api schema)
+  5. Yanna must save leads to Supabase with status "analyzing" (not JSON files)
+  6. Added "analyzing" status to Skybox leads page (leadSchema.js) - appears in status dropdown
 
 
 ## Reactions System (Feedback Loop)
@@ -92,6 +100,8 @@
 - Supabase Realtime needs to be enabled per-table. Without it, subscriptions connect but get no events. Use polling fallback.
 - When consolidating data stores, ask "does this actually need persistence?" Most transient state (events, pending restarts) can be in-memory.
 - **2026-04-07:** Yanna must update task and subtasks as she works. Added Task Update Protocol to Yanna's `supabase-api` SKILL.md and updated Yanna's `SKILLS.md` research pipeline to include task updates. Updated daily log (2026-04-08.md).
+- **2026-04-07 (cont):** Task status "in progress" moved to "Other" column in Skybox. Fixed by adding default columns to useTasks.js hook and normalizing status comparisons.
+- **2026-04-07 (cont):** Column matching now accepts underscores ("in_progress" = "in progress") and is case-insensitive.
 
 ## Git Protocol
 - Do NOT push to GitHub unless Keagan explicitly requests it.

@@ -34,7 +34,9 @@ switch ($Action) {
         $body = @{}
         if ($Status) { $body['Status'] = $Status }
         if ($AssignedTo) { $body['assigned_to'] = $AssignedTo }
-        if ($Fields) { ($Fields | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $body[$_.Name] = $_.Value } }
+        if ($Fields) { 
+            ($Fields | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $body[$_.Name] = $_.Value }
+        }
         Invoke-RestMethod -Uri "$Url/rest/v1/research_campaigns?id=eq.$Id" -Headers $Headers -Method PATCH -Body ($body | ConvertTo-Json -Depth 5) | Out-Null
         Write-Output "Updated campaign $Id"
     }

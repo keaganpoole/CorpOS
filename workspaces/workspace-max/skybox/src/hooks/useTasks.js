@@ -26,6 +26,18 @@ export function useTasks() {
       .select('*')
       .order('position', { ascending: true });
     if (!error && data) setColumns(data);
+    // If no columns exist, create default columns
+    if (!error && data && data.length === 0) {
+      const defaultColumns = [
+        { id: 'col-queued', display_name: 'Queued', status_value: 'queued', color: '#71717A', position: 0 },
+        { id: 'col-inprogress', display_name: 'In Progress', status_value: 'in_progress', color: '#3b82f6', position: 1 },
+        { id: 'col-completed', display_name: 'Completed', status_value: 'completed', color: '#10b981', position: 2 },
+      ];
+      const { error: insertError } = await supabase.from('task_columns').insert(defaultColumns);
+      if (!insertError) {
+        setColumns(defaultColumns);
+      }
+    }
   }, []);
 
   const loadAll = useCallback(async () => {

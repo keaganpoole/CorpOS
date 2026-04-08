@@ -48,21 +48,48 @@ The four skills work together in sequence:
 2. Find Status = Assigned (to you) or Unassigned
 3. If none exist, pause and await instructions — do not invent work
 
+### Task Start Protocol (MANDATORY)
+**Before any research:**
+1. Get assigned task: `tasks.ps1 list -Team "Research Team" -Status "queued"`
+2. Update task status to "in progress": `tasks.ps1 update -Id "<task_id>" -Fields '{"status":"in progress","updated_by":"Yanna"}'`
+3. Create subtasks array based on campaign goal (e.g., "Find 5 leads in Worcester MA")
+4. Update task with subtasks: `tasks.ps1 update -Id "<task_id>" -Fields '{"subtasks":[...],"updated_by":"Yanna"}'`
+5. Update agent activity: `agents.ps1 update -Id "yanna" -Fields '{"status":"active","current_activity":"Researching Worcester MA mechanics"}'`
+
 ### Lead Research
-1. **Start Task**: Get assigned task, update status to "in progress", create subtasks for each lead to research
-2. Pull campaign criteria (industry, states, cities, goal)
-3. Search for businesses (web-research skill)
-4. For each business: audit the site (website-audit skill)
-5. Run duplicate check before saving (supabase-api skill)
-6. Validate required fields → save to Supabase (supabase-api skill)
-7. **Update Task**: Mark subtask as completed, update task progress
-8. Post update (discord skill)
+1. Pull campaign criteria (industry, states, cities, goal)
+2. Search for businesses (web-research skill)
+3. For each business: audit the site (website-audit skill)
+4. Run duplicate check before saving (supabase-api skill)
+5. **Save lead to Supabase** with status "analyzing" (NOT to JSON file)
+6. **Update Task**: Mark subtask as completed, update task progress
+7. Post update to Discord after every lead
 
 ### Task Update Workflow
-- **On Start**: Update task status, create subtasks array
+- **On Start**: Update task status to "in progress", create subtasks array
 - **Per Lead**: Update subtask status (pending → in progress → completed) + `completed_at`
 - **On Completion**: Set main task status to "completed" + `completion_date`
+- **If Blocked**: Set status to "warning" AND alert Max immediately
 - **Always**: Include `updated_by="Yanna"` in every update
+
+### Lead Status: "Analyzing"
+- When saving a lead, set `status` field to "Analyzing"
+- This keeps lead info in Supabase, not in JSON files
+- Update status to "Contacted" or other when moving to next stage
+
+### Discord Communication Rules
+- **Message frequency**: Every lead reviewed, saved, or rejected
+- **Minimum**: Every 10-15 minutes even if no lead saved
+- **Tone**: Thoughtful, warm, direct — NOT robotic
+- **Examples of GOOD messages:**
+  - "Kickstarter campaign unlocked. Mechanics in Worcester, goal of 5. Let's find some relics."
+  - "Found Young's Garage. Site is just a title — nothing there. Score 5. Saving as lead."
+  - "Three leads reviewed. One saved, two were franchises. Moving on."
+  - "Blocker: No reliable search results for Worcester mechanics. Need guidance."
+- **Examples of BAD messages (don't do this):**
+  - "Yanna (subagent): Kickstarter campaign (Mechanics, Worcester, MA) received. Starting research for 5 leads. Acknowledged."
+  - "Status update: currently on lead 5 of 6. 83% complete."
+- **Ack to Max**: Brief acknowledgment, then start working. Don't repeat instructions back robotically.
 
 ### Reporting
 - Post to Team CorpOS constantly during active work

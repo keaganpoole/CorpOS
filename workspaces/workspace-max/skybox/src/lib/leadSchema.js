@@ -4,6 +4,7 @@
 // Supabase `leads` table schema.
 
 export const STATUS_OPTIONS = [
+  { value: 'Analyzing',        color: 'blue' },
   { value: 'Won',              color: 'emerald' },
   { value: 'Interested',       color: 'green' },
   { value: 'Aware',            color: 'amber' },
@@ -325,6 +326,9 @@ export const getStatusColor = (status) => {
   const opt = STATUS_OPTIONS.find(s => s.value === status);
   return opt?.color || 'zinc';
 };
+
+// Add "analyzing" to the default status when creating new leads
+export const DEFAULT_STATUS = 'analyzing';
 
 // Score color: red < 40, amber < 70, emerald >= 70
 export const getScoreColor = (score) => {

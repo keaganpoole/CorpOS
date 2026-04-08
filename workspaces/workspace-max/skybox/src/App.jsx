@@ -44,7 +44,7 @@ import { useTasks } from './hooks/useTasks';
 import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
 import CampaignsModal from './pages/CampaignsModal';
-import { CommanderModal } from './pages/CommanderModal';
+import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 
 const StatusDot = ({ status, pulse = false }) => {
   const colors = {
@@ -106,7 +106,7 @@ const ownerInitial = (owner) => {
 
 const TaskCard = ({ task, columnColor }) => {
   const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
-  const completedCount = subtasks.filter(s => s.status === 'done').length;
+  const completedCount = subtasks.filter(s => s.status === 'done' || s.status === 'completed').length;
   const totalSubtasks = subtasks.length;
 
   // Priority color from accent
@@ -157,19 +157,25 @@ const TaskCard = ({ task, columnColor }) => {
         {/* Subtasks */}
         {totalSubtasks > 0 && (
           <div className="mt-3 mb-3 space-y-1.5">
-            {subtasks.map((sub, idx) => (
+            {subtasks.map((sub, idx) => {
+              // Normalize status: map Yanna's schema to display states
+              const rawStatus = sub.status || 'pending';
+              const displayStatus = rawStatus === 'completed' ? 'done' : rawStatus === 'in progress' ? 'working' : rawStatus;
+              const label = sub.title || sub.text || sub.task || '';
+              return (
               <div key={idx} className="flex items-center gap-2 group/sub">
-                <SubtaskStatusIcon status={sub.status} />
+                <SubtaskStatusIcon status={displayStatus} />
                 <span className={`text-[11px] font-medium flex-1 leading-tight ${
-                  sub.status === 'done' ? 'text-zinc-600 line-through decoration-zinc-700' :
-                  sub.status === 'skipped' ? 'text-zinc-700 line-through decoration-zinc-800' :
-                  sub.status === 'working' ? 'text-cyan-400/80' :
+                  displayStatus === 'done' ? 'text-zinc-600 line-through decoration-zinc-700' :
+                  displayStatus === 'skipped' ? 'text-zinc-700 line-through decoration-zinc-800' :
+                  displayStatus === 'working' ? 'text-cyan-400/80' :
                   'text-zinc-400'
                 }`}>
-                  {sub.task}
+                  {label}
                 </span>
               </div>
-            ))}
+              );
+            })}
             {/* Progress bar */}
             <div className="flex items-center gap-2 mt-2 pt-1.5">
               <div className="flex-1 h-1 bg-white/[0.04] rounded-full overflow-hidden">
@@ -2400,25 +2406,39 @@ const App = () => {
               }}
               className="flex-1 flex gap-5 overflow-x-auto custom-scrollbar snap-x p-8 pb-2"
             >
-              {taskColumns.map(col => (
-                <Reorder.Item
-                  key={col.id}
-                  value={col}
-                  className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full"
-                  style={{ listStyle: 'none' }}
-                  whileDrag={{ scale: 1.02, zIndex: 50, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
-                >
-                  <KanbanColumn
-                    column={col}
-                    tasks={supabaseTasks.filter(t => t.status === col.status_value)}
-                    onEditColumn={updateColumn}
-                  />
-                </Reorder.Item>
-              ))}
+              {taskColumns.map(col => {
+                // Normalize column status value for comparison
+                const colStatusNorm = col.status_value?.toLowerCase().replace(/_/g, ' ');
+                return (
+                  <Reorder.Item
+                    key={col.id}
+                    value={col}
+                    className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full"
+                    style={{ listStyle: 'none' }}
+                    whileDrag={{ scale: 1.02, zIndex: 50, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+                  >
+                    <KanbanColumn
+                      column={col}
+                      tasks={supabaseTasks.filter(t => {
+                        // Normalize task status for comparison (case-insensitive, underscores = spaces)
+                        const taskStatusNorm = t.status?.toLowerCase().replace(/_/g, ' ');
+                        return taskStatusNorm === colStatusNorm;
+                      })}
+                      onEditColumn={updateColumn}
+                    />
+                  </Reorder.Item>
+                );
+              })}
               {/* Uncategorized column — tasks with no matching column (not draggable) */}
               {(() => {
-                const knownStatuses = new Set(taskColumns.map(c => c.status_value));
-                const orphaned = supabaseTasks.filter(t => !knownStatuses.has(t.status));
+                // Build normalized set of known status values
+                const knownStatuses = new Set(
+                  taskColumns.map(c => c.status_value?.toLowerCase().replace(/_/g, ' '))
+                );
+                const orphaned = supabaseTasks.filter(t => {
+                  const taskStatusNorm = t.status?.toLowerCase().replace(/_/g, ' ');
+                  return !knownStatuses.has(taskStatusNorm);
+                });
                 if (orphaned.length === 0) return null;
                 return (
                   <div key="uncategorized" className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full" style={{ listStyle: 'none' }}>

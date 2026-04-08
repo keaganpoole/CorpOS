@@ -29,7 +29,7 @@ Each lead is a business identified as a potential client.
 | first_name | text | Contact first name |
 | last_name | text | Contact last name |
 | position | text | Contact role (Owner, Manager, etc.) |
-| status | text | Pipeline status (Aware, Contacted, etc.) |
+| status | text | Pipeline status (Aware, Contacted, Analyzing, etc.) |
 | discovery | text | Audit findings — bulleted + narrative |
 | industry | text | Business industry |
 | website | text | Full URL |

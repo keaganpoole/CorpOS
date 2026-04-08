@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Trash2, Circle, CheckCircle2,
   Loader2, MinusCircle, AlertCircle
 } from 'lucide-react';
@@ -125,7 +126,11 @@ const CommanderModal = ({ columns, onClose, onSubmit }) => {
 
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-2xl"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -135,7 +140,11 @@ const CommanderModal = ({ columns, onClose, onSubmit }) => {
         <div className="absolute bottom-1/3 left-1/3 w-[300px] h-[300px] bg-cyan-500/[0.02] blur-[100px] rounded-full" />
       </div>
 
-      <div
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
         className="relative w-[560px] max-h-[85vh] bg-zinc-950 border border-white/[0.07] rounded-3xl flex flex-col overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.9)]"
       >
         {/* ── Header ───────────────────────────────────── */}
@@ -220,31 +229,29 @@ const CommanderModal = ({ columns, onClose, onSubmit }) => {
               />
             </div>
 
+            {/* ── Error ──────────────────────────────────── */}
+            {error && (
+              <div className="mx-7 mb-4 px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
+                <AlertCircle size={14} className="text-rose-400 shrink-0" />
+                <span className="text-[11px] text-rose-400 font-medium">{error}</span>
+              </div>
+            )}
 
-          </div>
-
-          {/* ── Error ──────────────────────────────────── */}
-          {error && (
-            <div className="mx-7 mb-4 px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
-              <AlertCircle size={14} className="text-rose-400 shrink-0" />
-              <span className="text-[11px] text-rose-400 font-medium">{error}</span>
+            {/* ── Submit ──────────────────────────────────── */}
+            <div className="shrink-0 px-7 py-5 border-t border-white/[0.04]">
+              <button
+                type="submit"
+                disabled={!form.task.trim() || submitting}
+                className="w-full py-3.5 bg-white text-black rounded-xl text-[13px] font-black uppercase tracking-wider hover:bg-cyan-400 transition-all active:scale-[0.98] disabled:opacity-20 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(255,255,255,0.08)]"
+              >
+                {submitting ? 'Deploying...' : 'Deploy Task'}
+              </button>
             </div>
-          )}
-
-          {/* ── Submit ──────────────────────────────────── */}
-          <div className="shrink-0 px-7 py-5 border-t border-white/[0.04]">
-            <button
-              type="submit"
-              disabled={!form.task.trim() || submitting}
-              className="w-full py-3.5 bg-white text-black rounded-xl text-[13px] font-black uppercase tracking-wider hover:bg-cyan-400 transition-all active:scale-[0.98] disabled:opacity-20 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(255,255,255,0.08)]"
-            >
-              {submitting ? 'Deploying...' : 'Deploy Task'}
-            </button>
           </div>
         </form>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
-export { CommanderModal };
+export { CommanderModal, SubtaskStatusIcon };

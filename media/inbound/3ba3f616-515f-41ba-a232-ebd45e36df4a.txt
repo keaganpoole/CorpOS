@@ -1,0 +1,78 @@
+[0] 10:56:49 PM [vite] Pre-transform error: C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\src\pages\CommanderModal.jsx: Expected corresponding JSX closing tag for <motion.div>. (254:6)
+[0] 
+[0]   252 |           </div>
+[0]   253 |         </form>
+[0] > 254 |       </div>
+[0]       |       ^
+[0]   255 |     </motion.div>
+[0]   256 |     </motion.div>
+[0]   257 |   );
+[0] 10:56:50 PM [vite] Internal server error: C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\src\pages\CommanderModal.jsx: Expected corresponding JSX closing tag for <motion.div>. (254:6)
+[0] 
+[0]   252 |           </div>
+[0]   253 |         </form>
+[0] > 254 |       </div>
+[0]       |       ^
+[0]   255 |     </motion.div>
+[0]   256 |     </motion.div>
+[0]   257 |   );
+[0]   Plugin: vite:react-babel
+[0]   File: C:/Users/vboxuser/.openclaw/workspaces/workspace-max/skybox/src/pages/CommanderModal.jsx:254:6
+[0]   252|            </div>
+[0]   253|          </form>
+[0]   254|        </div>
+[0]      |        ^
+[0]   255|      </motion.div>
+[0]   256|      </motion.div>
+[0]       at constructor (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:365:19)
+[0]       at JSXParserMixin.raise (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:6599:19)
+[0]       at JSXParserMixin.jsxParseElementAt (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:4727:16)
+[0]       at JSXParserMixin.jsxParseElementAt (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:4698:32)
+[0]       at JSXParserMixin.jsxParseElement (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:4749:17)
+[0]       at JSXParserMixin.parseExprAtom (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:4759:19)
+[0]       at JSXParserMixin.parseExprSubscripts (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11081:23)
+[0]       at JSXParserMixin.parseUpdate (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11066:21)
+[0]       at JSXParserMixin.parseMaybeUnary (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11046:23)
+[0]       at JSXParserMixin.parseMaybeUnaryOrPrivate (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10899:61)
+[0]       at JSXParserMixin.parseExprOps (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10904:23)
+[0]       at JSXParserMixin.parseMaybeConditional (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10881:23)
+[0]       at JSXParserMixin.parseMaybeAssign (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10831:21)
+[0]       at C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10800:39
+[0]       at JSXParserMixin.allowInAnd (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:12426:12)
+[0]       at JSXParserMixin.parseMaybeAssignAllowIn (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10800:17)
+[0]       at JSXParserMixin.parseMaybeAssignAllowInOrVoidPattern (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:12493:17)
+[0]       at JSXParserMixin.parseParenAndDistinguishExpression (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11675:28)
+[0]       at JSXParserMixin.parseExprAtom (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11331:23)
+[0]       at JSXParserMixin.parseExprAtom (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:4764:20)
+[0]       at JSXParserMixin.parseExprSubscripts (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11081:23)
+[0]       at JSXParserMixin.parseUpdate (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11066:21)
+[0]       at JSXParserMixin.parseMaybeUnary (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11046:23)
+[0]       at JSXParserMixin.parseMaybeUnaryOrPrivate (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10899:61)
+[0]       at JSXParserMixin.parseExprOps (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10904:23)
+[0]       at JSXParserMixin.parseMaybeConditional (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10881:23)
+[0]       at JSXParserMixin.parseMaybeAssign (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10831:21)
+[0]       at JSXParserMixin.parseExpressionBase (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10784:23)
+[0]       at C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10780:39
+[0]       at JSXParserMixin.allowInAnd (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:12421:16)
+[0]       at JSXParserMixin.parseExpression (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10780:17)
+[0]       at JSXParserMixin.parseReturnStatement (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:13142:28)
+[0]       at JSXParserMixin.parseStatementContent (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:12798:21)
+[0]       at JSXParserMixin.parseStatementLike (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:12767:17)
+[0]       at JSXParserMixin.parseStatementListItem (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:12747:17)
+[0]       at JSXParserMixin.parseBlockOrModuleBlockBody (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:13316:61)
+[0]       at JSXParserMixin.parseBlockBody (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:13309:10)
+[0]       at JSXParserMixin.parseBlock (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:13297:10)
+[0]       at JSXParserMixin.parseFunctionBody (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:12100:24)
+[0]       at JSXParserMixin.parseArrowExpression (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:12075:10)
+[0]       at JSXParserMixin.parseParenAndDistinguishExpression (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11687:12)
+[0]       at JSXParserMixin.parseExprAtom (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11331:23)
+[0]       at JSXParserMixin.parseExprAtom (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:4764:20)
+[0]       at JSXParserMixin.parseExprSubscripts (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11081:23)
+[0]       at JSXParserMixin.parseUpdate (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11066:21)
+[0]       at JSXParserMixin.parseMaybeUnary (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:11046:23)
+[0]       at JSXParserMixin.parseMaybeUnaryOrPrivate (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10899:61)
+[0]       at JSXParserMixin.parseExprOps (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10904:23)
+[0]       at JSXParserMixin.parseMaybeConditional (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10881:23)
+[0]       at JSXParserMixin.parseMaybeAssign (C:\Users\vboxuser\.openclaw\workspaces\workspace-max\skybox\node_modules\@babel\parser\lib\index.js:10831:21)
+[1] [20052:0407/225651.270:ERROR:CONSOLE(1)] "Request Autofill.enable failed. {"code":-32601,"message":"'Autofill.enable' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
+[1] [20052:0407/225651.270:ERROR:CONSOLE(1)] "Request Autofill.setAddresses failed. {"code":-32601,"message":"'Autofill.setAddresses' wasn't found"}", source: devtools://devtools/bundled/core/protocol_client/protocol_client.js (1)
