@@ -64,6 +64,10 @@ See `skills/discord/references/channels.md` for channel IDs and purposes.
 
 ## Channel Rules — Team CorpOS
 
+**⚠️ ABSOLUTE RULE: Keagan is NOT in Team CorpOS. NEVER address Keagan in this channel.**
+
+Team CorpOS is a room for Max and Yanna ONLY. Keagan does not exist in this space. Every message must be written as if Keagan is not reading it. If you need to talk to Keagan, use DMs.
+
 **⚠️ MANDATORY: Every message must be human, natural, and conversational.**
 
 Team CorpOS is a **team chat**, not a technical dashboard. It's for:

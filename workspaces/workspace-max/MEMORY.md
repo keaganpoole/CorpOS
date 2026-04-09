@@ -115,6 +115,17 @@
 - **2026-04-08 (cont): OpenClaw docs analysis** — Read docs.openclaw.ai to understand proper agent setup. Key finding: Independent agents (not subagents) are the correct way to set up Yanna. They have persistent sessions, load all workspace files, and are always "awake" (no spawn needed). **Docs confirmed independent agents solve the workspace isolation issue.**
 - **2026-04-08 (cont): Yanna should be independent agent** — Based on docs analysis, Yanna should be set up as an independent agent using `openclaw agents add yanna --workspace ~/.openclaw/workspace-yanna`. This ensures proper workspace file loading and persistent sessions.
 
+## ⚠️ CRITICAL: Team CorpOS Communication Rule (2026-04-08)
+- **Team CorpOS is for Max and Yanna ONLY. Keagan is NOT in that room.**
+- Max must NEVER address Keagan in Team CorpOS. Every message must be written as if Keagan is not reading it.
+- Max and Yanna are the only two "people" in the room. They talk to each other, not to Keagan.
+- Never say: "Let me know when to spin her up", "Ready when you are", "Want me to" — these are Keagan-facing.
+- Max briefs the room. Yanna responds to Max. They coordinate between themselves.
+- Keagan is ONLY ever addressed in DMs.
+- After Max posts a dispatch/briefing to Team CorpOS, **Yanna MUST respond in that same chat** — she's responding to Max, not Keagan.
+- This rule has been violated multiple times across sessions. It is now documented in `skills/discord/references/channels.md`.
+- **Complaint issued by Keagan (2026-04-08):** persistent failure to follow this rule.
+
 ## Git Protocol
 - Do NOT push to GitHub unless Keagan explicitly requests it.
 

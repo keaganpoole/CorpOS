@@ -651,11 +651,55 @@
       "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
       "runTimeoutSeconds": 0,
       "createdAt": 1775700750252,
-      "startedAt": 1775700750937,
+      "startedAt": 1775700750617,
       "sessionStartedAt": 1775700750252,
       "accumulatedRuntimeMs": 0,
-      "cleanupHandled": false,
-      "retainAttachmentsOnKeep": false
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775700849030,
+      "outcome": {
+        "status": "timeout"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "Now let me audit these websites. Starting with MotoRizma Auto Repair.",
+      "frozenResultCapturedAt": 1775700849097,
+      "endedHookEmittedAt": 1775700861041,
+      "cleanupCompletedAt": 1775700861042
+    },
+    "92a8829c-0639-40c0-9b6c-4f70ce146160": {
+      "runId": "92a8829c-0639-40c0-9b6c-4f70ce146160",
+      "childSessionKey": "agent:main:subagent:897467c6-1f07-431a-92e9-9b1ac22cc5d8",
+      "controllerSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "channel:1488359049891283105",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:discord:direct:289460310673195018",
+      "task": "You've been dispatched on a research campaign. Here are the details:\n\nCampaign: Kickstarter\nCampaign ID: 86b71205-ba7e-4003-9a26-f98292db992b\nIndustry: Mechanics\nLocation: Massachusetts (MA) — Worcester\nGoal: 6 leads\nTask ID: 40a438f9-4c6c-4bf5-a1c0-86150c4a9f7c\n\nIMPORTANT — Do this FIRST before anything else:\n\nStep 1: Update task status to \"in_progress\"\npowershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id \"40a438f9-4c6c-4bf5-a1c0-86150c4a9f7c\" -Fields '{\"status\":\"in_progress\",\"updated_by\":\"Yanna\"}'\n\nStep 2: Create subtasks on the task (one per business you plan to research). Example:\npowershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id \"40a438f9-4c6c-4bf5-a1c0-86150c4a9f7c\" -Fields '{\"subtasks\":[{\"id\":\"subtask-1\",\"task\":\"Business Name 1\",\"status\":\"pending\",\"assigned_to\":\"Yanna\"},{\"id\":\"subtask-2\",\"task\":\"Business Name 2\",\"status\":\"pending\",\"assigned_to\":\"Yanna\"}]}'\n\nWorkflow after subtasks are set:\n3. Source businesses — search for mechanics in Worcester, MA area (web-research skill)\n4. For each lead found:\n   a. Audit their website (website-audit skill)\n   b. Save the lead to Supabase with status \"analyzing\" (supabase-api skill)\n   c. Update the matching subtask status to \"done\" \n   d. Post an update to Team CorpOS (discord skill) — conversational, casual team chat tone\n5. After every 10-15 minutes, post a progress update to Team CorpOS\n6. When done or at 6 leads, set task status to \"completed\" + completion_date, and post a summary to Team CorpOS\n\nSubtask rules:\n- Required fields: id, task, status, assigned_to\n- Always assigned_to \"Yanna\"\n- At least 1 subtask required, more if it makes sense\n- Track progress by updating subtask status: pending → working → done\n\nCritical:\n- ALWAYS set updated_by to \"Yanna\" when updating Supabase\n- Team CorpOS messages must sound human, not robotic. No data dumps.\n- Post to Team CorpOS using the discord skill (webhook: env var DISCORD_WEBHOOK_YANNA)",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "yanna",
+      "model": "openrouter/xiaomi/mimo-v2-pro",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775702120661,
+      "startedAt": 1775702120974,
+      "sessionStartedAt": 1775702120661,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775702281674,
+      "outcome": {
+        "status": "timeout"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "Lead 1 created. Now update subtask and post to Discord.",
+      "frozenResultCapturedAt": 1775702281771,
+      "endedHookEmittedAt": 1775702295816,
+      "cleanupCompletedAt": 1775702295818
     }
   }
 }

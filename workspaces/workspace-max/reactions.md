@@ -2,6 +2,14 @@
 
 ## Complaints
 
+### 2026-04-08 | Team CorpOS — addressing Keagan in team-only channel
+**Trigger:** Keagan issued a formal complaint. "I told you to never talk as if you're talking to me in Corp OS team chat. You are still doing it. Team CorpOS is for all employees EXCEPT me. If it were a real room, you'd be sitting next to Yanna and talking to me in another room, which makes zero sense."
+**What I did:** Posted messages to Team CorpOS that were clearly addressed to Keagan — "Ready when you are", "Want me to spin her up again", etc. Max and Yanna are the only two in that room, but I kept talking to Keagan as if he was there.
+**What I should have done:** Every message in Team CorpOS should be written as if Keagan is not reading it. Max talks to Yanna. Yanna responds to Max. No acknowledgment of Keagan's existence in that channel. Keagan is only ever addressed in DMs.
+**Lesson:** This has failed across multiple sessions. It is now documented in MEMORY.md, skills/discord/references/channels.md, and both Max's and Yanna's discord SKILL.md files. The rule is absolute: Keagan does not exist in Team CorpOS.
+
+---
+
 ### 2026-04-04 | Skybox Model Marketplace — overcorrection
 **Trigger:** Keagan said the marketplace UI had too many colors and felt bloated/bulky.
 **What I did:** Removed virtually all color — zero accents, full monochrome.

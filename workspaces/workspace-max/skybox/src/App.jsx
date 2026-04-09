@@ -161,7 +161,7 @@ const TaskCard = ({ task, columnColor }) => {
               // Normalize status: map Yanna's schema to display states
               const rawStatus = sub.status || 'pending';
               const displayStatus = rawStatus === 'completed' ? 'done' : rawStatus === 'in progress' ? 'working' : rawStatus;
-              const label = sub.title || sub.text || sub.task || '';
+              const label = sub.name || sub.title || sub.text || sub.task || '';
               return (
               <div key={idx} className="flex items-center gap-2 group/sub">
                 <SubtaskStatusIcon status={displayStatus} />
@@ -2346,8 +2346,8 @@ const App = () => {
   } = useTasks();
 
   // Enrich agents with campaign data from Supabase (matched by assigned_to)
-  const enrichedAgents = agents.map(a => {
-    const campaign = agentCampaigns[a.name.toLowerCase()];
+  const enrichedAgents = (agents || []).map(a => {
+    const campaign = agentCampaigns[a.name?.toLowerCase?.() || ''];
     if (campaign) {
       return { ...a, _campaign: campaign, campaign_name: campaign['Campaign Name'], campaign_id: campaign.id };
     }

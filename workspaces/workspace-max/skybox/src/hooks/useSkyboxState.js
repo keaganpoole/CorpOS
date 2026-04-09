@@ -163,7 +163,13 @@ const [reactions, setReactions] = useState([]);
       })
       .subscribe();
 
+    // Polling fallback — refreshes every 10s in case WebSocket goes stale
+    const pollTimer = setInterval(() => {
+      loadInitialData();
+    }, 10000);
+
     return () => {
+      clearInterval(pollTimer);
       removeListener();
       disconnectWebSocket();
       supabase.removeChannel(stateSub);
