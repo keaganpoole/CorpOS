@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Component } from 'react';
 import {
   Users,
   Activity,
@@ -45,6 +45,57 @@ import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
 import CampaignsModal from './pages/CampaignsModal';
 import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Error Boundary — catches render crashes so a blank screen never appears
+// ═══════════════════════════════════════════════════════════════════════════
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorInfo });
+    console.error('[Skybox] Page crashed:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      const err = this.state.error;
+      const info = this.state.errorInfo;
+      return (
+        <div className="h-full flex items-center justify-center bg-[#020202]">
+          <div className="max-w-lg w-full mx-8 p-8 bg-zinc-950 border border-rose-500/20 rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                <AlertTriangle size={18} className="text-rose-400" />
+              </div>
+              <h3 className="text-[14px] font-black text-white uppercase tracking-wider">Page Error</h3>
+            </div>
+            <p className="text-[12px] text-rose-400 font-medium mb-2">{err?.message || 'Unknown error'}</p>
+            {info?.componentStack && (
+              <pre className="text-[10px] text-zinc-600 mt-4 p-4 bg-black/60 rounded-xl overflow-auto max-h-[200px] custom-scrollbar font-mono leading-relaxed">
+                {info.componentStack.slice(0, 1500)}
+              </pre>
+            )}
+            <button
+              onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
+              className="mt-6 w-full py-2.5 bg-white text-black rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-cyan-400 transition-all active:scale-[0.98]"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const StatusDot = ({ status, pulse = false }) => {
   const colors = {
@@ -2728,7 +2779,9 @@ const App = () => {
         <div className="flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div key={currentRoute} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }} className="h-full">
-              {renderView()}
+              <ErrorBoundary>
+                {renderView()}
+              </ErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </div>
