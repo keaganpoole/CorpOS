@@ -560,6 +560,41 @@
       "frozenResultCapturedAt": 1775666058295,
       "endedHookEmittedAt": 1775666125031,
       "cleanupCompletedAt": 1775666125033
+    },
+    "ef286872-c4e9-4930-9a55-ab2cca4583f5": {
+      "runId": "ef286872-c4e9-4930-9a55-ab2cca4583f5",
+      "childSessionKey": "agent:main:subagent:a33d1281-f1d8-445e-a252-88bfab856b84",
+      "controllerSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "channel:1488359049891283105",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:discord:direct:289460310673195018",
+      "task": "Hey Yanna, quick test. Post a short message to Team CorpOS (channel 1487477234401939546) saying you're online and ready. Keep it casual, like a normal team chat message.",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "test-yanna-online",
+      "model": "openrouter/xiaomi/mimo-v2-pro",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775693383151,
+      "startedAt": 1775693384727,
+      "sessionStartedAt": 1775693383151,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775693435819,
+      "outcome": {
+        "status": "ok"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "Done. Posted to Team CorpOS via Yanna's webhook: \"Hey team, Yanna here - online and ready. What are we working on?\"\n\nMessage sent successfully to channel 1487477234401939546.",
+      "frozenResultCapturedAt": 1775693435894,
+      "endedHookEmittedAt": 1775693445806,
+      "cleanupCompletedAt": 1775693445806
     }
   }
 }
