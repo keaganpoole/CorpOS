@@ -175,11 +175,20 @@ Yanna MUST update the task she is working on as she progresses. This is mandator
 Example subtask structure:
 ```json
 {
-  "id": "subtask-uuid-or-string",
-  "text": "Audit website for Acme Co",
-  "status": "pending",
-  
+ "id": "st-1",
+ "task": "Source businesses",
+ "status": "completed",
+ "assigned_to": "Yanna",
+ "completed_at": "2026-04-08T21:35:00Z"
 }
+```
+
+**Subtask Structure Requirements:**
+- **Must have at least 1 subtask per task** — Create more than 1 subtask if it makes sense for the things you are doing
+- **Required fields:** `id`, `task`, `status`, `assigned_to`
+- **Optional field:** `completed_at` (set when status = "completed")
+- **Status values:** `queued`, `in progress`, `completed`, `skipped`
+- **Always assign to Yanna** — Use `assigned_to: "Yanna"` for all subtasks
 ```
 
 ## Duplicate Detection (Cross-Table)
@@ -219,11 +228,13 @@ powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action get -Id "<tas
 Add new subtask, mark as complete, etc. Example subtask structure:
 ```json
 {
-  "id": "subtask-uuid-or-string",
-  "text": "Audit website for Acme Co",
-  "status": "pending",
-  
+ "id": "st-1",
+ "task": "Source businesses",
+ "status": "completed",
+ "assigned_to": "Yanna",
+ "completed_at": "2026-04-08T21:35:00Z"
 }
+```
 ```
 
 **Step 3: Update task with new subtasks array**
@@ -245,10 +256,10 @@ powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action list -Team "R
 powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"working","updated_by":"Yanna"}'
 
 # 3. Create subtasks for each business to research (example)
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"1","text":"Research: Find 5 retail businesses in ME","status":"working","started_at":"2026-04-07T21:20:00Z"},{"id":"2","text":"Audit: Website for Acme Co","status":"pending"},{"id":"3","text":"Audit: Website for Beta Inc","status":"pending"}],"updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"st-1","task":"Source businesses","status":"completed","assigned_to":"Yanna","completed_at":"2026-04-08T21:35:00Z"},{"id":"st-2","task":"Audit websites","status":"in progress","assigned_to":"Yanna","completed_at":null},{"id":"st-3","task":"Save qualified leads","status":"queued","assigned_to":"Yanna","completed_at":null}],"updated_by":"Yanna"}'
 
 # 4. As you complete each: update subtask status + overall task progress
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"1","text":"Research: Find 5 retail businesses in ME","status":"done","completed_at":"2026-04-07T21:30:00Z"},{"id":"2","text":"Audit: Website for Acme Co","status":"done","completed_at":"2026-04-07T21:35:00Z"},{"id":"3","text":"Audit: Website for Beta Inc","status":"working"}],"updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"st-1","task":"Source businesses","status":"completed","assigned_to":"Yanna","completed_at":"2026-04-08T21:35:00Z"},{"id":"st-2","task":"Audit websites","status":"in progress","assigned_to":"Yanna","completed_at":null},{"id":"st-3","task":"Save qualified leads","status":"queued","assigned_to":"Yanna","completed_at":null}],"updated_by":"Yanna"}'
 
 # 5. When task is fully complete
 powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"done","completion_date":"2026-04-07T22:00:00Z","updated_by":"Yanna"}'

@@ -212,11 +212,8 @@ const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = 
   }, [open]);
   const handleSelect = (val) => { setOpen(false); if (val !== value) onSave(val); };
 
-  // Filter out removed options
-  const filteredOptions = options.filter(opt => {
-    const val = typeof opt === 'string' ? opt : opt.value;
-    return val !== 'Won' && val !== 'LinkedIn';
-  });
+  // Show all options (no filtering)
+  const filteredOptions = options;
 
   // Color for current value
   const currentColor = optionColors[value] || (type === 'status' ? getStatusColor(value) : '#3b82f6');
@@ -555,6 +552,18 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {} }) => 
     case 'email':
       return <InlineEmail value={lead.email} onSave={v => autoSave(lead.id, 'email', v)} />;
 
+    case 'phone':
+      return (
+        <InlineText value={lead.phone} onSave={v => autoSave(lead.id, 'phone', v)}
+          className="text-[12px] text-zinc-400 truncate block" placeholder="—" />
+      );
+
+    case 'discovery':
+      return (
+        <InlineText value={lead.discovery} onSave={v => autoSave(lead.id, 'discovery', v)}
+          className="text-[12px] text-zinc-400 truncate block" placeholder="—" />
+      );
+
     case 'source':
       return <InlineSelect value={lead.source} options={SOURCE_OPTIONS} type="source" onSave={v => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
 
@@ -591,8 +600,10 @@ const DEFAULT_COLUMNS = [
   { id: 'value',      label: 'Value',    width: '120px', sortKey: 'proposal_value',           flex: false },
   { id: 'revenue',    label: 'Revenue',  width: '120px', sortKey: 'revenue',                  flex: false },
   { id: 'email',      label: 'Email',    width: '170px', sortKey: 'email',                    flex: false },
+  { id: 'phone',      label: 'Phone',    width: '130px', sortKey: 'phone',                    flex: false },
   { id: 'source',     label: 'Source',   width: '130px', sortKey: 'source',                   flex: false },
   { id: 'location',   label: 'Location', width: '120px', sortKey: 'city',                     flex: false },
+  { id: 'discovery',  label: 'Discovery',width: '200px', sortKey: null,                       flex: false },
   { id: 'created',    label: 'Created',  width: '100px', sortKey: 'date_created',             flex: false },
 ];
 
@@ -798,8 +809,8 @@ const LeadsTable = ({
                             const animation = matchedRule.animation || 'none';
                             const gradId = `cb-${lead.id}`;
                             return (
-                              <div className="absolute left-0 top-0 bottom-0 w-[4px] rounded-full overflow-hidden pointer-events-none">
-                                <svg width="4" height="100%" className="block">
+                              <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-full overflow-hidden pointer-events-none" style={{ top: '25%', bottom: '25%' }}>
+                                <svg width="3" height="100%" className="block">
                                   <defs>
                                     {colors.length > 1 && (
                                       <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -814,7 +825,7 @@ const LeadsTable = ({
                                       </linearGradient>
                                     )}
                                   </defs>
-                                  <rect width="4" height="100%" rx="2"
+                                  <rect width="3" height="100%" rx="1.5"
                                     fill={colors.length > 1 ? `url(#${gradId})` : colors[0]}
                                     opacity={animation === 'pulse' ? undefined : 1}>
                                     {animation === 'pulse' && (

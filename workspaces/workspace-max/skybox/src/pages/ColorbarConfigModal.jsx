@@ -21,7 +21,7 @@ const ColorbarPreview = ({ rule, height = 48 }) => {
   const gradId = `cb-prev-${rule.id || 'new'}`;
 
   return (
-    <svg width="4" height={height} className="rounded-full overflow-hidden shrink-0">
+    <svg width="3" height={height} className="rounded-full overflow-hidden shrink-0">
       <defs>
         {isGradient ? (
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -36,7 +36,7 @@ const ColorbarPreview = ({ rule, height = 48 }) => {
           </linearGradient>
         ) : null}
       </defs>
-      <rect width="4" height={height} rx="2"
+      <rect width="3" height={height} rx="1.5"
         fill={isGradient ? `url(#${gradId})` : colors[0]}
         opacity={animation === 'pulse' ? undefined : 1}>
         {animation === 'pulse' && (

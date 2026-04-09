@@ -14,6 +14,8 @@ const DEFAULT_CONFIG = {
   status: {
     name: 'Status', icon: 'flag',
     optionColors: {
+      'Analyzing':      '#3b82f6',
+      'Won':            '#10b981',
       'Interested':     '#10b981',
       'Aware':          '#f59e0b',
       'Contacted':      '#eab308',
@@ -133,7 +135,7 @@ export const OPERATORS = {
 };
 
 export const CONDITIONAL_FIELDS = [
-  { key: 'status', label: 'Status', type: 'select', options: ['Interested', 'Aware', 'Contacted', 'Not contacted', 'Not interested', 'DNC'] },
+  { key: 'status', label: 'Status', type: 'select', options: ['Analyzing', 'Won', 'Interested', 'Aware', 'Contacted', 'Not contacted', 'Not interested', 'DNC'] },
   { key: 'source', label: 'Source', type: 'select', options: ['LinkedIn', 'Google Search', 'Google Maps', 'Manual Web Search'] },
   { key: 'industry', label: 'Industry', type: 'text' },
   { key: 'opportunity', label: 'Opportunity', type: 'multi_select', options: ['Outdated Website', 'Ugly Website', 'Poor Functionality', 'Limited Features', 'No Website', 'Not Mobile Friendly'] },

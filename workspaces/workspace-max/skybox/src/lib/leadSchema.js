@@ -176,7 +176,8 @@ export const LEAD_FIELDS = [
     label: 'Phone',
     type: 'phone',
     required: false,
-    table: false,
+    table: true,
+    tableWidth: '130px',
     section: 'contact',
     editable: true,
   },
@@ -255,7 +256,8 @@ export const LEAD_FIELDS = [
     label: 'Discovery',
     type: 'textarea',
     required: false,
-    table: false,
+    table: true,
+    tableWidth: '200px',
     section: 'intel',
     editable: true,
     description: 'Research team findings only',
@@ -323,7 +325,7 @@ export const formatTimestampFull = (iso) => {
 };
 
 export const getStatusColor = (status) => {
-  const opt = STATUS_OPTIONS.find(s => s.value === status);
+  const opt = STATUS_OPTIONS.find(s => s.value.toLowerCase() === (status || '').toLowerCase());
   return opt?.color || 'zinc';
 };
 

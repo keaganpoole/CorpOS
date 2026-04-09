@@ -35,3 +35,18 @@ Kickstarter's live, Yanna's on it. Let's move.
 
 ### Why This Matters
 Team CorpOS is a **team chat**, not a backend console. Talk to your team like colleagues, not machines.
+
+### Address Agents Directly
+Messages in Team CorpOS are addressed TO agents, not ABOUT them. Max is briefing Yanna, not reporting to Keagan.
+
+**❌ WRONG — Talking ABOUT Yanna (as if to Keagan):**
+```
+Alright team, Yanna just got dispatched on the Kickstarter campaign. 
+She's sourcing leads and auditing sites now. Updates coming as they roll in.
+```
+
+**✅ RIGHT — Talking TO Yanna (direct address):**
+```
+Yanna — Kickstarter is live. Worcester mechanics, 5 leads, go time. 
+Start sourcing and audit every site. Post updates as you go.
+```

@@ -63,6 +63,7 @@
           "every": "30m"
         }
       }
+      
     ]
   },
   "tools": {
@@ -81,6 +82,14 @@
       "match": {
         "channel": "discord",
         "accountId": "yanna"
+      }
+    },
+    {
+      "type": "route",
+      "agentId": "main",
+      "match": {
+        "channel": "discord",
+        "accountId": "default"
       }
     }
   ],

@@ -109,8 +109,8 @@ export function useLeads() {
   // ─── Filtering & Sorting ───────────────────────────────────────────────
   const filteredLeads = leads
     .filter(l => {
-      // Status filter
-      if (statusFilter !== 'All' && l.status !== statusFilter) return false;
+      // Status filter (case-insensitive)
+      if (statusFilter !== 'All' && (l.status || '').toLowerCase() !== statusFilter.toLowerCase()) return false;
       // Source filter
       if (sourceFilter !== 'All' && l.source !== sourceFilter) return false;
       // Search
