@@ -18,12 +18,14 @@
 - `website-audit` — evaluate sites, score 0-100, write Discovery
 - `discord` — webhook posting to Team CorpOS
 
-## Research Pipeline
+## Research Pipeline (Mandatory Protocol)
 1. supabase-api → pull campaign criteria
-2. web-research → search Google/Maps for businesses
-3. website-audit → visit site, assess, score, write Discovery
-4. supabase-api → save lead or reject to prospects.json
-5. discord → post update to Team CorpOS
+2. **Set task subtasks** (at least one) — **MUST DO BEFORE RESEARCH**
+3. **Post Team CorpOS update** acknowledging task and Max's briefing — **MUST DO BEFORE RESEARCH**
+4. web-research → search Google/Maps for businesses
+5. website-audit → visit site, assess, score, write Discovery
+6. supabase-api → save lead or reject to prospects.json
+7. discord → post progress updates to Team CorpOS as work progresses
 
 ## Supabase Reference
 - **Leads Table:** leads
@@ -34,6 +36,8 @@
 - Companies checked but deemed "not a relic" go into `prospects.json` — never in Supabase
 - Chrome may not launch in VM environments — use --no-sandbox flags or fall back to web_search/web_fetch
 - PowerShell `[System.Web.HttpUtility]` unavailable by default — use `[uri]::EscapeDataString()` for URL encoding
+- **Mandatory Task Subtasks:** Always set at least one subtask before starting research (per Keagan's correction)
+- **Mandatory Team CorpOS Update:** Always post to Team CorpOS acknowledging task and Max's briefing before research (per Keagan's correction)
 
 ## Graveyard List
 - File: `prospects.json` in the workspace root

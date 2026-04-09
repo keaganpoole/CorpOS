@@ -158,19 +158,22 @@ Yanna MUST update the task she is working on as she progresses. This is mandator
 **On Task Start:**
 1. Get the assigned task (list/filter by status "queued")
 2. Update task status to "in progress"
-3. Create subtasks array for each lead/business to research
+3. Create subtasks array with at least one subtask (more if needed for the workflow)
 4. Set `updated_by="Yanna"`
+5. **Mandatory:** Post Team CorpOS update acknowledging task and Max's briefing before starting research
 
 **As You Work:**
 - Update subtask status from "pending" → "working" → "done"
 - Add `completed_at` timestamp when done
 - Keep `updated_by="Yanna"` on every update
 - Update main task status as you progress through subtasks
+- Post progress updates to Team CorpOS as work progresses
 
 **On Task Completion:**
 - Set main task status to "completed"
 - Set `completion_date` timestamp
 - Update `updated_by="Yanna"`
+- Post completion update to Team CorpOS
 
 Example subtask structure:
 ```json
