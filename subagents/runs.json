@@ -770,6 +770,76 @@
       "frozenResultCapturedAt": 1775706679882,
       "endedHookEmittedAt": 1775706717176,
       "cleanupCompletedAt": 1775706717178
+    },
+    "3812627d-625e-452c-ad76-e53d029587b1": {
+      "runId": "3812627d-625e-452c-ad76-e53d029587b1",
+      "childSessionKey": "agent:yanna:subagent:de95a11c-dcd2-4ac6-b83a-63aa1571b219",
+      "controllerSessionKey": "agent:yanna:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:yanna:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "user:289460310673195018",
+        "accountId": "yanna"
+      },
+      "requesterDisplayKey": "agent:yanna:discord:direct:289460310673195018",
+      "task": "Check Supabase for any active research campaigns or pending tasks for Yanna",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "check_supabase",
+      "model": "openrouter/xiaomi/mimo-v2-flash",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-yanna",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775781230445,
+      "startedAt": 1775781230670,
+      "sessionStartedAt": 1775781230445,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775781242423,
+      "outcome": {
+        "status": "timeout"
+      },
+      "endedReason": "subagent-complete",
+      "cleanupCompletedAt": 1775781299729,
+      "endedHookEmittedAt": 1775781242403,
+      "frozenResultText": "{\r\n    \"id\":  \"86b71205-ba7e-4003-9a26-f98292db992b\",\r\n    \"Campaign Name\":  \"Kickstarter\",\r\n    \"Status\":  \"Assigned\",\r\n    \"Target Industry\":  \"Mechanics\",\r\n    \"Target State(s)\":  \"MA\",\r\n    \"Target City(s)\":  \"Worcester\",\r\n    \"Lead Count Goal\":  10,\r\n    \"created_at\":  \"2026-04-05T04:49:49+00:00\",\r\n    \"created_by\":  \"Keagan\",\r\n    \"updated_by\":  \"Yanna\",\r\n    \"assigned_to\":  \"Yanna\",\r\n    \"custom_fields\":  {\r\n\r\n                      }\r\n}",
+      "frozenResultCapturedAt": 1775781242461
+    },
+    "dcf92631-f399-41f0-9d70-8841c76de7f4": {
+      "runId": "dcf92631-f399-41f0-9d70-8841c76de7f4",
+      "childSessionKey": "agent:yanna:subagent:57691674-0fac-4ac5-ae45-2d5b9a729d69",
+      "controllerSessionKey": "agent:yanna:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:yanna:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "user:289460310673195018",
+        "accountId": "yanna"
+      },
+      "requesterDisplayKey": "agent:yanna:discord:direct:289460310673195018",
+      "task": "Search for mechanics businesses in Worcester, MA for the Kickstarter campaign. Use Google Search and Google Maps to find auto repair shops, garages, and mechanical services in the area.",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "search_mechanics_worcester",
+      "model": "openrouter/xiaomi/mimo-v2-flash",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-yanna",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1775781296030,
+      "startedAt": 1775781296446,
+      "sessionStartedAt": 1775781296030,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1775781390732,
+      "outcome": {
+        "status": "ok"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "**Search completed.** Found 15+ auto repair shops in Worcester, MA via Google Search and Maps data. Key leads with contact info:\n\n1. **MotoRizma Auto Repair** – 1 Lyon Pl, Worcester MA 01604 – 774‑253‑5245 – motorizmarepair.com  \n2. **Premier Auto Repair** – 616 W Boylston St, Worcester, MA 01606 – (508) 625‑9218 – mypremierrepair.com  \n3. **Linder’s Auto Repair** – 211‑A Granite St, Worcester, MA 01607 – (508) 713‑4157 – lindersautorepair.com  \n4. **VIP Tires & Service** – 3 Coes Square, Worcester, MA 01603 – 774‑314‑8207 – vipauto.com  \n5. **Monro Auto Service** – 605 Park Ave, Worcester, MA 01603 – (774) 314‑1989 – locations.monro.com  \n6. **East Side Auto Repair** – 235 Shrewsbury St, Worcester, MA 01604 – (508) 798‑9100 – frankseastsideauto.com  \n7. **3B Auto Inc (AAA‑approved)** – 7 Canterbury St, Worcester, MA 01610 – (508) 762‑9740 – 3bworcester.com\n\n**Also noted:** AAA‑approved facilities list (13B Auto Inc, East Side, VIP, Premier, A‑Tech, Fuller Automotive) with distances from central Worcester.  \n\n**Attempted agent‑browser for Google Maps interaction but Chrome crashed repeatedly** (sandbox/headless issues). Fell back to web_search + web_fetch, which provided sufficient business data for the Kickstarter campaign.  \n\nNext steps: audit websites for relic status and feed leads to Supabase.",
+      "frozenResultCapturedAt": 1775781390852,
+      "endedHookEmittedAt": 1775781482496,
+      "cleanupCompletedAt": 1775781482497
     }
   }
 }

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import {
   STATUS_OPTIONS, SOURCE_OPTIONS, OPPORTUNITY_OPTIONS,
-  formatCurrency, formatTimestamp, getStatusColor, getScoreColor,
+  formatCurrency, formatTimestamp, getStatusColor, getScoreColor, capitalizeFirst,
 } from '../lib/leadSchema';
 import {
   loadFieldConfig, saveFieldConfig, loadColorbarRules, saveColorbarRules,
@@ -519,7 +519,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {} }) => 
 
     case 'industry':
       return (
-        <InlineText value={lead.industry} onSave={v => autoSave(lead.id, 'industry', v)}
+        <InlineText value={capitalizeFirst(lead.industry)} onSave={v => autoSave(lead.id, 'industry', v)}
           className="text-[12px] text-zinc-400 truncate block" placeholder="—" />
       );
 
@@ -570,10 +570,10 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {} }) => 
     case 'location':
       return (
         <div className="flex items-center gap-1">
-          <InlineText value={lead.city} onSave={v => autoSave(lead.id, 'city', v)}
+          <InlineText value={capitalizeFirst(lead.city)} onSave={v => autoSave(lead.id, 'city', v)}
             className="text-[12px] text-zinc-400 truncate" placeholder="City" />
           {lead.state && <span className="text-[11px] text-zinc-600">,</span>}
-          <InlineText value={lead.state} onSave={v => autoSave(lead.id, 'state', v)}
+          <InlineText value={lead.state ? lead.state.toUpperCase() : null} onSave={v => autoSave(lead.id, 'state', v)}
             className="text-[12px] text-zinc-400 w-[24px]" placeholder="ST" />
         </div>
       );

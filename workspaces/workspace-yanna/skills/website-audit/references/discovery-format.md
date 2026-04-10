@@ -17,7 +17,7 @@ Open with a bulleted list. Group by opportunity type. Include specific evidence.
 
 ### Part 2: Narrative Summary
 
-Follow with a 2-4 sentence narrative that ties it together.
+Follow with a 2-4 sentence narrative that ties it together. Include the most important things you've found.
 
 ```
 This website appears to be from the early 2010s and has not been updated since. The visual design is dated with clashing colors and unprofessional typography. On mobile, the layout is completely broken — elements overlap and the navigation becomes unusable. There's no clear way for a potential customer to get in touch without scrolling to the bottom of the page.

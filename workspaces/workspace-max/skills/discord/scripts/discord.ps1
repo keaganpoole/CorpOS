@@ -24,13 +24,14 @@ try {
     switch ($Action) {
         'send' {
             if (-not $ChannelId -or -not $Content) { Write-Error "-ChannelId and -Content required"; exit 1 }
-            $body = @{ content = $Content } | ConvertTo-Json
+            $body = @{ content = $Content } | ConvertTo-Json -Depth 5
             $uri = "$Base/channels/$ChannelId/messages"
             
             # Use WebClient for better compatibility
             $webClient = New-Object System.Net.WebClient
             $webClient.Headers.Add("Authorization", "Bot $Token")
             $webClient.Headers.Add("Content-Type", "application/json")
+            $webClient.Encoding = [System.Text.Encoding]::UTF8
             try {
                 $response = $webClient.UploadString($uri, "POST", $body)
                 $r = $response | ConvertFrom-Json

@@ -9,8 +9,8 @@ export const STATUS_OPTIONS = [
   { value: 'Interested',       color: 'green' },
   { value: 'Aware',            color: 'amber' },
   { value: 'Contacted',        color: 'yellow' },
-  { value: 'Not contacted',    color: 'zinc' },
-  { value: 'Not interested',   color: 'rose' },
+  { value: 'Not Contacted',    color: 'zinc' },
+  { value: 'Not Interested',   color: 'rose' },
   { value: 'DNC',              color: 'red' },
 ];
 
@@ -329,8 +329,14 @@ export const getStatusColor = (status) => {
   return opt?.color || 'zinc';
 };
 
+// Capitalize first letter of a string for display
+export const capitalizeFirst = (str) => {
+  if (!str || typeof str !== 'string') return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
 // Add "analyzing" to the default status when creating new leads
-export const DEFAULT_STATUS = 'analyzing';
+export const DEFAULT_STATUS = 'Analyzing';
 
 // Score color: red < 40, amber < 70, emerald >= 70
 export const getScoreColor = (score) => {

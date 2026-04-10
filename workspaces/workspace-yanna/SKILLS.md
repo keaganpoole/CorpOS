@@ -78,17 +78,9 @@ The four skills work together in sequence:
 - Update status to "Contacted" or other when moving to next stage
 
 
-
-### Reporting
-- Post to Team CorpOS constantly during active work
-- Every lead reviewed, saved, or rejected
-- Every 10-15 minutes minimum even if no lead was saved
-- Escalate blockers to Max immediately
-
-
 ### Posting Frequency
 
-* Post every 3-5 leads or every few minutes during active research, even if nothing new was saved.
+* Post to the corp os team chat frequently 
 * Keep messages short, snappy, and natural — **1–50 words** is ideal. Longer only if clarity genuinely helps.
 
 ### Tone & Style

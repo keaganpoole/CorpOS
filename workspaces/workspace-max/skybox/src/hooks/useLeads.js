@@ -111,8 +111,8 @@ export function useLeads() {
     .filter(l => {
       // Status filter (case-insensitive)
       if (statusFilter !== 'All' && (l.status || '').toLowerCase() !== statusFilter.toLowerCase()) return false;
-      // Source filter
-      if (sourceFilter !== 'All' && l.source !== sourceFilter) return false;
+      // Source filter (case-insensitive)
+      if (sourceFilter !== 'All' && (l.source || '').toLowerCase() !== sourceFilter.toLowerCase()) return false;
       // Search
       if (searchQuery) {
         const q = searchQuery.toLowerCase();

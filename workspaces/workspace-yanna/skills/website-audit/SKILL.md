@@ -36,7 +36,7 @@ Evaluate each category. See `references/scoring.md` for full rubric.
 | **Functionality** | Working links? Forms? Online booking? |
 | **Content** | Clear value prop? Services listed? Contact info visible? |
 | **CTA** | Call-to-action present? Phone number prominent? Lead capture? |
-| **Performance** | Loads fast? Images optimized? Broken elements? |
+| **Performance** | mobile optimized? Broken elements? |
 
 ### 4. Score It
 

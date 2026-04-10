@@ -9,7 +9,7 @@ import {
 import {
   STATUS_OPTIONS, SOURCE_OPTIONS, OPPORTUNITY_OPTIONS, DETAIL_SECTIONS,
   getFieldDef, getSectionFields, formatTimestampFull, formatCurrency,
-  getScoreColor, getStatusColor,
+  getScoreColor, getStatusColor, capitalizeFirst,
 } from '../lib/leadSchema';
 
 // ─── Field Input Components (same as before, abbreviated for space) ────────
@@ -263,7 +263,7 @@ const LeadDetailPanel = ({ lead, onSave, onDelete, onClose, isNew = false }) => 
                   }`}>{currentLead.status}</span>
                 )}
                 {currentLead.industry && (
-                  <span className="px-2 py-0.5 rounded-lg text-[9px] font-bold text-zinc-500 border border-white/10 bg-white/5 uppercase">{currentLead.industry}</span>
+                  <span className="px-2 py-0.5 rounded-lg text-[9px] font-bold text-zinc-500 border border-white/10 bg-white/5 uppercase">{capitalizeFirst(currentLead.industry)}</span>
                 )}
               </div>
             </div>
