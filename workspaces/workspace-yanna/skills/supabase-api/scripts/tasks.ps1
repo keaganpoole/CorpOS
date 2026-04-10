@@ -36,7 +36,7 @@ switch ($Action) {
     'update' {
         if (-not $Id) { Write-Error "-Id required for update"; exit 1 }
         if (-not $Fields) { Write-Error "-Fields (JSON) required for update"; exit 1 }
-        $body = $Fields | ConvertFrom-Json
+        $body = $Fields | ConvertFrom-Json -ErrorAction Stop
         $json = $body | ConvertTo-Json -Depth 5
         Invoke-RestMethod -Uri "$Url/rest/v1/tasks?id=eq.$Id" -Headers $Headers -Method PATCH -Body $json | Out-Null
         Write-Output "Updated task $Id"

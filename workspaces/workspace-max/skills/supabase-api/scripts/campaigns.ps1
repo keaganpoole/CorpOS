@@ -35,8 +35,10 @@ switch ($Action) {
         if ($Status) { $body['Status'] = $Status }
         if ($AssignedTo) { $body['assigned_to'] = $AssignedTo }
         if ($Fields) { 
-            ($Fields | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $body[$_.Name] = $_.Value }
+            $FieldsObject = $Fields | ConvertFrom-Json
+            $FieldsObject.PSObject.Properties | ForEach-Object { $body[$_.Name] = $_.Value }
         }
+        $body['updated_by'] = 'Max'
         Invoke-RestMethod -Uri "$Url/rest/v1/research_campaigns?id=eq.$Id" -Headers $Headers -Method PATCH -Body ($body | ConvertTo-Json -Depth 5) | Out-Null
         Write-Output "Updated campaign $Id"
     }

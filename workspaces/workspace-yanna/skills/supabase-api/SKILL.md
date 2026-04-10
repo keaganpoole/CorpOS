@@ -86,7 +86,7 @@ powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action <action> [par
 
 **Update task status:**
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<uuid>" -Fields '{"status":"working","updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<uuid>" -Fields '{"status":"in progress","updated_by":"Yanna"}'
 ```
 
 **Update subtasks (JSON array):**
@@ -109,7 +109,7 @@ Add new subtask, mark as complete, etc. Example subtask structure:
 
 **Step 3: Update task with new subtasks array**
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","text":"Research businesses in ME","status":"done"},{"id":"subtask-2","text":"Audit website for Acme Co","status":"working"}],"updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","text":"Research businesses in ME","status":"done"},{"id":"subtask-2","text":"Audit website for Acme Co","status":"in progress"}],"updated_by":"Yanna"}'
 ```
 
 **Mandatory Task Update Workflow:**
@@ -216,7 +216,7 @@ Full research loop:
 ### Update Task Status
 Always update task status as you work. Example:
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"working","updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"in progress","updated_by":"Yanna"}'
 ```
 
 ### Update Subtasks (JSON array)
@@ -242,7 +242,7 @@ Add new subtask, mark as complete, etc. Example subtask structure:
 
 **Step 3: Update task with new subtasks array**
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","text":"Research businesses in ME","status":"done"},{"id":"subtask-2","text":"Audit website for Acme Co","status":"working"}],"updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"subtask-1","text":"Research businesses in ME","status":"done"},{"id":"subtask-2","text":"Audit website for Acme Co","status":"in progress"}],"updated_by":"Yanna"}'
 ```
 
 **Workflow:**
@@ -256,7 +256,7 @@ powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<
 powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action list -Team "Research Team" -Status "queued"
 
 # 2. Update task to "in progress" when starting
-powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"working","updated_by":"Yanna"}'
+powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"status":"in progress","updated_by":"Yanna"}'
 
 # 3. Create subtasks for each business to research (example)
 powershell -ExecutionPolicy Bypass -File scripts/tasks.ps1 -Action update -Id "<task_id>" -Fields '{"subtasks":[{"id":"st-1","task":"Source businesses","status":"completed","assigned_to":"Yanna","completed_at":"2026-04-08T21:35:00Z"},{"id":"st-2","task":"Audit websites","status":"in progress","assigned_to":"Yanna","completed_at":null},{"id":"st-3","task":"Save qualified leads","status":"queued","assigned_to":"Yanna","completed_at":null}],"updated_by":"Yanna"}'
