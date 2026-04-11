@@ -1,0 +1,59 @@
+
+.menu {
+    position: fixed; /* Changed to fixed to cover the screen */
+    z-index: 20;
+    height: 100vh;
+    overflow: hidden; /* Controlled by JS */
+    /* background: rgba(16, 16, 16, 0.7); */ /* Will be overridden by JS gradient */
+    border-right: none; /* Removed border-right */
+    backdrop-filter: blur(20px);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+    top: 0; /* Ensure it starts from the top */
+    left: 0; /* Ensure it starts from the left */
+}
+
+.menu-content-wrapper {
+}
+
+.menu-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    padding: 0;
+    scroll-snap-type: y mandatory; /* Enable scroll snapping */
+    scroll-behavior: smooth; /* Smooth scroll behavior */
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.menu-item {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 4rem;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+    padding: 20px 0; /* Adjusted padding */
+    width: 100%;
+    text-align: center;
+    will-change: transform, opacity;
+    /* transition: all 0.3s ease; */ /* Overridden by framer-motion */
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    scroll-snap-align: center; /* Snap items to center */
+}
+
+.menu-content::-webkit-scrollbar {
+    display: none;
+}
+
+.menu-item-text {
+    display: block;
+    white-space: nowrap;
+}
+
+.menu-item.active {
+    color: #fff;
+}

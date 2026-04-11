@@ -1,0 +1,406 @@
+:root {
+  --dashboard-bg: #030308;
+  --dashboard-secondary: #0a0b12;
+  --dashboard-border: rgba(255, 255, 255, 0.08);
+  --dashboard-text: #ffffff;
+  --dashboard-muted: rgba(255, 255, 255, 0.6);
+  --accent-turquoise: #32f0d9;
+  --accent-purple: #a855f7;
+  --accent-pink: #ff6ec7;
+  --scale-factor: 0.75;
+}
+
+.dashboard-v2-shell {
+  min-height: 100vh;
+  background: var(--dashboard-bg);
+  color: var(--dashboard-text);
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  font-family: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
+}
+
+.dashboard-grid {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+
+.menu {
+  width: 70px;
+  min-width: 70px;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.menu-rail {
+  width: 70px;
+  min-width: 70px;
+  height: 100vh;
+  background: #050507;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.1rem 0;
+  gap: 0.75rem;
+  z-index: 10;
+}
+
+.menu-rail::after {
+  content: '';
+  position: absolute;
+  bottom: 1rem;
+  width: 40px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+}
+
+.menu-icons {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.menu-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.65);
+  transition: transform 0.25s ease, color 0.25s ease;
+  cursor: pointer;
+}
+
+.menu-icon.active,
+.menu-icon:hover {
+  color: var(--dashboard-text);
+  transform: translateX(3px);
+}
+
+.menu-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.status-bar {
+  width: 5px;
+  height: 100%;
+  background: transparent;
+  position: relative;
+  transition: background 0.3s ease;
+}
+
+.status-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  opacity: 0.3;
+}
+
+.status-bar-active::after {
+  opacity: 1;
+  animation: statusPulse 2.4s linear infinite;
+  background: linear-gradient(180deg, rgba(50, 240, 217, 0.9), rgba(168, 85, 247, 0.9), rgba(255, 110, 199, 0.9));
+}
+
+@keyframes gradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes underlinePulse {
+  0% {
+    transform: translateX(-50%) scaleX(0.65);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateX(-50%) scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) scaleX(0.65);
+    opacity: 0.4;
+  }
+}
+
+@keyframes statusPulse {
+  0% {
+    opacity: 0.6;
+    transform: translateY(-5px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(5px);
+  }
+  100% {
+    opacity: 0.6;
+    transform: translateY(-5px);
+  }
+}
+
+.canvas {
+  flex: 1;
+  background: var(--dashboard-secondary);
+  padding: clamp(1.5rem, 2.25vw, 2.45rem);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.canvas-builder-mode {
+  padding: 0;
+}
+
+.scenario-builder-wrapper {
+  flex: 1;
+  min-height: 100%;
+}
+
+.canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 25% 25%, rgba(50, 240, 217, 0.2), transparent 45%), radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.25), transparent 50%);
+  opacity: 0.85;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.canvas-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  height: 100%;
+}
+
+.canvas-hero {
+  border-radius: 24px;
+  padding: clamp(1rem, 1.75vw, 2rem);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.hero-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.hero-spotlight {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  max-width: 260px;
+}
+
+.hero-spotlight strong {
+  display: block;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.canvas-hero h1 {
+  font-size: clamp(2.05rem, 3vw, 2.7rem);
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.canvas-hero p {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.85rem;
+  margin: 0;
+  max-width: 520px;
+}
+
+.hero-badges {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.hero-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.page-body {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  flex: 1;
+}
+
+.page-card {
+  border-radius: 20px;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 15px 25px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.page-card h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.page-card .value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.profile-menu {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(5, 5, 7, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.profile-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, rgba(50, 240, 217, 0.95), rgba(168, 85, 247, 0.9));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #02070d;
+  font-size: 0.9rem;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.profile-details {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.profile-details strong {
+  font-size: 0.72rem;
+}
+
+.profile-details span {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.1em;
+}
+
+.sub-menu-dock {
+  position: absolute;
+  bottom: 1.35rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(4, 4, 7, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 18px 35px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(18px);
+  z-index: 2;
+}
+
+.sub-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.3s ease, transform 0.3s ease;
+  cursor: pointer;
+}
+
+.sub-menu-item .icon {
+  font-size: 0.8rem;
+}
+
+.sub-menu-item:hover {
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.page-extra {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.page-extra-card {
+  border-radius: 22px;
+  padding: 1.2rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.page-extra-card span {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.65);
+  letter-spacing: 0.15em;
+}
+
+.page-extra-card strong {
+  font-size: 1.8rem;
+}
