@@ -72,7 +72,7 @@ class Controller {
     this.wss = new WebSocket.Server({ server: this.server });
     this.clients = new Set();
 
-    // Init DB (still needed for tasks, leads, cron_jobs tables)
+    // Init DB (needed for leads, cron_jobs tables)
     const dbPath = require('path').join(__dirname, '..', 'data', 'SONAR.db');
     this.db = initDatabase(dbPath);
 
@@ -132,7 +132,6 @@ class Controller {
 
     const state = {
       type: 'initial_state',
-      tasks: this.db.prepare('SELECT * FROM tasks ORDER BY updated_at DESC').all(),
       agents: agents,
       control: control,
       session: { status: 'active' },
@@ -159,105 +158,6 @@ class Controller {
   // ─── REST API Routes ─────────────────────────────────────
   _setupRoutes() {
     // --- Data endpoints ---
-
-    this.app.get('/api/tasks', (req, res) => {
-      const tasks = this.db.prepare('SELECT * FROM tasks ORDER BY updated_at DESC').all();
-      res.json(tasks);
-    });
-
-    this.app.get('/api/tasks/:id', (req, res) => {
-      const task = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-      if (!task) return res.status(404).json({ error: 'Task not found' });
-      const updates = this.db.prepare('SELECT * FROM task_updates WHERE task_id = ? ORDER BY timestamp DESC').all(req.params.id);
-      res.json({ ...task, updates });
-    });
-
-    // Create a new task
-    this.app.post('/api/tasks', (req, res) => {
-      const { id, title, description, owner, actor_type, department, priority, status } = req.body;
-      if (!title || !owner) return res.status(400).json({ error: 'title and owner are required' });
-
-      const taskId = id || 'task_' + Date.now();
-      const taskStatus = status || 'queued';
-
-      this.db.prepare(`
-        INSERT INTO tasks (id, title, description, owner, actor_type, status, department, priority)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(taskId, title, description || '', owner, actor_type || 'A', taskStatus, department || 'Operations', priority || 'medium');
-
-      this.events.emit({
-        event_type: 'task_created',
-        message: `Task created: ${title}`,
-        actor: owner,
-        actor_type: 'system',
-        source: 'SONAR_tasks',
-        task_id: taskId,
-        severity: 'ok',
-        payload: { taskId, title, owner, priority: priority || 'medium' },
-      });
-
-      res.json({ success: true, task: this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId) });
-    });
-
-    // Update task status
-    this.app.put('/api/tasks/:id', (req, res) => {
-      const task = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-      if (!task) return res.status(404).json({ error: 'Task not found' });
-
-      const { status, latest_update, priority, title, description } = req.body;
-      const changes = [];
-
-      if (status && status !== task.status) changes.push(`${task.status} → ${status}`);
-      if (priority && priority !== task.priority) changes.push(`priority: ${priority}`);
-      if (title && title !== task.title) changes.push(`title updated`);
-
-      this.db.prepare(`
-        UPDATE tasks SET
-          status = COALESCE(?, status),
-          latest_update = COALESCE(?, latest_update),
-          latest_update_at = datetime('now'),
-          priority = COALESCE(?, priority),
-          title = COALESCE(?, title),
-          description = COALESCE(?, description),
-          updated_at = datetime('now')
-        WHERE id = ?
-      `).run(status || null, latest_update || null, priority || null, title || null, description || null, req.params.id);
-
-      // Emit appropriate event
-      const eventType = status ? `task_${status}` : 'task_updated';
-      this.events.emit({
-        event_type: eventType,
-        message: latest_update || `Task "${task.title}" ${changes.length > 0 ? changes.join(', ') : 'updated'}`,
-        actor: task.owner,
-        actor_type: 'system',
-        source: 'SONAR_tasks',
-        task_id: req.params.id,
-        severity: status === 'failed' ? 'critical' : status === 'warning' ? 'warning' : 'ok',
-      });
-
-      res.json({ success: true, task: this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id) });
-    });
-
-    // Delete a task
-    this.app.delete('/api/tasks/:id', (req, res) => {
-      const task = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-      if (!task) return res.status(404).json({ error: 'Task not found' });
-
-      this.db.prepare('DELETE FROM task_updates WHERE task_id = ?').run(req.params.id);
-      this.db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
-
-      this.events.emit({
-        event_type: 'task_deleted',
-        message: `Task deleted: ${task.title}`,
-        actor: 'Keagan',
-        actor_type: 'user',
-        source: 'SONAR_tasks',
-        severity: 'warning',
-        payload: { taskId: req.params.id, title: task.title },
-      });
-
-      res.json({ success: true });
-    });
 
     this.app.get('/api/agents', async (req, res) => {
       try {
@@ -933,108 +833,7 @@ class Controller {
       res.json({ success: true });
     });
 
-    // --- Webhook endpoint to handle Supabase tasks table changes ---
-    this.app.post('/api/webhook/tasks', (req, res) => {
-      const { type, record, old_record } = req.body;
-      if (!type || !record || !record.id) {
-        return res.status(400).json({ error: 'Invalid webhook payload' });
-      }
 
-      const taskId = record.id;
-      const taskName = record.task || old_record?.task || 'Unknown Task';
-      const actorName = (type === 'INSERT' ? record.created_by : (record.updated_by || old_record?.updated_by)) || 'system';
-
-      const eventType = {
-        INSERT: 'task_created',
-        UPDATE: 'task_updated',
-        DELETE: 'task_deleted',
-      }[type];
-
-      if (!eventType) {
-        return res.status(400).json({ error: 'Unsupported event type' });
-      }
-
-      if (type === 'INSERT') {
-        this.events.emit({
-          event_type: 'task_created',
-          message: `New task created: ${taskName} 📋`,
-          actor: actorName,
-          actor_type: actorName === 'system' ? 'system' : 'user',
-          source: 'supabase_tasks_webhook',
-          severity: 'ok',
-          payload: { taskId, actor: actorName, time: new Date().toISOString() },
-        });
-        return res.json({ success: true });
-      }
-
-      if (type === 'DELETE') {
-        this.events.emit({
-          event_type: 'task_deleted',
-          message: `Deleted task: ${taskName} 🗑️`,
-          actor: actorName,
-          actor_type: actorName === 'system' ? 'system' : 'user',
-          source: 'supabase_tasks_webhook',
-          severity: 'warning',
-          payload: { taskId, actor: actorName, time: new Date().toISOString() },
-        });
-        return res.json({ success: true });
-      }
-
-      // UPDATE — compare fields dynamically
-      let changeParts = [];
-
-      const fieldLabels = {
-        task: 'title',
-        status: 'status',
-        assigned_to: 'assigned to',
-        assigned_team: 'team',
-        notes: 'notes',
-        due_date: 'due date',
-        start_date: 'start date',
-        completion_date: 'completion date',
-        subtasks: 'subtasks',
-      };
-
-      const skipFields = ['created_by', 'updated_by', 'id', 'created_at', 'updated_at'];
-
-      for (const [field, label] of Object.entries(fieldLabels)) {
-        const oldVal = old_record?.[field];
-        const newVal = record[field];
-        const oldStr = typeof oldVal === 'object' && oldVal !== null ? JSON.stringify(oldVal) : String(oldVal ?? '');
-        const newStr = typeof newVal === 'object' && newVal !== null ? JSON.stringify(newVal) : String(newVal ?? '');
-        if (oldStr !== newStr) {
-          if (field === 'task') {
-            changeParts.push(`renamed from "${oldStr}" to "${newStr}"`);
-          } else if (field === 'subtasks') {
-            changeParts.push(`subtasks updated`);
-          } else {
-            changeParts.push(`${label} from ${oldStr || 'empty'} to ${newStr || 'empty'}`);
-          }
-        }
-      }
-
-      let message;
-      if (changeParts.length > 0) {
-        const changeStr = changeParts.length === 1
-          ? changeParts[0]
-          : changeParts.slice(0, -1).join(', ') + ' and ' + changeParts[changeParts.length - 1];
-        message = `Updated task "${taskName}": ${changeStr}`;
-      } else {
-        message = `Updated task "${taskName}"`;
-      }
-
-      this.events.emit({
-        event_type: eventType,
-        message: `${message}.`,
-        actor: actorName,
-        actor_type: actorName === 'system' ? 'system' : 'user',
-        source: 'supabase_tasks_webhook',
-        severity: 'ok',
-        payload: { taskId, actor: actorName, changes: changeParts, time: new Date().toISOString() },
-      });
-
-      res.json({ success: true });
-    });
 
     // --- Webhook endpoint to handle Supabase research campaigns table changes ---
     this.app.post('/api/webhook/research-campaigns', (req, res) => {

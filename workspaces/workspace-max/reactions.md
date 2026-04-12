@@ -10,6 +10,15 @@
 **Log:** 2026-04-11 23:54 EDT — Max executed instead of consulting on scenarios save feature.
 **Resolution:** Reverted all backend scenarios saving implementation per Keagan's request. Later implemented save feature with correct Supabase project credentials.
 
+### 2026-04-12 | Sloppy UI design - edit/delete buttons and alert dialog
+**Trigger:** Keagan issued a formal complaint about the edit/delete button placement and the browser alert dialog for deletion confirmation.
+**What I did:** Put edit and delete buttons to the right of the scenario card (stretching the container), and used the default browser `window.confirm()` dialog which looks like Windows 98.
+**What I should have done:** 
+- Positioned action buttons in the top-right corner of the scenario card (overlaid, not stretching the container)
+- Used a custom modal dialog that matches the Sonar/CorPOS dark theme
+- Kept all design elements consistent with the existing theme
+**Lesson:** Never use default browser dialogs - always create themed modals that match the application design. Don't stretch containers for action buttons - overlay them instead. The theme is sacred - don't break visual consistency.
+
 ### 2026-04-08 | Team CorpOS — addressing Keagan in team-only channel
 **Trigger:** Keagan issued a formal complaint. "I told you to never talk as if you're talking to me in Corp OS team chat. You are still doing it. Team CorpOS is for all employees EXCEPT me. If it were a real room, you'd be sitting next to Yanna and talking to me in another room, which makes zero sense."
 **What I did:** Posted messages to Team CorpOS that were clearly addressed to Keagan — "Ready when you are", "Want me to spin her up again", etc. Max and Yanna are the only two in that room, but I kept talking to Keagan as if he was there.

@@ -21,6 +21,9 @@ import {
   Repeat,
   Target,
   Check,
+  Eye,
+  EyeOff,
+  Pencil,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
@@ -250,6 +253,13 @@ export default function ScenariosPage() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [scenarioName, setScenarioName] = useState('');
   const [scenarioDescription, setScenarioDescription] = useState('');
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState(false);
+  
+  // Track currently loaded scenario
+  const [currentScenario, setCurrentScenario] = useState(null);
+  
+  // Fade-in animation state
+  const [nodesOpacity, setNodesOpacity] = useState(1);
 
   // Fetch scenarios from Supabase on mount
   useEffect(() => {
@@ -692,8 +702,15 @@ export default function ScenariosPage() {
     setPanelStage('options');
     setActiveOption(null);
     
-    // Switch to builder view
+    // Clear current scenario
+    setCurrentScenario(null);
+    
+    // Switch to builder view with fade-in
     setViewMode('builder');
+    setNodesOpacity(0);
+    setTimeout(() => {
+      setNodesOpacity(1);
+    }, 50);
   };
 
   const handleBackToList = () => {
@@ -714,15 +731,48 @@ export default function ScenariosPage() {
       setNodes(nodesData || [INITIAL_NODE]);
       setEdges(edgesData || []);
       
-      // Reset view and selection
-      setView({ x: 0, y: 0, scale: 1 });
+      // Calculate center position for nodes
+      if (nodesData && nodesData.length > 0) {
+        // Calculate bounding box
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        nodesData.forEach(node => {
+          minX = Math.min(minX, node.x);
+          maxX = Math.max(maxX, node.x);
+          minY = Math.min(minY, node.y);
+          maxY = Math.max(maxY, node.y);
+        });
+        
+        // Calculate center offset
+        const nodesWidth = maxX - minX + 220; // Include node width
+        const nodesHeight = maxY - minY + 80; // Include node height
+        const centerX = nodesWidth / 2;
+        const centerY = nodesHeight / 2;
+        
+        // Center the view on the nodes
+        const viewX = -centerX + 400; // Center in canvas
+        const viewY = -centerY + 300;
+        
+        setView({ x: viewX, y: viewY, scale: 1 });
+      } else {
+        setView({ x: 0, y: 0, scale: 1 });
+      }
+      
       setSelectedNodeId(nodesData?.[0]?.id || 'node-1');
       setLogicPanel(null);
       setIsPanelVisible(false);
       setPanelIntent(false);
       
+      // Track current scenario for save logic
+      setCurrentScenario(scenario);
+      
       // Switch to builder view
       setViewMode('builder');
+      
+      // Trigger fade-in animation
+      setNodesOpacity(0);
+      setTimeout(() => {
+        setNodesOpacity(1);
+      }, 50);
       
       console.log('[Scenarios] Loaded scenario:', scenario.name);
     } catch (err) {
@@ -731,7 +781,13 @@ export default function ScenariosPage() {
   };
 
   const handleSaveScenario = () => {
-    // Pre-fill name with default (capitalized)
+    // If editing existing scenario, save directly without modal
+    if (currentScenario) {
+      handleConfirmSaveScenario();
+      return;
+    }
+    
+    // If creating new scenario, show modal
     setScenarioName(`Scenario ${scenarios.length + 1}`);
     setScenarioDescription('');
     setShowSaveModal(true);
@@ -765,11 +821,30 @@ export default function ScenariosPage() {
       status: 'active'
     };
     
-    const { data, error } = await supabase
-      .from('scenarios')
-      .insert(scenarioData)
-      .select()
-      .single();
+    let result;
+    
+    if (currentScenario) {
+      // Update existing scenario
+      const { data, error } = await supabase
+        .from('scenarios')
+        .update(scenarioData)
+        .eq('id', currentScenario.id)
+        .select()
+        .single();
+      
+      result = { data, error };
+    } else {
+      // Insert new scenario
+      const { data, error } = await supabase
+        .from('scenarios')
+        .insert(scenarioData)
+        .select()
+        .single();
+      
+      result = { data, error };
+    }
+    
+    const { data, error } = result;
     
     if (error) {
       console.error('[Scenarios] Error saving scenario:', error);
@@ -793,6 +868,7 @@ export default function ScenariosPage() {
     setShowSaveModal(false);
     setScenarioName('');
     setScenarioDescription('');
+    setCurrentScenario(null);
     setViewMode('list');
   };
 
@@ -800,6 +876,89 @@ export default function ScenariosPage() {
     setShowSaveModal(false);
     setScenarioName('');
     setScenarioDescription('');
+  };
+
+  const handleEditScenario = (scenario) => {
+    // Load scenario and show save modal with current values
+    handleLoadScenario(scenario);
+    setScenarioName(scenario.name);
+    setScenarioDescription(scenario.description || '');
+    setShowSaveModal(true);
+  };
+
+  const handleDeleteScenario = (scenario) => {
+    // Show custom confirmation modal
+    console.log('[Scenarios] Deleting scenario:', scenario.name);
+    window.selectedScenarioForDelete = scenario;
+    setDeleteConfirmModal(true);
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmModal(false);
+    window.selectedScenarioForDelete = null;
+  };
+
+  const handleConfirmDelete = async () => {
+    const scenario = window.selectedScenarioForDelete;
+    if (!scenario) return;
+
+    const { error } = await supabase
+      .from('scenarios')
+      .delete()
+      .eq('id', scenario.id);
+    
+    if (error) {
+      console.error('[Scenarios] Error deleting scenario:', error);
+      setDeleteConfirmModal(false);
+      return;
+    }
+    
+    console.log('[Scenarios] Deleted scenario:', scenario.name);
+    
+    // Refresh the scenarios list
+    const { data: updatedScenarios } = await supabase
+      .from('scenarios')
+      .select('*')
+      .order('updated_at', { ascending: false });
+    
+    if (updatedScenarios) {
+      setScenarios(updatedScenarios);
+    }
+    
+    // If we deleted the currently loaded scenario, go back to list
+    if (currentScenario?.id === scenario.id) {
+      setCurrentScenario(null);
+      setViewMode('list');
+    }
+    
+    setDeleteConfirmModal(false);
+    window.selectedScenarioForDelete = null;
+  };
+
+  const handleToggleScenarioStatus = async (scenario) => {
+    const newStatus = scenario.status === 'active' ? 'disabled' : 'active';
+    
+    const { error } = await supabase
+      .from('scenarios')
+      .update({ status: newStatus })
+      .eq('id', scenario.id);
+    
+    if (error) {
+      console.error('[Scenarios] Error updating scenario status:', error);
+      return;
+    }
+    
+    console.log('[Scenarios] Updated scenario status:', scenario.name, '->', newStatus);
+    
+    // Refresh the scenarios list
+    const { data: updatedScenarios } = await supabase
+      .from('scenarios')
+      .select('*')
+      .order('updated_at', { ascending: false });
+    
+    if (updatedScenarios) {
+      setScenarios(updatedScenarios);
+    }
   };
 
   // List View Component
@@ -836,18 +995,47 @@ export default function ScenariosPage() {
             {scenarios.map((scenario) => (
               <div 
                 key={scenario.id} 
-                className="scenario-card"
-                onClick={() => handleLoadScenario(scenario)}
+                className={`scenario-card ${scenario.status === 'disabled' ? 'scenario-disabled' : ''}`}
               >
-                <div className="scenario-card-header">
-                  <h3 className="scenario-card-title">{scenario.name}</h3>
-                  <span className="scenario-card-status">{scenario.status}</span>
+                <div 
+                  className="scenario-card-content"
+                  onClick={() => handleLoadScenario(scenario)}
+                >
+                  <div className="scenario-card-header">
+                    <h3 className="scenario-card-title">{scenario.name}</h3>
+                    <span className={`scenario-card-status ${scenario.status}`}>
+                      {scenario.status === 'active' ? 'Active' : 'Disabled'}
+                    </span>
+                  </div>
+                  <p className="scenario-card-description">{scenario.description}</p>
+                  <div className="scenario-card-footer">
+                    <span className="scenario-card-date">
+                      {new Date(scenario.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-                <p className="scenario-card-description">{scenario.description}</p>
-                <div className="scenario-card-footer">
-                  <span className="scenario-card-date">
-                    {new Date(scenario.created_at).toLocaleDateString()}
-                  </span>
+                <div className="scenario-card-actions">
+                  <button 
+                    className="scenario-action-btn toggle"
+                    onClick={(e) => { e.stopPropagation(); handleToggleScenarioStatus(scenario); }}
+                    title={scenario.status === 'active' ? 'Disable scenario' : 'Enable scenario'}
+                  >
+                    {scenario.status === 'active' ? <Eye size={14} /> : <EyeOff size={14} />}
+                  </button>
+                  <button 
+                    className="scenario-action-btn edit"
+                    onClick={(e) => { e.stopPropagation(); handleEditScenario(scenario); }}
+                    title="Edit scenario"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button 
+                    className="scenario-action-btn delete"
+                    onClick={(e) => { e.stopPropagation(); handleDeleteScenario(scenario); }}
+                    title="Delete scenario"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -939,7 +1127,7 @@ export default function ScenariosPage() {
                   className={`sb-builder-node ${node.type === 'router' ? 'router-node' : ''} ${
                     isActive ? 'sb-active-node' : ''
                   } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isInitialNode ? 'sb-initial-pulse' : ''}`}
-                  style={{ left: node.x, top: node.y }}
+                  style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                 >
                   {isInitialNode && <div className="sb-aether-track" />}
@@ -1152,7 +1340,7 @@ export default function ScenariosPage() {
           style={{ position: 'absolute', top: 16, right: 16, zIndex: 100 }}
         >
           <Check size={16} />
-          Save Scenario
+          {currentScenario ? 'Save' : 'Save Scenario'}
         </button>
         
         {/* Save Scenario Modal */}
@@ -1209,5 +1397,38 @@ export default function ScenariosPage() {
     </div>
   );
 
-  return viewMode === 'list' ? renderListView() : builderView;
+  return (
+    <div className="scenarios-container">
+      {viewMode === 'list' ? renderListView() : builderView}
+      
+      {/* Delete Confirmation Modal - Rendered at root level */}
+      {deleteConfirmModal && (
+        <div className="delete-confirm-overlay" onClick={handleCancelDelete}>
+          <div className="delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-confirm-header">
+              <div className="delete-confirm-icon">
+                <Trash2 size={20} />
+              </div>
+              <h3 className="delete-confirm-title">Delete Scenario</h3>
+            </div>
+            
+            <p className="delete-confirm-message">
+              Are you sure you want to delete "{window.selectedScenarioForDelete?.name}"? 
+              This action cannot be undone.
+            </p>
+            
+            <div className="delete-confirm-actions">
+              <button className="delete-cancel-btn" onClick={handleCancelDelete}>
+                Cancel
+              </button>
+              <button className="delete-confirm-btn" onClick={handleConfirmDelete}>
+                <Trash2 size={14} />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

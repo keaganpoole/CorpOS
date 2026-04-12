@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
-import { useTasks } from './hooks/useTasks';
+
 import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
 import CampaignsModal from './pages/CampaignsModal';
@@ -2324,7 +2324,7 @@ const NavButton = ({ item, isActive, onClick }) => {
 };
 
 const App = () => {
-  const [currentRoute, setCurrentRoute] = useState('tasks');
+  const [currentRoute, setCurrentRoute] = useState('pipeline');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [glitch, setGlitch] = useState(false);
   const [zoneOpen, setZoneOpen] = useState(false);
@@ -2387,17 +2387,6 @@ const App = () => {
   } = useSonarState();
 
   // Supabase-backed tasks + dynamic columns
-  const {
-    tasks: supabaseTasks,
-    columns: taskColumns,
-    loading: tasksLoading,
-    createTask,
-    updateTask,
-    deleteTask,
-    updateColumn,
-    reorderColumns,
-  } = useTasks();
-
   // Enrich agents with campaign data from Supabase (matched by assigned_to)
   const enrichedAgents = (agents || []).map(a => {
     const campaign = agentCampaigns[a.name?.toLowerCase?.() || ''];
@@ -2434,7 +2423,6 @@ const App = () => {
   }, []);
 
   const navItems = [
-    { id: 'tasks', icon: <Layers size={18} />, label: 'Tasks' },
     { id: 'agents', icon: <Users size={18} />, label: 'Agents' },
     { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
     { id: 'chronos', icon: <History size={18} />, label: 'Chronos' },
@@ -2446,78 +2434,6 @@ const App = () => {
 
   const renderView = () => {
     switch (currentRoute) {
-      case 'tasks':
-        return (
-          <div className="relative h-full flex flex-col">
-            {/* Board area — reorderable columns */}
-            <Reorder.Group
-              axis="x"
-              values={taskColumns}
-              onReorder={(newOrder) => {
-                // Optimistic: update local state immediately (Reorder.Group handles this)
-                // Persist to Supabase
-                reorderColumns(newOrder);
-              }}
-              className="flex-1 flex gap-5 overflow-x-auto custom-scrollbar snap-x p-8 pb-2"
-            >
-              {taskColumns.map(col => {
-                // Normalize column status value for comparison
-                const colStatusNorm = col.status_value?.toLowerCase().replace(/_/g, ' ');
-                return (
-                  <Reorder.Item
-                    key={col.id}
-                    value={col}
-                    className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full"
-                    style={{ listStyle: 'none' }}
-                    whileDrag={{ scale: 1.02, zIndex: 50, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
-                  >
-                    <KanbanColumn
-                      column={col}
-                      tasks={supabaseTasks.filter(t => {
-                        // Normalize task status for comparison (case-insensitive, underscores = spaces)
-                        const taskStatusNorm = t.status?.toLowerCase().replace(/_/g, ' ');
-                        return taskStatusNorm === colStatusNorm;
-                      })}
-                      onEditColumn={updateColumn}
-                    />
-                  </Reorder.Item>
-                );
-              })}
-              {/* Uncategorized column — tasks with no matching column (not draggable) */}
-              {(() => {
-                // Build normalized set of known status values
-                const knownStatuses = new Set(
-                  taskColumns.map(c => c.status_value?.toLowerCase().replace(/_/g, ' '))
-                );
-                const orphaned = supabaseTasks.filter(t => {
-                  const taskStatusNorm = t.status?.toLowerCase().replace(/_/g, ' ');
-                  return !knownStatuses.has(taskStatusNorm);
-                });
-                if (orphaned.length === 0) return null;
-                return (
-                  <div key="uncategorized" className="flex-1 min-w-[320px] max-w-[360px] flex flex-col h-full" style={{ listStyle: 'none' }}>
-                    <KanbanColumn
-                      column={{ id: 'uncategorized', display_name: 'Other', color: '#71717A', status_value: '__other__' }}
-                      tasks={orphaned}
-                      onEditColumn={() => {}}
-                    />
-                  </div>
-                );
-              })()}
-            </Reorder.Group>
-
-            {/* Commander Modal */}
-            <AnimatePresence>
-              {showCommander && (
-                <CommanderModal
-                  columns={taskColumns}
-                  onClose={() => setShowCommander(false)}
-                  onSubmit={createTask}
-                />
-              )}
-            </AnimatePresence>
-          </div>
-        );
       case 'agents':
 
         return (
@@ -2692,8 +2608,6 @@ const App = () => {
           {/* SONAR Logo - fades when either dropdown is open, reveals New Task on hover (tasks page) */}
           <div 
             className={`relative flex flex-col items-center transition-opacity duration-500 mx-20 ${zoneOpen || codeOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-            onMouseEnter={() => currentRoute === 'tasks' && setLogoHover(true)}
-            onMouseLeave={() => currentRoute === 'tasks' && setLogoHover(false)}
             style={{ perspective: '1000px' }}
           >
             {/* Logo text */}
@@ -2713,21 +2627,6 @@ const App = () => {
                 </h1>
               </div>
             </div>
-
-            {/* New Task button - hidden behind logo, revealed on hover */}
-            {currentRoute === 'tasks' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <button
-                  onClick={() => setShowCommander(true)}
-                  className={`px-8 py-2 bg-white text-black font-black uppercase tracking-widest text-[10px] 
-                    transition-all duration-700 ease-[cubic-bezier(0.19,1,0.22,1)] transform
-                    ${logoHover ? 'opacity-100 translate-y-0 scale-100 delay-300' : 'opacity-0 translate-y-8 scale-90 pointer-events-none'}
-                    hover:bg-red-600 hover:text-white hover:tracking-[0.4em] active:scale-95`}
-                >
-                  New Task
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Live + Ping */}

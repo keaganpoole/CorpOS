@@ -19,8 +19,6 @@ async function fetchJSON(endpoint) {
 }
 
 export const api = {
-  getTasks: () => fetchJSON('/api/tasks'),
-  getTask: (id) => fetchJSON(`/api/tasks/${id}`),
   getAgents: () => fetchJSON('/api/agents'),
   getSystemSummary: () => fetchJSON('/api/system/summary'),
   getLivePulse: (limit = 30) => fetchJSON(`/api/events/live-pulse?limit=${limit}`),

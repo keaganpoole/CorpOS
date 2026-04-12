@@ -23,8 +23,7 @@ const [reactions, setReactions] = useState([]);
 
   // Load initial data via REST
   const loadInitialData = useCallback(async () => {
-    const [tasksData, agentsData, controlData, sessionData, pulseData, logsData, summaryData, pipelineData, cronData, reactionsData] = await Promise.all([
-      api.getTasks(),
+    const [agentsData, controlData, sessionData, pulseData, logsData, summaryData, pipelineData, cronData, reactionsData] = await Promise.all([
       api.getAgents(),
       api.getControlState(),
       api.getSession(),
@@ -36,7 +35,7 @@ const [reactions, setReactions] = useState([]);
       api.getReactions(),
     ]);
 
-    if (tasksData) setTasks(tasksData);
+    // Note: tasksData removed - Sonar no longer uses tasks
     if (agentsData) setAgents(agentsData);
     if (controlData) {
       setControlState(controlData);
