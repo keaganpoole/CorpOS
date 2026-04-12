@@ -37,6 +37,7 @@ const OPTION_ICONS = {
   wait: Clock,
   router: Share2,
   intent_router: RefreshCw,
+  end_call: X,
 };
 
 const AUTOMATION_HIERARCHY = {
@@ -199,6 +200,7 @@ const AUTOMATION_HIERARCHY = {
     { key: 'wait', option: 'Wait', description: 'Pause the workflow temporarily', icon: OPTION_ICONS.wait, accent: '#f472b6' },
     { key: 'router', option: 'Router', description: 'Send flow to different paths', icon: OPTION_ICONS.router, accent: '#f472b6' },
     { key: 'intent_router', option: 'Intent Router', description: 'Re-evaluate the conversation and choose the correct path', icon: OPTION_ICONS.intent_router, accent: '#f472b6' },
+    { key: 'end_call', option: 'End Call', description: 'Immediately end the current call', icon: OPTION_ICONS.end_call, accent: '#f472b6' },
   ],
 };
 
@@ -236,8 +238,9 @@ export default function ScenariosPage() {
   const [initialNodeShifted, setInitialNodeShifted] = useState(false);
   const [logicPanel, setLogicPanel] = useState(null);
   const [edgeRules, setEdgeRules] = useState([
-    { id: 1, variable: '', operator: 'text_equal', value: '' },
+    { id: 1, variable: 'status', operator: 'equals', value: '' },
   ]);
+  const edgeRulesRef = useRef(edgeRules);
 
   const builderRef = useRef(null);
   const canvasRef = useRef(null);
@@ -246,6 +249,11 @@ export default function ScenariosPage() {
   const panRef = useRef(null);
   const nodeIdCounter = useRef(1);
   const edgeIdCounter = useRef(1);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    edgeRulesRef.current = edgeRules;
+  }, [edgeRules]);
 
   const nodeMap = useMemo(() => nodes.reduce((acc, node) => ({ ...acc, [node.id]: node }), {}), [nodes]);
   const selectedNode = selectedNodeId ? nodeMap[selectedNodeId] : null;
@@ -494,7 +502,7 @@ export default function ScenariosPage() {
   const addEdgeRule = useCallback(() => {
     setEdgeRules((prev) => [
       ...prev,
-      { id: Date.now(), variable: '', operator: 'text_equal', value: '' },
+      { id: Date.now(), variable: 'status', operator: 'equals', value: '' },
     ]);
   }, []);
 
@@ -508,6 +516,30 @@ export default function ScenariosPage() {
     );
   }, []);
 
+  const saveLogicPanel = useCallback(() => {
+    const currentEdgeRules = edgeRulesRef.current;
+    setEdges((prevEdges) => {
+      if (logicPanel && logicPanel.edgeId) {
+        // Check if rule has variable and operator, and value is required (not empty string for operators that need values)
+        const hasValidRules = currentEdgeRules.some(rule => {
+          if (!rule.variable || !rule.operator) return false;
+          // Operators that don't require a value
+          const noValueOperators = ['is_empty', 'is_not_empty'];
+          if (noValueOperators.includes(rule.operator)) return true;
+          // Other operators require a value
+          return rule.value !== '' && rule.value !== null && rule.value !== undefined;
+        });
+        return prevEdges.map((edge) =>
+          edge.id === logicPanel.edgeId
+            ? { ...edge, filter: hasValidRules ? { label: 'Condition', rules: currentEdgeRules } : null }
+            : edge
+        );
+      }
+      return prevEdges;
+    });
+    setLogicPanel(null);
+  }, [logicPanel]);
+
   const closeLogicPanel = useCallback(() => {
     setLogicPanel(null);
   }, []);
@@ -519,6 +551,8 @@ export default function ScenariosPage() {
       categoryType === 'UTILITIES'
         ? label.toLowerCase() === 'router'
           ? 'router'
+          : label.toLowerCase() === 'end call'
+            ? 'end_call'
           : 'utility'
         : meta.type;
     setNodes((prev) =>
@@ -576,6 +610,16 @@ export default function ScenariosPage() {
     const midY = (from.y + to.y) / 2;
     const top = canvasRect.top + view.y + midY * view.scale;
     const left = canvasRect.left + view.x + midX * view.scale;
+    
+    // Load existing filter rules into edgeRules state
+    const newRules = edge.filter && edge.filter.rules 
+      ? edge.filter.rules 
+      : [{ id: Date.now(), variable: 'status', operator: 'equals', value: '' }];
+    
+    // Update the ref immediately
+    edgeRulesRef.current = newRules;
+    setEdgeRules(newRules);
+    
     setLogicPanel({ edgeId: edge.id, top, left });
   };
 
@@ -650,7 +694,13 @@ export default function ScenariosPage() {
                   style={{ left: midX, top: midY }}
                   onClick={(event) => handleEdgeLogicClick(edge, event)}
                 >
-                  <div className="sb-filter-label">{edge.filter?.label || 'Condition'}</div>
+                  <div className="sb-filter-label">
+                    {edge.filter ? (
+                      <Zap size={10} />
+                    ) : (
+                      'Condition'
+                    )}
+                  </div>
                   <div className="sb-filter-dot" />
                 </div>
               );
@@ -861,6 +911,7 @@ export default function ScenariosPage() {
             onAddRule={addEdgeRule}
             onRemoveRule={removeEdgeRule}
             onUpdateRule={updateEdgeRule}
+            onSave={saveLogicPanel}
             onClose={closeLogicPanel}
           />
         )}

@@ -1,20 +1,19 @@
-# Discord Channel Rules
+# Discord Channels Reference
 
-## Team CorpOS (1487477234401939546)
-- **Audience:** Max and Yanna — Keagan is NOT in this room
-- **Tone:** Team chat between colleagues. Never address Keagan here.
-- **Never say:** "Let me know when to spin her up", "Ready when you are", "Want me to..." — these are Keagan-facing phrases
-- **Instead:** Max briefs the team on status. Yanna responds to Max. They coordinate between themselves.
-- **Example of CORRECT Max message:**
-  > "Yanna's been dispatched on the Kickstarter campaign. Mechanics in Worcester, MA. I'll keep you posted as she finds leads."
-  (This is Max talking TO Yanna/the room, not to Keagan)
-- **Example of WRONG Max message:**
-  > "Yanna is back online. Target is 6 leads this time. Ready when you are."
-  (This is Max talking TO Keagan — never do this)
+## Team CorpOS
+**Channel ID:** `1487477234401939546`
+**Purpose:** Primary hub for Max and Yanna. All briefings, updates, acks.
 
-### Key Rule
-**Keagan is never in Team CorpOS. Ever. Every message in that channel must be written as if Keagan is not reading it. Max and Yanna are the only two in the room.**
+**Communication Rules:**
+- **Max and Yanna ONLY.** Keagan is NOT in this room.
+- Never address Keagan in Team CorpOS. Write every message as if Keagan is not reading it.
+- Max and Yanna are the only two "people" in the room. They talk to each other, not to Keagan.
+- After Max posts a dispatch/briefing to Team CorpOS, Yanna MUST respond in that same chat — she's responding to Max, not Keagan.
 
-## Direct Messages
-- Keagan is ONLY ever addressed in direct message channels (DMs)
-- All status reports, questions for Keagan, go-haves, etc. stay in DMs
+## Situation Room
+**Channel ID:** `1488327248154202156`
+**Status:** RETIRED. Do not post here.
+
+## Telegram Policy
+- Only Max may use Telegram, and only when Keagan explicitly directs it.
+- No other agent uses Telegram. Discord is the only channel for agents.

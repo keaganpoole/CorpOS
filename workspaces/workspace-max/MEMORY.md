@@ -1,6 +1,7 @@
 # MEMORY — Max (COO)
 
 ## System History
+- **2026-04-11:** **BUSINESS PIVOT.** Keagan repurposed Skybox to build Sonar. The business is no longer a web design firm. We are now an **AI receptionist business**. Skybox development is frozen. All operations now focus on building and scaling Sonar. This is a fundamental shift in strategy and revenue model.
 - **2026-03-23:** First boot. Initial session startup and identity configuration.
 - **2026-03-24:** Onboarded agent "John" (temporary test agent, later identified as Devan). Created workspace-john. Set up Lauren's agent with rollcall. Set up Brian's agent (workspace-sales) with bot token and allowlist.
 - **2026-03-25:** Added Allie (Marketing Manager, @allieCorpOS_bot), Devan (Dev Manager), and Leah (Care Manager) to the system. Each got their own agent entry, Telegram account, and workspace. Filled in USER.md with Keagan's details. Keagan corrected: no pronouns in files — "Money Warriors don't use pronouns."
@@ -38,6 +39,38 @@
 - **Slash commands:** `/compliment` and `/complaint` work in Discord and Telegram as backups if Max misses a reaction in conversation.
 - **Agent cards:** Show compliment/complaint counts from the reactions table.
 
+
+## 2026-04-11 — Skybox UI Updates
+- **Scenarios Page:** Reverted Scenarios page changes per Keagan's request in Skybox.
+- **Business Context:** Pivot to AI receptionist business (Sonar) complete. Skybox is now the interface for Sonar configuration.
+- **Sonar App:** Confirmed existence of `sonar` directory containing the active Sonar app with Scenarios page integrated. Skybox is the legacy interface; Sonar is the new app.
+
+## 2026-04-11 (cont) — Sonar Condition Modal Polish
+- **Condition Modal Styling:** Improved the condition modal styling with gradient background, enhanced borders, and better visual hierarchy.
+- **Colorful Line Removed:** Removed the horizontal colorful line at the top of the condition modal.
+- **Icon Indicator (Builder):** "Condition" text on the filter pin in the builder canvas changes to a Zap icon when conditions are set for that edge.
+- **Modal Header:** Modal header remains as "Condition" text (unchanged).
+- **Filter Pin:** Zap icon shows on the filter pin when conditions are set (on the canvas).
+- **Input Fields:** Removed custom dropdown arrow (Keagan said it shouldn't be there).
+- **Action Buttons:** Improved button styling for remove and action links with better hover states.
+- **Save Button:** Added a dedicated Save button to the condition modal that saves the conditions and closes the modal.
+- **Bug Fixes:**
+  - Fixed edge filter saving issue by using edgeRulesRef to track current state in closeLogicPanel callback
+  - Fixed condition reset issue by properly handling operators that don't require values (is_empty, is_not_empty)
+- **Files Modified:**
+  - `sonar/src/pages/Scenarios/Scenarios.css` - Updated styling for condition panel, filter pin, input fields, and buttons, added Save button styling
+  - `sonar/src/pages/Scenarios/AetherEdgeLogic.jsx` - Modal header remains as "Condition" text, added Save button
+  - `sonar/src/pages/Scenarios/Scenarios.jsx` - Updated filter pin to show Zap icon when conditions exist, fixed edge filter saving with edgeRulesRef, fixed condition validation logic, added saveLogicPanel callback
+
+**Keagan's Feedback (2026-04-11):**
+- Condition modal needed polishing — improved styling and visual hierarchy
+- Icon should replace "Condition" text on the builder (filter pin) when conditions are set — implemented with Zap icon
+- Custom dropdown arrow should not be there — removed
+- Colorful line at top should be removed — removed
+- Modal header should remain as "Condition" text (not change to icon)
+- Not seeing changes when setting condition — fixed by using edgeRulesRef to track current state
+- Conditions resetting when reopening modal — fixed by properly handling operators that don't require values
+- Add save button to condition modal — implemented
 
 ## Operational Configuration
 **Reference:** See `AGENTS.md` for chain of command, session startup, and operational framework.
