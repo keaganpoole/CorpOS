@@ -27,6 +27,12 @@
   to { transform: rotate(360deg); }
 }
 
+.scenarios-container {
+  width: 100%;
+  height: 100%;
+  background-color: #020202;
+}
+
 .scenario-builder-page {
   width: 100%;
   height: 100%;

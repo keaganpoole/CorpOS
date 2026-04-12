@@ -691,7 +691,6 @@ export default function ScenariosPage() {
 
   const handleCreateScenario = () => {
     // Reset builder state to initial state
-    setNodes([INITIAL_NODE]);
     setEdges([]);
     setView({ x: 0, y: 0, scale: 1 });
     setSelectedNodeId('node-1');
@@ -705,12 +704,13 @@ export default function ScenariosPage() {
     // Clear current scenario
     setCurrentScenario(null);
     
-    // Switch to builder view with fade-in
+    // Clear current scenario ID
+    window.selectedScenarioForDelete = null;
+    
+    // Switch to builder view
     setViewMode('builder');
-    setNodesOpacity(0);
-    setTimeout(() => {
-      setNodesOpacity(1);
-    }, 50);
+    setNodes([INITIAL_NODE]);
+    setNodesOpacity(1);
   };
 
   const handleBackToList = () => {
@@ -838,10 +838,9 @@ export default function ScenariosPage() {
       const { data, error } = await supabase
         .from('scenarios')
         .insert(scenarioData)
-        .select()
-        .single();
+        .select();
       
-      result = { data, error };
+      result = { data: data?.[0], error };
     }
     
     const { data, error } = result;
@@ -1045,7 +1044,7 @@ export default function ScenariosPage() {
     </div>
   );
 
-  const builderView = (
+  const renderBuilderView = () => (
     <div className="scenario-builder-page" ref={builderRef} onPointerDown={handlePagePointerDown}>
       <div className="sb-canvas-wrapper">
         <div
@@ -1114,7 +1113,7 @@ export default function ScenariosPage() {
             })}
             
             {nodes.map((node) => {
-              const Icon = node.icon;
+              const Icon = node.icon || null;
               const isActive = selectedNodeId === node.id;
               const isInitialNode = node.id === INITIAL_NODE.id && initialPulse;
               return (
@@ -1399,7 +1398,7 @@ export default function ScenariosPage() {
 
   return (
     <div className="scenarios-container">
-      {viewMode === 'list' ? renderListView() : builderView}
+      {viewMode === 'list' ? renderListView() : renderBuilderView()}
       
       {/* Delete Confirmation Modal - Rendered at root level */}
       {deleteConfirmModal && (
