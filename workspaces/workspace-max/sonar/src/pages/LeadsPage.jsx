@@ -4,7 +4,7 @@ import { useLeads } from '../hooks/useLeads';
 import LeadsTable from './LeadsTable';
 import LeadDetailPanel from './LeadDetailPanel';
 
-const LeadsPage = () => {
+const PeoplePage = () => {
   const {
     leads, allLeads, loading, error,
     selectedId, setSelectedId, selectedLead,
@@ -41,7 +41,7 @@ const LeadsPage = () => {
     try {
       await updateLead(leadId, updates);
     } catch (err) {
-      console.error('[LeadsPage] Autosave failed:', err.message);
+      console.error('[PeoplePage] Autosave failed:', err.message);
     }
   }, [updateLead]);
 
@@ -88,4 +88,4 @@ const LeadsPage = () => {
   );
 };
 
-export default LeadsPage;
+export default PeoplePage;

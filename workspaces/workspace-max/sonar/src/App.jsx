@@ -2439,7 +2439,7 @@ const App = () => {
     { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
     { id: 'chronos', icon: <History size={18} />, label: 'Chronos' },
     { id: 'system', icon: <Activity size={18} />, label: 'System' },
-    { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'Leads' },
+    { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'People' },
     { id: 'memory', icon: <Database size={18} />, label: 'Memory' },
     { id: 'council', icon: <Gavel size={18} />, label: 'Council' },
   ];

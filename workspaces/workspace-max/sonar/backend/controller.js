@@ -755,32 +755,34 @@ class Controller {
       res.json({ status: 'ok', uptime: process.uptime() });
     });
 
-    // --- Webhook endpoint to handle Supabase leads table changes ---
-    this.app.post('/api/webhook/leads', (req, res) => {
+    // --- Webhook endpoint to handle Supabase people table changes ---
+    this.app.post(['/api/webhook/leads', '/api/webhook/people'], (req, res) => {
       const { type, record, old_record } = req.body;
       if (!type || !record || !record.id) {
         return res.status(400).json({ error: 'Invalid webhook payload' });
       }
 
-      const leadId = record.id;
+      const personId = record.id;
       const eventType = {
         INSERT: 'lead_created',
         UPDATE: 'lead_updated',
         DELETE: 'lead_deleted',
       }[type];
 
-      const companyName = record.company || old_record?.company || 'Unknown Company';
+      const companyName = [record.first_name || old_record?.first_name, record.last_name || old_record?.last_name]
+        .filter(Boolean)
+        .join(' ') || record.phone || record.email || 'Unknown Person';
       const actorName = (type === 'INSERT' ? record.created_by : (record.updated_by || old_record?.updated_by)) || 'system';
 
       if (type === 'INSERT') {
         this.events.emit({
           event_type: 'lead_created',
-          message: `Created a new lead for ${companyName} 🆕`,
+          message: `Created a new person record for ${companyName}`,
           actor: actorName,
           actor_type: actorName === 'system' ? 'system' : 'user',
-          source: 'supabase_leads_webhook',
+          source: 'supabase_people_webhook',
           severity: 'ok',
-          payload: { leadId, actor: actorName, time: new Date().toISOString() },
+          payload: { personId, actor: actorName, time: new Date().toISOString() },
         });
         return res.json({ success: true });
       }
@@ -788,12 +790,12 @@ class Controller {
       if (type === 'DELETE') {
         this.events.emit({
           event_type: 'lead_deleted',
-          message: `Deleted the lead for ${companyName} 🗑️`,
+          message: `Deleted the person record for ${companyName}`,
           actor: actorName,
           actor_type: actorName === 'system' ? 'system' : 'user',
-          source: 'supabase_leads_webhook',
+          source: 'supabase_people_webhook',
           severity: 'warning',
-          payload: { leadId, actor: actorName, time: new Date().toISOString() },
+          payload: { personId, actor: actorName, time: new Date().toISOString() },
         });
         return res.json({ success: true });
       }
@@ -811,7 +813,7 @@ class Controller {
         const f = field.toLowerCase();
 
         // Score/quality fields — direction matters
-        const numericFields = ['score', 'page_quality_score', 'value', 'revenue', 'traffic', 'rating'];
+        const numericFields = ['missed_call_count', 'balance_due'];
         if (numericFields.some(n => f.includes(n)) || f.endsWith('_score')) {
           const oldNum = parseFloat(oldVal);
           const newNum = parseFloat(newVal);
@@ -842,19 +844,44 @@ class Controller {
       // Compare every field dynamically
       if (type === 'UPDATE' && record && old_record) {
         const fieldLabels = {
-          company: 'company name',
-          status: 'status',
+          first_name: 'first name',
+          last_name: 'last name',
           phone: 'phone number',
           email: 'email',
-          website: 'website',
-          address: 'address',
+          street_address: 'street address',
           city: 'city',
           state: 'state',
-          zip: 'zip code',
+          zip_code: 'zip code',
+          preferred_contact_method: 'preferred contact method',
+          preferred_language: 'preferred language',
+          best_time_to_contact: 'best time to contact',
+          status: 'status',
+          source: 'source',
+          lead_source_detail: 'source detail',
+          tags: 'tags',
+          last_inbound_call_at: 'last inbound call',
+          last_outbound_call_at: 'last outbound call',
+          last_call_status: 'last call status',
+          last_intent: 'last intent',
+          last_outcome: 'last outcome',
+          missed_call_count: 'missed call count',
+          last_inbound_sms_at: 'last inbound sms',
+          last_outbound_sms_at: 'last outbound sms',
+          last_sms_status: 'last sms status',
+          last_inbound_email_at: 'last inbound email',
+          last_outbound_email_at: 'last outbound email',
+          last_email_status: 'last email status',
+          callback_needed: 'callback needed',
+          callback_due_at: 'callback due',
+          handoff_required: 'handoff required',
+          assigned_staff: 'assigned staff',
+          call_route: 'call route',
+          payment_status: 'payment status',
+          balance_due: 'balance due',
+          invoice_id: 'invoice id',
           notes: 'notes',
-          score: 'score',
-          stage: 'stage',
-          assigned_agent: 'assigned agent',
+          special_instructions: 'special instructions',
+          internal_notes: 'internal notes',
         };
 
         // Skip metadata fields — not worth showing in live pulse
@@ -898,9 +925,9 @@ class Controller {
         message: `${message}.`,
         actor: actorName,
         actor_type: actorName === 'system' ? 'system' : 'user',
-        source: 'supabase_leads_webhook',
+        source: 'supabase_people_webhook',
         severity: 'ok',
-        payload: { leadId, actor: actorName, changes: changeParts, time: new Date().toISOString() },
+        payload: { personId, actor: actorName, changes: changeParts, time: new Date().toISOString() },
       });
 
       res.json({ success: true });

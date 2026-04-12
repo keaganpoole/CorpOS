@@ -107,7 +107,7 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
   };
   const addCondition = () => {
     updateRule({
-      conditions: [...(rule.conditions || []), { field: 'industry', operator: 'equals', value: '' }],
+      conditions: [...(rule.conditions || []), { field: 'status', operator: 'equals', value: '' }],
     });
   };
 
@@ -283,7 +283,7 @@ const ColorbarConfigModal = ({ onClose, onRulesChange }) => {
       name: 'New Rule',
       enabled: true,
       logic: 'and',
-      conditions: [{ field: 'industry', operator: 'equals', value: '' }],
+    conditions: [{ field: 'status', operator: 'equals', value: '' }],
       colors: ['#6366f1', '#ec4899'],
       animation: 'sweep',
     }]);
