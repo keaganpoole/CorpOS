@@ -44,7 +44,7 @@ import { useSonarState } from './hooks/useSonarState';
 
 import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
-import CampaignsModal from './pages/CampaignsModal';
+import ScenariosModal from './pages/ScenariosModal';
 import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 import ScenariosPage from './pages/Scenarios/Scenarios';
 
@@ -366,7 +366,7 @@ const KanbanColumn = ({ column, tasks, onEditColumn }) => {
   );
 };
 
-const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenCampaigns }) => {
+const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
 
   // Determine if this agent has a pending model change
@@ -474,39 +474,37 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           </button>
         </div>
 
-        {/* Campaigns — only show for departments with campaigns */}
-        {agent.department === 'Research' && (
+        {/* Scenario — assigned to agent for AI receptionist workflows */}
         <div className="pt-3 border-t border-white/[0.04]">
-          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Campaign</p>
+          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Scenario</p>
           <button
-            onClick={() => onOpenCampaigns && onOpenCampaigns(agent)}
+            onClick={() => onOpenScenarios && onOpenScenarios(agent)}
             className="w-full flex items-center justify-between group cursor-pointer"
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <Target size={11} className="text-indigo-400/60" />
-              {(agent.campaign_name || agent._campaign?.['Campaign Name']) ? (
+              {(agent.scenario_name) ? (
                 <span className="text-[11px] font-bold text-indigo-400/80 truncate group-hover:text-indigo-400 transition-colors">
-                  {agent.campaign_name || agent._campaign?.['Campaign Name']}
+                  {agent.scenario_name}
                 </span>
               ) : (
-                <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Campaigns</span>
+                <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">No Scenario</span>
               )}
             </div>
             <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
-                {(agent.campaign_name || agent._campaign?.['Campaign Name']) ? 'Change' : 'Assign'}
+                {(agent.scenario_name) ? 'Change' : 'Assign'}
               </span>
               <ChevronRight size={11} className="text-indigo-500/60" />
             </div>
           </button>
         </div>
-        )}
       </div>
     </motion.div>
   );
 };
 
-const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onOpenMarketplace, onOpenCampaigns }) => {
+const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onOpenMarketplace, onOpenScenarios }) => {
   const directReports = agents.filter((a) => a.reports_to === agent.id);
 
   return (
@@ -514,7 +512,7 @@ const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onO
       {depth > 0 && (
         <div className="absolute left-1/2 -translate-x-1/2 w-[1px] bg-zinc-800" style={{ height: '40px', top: '-40px' }} />
       )}
-      <AgentNode agent={agent} isActive={depth === 0} reactions={reactionsMap[agent.name] || {}} pendingModel={pendingModel} onOpenMarketplace={onOpenMarketplace} onOpenCampaigns={onOpenCampaigns} />
+      <AgentNode agent={agent} isActive={depth === 0} reactions={reactionsMap[agent.name] || {}} pendingModel={pendingModel} onOpenMarketplace={onOpenMarketplace} onOpenScenarios={onOpenScenarios} />
 
       {directReports.length > 0 && (
         <div className="mt-8 flex flex-col items-center">
@@ -525,7 +523,7 @@ const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onO
               <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] bg-zinc-800" style={{ width: 'calc(100% - 260px)' }} />
             )}
             {directReports.map((report) => (
-              <AgentBranch key={report.id} agent={report} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={depth + 1} onOpenMarketplace={onOpenMarketplace} onOpenCampaigns={onOpenCampaigns} />
+              <AgentBranch key={report.id} agent={report} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={depth + 1} onOpenMarketplace={onOpenMarketplace} onOpenScenarios={onOpenScenarios} />
             ))}
           </div>
         </div>
@@ -534,7 +532,7 @@ const AgentBranch = ({ agent, agents, reactionsMap, pendingModel, depth = 0, onO
   );
 };
 
-const AgentsHierarchy = ({ agents, reactions = [], pendingModel = null, onOpenMarketplace, onOpenCampaigns }) => {
+const AgentsHierarchy = ({ agents, reactions = [], pendingModel = null, onOpenMarketplace, onOpenScenarios }) => {
   const root = agents.find((a) => a.hierarchy_level === 1);
   if (!root) return <div className="flex items-center justify-center h-full text-zinc-600">No agent data</div>;
 
@@ -546,7 +544,7 @@ const AgentsHierarchy = ({ agents, reactions = [], pendingModel = null, onOpenMa
 
   return (
     <div className="min-w-fit px-12 pt-10 flex flex-col items-center select-none">
-      <AgentBranch agent={root} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={0} onOpenMarketplace={onOpenMarketplace} onOpenCampaigns={onOpenCampaigns} />
+      <AgentBranch agent={root} agents={agents} reactionsMap={reactionsMap} pendingModel={pendingModel} depth={0} onOpenMarketplace={onOpenMarketplace} onOpenScenarios={onOpenScenarios} />
     </div>
   );
 };
@@ -2331,38 +2329,38 @@ const App = () => {
   const [codeOpen, setCodeOpen] = useState(false);
   const [marketplaceAgent, setMarketplaceAgent] = useState(null); // agent object for marketplace
   const [pendingModel, setPendingModel] = useState(null); // { agentId, model } pending confirmation
-  const [campaignsAgent, setCampaignsAgent] = useState(null); // agent object for campaigns modal
+  const [scenariosAgent, setScenariosAgent] = useState(null); // agent object for scenarios modal
   const [showCommander, setShowCommander] = useState(false); // Commander task creation modal
   const [logoHover, setLogoHover] = useState(false); // SONAR logo hover for New Task reveal
 
-  // Agent campaigns — loaded from Supabase to display on agent cards
-  const [agentCampaigns, setAgentCampaigns] = useState({});
+  // Agent scenarios — loaded from Supabase to display on agent cards
+  const [agentScenarios, setAgentScenarios] = useState({});
 
-  const loadAgentCampaigns = async () => {
+  const loadAgentScenarios = async () => {
     try {
-      const resp = await fetch('https://jspksetkrprvomilgtyj.supabase.co/rest/v1/research_campaigns?select=*', {
+      const resp = await fetch('https://grpgmhhtmfiwukncucaq.supabase.co/rest/v1/scenarios?select=*', {
         headers: {
-          'apikey': 'sb_publishable_LjxUo8j__ixUP6iWdf_DBQ_CMuSxAa3',
-          'Authorization': 'Bearer sb_publishable_LjxUo8j__ixUP6iWdf_DBQ_CMuSxAa3',
+          'apikey': 'sb_publishable_9y38ODRiD3SOXvMianpUUA_SfDw_y3Z',
+          'Authorization': 'Bearer sb_publishable_9y38ODRiD3SOXvMianpUUA_SfDw_y3Z',
         },
       });
       const data = await resp.json();
-      // Build map: agent name (lowercase) -> assigned campaign
+      // Build map: agent name (lowercase) -> assigned scenario
       const map = {};
       if (Array.isArray(data)) {
-        data.forEach(c => {
-          if (c.assigned_to && c.assigned_to.trim()) {
-            map[c.assigned_to.trim().toLowerCase()] = c;
+        data.forEach(s => {
+          if (s.assigned_to && s.assigned_to.trim()) {
+            map[s.assigned_to.trim().toLowerCase()] = s;
           }
         });
       }
-      setAgentCampaigns(map);
-    } catch (err) { console.error('[App] Failed to load campaigns:', err); }
+      setAgentScenarios(map);
+    } catch (err) { console.error('[App] Failed to load scenarios:', err); }
   };
 
-  // Load campaigns when switching to agents page
+  // Load scenarios when switching to agents page
   useEffect(() => {
-    if (currentRoute === 'agents') loadAgentCampaigns();
+    if (currentRoute === 'agents') loadAgentScenarios();
   }, [currentRoute]);
 
   // Live backend state
@@ -2387,13 +2385,13 @@ const App = () => {
   } = useSonarState();
 
   // Supabase-backed tasks + dynamic columns
-  // Enrich agents with campaign data from Supabase (matched by assigned_to)
+  // Enrich agents with scenario data from Supabase (matched by assigned_to)
   const enrichedAgents = (agents || []).map(a => {
-    const campaign = agentCampaigns[a.name?.toLowerCase?.() || ''];
-    if (campaign) {
-      return { ...a, _campaign: campaign, campaign_name: campaign['Campaign Name'], campaign_id: campaign.id };
+    const scenario = agentScenarios[a.name?.toLowerCase?.() || ''];
+    if (scenario) {
+      return { ...a, _scenario: scenario, scenario_name: scenario.name, scenario_id: scenario.id };
     }
-    return { ...a, _campaign: null, campaign_name: null, campaign_id: null };
+    return { ...a, _scenario: null, scenario_name: null, scenario_id: null };
   });
 
   // Clear pendingModel once the agents data confirms the new model is loaded
@@ -2455,7 +2453,7 @@ const App = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-[#020202]/60 via-transparent to-[#020202]/60" />
             </div>
             <div className="w-full flex justify-center pt-6 relative -mt-16 z-10">
-              <AgentsHierarchy agents={enrichedAgents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} onOpenCampaigns={setCampaignsAgent} />
+              <AgentsHierarchy agents={enrichedAgents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} onOpenScenarios={setScenariosAgent} />
             </div>
             <AnimatePresence>
               {marketplaceAgent && (
@@ -2471,11 +2469,11 @@ const App = () => {
               )}
             </AnimatePresence>
             <AnimatePresence>
-              {campaignsAgent && (
-                <CampaignsModal
-                  agent={campaignsAgent}
-                  onClose={() => setCampaignsAgent(null)}
-                  onCampaignAssigned={() => { refresh(); loadAgentCampaigns(); }}
+              {scenariosAgent && (
+                <ScenariosModal
+                  agent={scenariosAgent}
+                  onClose={() => setScenariosAgent(null)}
+                  onScenarioAssigned={() => { refresh(); loadAgentScenarios(); }}
                 />
               )}
             </AnimatePresence>

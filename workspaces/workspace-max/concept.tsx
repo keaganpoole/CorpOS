@@ -1,168 +1,220 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Send, User, Bot, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Mic, 
+  Cpu, 
+  Sparkles, 
+  User, 
+  Volume2,
+  Zap,
+  Play
+} from 'lucide-react';
 
-const MOCK_CONVERSATION = [
-  { id: 1, sender: 'bot', text: "Welcome to the secure channel. All messages here use the refined Masked Reveal protocol.", time: "10:02 AM" },
-  { id: 2, sender: 'user', text: "It looks incredibly smooth. How does the staggered avatar effect work?", time: "10:03 AM" },
-  { id: 3, sender: 'bot', text: "The bubble initiates the clip-path expansion first. Then, the avatar follows with a vertical translation and a slight scale-up.", time: "10:03 AM" },
-  { id: 4, sender: 'user', text: "The 'going up' motion adds a lot of weight and intentionality to the UI.", time: "10:04 AM" },
-  { id: 5, sender: 'bot', text: "Exactly. It creates a secondary motion path that makes the interface feel alive without being distracting.", time: "10:04 AM" },
+const RECEPTIONISTS = [
+  {
+    id: 1,
+    name: "Max",
+    role: "Operational Lead",
+    voice: "ElevenLabs - Josh (Deep, Professional)",
+    personality: ["Direct", "Highly Efficient", "No-Nonsense"],
+    color: "emerald",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1000&auto=format&fit=crop",
+    bio: "Optimized for high-volume logistics and rapid response. Max ensures every caller gets exactly what they need without the fluff."
+  },
+  {
+    id: 2,
+    name: "Sofia",
+    role: "Hospitality Expert",
+    voice: "ElevenLabs - Bella (Warm, Engaging)",
+    personality: ["Empathetic", "Graceful", "Detail-Oriented"],
+    color: "rose",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=1000&auto=format&fit=crop",
+    bio: "Focused on building relationships. Sofia handles complex client inquiries with a touch of elegance and unmatched patience."
+  },
+  {
+    id: 3,
+    name: "Kai",
+    role: "Tech Strategist",
+    voice: "ElevenLabs - Adam (Witty, Energetic)",
+    personality: ["Innovative", "Problem Solver", "Articulate"],
+    color: "blue",
+    avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=1000&auto=format&fit=crop",
+    bio: "Best for technical support and dynamic scheduling. Kai leverages deep logic to resolve conflicts before they even arise."
+  }
 ];
 
-const App = () => {
-  const [visibleMessages, setVisibleMessages] = useState([]);
+const ReceptionistCard = ({ person, isActive, isNext, isPrev, onClick }) => {
+  // Base classes for the card animation/transition
+  const baseClasses = "absolute top-0 left-0 w-full h-full transition-all duration-700 ease-in-out transform";
+  let stateClasses = "opacity-0 scale-90 pointer-events-none";
 
-  const startSequence = useCallback(() => {
-    setVisibleMessages([]);
-    MOCK_CONVERSATION.forEach((msg, index) => {
-      setTimeout(() => {
-        setVisibleMessages(prev => [...prev, msg]);
-      }, index * 900); 
-    });
-  }, []);
-
-  useEffect(() => {
-    startSequence();
-  }, [startSequence]);
+  if (isActive) stateClasses = "opacity-100 scale-100 translate-x-0 z-20";
+  if (isNext) stateClasses = "opacity-40 scale-95 translate-x-full z-10 blur-[2px] cursor-pointer hover:translate-x-[95%] transition-transform";
+  if (isPrev) stateClasses = "opacity-40 scale-95 -translate-x-full z-10 blur-[2px] cursor-pointer hover:-translate-x-[95%] transition-transform";
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4 md:p-8 font-sans selection:bg-indigo-500/30">
-      <style>{`
-        /* 1. The Bubble Reveal (Horizontal Clip + Fade) */
-        @keyframes revealIn {
-          from { 
-            opacity: 0; 
-            clip-path: inset(0 100% 0 0); 
-            transform: translateX(-10px);
-          }
-          to { 
-            opacity: 1; 
-            clip-path: inset(0 0 0 0); 
-            transform: translateX(0);
-          }
-        }
+    <div className={`${baseClasses} ${stateClasses}`} onClick={onClick}>
+      <div className="relative h-full w-full bg-[#0a0c10] border border-white/10 rounded-[40px] overflow-hidden shadow-2xl flex flex-col">
+        {/* Header Image Area */}
+        <div className="relative h-1/2 w-full group overflow-hidden">
+          <img 
+            src={person.avatar} 
+            alt={person.name}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0c10] via-[#0a0c10]/40 to-transparent" />
 
-        /* 2. The Avatar Upward Float (Vertical + Scale) */
-        @keyframes avatarUp {
-          from { 
-            opacity: 0; 
-            transform: translateY(12px) scale(0.85); 
-          }
-          to { 
-            opacity: 1; 
-            transform: translateY(0) scale(1); 
-          }
-        }
-
-        .animate-reveal { 
-          animation: revealIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
-        }
-
-        .animate-avatar { 
-          animation: avatarUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; 
-        }
-
-        .glass-panel {
-          background: rgba(255, 255, 255, 0.02);
-          backdrop-filter: blur(24px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
-        }
-
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-      `}</style>
-
-      <div className="max-w-2xl w-full h-[780px] glass-panel rounded-[3rem] overflow-hidden flex flex-col relative border border-white/5">
-        {/* Header */}
-        <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.01]">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20">
-              <ShieldCheck size={24} />
-            </div>
-            <div>
-              <div className="font-semibold text-lg tracking-tight">System Core</div>
-              <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-bold uppercase tracking-[0.2em]">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                Live Transmission
-              </div>
-            </div>
+          {/* Name Overlay */}
+          <div className="absolute bottom-6 left-8">
+            <h2 className="text-4xl font-bold text-white tracking-tight leading-none mb-1">{person.name}</h2>
           </div>
         </div>
 
-        {/* Messages Container */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-10 flex flex-col no-scrollbar">
-          {visibleMessages.map((msg) => (
-            <div 
-              key={msg.id}
-              className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`flex gap-4 max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                
-                {/* Avatar: Animates slightly after and goes UP */}
-                <div className="flex-shrink-0 mt-1 opacity-0 animate-avatar [animation-delay:350ms]">
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border transition-colors duration-500 ${
-                    msg.sender === 'bot' 
-                      ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 shadow-lg shadow-indigo-500/5' 
-                      : 'bg-white/5 border-white/10 text-neutral-400'
-                  }`}>
-                    {msg.sender === 'bot' ? <Bot size={20} /> : <User size={20} />}
-                  </div>
-                </div>
+        {/* Content Area */}
+        <div className="flex-1 p-8 pt-2 flex flex-col gap-6">
+          <div className="flex items-center gap-2 text-white/30 text-[11px] uppercase tracking-widest font-semibold">
+            <Zap size={12} className="text-white/50" />
+            <span>Operational Config</span>
+          </div>
 
-                {/* Message Bubble: Initiates reveal immediately */}
-                <div className="flex flex-col">
-                  <div 
-                    className={`
-                      p-5 px-6 rounded-[1.5rem] text-[15px] leading-relaxed opacity-0 animate-reveal
-                      ${msg.sender === 'user' 
-                        ? 'bg-white text-black font-medium rounded-tr-none' 
-                        : 'bg-white/[0.04] text-neutral-200 border border-white/5 rounded-tl-none'
-                      }
-                    `}
-                  >
-                    {msg.text}
-                  </div>
-                  <span className={`text-[10px] text-neutral-600 mt-2 font-bold uppercase tracking-widest ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
-                    {msg.time}
-                  </span>
-                </div>
+          <div className="border-b border-white/5 pb-6">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-white/30">
+                <Volume2 size={12} />
+                <span>Voice Profile</span>
+              </div>
+              <div className="flex items-center gap-2 group/play">
+                <p className="text-sm font-medium text-white/80">{person.voice.split(' - ')[1]}</p>
+                <button className="p-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                  <Play size={10} fill="white" className="ml-0.5" />
+                </button>
               </div>
             </div>
-          ))}
-          
-          {/* Incoming Signal */}
-          {visibleMessages.length < MOCK_CONVERSATION.length && (
-            <div className="flex gap-2 items-center px-2 opacity-20">
-              <div className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:-0.3s]" />
-              <div className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:-0.15s]" />
-              <div className="w-1 h-1 bg-white rounded-full animate-bounce" />
-            </div>
-          )}
-        </div>
+          </div>
 
-        {/* Input Footer */}
-        <div className="p-8 bg-neutral-900/40 border-t border-white/5">
-          <div className="relative">
-            <input 
-              type="text" 
-              placeholder="Encrypted input disabled..." 
-              className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-6 pr-14 text-sm focus:outline-none placeholder:text-neutral-700 cursor-not-allowed"
-              readOnly
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 bg-indigo-600/50 text-white/50 rounded-xl">
-              <Send size={18} />
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-white/30">
+              <Sparkles size={12} />
+              <span>Core Traits</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {person.personality.map((trait, i) => (
+                <span key={i} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-white/60 font-medium">
+                  {trait}
+                </span>
+              ))}
             </div>
           </div>
+
+          <p className="text-xs text-white/40 leading-relaxed mt-2 italic">
+            "{person.bio}"
+          </p>
         </div>
       </div>
-      
-      {/* Replay Control */}
-      <button 
-        onClick={startSequence}
-        className="fixed bottom-10 right-10 w-14 h-14 glass-panel rounded-2xl flex items-center justify-center text-neutral-500 hover:text-white hover:border-indigo-500/50 transition-all duration-300 group"
-      >
-        <Bot size={22} className="group-hover:scale-110 transition-transform" />
-      </button>
+    </div>
+  );
+};
+
+const App = () => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const nextCard = () => {
+    if (isAnimating) return;
+    setIsAnimating(true);
+    setCurrentIndex((prev) => (prev + 1) % RECEPTIONISTS.length);
+    setTimeout(() => setIsAnimating(false), 700);
+  };
+
+  const prevCard = () => {
+    if (isAnimating) return;
+    setIsAnimating(true);
+    setCurrentIndex((prev) => (prev - 1 + RECEPTIONISTS.length) % RECEPTIONISTS.length);
+    setTimeout(() => setIsAnimating(false), 700);
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowRight') nextCard();
+      if (e.key === 'ArrowLeft') prevCard();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAnimating]);
+
+  return (
+    <div className="min-h-screen bg-[#050608] flex items-center justify-center p-6 font-sans antialiased text-white selection:bg-white/10">
+      <div className="w-full max-w-[440px] flex flex-col items-center">
+        
+        {/* Header Branding */}
+        <div className="text-center mb-10 space-y-2">
+          <h1 className="text-xs uppercase tracking-[6px] font-bold text-white/20">System Config</h1>
+          <p className="text-2xl font-semibold tracking-tight">Deploy your Receptionist</p>
+        </div>
+
+        {/* Card Container */}
+        <div className="relative w-full aspect-[4/5] perspective-1000 mb-12">
+          {RECEPTIONISTS.map((person, index) => {
+            const isActive = index === currentIndex;
+            const isNext = index === (currentIndex + 1) % RECEPTIONISTS.length;
+            const isPrev = index === (currentIndex - 1 + RECEPTIONISTS.length) % RECEPTIONISTS.length;
+            
+            return (
+              <ReceptionistCard 
+                key={person.id} 
+                person={person} 
+                isActive={isActive} 
+                isNext={isNext}
+                isPrev={isPrev}
+                onClick={() => {
+                  if (isNext) nextCard();
+                  if (isPrev) prevCard();
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Navigation & Select Controls */}
+        <div className="flex items-center gap-6 w-full">
+          <button className="flex-1 h-16 bg-white text-black font-bold rounded-2xl tracking-wide flex items-center justify-center gap-3 hover:bg-white/90 transition-all active:scale-[0.98] shadow-xl shadow-white/5">
+            <User size={20} fill="black" />
+            SELECT {RECEPTIONISTS[currentIndex].name.toUpperCase()}
+          </button>
+        </div>
+
+        {/* Helper Instructions */}
+        <div className="mt-8 flex items-center gap-4 text-white/20 text-[10px] font-bold uppercase tracking-[2px]">
+          <span className="flex items-center gap-1"><Mic size={10} /> Voice Sample Available</span>
+          <span className="w-1 h-1 bg-white/20 rounded-full" />
+          <span className="flex items-center gap-1"><Cpu size={10} /> Low Latency</span>
+        </div>
+
+      </div>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+          font-family: 'Inter', sans-serif;
+        }
+
+        .perspective-1000 {
+          perspective: 1500px;
+        }
+
+        /* Custom scrollbar for dark theme if needed */
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: #050608;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #1a1c20;
+          border-radius: 4px;
+        }
+      `}</style>
     </div>
   );
 };
