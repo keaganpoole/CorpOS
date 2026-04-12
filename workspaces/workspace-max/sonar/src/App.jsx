@@ -45,6 +45,7 @@ import { useSonarState } from './hooks/useSonarState';
 import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
 import ScenariosModal from './pages/ScenariosModal';
+import HireReceptionistModal from './pages/HireReceptionistModal';
 import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 import ScenariosPage from './pages/Scenarios/Scenarios';
 
@@ -2329,7 +2330,8 @@ const App = () => {
   const [codeOpen, setCodeOpen] = useState(false);
   const [marketplaceAgent, setMarketplaceAgent] = useState(null); // agent object for marketplace
   const [pendingModel, setPendingModel] = useState(null); // { agentId, model } pending confirmation
-  const [scenariosAgent, setScenariosAgent] = useState(null); // agent object for scenarios modal
+  const [receptionistsAgent, setReceptionistsAgent] = useState(null); // agent object for scenarios modal
+  const [showHireModal, setShowHireModal] = useState(false); // show hire receptionist modal
   const [showCommander, setShowCommander] = useState(false); // Commander task creation modal
   const [logoHover, setLogoHover] = useState(false); // SONAR logo hover for New Task reveal
 
@@ -2358,9 +2360,9 @@ const App = () => {
     } catch (err) { console.error('[App] Failed to load scenarios:', err); }
   };
 
-  // Load scenarios when switching to agents page
+  // Load scenarios when switching to receptionists page
   useEffect(() => {
-    if (currentRoute === 'agents') loadAgentScenarios();
+    if (currentRoute === 'receptionists') loadAgentScenarios();
   }, [currentRoute]);
 
   // Live backend state
@@ -2421,7 +2423,7 @@ const App = () => {
   }, []);
 
   const navItems = [
-    { id: 'agents', icon: <Users size={18} />, label: 'Agents' },
+    { id: 'receptionists', icon: <Users size={18} />, label: 'Receptionists' },
     { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
     { id: 'chronos', icon: <History size={18} />, label: 'Chronos' },
     { id: 'system', icon: <Activity size={18} />, label: 'System' },
@@ -2432,7 +2434,7 @@ const App = () => {
 
   const renderView = () => {
     switch (currentRoute) {
-      case 'agents':
+      case 'receptionists':
 
         return (
           <div className={`h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col items-center relative`}>
@@ -2440,7 +2442,7 @@ const App = () => {
             <div className="w-full relative shrink-0" style={{ height: '280px' }}>
               <img
                 src={`${AVATAR_BASE}/team3.jpg`}
-                alt="CorpOS Team"
+                alt="Receptionists Team"
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   e.target.style.display = 'none';
@@ -2452,8 +2454,21 @@ const App = () => {
               {/* Side vignettes */}
               <div className="absolute inset-0 bg-gradient-to-r from-[#020202]/60 via-transparent to-[#020202]/60" />
             </div>
-            <div className="w-full flex justify-center pt-6 relative -mt-16 z-10">
-              <AgentsHierarchy agents={enrichedAgents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} onOpenScenarios={setScenariosAgent} />
+            {/* Header with Hire button */}
+            <div className="w-full flex items-center justify-between px-12 pt-6 pb-4 relative -mt-16 z-10">
+              <div className="flex-1" />
+              <div className="flex-1 flex justify-center">
+                <AgentsHierarchy agents={enrichedAgents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} onOpenScenarios={setReceptionistsAgent} />
+              </div>
+              <div className="flex-1 flex justify-end">
+                <button
+                  onClick={() => setShowHireModal(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95"
+                >
+                  <Plus size={14} />
+                  Hire Receptionist
+                </button>
+              </div>
             </div>
             <AnimatePresence>
               {marketplaceAgent && (
@@ -2469,11 +2484,22 @@ const App = () => {
               )}
             </AnimatePresence>
             <AnimatePresence>
-              {scenariosAgent && (
+              {receptionistsAgent && (
                 <ScenariosModal
-                  agent={scenariosAgent}
-                  onClose={() => setScenariosAgent(null)}
+                  agent={receptionistsAgent}
+                  onClose={() => setReceptionistsAgent(null)}
                   onScenarioAssigned={() => { refresh(); loadAgentScenarios(); }}
+                />
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
+              {showHireModal && (
+                <HireReceptionistModal
+                  onClose={() => setShowHireModal(false)}
+                  onHire={(receptionist) => {
+                    console.log('Hired receptionist:', receptionist);
+                    refresh();
+                  }}
                 />
               )}
             </AnimatePresence>
