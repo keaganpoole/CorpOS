@@ -20,9 +20,11 @@ import {
   RefreshCw,
   Repeat,
   Target,
+  Check,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
+import { supabase } from '../../lib/supabase';
 
 const OPTION_ICONS = {
   phone_calls: Phone,
@@ -222,6 +224,8 @@ const INITIAL_NODE = { id: 'node-1', x: 200, y: 300, configured: false, label: '
 const INITIAL_NODE_SHIFT = 140;
 
 export default function ScenariosPage() {
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
+  const [scenarios, setScenarios] = useState([]); // List of saved scenarios
   const [nodes, setNodes] = useState([INITIAL_NODE]);
   const [edges, setEdges] = useState([]);
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
@@ -241,6 +245,43 @@ export default function ScenariosPage() {
     { id: 1, variable: 'status', operator: 'equals', value: '' },
   ]);
   const edgeRulesRef = useRef(edgeRules);
+  
+  // Save scenario modal state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [scenarioName, setScenarioName] = useState('');
+  const [scenarioDescription, setScenarioDescription] = useState('');
+
+  // Fetch scenarios from Supabase on mount
+  useEffect(() => {
+    const fetchScenarios = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('scenarios')
+          .select('*')
+          .order('updated_at', { ascending: false });
+        
+        if (error) {
+          // Handle case where table doesn't exist yet
+          if (error.code === 'PGRST205') {
+            console.log('[Scenarios] Table not found. Run SQL in Supabase to create scenarios table.');
+            setScenarios([]);
+          } else {
+            console.error('[Scenarios] Error fetching scenarios:', error);
+          }
+          return;
+        }
+        
+        if (data) {
+          setScenarios(data);
+          console.log('[Scenarios] Loaded', data.length, 'scenarios');
+        }
+      } catch (err) {
+        console.error('[Scenarios] Exception fetching scenarios:', err);
+      }
+    };
+    
+    fetchScenarios();
+  }, []);
 
   const builderRef = useRef(null);
   const canvasRef = useRef(null);
@@ -638,7 +679,185 @@ export default function ScenariosPage() {
     setLogicPanel(null);
   };
 
-  return (
+  const handleCreateScenario = () => {
+    // Reset builder state to initial state
+    setNodes([INITIAL_NODE]);
+    setEdges([]);
+    setView({ x: 0, y: 0, scale: 1 });
+    setSelectedNodeId('node-1');
+    setEdgeRules([{ id: 1, variable: 'status', operator: 'equals', value: '' }]);
+    setLogicPanel(null);
+    setIsPanelVisible(false);
+    setPanelIntent(false);
+    setPanelStage('options');
+    setActiveOption(null);
+    
+    // Switch to builder view
+    setViewMode('builder');
+  };
+
+  const handleBackToList = () => {
+    setViewMode('list');
+  };
+
+  const handleLoadScenario = (scenario) => {
+    try {
+      // Parse nodes and edges from JSON
+      const nodesData = typeof scenario.nodes_data === 'string' 
+        ? JSON.parse(scenario.nodes_data) 
+        : scenario.nodes_data;
+      const edgesData = typeof scenario.edges_data === 'string' 
+        ? JSON.parse(scenario.edges_data) 
+        : scenario.edges_data;
+      
+      // Set nodes and edges from scenario data
+      setNodes(nodesData || [INITIAL_NODE]);
+      setEdges(edgesData || []);
+      
+      // Reset view and selection
+      setView({ x: 0, y: 0, scale: 1 });
+      setSelectedNodeId(nodesData?.[0]?.id || 'node-1');
+      setLogicPanel(null);
+      setIsPanelVisible(false);
+      setPanelIntent(false);
+      
+      // Switch to builder view
+      setViewMode('builder');
+      
+      console.log('[Scenarios] Loaded scenario:', scenario.name);
+    } catch (err) {
+      console.error('[Scenarios] Error loading scenario:', err);
+    }
+  };
+
+  const handleSaveScenario = () => {
+    // Pre-fill name with default (capitalized)
+    setScenarioName(`Scenario ${scenarios.length + 1}`);
+    setScenarioDescription('');
+    setShowSaveModal(true);
+  };
+
+  const handleConfirmSaveScenario = async () => {
+    const scenarioData = {
+      name: scenarioName 
+        ? scenarioName.charAt(0).toUpperCase() + scenarioName.slice(1) 
+        : `Scenario ${scenarios.length + 1}`,
+      description: scenarioDescription 
+        ? scenarioDescription.charAt(0).toUpperCase() + scenarioDescription.slice(1) 
+        : '',
+      nodes_data: nodes.map(n => ({
+        id: n.id,
+        x: n.x,
+        y: n.y,
+        type: n.type,
+        label: n.label,
+        detail: n.detail,
+        configured: n.configured,
+        accent: n.accent,
+        icon: n.icon?.name
+      })),
+      edges_data: edges.map(e => ({
+        id: e.id,
+        from: e.from,
+        to: e.to,
+        filter: e.filter
+      })),
+      status: 'active'
+    };
+    
+    const { data, error } = await supabase
+      .from('scenarios')
+      .insert(scenarioData)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('[Scenarios] Error saving scenario:', error);
+      setShowSaveModal(false);
+      return;
+    }
+    
+    console.log('[Scenarios] Scenario saved:', data);
+    
+    // Refresh the scenarios list
+    const { data: updatedScenarios } = await supabase
+      .from('scenarios')
+      .select('*')
+      .order('updated_at', { ascending: false });
+    
+    if (updatedScenarios) {
+      setScenarios(updatedScenarios);
+    }
+    
+    // Close modal and switch back to list view
+    setShowSaveModal(false);
+    setScenarioName('');
+    setScenarioDescription('');
+    setViewMode('list');
+  };
+
+  const handleCancelSaveScenario = () => {
+    setShowSaveModal(false);
+    setScenarioName('');
+    setScenarioDescription('');
+  };
+
+  // List View Component
+  const renderListView = () => (
+    <div className="scenario-list-page">
+      <div className="scenario-list-header">
+        <div className="scenario-list-title-group">
+          <h1 className="scenario-list-title">Scenarios</h1>
+          <p className="scenario-list-subtitle">Automate your workflows with conditional logic</p>
+        </div>
+        <button className="create-scenario-btn" onClick={handleCreateScenario}>
+          <Plus size={18} />
+          Create Scenario
+        </button>
+      </div>
+      
+      <div className="scenario-list-content">
+        {scenarios.length === 0 ? (
+          <div className="scenario-empty-state">
+            <div className="scenario-empty-icon">
+              <Target size={48} />
+            </div>
+            <h3 className="scenario-empty-title">No scenarios yet</h3>
+            <p className="scenario-empty-description">
+              Create your first scenario to automate workflows based on lead conditions.
+            </p>
+            <button className="create-scenario-btn" onClick={handleCreateScenario}>
+              <Plus size={18} />
+              Create Your First Scenario
+            </button>
+          </div>
+        ) : (
+          <div className="scenario-grid">
+            {scenarios.map((scenario) => (
+              <div 
+                key={scenario.id} 
+                className="scenario-card"
+                onClick={() => handleLoadScenario(scenario)}
+              >
+                <div className="scenario-card-header">
+                  <h3 className="scenario-card-title">{scenario.name}</h3>
+                  <span className="scenario-card-status">{scenario.status}</span>
+                </div>
+                <p className="scenario-card-description">{scenario.description}</p>
+                <div className="scenario-card-footer">
+                  <span className="scenario-card-date">
+                    {new Date(scenario.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const builderView = (
     <div className="scenario-builder-page" ref={builderRef} onPointerDown={handlePagePointerDown}>
       <div className="sb-canvas-wrapper">
         <div
@@ -915,7 +1134,80 @@ export default function ScenariosPage() {
             onClose={closeLogicPanel}
           />
         )}
+        
+        {/* Back button for builder view */}
+        <button 
+          className="back-to-list-btn" 
+          onClick={handleBackToList}
+          style={{ position: 'absolute', top: 16, left: 16, zIndex: 100 }}
+        >
+          <ChevronLeft size={16} />
+          Back to Scenarios
+        </button>
+        
+        {/* Save button for builder view */}
+        <button 
+          className="save-scenario-btn" 
+          onClick={handleSaveScenario}
+          style={{ position: 'absolute', top: 16, right: 16, zIndex: 100 }}
+        >
+          <Check size={16} />
+          Save Scenario
+        </button>
+        
+        {/* Save Scenario Modal */}
+        {showSaveModal && (
+          <div className="save-scenario-modal-overlay">
+            <div className="save-scenario-modal">
+              <div className="save-scenario-modal-header">
+                <h3>Save Scenario</h3>
+                <button className="modal-close-btn" onClick={handleCancelSaveScenario}>
+                  <X size={18} />
+                </button>
+              </div>
+              
+              <div className="save-scenario-modal-body">
+                <div className="form-group">
+                  <label htmlFor="scenario-name">Scenario Name</label>
+                  <input
+                    id="scenario-name"
+                    type="text"
+                    className="sb-input-field"
+                    value={scenarioName}
+                    onChange={(e) => setScenarioName(e.target.value)}
+                    placeholder="Enter scenario name..."
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="scenario-description">Description (optional)</label>
+                  <textarea
+                    id="scenario-description"
+                    className="sb-input-field"
+                    value={scenarioDescription}
+                    onChange={(e) => setScenarioDescription(e.target.value)}
+                    placeholder="Describe what this scenario does..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+              
+              <div className="save-scenario-modal-footer">
+                <button className="modal-cancel-btn" onClick={handleCancelSaveScenario}>
+                  Cancel
+                </button>
+                <button className="modal-save-btn" onClick={handleConfirmSaveScenario}>
+                  <Check size={16} />
+                  Save Scenario
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
+
+  return viewMode === 'list' ? renderListView() : builderView;
 }

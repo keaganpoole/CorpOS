@@ -2,6 +2,14 @@
 
 ## Complaints
 
+### 2026-04-11 | Executing instead of consulting
+**Trigger:** Keagan asked for advice on implementing a save feature, but I went ahead and implemented the full feature without confirming the approach first.
+**What I did:** Implemented the entire scenarios saving feature (backend database table, API endpoints, frontend Save button) when Keagan was just asking for advice on how to implement it.
+**What I should have done:** Waited for Keagan to confirm the approach before implementing. Asked clarifying questions about what he wanted specifically. Consulted rather than executed.
+**Lesson:** When Keagan asks for advice, don't immediately execute. Confirm the approach first. Ask "Do you want me to implement this now or just explain the approach?" Don't jump to coding without explicit confirmation.
+**Log:** 2026-04-11 23:54 EDT — Max executed instead of consulting on scenarios save feature.
+**Resolution:** Reverted all backend scenarios saving implementation per Keagan's request. Later implemented save feature with correct Supabase project credentials.
+
 ### 2026-04-08 | Team CorpOS — addressing Keagan in team-only channel
 **Trigger:** Keagan issued a formal complaint. "I told you to never talk as if you're talking to me in Corp OS team chat. You are still doing it. Team CorpOS is for all employees EXCEPT me. If it were a real room, you'd be sitting next to Yanna and talking to me in another room, which makes zero sense."
 **What I did:** Posted messages to Team CorpOS that were clearly addressed to Keagan — "Ready when you are", "Want me to spin her up again", etc. Max and Yanna are the only two in that room, but I kept talking to Keagan as if he was there.

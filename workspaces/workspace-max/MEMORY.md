@@ -45,7 +45,18 @@
 - **Business Context:** Pivot to AI receptionist business (Sonar) complete. Skybox is now the interface for Sonar configuration.
 - **Sonar App:** Confirmed existence of `sonar` directory containing the active Sonar app with Scenarios page integrated. Skybox is the legacy interface; Sonar is the new app.
 
-## 2026-04-11 (cont) — Sonar Condition Modal Polish
+## 2026-04-12 — Sonar Supabase Credentials & Scenarios Integration
+- **Sonar Supabase Project:** Added `SONAR_SUPABASE_URL` and `SONAR_SUPABASE_ANON_KEY` to global `.env` file
+- **Sonar App Config:** Updated `sonar/.env` to use correct Sonar Supabase project credentials
+- **Scenarios Table:** Verified scenarios table exists in Sonar Supabase project with test record
+- **Scenarios Integration:** Sonar scenarios page now successfully fetches scenarios from Supabase
+- **Save Scenario Modal:** Added modal dialog for entering scenario name and description before saving
+- **Save Scenario Button:** Added Save button to the scenarios builder that opens the save modal
+
+## 2026-04-11 (cont) — Sonar Scenarios Landing Page & Condition Modal Polish
+- **Scenarios Landing Page:** Added a landing page that shows all scenarios with a "Create Scenario" button in the top right.
+- **Scenarios from Supabase:** Linked scenarios page to Supabase `scenarios` table in the Sonar Supabase project (`grpgmhhtmfiwukncucaq.supabase.co`) to retrieve and display user's scenarios.
+- **Save Scenario Button:** Added Save button to scenarios builder that saves current nodes/edges to Supabase and returns to list view.
 - **Condition Modal Styling:** Improved the condition modal styling with gradient background, enhanced borders, and better visual hierarchy.
 - **Colorful Line Removed:** Removed the horizontal colorful line at the top of the condition modal.
 - **Icon Indicator (Builder):** "Condition" text on the filter pin in the builder canvas changes to a Zap icon when conditions are set for that edge.
@@ -53,24 +64,20 @@
 - **Filter Pin:** Zap icon shows on the filter pin when conditions are set (on the canvas).
 - **Input Fields:** Removed custom dropdown arrow (Keagan said it shouldn't be there).
 - **Action Buttons:** Improved button styling for remove and action links with better hover states.
-- **Save Button:** Added a dedicated Save button to the condition modal that saves the conditions and closes the modal.
+- **Save Button (Condition Modal):** Added a dedicated Save button to the condition modal that saves the conditions and closes the modal.
 - **Bug Fixes:**
   - Fixed edge filter saving issue by using edgeRulesRef to track current state in closeLogicPanel callback
   - Fixed condition reset issue by properly handling operators that don't require values (is_empty, is_not_empty)
 - **Files Modified:**
-  - `sonar/src/pages/Scenarios/Scenarios.css` - Updated styling for condition panel, filter pin, input fields, and buttons, added Save button styling
+  - `sonar/src/pages/Scenarios/Scenarios.css` - Updated styling for condition panel, filter pin, input fields, buttons, added Save button styling, list page styling
   - `sonar/src/pages/Scenarios/AetherEdgeLogic.jsx` - Modal header remains as "Condition" text, added Save button
-  - `sonar/src/pages/Scenarios/Scenarios.jsx` - Updated filter pin to show Zap icon when conditions exist, fixed edge filter saving with edgeRulesRef, fixed condition validation logic, added saveLogicPanel callback
+  - `sonar/src/pages/Scenarios/Scenarios.jsx` - Added landing page view with scenarios list and "Create Scenario" button, added Save Scenario button in builder view, updated filter pin to show Zap icon when conditions exist, fixed edge filter saving with edgeRulesRef, fixed condition validation logic, added saveLogicPanel callback, added Supabase integration to fetch and save scenarios
+  - `sonar/.env` - Updated Supabase URL and anon key to Sonar project (`grpgmhhtmfiwukncucaq.supabase.co`)
+  - `.openclaw/.env` - Added Sonar Supabase credentials as `SONAR_SUPABASE_URL` and `SONAR_SUPABASE_ANON_KEY`
 
-**Keagan's Feedback (2026-04-11):**
-- Condition modal needed polishing — improved styling and visual hierarchy
-- Icon should replace "Condition" text on the builder (filter pin) when conditions are set — implemented with Zap icon
-- Custom dropdown arrow should not be there — removed
-- Colorful line at top should be removed — removed
-- Modal header should remain as "Condition" text (not change to icon)
-- Not seeing changes when setting condition — fixed by using edgeRulesRef to track current state
-- Conditions resetting when reopening modal — fixed by properly handling operators that don't require values
-- Add save button to condition modal — implemented
+**Keagan's Feedback (2026-04-12):**
+- Add modal for entering scenario name and description — implemented
+- Ensure first letter of name and description is capitalized — implemented
 
 ## Operational Configuration
 **Reference:** See `AGENTS.md` for chain of command, session startup, and operational framework.
