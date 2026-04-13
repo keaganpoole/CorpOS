@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Play, Pause, Mic, Volume2, Zap, Sparkles,
   User, ChevronLeft, ChevronRight, Loader2,
+  Briefcase,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -141,7 +142,7 @@ const HireReceptionistModal = ({ onClose, onHire }) => {
         ) : (
           <>
             {/* Card Carousel — 3D perspective */}
-            <div className="relative w-full aspect-[4/5] mb-12" style={{ perspective: '1500px' }}>
+            <div className="relative w-full aspect-[2/3] mb-6" style={{ perspective: '1500px' }}>
               {receptionists.map((person, index) => {
                 const isActive = index === currentIndex;
                 const isNext = index === (currentIndex + 1) % receptionists.length;
@@ -165,12 +166,12 @@ const HireReceptionistModal = ({ onClose, onHire }) => {
                   >
                     <div className="relative h-full w-full bg-[#0a0c10] border border-white/10 rounded-[40px] overflow-hidden shadow-2xl flex flex-col">
                       {/* Header Image Area */}
-                      <div className="relative h-1/2 w-full group overflow-hidden">
+                      <div className="relative h-[75%] w-full group overflow-hidden">
                         {person.avatar ? (
                           <img
                             src={person.avatar}
                             alt={person.full_name || 'Receptionist'}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            className="w-full h-full object-cover"
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-950 flex items-center justify-center">
@@ -184,22 +185,24 @@ const HireReceptionistModal = ({ onClose, onHire }) => {
                           <h2 className="text-4xl font-bold text-white tracking-tight leading-none mb-1">
                             {person.full_name || 'Unnamed'}
                           </h2>
-                          {person.stereotype && (
-                            <p className="text-[11px] text-white/40 font-bold uppercase tracking-[0.2em] mt-1">
-                              {person.stereotype}
-                            </p>
-                          )}
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {person.stereotype && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/25 text-[10px] font-bold text-indigo-300 uppercase tracking-widest shadow-[0_0_12px_rgba(99,102,241,0.1)]">
+                                <Briefcase size={10} className="text-indigo-400/70" />
+                                {person.stereotype}
+                              </span>
+                            )}
+                            {person.age && (
+                              <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-white/50 tracking-wide">
+                                🎂 {person.age} years old
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       {/* Content Area */}
                       <div className="flex-1 p-8 pt-2 flex flex-col gap-6">
-                        {/* Voice Profile */}
-                        <div className="flex items-center gap-2 text-white/30 text-[11px] uppercase tracking-widest font-semibold">
-                          <Zap size={12} className="text-white/50" />
-                          <span>Operational Config</span>
-                        </div>
-
                         <div className="border-b border-white/5 pb-6">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-white/30">
@@ -253,6 +256,19 @@ const HireReceptionistModal = ({ onClose, onHire }) => {
                             "{person.description || person.bio}"
                           </p>
                         )}
+
+                        {/* Hire button — only on active card */}
+                        {isActive && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelect(person);
+                            }}
+                            className="mt-auto w-full h-11 bg-white text-black font-bold rounded-2xl tracking-wide flex items-center justify-center gap-2 hover:bg-white/90 transition-all active:scale-[0.98] shadow-lg shadow-white/5"
+                          >
+                            ✨ Hire {person.first_name || person.full_name || 'Receptionist'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -297,18 +313,6 @@ const HireReceptionistModal = ({ onClose, onHire }) => {
                 </button>
               </div>
             )}
-
-            {/* SELECT button */}
-            <div className="flex items-center gap-6 w-full">
-              <button
-                onClick={() => active && handleSelect(active)}
-                disabled={!active}
-                className="flex-1 h-16 bg-white text-black font-bold rounded-2xl tracking-wide flex items-center justify-center gap-3 hover:bg-white/90 transition-all active:scale-[0.98] shadow-xl shadow-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <User size={20} fill="black" />
-                SELECT {active ? (active.full_name || 'RECEPTIONIST').toUpperCase() : ''}
-              </button>
-            </div>
 
             {/* Helper Instructions */}
             <div className="mt-8 flex items-center gap-4 text-white/20 text-[10px] font-bold uppercase tracking-[2px]">

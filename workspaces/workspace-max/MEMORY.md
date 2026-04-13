@@ -53,6 +53,12 @@
 - **Save Scenario Modal:** Added modal dialog for entering scenario name and description before saving
 - **Save Scenario Button:** Added Save button to the scenarios builder that opens the save modal
 
+## 2026-04-13 - Backend Migration to Supabase (No SQLite)
+- **Supabase-Only Backend:** Confirmed Sonar backend now uses Supabase exclusively (no SQLite/local DB). All data (leads, appointments, scenarios, agents) lives in Supabase. This is a hard pivot from the earlier `schema.js` SQLite design.
+- **Memory Update:** Documented that SQLite is no longer used for Sonar backend. The `sonar/backend/db/schema.js` SQLite schema is deprecated.
+- **Calendar Backend:** Appointments table design finalized with Supabase-first approach, using foreign keys to leads (optional), dedicated `appointments` table, and REST/WebSocket API endpoints.
+- **GitHub Tag:** Ready to push as `v20.8 - pre calendar`.
+
 ## 2026-04-11 (cont) - Sonar Scenarios Landing Page & Condition Modal Polish
 - **Scenarios Landing Page:** Added a landing page that shows all scenarios with a "Create Scenario" button in the top right.
 - **Scenarios from Supabase:** Linked scenarios page to Supabase `scenarios` table in the Sonar Supabase project (`grpgmhhtmfiwukncucaq.supabase.co`) to retrieve and display user's scenarios.
