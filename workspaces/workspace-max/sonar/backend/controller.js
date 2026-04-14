@@ -639,6 +639,37 @@ class Controller {
       }
     });
 
+    // --- Agent Call Types ---
+    this.app.post('/api/agents/:id/call-types', async (req, res) => {
+      const { call_types } = req.body;
+      const validTypes = ['none', 'inbound', 'outbound', 'both'];
+      if (!validTypes.includes(call_types)) {
+        return res.status(400).json({ error: 'call_types must be one of: ' + validTypes.join(', ') });
+      }
+
+      try {
+        const agents = await sbQuery('agents', 'GET', null, `?id=eq.${req.params.id}`) || [];
+        if (agents.length === 0) return res.status(404).json({ error: 'Agent not found' });
+
+        await sbQuery('agents', 'PATCH', { call_types }, `?id=eq.${req.params.id}`);
+
+        this.events.emit({
+          event_type: 'agent_call_types_changed',
+          message: `Agent call types → ${call_types}`,
+          actor: 'Keagan',
+          actor_type: 'user',
+          source: 'SONAR_control',
+          agent_id: req.params.id,
+          severity: 'ok',
+          payload: { agent_id: req.params.id, call_types },
+        });
+
+        res.json({ success: true, call_types });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
     // --- Pending restarts (for OpenClaw Max to poll) ---
     this.app.get('/api/pending-restarts', (req, res) => {
       res.json({ pending_restarts: this.pendingRestarts });

@@ -226,6 +226,9 @@ const PANEL_CATEGORIES = ['TRIGGERS', 'ACTIONS', 'UTILITIES'];
 const INITIAL_NODE = { id: 'node-1', x: 200, y: 300, configured: false, label: 'Start Flow' };
 const INITIAL_NODE_SHIFT = 140;
 
+const sbLabelStyle = { fontSize: 9, fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 4, display: 'block' };
+const sbInputStyle = { width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: '#e4e4e7', outline: 'none', boxSizing: 'border-box' };
+
 export default function ScenariosPage() {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
   const [scenarios, setScenarios] = useState([]); // List of saved scenarios
@@ -244,6 +247,7 @@ export default function ScenariosPage() {
   const [initialFocusSet, setInitialFocusSet] = useState(false);
   const [initialNodeShifted, setInitialNodeShifted] = useState(false);
   const [logicPanel, setLogicPanel] = useState(null);
+  const [appointmentConfig, setAppointmentConfig] = useState({});
   const [edgeRules, setEdgeRules] = useState([
     { id: 1, variable: 'status', operator: 'equals', value: '' },
   ]);
@@ -420,8 +424,15 @@ export default function ScenariosPage() {
       }
       setSelectedNodeId(nodeId);
       setLogicPanel(null);
+      
+      // If this node has an appointment config, show the config form
+      const node = nodeMap[nodeId];
+      if (node?.appointmentConfig) {
+        setAppointmentConfig({ ...node.appointmentConfig });
+        setPanelStage('appointmentConfig');
+      }
     },
-    [initialNodeShifted]
+    [initialNodeShifted, nodeMap]
   );
 
   useEffect(() => {
@@ -639,10 +650,31 @@ export default function ScenariosPage() {
     finalizeSelection(option.option, option.description, optionIcon, panelCategory, optionAccent);
   };
 
+  const APPOINTMENT_CONFIG_ACTIONS = new Set([
+    'create_appointment', 'search_appointments', 'update_appointment', 'delete_appointment',
+  ]);
+
   const handleSubOptionClick = (subOption) => {
     const subIcon = activeOption?.icon || categoryMeta.icon;
     const subAccent = activeOption?.accent || categoryMeta.accent;
     finalizeSelection(subOption.name, subOption.description, subIcon, panelCategory, subAccent);
+    
+    // If this is an appointment action, show config form
+    if (APPOINTMENT_CONFIG_ACTIONS.has(subOption.key)) {
+      setAppointmentConfig({
+        key: subOption.key,
+        client_name: '',
+        date: '',
+        time: '',
+        duration: 30,
+        status: 'pending',
+        assigned_receptionist: '',
+        notes: '',
+      });
+      setPanelStage('appointmentConfig');
+      setIsPanelVisible(true);
+      setPanelIntent(true);
+    }
   };
 
   const handleBackToOptions = () => {
@@ -810,7 +842,8 @@ export default function ScenariosPage() {
         detail: n.detail,
         configured: n.configured,
         accent: n.accent,
-        icon: n.icon?.name
+        icon: n.icon?.name,
+        appointmentConfig: n.appointmentConfig || null,
       })),
       edges_data: edges.map(e => ({
         id: e.id,
@@ -1247,7 +1280,109 @@ export default function ScenariosPage() {
                 ))}
               </div>
               <div className="sb-panel-actions">
-                {panelStage === 'options' ? (
+                {panelStage === 'appointmentConfig' ? (
+                  <div style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                      <h4 style={{ fontSize: 12, fontWeight: 800, color: '#fff', margin: 0 }}>Configure Appointment</h4>
+                      <button type="button" onClick={() => { setPanelStage('options'); setAppointmentConfig({}); }}
+                        style={{ background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 10, color: '#71717a', marginBottom: 14, fontWeight: 600 }}>
+                      {appointmentConfig.key === 'create_appointment' && 'Set up the appointment details. Fields can reference variables like {caller_name}.'}
+                      {appointmentConfig.key === 'search_appointments' && 'Define search criteria to find appointments.'}
+                      {appointmentConfig.key === 'update_appointment' && 'Select appointment fields to update.'}
+                      {appointmentConfig.key === 'delete_appointment' && 'Set cancellation criteria.'}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {/* Client Name */}
+                      {(appointmentConfig.key === 'create_appointment') && (
+                        <div>
+                          <label style={sbLabelStyle}>Client Name</label>
+                          <input type="text" value={appointmentConfig.client_name || ''}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, client_name: e.target.value })}
+                            placeholder="e.g. {caller_name} or Maria Santos"
+                            style={sbInputStyle} />
+                        </div>
+                      )}
+                      {/* Date */}
+                      {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'search_appointments') && (
+                        <div>
+                          <label style={sbLabelStyle}>Date</label>
+                          <input type="date" value={appointmentConfig.date || ''}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, date: e.target.value })}
+                            style={sbInputStyle} />
+                        </div>
+                      )}
+                      {/* Time */}
+                      {appointmentConfig.key === 'create_appointment' && (
+                        <div>
+                          <label style={sbLabelStyle}>Time</label>
+                          <input type="time" value={appointmentConfig.time || ''}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, time: e.target.value })}
+                            style={sbInputStyle} />
+                        </div>
+                      )}
+                      {/* Duration */}
+                      {appointmentConfig.key === 'create_appointment' && (
+                        <div>
+                          <label style={sbLabelStyle}>Duration</label>
+                          <select value={appointmentConfig.duration || 30}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, duration: Number(e.target.value) })}
+                            style={sbInputStyle}>
+                            <option value={15}>15 min</option>
+                            <option value={30}>30 min</option>
+                            <option value={45}>45 min</option>
+                            <option value={60}>1 hour</option>
+                            <option value={90}>1.5 hours</option>
+                            <option value={120}>2 hours</option>
+                          </select>
+                        </div>
+                      )}
+                      {/* Status filter for search */}
+                      {appointmentConfig.key === 'search_appointments' && (
+                        <div>
+                          <label style={sbLabelStyle}>Status Filter</label>
+                          <select value={appointmentConfig.status || 'any'}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, status: e.target.value })}
+                            style={sbInputStyle}>
+                            <option value="any">Any Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </div>
+                      )}
+                      {/* Notes */}
+                      {appointmentConfig.key === 'create_appointment' && (
+                        <div>
+                          <label style={sbLabelStyle}>Notes</label>
+                          <textarea value={appointmentConfig.notes || ''}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, notes: e.target.value })}
+                            placeholder="e.g. {caller_reason} or Website consultation"
+                            rows={2}
+                            style={{ ...sbInputStyle, resize: 'none' }} />
+                        </div>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => {
+                      // Save config to the selected node
+                      const targetNode = selectedNodeId || nodes.find(n => n.configured && n.label === appointmentConfig.key?.replace(/_/g, ' '))?.id;
+                      if (targetNode) {
+                        setNodes(prev => prev.map(n => n.id === targetNode ? { ...n, appointmentConfig: { ...appointmentConfig } } : n));
+                      }
+                      setPanelStage('options');
+                      setAppointmentConfig({});
+                      setSelectedNodeId(null);
+                      setIsPanelVisible(false);
+                      setPanelIntent(false);
+                    }}
+                      style={{ width: '100%', marginTop: 14, padding: '8px 0', background: '#fff', color: '#000', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer' }}>
+                      Save Config
+                    </button>
+                  </div>
+                ) : panelStage === 'options' ? (
                   filteredOptions.length === 0 ? (
                     <div className="sb-panel-empty" style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>No components found</div>
                   ) : (

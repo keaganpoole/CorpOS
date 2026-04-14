@@ -23,7 +23,6 @@ import {
   Heart,
   AlertTriangle,
   Info,
-  History,
   ChevronDown,
   ChevronUp,
   ChevronLeft,
@@ -38,6 +37,7 @@ import {
   X,
   Target,
   GitBranch,
+  Calendar,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
@@ -48,6 +48,8 @@ import ScenariosModal from './pages/ScenariosModal';
 import HireReceptionistModal from './pages/HireReceptionistModal';
 import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 import ScenariosPage from './pages/Scenarios/Scenarios';
+import SettingsPage from './pages/SettingsPage';
+import CalendarPage from './pages/CalendarPage';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Error Boundary — catches render crashes so a blank screen never appears
@@ -499,6 +501,47 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
               <ChevronRight size={11} className="text-indigo-500/60" />
             </div>
           </button>
+        </div>
+
+        {/* Call Handling */}
+        <div className="pt-3 border-t border-white/[0.04]">
+          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Call Handling</p>
+          <div className="flex items-center gap-1.5 mb-2">
+            {[
+              { key: 'none', label: 'Off', color: 'zinc-600' },
+              { key: 'inbound', label: 'In', color: 'cyan-400' },
+              { key: 'outbound', label: 'Out', color: 'indigo-400' },
+              { key: 'both', label: 'Both', color: 'emerald-400' },
+            ].map(ct => {
+              const isActive = (agent.call_types || 'none') === ct.key;
+              return (
+                <button
+                  key={ct.key}
+                  onClick={async () => {
+                    const newVal = ct.key === (agent.call_types || 'none') ? 'none' : ct.key;
+                    await api.updateAgentCallTypes(agent.id, newVal);
+                    // Refresh agent data
+                    if (typeof refresh === 'function') refresh();
+                  }}
+                  className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border
+                    ${isActive
+                      ? `bg-${ct.color}/10 border-${ct.color}/20 text-${ct.color}`
+                      : 'bg-transparent border-transparent text-zinc-700 hover:text-zinc-500 hover:bg-white/[0.02]'
+                    }`}
+                >
+                  {ct.label}
+                </button>
+              );
+            })}
+          </div>
+          {(agent.call_types && agent.call_types !== 'none') && (
+            <div className="flex items-center gap-1.5">
+              <Phone size={9} className="text-zinc-600" />
+              <span className="text-[10px] text-zinc-500 font-medium">
+                {agent.phone_number || 'No number assigned'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
@@ -1506,8 +1549,6 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
   );
 };
 
-// --- Chronos Components ---
-
 // ─── Relative Time ────────────────────────────────────────
 const timeAgo = (timestamp) => {
   const ts = String(timestamp);
@@ -1585,674 +1626,6 @@ const AgentAvatar = ({ name, size = 40 }) => {
   );
 };
 
-const CronStatusIndicator = ({ status }) => {
-  const map = {
-    active: 'bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]',
-    queued: 'bg-zinc-800 border border-zinc-700',
-    completed: 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.6)]',
-    stopped: 'bg-rose-600 shadow-[0_0_15px_rgba(225,29,72,0.6)]',
-  };
-
-  return (
-    <div className="relative">
-      <div className={`h-2 w-2 rounded-full ${map[status] || map.queued} transition-all duration-500`} />
-      {status === 'active' && (
-        <div className="absolute inset-0 rounded-full bg-cyan-400 animate-ping opacity-40" />
-      )}
-    </div>
-  );
-};
-
-const CronCard = ({ job, onDelete }) => {
-  const [expanded, setExpanded] = useState(false);
-  const [showIssue, setShowIssue] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(getCountdown(job.next_run_at));
-
-  useEffect(() => {
-    if (job.status === 'queued' && job.next_run_at) {
-      const timer = setInterval(() => {
-        setTimeLeft(getCountdown(job.next_run_at));
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [job.status, job.next_run_at]);
-
-  const formatTime = (isoStr) => {
-    if (!isoStr) return '--:--';
-    const d = new Date(isoStr);
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York' }).toLowerCase();
-  };
-
-  return (
-    <motion.div
-      layout
-      className="group relative bg-zinc-950/50 border border-white/[0.04] hover:border-cyan-500/20 rounded-2xl p-5 mb-4 backdrop-blur-xl transition-all duration-500 shadow-2xl"
-    >
-      {job.issue && (
-        <div className="absolute top-5 right-5 z-20">
-          <button
-            onMouseEnter={() => setShowIssue(true)}
-            onMouseLeave={() => setShowIssue(false)}
-            className="text-rose-500/30 hover:text-rose-400 transition-colors"
-          >
-            <AlertCircle size={15} />
-          </button>
-          <AnimatePresence>
-            {showIssue && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, x: 10 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 0.95, x: 10 }}
-                className="absolute right-8 top-0 w-64 p-4 bg-black/95 border border-rose-500/30 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-50 pointer-events-none backdrop-blur-2xl"
-              >
-                <div className="flex items-center gap-2 text-rose-500 mb-2">
-                  <AlertCircle size={12} />
-                  <span className="text-[9px] font-black uppercase tracking-[0.2em]">Diagnostic Alert</span>
-                </div>
-                <p className="text-[11px] text-zinc-400 leading-relaxed italic">{job.issue}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {/* Delete button */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onDelete(job.id); }}
-        className="absolute top-4 right-4 w-6 h-6 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-zinc-700 hover:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/20 transition-all opacity-0 group-hover:opacity-100 z-20"
-      >
-        <span className="text-[11px] font-bold leading-none">&times;</span>
-      </button>
-
-      {/* Identity Row - Avatar replaces Navigation icon */}
-      <div className="flex items-center gap-3 mb-4">
-        <AgentAvatar name={job.assigned_agent} />
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-semibold text-zinc-200 font-sans tracking-normal">
-              {job.assigned_agent || 'Unassigned'}
-            </span>
-            <span className="w-1 h-1 rounded-full bg-zinc-800" />
-            <span className="text-[9px] uppercase tracking-widest text-zinc-600 font-black">{job.department || 'Operations'}</span>
-          </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[8px] font-bold text-zinc-700 uppercase tracking-tighter">Verified Protocol</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Content Body */}
-      <div className="space-y-2.5">
-        <h4 className="text-[14px] font-bold text-zinc-100 tracking-tight leading-tight group-hover:text-white transition-colors">
-          {job.name}
-        </h4>
-        {job.payload_text && (
-          <div
-            className="cursor-pointer group/desc"
-            onClick={() => setExpanded(!expanded)}
-          >
-            <p className={`text-[11px] text-zinc-500 font-medium leading-relaxed transition-all duration-500 ${expanded ? '' : 'line-clamp-2 opacity-60'}`}>
-              {job.payload_text}
-            </p>
-            <div className="flex items-center gap-1.5 mt-2 opacity-0 group-hover:opacity-100 transition-all">
-              <div className="h-px w-4 bg-zinc-800" />
-              {expanded ? <ChevronUp size={11} className="text-zinc-500" /> : <ChevronDown size={11} className="text-zinc-500" />}
-              <span className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-600">{expanded ? 'Collapse' : 'Expand Brief'}</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Precision Action Bar */}
-      <div className="mt-5 pt-4 border-t border-white/[0.03] flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Timer size={12} className={job.status === 'active' ? 'text-cyan-400' : 'text-zinc-700'} />
-            <span className="text-[11px] font-mono font-bold tracking-tight text-zinc-400 tabular-nums">
-              {job.status === 'active' ? 'EXECUTING' : timeLeft}
-            </span>
-          </div>
-
-          <div className="h-3 w-px bg-white/5" />
-
-          <div className="flex items-center gap-2">
-            <Clock size={12} className="text-zinc-800" />
-            <span className="text-[11px] font-bold tracking-tighter text-zinc-500 lowercase">
-              {formatTime(job.next_run_at)} <span className="text-[9px] uppercase font-black opacity-30 tracking-widest ml-1">est</span>
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {job.schedule_kind === 'every' || job.schedule_kind === 'cron' ? (
-            <Repeat size={12} className="text-zinc-800 hover:text-zinc-600 transition-colors cursor-help" title="Recurring" />
-          ) : null}
-          <CronStatusIndicator status={job.status} />
-        </div>
-      </div>
-
-      {/* Hover Status Light */}
-      <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-[2px] group-hover:w-1/2 transition-all duration-700 rounded-full ${job.status === 'active' ? 'bg-cyan-500 shadow-[0_0_15px_cyan]' : 'bg-zinc-800'}`} />
-    </motion.div>
-  );
-};
-
-const ItineraryColumn = ({ day, isToday, jobs, onDelete }) => {
-  return (
-    <div className={`flex-1 min-w-[340px] max-w-[380px] flex flex-col h-full rounded-3xl relative transition-all duration-1000 ${isToday ? 'bg-zinc-950/20' : ''}`}>
-      <div className="px-8 py-10 relative z-10">
-        <div className="flex items-baseline gap-3 mb-2">
-          <h3 className={`text-3xl font-black tracking-tighter transition-colors duration-500 ${isToday ? 'text-white' : 'text-zinc-800'}`}>
-            {day.date.split(' ')[1]}
-          </h3>
-          <span className={`text-[11px] font-black uppercase tracking-[0.4em] ${isToday ? 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'text-zinc-900'}`}>
-            {day.weekday.slice(0, 3)}
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className={`h-[1px] flex-1 ${isToday ? 'bg-cyan-500/20' : 'bg-zinc-900/50'}`} />
-          <span className={`text-[9px] font-black uppercase tracking-widest ${isToday ? 'text-zinc-500' : 'text-zinc-800'}`}>
-            {jobs.length} Operational Node{jobs.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-5 custom-scrollbar pb-12 space-y-2">
-        {jobs.length > 0 ? jobs.map(job => (
-          <CronCard key={job.id} job={job} onDelete={onDelete} />
-        )) : (
-          <div className="h-40 flex flex-col items-center justify-center opacity-20 group">
-            <div className="w-12 h-12 rounded-full border border-dashed border-zinc-800 flex items-center justify-center mb-4 group-hover:border-zinc-700 transition-colors">
-              <History size={20} className="text-zinc-800" />
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-800">No Scheduled Logic</span>
-          </div>
-        )}
-      </div>
-
-      {isToday && (
-        <div className="absolute top-0 right-8">
-          <div className="bg-cyan-500/10 text-cyan-400 text-[8px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-b-lg border-x border-b border-cyan-500/20 shadow-lg">
-            Current
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const ChronosView = ({ cronJobs, onRefresh }) => {
-  const [showAddJob, setShowAddJob] = useState(false);
-  const [form, setForm] = useState({
-    name: '',
-    date: new Date().toISOString().split('T')[0],
-    hour: '6',
-    minute: '00',
-    ampm: 'PM',
-    recurring: false,
-    repeat: 'none',
-    cron_expr: '',
-    payload_text: '',
-    assigned_agent: '',
-    department: '',
-  });
-  const [showAgentPicker, setShowAgentPicker] = useState(false);
-  const [activeIdx, setActiveIdx] = useState(0);
-  const wheelLock = useRef(false);
-
-  const agentOptions = [
-    { name: 'Max', role: 'COO', department: 'Executive', reports_to: null },
-    { name: 'Yanna', role: 'Research Manager', department: 'Research', reports_to: 'Max' },
-  ];
-
-  const selectAgent = (agent) => {
-    setForm({ ...form, assigned_agent: agent.name, department: agent.department });
-    setShowAgentPicker(false);
-    setActiveIdx(0);
-  };
-
-  const cycleAgent = (direction) => {
-    if (wheelLock.current) return;
-    wheelLock.current = true;
-    setTimeout(() => { wheelLock.current = false; }, 600);
-
-    setActiveIdx(prev => {
-      const next = prev + direction;
-      if (next < 0) return agentOptions.length - 1;
-      if (next >= agentOptions.length) return 0;
-      return next;
-    });
-  };
-
-  const handleWheel = (e) => {
-    e.preventDefault();
-    if (e.deltaY > 15) cycleAgent(1);
-    else if (e.deltaY < -15) cycleAgent(-1);
-  };
-
-  const handleDelete = async (jobId) => {
-    const res = await api.deleteCronJob(jobId);
-    if (res?.success && onRefresh) onRefresh();
-  };
-
-  const buildScheduleValue = () => {
-    if (form.recurring) {
-      if (form.repeat === 'daily') return '0 ' + (form.ampm === 'AM' ? (form.hour === '12' ? '0' : form.hour) : (form.hour === '12' ? '12' : String(parseInt(form.hour) + 12))) + ' * * *';
-      if (form.repeat === 'weekly') return '0 ' + (form.ampm === 'AM' ? (form.hour === '12' ? '0' : form.hour) : (form.hour === '12' ? '12' : String(parseInt(form.hour) + 12))) + ' * * 1';
-      if (form.repeat === 'custom') return form.cron_expr;
-      return form.cron_expr;
-    }
-    // Build ISO timestamp from date + time in EST
-    let h = parseInt(form.hour);
-    if (form.ampm === 'PM' && h !== 12) h += 12;
-    if (form.ampm === 'AM' && h === 12) h = 0;
-    const iso = `${form.date}T${String(h).padStart(2, '0')}:${form.minute}:00`;
-    return iso;
-  };
-
-  const buildScheduleKind = () => {
-    if (form.recurring) return 'cron';
-    return 'at';
-  };
-
-  const [submitting, setSubmitting] = useState(false);
-  const [createError, setCreateError] = useState('');
-
-  const handleCreate = async () => {
-    if (!form.name) return;
-    setSubmitting(true);
-    setCreateError('');
-    try {
-      const payload = {
-        name: form.name,
-        schedule_kind: buildScheduleKind(),
-        schedule_value: buildScheduleValue(),
-        payload_text: form.payload_text,
-        assigned_agent: form.assigned_agent || 'Max',
-        department: form.department || 'Executive',
-      };
-      const res = await api.createCronJob(payload);
-      if (res?.success) {
-        setShowAddJob(false);
-        setForm({ name: '', date: new Date().toISOString().split('T')[0], hour: '6', minute: '00', ampm: 'PM', recurring: false, repeat: 'none', cron_expr: '', payload_text: '', assigned_agent: '', department: '' });
-        if (onRefresh) onRefresh();
-      } else {
-        setCreateError(res?.error || 'Failed to create job');
-      }
-    } catch (err) {
-      setCreateError(err.message || 'Network error');
-    }
-    setSubmitting(false);
-  };
-
-  const timeline = Array.from({ length: 8 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    return {
-      weekday: d.toLocaleDateString('en-US', { weekday: 'long' }),
-      date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      raw: d.toISOString().split('T')[0],
-    };
-  });
-
-  // Map cron jobs to day offsets
-  const jobsByDay = {};
-  for (const job of cronJobs) {
-    if (!job.next_run_at) continue;
-    const jobDate = new Date(job.next_run_at).toISOString().split('T')[0];
-    const dayIdx = timeline.findIndex(d => d.raw === jobDate);
-    if (dayIdx === -1) continue;
-
-    if (!jobsByDay[dayIdx]) jobsByDay[dayIdx] = [];
-    jobsByDay[dayIdx].push(job);
-  }
-
-  const activeCount = cronJobs.filter(j => j.status === 'active').length;
-
-  return (
-    <div className="h-full flex flex-col bg-[#020202] text-zinc-400 font-sans selection:bg-cyan-500/20 overflow-hidden">
-      <header className="shrink-0 flex items-center justify-between border-b border-white/[0.02] bg-gradient-to-b from-zinc-950/20 to-transparent px-8 py-6">
-        <div>
-          <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-cyan-500/5 rounded-xl border border-cyan-500/10 shadow-[0_0_20px_rgba(34,211,238,0.05)]">
-              <History className="text-cyan-400" size={22} />
-            </div>
-            <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic leading-none">Chronos</h2>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setShowAddJob(true)}
-          className="no-drag w-14 h-14 rounded-2xl bg-white border border-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.15)] group"
-        >
-          <Plus size={24} className="text-black group-hover:rotate-90 transition-transform duration-300" />
-        </button>
-      </header>
-
-      <div className="flex-1 flex gap-0 overflow-x-auto custom-scrollbar relative">
-        <div className="absolute top-[40px] left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-900 to-transparent z-0" />
-
-        {timeline.map((day, idx) => (
-          <ItineraryColumn
-            key={day.raw}
-            day={day}
-            isToday={idx === 0}
-            jobs={jobsByDay[idx] || []}
-            onDelete={handleDelete}
-          />
-        ))}
-      </div>
-
-
-      {/* Add Job Modal */}
-      <AnimatePresence>
-        {showAddJob && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl"
-            onClick={() => setShowAddJob(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="w-[480px] bg-zinc-950 border border-white/10 rounded-3xl p-8 shadow-[0_40px_80px_rgba(0,0,0,0.8)]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-cyan-500/5 rounded-xl border border-cyan-500/10">
-                    <Plus size={18} className="text-cyan-400" />
-                  </div>
-                  <h3 className="text-[14px] font-black text-white uppercase tracking-wider">New Cron Job</h3>
-                </div>
-                <button onClick={() => setShowAddJob(false)} className="text-zinc-600 hover:text-white transition-colors">
-                  <span className="text-lg">&times;</span>
-                </button>
-              </div>
-
-              <div className="space-y-5">
-                {/* Task Name */}
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Task Name</label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Daily health check"
-                    className="w-full bg-black/60 border border-white/5 rounded-xl px-4 py-3 text-[13px] text-zinc-200 font-medium placeholder:text-zinc-800 focus:outline-none focus:border-cyan-500/30 transition-colors"
-                  />
-                </div>
-
-                {/* Schedule - Date & Time Picker */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">When</label>
-                    <button
-                      onClick={() => setForm({ ...form, recurring: !form.recurring })}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-full border text-[9px] font-bold uppercase tracking-wider transition-all ${form.recurring ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' : 'bg-white/[0.02] border-white/5 text-zinc-600 hover:text-zinc-400'}`}
-                    >
-                      <Repeat size={10} /> Repeat
-                    </button>
-                  </div>
-
-                  <div className="flex gap-3">
-                    {/* Date */}
-                    <div className="flex-1">
-                      <input
-                        type="date"
-                        value={form.date}
-                        onChange={(e) => setForm({ ...form, date: e.target.value })}
-                        className="w-full bg-black/60 border border-white/5 rounded-xl px-4 py-3 text-[13px] text-zinc-200 font-medium focus:outline-none focus:border-cyan-500/30 transition-colors [color-scheme:dark]"
-                      />
-                    </div>
-
-                    {/* Time - Hour : Minute AM/PM */}
-                    <div className="flex items-center gap-1.5 bg-black/60 border border-white/5 rounded-xl px-3 py-3">
-                      <select
-                        value={form.hour}
-                        onChange={(e) => setForm({ ...form, hour: e.target.value })}
-                        className="bg-transparent text-[15px] text-zinc-200 font-bold focus:outline-none appearance-none cursor-pointer w-8 text-center"
-                      >
-                        {Array.from({ length: 12 }, (_, i) => (
-                          <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
-                        ))}
-                      </select>
-                      <span className="text-zinc-600 font-bold text-[15px]">:</span>
-                      <select
-                        value={form.minute}
-                        onChange={(e) => setForm({ ...form, minute: e.target.value })}
-                        className="bg-transparent text-[15px] text-zinc-200 font-bold focus:outline-none appearance-none cursor-pointer w-10 text-center"
-                      >
-                        {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
-                      <div className="flex flex-col ml-1">
-                        <button
-                          onClick={() => setForm({ ...form, ampm: 'AM' })}
-                          className={`text-[9px] font-black px-1.5 py-0.5 rounded transition-all ${form.ampm === 'AM' ? 'text-cyan-400 bg-cyan-500/10' : 'text-zinc-700'}`}
-                        >AM</button>
-                        <button
-                          onClick={() => setForm({ ...form, ampm: 'PM' })}
-                          className={`text-[9px] font-black px-1.5 py-0.5 rounded transition-all ${form.ampm === 'PM' ? 'text-cyan-400 bg-cyan-500/10' : 'text-zinc-700'}`}
-                        >PM</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Repeat presets */}
-                  {form.recurring && (
-                    <div className="mt-3 flex gap-2">
-                      {[
-                        { label: 'Daily', value: 'daily' },
-                        { label: 'Weekly', value: 'weekly' },
-                        { label: 'Custom', value: 'custom' },
-                      ].map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => setForm({ ...form, repeat: opt.value })}
-                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${form.repeat === opt.value ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' : 'bg-white/[0.02] border-white/5 text-zinc-600 hover:text-zinc-400'}`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Cron expression (only for custom repeat) */}
-                  {form.recurring && form.repeat === 'custom' && (
-                    <input
-                      type="text"
-                      value={form.cron_expr}
-                      onChange={(e) => setForm({ ...form, cron_expr: e.target.value })}
-                      placeholder="0 9 * * *"
-                      className="w-full mt-3 bg-black/60 border border-white/5 rounded-xl px-4 py-3 text-[13px] text-zinc-200 font-medium placeholder:text-zinc-800 focus:outline-none focus:border-cyan-500/30 transition-colors font-mono"
-                    />
-                  )}
-                </div>
-
-                {/* What happens */}
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">What Happens</label>
-                  <textarea
-                    value={form.payload_text}
-                    onChange={(e) => setForm({ ...form, payload_text: e.target.value })}
-                    placeholder="Describe what this job should do..."
-                    rows={3}
-                    className="w-full bg-black/60 border border-white/5 rounded-xl px-4 py-3 text-[13px] text-zinc-200 font-medium placeholder:text-zinc-800 focus:outline-none focus:border-cyan-500/30 transition-colors resize-none"
-                  />
-                </div>
-
-                {/* Assign To */}
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Assign To</label>
-                  <button
-                    onClick={() => setShowAgentPicker(true)}
-                    className="w-full bg-black/60 border border-white/5 hover:border-cyan-500/20 rounded-xl px-4 py-3 text-left flex items-center justify-between transition-all group"
-                  >
-                    {form.assigned_agent ? (
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-lg overflow-hidden border border-white/10 bg-zinc-900">
-                          <img src={`${AVATAR_BASE}/${form.assigned_agent.toLowerCase()}.jpg`} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display='none' }} />
-                        </div>
-                        <div>
-                          <span className="text-[13px] font-bold text-zinc-200">{form.assigned_agent}</span>
-                          <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest ml-2">{form.department}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-[13px] text-zinc-700 font-medium">Select agent...</span>
-                    )}
-                    <Users size={14} className="text-zinc-700 group-hover:text-zinc-400 transition-colors" />
-                  </button>
-                </div>
-
-                {/* Agent Picker - Tinder-style card cycling */}
-                <AnimatePresence>
-                  {showAgentPicker && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-md rounded-3xl"
-                      onClick={() => setShowAgentPicker(false)}
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.92, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.92, y: 20 }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        className="w-[420px] h-[520px] bg-zinc-950/90 border border-white/[0.08] rounded-3xl overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.9)] flex flex-col"
-                        onClick={(e) => e.stopPropagation()}
-                        onWheel={handleWheel}
-                      >
-                        {/* Header */}
-                        <div className="shrink-0 px-8 pt-7 pb-3 flex items-center justify-between">
-                          <h4 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em]">Assign To</h4>
-                          <div className="flex items-center gap-1.5 text-zinc-700">
-                            <ChevronUp size={12} />
-                            <ChevronDown size={12} />
-                            <span className="text-[8px] font-bold uppercase tracking-widest ml-1">Scroll</span>
-                          </div>
-                        </div>
-
-                        {/* Card Stage */}
-                        <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
-                          {agentOptions.map((agent, idx) => {
-                            const offset = idx - activeIdx;
-                            const isActive = offset === 0;
-                            const absOff = Math.abs(offset);
-
-                            return (
-                              <div
-                                key={agent.name}
-                                className="absolute w-[calc(100%-48px)] h-[340px] rounded-2xl overflow-hidden cursor-pointer group border border-white/[0.06]"
-                                style={{
-                                  transform: `translateX(${offset * 110}%) scale(${isActive ? 1 : 0.88})`,
-                                  opacity: isActive ? 1 : 0.25,
-                                  zIndex: isActive ? 10 : 5 - absOff,
-                                  transition: 'transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.4s ease',
-                                  willChange: 'transform, opacity',
-                                }}
-                                onDoubleClick={() => selectAgent(agent)}
-                              >
-                                {/* Full avatar */}
-                                <img
-                                  src={`${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
-                                  alt={agent.name}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
-                                  }}
-                                />
-
-                                {/* Gradient overlay */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-
-                                {/* Glow edge on active */}
-                                {isActive && (
-                                  <div className="absolute inset-0 rounded-2xl border border-cyan-500/20 shadow-[0_0_40px_rgba(34,211,238,0.1)] pointer-events-none" />
-                                )}
-
-                                {/* Info */}
-                                <div className="absolute bottom-0 left-0 right-0 p-6">
-                                  <div className="flex items-end justify-between">
-                                    <div>
-                                      <h3 className="text-2xl font-black text-white tracking-tight">{agent.name}</h3>
-                                      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-[0.2em] mt-1.5">{agent.role}</p>
-                                    </div>
-                                    <Badge color={agent.department === 'Executive' ? 'magenta' : 'cyan'}>
-                                      {agent.department}
-                                    </Badge>
-                                  </div>
-                                </div>
-
-                                {/* Hover hint on active card */}
-                                {isActive && (
-                                  <div className="absolute top-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <div className="px-3 py-1.5 bg-white/10 backdrop-blur-xl rounded-full border border-white/10">
-                                      <span className="text-[8px] font-black text-white uppercase tracking-widest">Double-click</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Footer - dots + select */}
-                        <div className="shrink-0 px-8 py-5 flex items-center justify-between border-t border-white/[0.04]">
-                          <div className="flex gap-2">
-                            {agentOptions.map((_, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => setActiveIdx(idx)}
-                                className={`h-1.5 rounded-full transition-all duration-300 ${
-                                  activeIdx === idx
-                                    ? 'w-6 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]'
-                                    : 'w-1.5 bg-zinc-700 hover:bg-zinc-500'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          <button
-                            onClick={() => selectAgent(agentOptions[activeIdx])}
-                            className="px-6 py-2.5 bg-white text-black rounded-full text-[11px] font-black uppercase tracking-wider hover:bg-cyan-400 transition-all active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-                          >
-                            Select
-                          </button>
-                        </div>
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {createError && (
-                <div className="mt-4 px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
-                  <AlertCircle size={14} className="text-rose-400 shrink-0" />
-                  <span className="text-[11px] text-rose-400 font-medium">{createError}</span>
-                </div>
-              )}
-
-              <button
-                onClick={handleCreate}
-                disabled={!form.name || submitting}
-                className="w-full mt-8 py-3.5 bg-white text-black rounded-xl text-[13px] font-black uppercase tracking-wider hover:bg-cyan-400 transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(255,255,255,0.1)]"
-              >
-                {submitting ? 'Scheduling...' : 'Schedule Job'}
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
 
 const NavButton = ({ item, isActive, onClick }) => {
   const [sweeping, setSweeping] = useState(false);
@@ -2374,7 +1747,6 @@ const App = () => {
     livePulse,
     systemLogs,
     pipeline,
-    cronJobs,
     reactions,
     summary,
     wsStatus,
@@ -2425,11 +1797,12 @@ const App = () => {
   const navItems = [
     { id: 'receptionists', icon: <Users size={18} />, label: 'Receptionists' },
     { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
-    { id: 'chronos', icon: <History size={18} />, label: 'Chronos' },
+    { id: 'calendar', icon: <Calendar size={18} />, label: 'Calendar' },
     { id: 'system', icon: <Activity size={18} />, label: 'System' },
     { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'People' },
     { id: 'memory', icon: <Database size={18} />, label: 'Memory' },
     { id: 'council', icon: <Gavel size={18} />, label: 'Council' },
+    { id: 'settings', icon: <Settings size={18} />, label: 'Settings' },
   ];
 
   const renderView = () => {
@@ -2507,8 +1880,10 @@ const App = () => {
         );
       case 'scenarios':
         return <ScenariosPage />;
-      case 'chronos':
-        return <ChronosView cronJobs={cronJobs} onRefresh={refresh} />;
+      case 'settings':
+        return <SettingsPage />;
+      case 'calendar':
+        return <CalendarPage />;
       case 'system':
         return <SystemView summary={summary} systemLogs={systemLogs} />;
       case 'pipeline':
