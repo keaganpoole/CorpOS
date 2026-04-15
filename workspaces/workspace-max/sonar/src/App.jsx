@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
+import { supabase } from './lib/supabase';
 import {
   Users,
   Activity,
@@ -38,6 +39,7 @@ import {
   Target,
   GitBranch,
   Calendar,
+  Radio,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
@@ -50,6 +52,7 @@ import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 import ScenariosPage from './pages/Scenarios/Scenarios';
 import SettingsPage from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
+import RoutesPage from './pages/RoutesPage';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Error Boundary — catches render crashes so a blank screen never appears
@@ -381,8 +384,8 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
   const stats = {
     memory: agent.memory_items || 0,
     tasks: agent.tasks_done || 0,
-    compliments: reactions.compliments || 0,
-    complaints: reactions.complaints || 0,
+    compliments: agent.compliments ?? reactions.compliments ?? 0,
+    complaints: agent.complaints ?? reactions.complaints ?? 0,
   };
 
   const isOnline = agent.status === 'active';
@@ -508,10 +511,10 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Call Handling</p>
           <div className="flex items-center gap-1.5 mb-2">
             {[
-              { key: 'none', label: 'Off', color: 'zinc-600' },
-              { key: 'inbound', label: 'In', color: 'cyan-400' },
-              { key: 'outbound', label: 'Out', color: 'indigo-400' },
-              { key: 'both', label: 'Both', color: 'emerald-400' },
+              { key: 'none', label: 'Off', activeClass: 'bg-zinc-700/10 border-zinc-700/20 text-zinc-600' },
+              { key: 'inbound', label: 'In', activeClass: 'bg-cyan-400/10 border-cyan-400/20 text-cyan-400' },
+              { key: 'outbound', label: 'Out', activeClass: 'bg-indigo-400/10 border-indigo-400/20 text-indigo-400' },
+              { key: 'both', label: 'Both', activeClass: 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' },
             ].map(ct => {
               const isActive = (agent.call_types || 'none') === ct.key;
               return (
@@ -519,13 +522,15 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
                   key={ct.key}
                   onClick={async () => {
                     const newVal = ct.key === (agent.call_types || 'none') ? 'none' : ct.key;
-                    await api.updateAgentCallTypes(agent.id, newVal);
-                    // Refresh agent data
-                    if (typeof refresh === 'function') refresh();
+                    try {
+                      await api.updateAgentCallTypes(agent.id, newVal);
+                    } catch (err) {
+                      console.error('[CallTypes] Failed:', err.message || err);
+                    }
                   }}
                   className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border
                     ${isActive
-                      ? `bg-${ct.color}/10 border-${ct.color}/20 text-${ct.color}`
+                      ? ct.activeClass
                       : 'bg-transparent border-transparent text-zinc-700 hover:text-zinc-500 hover:bg-white/[0.02]'
                     }`}
                 >
@@ -1798,6 +1803,7 @@ const App = () => {
     { id: 'receptionists', icon: <Users size={18} />, label: 'Receptionists' },
     { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
     { id: 'calendar', icon: <Calendar size={18} />, label: 'Calendar' },
+    { id: 'routes', icon: <Radio size={18} />, label: 'Routes' },
     { id: 'system', icon: <Activity size={18} />, label: 'System' },
     { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'People' },
     { id: 'memory', icon: <Database size={18} />, label: 'Memory' },
@@ -1869,8 +1875,26 @@ const App = () => {
               {showHireModal && (
                 <HireReceptionistModal
                   onClose={() => setShowHireModal(false)}
-                  onHire={(receptionist) => {
-                    console.log('Hired receptionist:', receptionist);
+                  onHire={async (receptionist) => {
+                    try {
+                      const { error } = await supabase.from('hired_receptionists').insert({
+                        catalog_id: receptionist.id,
+                        full_name: receptionist.full_name,
+                        description: receptionist.description,
+                        stereotype: receptionist.stereotype,
+                        avatar: receptionist.avatar,
+                        traits: receptionist.traits,
+                        voice: receptionist.voice,
+                        age: receptionist.age,
+                        first_name: receptionist.first_name,
+                        elevenlabs_agent_id: receptionist.elevenlabs_agent_id,
+                        call_types: 'none',
+                        is_active: true,
+                      });
+                      if (error) throw error;
+                    } catch (err) {
+                      console.error('[Hire] Failed:', err.message);
+                    }
                     refresh();
                   }}
                 />
@@ -1884,6 +1908,8 @@ const App = () => {
         return <SettingsPage />;
       case 'calendar':
         return <CalendarPage />;
+      case 'routes':
+        return <RoutesPage />;
       case 'system':
         return <SystemView summary={summary} systemLogs={systemLogs} />;
       case 'pipeline':

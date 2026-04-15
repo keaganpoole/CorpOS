@@ -19,7 +19,7 @@ const HireReceptionistModal = ({ onClose, onHire }) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('receptionists')
+        .from('receptionist_catalog')
         .select('*')
         .order('full_name', { ascending: true });
 
