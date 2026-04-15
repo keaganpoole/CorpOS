@@ -40,6 +40,7 @@ import {
   GitBranch,
   Calendar,
   Radio,
+  Phone,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
@@ -372,6 +373,55 @@ const KanbanColumn = ({ column, tasks, onEditColumn }) => {
   );
 };
 
+const PhoneField = ({ agent }) => {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(agent.phone_number || '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (value === (agent.phone_number || '')) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      await api.patchAgent(agent.id, { phone_number: value || null });
+    } catch (err) {
+      console.error('[PhoneField] Save failed:', err);
+    }
+    setSaving(false);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <div
+        className="flex items-center gap-1.5 cursor-pointer group"
+        onClick={() => { setValue(agent.phone_number || ''); setEditing(true); }}
+      >
+        <Phone size={9} className="text-zinc-600" />
+        <span className="text-[10px] text-zinc-500 font-medium group-hover:text-zinc-300 transition-colors">
+          {agent.phone_number || 'Click to add number'}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Phone size={9} className="text-zinc-600" />
+      <input
+        autoFocus
+        type="tel"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+        placeholder="+1234567890"
+        className="w-full bg-transparent border-b border-cyan-500/40 text-[10px] text-zinc-300 font-medium outline-none placeholder-zinc-700 py-0.5"
+      />
+      {saving && <span className="text-[8px] text-zinc-600 animate-pulse">saving</span>}
+    </div>
+  );
+};
+
 const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
 
@@ -379,14 +429,6 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   // Show the pending model if one exists, otherwise show the current model
   const displayModel = pending || agent.model || 'Not set';
-
-  // Stats from DB + reactions
-  const stats = {
-    memory: agent.memory_items || 0,
-    tasks: agent.tasks_done || 0,
-    compliments: agent.compliments ?? reactions.compliments ?? 0,
-    complaints: agent.complaints ?? reactions.complaints ?? 0,
-  };
 
   const isOnline = agent.status === 'active';
 
@@ -399,7 +441,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
       {/* Avatar - large, dominant */}
       <div className="relative h-[200px] overflow-hidden">
         <img
-          src={`${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
+          src={agent.avatar || `${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
           alt={agent.name}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           onError={(e) => {
@@ -431,26 +473,6 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         <div className="flex items-center gap-2 text-zinc-500">
           <Terminal size={11} className="shrink-0 text-zinc-700" />
           <span className="text-[11px] font-medium truncate italic">{agent.current_activity || 'Idle'}</span>
-        </div>
-
-        {/* Stat grid */}
-        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/[0.04]">
-          <div>
-            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Memory</p>
-            <p className="text-[14px] font-bold text-zinc-300 mt-0.5">{stats.memory} <span className="text-[10px] text-zinc-600">items</span></p>
-          </div>
-          <div>
-            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Tasks Done</p>
-            <p className="text-[14px] font-bold text-zinc-300 mt-0.5">{stats.tasks}</p>
-          </div>
-          <div>
-            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Compliments</p>
-            <p className="text-[14px] font-bold text-emerald-400 mt-0.5">{stats.compliments}</p>
-          </div>
-          <div>
-            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Complaints</p>
-            <p className="text-[14px] font-bold text-rose-400 mt-0.5">{stats.complaints}</p>
-          </div>
         </div>
 
         {/* Model info */}
@@ -539,14 +561,15 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
               );
             })}
           </div>
-          {(agent.call_types && agent.call_types !== 'none') && (
-            <div className="flex items-center gap-1.5">
-              <Phone size={9} className="text-zinc-600" />
-              <span className="text-[10px] text-zinc-500 font-medium">
-                {agent.phone_number || 'No number assigned'}
-              </span>
-            </div>
-          )}
+          {/* Phone Number */}
+          <div className="pt-3 border-t border-white/[0.04]">
+            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Phone Number</p>
+            {(agent.call_types && agent.call_types !== 'none') ? (
+              <PhoneField agent={agent} />
+            ) : (
+              <span className="text-[10px] text-zinc-600">Enable call handling to assign a number</span>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

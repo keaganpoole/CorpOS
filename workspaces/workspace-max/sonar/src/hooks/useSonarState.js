@@ -143,14 +143,9 @@ const [reactions, setReactions] = useState([]);
 
     const agentsSub = supabase
       .channel('agents-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hired_receptionists' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setAgents(prev => [...prev, payload.new]);
-        } else if (payload.eventType === 'UPDATE') {
-          setAgents(prev => prev.map(a => a.id === payload.new.id ? payload.new : a));
-        } else if (payload.eventType === 'DELETE') {
-          setAgents(prev => prev.filter(a => a.id !== payload.old.id));
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hired_receptionists' }, () => {
+        // Refresh agents from API to get proper field mapping
+        api.getAgents().then(d => { if (d) setAgents(d); });
       })
       .subscribe();
 

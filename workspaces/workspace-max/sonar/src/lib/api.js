@@ -34,6 +34,7 @@ export const api = {
   getOpenRouterModels: () => fetchJSON('/api/openrouter/models'),
   updateAgentModel: (agentId, model) => postJSON(`/api/agents/${agentId}/model`, { model }),
   updateAgentCallTypes: (agentId, callTypes) => postJSON(`/api/agents/${agentId}/call-types`, { call_types: callTypes }),
+  patchAgent: (agentId, data) => patchJSON(`/api/agents/${agentId}`, data),
   getPendingRestarts: () => fetchJSON('/api/pending-restarts'),
   clearPendingRestart: (id) => del(`/api/pending-restarts/${id}`),
 
@@ -55,6 +56,21 @@ async function postJSON(endpoint, body) {
     return await res.json();
   } catch (err) {
     console.error(`[SONARAPI] POST failed: ${endpoint}`, err.message);
+    return null;
+  }
+}
+
+async function patchJSON(endpoint, body) {
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error(`[SONARAPI] PATCH failed: ${endpoint}`, err.message);
     return null;
   }
 }

@@ -31,6 +31,7 @@ const WebSocket = require('ws');
 const { initDatabase } = require('./db/schema');
 const { EventSystem } = require('./events/EventSystem');
 const { seedData } = require('./seed');
+const { syncAgentVoice } = require('./elevenlabs/sync-voice');
 
 // ─── Supabase Helper ─────────────────────────────────────
 function getSBHeaders() {
@@ -205,13 +206,24 @@ class Controller {
     this.app.patch('/api/agents/:id', async (req, res) => {
       try {
         const updates = req.body;
-        const allowed = ['name', 'status', 'current_activity', 'last_heartbeat'];
+        const allowed = ['name', 'status', 'current_activity', 'last_heartbeat', 'phone_number', 'call_types', 'is_active'];
         const payload = {};
         for (const f of allowed) {
           if (updates[f] !== undefined) payload[f] = updates[f];
         }
         if (Object.keys(payload).length === 0) return res.status(400).json({ error: 'No valid fields' });
         const result = await sbQuery('hired_receptionists', 'PATCH', payload, `?id=eq.${req.params.id}`);
+
+        // Sync voice to ElevenLabs when call_types changes
+        if (payload.call_types !== undefined) {
+          const receptionist = result?.[0] || {};
+          if (payload.call_types !== 'none') {
+            syncAgentVoice(receptionist.elevenlabs_voice_id, receptionist.full_name || 'Unknown');
+          } else {
+            syncAgentVoice(null, receptionist.full_name || 'Unknown');
+          }
+        }
+
         res.json(this._mapAgentFields(result?.[0]) || { success: true });
       } catch (err) {
         res.status(500).json({ error: err.message });
@@ -667,6 +679,14 @@ class Controller {
         if (r.length === 0) return res.status(404).json({ error: 'Receptionist not found' });
 
         await sbQuery('hired_receptionists', 'PATCH', { call_types }, `?id=eq.${req.params.id}`);
+
+        // Sync voice to ElevenLabs agent when call handling is activated
+        const receptionist = r[0];
+        if (call_types !== 'none') {
+          syncAgentVoice(receptionist.elevenlabs_voice_id, receptionist.full_name);
+        } else {
+          syncAgentVoice(null, receptionist.full_name);
+        }
 
         res.json({ success: true, call_types });
       } catch (err) {
