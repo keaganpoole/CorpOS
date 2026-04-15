@@ -122,6 +122,11 @@ class Controller {
       ...agent,
       name: agent.full_name || agent.name,
       role: agent.stereotype || agent.role || 'Receptionist',
+      model: agent.language_model || agent.model || null,
+      compliments: agent.compliments ?? 0,
+      complaints: agent.complaints ?? 0,
+      memory_items: agent.memory_items ?? 0,
+      tasks_done: agent.tasks_done ?? 0,
     };
   }
 

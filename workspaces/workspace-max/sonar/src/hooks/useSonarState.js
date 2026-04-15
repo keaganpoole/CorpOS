@@ -143,7 +143,7 @@ const [reactions, setReactions] = useState([]);
 
     const agentsSub = supabase
       .channel('agents-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'agents' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hired_receptionists' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setAgents(prev => [...prev, payload.new]);
         } else if (payload.eventType === 'UPDATE') {

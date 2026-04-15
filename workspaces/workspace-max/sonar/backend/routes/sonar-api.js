@@ -33,23 +33,23 @@ function normalizePhone(phone) {
 
 /**
  * GET /api/sonar/business/profile
- * Returns the full business profile from the account_settings table.
+ * Returns the full business profile from the businesses table.
  */
 router.get('/business/profile', async (req, res) => {
   try {
-    const rows = await sbQuery('account_settings', 'GET', null, '?limit=1') || [];
-    const s = rows[0] || {};
+    const rows = await sbQuery('businesses', 'GET', null, '?limit=1') || [];
+    const b = rows[0] || {};
 
     res.json({
-      business_name: s.business_name || '',
-      phone: s.business_phone || '',
-      email: s.business_email || '',
-      address: s.business_address || '',
-      timezone: s.business_timezone || 'America/New_York',
-      appointment_duration: s.default_appointment_duration || 30,
-      appointment_buffer: s.appointment_buffer_minutes || 0,
-      business_hours: s.business_hours || {},
-      forwarding_number: s.forwarding_number || '',
+      name: b.name || '',
+      phone: b.phone || '',
+      email: b.email || '',
+      address: b.address || '',
+      city: b.city || '',
+      state: b.state || '',
+      zip: b.zip || '',
+      website: b.website || '',
+      hours: b.hours || '',
     });
   } catch (err) {
     console.error('[SONAR-API] get profile failed:', err.message);
@@ -59,38 +59,28 @@ router.get('/business/profile', async (req, res) => {
 
 /**
  * PUT /api/sonar/business/profile
- * Updates business profile fields in account_settings.
+ * Updates business profile fields in the businesses table.
  */
 router.put('/business/profile', async (req, res) => {
   try {
-    const fieldMap = {
-      business_name: 'business_name',
-      phone: 'business_phone',
-      email: 'business_email',
-      address: 'business_address',
-      timezone: 'business_timezone',
-      appointment_duration: 'default_appointment_duration',
-      appointment_buffer: 'appointment_buffer_minutes',
-      forwarding_number: 'forwarding_number',
-    };
+    const allowedFields = ['name', 'phone', 'email', 'address', 'city', 'state', 'zip', 'website', 'hours'];
 
     const payload = {};
-    for (const [bodyField, dbField] of Object.entries(fieldMap)) {
-      if (req.body[bodyField] !== undefined) payload[dbField] = req.body[bodyField];
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) payload[field] = req.body[field];
     }
-    if (req.body.business_hours !== undefined) payload.business_hours = req.body.business_hours;
+    payload.updated_at = new Date().toISOString();
 
-    if (Object.keys(payload).length === 0) return res.status(400).json({ error: 'No valid fields' });
+    if (Object.keys(payload).length === 1) return res.status(400).json({ error: 'No valid fields' }); // only updated_at
 
     // Get the row id first
-    const existing = await sbQuery('account_settings', 'GET', null, '?limit=1') || [];
+    const existing = await sbQuery('businesses', 'GET', null, '?limit=1') || [];
     if (existing.length === 0) {
-      // Insert a new row
-      const result = await sbQuery('account_settings', 'POST', payload);
+      const result = await sbQuery('businesses', 'POST', payload);
       return res.json({ success: true, updated: payload });
     }
 
-    const result = await sbQuery('account_settings', 'PATCH', payload, `?id=eq.${existing[0].id}`);
+    const result = await sbQuery('businesses', 'PATCH', payload, `?id=eq.${existing[0].id}`);
     res.json({ success: true, updated: payload });
   } catch (err) {
     console.error('[SONAR-API] update profile failed:', err.message);
@@ -100,28 +90,56 @@ router.put('/business/profile', async (req, res) => {
 
 /**
  * GET /api/sonar/business/knowledge-base
- * Returns knowledge base content. Currently stored in-memory until KB table is added.
+ * Returns knowledge base content from the businesses table.
  */
 router.get('/business/knowledge-base', async (req, res) => {
-  // account_settings doesn't have KB columns yet — return empty structure
-  res.json({
-    about: '',
-    services: '',
-    policies: '',
-    faq: '',
-  });
+  try {
+    const rows = await sbQuery('businesses', 'GET', null, '?limit=1') || [];
+    const b = rows[0] || {};
+
+    res.json({
+      about: b.about_us || '',
+      policies: b.policies || '',
+      faq: b.faq || '',
+    });
+  } catch (err) {
+    console.error('[SONAR-API] get knowledge-base failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**
  * PUT /api/sonar/business/knowledge-base
- * Updates knowledge base sections. Stub until KB table is added.
+ * Updates knowledge base sections in the businesses table.
  */
 router.put('/business/knowledge-base', async (req, res) => {
-  // account_settings doesn't have KB columns yet — accept but no-op
-  const fields = Object.keys(req.body).filter(k => ['about', 'services', 'policies', 'faq'].includes(k));
-  if (fields.length === 0) return res.status(400).json({ error: 'No valid fields (about, services, policies, faq)' });
+  try {
+    const fieldMap = {
+      about: 'about_us',
+      policies: 'policies',
+      faq: 'faq',
+    };
 
-  res.json({ success: true, stored: fields, note: 'Knowledge base will persist once KB columns are added to account_settings' });
+    const payload = {};
+    for (const [bodyField, dbField] of Object.entries(fieldMap)) {
+      if (req.body[bodyField] !== undefined) payload[dbField] = req.body[bodyField];
+    }
+    payload.updated_at = new Date().toISOString();
+
+    if (Object.keys(payload).length === 1) return res.status(400).json({ error: 'No valid fields (about, policies, faq)' });
+
+    const existing = await sbQuery('businesses', 'GET', null, '?limit=1') || [];
+    if (existing.length === 0) {
+      const result = await sbQuery('businesses', 'POST', payload);
+      return res.json({ success: true, stored: Object.keys(payload).filter(k => k !== 'updated_at') });
+    }
+
+    await sbQuery('businesses', 'PATCH', payload, `?id=eq.${existing[0].id}`);
+    res.json({ success: true, stored: Object.keys(payload).filter(k => k !== 'updated_at') });
+  } catch (err) {
+    console.error('[SONAR-API] update knowledge-base failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ══════════════════════════════════════════════════════════

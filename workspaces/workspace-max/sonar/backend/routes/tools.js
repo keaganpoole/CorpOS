@@ -291,15 +291,21 @@ router.post('/create-appointment', async (req, res) => {
  * 
  * Body: {
  *   appointment_id: "uuid",
- *   new_date: "2026-04-16",
- *   new_time: "15:00",
- *   reason: "Caller requested reschedule"
+ *   date?: "2026-04-16",       // accepts 'date' or 'new_date'
+ *   time?: "15:00",             // accepts 'time' or 'new_time'
+ *   duration?: 45,
+ *   notes?: "updated notes",
+ *   reason?: "Caller requested reschedule"
  * }
  * Returns: { success: true, appointment: {...}, changes: {...} }
  */
 router.post('/update-appointment', async (req, res) => {
   try {
     const { appointment_id, new_date, new_time, reason } = req.body;
+    // Accept both naming conventions: 'date' or 'new_date', 'time' or 'new_time'
+    const date = req.body.date || new_date;
+    const time = req.body.time || new_time;
+    const { duration, notes } = req.body;
     if (!appointment_id) return res.status(400).json({ error: 'appointment_id is required' });
 
     // Fetch current appointment
@@ -310,10 +316,10 @@ router.post('/update-appointment', async (req, res) => {
     const changes = {};
 
     // If new date/time provided, check for conflicts
-    if (new_date || new_time) {
-      const targetDate = new_date || apt.date;
-      const targetTime = new_time || apt.time;
-      const duration = apt.duration || 30;
+    if (date || time) {
+      const targetDate = date || apt.date;
+      const targetTime = time || apt.time;
+      const targetDuration = duration || apt.duration || 30;
 
       const existing = await sbQuery('appointments', 'GET', null,
         `?date=eq.${targetDate}&status=in.(pending,confirmed)&id=neq.${appointment_id}`
@@ -321,7 +327,7 @@ router.post('/update-appointment', async (req, res) => {
 
       const [reqH, reqM] = targetTime.split(':').map(Number);
       const reqStart = reqH * 60 + reqM;
-      const reqEnd = reqStart + duration;
+      const reqEnd = reqStart + targetDuration;
 
       const conflict = existing.some(other => {
         const [ah, am] = other.time.split(':').map(Number);
@@ -339,14 +345,23 @@ router.post('/update-appointment', async (req, res) => {
         });
       }
 
-      if (new_date && new_date !== apt.date) changes.date = { from: apt.date, to: new_date };
-      if (new_time && new_time !== apt.time) changes.time = { from: apt.time, to: new_time };
+      if (date && date !== apt.date) changes.date = { from: apt.date, to: date };
+      if (time && time !== apt.time) changes.time = { from: apt.time, to: time };
+    }
+
+    if (duration && duration !== apt.duration) {
+      changes.duration = { from: apt.duration, to: duration };
+    }
+    if (notes !== undefined && notes !== apt.notes) {
+      changes.notes = { from: apt.notes, to: notes };
     }
 
     // Build update payload
     const updatePayload = {};
     if (changes.date) updatePayload.date = changes.date.to;
     if (changes.time) updatePayload.time = changes.time.to;
+    if (changes.duration) updatePayload.duration = changes.duration.to;
+    if (changes.notes) updatePayload.notes = changes.notes.to;
     if (reason) updatePayload.notes = (apt.notes ? apt.notes + ' | ' : '') + `Rescheduled: ${reason}`;
 
     if (Object.keys(updatePayload).length === 0) {
@@ -501,49 +516,52 @@ function formatPrice(s) {
 /**
  * POST /api/tools/get-business-info
  * 
- * Returns knowledge base content for the agent to use during calls.
+ * Returns business info and knowledge base content for the agent to use during calls.
+ * Reads from the businesses table.
  * 
- * Body: { section?: "about" | "services" | "policies" | "faq" }
- * Returns: { business_name, phone, hours, knowledge_base: {...} }
+ * Body: { category?: "about" | "services" | "policies" | "faq" | "general", question?: string }
+ * Returns: { business_name, phone, hours, address, knowledge_base: {...} }
  */
 router.post('/get-business-info', async (req, res) => {
   try {
-    const { section } = req.body || {};
+    const { category, question } = req.body || {};
 
-    // Fetch business settings
-    let settings = {};
+    // Fetch business from businesses table
+    let business = {};
     try {
-      const rows = await sbQuery('settings', 'GET', null, '?order=key.asc') || [];
-      for (const row of rows) {
-        settings[row.key] = typeof row.value === 'string' ? (() => { try { return JSON.parse(row.value); } catch { return row.value; } })() : row.value;
-      }
+      const rows = await sbQuery('businesses', 'GET', null, '?limit=1') || [];
+      business = rows[0] || {};
     } catch (_) { /* return defaults */ }
 
-    // Build knowledge base from settings
+    // Build knowledge base from businesses table
     const knowledgeBase = {
-      about: settings.kb_about || settings.about_us || '',
-      services: settings.kb_services || settings.services_info || '',
-      policies: settings.kb_policies || settings.policies || '',
-      faq: settings.kb_faq || settings.faq || '',
+      about: business.about_us || '',
+      policies: business.policies || '',
+      faq: business.faq || '',
     };
 
-    // If section requested, return only that section
-    if (section && knowledgeBase[section] !== undefined) {
+    // If specific category requested, return only that section
+    if (category && category !== 'general' && knowledgeBase[category] !== undefined) {
       return res.json({
-        business_name: settings.business_name || settings.name || '',
-        section,
-        content: knowledgeBase[section],
+        business_name: business.name || '',
+        phone: business.phone || '',
+        email: business.email || '',
+        address: [business.address, business.city, business.state, business.zip].filter(Boolean).join(', '),
+        hours: business.hours || '',
+        category,
+        content: knowledgeBase[category],
       });
     }
 
     // Return everything
     res.json({
-      business_name: settings.business_name || settings.name || '',
-      phone: settings.phone || '',
-      email: settings.email || '',
-      address: settings.address || '',
-      hours: settings.business_hours || settings.hours || {},
-      timezone: settings.timezone || 'America/New_York',
+      business_name: business.name || '',
+      phone: business.phone || '',
+      email: business.email || '',
+      address: [business.address, business.city, business.state, business.zip].filter(Boolean).join(', '),
+      website: business.website || '',
+      hours: business.hours || '',
+      timezone: 'America/New_York',
       knowledge_base: knowledgeBase,
     });
   } catch (err) {

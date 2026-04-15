@@ -1837,7 +1837,25 @@ const App = () => {
             <div className="w-full flex items-center justify-between px-12 pt-6 pb-4 relative -mt-16 z-10">
               <div className="flex-1" />
               <div className="flex-1 flex justify-center">
-                <AgentsHierarchy agents={enrichedAgents} reactions={reactions} pendingModel={pendingModel} onOpenMarketplace={setMarketplaceAgent} onOpenScenarios={setReceptionistsAgent} />
+                <div className="flex flex-wrap gap-6 justify-center">
+                  {enrichedAgents.map(agent => {
+                    const reactionsMap = {};
+                    for (const r of (reactions || [])) {
+                      reactionsMap[r.agent_name] = r;
+                    }
+                    return (
+                      <AgentNode
+                        key={agent.id}
+                        agent={agent}
+                        isActive={false}
+                        reactions={reactionsMap[agent.name] || {}}
+                        pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
+                        onOpenMarketplace={setMarketplaceAgent}
+                        onOpenScenarios={setReceptionistsAgent}
+                      />
+                    );
+                  })}
+                </div>
               </div>
               <div className="flex-1 flex justify-end">
                 <button
