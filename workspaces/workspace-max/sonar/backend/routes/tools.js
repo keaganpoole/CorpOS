@@ -49,29 +49,61 @@ function formatAppointment(apt) {
 /**
  * POST /api/tools/identify-caller
  * 
- * Takes a phone number, returns the customer record and recent appointment history.
+ * Takes a phone number (and optional called_number), returns the customer record,
+ * business context, and recent appointment history.
  * First thing the agent calls on every inbound call.
  * 
- * Body: { phone: "+12076801233" }
- * Returns: { found: true, customer: {...}, recent_appointments: [...] }
+ * Body: { phone: "+12076801233", called_number: "+12075550199" }
+ * Returns: { found: true, customer: {...}, business: {...}, receptionist: {...}, recent_appointments: [...] }
  */
 router.post('/identify-caller', async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { phone, called_number } = req.body;
     if (!phone) return res.status(400).json({ error: 'phone is required', found: false });
 
-    const normalized = normalizePhone(phone);
+    // Step 1: Resolve business via called_number → user_id
+    let business = null;
+    let receptionist = null;
+    let userId = null;
 
-    // Search by phone (try normalized and raw) — encode special chars for Supabase REST
+    if (called_number) {
+      const enc = encodeURIComponent;
+      const bizRows = await sbQuery('businesses', 'GET', null,
+        `?phone=eq.${enc(called_number)}&limit=1`
+      ) || [];
+
+      if (bizRows.length > 0) {
+        business = bizRows[0];
+        userId = business.user_id;
+
+        // Find the active inbound receptionist for this business
+        const repRows = await sbQuery('hired_receptionists', 'GET', null,
+          `?user_id=eq.${userId}&call_types=in.(inbound,both)&is_active=is.true&limit=1`
+        ) || [];
+
+        if (repRows.length > 0) {
+          receptionist = repRows[0];
+        }
+      }
+    }
+
+    // Step 2: Look up caller — scope by user_id if available
+    const normalized = normalizePhone(phone);
     const enc = encodeURIComponent;
-    const people = await sbQuery('people', 'GET', null,
-      `?or=(phone.eq.${enc(normalized)},phone.eq.${enc(phone)},phone.eq.${enc(phone.replace(/\D/g, ''))})&order=id.desc&limit=1`
-    ) || [];
+    let peopleFilter = `?or=(phone.eq.${enc(normalized)},phone.eq.${enc(phone)},phone.eq.${enc(phone.replace(/\D/g, ''))})`;
+    if (userId) {
+      peopleFilter += `&user_id=eq.${userId}`;
+    }
+    peopleFilter += '&order=id.desc&limit=1';
+
+    const people = await sbQuery('people', 'GET', null, peopleFilter) || [];
 
     if (people.length === 0) {
       return res.json({
         found: false,
         customer: null,
+        business: business ? { name: business.name, phone: business.phone, hours: business.hours } : null,
+        receptionist: receptionist ? { name: receptionist.first_name, personality: receptionist.description, role: receptionist.stereotype } : null,
         recent_appointments: [],
         message: 'Caller not found in system',
       });
@@ -80,13 +112,16 @@ router.post('/identify-caller', async (req, res) => {
     const customer = people[0];
     const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown';
 
-    // Pull recent appointments for this customer
-    const appointments = await sbQuery('appointments', 'GET', null,
-      `?lead_id=eq.${customer.id}&order=date.desc&limit=5`
-    ) || [];
+    // Pull recent appointments for this customer, scoped by user_id
+    let aptFilter = `?lead_id=eq.${customer.id}&order=date.desc&limit=5`;
+    if (userId) {
+      aptFilter += `&user_id=eq.${userId}`;
+    }
+    const appointments = await sbQuery('appointments', 'GET', null, aptFilter) || [];
 
     res.json({
       found: true,
+      user_id: userId,
       customer: {
         id: customer.id,
         name: customerName,
@@ -104,6 +139,8 @@ router.post('/identify-caller', async (req, res) => {
         last_intent: customer.last_intent,
         missed_call_count: customer.missed_call_count,
       },
+      business: business ? { name: business.name, phone: business.phone, hours: business.hours } : null,
+      receptionist: receptionist ? { name: receptionist.first_name, personality: receptionist.description, role: receptionist.stereotype } : null,
       recent_appointments: appointments.map(formatAppointment),
     });
   } catch (err) {
@@ -118,28 +155,42 @@ router.post('/identify-caller', async (req, res) => {
  * Checks appointment calendar for available slots on a given date.
  * Returns conflict-free time slots based on business hours and existing bookings.
  * 
- * Body: { date: "2026-04-15", duration: 30, business_hours: { start: "09:00", end: "17:00" } }
+ * Body: { date: "2026-04-15", duration: 30, user_id: "uuid" }
  * Returns: { date: "2026-04-15", available_slots: ["09:00", "09:30", ...], booked_slots: [...], business_hours: {...} }
  */
 router.post('/check-availability', async (req, res) => {
   try {
-    const { date, duration = 30 } = req.body;
+    const { date, duration = 30, user_id } = req.body;
     if (!date) return res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
 
-    // Get business hours from settings
+    // Get business hours from businesses table
     let businessHours = { start: '09:00', end: '17:00' };
     try {
-      const settings = await sbQuery('settings', 'GET', null, '?key=eq.business_hours&limit=1') || [];
-      if (settings.length > 0 && settings[0].value) {
-        const parsed = typeof settings[0].value === 'string' ? JSON.parse(settings[0].value) : settings[0].value;
-        if (parsed.start && parsed.end) businessHours = parsed;
+      let bizFilter = '?limit=1';
+      if (user_id) bizFilter += `&user_id=eq.${user_id}`;
+      const bizRows = await sbQuery('businesses', 'GET', null, bizFilter) || [];
+      if (bizRows.length > 0 && bizRows[0].hours) {
+        // Parse hours string like "Mon-Fri 9:00 AM - 7:00 PM, Sat 9:00 AM - 5:00 PM, Sun Closed"
+        // Default to Mon-Fri hours for availability
+        const hoursStr = bizRows[0].hours;
+        const match = hoursStr.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+        if (match) {
+          const parseTime = (t) => {
+            const [time, period] = t.trim().split(/\s+/);
+            let [h, m] = time.split(':').map(Number);
+            if (period && period.toUpperCase() === 'PM' && h !== 12) h += 12;
+            if (period && period.toUpperCase() === 'AM' && h === 12) h = 0;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          };
+          businessHours = { start: parseTime(match[1]), end: parseTime(match[2]) };
+        }
       }
     } catch (_) { /* use defaults */ }
 
-    // Get existing appointments for the date
-    const existing = await sbQuery('appointments', 'GET', null,
-      `?date=eq.${date}&status=in.(pending,confirmed)&order=time.asc`
-    ) || [];
+    // Get existing appointments for the date, scoped by user_id
+    let aptFilter = `?date=eq.${date}&status=in.(pending,confirmed)&order=time.asc`;
+    if (user_id) aptFilter += `&user_id=eq.${user_id}`;
+    const existing = await sbQuery('appointments', 'GET', null, aptFilter) || [];
 
     // Build time slots from business hours
     const slots = [];
@@ -203,22 +254,23 @@ router.post('/check-availability', async (req, res) => {
  *   service: "Consultation",
  *   notes: "First-time caller",
  *   receptionist_id: 5,
- *   lead_id: 123  (optional — will look up or create)
+ *   lead_id: 123,  (optional — will look up or create)
+ *   user_id: "uuid"  (optional — business context)
  * }
  * Returns: { success: true, appointment: {...} }
  */
 router.post('/create-appointment', async (req, res) => {
   try {
-    const { client_name, phone, date, time, duration = 30, service, notes, receptionist_id, lead_id } = req.body;
+    const { client_name, phone, date, time, duration = 30, service, notes, receptionist_id, lead_id, user_id } = req.body;
 
     if (!client_name || !date || !time) {
       return res.status(400).json({ error: 'client_name, date, and time are required' });
     }
 
-    // Verify no conflict before booking
-    const existing = await sbQuery('appointments', 'GET', null,
-      `?date=eq.${date}&status=in.(pending,confirmed)`
-    ) || [];
+    // Verify no conflict before booking, scoped by user_id
+    let conflictFilter = `?date=eq.${date}&status=in.(pending,confirmed)`;
+    if (user_id) conflictFilter += `&user_id=eq.${user_id}`;
+    const existing = await sbQuery('appointments', 'GET', null, conflictFilter) || [];
 
     const [reqH, reqM] = time.split(':').map(Number);
     const reqStart = reqH * 60 + reqM;
@@ -268,6 +320,7 @@ router.post('/create-appointment', async (req, res) => {
       status: 'pending',
       assigned_receptionist: receptionistName,
       notes: notes || null,
+      user_id: user_id || null,
     };
 
     const result = await sbQuery('appointments', 'POST', payload);
@@ -429,12 +482,12 @@ router.post('/cancel-appointment', async (req, res) => {
  * Searches for a customer by name, email, or phone. Used when the caller
  * isn't found by phone alone or when the receptionist needs to look up someone else.
  * 
- * Body: { name?: "Smith", email?: "john@example.com", phone?: "+1207..." }
+ * Body: { name?: "Smith", email?: "john@example.com", phone?: "+1207...", user_id?: "uuid" }
  * Returns: { customers: [...], count: number }
  */
 router.post('/lookup-customer', async (req, res) => {
   try {
-    const { name, email, phone } = req.body;
+    const { name, email, phone, user_id } = req.body;
     if (!name && !email && !phone) {
       return res.status(400).json({ error: 'At least one search field required (name, email, phone)' });
     }
@@ -446,6 +499,7 @@ router.post('/lookup-customer', async (req, res) => {
     }
     if (email) filters.push(`email=eq.${encodeURIComponent(email.toLowerCase())}`);
     if (name) filters.push(`or=(first_name.ilike.%25${name}%25,last_name.ilike.%25${name}%25)`);
+    if (user_id) filters.push(`user_id=eq.${user_id}`);
 
     const query = '?' + filters.join('&') + '&limit=10';
     const results = await sbQuery('people', 'GET', null, query) || [];
@@ -473,18 +527,162 @@ router.post('/lookup-customer', async (req, res) => {
 });
 
 /**
+ * POST /api/tools/update-customer
+ * 
+ * Updates customer info in the people table. Use when the caller wants to
+ * update their contact details (phone, email, address, etc.).
+ * 
+ * Body: { customer_id: 123, name?: "...", phone?: "...", email?: "...", 
+ *         street_address?: "...", city?: "...", state?: "...", zip_code?: "...",
+ *         preferred_contact_method?: "...", notes?: "...", special_instructions?: "...",
+ *         user_id?: "uuid" }
+ * Returns: { success: true, customer: {...} }
+ */
+router.post('/update-customer', async (req, res) => {
+  try {
+    const { customer_id, user_id, ...updates } = req.body;
+    if (!customer_id) return res.status(400).json({ error: 'customer_id is required' });
+
+    const allowedFields = [
+      'first_name', 'last_name', 'phone', 'email',
+      'street_address', 'city', 'state', 'zip_code',
+      'preferred_contact_method', 'notes', 'special_instructions',
+      'last_intent'
+    ];
+
+    const payload = {};
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) payload[field] = updates[field];
+    }
+
+    // Handle full_name → first_name/last_name splitting
+    if (updates.name && !updates.first_name && !updates.last_name) {
+      const parts = updates.name.trim().split(/\s+/);
+      if (parts.length === 1) {
+        payload.first_name = parts[0];
+      } else {
+        payload.first_name = parts[0];
+        payload.last_name = parts.slice(1).join(' ');
+      }
+    }
+
+    if (Object.keys(payload).length === 0) return res.status(400).json({ error: 'No valid fields to update' });
+
+    let filter = `?id=eq.${customer_id}`;
+    if (user_id) filter += `&user_id=eq.${user_id}`;
+
+    const result = await sbQuery('people', 'PATCH', payload, filter);
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const customer = result[0];
+    res.json({
+      success: true,
+      customer: {
+        id: customer.id,
+        name: [customer.first_name, customer.last_name].filter(Boolean).join(' '),
+        phone: customer.phone,
+        email: customer.email,
+        address: customer.street_address,
+        city: customer.city,
+        state: customer.state,
+        zip: customer.zip_code,
+      },
+    });
+  } catch (err) {
+    console.error('[TOOLS] update-customer failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/tools/create-customer
+ * 
+ * Creates a new customer in the people table. Use when an unknown caller
+ * wants to book an appointment or needs to be added to the system.
+ * 
+ * Body: { name: "John Smith", phone: "+1207...", email?: "...", 
+ *         street_address?: "...", city?: "...", state?: "...", zip_code?: "...",
+ *         user_id?: "uuid" }
+ * Returns: { success: true, customer: {...} }
+ */
+router.post('/create-customer', async (req, res) => {
+  try {
+    const { name, phone, email, street_address, city, state, zip_code, user_id } = req.body;
+    if (!name || !phone) return res.status(400).json({ error: 'name and phone are required' });
+
+    const normalized = normalizePhone(phone);
+    const enc = encodeURIComponent;
+    const existing = await sbQuery('people', 'GET', null,
+      `?or=(phone.eq.${enc(normalized)},phone.eq.${enc(phone)},phone.eq.${enc(phone.replace(/\D/g, ''))})&limit=1`
+    ) || [];
+
+    if (existing.length > 0) {
+      return res.json({
+        success: true,
+        customer: {
+          id: existing[0].id,
+          name: [existing[0].first_name, existing[0].last_name].filter(Boolean).join(' '),
+          phone: existing[0].phone,
+          email: existing[0].email,
+        },
+        message: 'Customer already exists',
+      });
+    }
+
+    const parts = name.trim().split(/\s+/);
+    const first_name = parts[0] || '';
+    const last_name = parts.length > 1 ? parts.slice(1).join(' ') : '';
+
+    const payload = {
+      first_name,
+      last_name,
+      phone: normalized,
+      email: email || null,
+      street_address: street_address || null,
+      city: city || null,
+      state: state || null,
+      zip_code: zip_code || null,
+      user_id: user_id || null,
+    };
+
+    const result = await sbQuery('people', 'POST', payload);
+    const customer = result?.[0] || {};
+
+    res.json({
+      success: true,
+      customer: {
+        id: customer.id,
+        name: [customer.first_name, customer.last_name].filter(Boolean).join(' '),
+        phone: customer.phone,
+        email: customer.email,
+      },
+    });
+  } catch (err) {
+    console.error('[TOOLS] create-customer failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/tools/get-services
  * 
- * Returns all active services from the business. Agent uses this to answer
+ * Returns all active services for the business. Agent uses this to answer
  * pricing and service questions during calls.
  * 
+ * Query: ?user_id=<uuid>
  * Returns: { services: [...], count: number }
  */
 router.get('/get-services', async (req, res) => {
   try {
-    const services = await sbQuery('services', 'GET', null,
-      '?is_active=eq.true&order=sort_order.asc,name.asc'
-    ) || [];
+    const { user_id } = req.query;
+    let filter = '?is_active=eq.true';
+    if (user_id) filter += `&user_id=eq.${user_id}`;
+    filter += '&order=sort_order.asc,name.asc';
+
+    const services = await sbQuery('services', 'GET', null, filter) || [];
 
     const formatted = services.map(s => ({
       id: s.id,
@@ -517,19 +715,21 @@ function formatPrice(s) {
  * POST /api/tools/get-business-info
  * 
  * Returns business info and knowledge base content for the agent to use during calls.
- * Reads from the businesses table.
+ * Reads from the businesses table, scoped by user_id.
  * 
- * Body: { category?: "about" | "services" | "policies" | "faq" | "general", question?: string }
+ * Body: { user_id?: "uuid", category?: "about" | "policies" | "faq" | "general", question?: string }
  * Returns: { business_name, phone, hours, address, knowledge_base: {...} }
  */
 router.post('/get-business-info', async (req, res) => {
   try {
-    const { category, question } = req.body || {};
+    const { user_id, category, question } = req.body || {};
 
-    // Fetch business from businesses table
+    // Fetch business from businesses table, scoped by user_id
     let business = {};
     try {
-      const rows = await sbQuery('businesses', 'GET', null, '?limit=1') || [];
+      let filter = '?limit=1';
+      if (user_id) filter += `&user_id=eq.${user_id}`;
+      const rows = await sbQuery('businesses', 'GET', null, filter) || [];
       business = rows[0] || {};
     } catch (_) { /* return defaults */ }
 

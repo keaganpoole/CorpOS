@@ -7,7 +7,7 @@
 
 const EL = 'https://api.elevenlabs.io/v1';
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const SONAR_AGENT_ID = process.env.ELEVENLABS_AGENT_ID || 'agent_4901kp6x416efqd8x211a49pvknf';
+const SONAR_AGENT_ID = process.env.ELEVENLABS_AGENT_ID || 'agent_6101kp755r1aeg3vj6n3emg1ggft';
 
 /**
  * Sync the ElevenLabs agent's voice to match a receptionist.

@@ -619,8 +619,8 @@ class Controller {
       const { model } = req.body;
       if (!model) return res.status(400).json({ error: 'model is required' });
 
-      // Prepend 'openrouter/' if not already present
-      const normalizedModel = model.startsWith('openrouter/') ? model : `openrouter/${model}`;
+      // Strip 'openrouter/' prefix if present — store clean model name
+      const normalizedModel = model.replace(/^openrouter\//, '');
 
       try {
         // Look up agent from Supabase
@@ -647,7 +647,7 @@ class Controller {
         });
 
         // Write model back to Supabase
-        await sbQuery('hired_receptionists', 'PATCH', { model: normalizedModel }, `?id=eq.${req.params.id}`);
+        await sbQuery('hired_receptionists', 'PATCH', { language_model: normalizedModel }, `?id=eq.${req.params.id}`);
 
         this.events.emit({
           event_type: 'agent_model_changed',
@@ -1215,6 +1215,10 @@ class Controller {
     const { router: sonarApiRouter, init: initSonarApi } = require('./routes/sonar-api');
     initSonarApi({ sbQuery });
     this.app.use('/api/sonar', sonarApiRouter);
+
+    // --- Call Router (pre-call resolution middleware) ---
+    const callRouter = require('./routes/call-router');
+    this.app.use('/api/call', callRouter);
   }
 
   _getPipelineData() {
