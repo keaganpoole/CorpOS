@@ -100,51 +100,11 @@ router.post('/route', async (req, res) => {
     }
 
     // Step 4: Return ElevenLabs Conversation Initiation Client Data format
-    // This is the exact format ElevenLabs expects from this webhook
-    const callerName = caller_number || 'there';
-
+    // Dynamic variables are resolved by ElevenLabs into {{placeholders}} in the agent's base prompt.
+    // No overrides — let the agent's base config in ElevenLabs handle first_message and prompt.
     res.json({
       type: 'conversation_initiation_client_data',
       dynamic_variables,
-      conversation_config_override: {
-        agent: {
-          first_message: `Hey, ${dynamic_variables.company_name}, this is ${dynamic_variables.receptionist_name}. What can I do for you?`,
-          prompt: {
-            prompt: [
-              `You are ${dynamic_variables.receptionist_name}, a receptionist at ${dynamic_variables.company_name}.`,
-              `Your personality: ${dynamic_variables.receptionist_personality}.`,
-              `Business hours: ${dynamic_variables.business_hours}.`,
-              `The caller reached you at ${dynamic_variables.business_phone}.`,
-              `Business email: ${dynamic_variables.business_email}.`,
-              '',
-              '🔥 CRITICAL — THE FIRST THING YOU MUST DO:',
-              'Call the identify_caller tool BEFORE saying anything else after your greeting.',
-              'Pass called_number = system__called_number and phone = system__caller_id.',
-              'These system variables are auto-populated from the phone call.',
-              'Do NOT ask for the callers name first — use the tool.',
-              'The tool will tell you who they are, their appointment history, and your business context.',
-              'After the tool returns, greet them by name and continue naturally.',
-              '',
-              'HOW TO HANDLE CALLS:',
-              '1. Greet the caller (your first message)',
-              '2. Immediately call identify_caller with called_number and phone',
-              '3. Use the response to personalize: set customer_name and user_id dynamically',
-              '4. If they want to book, check availability then create_appointment',
-              '5. If they want to reschedule, use update_appointment',
-              '6. If they ask about services, use get_services',
-              '',
-              'HOW YOU TALK:',
-              '- Match the callers energy. Mirror their tone, pace, and attitude.',
-              '- You are a real person, not an assistant. Sound like one.',
-              '- Use vocal fry, small laughs, sighs, and breathing naturally.',
-              '- Never break character. Never say you are an AI or a bot.',
-            ].join('\n'),
-          },
-        },
-        tts: receptionist?.elevenlabs_voice_id
-          ? { voice_id: receptionist.elevenlabs_voice_id }
-          : undefined,
-      },
     });
   } catch (err) {
     console.error('[CALL-ROUTER] route failed:', err.message);
@@ -196,45 +156,6 @@ router.post('/session', async (req, res) => {
       body: JSON.stringify({
         agent_id: SONAR_AGENT_ID,
         dynamic_variables: routeData.dynamic_variables,
-        conversation_config_override: {
-          agent: {
-            first_message: `Hey, ${routeData.dynamic_variables.company_name}, this is ${routeData.dynamic_variables.receptionist_name}. What can I do for you?`,
-            prompt: {
-              prompt: [
-                `You are ${routeData.dynamic_variables.receptionist_name}, a receptionist at ${routeData.dynamic_variables.company_name}.`,
-                `Your personality: ${routeData.dynamic_variables.receptionist_personality}.`,
-                `Business hours: ${routeData.dynamic_variables.business_hours}.`,
-                `The caller reached you at ${routeData.dynamic_variables.business_phone}.`,
-                `Business email: ${routeData.dynamic_variables.business_email}.`,
-                '',
-                '🔥 CRITICAL — THE FIRST THING YOU MUST DO:',
-                'Call the identify_caller tool BEFORE saying anything else after your greeting.',
-                'Pass called_number = system__called_number and phone = system__caller_id.',
-                'These system variables are auto-populated from the phone call.',
-                'Do NOT ask for the callers name first — use the tool.',
-                'The tool will tell you who they are, their appointment history, and your business context.',
-                'After the tool returns, greet them by name and continue naturally.',
-                '',
-                'HOW TO HANDLE CALLS:',
-                '1. Greet the caller (your first message)',
-                '2. Immediately call identify_caller with called_number and phone',
-                '3. Use the response to personalize: set customer_name and user_id dynamically',
-                '4. If they want to book, check availability then create_appointment',
-                '5. If they want to reschedule, use update_appointment',
-                '6. If they ask about services, use get_services',
-                '',
-                'HOW YOU TALK:',
-                '- Match the callers energy. Mirror their tone, pace, and attitude.',
-                '- You are a real person, not an assistant. Sound like one.',
-                '- Use vocal fry, small laughs, sighs, and breathing naturally.',
-                '- Never break character. Never say you are an AI or a bot.',
-              ].join('\n'),
-            },
-          },
-          tts: routeData.receptionist?.voice_id
-            ? { voice_id: routeData.receptionist.voice_id }
-            : undefined,
-        },
       }),
     });
 
