@@ -106,13 +106,26 @@ router.post('/route', async (req, res) => {
     const response = {
       type: 'conversation_initiation_client_data',
       dynamic_variables,
+      conversation_config_override: {},
     };
+
+    // Personalized first message using resolved dynamic variables
+    if (receptionist) {
+      response.conversation_config_override.agent = {
+        first_message: `Hey, this is ${dynamic_variables.receptionist_name} at ${dynamic_variables.company_name}. What can I do for you?`,
+      };
+    }
 
     // Override the agent's voice if the receptionist has one configured
     if (receptionist?.elevenlabs_voice_id) {
-      response.conversation_config_override = {
-        tts: { voice_id: receptionist.elevenlabs_voice_id },
+      response.conversation_config_override.tts = {
+        voice_id: receptionist.elevenlabs_voice_id,
       };
+    }
+
+    // Clean up empty override
+    if (Object.keys(response.conversation_config_override).length === 0) {
+      delete response.conversation_config_override;
     }
 
     res.json(response);
