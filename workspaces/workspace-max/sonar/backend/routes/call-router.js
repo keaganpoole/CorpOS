@@ -82,6 +82,7 @@ router.post('/route', async (req, res) => {
       business_hours: business.hours || 'Contact the business for hours',
       business_phone: business.phone || '',
       business_email: business.email || '',
+      customer_name: '',  // populated by identify_caller tool during call
     };
 
     if (receptionist) {
@@ -97,15 +98,24 @@ router.post('/route', async (req, res) => {
       dynamic_variables.receptionist_name = 'Receptionist';
       dynamic_variables.receptionist_personality = 'Professional and helpful';
       dynamic_variables.receptionist_role = 'Receptionist';
+      dynamic_variables.customer_name = '';
     }
 
     // Step 4: Return ElevenLabs Conversation Initiation Client Data format
     // Dynamic variables are resolved by ElevenLabs into {{placeholders}} in the agent's base prompt.
-    // No overrides — let the agent's base config in ElevenLabs handle first_message and prompt.
-    res.json({
+    const response = {
       type: 'conversation_initiation_client_data',
       dynamic_variables,
-    });
+    };
+
+    // Override the agent's voice if the receptionist has one configured
+    if (receptionist?.elevenlabs_voice_id) {
+      response.conversation_config_override = {
+        tts: { voice_id: receptionist.elevenlabs_voice_id },
+      };
+    }
+
+    res.json(response);
   } catch (err) {
     console.error('[CALL-ROUTER] route failed:', err.message);
     res.status(500).json({ error: err.message, resolved: false });
