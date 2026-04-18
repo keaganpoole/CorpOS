@@ -6,7 +6,7 @@ import {
   BookOpen, FileText, Shield, HelpCircle, Sparkles,
   Eye, EyeOff, Lightbulb, Zap, Star, Info,
   Plus, Trash2, GripVertical, Tag, DollarSign,
-  ChevronRight, ArrowRight, X,
+  ChevronRight, ArrowRight, X, MessageSquareText,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -153,7 +153,6 @@ const PRICE_UNITS = [
 
 const KNOWLEDGE_TABS = [
   { key: 'about', icon: Sparkles, label: 'About Us', hint: 'Your story, mission, and what makes you different' },
-  { key: 'services', icon: Zap, label: 'Services', hint: 'What you offer and what it costs' },
   { key: 'policies', icon: Shield, label: 'Policies', hint: 'Cancellation, payment, warranties, and expectations' },
   { key: 'faq', icon: HelpCircle, label: 'FAQ', hint: 'Common questions your callers ask — with answers' },
 ];
@@ -163,7 +162,10 @@ const defaultSettings = {
   business_phone: '',
   business_email: '',
   business_timezone: 'America/New_York',
-  business_address: '',
+  business_street: '',
+  business_city: '',
+  business_state: '',
+  business_zip: '',
   default_appointment_duration: 30,
   appointment_buffer_minutes: 0,
   business_hours: {
@@ -187,7 +189,7 @@ const defaultSettings = {
     policies: '',
     faq: '',
   },
-  services: [],
+  intro_message_prompt: 'Hey, this is {{receptionist_name}} at {{company_name}}. What can I do for you?',
 };
 
 // ─── Section Card ───────────────────────────────────────────────────────────
@@ -776,6 +778,114 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
   );
 };
 
+// ─── Intro Message Editor ──────────────────────────────────────────────────
+const INTRO_VARIABLES = [
+  { key: '{{receptionist_name}}', label: 'Receptionist Name', desc: "The receptionist's name" },
+  { key: '{{company_name}}', label: 'Business Name', desc: 'Your business name' },
+];
+
+const IntroMessageEditor = ({ value, onChange }) => {
+  const [focused, setFocused] = useState(false);
+
+  const handleDragStart = (e, variable) => {
+    e.dataTransfer.setData('text/plain', variable);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const variable = e.dataTransfer.getData('text/plain');
+    if (!variable) return;
+
+    const textarea = e.target;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const newValue = (value || '').substring(0, start) + variable + (value || '').substring(end);
+    onChange(newValue);
+
+    // Restore cursor position after the inserted variable
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + variable.length, start + variable.length);
+    }, 0);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const insertVariable = (variable) => {
+    const textarea = document.getElementById('intro-message-textarea');
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const newValue = (value || '').substring(0, start) + variable + (value || '').substring(end);
+    onChange(newValue);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + variable.length, start + variable.length);
+    }, 0);
+  };
+
+  const wordCount = (value || '').trim() ? (value || '').trim().split(/\s+/).length : 0;
+
+  return (
+    <div className="border border-white/[0.04] rounded-2xl bg-gradient-to-b from-zinc-950/40 to-transparent overflow-hidden">
+      {/* Variable chips */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.03]">
+        <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest shrink-0">Variables</span>
+        <div className="h-4 w-px bg-white/[0.06] shrink-0" />
+        {INTRO_VARIABLES.map(v => (
+          <button
+            key={v.key}
+            draggable
+            onDragStart={(e) => handleDragStart(e, v.key)}
+            onClick={() => insertVariable(v.key)}
+            title={v.desc}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/8 border border-indigo-500/15 text-[10px] font-bold text-indigo-400 uppercase tracking-wider hover:bg-indigo-500/15 hover:border-indigo-500/25 transition-all cursor-grab active:cursor-grabbing select-none"
+          >
+            <GripVertical size={10} className="text-indigo-500/40" />
+            {v.label}
+          </button>
+        ))}
+        <span className="text-[10px] text-zinc-700 ml-auto italic">drag into text or click to insert</span>
+      </div>
+
+      {/* Editor */}
+      <div className="p-5">
+        <textarea
+          id="intro-message-textarea"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          placeholder="Hey, this is {{receptionist_name}} at {{company_name}}. What can I do for you?"
+          rows={4}
+          className={`w-full bg-black/30 border rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 focus:outline-none transition-all resize-y leading-relaxed font-mono ${
+            focused
+              ? 'border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.06)]'
+              : 'border-white/[0.04]'
+          }`}
+        />
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.03] bg-white/[0.01]">
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-zinc-700 tabular-nums">{wordCount} words · {(value || '').length} chars</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Lightbulb size={11} className="text-amber-400/60" />
+          <span className="text-[10px] text-zinc-600">Variables resolve dynamically per call — receptionist and business names update automatically</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Settings Page ──────────────────────────────────────────────────────────
 const SettingsPage = () => {
   const [settings, setSettings] = useState(defaultSettings);
@@ -786,23 +896,68 @@ const SettingsPage = () => {
 
   useEffect(() => {
     loadSettings();
+
+    // Reload when tab becomes visible
+    const onVisible = () => { if (document.visibilityState === 'visible') loadSettings(); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Load business info from businesses table
+      const { data: bizData, error: bizErr } = await supabase
+        .from('businesses')
+        .select('id, name, phone, email, address, city, state, zip, business_hours, about_us, policies, faq')
+        .limit(1)
+        .single();
+
+      if (bizErr && bizErr.code !== 'PGRST116') throw bizErr;
+
+      // Load app config from account_settings
+      const { data: settingsData, error: settingsErr } = await supabase
         .from('account_settings')
         .select('*')
         .limit(1)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
-      if (data) {
-        // Strip supabase metadata fields
-        const { id, created_at, updated_at, ...parsed } = data;
-        setSettings({ ...defaultSettings, ...parsed });
-      }
+      if (settingsErr && settingsErr.code !== 'PGRST116') throw settingsErr;
+
+      const biz = bizData || {};
+      const config = settingsData ? (() => {
+        const { created_at, updated_at, business_name, business_phone, business_email, business_address, business_hours, business_timezone, ...parsed } = settingsData;
+        return parsed;
+      })() : {};
+
+      setSettings({
+        ...defaultSettings,
+        // Business fields from businesses table
+        _business_id: biz.id || null,
+        business_name: biz.name || '',
+        business_phone: biz.phone || '',
+        business_email: biz.email || '',
+        business_street: biz.address || '',
+        business_city: biz.city || '',
+        business_state: biz.state || '',
+        business_zip: biz.zip || '',
+        business_hours: (() => {
+          const h = biz.business_hours;
+          if (!h) return {};
+          if (typeof h === 'object') return h;
+          try { return JSON.parse(h); } catch { return {}; }
+        })(),
+        business_timezone: config.business_timezone || 'America/New_York',
+        // App config from account_settings
+        ...config,
+        // Knowledge base from businesses table
+        knowledge_base: {
+          about: biz.about_us ?? '',
+          policies: biz.policies ?? '',
+          faq: biz.faq ?? '',
+        },
+      });
     } catch (err) {
       console.error('[SettingsPage] Failed to load settings:', err);
       setError('Failed to load settings');
@@ -815,15 +970,42 @@ const SettingsPage = () => {
     setSaving(true);
     setError(null);
     try {
-      const payload = { ...settings };
+      // Save business info + knowledge base to businesses table
+      const kb = settings.knowledge_base || {};
+      const { error: bizErr } = await supabase
+        .from('businesses')
+        .update({
+          name: settings.business_name,
+          phone: settings.business_phone,
+          email: settings.business_email,
+          address: settings.business_street,
+          city: settings.business_city,
+          state: settings.business_state,
+          zip: settings.business_zip,
+          business_hours: typeof settings.business_hours === 'object' ? JSON.stringify(settings.business_hours) : settings.business_hours,
+          about_us: kb.about || '',
+          policies: kb.policies || '',
+          faq: kb.faq || '',
+        })
+        .eq('id', settings._business_id);
 
-      const { data, error } = await supabase
-        .from('account_settings')
-        .upsert(payload, { onConflict: 'id' })
-        .select()
-        .single();
+      if (bizErr) throw bizErr;
 
-      if (error) throw error;
+      // Save app config to account_settings (excluding business fields and services)
+      const { business_name, business_phone, business_email, business_street, business_city, business_state, business_zip, business_hours, business_timezone, _business_id, services, knowledge_base, id: _id, created_at, updated_at, ...appConfig } = settings;
+
+      // Upsert — use insert if no existing record, update otherwise
+      let settingsErr;
+      if (_id) {
+        const { error } = await supabase.from('account_settings').update(appConfig).eq('id', _id);
+        settingsErr = error;
+      } else {
+        const { error } = await supabase.from('account_settings').insert(appConfig);
+        settingsErr = error;
+      }
+
+      if (settingsErr) throw settingsErr;
+
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2000);
     } catch (err) {
@@ -906,9 +1088,37 @@ const SettingsPage = () => {
                 />
               </Field>
             </div>
-            <Field label="Address">
-              <TextInput value={settings.business_address} onChange={(v) => update('business_address', v)} placeholder="123 Main St, City, State ZIP" />
+            <Field label="Street Address">
+              <TextInput value={settings.business_street} onChange={(v) => update('business_street', v)} placeholder="123 Main St" />
             </Field>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="City">
+                <TextInput value={settings.business_city} onChange={(v) => update('business_city', v)} placeholder="City" />
+              </Field>
+              <Field label="State">
+                <TextInput value={settings.business_state} onChange={(v) => update('business_state', v)} placeholder="ME" />
+              </Field>
+              <Field label="ZIP Code">
+                <TextInput value={settings.business_zip} onChange={(v) => update('business_zip', v)} placeholder="04901" />
+              </Field>
+            </div>
+          </Section>
+
+          {/* ── Intro Message ─────────────────────────────────────────────── */}
+          <Section title="Intro Message" icon={MessageSquareText} color="bg-indigo-500/10 text-indigo-400" defaultOpen={true}>
+            <div className="mb-4">
+              <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
+                The first thing callers hear when your AI receptionist picks up. Use variables to personalize it automatically.
+              </p>
+              <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
+                <Info size={11} className="text-indigo-400/60 shrink-0" />
+                Variables resolve dynamically — if the receptionist changes, the greeting updates automatically.
+              </p>
+            </div>
+            <IntroMessageEditor
+              value={settings.intro_message_prompt}
+              onChange={(v) => update('intro_message_prompt', v)}
+            />
           </Section>
 
           {/* ── Calendar & Appointments ──────────────────────────────────── */}

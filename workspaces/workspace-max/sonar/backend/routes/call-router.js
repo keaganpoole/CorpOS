@@ -64,6 +64,10 @@ router.post('/route', async (req, res) => {
     const business = businesses[0];
     const userId = business.user_id;
 
+    // Step 1b: Fetch user's intro message prompt from account_settings
+    const accountSettings = await sbQuery('account_settings', 'GET', null, `?select=intro_message_prompt&limit=1`) || [];
+    const introMessagePrompt = accountSettings[0]?.intro_message_prompt || 'Hey, this is {{receptionist_name}} at {{company_name}}. What can I do for you?';
+
     // Step 2: Find the active inbound receptionist for this business
     const receptionists = await sbQuery('hired_receptionists', 'GET', null,
       `?user_id=eq.${userId}&call_types=in.(inbound,both)&is_active=is.true&order=hired_at.asc&limit=1`
@@ -79,7 +83,7 @@ router.post('/route', async (req, res) => {
     const dynamic_variables = {
       user_id: userId,  // used by all server tools to scope queries
       company_name: business.name || 'Unknown Business',
-      business_hours: business.hours || 'Contact the business for hours',
+      business_hours: business.business_hours || 'Contact the business for hours',
       business_phone: business.phone || '',
       business_email: business.email || '',
       customer_name: '',  // populated by identify_caller tool during call
@@ -109,10 +113,14 @@ router.post('/route', async (req, res) => {
       conversation_config_override: {},
     };
 
-    // Personalized first message using resolved dynamic variables
+    // Personalized first message using user's intro message prompt
+    let firstMessage = introMessagePrompt
+      .replace(/\{\{receptionist_name\}\}/g, dynamic_variables.receptionist_name)
+      .replace(/\{\{company_name\}\}/g, dynamic_variables.company_name);
+
     if (receptionist) {
       response.conversation_config_override.agent = {
-        first_message: `Hey, this is ${dynamic_variables.receptionist_name} at ${dynamic_variables.company_name}. What can I do for you?`,
+        first_message: firstMessage,
       };
     }
 
