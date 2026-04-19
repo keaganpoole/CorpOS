@@ -107,6 +107,22 @@ const TOOLS = [
     required: [],
   },
   {
+    name: 'create_customer',
+    description: 'Create a new customer record in the people table. Use when a caller is not in the system. Requires name and phone. Use for appointment bookings OR when a caller is a new lead.',
+    method: 'POST',
+    parameters: {
+      name: { type: 'string', description: 'Full name of the customer' },
+      phone: { type: 'string', description: 'Customer phone number' },
+      email: { type: 'string', description: 'Customer email (optional)' },
+      street_address: { type: 'string', description: 'Street address (optional)' },
+      city: { type: 'string', description: 'City (optional)' },
+      state: { type: 'string', description: 'State (optional)' },
+      zip_code: { type: 'string', description: 'ZIP code (optional)' },
+      notes: { type: 'string', description: 'Notes about the customer, context, or reason for call' },
+    },
+    required: ['name', 'phone'],
+  },
+  {
     name: 'get_services',
     description: 'Get all services the business offers including pricing. Use when a caller asks about services or pricing.',
     method: 'GET',
@@ -249,6 +265,16 @@ WORKFLOW:
 3. Help them with their request
 4. For appointments: check availability first, confirm ALL details, then book
 5. At the end of EVERY call, use "log_call_outcome" to log what happened
+
+NEW CUSTOMER RULES:
+- If a caller is not in the system (identified by identify_caller), create a record in the people table using "create_customer"
+- ALWAYS capture name and phone for new customers
+- Capture email, address, and notes when available or appropriate
+- Notes are critical — document the context, reason for call, and any relevant details
+- Even if the caller doesn't book an appointment, add them to the system as a lead for future opportunities
+- Be natural about it — don't be pushy, but make it part of the conversation
+- For example: "Got it — I don't think I have you in our system yet. What's your name and best number?"
+- Then: "Perfect, I've got you saved here. Is there anything else I should note down?"
 
 RULES:
 - Never make up information — always use your tools for real data

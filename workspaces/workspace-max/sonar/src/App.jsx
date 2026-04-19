@@ -55,6 +55,7 @@ import ScenariosPage from './pages/Scenarios/Scenarios';
 import SettingsPage from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
 import RoutesPage from './pages/RoutesPage';
+import WorkflowTreePage from './pages/WorkflowTreePage';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Error Boundary — catches render crashes so a blank screen never appears
@@ -1807,6 +1808,7 @@ const App = () => {
     { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
     { id: 'calendar', icon: <Calendar size={18} />, label: 'Calendar' },
     { id: 'routes', icon: <Radio size={18} />, label: 'Routes' },
+    { id: 'workflow', icon: <GitBranch size={18} />, label: 'Workflow' },
     { id: 'system', icon: <Activity size={18} />, label: 'System' },
     { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'People' },
     { id: 'memory', icon: <Database size={18} />, label: 'Memory' },
@@ -1997,6 +1999,8 @@ const App = () => {
         return <CalendarPage />;
       case 'routes':
         return <RoutesPage />;
+      case 'workflow':
+        return <WorkflowTreePage />;
       case 'system':
         return <SystemView summary={summary} systemLogs={systemLogs} />;
       case 'pipeline':

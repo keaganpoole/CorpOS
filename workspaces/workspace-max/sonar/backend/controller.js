@@ -28,9 +28,7 @@ if (fs.existsSync(envPath)) {
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
-const { initDatabase } = require('./db/schema');
 const { EventSystem } = require('./events/EventSystem');
-const { seedData } = require('./seed');
 const { syncAgentVoice } = require('./elevenlabs/sync-voice');
 
 // ─── Supabase Helper ─────────────────────────────────────
@@ -61,6 +59,10 @@ class Controller {
     this.port = port;
     this.app = express();
     this.app.use(express.json());
+    // Root health endpoint
+    this.app.get('/', (req, res) => {
+      res.json({ status: 'ok', service: 'sonar-backend', port: this.port });
+    });
     // CORS for Electron dev mode (Vite on :5173 → backend on :7878)
     this.app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', '*');
@@ -72,10 +74,6 @@ class Controller {
     this.server = http.createServer(this.app);
     this.wss = new WebSocket.Server({ server: this.server });
     this.clients = new Set();
-
-    // Init DB (needed for leads, cron_jobs tables)
-    const dbPath = require('path').join(__dirname, '..', 'data', 'SONAR.db');
-    this.db = initDatabase(dbPath);
 
     // Init event system with Supabase helpers
     this.events = new EventSystem(this.broadcast.bind(this), { sbQuery });
@@ -90,8 +88,7 @@ class Controller {
     this._setupRoutes();
     this._setupWebSocket();
 
-    // Seed initial data if empty
-    seedData(this.db, this.events);
+
   }
 
   // ─── WebSocket ───────────────────────────────────────────
@@ -132,7 +129,7 @@ class Controller {
   }
 
   async _sendInitialState(ws) {
-    const pipelineData = this._getPipelineData();
+    const pipelineData = await this._getPipelineData();
 
     // Fetch agents and state from Supabase
     let agents = [];
@@ -402,168 +399,44 @@ class Controller {
       res.json({ success: true, emitted: results.length, results });
     });
 
-    // --- Lead CRUD ---
+    // --- Pipeline (Supabase people table) ---
 
-    this.app.get('/api/pipeline', (req, res) => {
-      const stages = this.db.prepare(`
-        SELECT stage, COUNT(*) as count FROM leads GROUP BY stage
-      `).all();
+    this.app.get('/api/pipeline', async (req, res) => {
+      try {
+        const people = await sbQuery('people', 'GET', null, '?select=status') || [];
+        const statusMap = {};
+        for (const p of people) {
+          const s = p.status || 'New';
+          statusMap[s] = (statusMap[s] || 0) + 1;
+        }
 
-      const stageMap = {
-        discovery: 0,
-        qualification: 0,
-        outreach: 0,
-        proposal: 0,
-        closed: 0,
-      };
-      for (const row of stages) {
-        stageMap[row.stage] = row.count;
-      }
+        const stages = [
+          { id: 'new', label: 'New', count: statusMap['New'] || 0, color: 'indigo' },
+          { id: 'contacted', label: 'Contacted', count: statusMap['Contacted'] || 0, color: 'cyan' },
+          { id: 'qualified', label: 'Qualified', count: statusMap['Qualified'] || 0, color: 'fuchsia' },
+          { id: 'booked', label: 'Booked', count: statusMap['Booked'] || 0, color: 'amber' },
+          { id: 'closed', label: 'Closed', count: statusMap['Closed'] || 0, color: 'green' },
+        ];
 
-      const total = this.db.prepare('SELECT COUNT(*) as count FROM leads').get().count;
-      const qualified = this.db.prepare("SELECT COUNT(*) as count FROM leads WHERE stage IN ('qualification','outreach','proposal','closed')").get().count;
-      const active = this.db.prepare("SELECT COUNT(*) as count FROM leads WHERE stage IN ('outreach','proposal')").get().count;
-
-      res.json({
-        stages: [
-          { id: 'discovery', label: 'Discovery', count: stageMap.discovery, color: 'indigo' },
-          { id: 'qualification', label: 'Qualification', count: stageMap.qualification, color: 'cyan' },
-          { id: 'outreach', label: 'Outreach', count: stageMap.outreach, color: 'fuchsia' },
-          { id: 'proposal', label: 'Proposal', count: stageMap.proposal, color: 'amber' },
-          { id: 'closed', label: 'Closed', count: stageMap.closed, color: 'green' },
-        ],
-        totalRelics: total,
-        qualifiedLeads: qualified,
-        activeOutreach: active,
-      });
-    });
-
-    this.app.get('/api/leads', (req, res) => {
-      const stage = req.query.stage;
-      let leads;
-      if (stage) {
-        leads = this.db.prepare('SELECT * FROM leads WHERE stage = ? ORDER BY updated_at DESC').all(stage);
-      } else {
-        leads = this.db.prepare('SELECT * FROM leads ORDER BY updated_at DESC').all();
-      }
-      res.json(leads);
-    });
-
-    this.app.post('/api/leads/:id/stage', (req, res) => {
-      const { stage } = req.body;
-      if (!['discovery', 'qualification', 'outreach', 'proposal', 'closed'].includes(stage)) {
-        return res.status(400).json({ error: 'Invalid stage' });
-      }
-
-      const lead = this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id);
-      if (!lead) return res.status(404).json({ error: 'Lead not found' });
-
-      this.db.prepare("UPDATE leads SET stage = ?, updated_at = datetime('now') WHERE id = ?").run(stage, req.params.id);
-
-      this.events.emit({
-        event_type: 'lead_stage_changed',
-        message: `${lead.business_name} moved to ${stage}`,
-        actor: 'Keagan',
-        actor_type: 'user',
-        source: 'SONAR_control',
-        severity: 'ok',
-      });
-
-      res.json({ success: true, lead: this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id) });
-    });
-
-    // Create a new lead
-    this.app.post('/api/leads', (req, res) => {
-      const { id, business_name, url, stage, score, notes, assigned_agent } = req.body;
-      if (!business_name) return res.status(400).json({ error: 'business_name is required' });
-
-      const leadId = id || 'lead_' + Date.now();
-      const leadStage = stage || 'discovery';
-
-      this.db.prepare(`
-        INSERT INTO leads (id, business_name, url, stage, score, notes, assigned_agent)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(leadId, business_name, url || '', leadStage, score || 0, notes || '', assigned_agent || '');
-
-      this.events.emit({
-        event_type: 'lead_created',
-        message: `New lead: ${business_name} → ${leadStage}`,
-        actor: 'system',
-        actor_type: 'system',
-        source: 'SONAR_leads',
-        severity: 'ok',
-        payload: { leadId, business_name, stage: leadStage },
-      });
-
-      res.json({ success: true, lead: this.db.prepare('SELECT * FROM leads WHERE id = ?').get(leadId) });
-    });
-
-    // Update a lead
-    this.app.put('/api/leads/:id', (req, res) => {
-      const lead = this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id);
-      if (!lead) return res.status(404).json({ error: 'Lead not found' });
-
-      const { business_name, url, score, notes, assigned_agent, stage } = req.body;
-      const changes = [];
-
-      if (business_name && business_name !== lead.business_name) changes.push(`name: "${lead.business_name}" → "${business_name}"`);
-      if (stage && stage !== lead.stage) changes.push(`stage: ${lead.stage} → ${stage}`);
-      if (score !== undefined && score !== lead.score) changes.push(`score: ${lead.score} → ${score}`);
-      if (assigned_agent && assigned_agent !== lead.assigned_agent) changes.push(`agent: ${lead.assigned_agent || 'none'} → ${assigned_agent}`);
-
-      this.db.prepare(`
-        UPDATE leads SET
-          business_name = COALESCE(?, business_name),
-          url = COALESCE(?, url),
-          stage = COALESCE(?, stage),
-          score = COALESCE(?, score),
-          notes = COALESCE(?, notes),
-          assigned_agent = COALESCE(?, assigned_agent),
-          updated_at = datetime('now')
-        WHERE id = ?
-      `).run(
-        business_name || null,
-        url || null,
-        stage || null,
-        score !== undefined ? score : null,
-        notes !== undefined ? notes : null,
-        assigned_agent || null,
-        req.params.id
-      );
-
-      if (changes.length > 0) {
-        this.events.emit({
-          event_type: 'lead_updated',
-          message: `${lead.business_name} updated: ${changes.join(', ')}`,
-          actor: 'Keagan',
-          actor_type: 'user',
-          source: 'SONAR_leads',
-          severity: 'info',
-          payload: { leadId: req.params.id, changes },
+        res.json({
+          stages,
+          totalRelics: people.length,
+          qualifiedLeads: (statusMap['Qualified'] || 0) + (statusMap['Booked'] || 0) + (statusMap['Closed'] || 0),
+          activeOutreach: (statusMap['Contacted'] || 0) + (statusMap['Qualified'] || 0),
+        });
+      } catch (err) {
+        console.error('[SONAR] Pipeline query failed:', err.message);
+        res.json({
+          stages: [
+            { id: 'new', label: 'New', count: 0, color: 'indigo' },
+            { id: 'contacted', label: 'Contacted', count: 0, color: 'cyan' },
+            { id: 'qualified', label: 'Qualified', count: 0, color: 'fuchsia' },
+            { id: 'booked', label: 'Booked', count: 0, color: 'amber' },
+            { id: 'closed', label: 'Closed', count: 0, color: 'green' },
+          ],
+          totalRelics: 0, qualifiedLeads: 0, activeOutreach: 0,
         });
       }
-
-      res.json({ success: true, lead: this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id) });
-    });
-
-    // Delete a lead
-    this.app.delete('/api/leads/:id', (req, res) => {
-      const lead = this.db.prepare('SELECT * FROM leads WHERE id = ?').get(req.params.id);
-      if (!lead) return res.status(404).json({ error: 'Lead not found' });
-
-      this.db.prepare('DELETE FROM leads WHERE id = ?').run(req.params.id);
-
-      this.events.emit({
-        event_type: 'lead_deleted',
-        message: `Lead deleted: ${lead.business_name}`,
-        actor: 'Keagan',
-        actor_type: 'user',
-        source: 'SONAR_leads',
-        severity: 'warning',
-        payload: { leadId: req.params.id, business_name: lead.business_name },
-      });
-
-      res.json({ success: true });
     });
 
     // --- Pipeline endpoint (live from leads table) ---
@@ -994,49 +867,18 @@ class Controller {
       res.json({ success: true });
     });
 
-    this.app.get('/api/cron', (req, res) => {
-      const jobs = this.db.prepare('SELECT * FROM cron_jobs ORDER BY next_run_at ASC').all();
-      res.json(jobs);
-    });
-
-    this.app.post('/api/cron/sync', (req, res) => {
-      const { jobs } = req.body;
-      if (!Array.isArray(jobs)) return res.status(400).json({ error: 'jobs array required' });
-
-      const upsert = this.db.prepare(`
-        INSERT INTO cron_jobs (id, name, schedule_kind, schedule_value, payload_kind, payload_text, session_target, status, enabled, assigned_agent, department, next_run_at, updated_at)
-        VALUES (@id, @name, @schedule_kind, @schedule_value, @payload_kind, @payload_text, @session_target, @status, @enabled, @assigned_agent, @department, @next_run_at, datetime('now'))
-        ON CONFLICT(id) DO UPDATE SET
-          name = @name, schedule_kind = @schedule_kind, schedule_value = @schedule_value,
-          payload_kind = @payload_kind, payload_text = @payload_text, session_target = @session_target,
-          status = @status, enabled = @enabled, assigned_agent = @assigned_agent,
-          department = @department, next_run_at = @next_run_at, updated_at = datetime('now')
-      `);
-
-      const syncAll = this.db.transaction((items) => {
-        for (const j of items) {
-          upsert.run(j);
-        }
-      });
-
-      syncAll(jobs);
-      const result = this.db.prepare('SELECT * FROM cron_jobs ORDER BY next_run_at ASC').all();
-
-      this.events.emit({
-        event_type: 'cron_synced',
-        message: `Cron synced - ${jobs.length} job(s) updated`,
-        actor: 'system',
-        actor_type: 'system',
-        source: 'SONAR_cron',
-        severity: 'ok',
-        payload: { count: jobs.length },
-      });
-
-      res.json({ success: true, jobs: result });
+    this.app.get('/api/cron', async (req, res) => {
+      try {
+        const jobs = await sbQuery('cron_jobs', 'GET', null, '?order=next_run_at.asc') || [];
+        res.json(jobs);
+      } catch (err) {
+        console.error('[SONAR] GET cron failed:', err.message);
+        res.json([]);
+      }
     });
 
     // Create a new cron job (SONAR + OpenClaw)
-    this.app.post('/api/cron', (req, res) => {
+    this.app.post('/api/cron', async (req, res) => {
       const { name, schedule_kind, schedule_value, payload_text, assigned_agent, department } = req.body;
       if (!name || !schedule_kind || !schedule_value) {
         return res.status(400).json({ error: 'name, schedule_kind, and schedule_value are required' });
@@ -1053,7 +895,6 @@ class Controller {
       } else if (schedule_kind === 'every') {
         nextRunAt = new Date(Date.now() + parseInt(schedule_value)).toISOString();
       } else {
-        // For cron expressions, set next_run_at to now (OpenClaw handles actual scheduling)
         nextRunAt = new Date().toISOString();
       }
 
@@ -1071,14 +912,12 @@ class Controller {
       }
 
       if (isMainAgent) {
-        // Max = main session system event
         cmd += ` --session main`;
         if (payload_text) {
           cmd += ` --system-event "${payload_text.replace(/"/g, '\\"')}"`;
         }
         cmd += ` --wake now`;
       } else {
-        // Yanna = isolated agent turn
         cmd += ` --session isolated`;
         cmd += ` --agent ${assigned_agent.toLowerCase()}`;
         if (payload_text) {
@@ -1092,7 +931,6 @@ class Controller {
       let openclawError = null;
       try {
         const output = execSync(cmd, { encoding: 'utf8', timeout: 10000 });
-        // Parse job ID from output (format: "Created job <id>")
         const match = output.match(/(?:Created job|jobId)[:\s]+([a-f0-9-]+)/i) || output.match(/([a-f0-9-]{36})/);
         if (match) openclawJobId = match[1];
       } catch (err) {
@@ -1100,29 +938,42 @@ class Controller {
         console.error('[SONAR] OpenClaw cron add failed:', err.message);
       }
 
-      // Save to SONAR DB
-      this.db.prepare(`
-        INSERT INTO cron_jobs (id, name, schedule_kind, schedule_value, payload_kind, payload_text, session_target, status, enabled, assigned_agent, department, next_run_at)
-        VALUES (?, ?, ?, ?, 'systemEvent', ?, 'main', 'queued', 1, ?, ?, ?)
-      `).run(jobId, name, schedule_kind, schedule_value, payload_text || '', assigned_agent || 'Max', department || 'Operations', nextRunAt);
+      // Save to Supabase
+      try {
+        const job = await sbQuery('cron_jobs', 'POST', {
+          id: jobId,
+          name,
+          schedule_kind,
+          schedule_value,
+          payload_kind: 'systemEvent',
+          payload_text: payload_text || '',
+          session_target: 'main',
+          status: 'queued',
+          enabled: true,
+          assigned_agent: assigned_agent || 'Max',
+          department: department || 'Operations',
+          next_run_at: nextRunAt,
+        });
 
-      const job = this.db.prepare('SELECT * FROM cron_jobs WHERE id = ?').get(jobId);
+        this.events.emit({
+          event_type: 'cron_created',
+          message: `Cron job "${name}" created - ${schedule_kind}: ${schedule_value}`,
+          actor: assigned_agent || 'Max',
+          actor_type: 'system',
+          source: 'SONAR_cron',
+          severity: 'ok',
+          payload: { jobId, name, schedule_kind, schedule_value, assigned_agent, openclawJobId },
+        });
 
-      this.events.emit({
-        event_type: 'cron_created',
-        message: `Cron job "${name}" created - ${schedule_kind}: ${schedule_value}`,
-        actor: assigned_agent || 'Max',
-        actor_type: 'system',
-        source: 'SONAR_cron',
-        severity: 'ok',
-        payload: { jobId, name, schedule_kind, schedule_value, assigned_agent, openclawJobId },
-      });
-
-      res.json({ success: true, job, openclawJobId, openclawError });
+        res.json({ success: true, job: job?.[0] || { id: jobId, name }, openclawJobId, openclawError });
+      } catch (err) {
+        console.error('[SONAR] Cron insert failed:', err.message);
+        res.status(500).json({ error: err.message });
+      }
     });
 
     // Delete a cron job (SONAR + OpenClaw)
-    this.app.delete('/api/cron/:id', (req, res) => {
+    this.app.delete('/api/cron/:id', async (req, res) => {
       const jobId = req.params.id;
       const { execSync } = require('child_process');
 
@@ -1134,18 +985,24 @@ class Controller {
         openclawError = err.message;
       }
 
-      // Remove from SONAR DB
-      const deletedJob = this.db.prepare('SELECT name FROM cron_jobs WHERE id = ?').get(jobId);
-      this.db.prepare('DELETE FROM cron_jobs WHERE id = ?').run(jobId);
+      // Remove from Supabase
+      let jobName = jobId;
+      try {
+        const existing = await sbQuery('cron_jobs', 'GET', null, `?id=eq.${jobId}&select=name`) || [];
+        if (existing.length > 0) jobName = existing[0].name;
+        await sbQuery('cron_jobs', 'DELETE', null, `?id=eq.${jobId}`);
+      } catch (err) {
+        console.error('[SONAR] Cron delete failed:', err.message);
+      }
 
       this.events.emit({
         event_type: 'cron_deleted',
-        message: `Cron job "${deletedJob?.name || jobId}" deleted`,
+        message: `Cron job "${jobName}" deleted`,
         actor: 'Keagan',
         actor_type: 'user',
         source: 'SONAR_cron',
         severity: 'warning',
-        payload: { jobId, name: deletedJob?.name },
+        payload: { jobId, name: jobName },
       });
 
       res.json({ success: true, openclawError });
@@ -1221,32 +1078,30 @@ class Controller {
     this.app.use('/api/call', callRouter);
   }
 
-  _getPipelineData() {
-    const stages = this.db.prepare(`
-      SELECT stage, COUNT(*) as count FROM leads GROUP BY stage
-    `).all();
+  async _getPipelineData() {
+    try {
+      const people = await sbQuery('people', 'GET', null, '?select=status') || [];
+      const statusMap = {};
+      for (const p of people) {
+        const s = p.status || 'New';
+        statusMap[s] = (statusMap[s] || 0) + 1;
+      }
 
-    const stageMap = { discovery: 0, qualification: 0, outreach: 0, proposal: 0, closed: 0 };
-    for (const row of stages) {
-      stageMap[row.stage] = row.count;
+      return {
+        stages: [
+          { id: 'new', label: 'New', count: statusMap['New'] || 0, color: 'indigo' },
+          { id: 'contacted', label: 'Contacted', count: statusMap['Contacted'] || 0, color: 'cyan' },
+          { id: 'qualified', label: 'Qualified', count: statusMap['Qualified'] || 0, color: 'fuchsia' },
+          { id: 'booked', label: 'Booked', count: statusMap['Booked'] || 0, color: 'amber' },
+          { id: 'closed', label: 'Closed', count: statusMap['Closed'] || 0, color: 'green' },
+        ],
+        totalRelics: people.length,
+        qualifiedLeads: (statusMap['Qualified'] || 0) + (statusMap['Booked'] || 0) + (statusMap['Closed'] || 0),
+        activeOutreach: (statusMap['Contacted'] || 0) + (statusMap['Qualified'] || 0),
+      };
+    } catch {
+      return { stages: [], totalRelics: 0, qualifiedLeads: 0, activeOutreach: 0 };
     }
-
-    const total = this.db.prepare('SELECT COUNT(*) as count FROM leads').get().count;
-    const qualified = this.db.prepare("SELECT COUNT(*) as count FROM leads WHERE stage IN ('qualification','outreach','proposal','closed')").get().count;
-    const active = this.db.prepare("SELECT COUNT(*) as count FROM leads WHERE stage IN ('outreach','proposal')").get().count;
-
-    return {
-      stages: [
-        { id: 'discovery', label: 'Discovery', count: stageMap.discovery, color: 'indigo' },
-        { id: 'qualification', label: 'Qualification', count: stageMap.qualification, color: 'cyan' },
-        { id: 'outreach', label: 'Outreach', count: stageMap.outreach, color: 'fuchsia' },
-        { id: 'proposal', label: 'Proposal', count: stageMap.proposal, color: 'amber' },
-        { id: 'closed', label: 'Closed', count: stageMap.closed, color: 'green' },
-      ],
-      totalRelics: total,
-      qualifiedLeads: qualified,
-      activeOutreach: active,
-    };
   }
 
   _getSystemSummary() {
@@ -1311,7 +1166,6 @@ class Controller {
     }
     this.wss.close();
     this.server.close();
-    this.db.close();
   }
 }
 

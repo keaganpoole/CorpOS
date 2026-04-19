@@ -244,6 +244,7 @@ router.post('/check-availability', async (req, res) => {
  * POST /api/tools/create-appointment
  * 
  * Books a new appointment. The agent calls this after confirming details with the caller.
+ * If a lead_id is not provided, the system will attempt to find or create a person record.
  * 
  * Body: {
  *   client_name: "John Smith",
@@ -291,14 +292,25 @@ router.post('/create-appointment', async (req, res) => {
       });
     }
 
-    // Resolve lead_id — use provided, look up by phone, or null
+    // Resolve lead_id — must already exist in people table
     let resolvedLeadId = lead_id || null;
     if (!resolvedLeadId && phone) {
       const normalized = normalizePhone(phone);
       const people = await sbQuery('people', 'GET', null,
         `?phone=eq.${encodeURIComponent(normalized)}&limit=1`
       ) || [];
-      if (people.length > 0) resolvedLeadId = people[0].id;
+      if (people.length > 0) {
+        resolvedLeadId = people[0].id;
+      }
+    }
+
+    // Customer must already exist — do NOT auto-create
+    if (!resolvedLeadId) {
+      return res.status(400).json({
+        error: 'Customer not found in the people table. Call create_customer first to add them, then try booking again.',
+        code: 'CUSTOMER_NOT_FOUND',
+        suggested_action: 'create_customer',
+      });
     }
 
     // Get receptionist name for confirmation
@@ -605,12 +617,12 @@ router.post('/update-customer', async (req, res) => {
  * 
  * Body: { name: "John Smith", phone: "+1207...", email?: "...", 
  *         street_address?: "...", city?: "...", state?: "...", zip_code?: "...",
- *         user_id?: "uuid" }
+ *         notes?: "...", user_id?: "uuid" }
  * Returns: { success: true, customer: {...} }
  */
 router.post('/create-customer', async (req, res) => {
   try {
-    const { name, phone, email, street_address, city, state, zip_code, user_id } = req.body;
+    const { name, phone, email, street_address, city, state, zip_code, notes, user_id } = req.body;
     if (!name || !phone) return res.status(400).json({ error: 'name and phone are required' });
 
     const normalized = normalizePhone(phone);
@@ -620,6 +632,13 @@ router.post('/create-customer', async (req, res) => {
     ) || [];
 
     if (existing.length > 0) {
+      // Update existing record with new notes if provided
+      if (notes) {
+        const existingNotes = existing[0].notes || '';
+        const updatedNotes = existingNotes ? `${existingNotes} | ${notes}` : notes;
+        await sbQuery('people', 'PATCH', { notes: updatedNotes }, `?id=eq.${existing[0].id}`);
+      }
+      
       return res.json({
         success: true,
         customer: {
@@ -645,6 +664,7 @@ router.post('/create-customer', async (req, res) => {
       city: city || null,
       state: state || null,
       zip_code: zip_code || null,
+      notes: notes || null,
       user_id: user_id || null,
     };
 
