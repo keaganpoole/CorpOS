@@ -334,13 +334,13 @@ const PricingPage = () => {
         
         if (!stripeData) return { ...plan, price: { monthly: 0, annually: 0 }, priceIds: {} };
 
-        const product = stripeData.products?.find(p => p.name.toLowerCase() === plan.name.toLowerCase());
+        const product = stripeData.products?.find(p => p.name?.toLowerCase() === plan.name.toLowerCase());
         if (!product) return { ...plan, price: { monthly: plan.prices[source]?.monthly || plan.prices.Standard?.monthly || 0, annually: plan.prices[source]?.annually || plan.prices.Standard?.annually || 0 }, priceIds: {} };
 
         const getPrice = (interval) => {
             return stripeData.prices?.find(p => 
                 p.product === product.id && 
-                p.recurring.interval === interval && 
+                p.recurring?.interval === interval && 
                 (p.metadata?.source || '').toLowerCase() === source.toLowerCase()
             );
         };

@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 import json
 from time import sleep
-
+2
 load_dotenv()
 
 STRIPE_TEST_KEY = os.getenv("STRIPE_SECRET_TEST_KEY")
@@ -11,35 +11,61 @@ STRIPE_LIVE_KEY = os.getenv("STRIPE_API_SECRET_KEY")
 
 # ---- Pricing Matrix (EDIT THESE TO YOUR REAL NUMBERS IN CENTS) ----
 pricing_matrix = {
-    "unlimited": {
+    "free": {
         "monthly": {
-            "standard": 600,
-            "sales": 2900,
-            "social": 600
+            "standard": 0,
+            "sales": 0,
+            "social": 0
         },
         "annual": {
-            "standard": 6000,
-            "sales": 30000,
-            "social": 6000
+            "standard": 0,
+            "sales": 0,
+            "social": 0
         }
     },
-    "unlimited_pro": {
+    "essentials": {
         "monthly": {
-            "standard": 900,
-            "sales": 4900,
-            "social": 900
+            "standard": 99,
+            "sales": 124,
+            "social": 99
         },
         "annual": {
-            "standard": 8400,
-            "sales": 49200,
-            "social": 8400
+            "standard": 948,   # 79 * 12
+            "sales": 1188,     # 99 * 12
+            "social": 948
+        }
+    },
+    "pro": {
+        "monthly": {
+            "standard": 499,
+            "sales": 624,
+            "social": 499
+        },
+        "annual": {
+            "standard": 4788,  # 399 * 12
+            "sales": 5988,     # 499 * 12
+            "social": 4788
+        }
+    },
+    "ultra": {
+        "monthly": {
+            "standard": 999,
+            "sales": 1249,
+            "social": 999
+        },
+        "annual": {
+            "standard": 9588,  # 799 * 12
+            "sales": 11988,    # 999 * 12
+            "social": 9588
         }
     }
 }
 
 plans = {
-    "unlimited": "Unlimited",
-    "unlimited_pro": "Unlimited Pro"
+    "free": "Free",
+    "essentials": "Essentials",
+    "pro": "Pro",
+    "ultra": "Ultra"
 }
 
 billing_intervals = {
