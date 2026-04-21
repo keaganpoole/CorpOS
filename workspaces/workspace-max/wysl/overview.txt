@@ -1,0 +1,109 @@
+The Scenario Builder is a powerful tool for programming an AI Receptionist. It allows you to visually design and build complex sequences of events, actions, and conditions that the AI Receptionist will follow. This document provides a comprehensive overview of the Scenario Builder's functionality and purpose, specifically in the context of programming an AI Receptionist.
+## Purpose
+
+The primary purpose of the Scenario Builder is to program the AI Receptionist. It provides a visual interface for creating a clear set of instructions that the AI Receptionist will follow when interacting with customers. This allows you to create a highly customized and intelligent virtual assistant that can handle a wide variety of tasks, such as answering questions, scheduling appointments, and routing calls.
+
+## Core Concepts
+
+The Scenario Builder is based on a few core concepts:
+
+*   **Nodes:** Nodes are the building blocks of your scenarios. Each node represents a single step in your workflow. There are three main types of nodes: Triggers, Actions, and Utilities.
+*   **Edges:** Edges are the connections between nodes. They define the path that your workflow will follow.
+*   **Scenarios:** A scenario is a complete workflow, consisting of a collection of nodes and edges.
+
+## Node Types
+
+### Triggers
+
+Triggers are the starting point of your scenarios. They are the events that initiate your workflows. The Scenario Builder supports a wide range of triggers, including:
+
+*   **Phone Calls:**
+    *   Incoming Call
+    *   Call Answered
+    *   Missed Call
+    *   Call Failed
+    *   Voicemail Received
+*   **Text Messages:**
+    *   SMS Received
+    *   SMS Sent
+    *   SMS Failed
+    *   Customer Replied
+*   **Appointments:**
+    *   Appointment Created
+    *   Appointment Updated
+    *   Appointment Cancelled
+    *   Appointment Rescheduled
+    *   Appointment Confirmed
+    *   Appointment Soon
+    *   Appointment Completed
+    *   Appointment Missed
+*   **Records:**
+    *   Record Created
+    *   Record Updated
+    *   Record Deleted
+*   **Payments:**
+    *   Invoice Created
+    *   Invoice Paid
+    *   Payment Failed
+    *   Invoice Sent
+
+### Actions
+
+Actions are the tasks that are performed in your workflows. They are the "do" part of your scenarios. The Scenario Builder provides a variety of actions, such as:
+
+*   **Phone Calls:**
+    *   Call Customer
+    *   Call Phone Number
+*   **Text Messaging:**
+    *   Send To Phone Number
+    *   Send To Customer
+*   **Call Routing:**
+    *   Transfer To Phone Number
+    *   Transfer To Department
+    *   Transfer To Staff Member
+    *   Hang Up
+*   **Records:**
+    *   Search Records
+    *   Create New Record
+    *   Update Record
+    *   Delete Record
+*   **Appointments:**
+    *   Create Appointment
+    *   Search Appointments
+    *   Update Appointment
+    *   Delete Appointment
+*   **Email:**
+    *   Send Email
+*   **Tags:**
+    *   Add Tag
+    *   Search Tags
+    *   Update Tag
+    *   Delete Tag
+
+### Utilities
+
+Utilities are special nodes that provide additional functionality to your workflows. They allow you to add logic and control to your scenarios. The available utilities are:
+
+*   **Wait:** This utility allows you to pause your workflow for a specified amount of time.
+*   **Router:** This utility allows you to create conditional branches in your workflow. You can use it to send your workflow down different paths based on specific conditions.
+
+## Aether Edge Logic
+
+The Aether Edge Logic is a powerful feature that allows you to add conditional logic to the edges connecting your nodes. This means that you can control the flow of your workflow based on specific criteria. For example, you can use the Aether Edge Logic to:
+
+*   Route a workflow down a different path if a customer has a specific tag.
+*   Only proceed with a workflow if a certain condition is met.
+*   Create complex, branching scenarios with multiple possible outcomes.
+
+The Aether Edge Logic allows you to define rules based on variables, operators, and values. For example, you could create a rule that says "if the customer's `city` is `New York`, then follow this path."
+
+## How to Use the Scenario Builder
+
+1.  **Create a new scenario:** Start by giving your scenario a name.
+2.  **Add a trigger:** Choose the event that will start your workflow.
+3.  **Add actions and utilities:** Build out your workflow by adding and connecting nodes.
+4.  **Configure your nodes:** Customize each node with the specific settings you need.
+5.  **Use Aether Edge Logic for conditional routing:** Create rules to control the flow of your workflow.
+6.  **Save and activate your scenario:** Once you're finished, save your scenario and activate it to start automating your tasks.
+
+The Scenario Builder is a flexible and powerful tool that can be used to automate a wide variety of tasks. By understanding the core concepts and features, you can create complex and intelligent workflows to streamline your business processes.

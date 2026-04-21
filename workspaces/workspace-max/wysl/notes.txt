@@ -1,0 +1,38 @@
+🚀 Quick Dev & Stripe Setup
+1. Run Backend (Uvicorn)
+cd backend
+uvicorn main:app --reload --port 8000
+
+
+2. 💳Stripe CLI
+stripe login
+stripe listen --forward-to localhost:8000/stripe-webhook
+
+
+3. Run Frontend (Development)
+npm run dev
+
+
+🛠️ SQL Commands
+Reset Billing & Subscriptions for a User
+UPDATE public.users
+SET 
+    plan = 'free',
+    trial_start_date = NULL,
+    trial_end_date = NULL,
+    stripe_customer_id = NULL,
+    stripe_subscription_id = NULL,
+    billing_period = NULL,
+    source = NULL,
+    last_awarded_points = NULL,
+    months_subscribed = NULL,
+    cancellation_reason = NULL,
+    started_trial = NULL,
+    subscription_status = NULL,
+    card_retries = NULL
+WHERE id = 'decea4a4-cfa8-4356-b502-ea555000c06d';
+
+
+
+
+

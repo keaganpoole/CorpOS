@@ -20,7 +20,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "openrouter/xiaomi/mimo-v2-Omni"
+        "primary": "openrouter/xiaomi/mimo-v2-pro"
       },
       "models": {
         "openrouter/auto": {

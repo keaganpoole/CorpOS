@@ -1,0 +1,37 @@
+
+.submenu {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background-color: rgba(30, 30, 30, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.submenu-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 10px;
+    border-radius: 5px;
+    color: white;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+
+.submenu-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.submenu-item .icon {
+    font-size: 1.2rem;
+}
+
+.submenu-item .label {
+    font-size: 0.9rem;
+}

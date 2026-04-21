@@ -1,0 +1,437 @@
+import React, { useState, useRef, useMemo, useEffect, useLayoutEffect, useCallback } from 'react';
+import { 
+  Phone, 
+  Bell, 
+  Zap, 
+  Plus, 
+  ChevronRight, 
+  ChevronLeft, 
+  Search, 
+  X, 
+  MessageSquare, 
+  Calendar, 
+  Layers, 
+  DollarSign, 
+  Share2, 
+  Mail, 
+  Tag, 
+  Clock, 
+  Trash2, 
+  RefreshCw, 
+  Repeat, 
+  Target, 
+  Cpu,
+  Settings,
+  Activity,
+  Brain,
+  Orbit,
+  Aperture
+} from 'lucide-react';
+
+// --- Thinking Hub Styles ---
+const styles = `
+  @keyframes hub-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes hub-pulse { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } }
+  @keyframes hub-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  @keyframes hub-glitch {
+    0% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+    100% { transform: translate(0); }
+  }
+  @keyframes dash-flow {
+    to { stroke-dashoffset: -20; }
+  }
+  @keyframes iris-open {
+    0%, 100% { clip-path: circle(30%); }
+    50% { clip-path: circle(50%); }
+  }
+
+  .intent-hub-wrapper {
+    transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  /* Variant 1: The Neural Synapse */
+  .variant-1 .synapse-node {
+    animation: hub-pulse 2s ease-in-out infinite;
+  }
+
+  /* Variant 2: The Aperture Eye */
+  .variant-2 .iris {
+    animation: iris-open 4s ease-in-out infinite;
+    background: radial-gradient(circle, #f472b6 20%, transparent 70%);
+  }
+
+  /* Variant 3: The Particle Vortex */
+  .variant-3 .particle-ring {
+    border: 2px dashed #f472b6;
+    animation: hub-spin 10s linear infinite;
+  }
+
+  /* Variant 4: Isometric Monolith */
+  .variant-4 .monolith-face {
+    transform: skewY(-15deg);
+    background: linear-gradient(135deg, #1a1a20, #0a0a0c);
+  }
+
+  /* Variant 5: The Flux Capacitor */
+  .variant-5 .flux-path {
+    stroke-dasharray: 5;
+    animation: dash-flow 1s linear infinite;
+  }
+
+  /* Variant 6: Holographic Slices */
+  .variant-6 .slice {
+    height: 4px;
+    background: #f472b6;
+    margin: 2px 0;
+    opacity: 0.3;
+    animation: hub-glitch 3s steps(2) infinite;
+  }
+
+  /* Variant 7: The Data Lens */
+  .variant-7::before {
+    content: ''; position: absolute; inset: -20px;
+    background: radial-gradient(circle, rgba(244,114,182,0.1) 0%, transparent 70%);
+    animation: hub-pulse 3s infinite;
+  }
+
+  /* Variant 8: Constellation Hub */
+  .variant-8 .star {
+    position: absolute; width: 4px; height: 4px; background: white; border-radius: 50%;
+    box-shadow: 0 0 10px #f472b6;
+  }
+
+  /* Variant 9: The Bio-Digital Core */
+  .variant-9 {
+    border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+    animation: hub-spin 20s linear infinite reverse;
+    background: linear-gradient(45deg, #0f0a14, #1a0b1a);
+  }
+
+  /* Variant 10: High-Frequency Wave */
+  .variant-10 .wave-bar {
+    width: 3px; background: #f472b6;
+    animation: hub-pulse 0.5s ease-in-out infinite;
+  }
+`;
+
+const OPTION_ICONS = {
+  phone_calls: Phone,
+  text_messages: MessageSquare,
+  appointments: Calendar,
+  records: Layers,
+  payments: DollarSign,
+  call_routing: Share2,
+  email: Mail,
+  tags: Tag,
+  wait: Clock,
+  router: Share2,
+  intent_router: Brain,
+};
+
+const INITIAL_NODE = { id: 'node-1', x: 200, y: 300, configured: false, label: 'Start Flow' };
+
+export default function App() {
+  const [nodes, setNodes] = useState([INITIAL_NODE]);
+  const [edges, setEdges] = useState([]);
+  const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
+  const [selectedNodeId, setSelectedNodeId] = useState('node-1');
+  const [intentVariant, setIntentVariant] = useState(1);
+
+  const builderRef = useRef(null);
+  const dragRef = useRef({ id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 });
+  const panRef = useRef(null);
+  const nodeIdCounter = useRef(1);
+  const edgeIdCounter = useRef(1);
+
+  const nodeMap = useMemo(() => nodes.reduce((acc, node) => ({ ...acc, [node.id]: node }), {}), [nodes]);
+
+  useLayoutEffect(() => {
+    const builderRect = builderRef.current?.getBoundingClientRect();
+    if (!builderRect) return;
+    setView(v => ({ ...v, x: builderRect.width / 2 - 200, y: builderRect.height / 2 - 100 }));
+  }, []);
+
+  const handleNodePointerDown = (nodeId, event) => {
+    event.stopPropagation();
+    const node = nodeMap[nodeId];
+    dragRef.current = { id: nodeId, moved: false, startX: event.clientX, startY: event.clientY, nodeX: node.x, nodeY: node.y, scale: view.scale };
+  };
+
+  useEffect(() => {
+    const handleMove = (e) => {
+      if (dragRef.current.id) {
+        const dx = (e.clientX - dragRef.current.startX) / dragRef.current.scale;
+        const dy = (e.clientY - dragRef.current.startY) / dragRef.current.scale;
+        setNodes(prev => prev.map(n => n.id === dragRef.current.id ? { ...n, x: dragRef.current.nodeX + dx, y: dragRef.current.nodeY + dy } : n));
+        dragRef.current.moved = true;
+      } else if (panRef.current) {
+        setView(prev => ({ ...prev, x: panRef.current.originX + (e.clientX - panRef.current.startX), y: panRef.current.originY + (e.clientY - panRef.current.startY) }));
+      }
+    };
+    const handleUp = () => {
+      if (dragRef.current.id && !dragRef.current.moved) setSelectedNodeId(dragRef.current.id);
+      dragRef.current.id = null;
+      panRef.current = null;
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    return () => { window.removeEventListener('pointermove', handleMove); window.removeEventListener('pointerup', handleUp); };
+  }, [nodeMap, view]);
+
+  const finalizeSelection = (label, detail, icon, categoryType, accentColor) => {
+    const isIntent = label === 'Intent Router';
+    setNodes(prev => prev.map(node => node.id === selectedNodeId ? {
+      ...node,
+      configured: true,
+      label,
+      detail: detail || 'Component',
+      icon: icon,
+      type: isIntent ? 'intent_router' : (categoryType === 'TRIGGERS' ? 'trigger' : 'action'),
+      accent: accentColor,
+    } : node));
+    setSelectedNodeId(null);
+  };
+
+  const handleAddNode = (nodeId) => {
+    const parent = nodeMap[nodeId];
+    const nextId = `node-${++nodeIdCounter.current}`;
+    setNodes(prev => [...prev, { id: nextId, x: parent.x + 350, y: parent.y, configured: false, label: 'New Step' }]);
+    setEdges(prev => [...prev, { id: `edge-${++edgeIdCounter.current}`, from: nodeId, to: nextId }]);
+  };
+
+  const renderIntentHub = (node, isActive) => {
+    const Icon = node.icon || Brain;
+    const accent = '#f472b6';
+
+    return (
+      <div 
+        key={node.id}
+        className={`absolute w-[320px] h-[320px] flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 z-20 intent-hub-wrapper variant-${intentVariant}`}
+        style={{ left: node.x, top: node.y }}
+        onPointerDown={(e) => handleNodePointerDown(node.id, e)}
+      >
+        <style>{styles}</style>
+        
+        {/* DESIGN 1: Neural Synapse (Floating dots & connections) */}
+        {intentVariant === 1 && (
+          <div className="relative w-full h-full flex items-center justify-center">
+             <div className="absolute inset-0 border-2 border-[#f472b6]/20 rounded-full animate-[hub-spin_20s_linear_infinite]" />
+             {Array(5).fill(0).map((_, i) => (
+               <div key={i} className={`synapse-node absolute w-3 h-3 bg-[#f472b6] rounded-full shadow-[0_0_15px_#f472b6]`} 
+                    style={{ top: `${20+Math.random()*60}%`, left: `${20+Math.random()*60}%`, animationDelay: `${i*0.4}s` }} />
+             ))}
+          </div>
+        )}
+
+        {/* DESIGN 2: The Aperture (Mechanical iris eye) */}
+        {intentVariant === 2 && (
+          <div className="relative w-48 h-48 border-4 border-white/10 rounded-full overflow-hidden flex items-center justify-center bg-[#0a0a0c]">
+            <div className="iris absolute inset-0" />
+            <div className="absolute inset-0 border-[20px] border-black/40 rounded-full" />
+          </div>
+        )}
+
+        {/* DESIGN 3: Particle Vortex (Spinning dashes) */}
+        {intentVariant === 3 && (
+          <div className="w-56 h-56 relative flex items-center justify-center">
+            <div className="particle-ring absolute inset-0 rounded-full" />
+            <div className="particle-ring absolute inset-4 rounded-full [animation-direction:reverse] [animation-duration:15s]" />
+          </div>
+        )}
+
+        {/* DESIGN 4: The Monolith (Isometric 3D shape) */}
+        {intentVariant === 4 && (
+          <div className="w-40 h-64 monolith-face border-r-4 border-b-4 border-[#f472b6]/30 shadow-2xl flex items-center justify-center">
+             <div className="rotate-[15deg] text-center">
+                <Brain size={48} className="text-[#f472b6] mb-2" />
+                <p className="text-[10px] font-bold tracking-tighter text-white/40">EVALUATING</p>
+             </div>
+          </div>
+        )}
+
+        {/* DESIGN 5: Flux Capacitor (Y-shape energy flow) */}
+        {intentVariant === 5 && (
+          <svg className="w-64 h-64" viewBox="0 0 100 100">
+            <path d="M50 50 L50 10 M50 50 L10 80 M50 50 L90 80" fill="none" stroke="#f472b6" strokeWidth="2" className="flux-path" />
+            <circle cx="50" cy="50" r="15" fill="#0a0a0c" stroke="#f472b6" strokeWidth="1" />
+          </svg>
+        )}
+
+        {/* DESIGN 6: Holographic Slice (Glitchy horizontal bars) */}
+        {intentVariant === 6 && (
+          <div className="w-64 flex flex-col items-center">
+            {Array(10).fill(0).map((_, i) => (
+              <div key={i} className="slice" style={{ width: `${60 + Math.sin(i)*30}%`, animationDelay: `${i*0.1}s` }} />
+            ))}
+          </div>
+        )}
+
+        {/* DESIGN 8: Constellation (Star map) */}
+        {intentVariant === 8 && (
+          <div className="w-64 h-64 relative">
+             <svg className="absolute inset-0 w-full h-full opacity-30">
+                <line x1="20" y1="20" x2="80" y2="80" stroke="#f472b6" />
+                <line x1="80" y1="20" x2="20" y2="80" stroke="#f472b6" />
+             </svg>
+             {Array(8).fill(0).map((_, i) => (
+               <div key={i} className="star" style={{ top: `${Math.random()*100}%`, left: `${Math.random()*100}%` }} />
+             ))}
+          </div>
+        )}
+
+        {/* DESIGN 10: Audio Wave (Dynamic bars) */}
+        {intentVariant === 10 && (
+          <div className="flex items-end gap-1 h-32">
+            {Array(15).fill(0).map((_, i) => (
+              <div key={i} className="wave-bar" style={{ height: `${20 + Math.random()*80}%`, animationDelay: `${i*0.05}s` }} />
+            ))}
+          </div>
+        )}
+
+        {/* CENTRAL CONTENT (Always present) */}
+        <div className={`absolute z-30 text-center flex flex-col items-center transition-all ${isActive ? 'scale-110' : ''}`}>
+          <div className="w-16 h-16 rounded-full bg-black border-2 border-[#f472b6] flex items-center justify-center shadow-[0_0_30px_rgba(244,114,182,0.5)] mb-4">
+            <Icon size={32} className="text-[#f472b6]" />
+          </div>
+          <div className="bg-black/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+            <p className="text-[10px] uppercase font-black text-[#f472b6] tracking-widest mb-0.5">INTENT HUB</p>
+            <h4 className="text-sm font-bold text-white whitespace-nowrap">{node.label}</h4>
+          </div>
+          {node.configured && (
+            <button 
+              className="mt-4 w-10 h-10 rounded-full bg-[#222] border-2 border-[#f472b6] flex items-center justify-center hover:bg-[#f472b6] hover:text-black transition-all"
+              onClick={(e) => { e.stopPropagation(); handleAddNode(node.id); }}
+            >
+              <Plus size={20} />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-full h-screen bg-[#0a0a0c] text-white font-sans overflow-hidden flex flex-col" ref={builderRef}>
+      {/* Design Switcher */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-black/80 border border-white/10 px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl backdrop-blur-md">
+        <span className="text-xs uppercase font-black tracking-widest text-white/40">Hub Logic:</span>
+        <div className="flex gap-2">
+          {[1,2,3,4,5,6,7,8,9,10].map(v => (
+            <button 
+              key={v} 
+              className={`w-9 h-9 rounded-full text-xs font-bold transition-all border-2 ${intentVariant === v ? 'bg-[#f472b6] text-black border-[#f472b6] scale-125' : 'bg-white/5 text-white/50 border-white/10 hover:border-[#f472b6]'}`}
+              onClick={() => setIntentVariant(v)}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 relative" 
+           onPointerDown={(e) => { if (e.button === 0 && !e.target.closest('.builder-node') && !e.target.closest('.intent-hub-wrapper')) panRef.current = { startX: e.clientX, startY: e.clientY, originX: view.x, originY: view.y } }}
+           onWheel={(e) => setView(v => ({ ...v, scale: Math.min(1.5, Math.max(0.5, v.scale - e.deltaY * 0.001)) }))}>
+        <div className="absolute inset-0 canvas-grid" />
+        
+        <div className="absolute inset-0" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`, transformOrigin: '0 0' }}>
+          <svg className="absolute inset-0 w-[10000px] h-[10000px] pointer-events-none">
+            {edges.map(edge => {
+              const from = nodeMap[edge.from]; const to = nodeMap[edge.to];
+              if (!from || !to) return null;
+              const path = `M ${from.x} ${from.y} C ${from.x + 150} ${from.y}, ${to.x - 150} ${to.y}, ${to.x} ${to.y}`;
+              return <path key={edge.id} d={path} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />;
+            })}
+          </svg>
+
+          {nodes.map((node) => {
+            const isActive = selectedNodeId === node.id;
+            const isIntent = node.label === 'Intent Router';
+            
+            if (isIntent && node.configured) return renderIntentHub(node, isActive);
+
+            const Icon = node.icon || Plus;
+            return (
+              <div
+                key={node.id}
+                className={`builder-node absolute w-[220px] h-[80px] -translate-x-1/2 -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing
+                  ${node.configured ? 'bg-[#141419]/90' : 'bg-white/[0.02] border-dashed'}
+                  ${isActive ? 'ring-2 ring-[#32f0d9]' : 'border border-white/10'}
+                  rounded-2xl backdrop-blur-md flex items-center px-4 gap-3 shadow-xl
+                `}
+                style={{ left: node.x, top: node.y }}
+                onPointerDown={(e) => handleNodePointerDown(node.id, e)}
+              >
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center bg-white/5`} style={{ color: node.accent || '#32f0d9' }}>
+                  <Icon size={22} />
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <p className="text-[10px] uppercase opacity-40 mb-0.5">{node.detail || 'Step'}</p>
+                  <h4 className="text-sm font-semibold truncate text-white">{node.label}</h4>
+                </div>
+                {node.configured && (
+                  <button className="absolute -right-3 w-7 h-7 rounded-full bg-[#222] border border-white/20 flex items-center justify-center hover:bg-[#32f0d9] hover:text-black" onClick={(e) => { e.stopPropagation(); handleAddNode(node.id); }}>
+                    <Plus size={14} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Simplified Selection Modal */}
+      {selectedNodeId && !nodeMap[selectedNodeId].configured && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
+          <div className="bg-[#0a0a0c] w-full max-w-md rounded-[32px] border border-white/10 p-10 shadow-2xl">
+            <h3 className="text-3xl font-black mb-8 tracking-tighter">SELECT ENGINE</h3>
+            <div className="space-y-4">
+              <button 
+                className="w-full flex items-center gap-5 p-6 rounded-3xl bg-[#f472b6]/5 border border-[#f472b6]/20 hover:bg-[#f472b6]/20 transition-all text-left group"
+                onClick={() => finalizeSelection('Intent Router', 'MASTER HUB', Brain, 'UTILITIES', '#f472b6')}
+              >
+                <div className="w-14 h-14 rounded-2xl bg-[#f472b6]/20 flex items-center justify-center text-[#f472b6] group-hover:scale-110 transition-transform"><Brain size={32}/></div>
+                <div>
+                  <strong className="block text-[#f472b6] text-lg uppercase font-black">Intent Router</strong>
+                  <span className="text-xs text-white/40">System-wide evaluator for complex branching.</span>
+                </div>
+              </button>
+              <button 
+                className="w-full flex items-center gap-5 p-6 rounded-3xl bg-[#38bdf8]/5 border border-[#38bdf8]/20 hover:bg-[#38bdf8]/20 transition-all text-left group"
+                onClick={() => finalizeSelection('Send SMS', 'Action', MessageSquare, 'ACTIONS', '#38bdf8')}
+              >
+                <div className="w-14 h-14 rounded-2xl bg-[#38bdf8]/20 flex items-center justify-center text-[#38bdf8] group-hover:scale-110 transition-transform"><MessageSquare size={32}/></div>
+                <div>
+                  <strong className="block text-[#38bdf8] text-lg uppercase font-black">Standard Action</strong>
+                  <span className="text-xs text-white/40">Execute a single linear automation step.</span>
+                </div>
+              </button>
+            </div>
+            <button className="w-full mt-8 py-4 text-white/20 hover:text-white transition-colors uppercase font-bold text-xs tracking-widest" onClick={() => setSelectedNodeId(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

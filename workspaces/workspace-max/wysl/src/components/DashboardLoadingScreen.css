@@ -1,0 +1,135 @@
+/* src/components/DashboardLoadingScreen.css */
+
+/* Styles for the main backdrop of the loading screen */
+.dashboard-loading-screen-backdrop {
+  position: fixed; /* Fixes the backdrop to the viewport */
+  inset: 0; /* Covers the entire viewport */
+  background-color: #0B0C10; /* Dark background color, matching SplashScreen */
+  display: flex; /* Uses flexbox for centering content */
+  align-items: center; /* Centers content vertically */
+  justify-content: center; /* Centers content horizontally */
+  z-index: 1; /* Ensures the loading screen is on top of other content */
+  /* CSS variable for the background color, used for soft clipping the animated text */
+  --bg-color: #0B0C10; 
+}
+
+/* Styles for the container holding the logo and loading text */
+.dashboard-loading-content {
+  display: flex; /* Uses flexbox for vertical stacking of logo and text */
+  flex-direction: column; /* Stacks items vertically */
+  align-items: center; /* Centers items horizontally within the column */
+  justify-content: center; /* Centers items vertically within the column */
+  text-align: center;
+}
+
+/* Styles for the logo image */
+.dashboard-loading-logo {
+  width: 112px; /* Sets a fixed width for the logo */
+  height: auto; /* Maintains aspect ratio */
+  margin-bottom: 0px; /* Reduce space between the logo and the loading text */
+}
+
+/* Styles for the main 'Loading' text container */
+.loader {
+  color: rgb(124, 124, 124); /* Default color for 'Loading' static text */
+  font-family: "Poppins", sans-serif; /* Font family for the text */
+  font-weight: 500; /* Font weight */
+  font-size: 25px; /* Base font size */
+  -webkit-box-sizing: content-box; /* Ensures padding is added to the content box */
+  box-sizing: content-box;
+  height: 40px; /* Fixed height for the loader to contain animated words */
+  padding: 10px 10px; /* Padding around the 'Loading' text */
+  display: -webkit-box; /* For older WebKit browsers */
+  display: flex; /* Uses flexbox to align 'Loading' and animated words */
+  border-radius: 8px; /* Rounded corners for the loader container */
+}
+
+/* Styles for the container of the animated words */
+.words {
+  overflow: hidden; /* Hides words that are outside this container */
+  position: relative; /* Needed for absolute positioning of the ::after pseudo-element */
+  text-align: left; /* Aligns the animated words to the left */
+}
+
+/* Pseudo-element to create a soft clipping/fade effect at the top and bottom of the words */
+.words::after {
+  content: "";
+  position: absolute;
+  inset: 0; /* Covers the entire .words container */
+  background: linear-gradient(
+    var(--bg-color) 10%,
+    transparent 30%,
+    transparent 70%,
+    var(--bg-color) 90%
+  ); /* Gradient to fade out text at top/bottom */
+  z-index: 20; /* Ensures it's above the animated words */
+}
+
+/* Styles for each individual animated word */
+.word {
+  display: block; /* Each word takes its own line */
+  height: 100%; /* Each word takes the full height of the .words container */
+  padding-left: 6px; /* Space between 'Loading' and the animated word */
+  background: linear-gradient(to right, var(--accent-color1), var(--accent-color2));
+  -webkit-background-clip: text; /* Clips the background to the shape of the text */
+  -webkit-text-fill-color: transparent; /* Makes the text transparent to show the clipped background */
+  background-clip: text;
+  text-fill-color: transparent;
+  animation: spin_4991 4s infinite;
+}
+
+/* Media query for mobile and tablet devices */
+@media (max-width: 1023px) { 
+  .loader {
+    font-size: 20px; /* Smaller font size for loader text on smaller screens */
+    height: 35px; /* Adjust height to match smaller font */
+    padding: 8px 8px; /* Adjusted padding */
+  }
+
+  .word {
+    padding-left: 5px; /* Adjusted padding for animated words */
+  }
+}
+
+/* Keyframes for the vertical spinning animation of the words */
+ @keyframes spin_4991 {
+  10% {
+    -webkit-transform: translateY(-102%); /* Moves the word up slightly */
+    transform: translateY(-102%);
+  }
+
+  25% {
+    -webkit-transform: translateY(-100%); /* Displays the first word */
+    transform: translateY(-100%);
+  }
+
+  35% {
+    -webkit-transform: translateY(-202%); /* Moves to the second word, slightly up */
+    transform: translateY(-202%);
+  }
+
+  50% {
+    -webkit-transform: translateY(-200%); /* Displays the second word */
+    transform: translateY(-200%);
+  }
+
+  60% {
+    -webkit-transform: translateY(-302%); /* Moves to the third word, slightly up */
+    transform: translateY(-302%);
+  }
+
+  75% {
+    -webkit-transform: translateY(-300%); /* Displays the third word */
+    transform: translateY(-300%);
+  }
+
+  85% {
+    -webkit-transform: translateY(-402%); /* Moves to the fourth word, slightly up */
+    transform: translateY(-402%);
+  }
+
+  100% {
+    -webkit-transform: translateY(-400%); /* Displays the fourth word */
+    transform: translateY(-400%);
+  }
+}
