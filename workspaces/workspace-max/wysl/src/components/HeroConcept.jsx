@@ -22,7 +22,7 @@ const RECEPTIONISTS = [
     traits: ['Kind', 'Approachable', 'Sincere'],
     voiceName: 'Kore',
     color: '#2dd4bf',
-    image: "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie_transparent.png"
+    image: "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie_transparent8.png"
   },
   {
     id: 'brian',
@@ -70,34 +70,51 @@ const RECEPTIONISTS = [
   }
 ];
 
-const HeroConcept = () => {
+const HeroConcept = React.forwardRef((props, ref) => {
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(0);
   const autoPlayRef = useRef(null);
-  const wrapperRef = useRef(null);
+  const innerRef = useRef(null);
+  const wrapperRef = ref || innerRef;
 
   // Track scroll relative to this wrapper — gives us 0→1 as user scrolls past the hero
   const { scrollYProgress } = useScroll({
-    target: wrapperRef,
+    target: innerRef,
     offset: ["start start", "end start"]
   });
 
-  // Collapse: shrink, fade, round corners, shift up
-  const scale = useTransform(scrollYProgress, [0, 1], [1, 0.92]);
-  const opacity = useTransform(scrollYProgress, [0, 0.8, 1], [1, 0.5, 0]);
-  const y = useTransform(scrollYProgress, [0, 1], [0, -60]);
-  const radius = useTransform(scrollYProgress, [0, 1], ["0px", "20px"]);
+  // Cinematic zoom — starts immediately, accelerates smoothly
+  const scale = useTransform(
+    scrollYProgress,
+    [0, 0.15, 0.4, 0.7, 1],
+    [1, 1.03, 1.08, 1.18, 1.3]
+  );
+  const opacity = useTransform(
+    scrollYProgress,
+    [0, 0.4, 0.7, 1],
+    [1, 1, 0.6, 0]
+  );
+  const motionBlur = useTransform(
+    scrollYProgress,
+    [0.3, 0.8, 1],
+    [0, 4, 10]
+  );
+  const backdropBlur = useTransform(
+    scrollYProgress,
+    [0.4, 0.9],
+    [0, 20]
+  );
+  const backdropOpacity = useTransform(
+    scrollYProgress,
+    [0.3, 0.7],
+    [0, 0.3]
+  );
 
   const active = RECEPTIONISTS[index];
 
   const nextSlide = () => {
     setDirection(1);
     setIndex((prev) => (prev + 1) % RECEPTIONISTS.length);
-  };
-
-  const prevSlide = () => {
-    setDirection(-1);
-    setIndex((prev) => (prev - 1 + RECEPTIONISTS.length) % RECEPTIONISTS.length);
   };
 
   useEffect(() => {
@@ -108,13 +125,22 @@ const HeroConcept = () => {
   return (
     <>
       {/* Hero wrapper — this is the scroll anchor */}
-      <div ref={wrapperRef} className="relative" style={{ height: '180vh' }}>
+      <div ref={wrapperRef} className="relative" style={{ height: '130vh' }}>
         {/* Sticky viewport-filling hero */}
-        <div className="sticky top-0 h-screen overflow-hidden">
+        <div ref={innerRef} className="sticky top-0 h-screen overflow-hidden">
           <motion.div
-            style={{ scale, opacity, y, borderRadius: radius }}
+            style={{ scale, opacity, filter: useTransform(motionBlur, v => `blur(${v}px)`) }}
             className="relative w-full h-full bg-black origin-bottom"
           >
+            {/* Glassmorphism overlay on scroll */}
+            <motion.div
+              style={{
+                opacity: backdropOpacity,
+                backdropFilter: useTransform(backdropBlur, v => `blur(${v}px)`),
+                WebkitBackdropFilter: useTransform(backdropBlur, v => `blur(${v}px)`),
+              }}
+              className="absolute inset-0 bg-white/[0.05] z-20 pointer-events-none"
+            />
             {/* Background ambient glow */}
             <AnimatePresence mode="wait">
               <motion.div
@@ -194,6 +220,15 @@ const HeroConcept = () => {
                         Your AI-powered {active.role.toLowerCase()} — {active.traits.map(t => t.toLowerCase()).join(', ')}.
                         Answers every call, handles bookings, and represents your business with precision.
                       </p>
+
+                      {/* Scroll indicator under description */}
+                      <motion.div
+                        style={{ opacity: useTransform(scrollYProgress, [0, 0.15], [1, 0]) }}
+                        className="flex flex-col items-start gap-2 pointer-events-none mt-4"
+                      >
+                        <p className="text-[10px] tracking-[0.3em] uppercase text-white/30 font-bold">Scroll</p>
+                        <div className="w-[1px] h-8 bg-gradient-to-b from-white/30 to-transparent animate-pulse" />
+                      </motion.div>
                     </div>
                   </motion.div>
                 </AnimatePresence>
@@ -224,17 +259,8 @@ const HeroConcept = () => {
               </div>
             </div>
 
-            {/* Scroll indicator — fades out as you scroll */}
-            <motion.div
-              style={{ opacity: useTransform(scrollYProgress, [0, 0.15], [1, 0]) }}
-              className="absolute bottom-24 inset-x-0 flex flex-col items-center gap-2 pointer-events-none z-40"
-            >
-              <p className="text-[10px] tracking-[0.3em] uppercase text-white/30 font-bold">Scroll</p>
-              <div className="w-[1px] h-8 bg-gradient-to-b from-white/30 to-transparent animate-pulse" />
-            </motion.div>
-
-            {/* Navigation dots + arrows */}
-            <div className="absolute bottom-8 inset-x-8 lg:inset-x-20 max-w-7xl mx-auto flex items-center justify-between z-50">
+            {/* Navigation dots */}
+            <div className="absolute bottom-8 inset-x-8 lg:inset-x-20 max-w-7xl mx-auto flex items-center z-50">
               <div className="flex items-center gap-2">
                 {RECEPTIONISTS.map((_, i) => (
                   <button
@@ -258,25 +284,6 @@ const HeroConcept = () => {
                   </button>
                 ))}
               </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={prevSlide}
-                  className="w-10 h-10 flex items-center justify-center border border-white/10 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M15 18l-6-6 6-6" />
-                  </svg>
-                </button>
-                <button
-                  onClick={nextSlide}
-                  className="w-10 h-10 flex items-center justify-center border border-white/10 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M9 18l6-6-6-6" />
-                  </svg>
-                </button>
-              </div>
             </div>
           </motion.div>
         </div>
@@ -290,6 +297,6 @@ const HeroConcept = () => {
       `}</style>
     </>
   );
-};
+});
 
 export default HeroConcept;

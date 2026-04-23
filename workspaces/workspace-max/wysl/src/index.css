@@ -44,7 +44,7 @@ body {
   font-family: var(--font-family-sans);
   margin: 0;
   padding: 0;
-  background-color: var(--color-black);
+  background-color: #000000;
   color: #e5e7eb; /* Default light text color */
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;

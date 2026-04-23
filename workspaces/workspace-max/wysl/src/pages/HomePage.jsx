@@ -205,6 +205,20 @@ const HomePage = () => {
   const [showSplash, setShowSplash] = useState(true);
   useLegacyAnimation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [navOnHero, setNavOnHero] = useState(true);
+  const heroRef = useRef(null);
+
+  useEffect(() => {
+    if (!heroRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setNavOnHero(entry.isIntersecting);
+      },
+      { threshold: 0 }
+    );
+    observer.observe(heroRef.current);
+    return () => observer.disconnect();
+  }, []);
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -376,7 +390,7 @@ const HomePage = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="header">
+      <div className={`header${!navOnHero ? ' is-visible' : ''}`}>
         <nav className="nav-content">
           <img src={logoImage} alt="Sonar" className="header-logo" />
 
@@ -438,7 +452,7 @@ const HomePage = () => {
       </div>
 
       <main>
-        <HeroConcept />
+        <HeroConcept ref={heroRef} />
 
 
         <section className="content-section dark-bg text-center">
