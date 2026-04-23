@@ -42,6 +42,7 @@ import expandedTicketmaster from '@/assets/t1-expanded-ticketmaster.png';
 import expandedWifi from '@/assets/t1-expanded-wifi.png';
 import expandedX from '@/assets/t1-expanded-x.png';
 import TypingAnimation from '../components/TypingAnimation';
+import HeroConcept from '../components/HeroConcept';
 import { trackVisitor } from '../services/apiService';
 
 const FadingImageCollage = ({ images }) => {
@@ -437,13 +438,7 @@ const HomePage = () => {
       </div>
 
       <main>
-        <section className="content-section light-bg text-center relative overflow-hidden">
-          <h3 data-animate="true">An <AnimatedBeautifulText /> AI Receptionist</h3>
-          <p data-animate="true">
-            Never miss another call. Sonar answers your phones 24/7, books appointments, handles customer questions, and routes calls — all with a natural, human-like voice that your callers will love.
-          </p>
-          <RainingImages />
-        </section>
+        <HeroConcept />
 
 
         <section className="content-section dark-bg text-center">

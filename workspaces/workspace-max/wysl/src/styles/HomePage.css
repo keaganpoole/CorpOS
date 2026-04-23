@@ -152,10 +152,10 @@
 
 
 .header {
-    width: 100%; background-image: radial-gradient(circle 75px at center, #222222 0%, var(--color-black) 100%); position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid rgba(0, 0, 0, 0.04); padding: 0 55px;
+    width: 100%; background: transparent !important; background-image: none !important; position: sticky; top: 0; z-index: 1000; border-bottom: none; padding: 0 55px; box-shadow: none !important;
 }
 .nav-content {
-    display: flex; align-items: center; max-width: 980px; margin: 0 auto; height: 50px; position: relative;
+    display: flex; align-items: center; max-width: 980px; margin: 0 auto; height: 50px; position: relative; background: transparent !important;
 }
 .header-logo {
     position: absolute;
