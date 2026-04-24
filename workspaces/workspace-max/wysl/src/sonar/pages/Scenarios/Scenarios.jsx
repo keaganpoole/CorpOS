@@ -1391,7 +1391,7 @@ export default function ScenariosPage() {
 
                     {/* Icon Container with Glassmorphism */}
                     <div className="sb-node-icon-glass">
-                      {Icon ? <Icon size={36} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={36} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
+                      {Icon ? <Icon size={48} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={48} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
                     </div>
 
                     {/* Pulse Effect for Activity */}
