@@ -537,7 +537,7 @@ export default function ScenariosPage() {
     const yOffset = siblingCount * 120 - (parent.type === 'router' ? 60 : 0);
     const newNode = {
       id: nextId,
-      x: parent.x + 280,
+      x: parent.x + 220,
       y: parent.y + yOffset,
       configured: false,
       label: 'New Step',
@@ -759,8 +759,14 @@ export default function ScenariosPage() {
         ? JSON.parse(scenario.edges_data) 
         : scenario.edges_data;
       
+      // Resolve icon strings back to components
+      const resolvedNodes = (nodesData || [INITIAL_NODE]).map(node => ({
+        ...node,
+        icon: typeof node.icon === 'string' ? OPTION_ICONS[node.icon] || null : node.icon,
+      }));
+
       // Set nodes and edges from scenario data
-      setNodes(nodesData || [INITIAL_NODE]);
+      setNodes(resolvedNodes);
       setEdges(edgesData || []);
       
       // Calculate center position for nodes
@@ -774,9 +780,9 @@ export default function ScenariosPage() {
           maxY = Math.max(maxY, node.y);
         });
         
-        // Calculate center offset
-        const nodesWidth = maxX - minX + 220; // Include node width
-        const nodesHeight = maxY - minY + 80; // Include node height
+        // Calculate center offset (new sphere nodes are ~140×180)
+        const nodesWidth = maxX - minX + 140;
+        const nodesHeight = maxY - minY + 180;
         const centerX = nodesWidth / 2;
         const centerY = nodesHeight / 2;
         
@@ -1145,10 +1151,12 @@ export default function ScenariosPage() {
               );
             })}
             
-            {nodes.map((node) => {
+            {nodes.map((node, idx) => {
               const Icon = node.icon || null;
               const isActive = selectedNodeId === node.id;
               const isInitialNode = node.id === INITIAL_NODE.id && initialPulse;
+              const accent = node.accent || '#32f0d9';
+
               return (
                 <div
                   key={node.id}
@@ -1158,30 +1166,44 @@ export default function ScenariosPage() {
                   }}
                   className={`sb-builder-node ${node.type === 'router' ? 'router-node' : ''} ${
                     isActive ? 'sb-active-node' : ''
-                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isInitialNode ? 'sb-initial-pulse' : ''}`}
-                  style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
+                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} sb-node-enter`}
+                  style={{
+                    left: node.x,
+                    top: node.y,
+                    opacity: nodesOpacity,
+                    '--node-shadow': `${accent}55`,
+                    animationDelay: `${idx * 0.08}s`,
+                  }}
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                 >
-                  {isInitialNode && <div className="sb-aether-track" />}
-                  
-                  <div className="sb-node-glow" style={{ background: node.accent }} />
-                  <div
-                    className="sb-node-core"
-                    style={{ '--node-accent': node.accent || 'var(--sb-accent-primary)' }}
-                  >
-                    <div className="sb-node-icon-wrapper" style={{ color: node.accent }}>
-                      {Icon ? <Icon size={22} /> : <Plus size={22} />}
+                  {/* Sphere body */}
+                  <div className="sb-node-core">
+                    <div className="sb-node-glow" style={{ background: accent }} />
+                    {isInitialNode && <div className="sb-aether-track" />}
+                    <div className="sb-node-outer-ring" />
+                    <div className="sb-node-sphere" style={{ background: `linear-gradient(135deg, ${accent}, ${accent}99)` }}>
+                      <div className="sb-node-core-shadow" />
+                      <div className="sb-node-icon-wrapper" style={{ color: '#fff' }}>
+                        {Icon ? <Icon size={22} strokeWidth={1.5} /> : <Plus size={22} strokeWidth={1.5} />}
+                      </div>
                     </div>
-                    <div className="sb-node-content">
-                      <p className="sb-node-category">{node.detail || 'Step'}</p>
-                      <h4 className="sb-node-title">{node.label}</h4>
-                    </div>
-                    {node.configured && (
-                      <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
-                        <Plus size={16} />
-                      </button>
-                    )}
                   </div>
+
+                  {/* Typography below sphere */}
+                  <div className="sb-node-content">
+                    <p className="sb-node-category">{node.detail || 'Step'}</p>
+                    <h4 className="sb-node-title">{node.label}</h4>
+                  </div>
+
+                  {/* Connecting line */}
+                  <div className="sb-node-line" />
+
+                  {/* Add child button */}
+                  {node.configured && (
+                    <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
+                      <Plus size={16} />
+                    </button>
+                  )}
                 </div>
               );
             })}

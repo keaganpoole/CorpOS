@@ -1,441 +1,114 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Star, 
-  BrainCircuit, 
-  Volume2, 
-  Loader2,
-  X
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Workflow } from 'lucide-react';
 
-// API Configuration
-const apiKey = ""; // Provided at runtime
-const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
-const TTS_MODEL = "gemini-2.5-flash-preview-tts";
-
-const RECEPTIONISTS = [
-  {
-    id: 'bonnie',
-    name: 'Bonnie',
-    role: 'Executive Concierge',
-    stereotype: 'The Professional',
-    age: '30',
-    traits: ['Precise', 'Elite', 'Reliable'],
-    callType: 'inbound',
-    voiceName: 'Leda',
-    color: '#818cf8',
-    image: "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/bonnie_transparent2.png"
-  },
-  {
-    id: 'maggie',
-    name: 'Maggie',
-    role: 'Technical Support',
-    stereotype: 'The Sweetheart',
-    age: '28',
-    traits: ['Kind', 'Approachable', 'Sincere'],
-    callType: 'inbound',
-    voiceName: 'Kore',
-    color: '#2dd4bf',
-    image: "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie_transparent.png"
-  },
-  {
-    id: 'brian',
-    name: 'Brian',
-    role: 'Enterprise Relations',
-    stereotype: 'The Stabilizer',
-    age: '32',
-    traits: ['Calm', 'Grounded', 'Reassuring'],
-    callType: null,
-    voiceName: 'Fenrir',
-    color: '#60a5fa',
-    image: "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/brian_transparent4.png"
-  },
-  {
-    id: 'kayla',
-    name: 'Kayla',
-    role: 'Creative Logistics',
-    stereotype: 'The Strategist',
-    age: '29',
-    traits: ['Creative', 'Sharp', 'Vibrant'],
-    callType: 'outbound',
-    voiceName: 'Aoede',
-    color: '#a78bfa',
-    image: "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/kayla_transparent.png"
-  },
-  {
-    id: 'nikki',
-    name: 'Nikki',
-    role: 'Premium Sales',
-    stereotype: 'The Executor',
-    age: '42',
-    traits: ['Direct', 'Confident', 'Authoritative'],
-    callType: null,
-    voiceName: 'Callirrhoe',
-    color: '#f472b6',
-    image: "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/nikki_transparent4.png"
-  },
-  {
-    id: 'kyle',
-    name: 'Kyle',
-    role: 'Strategic Support',
-    stereotype: 'The Bro',
-    age: '23',
-    traits: ['Fun', 'Energetic', 'Free-spirit'],
-    callType: null,
-    voiceName: 'Puck',
-    color: '#fbbf24',
-    image: "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/kyle_transparent.png"
-  }
-];
-
-const App = () => {
-  const [index, setIndex] = useState(0);
-  const [direction, setDirection] = useState(0);
-  const [analysis, setAnalysis] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const autoPlayRef = useRef(null);
-
-  const active = RECEPTIONISTS[index];
-
-  const nextSlide = useCallback(() => {
-    setDirection(1);
-    setIndex((prev) => (prev + 1) % RECEPTIONISTS.length);
-    setAnalysis(null);
-  }, []);
-
-  const prevSlide = useCallback(() => {
-    setDirection(-1);
-    setIndex((prev) => (prev - 1 + RECEPTIONISTS.length) % RECEPTIONISTS.length);
-    setAnalysis(null);
-  }, []);
-
-  useEffect(() => {
-    autoPlayRef.current = setInterval(() => {
-      nextSlide();
-    }, 8000);
-    return () => {
-      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
-    };
-  }, [nextSlide]);
-
-  useEffect(() => {
-    if (isAnalyzing || isSpeaking || analysis) {
-      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
-    } else {
-      autoPlayRef.current = setInterval(() => {
-        nextSlide();
-      }, 8000);
-    }
-    return () => {
-      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
-    };
-  }, [isAnalyzing, isSpeaking, analysis, nextSlide]);
-
-  const generateAnalysis = async () => {
-    setIsAnalyzing(true);
-    setErrorMessage("");
-    const prompt = `Analyze this AI Receptionist: Name: ${active.name}, Role: ${active.role}, Stereotype: ${active.stereotype}, Traits: ${active.traits.join(', ')}. Provide a brief 2-sentence "Psychographic Analysis" on how they handle difficult customers. Format as JSON: { "analysis": "text" }`;
-
-    const fetchWithRetry = async (retries = 0) => {
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-          })
-        });
-        const data = await response.json();
-        const result = JSON.parse(data.candidates[0].content.parts[0].text);
-        setAnalysis(result.analysis);
-      } catch (error) {
-        if (retries < 5) {
-          const delay = Math.pow(2, retries) * 1000;
-          await new Promise(res => setTimeout(res, delay));
-          return fetchWithRetry(retries + 1);
-        }
-        setErrorMessage("Analysis matrix failed to load.");
-      } finally {
-        setIsAnalyzing(false);
-      }
-    };
-    fetchWithRetry();
-  };
-
-  const speakGreeting = async () => {
-    if (isSpeaking) return;
-    setIsSpeaking(true);
-    const text = `Hello, I'm ${active.name}, your ${active.role}. How can I assist your business today?`;
-    
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        body: JSON.stringify({
-          contents: [{ parts: [{ text }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: active.voiceName } }
-            }
-          }
-        })
-      });
-      const data = await response.json();
-      const pcmData = data.candidates[0].content.parts[0].inlineData.data;
-      const audioBlob = pcmToWav(pcmData, 24000);
-      const url = URL.createObjectURL(audioBlob);
-      const audio = new Audio(url);
-      audio.onended = () => setIsSpeaking(false);
-      audio.play();
-    } catch (error) {
-      setErrorMessage("Voice synthesis unavailable.");
-      setIsSpeaking(false);
-    }
-  };
-
-  const pcmToWav = (base64Pcm, sampleRate) => {
-    const buffer = Uint8Array.from(atob(base64Pcm), c => c.charCodeAt(0)).buffer;
-    const length = buffer.byteLength;
-    const wavHeader = new ArrayBuffer(44);
-    const view = new DataView(wavHeader);
-    view.setUint32(0, 0x52494646, false); 
-    view.setUint32(4, 36 + length, true);
-    view.setUint32(8, 0x57415645, false);
-    view.setUint32(12, 0x666d7420, false);
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    view.setUint32(36, 0x64617461, false);
-    view.setUint32(40, length, true);
-    return new Blob([wavHeader, buffer], { type: 'audio/wav' });
-  };
+const Node = ({ icon: Icon, gradient, shadowColor, title, description, delay }) => {
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden font-sans selection:bg-white/20 text-white bg-black">
-      {/* Background Ambience */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={active.id + '-ambient'}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.15 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 1.5 }}
-          className="absolute inset-0 pointer-events-none"
-          style={{ 
-            background: `radial-gradient(circle at 75% 50%, ${active.color} 0%, rgba(0, 0, 0, 0) 70%)` 
-          }}
-        />
-      </AnimatePresence>
-
-      <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
-
-      <div className="relative h-full max-w-7xl mx-auto px-12 lg:px-20 flex items-center">
-        <div className="relative z-30 w-full lg:w-1/2 flex flex-col items-start text-left">
-          <AnimatePresence mode="wait" custom={direction}>
-            <motion.div
-              key={active.id + '-content'}
-              custom={direction}
-              initial={{ opacity: 0, x: -30, filter: 'blur(10px)' }}
-              animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: 20, filter: 'blur(10px)' }}
-              transition={{ duration: 0.8, ease: [0.19, 1, 0.22, 1] }}
-              className="w-full flex flex-col items-start"
-            >
-              {/* Position / Meta Information */}
-              <div className="flex items-center gap-6 mb-12">
-                <div className="flex flex-col items-start">
-                  <p className="text-[10px] tracking-[0.3em] font-black uppercase text-white/40 mb-1">Position</p>
-                  <p className="text-sm font-medium tracking-wide text-white">{active.role}</p>
-                </div>
-                <div className="w-[1px] h-8 bg-white/10" />
-                <div className="flex flex-col items-start">
-                  <p className="text-[10px] tracking-[0.3em] font-black uppercase text-white/40 mb-1">Vibe</p>
-                  <p className="text-sm font-medium tracking-wide text-white">{active.stereotype}</p>
-                </div>
-              </div>
-
-              {/* Name Header */}
-              <h1 className="text-8xl lg:text-[11rem] font-normal tracking-tighter leading-[0.8] miami-gradient-text animate-miami-flow text-left -ml-2">
-                {active.name}
-              </h1>
-
-              {/* Traits List */}
-              <div className="flex items-center gap-4 text-[10px] font-black tracking-[0.2em] uppercase text-white/50 mt-6 mb-12">
-                {active.traits.map((trait, i) => (
-                  <React.Fragment key={i}>
-                    <span>{trait}</span>
-                    {i < active.traits.length - 1 && <span className="opacity-40">•</span>}
-                  </React.Fragment>
-                ))}
-              </div>
-
-              {/* Interface Actions */}
-              <div className="flex flex-col gap-4 w-full max-w-sm">
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={generateAnalysis}
-                    disabled={isAnalyzing}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/[0.05] border border-white/10 rounded-lg hover:bg-white/[0.1] transition-all text-[10px] font-bold tracking-widest uppercase disabled:opacity-50"
-                  >
-                    {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <BrainCircuit size={14} />}
-                    Analysis
-                  </button>
-
-                  <button 
-                    onClick={speakGreeting}
-                    disabled={isSpeaking}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/[0.05] border border-white/10 rounded-lg hover:bg-white/[0.1] transition-all text-[10px] font-bold tracking-widest uppercase disabled:opacity-50"
-                  >
-                    {isSpeaking ? <div className="flex gap-1 items-center h-3"><div className="w-0.5 h-full bg-white animate-pulse" /><div className="w-0.5 h-2 bg-white animate-pulse" /></div> : <Volume2 size={14} />}
-                    Preview
-                  </button>
-                </div>
-
-                <AnimatePresence>
-                  {analysis && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="p-4 bg-white/[0.03] border border-white/5 rounded-lg relative text-left">
-                        <button onClick={() => setAnalysis(null)} className="absolute top-3 right-3 opacity-30 hover:opacity-100 transition-opacity">
-                          <X size={14} />
-                        </button>
-                        <p className="text-[9px] text-white/40 font-black tracking-widest uppercase mb-2">Psychographic Report</p>
-                        <p className="text-xs text-white/80 leading-relaxed">
-                          {analysis}
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {errorMessage && (
-                  <p className="text-[9px] text-rose-500 uppercase font-bold tracking-widest text-left">{errorMessage}</p>
-                )}
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Character Visuals */}
-        <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[60%] flex items-end justify-center pointer-events-none">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={active.id + '-visual'}
-              initial={{ opacity: 0, scale: 0.95, x: 50 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 1.05, filter: 'blur(40px)' }}
-              transition={{ duration: 1.2, ease: [0.19, 1, 0.22, 1] }}
-              className="relative w-full h-[95%] flex items-end justify-center"
-            >
-              <img 
-                src={active.image} 
-                alt={active.name}
-                className="h-full w-auto object-contain object-bottom select-none z-10"
-              />
-              <div 
-                className="absolute bottom-[10%] -z-10 blur-[150px] opacity-20 rounded-full w-[60%] aspect-square"
-                style={{ backgroundColor: active.color }}
-              />
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* Navigation Layer */}
-      <div className="absolute bottom-12 inset-x-12 lg:inset-x-20 flex items-end justify-between z-50">
-        <div className="flex items-center gap-2 mb-2">
-          {RECEPTIONISTS.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                setDirection(i > index ? 1 : -1);
-                setIndex(i);
-                setAnalysis(null);
-              }}
-              className={`h-0.5 rounded-full transition-all duration-500 relative overflow-hidden ${
-                i === index ? 'w-16 bg-white/20' : 'w-3 bg-white/10 hover:bg-white/30'
-              }`}
-            >
-              {i === index && (
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 8, ease: "linear" }}
-                  className="absolute inset-0 bg-white"
-                />
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-4">
-          <button 
-            onClick={prevSlide}
-            className="w-12 h-12 flex items-center justify-center border border-white/10 rounded-full hover:bg-white/10 transition-colors"
-          >
-            <ChevronLeft size={20} strokeWidth={1.5} />
-          </button>
-          <button 
-            onClick={nextSlide}
-            className="w-12 h-12 flex items-center justify-center border border-white/10 rounded-full hover:bg-white/10 transition-colors"
-          >
-            <ChevronRight size={20} strokeWidth={1.5} />
-          </button>
-        </div>
-      </div>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;700;900&display=swap');
+    <div 
+      className="flex flex-col items-center group transition-all duration-700 ease-out"
+      style={{ 
+        animation: `fadeInUp 0.8s ease-out ${delay}s both`,
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* The Main Node Body */}
+      <div className="relative w-32 h-32 md:w-44 md:h-44 flex items-center justify-center cursor-pointer">
         
-        :root {
-          font-family: 'Inter', sans-serif;
-        }
+        {/* Outer Ring / Aura - Significantly tightened and reduced */}
+        <div 
+          className={`absolute inset-0 rounded-full transition-all duration-1000 blur-xl opacity-5 group-hover:opacity-10 group-hover:scale-95 ${gradient}`}
+        />
 
-        body {
-          margin: 0;
-          background: black;
-        }
+        {/* The Outer Boundary Stroke - Concentric design */}
+        <div className="absolute inset-0 rounded-full border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-inner" />
 
-        .miami-gradient-text {
-          background: linear-gradient(
-            to right, 
-            #00f5ff, /* Teal */
-            #ff1493, /* Pink */
-            #9400d3, /* Purple */
-            #00f5ff  /* Back to Teal for loop */
-          );
-          background-size: 200% auto;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
+        {/* The Primary Gradient Sphere */}
+        <div 
+          className={`absolute inset-3 rounded-full shadow-2xl transition-all duration-500 overflow-hidden ${gradient} ${isHovered ? 'scale-105' : 'scale-100'}`}
+          style={{
+            boxShadow: isHovered 
+              ? `0 10px 25px -8px ${shadowColor}55, inset 0 4px 20px rgba(255,255,255,0.2)` 
+              : `0 8px 20px -5px ${shadowColor}44, inset 0 2px 12px rgba(255,255,255,0.15)`
+          }}
+        >
+          {/* Internal Specular Highlight (The "Glass" Look) */}
+          <div className="absolute top-[-30%] left-[-20%] w-[140%] h-[140%] bg-gradient-to-br from-white/40 via-transparent to-transparent pointer-events-none" />
+          
+          {/* Subtle Internal Pattern */}
+          <div className="absolute inset-0 opacity-20 mix-blend-overlay">
+            <svg width="100%" height="100%">
+              <pattern id="grid" width="12" height="12" patternUnits="userSpaceOnUse">
+                <circle cx="1" cy="1" r="0.6" fill="white" />
+              </pattern>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
+          </div>
 
-        @keyframes miami-flow {
-          0% { background-position: 0% center; }
-          100% { background-position: 200% center; }
-        }
+          {/* Deep Core Shadow for dimension */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,rgba(0,0,0,0.4)_100%)]" />
+        </div>
 
-        .animate-miami-flow {
-          animation: miami-flow 8s linear infinite;
-        }
+        {/* Icon Container with Glassmorphism */}
+        <div className="relative z-10 flex items-center justify-center w-16 h-16 md:w-24 md:h-24 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 shadow-2xl group-hover:rotate-[360deg] transition-transform duration-1000 ease-in-out">
+          <Icon 
+            size={40} 
+            className="text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]" 
+            strokeWidth={1.5}
+          />
+        </div>
+      </div>
 
-        ::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
+      {/* Typography Section */}
+      <div className="mt-8 text-center max-w-[220px]">
+        <h3 className="text-xl md:text-2xl font-bold tracking-tight text-white transition-colors duration-300">
+          {title}
+        </h3>
+        <p className="mt-2 text-sm font-medium text-slate-400 leading-relaxed opacity-80 group-hover:opacity-100 transition-opacity">
+          {description}
+        </p>
+      </div>
+
+      {/* Connecting Line Indicator */}
+      <div className="mt-6 w-px h-16 bg-gradient-to-b from-white/20 to-transparent opacity-30 group-hover:h-20 transition-all duration-500" />
     </div>
   );
 };
 
-export default App;
+export default function App() {
+  const processHubNode = {
+    title: "Process Hub",
+    description: "Centralize your operational workflow management.",
+    icon: Workflow,
+    gradient: "bg-gradient-to-tr from-rose-600 via-red-500 to-orange-500",
+    shadowColor: "#e11d48",
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center overflow-hidden">
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(40px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        body {
+          background-color: #0a0a0c;
+        }
+      `}</style>
+      
+      <div className="max-w-7xl mx-auto">
+        <Node 
+          {...processHubNode} 
+          delay={0}
+        />
+      </div>
+    </div>
+  );
+}

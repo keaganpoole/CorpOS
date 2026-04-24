@@ -1347,6 +1347,7 @@ export default function ScenariosPage() {
               const Icon = node.icon || null;
               const isActive = selectedNodeId === node.id;
               const isInitialNode = node.id === INITIAL_NODE.id && initialPulse;
+              const accent = node.accent || '#e11d48';
               return (
                 <div
                   key={node.id}
@@ -1361,28 +1362,59 @@ export default function ScenariosPage() {
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                 >
                   {isInitialNode && <div className="sb-aether-track" />}
-                  
-                  <div className="sb-node-glow" style={{ background: node.accent }} />
-                  <div
-                    className="sb-node-core"
-                    style={{ '--node-accent': node.accent || 'var(--sb-accent-primary)' }}
-                  >
-                    <div className="sb-node-icon-wrapper" style={{ color: node.accent }}>
-                      {Icon ? <Icon size={22} /> : <Plus size={22} />}
+
+                  <div className="sb-node-inner-wrap">
+                    {/* Outer Ring / Aura — exact from concepts.txt */}
+                    <div className={`sb-node-aura ${accent ? 'sb-node-custom-gradient' : ''}`}
+                      style={accent ? { '--node-accent-color': accent } : {}}
+                    />
+
+                    {/* Outer Boundary Stroke — Concentric design */}
+                    <div className="sb-node-ring" />
+
+                    {/* The Primary Gradient Sphere */}
+                    <div
+                      className={`sb-node-sphere ${isActive ? 'sb-sphere-active' : ''}`}
+                      style={{ '--node-accent-color': accent }}
+                    >
+                      <div className="sb-node-specular" />
+                      <div className="sb-node-dots">
+                        <svg width="100%" height="100%">
+                          <pattern id={`grid-${node.id}`} width="12" height="12" patternUnits="userSpaceOnUse">
+                            <circle cx="1" cy="1" r="0.6" fill="white" />
+                          </pattern>
+                          <rect width="100%" height="100%" fill={`url(#grid-${node.id})`} />
+                        </svg>
+                      </div>
+                      <div className="sb-node-core-shadow" />
                     </div>
-                    <div className="sb-node-content">
-                      <h4 className="sb-node-title">{node.label}</h4>
+
+                    {/* Icon Container with Glassmorphism */}
+                    <div className="sb-node-icon-glass">
+                      {Icon ? <Icon size={36} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={36} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
                     </div>
+
+                    {/* Pulse Effect for Activity */}
+                    {node.configured && (
+                      <div className="sb-node-pulse-dot" />
+                    )}
+
+                    {/* Add button */}
                     {node.configured && (
                       <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
                         <Plus size={16} />
                       </button>
                     )}
                   </div>
+
+                  {/* Label below — typography from concepts.txt */}
                   <div className="sb-node-label-below">
-                    <p className="sb-node-below-title">{node.label}</p>
+                    <h3 className="sb-node-below-title">{node.label}</h3>
                     {node.detail && <p className="sb-node-below-desc">{node.detail}</p>}
                   </div>
+
+                  {/* Connecting Line Indicator */}
+                  <div className="sb-node-connector-line" />
                 </div>
               );
             })}
