@@ -24,10 +24,14 @@ import {
   Eye,
   EyeOff,
   Pencil,
+  GitBranch,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
+import VariablesPane, { getVariableRef, parseVariables, renderVarChipsHTML } from './VariablesPane';
 import { supabase } from '../../lib/supabase';
+import { LEAD_FIELDS } from '../../lib/leadSchema';
+import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
 
 const OPTION_ICONS = {
   phone_calls: Phone,
@@ -43,6 +47,7 @@ const OPTION_ICONS = {
   router: Share2,
   intent_router: RefreshCw,
   end_call: X,
+  time_schedule: Clock,
 };
 
 const AUTOMATION_HIERARCHY = {
@@ -116,6 +121,19 @@ const AUTOMATION_HIERARCHY = {
         { key: 'invoice_sent', name: 'Invoice Sent', description: 'When an invoice is sent to customer' },
       ],
     },
+    {
+      key: 'time_schedule',
+      option: 'Time & Schedule',
+      description: 'When a scheduled time is reached',
+      accent: '#32f0d9',
+      icon: OPTION_ICONS.time_schedule,
+      sub_options: [
+        { key: 'specific_time', name: 'Specific Time', description: 'Run once at a specific date and time' },
+        { key: 'recurring_daily', name: 'Recurring Daily', description: 'Run every day at a set time' },
+        { key: 'recurring_weekly', name: 'Recurring Weekly', description: 'Run weekly on selected days' },
+        { key: 'appointment_reminder', name: 'Appointment Reminder', description: 'Run before an upcoming appointment' },
+      ],
+    },
   ],
   ACTIONS: [
     {
@@ -125,8 +143,14 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
-        { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer' },
-        { key: 'call_phone_number', name: 'Call Phone Number', description: 'Call a specific number' },
+        { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
+          { key: 'greeting', label: 'Greeting Message', type: 'textarea', placeholder: 'e.g. Hello {customer_name}, this is...' },
+          { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text', placeholder: 'Phone number to transfer after greeting' },
+        ]},
+        { key: 'call_phone_number', name: 'Call Phone Number', description: 'Call a specific number', configFields: [
+          { key: 'phone_number', label: 'Phone Number', type: 'text', placeholder: 'e.g. +15551234567' },
+          { key: 'greeting', label: 'Greeting Message', type: 'textarea', placeholder: 'Optional greeting message' },
+        ]},
       ],
     },
     {
@@ -136,8 +160,13 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.text_messaging,
       sub_options: [
-        { key: 'send_to_phone_number', name: 'Send To Phone Number', description: 'Send SMS to any number' },
-        { key: 'send_to_customer', name: 'Send To Customer', description: 'Send SMS to an existing customer' },
+        { key: 'send_to_phone_number', name: 'Send To Phone Number', description: 'Send SMS to any number', configFields: [
+          { key: 'recipient', label: 'Recipient Number', type: 'text', placeholder: 'e.g. +15551234567' },
+          { key: 'message', label: 'Message Template', type: 'textarea', placeholder: 'e.g. Hi {customer_name}, your appointment is {appointment_date}' },
+        ]},
+        { key: 'send_to_customer', name: 'Send To Customer', description: 'Send SMS to an existing customer', configFields: [
+          { key: 'message', label: 'Message Template', type: 'textarea', placeholder: 'e.g. Hi {customer_name}, your appointment is confirmed for {appointment_date}' },
+        ]},
       ],
     },
     {
@@ -147,9 +176,16 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.call_routing,
       sub_options: [
-        { key: 'transfer_to_phone_number', name: 'Transfer To Phone Number', description: 'Forward call to a specific number' },
-        { key: 'transfer_to_department', name: 'Transfer To Department', description: 'Route call to a department' },
-        { key: 'transfer_to_staff_member', name: 'Transfer To Staff Member', description: 'Send call to a staff member' },
+        { key: 'transfer_to_phone_number', name: 'Transfer To Phone Number', description: 'Forward call to a specific number', configFields: [
+          { key: 'phone_number', label: 'Phone Number', type: 'text', placeholder: 'e.g. +15551234567' },
+          { key: 'announce', label: 'Announce Before Transfer', type: 'textarea', placeholder: 'Optional message before transfer' },
+        ]},
+        { key: 'transfer_to_department', name: 'Transfer To Department', description: 'Route call to a department', configFields: [
+          { key: 'department', label: 'Department', type: 'select', options: ['Front Desk', 'Billing', 'Support', 'Sales', 'Urgent'] },
+        ]},
+        { key: 'transfer_to_staff_member', name: 'Transfer To Staff Member', description: 'Send call to a staff member', configFields: [
+          { key: 'staff_member', label: 'Staff Member', type: 'text', placeholder: 'Name or extension' },
+        ]},
         { key: 'hang_up', name: 'Hang Up', description: 'End the current call' },
       ],
     },
@@ -160,10 +196,26 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.records,
       sub_options: [
-        { key: 'search_records', name: 'Search Records', description: 'Find customer records' },
-        { key: 'create_new_record', name: 'Create New Record', description: 'Create a new customer record' },
-        { key: 'update_record', name: 'Update Record', description: 'Modify an existing customer record' },
-        { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a customer record' },
+        { key: 'search_records', name: 'Search Records', description: 'Find customer records', configFields: [
+          { key: 'search_field', label: 'Search By', type: 'select', options: ['Phone', 'Email', 'Name', 'Record ID'] },
+          { key: 'search_value', label: 'Search Value', type: 'text', placeholder: 'e.g. {caller_number}' },
+        ]},
+        { key: 'create_new_record', name: 'Create New Record', description: 'Create a new customer record', configFields: [
+          { key: 'first_name', label: 'First Name', type: 'text', placeholder: 'e.g. {caller_name}' },
+          { key: 'last_name', label: 'Last Name', type: 'text', placeholder: 'Last name' },
+          { key: 'phone', label: 'Phone', type: 'text', placeholder: 'e.g. {caller_number}' },
+          { key: 'email', label: 'Email', type: 'text', placeholder: 'Email address' },
+          { key: 'source', label: 'Source', type: 'select', options: ['Phone', 'Text', 'Email', 'Website', 'Referral', 'Walk-In', 'Manual'] },
+        ]},
+        { key: 'update_record', name: 'Update Record', description: 'Modify an existing customer record', configFields: [
+          { key: 'record_lookup', label: 'Find Record By', type: 'select', options: ['Phone', 'Email', 'Name', 'Record ID'] },
+          { key: 'record_lookup_value', label: 'Lookup Value', type: 'text', placeholder: 'e.g. {caller_number}' },
+          { key: 'field_to_update', label: 'Field to Update', type: 'select', options: ['status', 'notes', 'tags', 'assigned_staff', 'email', 'phone', 'source'] },
+          { key: 'new_value', label: 'New Value', type: 'text', placeholder: 'New value for the field' },
+        ]},
+        { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a customer record', configFields: [
+          { key: 'record_id', label: 'Record ID', type: 'text', placeholder: 'Record ID to delete' },
+        ]},
       ],
     },
     {
@@ -173,10 +225,17 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.appointments,
       sub_options: [
-        { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment' },
-        { key: 'search_appointments', name: 'Search Appointments', description: 'Find existing appointments' },
-        { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment' },
-        { key: 'delete_appointment', name: 'Delete Appointment', description: 'Cancel and remove an appointment' },
+        { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment', configFields: [] },
+        { key: 'search_appointments', name: 'Search Appointments', description: 'Find existing appointments', configFields: [] },
+        { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment', configFields: [
+          { key: 'lookup_field', label: 'Find Appointment By', type: 'select', options: ['Customer Name', 'Date', 'Appointment ID'] },
+          { key: 'lookup_value', label: 'Lookup Value', type: 'text', placeholder: 'e.g. {customer_name}' },
+          { key: 'field_to_update', label: 'Field to Update', type: 'select', options: ['date', 'time', 'status', 'notes', 'duration'] },
+          { key: 'new_value', label: 'New Value', type: 'text', placeholder: 'New value' },
+        ]},
+        { key: 'delete_appointment', name: 'Delete Appointment', description: 'Cancel and remove an appointment', configFields: [
+          { key: 'appointment_id', label: 'Appointment ID', type: 'text', placeholder: 'Appointment ID to cancel' },
+        ]},
       ],
     },
     {
@@ -185,7 +244,11 @@ const AUTOMATION_HIERARCHY = {
       description: 'Manage email',
       accent: '#38bdf8',
       icon: OPTION_ICONS.email,
-      sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email' }],
+      sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email', configFields: [
+        { key: 'to', label: 'To', type: 'text', placeholder: 'e.g. {customer_email}' },
+        { key: 'subject', label: 'Subject', type: 'text', placeholder: 'e.g. Appointment Confirmation' },
+        { key: 'body', label: 'Body', type: 'textarea', placeholder: 'Email body with {variables}' },
+      ]}],
     },
     {
       key: 'tags',
@@ -194,10 +257,19 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.tags,
       sub_options: [
-        { key: 'add_tag', name: 'Add Tag', description: 'Attach tag to record' },
-        { key: 'search_tags', name: 'Search Tags', description: 'Find existing tags' },
-        { key: 'update_tag', name: 'Update Tag', description: 'Update an existing tag' },
-        { key: 'delete_tag', name: 'Delete Tag', description: 'Remove a tag permanently' },
+        { key: 'add_tag', name: 'Add Tag', description: 'Attach tag to record', configFields: [
+          { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'e.g. VIP, Urgent, Callback' },
+        ]},
+        { key: 'search_tags', name: 'Search Tags', description: 'Find existing tags', configFields: [
+          { key: 'search_value', label: 'Search', type: 'text', placeholder: 'Tag to search for' },
+        ]},
+        { key: 'update_tag', name: 'Update Tag', description: 'Update an existing tag', configFields: [
+          { key: 'old_tag', label: 'Current Tag Name', type: 'text', placeholder: 'Tag to rename' },
+          { key: 'new_tag', label: 'New Tag Name', type: 'text', placeholder: 'New name' },
+        ]},
+        { key: 'delete_tag', name: 'Delete Tag', description: 'Remove a tag permanently', configFields: [
+          { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'Tag to remove' },
+        ]},
       ],
     },
   ],
@@ -247,7 +319,15 @@ export default function ScenariosPage() {
   const [initialFocusSet, setInitialFocusSet] = useState(false);
   const [initialNodeShifted, setInitialNodeShifted] = useState(false);
   const [logicPanel, setLogicPanel] = useState(null);
+  const [logicContextType, setLogicContextType] = useState('default');
+  const [logicAvailableVars, setLogicAvailableVars] = useState([]);
+  const [logicFallbackAction, setLogicFallbackAction] = useState('');
+  const [logicIsFallback, setLogicIsFallback] = useState(false);
   const [appointmentConfig, setAppointmentConfig] = useState({});
+  const [scheduleConfig, setScheduleConfig] = useState({});
+  const [varsPane, setVarsPane] = useState({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
+  const [hoveredTableColor, setHoveredTableColor] = useState('');
+  const [actionConfig, setActionConfig] = useState(null);
   const [edgeRules, setEdgeRules] = useState([
     { id: 1, variable: 'status', operator: 'equals', value: '' },
   ]);
@@ -371,7 +451,19 @@ export default function ScenariosPage() {
     : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
-  const showNodeConfigText = panelStage !== 'subOptions';
+  const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage);
+
+  // Handle variable insertion from VariablesPane
+  const handleInsertVariable = (varRef, fieldLabel, color) => {
+    if (!varsPane.fieldKey) return;
+    // Find the next available slot in the config fields
+    setActionConfig(prev => {
+      const current = prev[varsPane.fieldKey] || '';
+      const newVal = current ? `${current} ${varRef}` : varRef;
+      return { ...prev, [varsPane.fieldKey]: newVal };
+    });
+    // Keep the pane open so they can add more variables
+  };
 
   const repositionPanel = useCallback(() => {
     if (!selectedNodeId) {
@@ -425,11 +517,21 @@ export default function ScenariosPage() {
       setSelectedNodeId(nodeId);
       setLogicPanel(null);
       
-      // If this node has an appointment config, show the config form
+      // If this node has a schedule config, show the schedule config form
       const node = nodeMap[nodeId];
-      if (node?.appointmentConfig) {
+      if (node?.scheduleConfig) {
+        setScheduleConfig({ ...node.scheduleConfig });
+        setPanelStage('scheduleConfig');
+      }
+      // If this node has an appointment config, show the config form
+      else if (node?.appointmentConfig) {
         setAppointmentConfig({ ...node.appointmentConfig });
         setPanelStage('appointmentConfig');
+      }
+      // If this node has an action config, show the action config form
+      else if (node?.actionConfig?._fields?.length) {
+        setActionConfig({ ...node.actionConfig });
+        setPanelStage('actionConfig');
       }
     },
     [initialNodeShifted, nodeMap]
@@ -582,6 +684,15 @@ export default function ScenariosPage() {
     const currentEdgeRules = edgeRulesRef.current;
     setEdges((prevEdges) => {
       if (logicPanel && logicPanel.edgeId) {
+        // Handle fallback edge save
+        if (logicIsFallback) {
+          return prevEdges.map((edge) =>
+            edge.id === logicPanel.edgeId
+              ? { ...edge, filter: { type: 'fallback', fallbackAction: logicFallbackAction, label: 'Fallback' } }
+              : edge
+          );
+        }
+        
         // Check if rule has variable and operator, and value is required (not empty string for operators that need values)
         const hasValidRules = currentEdgeRules.some(rule => {
           if (!rule.variable || !rule.operator) return false;
@@ -600,7 +711,9 @@ export default function ScenariosPage() {
       return prevEdges;
     });
     setLogicPanel(null);
-  }, [logicPanel]);
+    setLogicIsFallback(false);
+    setLogicFallbackAction('');
+  }, [logicPanel, logicIsFallback, logicFallbackAction]);
 
   const closeLogicPanel = useCallback(() => {
     setLogicPanel(null);
@@ -653,28 +766,88 @@ export default function ScenariosPage() {
   const APPOINTMENT_CONFIG_ACTIONS = new Set([
     'create_appointment', 'search_appointments', 'update_appointment', 'delete_appointment',
   ]);
+  const TIME_CONFIG_ACTIONS = new Set([
+    'specific_time', 'recurring_daily', 'recurring_weekly', 'appointment_reminder',
+  ]);
 
   const handleSubOptionClick = (subOption) => {
     const subIcon = activeOption?.icon || categoryMeta.icon;
     const subAccent = activeOption?.accent || categoryMeta.accent;
+    const meta = CATEGORY_META[panelCategory] || CATEGORY_META.TRIGGERS;
+    const currentNodeId = selectedNodeId; // Capture before finalizeSelection clears it
+    
+    // Check if this action needs config BEFORE finalizing
+    const needsAppointmentConfig = APPOINTMENT_CONFIG_ACTIONS.has(subOption.key);
+    const needsActionConfig = subOption.configFields && subOption.configFields.length > 0;
+    
+    if (needsAppointmentConfig || needsActionConfig) {
+      // Configure the node but DON'T close the panel yet
+      const nodeType = 'action';
+      setNodes((prev) =>
+        prev.map((node) =>
+          node.id === currentNodeId
+            ? {
+                ...node,
+                configured: true,
+                label: subOption.name,
+                detail: subOption.description,
+                icon: subIcon,
+                type: nodeType,
+                category: meta.detail,
+                accent: subAccent,
+                categoryType: panelCategory,
+                subOptionKey: subOption.key,
+                categoryKey: activeOption?.key || '',
+              }
+            : node
+        )
+      );
+      
+      if (needsAppointmentConfig) {
+        setAppointmentConfig({
+          key: subOption.key,
+          client_name: '',
+          date: '',
+          time: '',
+          duration: 30,
+          status: 'pending',
+          assigned_receptionist: '',
+          notes: '',
+        });
+        setPanelStage('appointmentConfig');
+      } else if (TIME_CONFIG_ACTIONS.has(subOption.key)) {
+        setScheduleConfig({
+          key: subOption.key,
+          date: '',
+          time: '09:00',
+          // recurring fields
+          days_of_week: [],
+          // reminder fields
+          reminder_minutes: 30,
+          timezone: 'America/New_York',
+        });
+        setPanelStage('scheduleConfig');
+      } else {
+        const initialConfig = { _key: subOption.key, _fields: subOption.configFields };
+        subOption.configFields.forEach(f => { initialConfig[f.key] = ''; });
+        setActionConfig(initialConfig);
+        setPanelStage('actionConfig');
+      }
+      // Keep panel open — don't call finalizeSelection
+      return;
+    }
+    
+    // No config needed — finalize normally (closes panel)
     finalizeSelection(subOption.name, subOption.description, subIcon, panelCategory, subAccent);
     
-    // If this is an appointment action, show config form
-    if (APPOINTMENT_CONFIG_ACTIONS.has(subOption.key)) {
-      setAppointmentConfig({
-        key: subOption.key,
-        client_name: '',
-        date: '',
-        time: '',
-        duration: 30,
-        status: 'pending',
-        assigned_receptionist: '',
-        notes: '',
-      });
-      setPanelStage('appointmentConfig');
-      setIsPanelVisible(true);
-      setPanelIntent(true);
-    }
+    // Store subOptionKey and categoryKey on node
+    setNodes((prev) =>
+      prev.map((node) =>
+        node.id === currentNodeId
+          ? { ...node, subOptionKey: subOption.key, categoryKey: activeOption?.key || '' }
+          : node
+      )
+    );
   };
 
   const handleBackToOptions = () => {
@@ -694,6 +867,19 @@ export default function ScenariosPage() {
     const top = canvasRect.top + view.y + midY * view.scale;
     const left = canvasRect.left + view.x + midX * view.scale;
     
+    // Determine context type from source node
+    const ctxType = getContextType(from);
+    setLogicContextType(ctxType);
+    
+    // Build available variables from previous nodes
+    const vars = buildVariableMap(nodes, edges, edge.from);
+    setLogicAvailableVars(vars);
+    
+    // Check if this is a fallback edge
+    const isFallbackEdge = edge.filter?.type === 'fallback';
+    setLogicIsFallback(isFallbackEdge);
+    setLogicFallbackAction(edge.filter?.fallbackAction || '');
+    
     // Load existing filter rules into edgeRules state
     const newRules = edge.filter && edge.filter.rules 
       ? edge.filter.rules 
@@ -710,7 +896,9 @@ export default function ScenariosPage() {
     if (
       event.target.closest('.sb-selection-panel') ||
       event.target.closest('.aether-logic-wrapper') ||
-      event.target.closest('.sb-node-add')
+      event.target.closest('.sb-node-add') ||
+      event.target.closest('.sb-variables-pane') ||
+      event.target.closest('.sb-vars-field')
     )
       return;
     if (!event.target.closest('.sb-builder-node')) {
@@ -719,6 +907,7 @@ export default function ScenariosPage() {
       setPanelIntent(false);
     }
     setLogicPanel(null);
+    setVarsPane(prev => ({ ...prev, visible: false }));
   };
 
   const handleCreateScenario = () => {
@@ -844,6 +1033,10 @@ export default function ScenariosPage() {
         accent: n.accent,
         icon: n.icon?.name,
         appointmentConfig: n.appointmentConfig || null,
+        scheduleConfig: n.scheduleConfig || null,
+        actionConfig: n.actionConfig || null,
+        subOptionKey: n.subOptionKey || null,
+        categoryKey: n.categoryKey || null,
       })),
       edges_data: edges.map(e => ({
         id: e.id,
@@ -1104,6 +1297,7 @@ export default function ScenariosPage() {
                 const to = nodeMap[edge.to];
                 if (!from || !to) return null;
                 const isDraft = !nodeMap[edge.to]?.configured;
+                const isFallback = edge.filter?.type === 'fallback';
                 const dx = to.x - from.x;
                 const dy = to.y - from.y;
                 const path = `M ${from.x} ${from.y} C ${from.x + dx/2} ${from.y}, ${from.x + dx/2} ${to.y}, ${to.x} ${to.y}`;
@@ -1112,9 +1306,10 @@ export default function ScenariosPage() {
                   <path
                     key={edge.id}
                     d={path}
-                    className={`sb-edge-line ${isDraft ? 'sb-edge-draft' : ''}`}
+                    className={`sb-edge-line ${isDraft ? 'sb-edge-draft' : ''} ${isFallback ? 'sb-edge-fallback' : ''}`}
                     fill="none"
                     markerEnd={!isDraft ? "url(#sb-arrowhead)" : ""}
+                    style={isFallback ? { stroke: '#f59e0b', strokeDasharray: '8 4', strokeWidth: '2px' } : {}}
                   />
                 );
               })}
@@ -1126,15 +1321,18 @@ export default function ScenariosPage() {
               if (!from || !to) return null;
               const midX = (from.x + to.x) / 2;
               const midY = (from.y + to.y) / 2;
+              const isFallback = edge.filter?.type === 'fallback';
               return (
                 <div
                   key={`filter-${edge.id}`}
-                  className={`sb-filter-pin ${edge.filter ? 'has-filter' : ''}`}
+                  className={`sb-filter-pin ${edge.filter ? 'has-filter' : ''} ${isFallback ? 'sb-filter-fallback' : ''}`}
                   style={{ left: midX, top: midY }}
-                  onClick={(event) => handleEdgeLogicClick(edge, event)}
+                  onClick={(event) => { setVarsPane(prev => ({ ...prev, visible: false })); handleEdgeLogicClick(edge, event); }}
                 >
                   <div className="sb-filter-label">
-                    {edge.filter ? (
+                    {isFallback ? (
+                      <><GitBranch size={10} /> Fallback</>
+                    ) : edge.filter ? (
                       <Zap size={10} />
                     ) : (
                       'Condition'
@@ -1173,7 +1371,6 @@ export default function ScenariosPage() {
                       {Icon ? <Icon size={22} /> : <Plus size={22} />}
                     </div>
                     <div className="sb-node-content">
-                      <p className="sb-node-category">{node.detail || 'Step'}</p>
                       <h4 className="sb-node-title">{node.label}</h4>
                     </div>
                     {node.configured && (
@@ -1181,6 +1378,10 @@ export default function ScenariosPage() {
                         <Plus size={16} />
                       </button>
                     )}
+                  </div>
+                  <div className="sb-node-label-below">
+                    <p className="sb-node-below-title">{node.label}</p>
+                    {node.detail && <p className="sb-node-below-desc">{node.detail}</p>}
                   </div>
                 </div>
               );
@@ -1254,33 +1455,182 @@ export default function ScenariosPage() {
                   <p className="sb-panel-subheader">Select an action for {activeOption.option}</p>
                 </>
               )}
-              <div className="sb-panel-search">
-                <Search className="sb-panel-search-icon" size={16} />
-                <input
-                  type="text"
-                  value={panelSearch}
-                  onChange={(event) => setPanelSearch(event.target.value)}
-                  placeholder="Search options..."
-                />
-              </div>
-              <div className="sb-panel-tabs">
-                {visibleCategories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    className={`sb-panel-tab ${panelCategory === category ? 'active' : ''}`}
-                    onClick={() => {
-                      setPanelCategory(category);
-                      setPanelStage('options');
-                      setActiveOption(null);
-                    }}
-                  >
-                    {PANEL_CATEGORY_LABELS[category] || category}
-                  </button>
-                ))}
-              </div>
+              {!['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) && (
+                <>
+                  <div className="sb-panel-search">
+                    <Search className="sb-panel-search-icon" size={16} />
+                    <input
+                      type="text"
+                      value={panelSearch}
+                      onChange={(event) => setPanelSearch(event.target.value)}
+                      placeholder="Search options..."
+                    />
+                  </div>
+                  <div className="sb-panel-tabs">
+                    {visibleCategories.map((category) => (
+                      <button
+                        key={category}
+                        type="button"
+                        className={`sb-panel-tab ${panelCategory === category ? 'active' : ''}`}
+                        onClick={() => {
+                          setPanelCategory(category);
+                          setPanelStage('options');
+                          setActiveOption(null);
+                        }}
+                      >
+                        {PANEL_CATEGORY_LABELS[category] || category}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {/* Action banner — persists across all config stages */}
+              {['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) && selectedNode && (
+                <div
+                  className="sb-active-banner sleek-cyber"
+                  style={{ borderLeft: `4px solid ${selectedNode.accent || categoryMeta.accent}` }}
+                >
+                  <div className="sb-cyber-inner">
+                    <div className="sb-cyber-header">
+                      <div
+                        className="sb-cyber-pill"
+                        style={{ backgroundColor: `${selectedNode.accent || categoryMeta.accent}20`, color: selectedNode.accent || categoryMeta.accent }}
+                      >
+                        {selectedNode.category || categoryMeta.detail}
+                      </div>
+                      <button
+                        type="button"
+                        className="sb-cyber-back"
+                        onClick={() => { setPanelStage('options'); setActionConfig(null); setAppointmentConfig({}); setScheduleConfig({}); }}
+                      >
+                        <ChevronLeft size={14} /> Back
+                      </button>
+                    </div>
+                    <div className="sb-cyber-main">
+                      <div
+                        className="sb-cyber-icon-box"
+                        style={{
+                          background: `linear-gradient(135deg, ${selectedNode.accent || categoryMeta.accent}40, transparent)`,
+                        }}
+                      >
+                        {selectedNode.icon && typeof selectedNode.icon === 'function'
+                          ? <selectedNode.icon size={24} style={{ color: selectedNode.accent || categoryMeta.accent }} />
+                          : <Phone size={24} style={{ color: selectedNode.accent || categoryMeta.accent }} />}
+                      </div>
+                      <div className="sb-cyber-title-group">
+                        <h2 className="sb-cyber-title">{selectedNode.label}</h2>
+                        <p className="sb-cyber-desc">Configure {selectedNode.label}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="sb-panel-actions">
-                {panelStage === 'appointmentConfig' ? (
+                {panelStage === 'actionConfig' && actionConfig ? (
+                  /* Staged Action Config Form */
+                  <div className="sb-action-config-form">
+                    <div className="sb-action-config-header">
+                      <h4 className="sb-action-config-title">Configure Action</h4>
+                      <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); setActionConfig(null); }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="sb-action-config-fields">
+                      {actionConfig._fields.map((field) => {
+                        const rawVal = actionConfig[field.key] || '';
+
+                        return (
+                          <div key={field.key} className="sb-action-config-field">
+                            <label className="sb-action-field-label">{field.label}</label>
+                            {field.type === 'select' ? (
+                              <select
+                                className="sb-input-field sb-select-field"
+                                value={actionConfig[field.key] || ''}
+                                onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
+                              >
+                                <option value="">Select...</option>
+                                {(field.options || []).map(opt => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            ) : field.type === 'textarea' ? (
+                              <textarea
+                                className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
+                                value={rawVal}
+                                onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                placeholder={field.placeholder || ''}
+                                rows={3}
+                                style={{
+                                  resize: 'none',
+                                  ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
+                                    borderColor: hoveredTableColor,
+                                    boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                    '--hover-glow-color': `${hoveredTableColor}20`,
+                                    '--hover-glow-color-strong': `${hoveredTableColor}40`,
+                                  } : {}),
+                                }}
+                              />
+                            ) : (
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
+                                  type="text"
+                                  value={rawVal}
+                                  onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                  onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                  placeholder={field.placeholder || ''}
+                                  style={{
+                                    ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
+                                    ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
+                                      borderColor: hoveredTableColor,
+                                      boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                      '--hover-glow-color': `${hoveredTableColor}20`,
+                                      '--hover-glow-color-strong': `${hoveredTableColor}40`,
+                                    } : {}),
+                                  }}
+                                />
+                                {/* Variable chip overlay — renders chips with color while input stays transparent */}
+                                {rawVal.includes('{{') && (
+                                  <div
+                                    className="sb-var-chip-overlay"
+                                    style={{
+                                      position: 'absolute',
+                                      inset: 0,
+                                      pointerEvents: 'none',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      padding: '0 10px',
+                                      fontSize: 12,
+                                      color: '#e4e4e7',
+                                      overflow: 'hidden',
+                                      whiteSpace: 'nowrap',
+                                      fontFamily: 'Inter, sans-serif',
+                                    }}
+                                    dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <button type="button" className="sb-action-config-save" onClick={() => {
+                      // Save action config to the node
+                      if (selectedNodeId) {
+                        setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, actionConfig: { ...actionConfig } } : n));
+                      }
+                      setPanelStage('options');
+                      setActionConfig(null);
+                      setSelectedNodeId(null);
+                      setIsPanelVisible(false);
+                      setPanelIntent(false);
+                    }}>
+                      Save Config
+                    </button>
+                  </div>
+                ) : panelStage === 'appointmentConfig' ? (
                   <div style={{ padding: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                       <h4 style={{ fontSize: 12, fontWeight: 800, color: '#fff', margin: 0 }}>Configure Appointment</h4>
@@ -1382,6 +1732,122 @@ export default function ScenariosPage() {
                       Save Config
                     </button>
                   </div>
+                ) : panelStage === 'scheduleConfig' ? (
+                  <div style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                      <h4 style={{ fontSize: 12, fontWeight: 800, color: '#fff', margin: 0 }}>Schedule</h4>
+                      <button type="button" onClick={() => { setPanelStage('options'); setScheduleConfig({}); }}
+                        style={{ background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 10, color: '#71717a', marginBottom: 14, fontWeight: 600 }}>
+                      {scheduleConfig.key === 'specific_time' && 'Set a specific date and time to trigger this flow once.'}
+                      {scheduleConfig.key === 'recurring_daily' && 'This flow will run every day at the specified time.'}
+                      {scheduleConfig.key === 'recurring_weekly' && 'Select days of the week and a time to run this flow.'}
+                      {scheduleConfig.key === 'appointment_reminder' && 'Trigger this flow a set number of minutes before an appointment.'}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {/* Date picker for specific_time */}
+                      {scheduleConfig.key === 'specific_time' && (
+                        <div>
+                          <label style={sbLabelStyle}>Date</label>
+                          <input type="date" value={scheduleConfig.date || ''}
+                            onChange={e => setScheduleConfig({ ...scheduleConfig, date: e.target.value })}
+                            style={sbInputStyle} />
+                        </div>
+                      )}
+                      {/* Time picker for all except appointment_reminder */}
+                      {scheduleConfig.key !== 'appointment_reminder' && (
+                        <div>
+                          <label style={sbLabelStyle}>Time</label>
+                          <input type="time" value={scheduleConfig.time || '09:00'}
+                            onChange={e => setScheduleConfig({ ...scheduleConfig, time: e.target.value })}
+                            style={sbInputStyle} />
+                        </div>
+                      )}
+                      {/* Timezone */}
+                      {scheduleConfig.key !== 'appointment_reminder' && (
+                        <div>
+                          <label style={sbLabelStyle}>Timezone</label>
+                          <select value={scheduleConfig.timezone || 'America/New_York'}
+                            onChange={e => setScheduleConfig({ ...scheduleConfig, timezone: e.target.value })}
+                            style={sbInputStyle}>
+                            <option value="America/New_York">Eastern Time</option>
+                            <option value="America/Chicago">Central Time</option>
+                            <option value="America/Denver">Mountain Time</option>
+                            <option value="America/Los_Angeles">Pacific Time</option>
+                          </select>
+                        </div>
+                      )}
+                      {/* Days of week for recurring_weekly */}
+                      {scheduleConfig.key === 'recurring_weekly' && (
+                        <div>
+                          <label style={sbLabelStyle}>Days</label>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                              const isSelected = (scheduleConfig.days_of_week || []).includes(day);
+                              return (
+                                <button
+                                  key={day}
+                                  type="button"
+                                  onClick={() => {
+                                    const current = scheduleConfig.days_of_week || [];
+                                    const updated = isSelected
+                                      ? current.filter(d => d !== day)
+                                      : [...current, day];
+                                    setScheduleConfig({ ...scheduleConfig, days_of_week: updated });
+                                  }}
+                                  style={{
+                                    padding: '6px 10px',
+                                    borderRadius: 6,
+                                    border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
+                                    background: isSelected ? 'rgba(56,189,248,0.15)' : 'rgba(0,0,0,0.4)',
+                                    color: isSelected ? '#38bdf8' : '#71717a',
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                  }}
+                                >
+                                  {day}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {/* Minutes before for appointment_reminder */}
+                      {scheduleConfig.key === 'appointment_reminder' && (
+                        <div>
+                          <label style={sbLabelStyle}>Minutes Before Appointment</label>
+                          <select value={scheduleConfig.reminder_minutes || 30}
+                            onChange={e => setScheduleConfig({ ...scheduleConfig, reminder_minutes: Number(e.target.value) })}
+                            style={sbInputStyle}>
+                            <option value={15}>15 minutes</option>
+                            <option value={30}>30 minutes</option>
+                            <option value={60}>1 hour</option>
+                            <option value={120}>2 hours</option>
+                            <option value={1440}>1 day</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => {
+                      // Save schedule config to the selected node
+                      if (selectedNodeId) {
+                        setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, scheduleConfig: { ...scheduleConfig } } : n));
+                      }
+                      setPanelStage('options');
+                      setScheduleConfig({});
+                      setSelectedNodeId(null);
+                      setIsPanelVisible(false);
+                      setPanelIntent(false);
+                    }}
+                      style={{ width: '100%', marginTop: 14, padding: '8px 0', background: '#fff', color: '#000', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer' }}>
+                      Save Schedule
+                    </button>
+                  </div>
                 ) : panelStage === 'options' ? (
                   filteredOptions.length === 0 ? (
                     <div className="sb-panel-empty" style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>No components found</div>
@@ -1445,6 +1911,24 @@ export default function ScenariosPage() {
           </div>
         )}
 
+        {/* Variables pane — rendered outside selection panel (overflow: hidden clips it otherwise) */}
+        {['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) && (
+          <VariablesPane
+            visible={varsPane.visible}
+            targetFieldKey={varsPane.fieldKey}
+            fieldLabel={varsPane.fieldLabel}
+            onInsertVariable={handleInsertVariable}
+            onTableHover={(color) => setHoveredTableColor(color)}
+            onClose={() => { setVarsPane({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' }); setHoveredTableColor(''); }}
+            style={{
+              position: 'absolute',
+              top: panelStyle.top,
+              left: Math.max(10, (panelStyle.left || 0) - 228 - 8),
+              height: 760,
+            }}
+          />
+        )}
+
         {logicPanel && (
           <AetherEdgeLogic
             style={{ top: logicPanel.top, left: logicPanel.left }}
@@ -1454,6 +1938,12 @@ export default function ScenariosPage() {
             onUpdateRule={updateEdgeRule}
             onSave={saveLogicPanel}
             onClose={closeLogicPanel}
+            contextType={logicContextType}
+            availableVariables={logicAvailableVars}
+            fallbackAction={logicFallbackAction}
+            onFallbackChange={(val) => setLogicFallbackAction(val)}
+            isFallback={logicIsFallback}
+            onToggleFallback={(val) => setLogicIsFallback(val)}
           />
         )}
         

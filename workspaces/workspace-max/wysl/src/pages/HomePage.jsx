@@ -43,6 +43,7 @@ import expandedWifi from '@/assets/t1-expanded-wifi.png';
 import expandedX from '@/assets/t1-expanded-x.png';
 import TypingAnimation from '../components/TypingAnimation';
 import HeroConcept from '../components/HeroConcept';
+import CalendarShowcase from '../components/CalendarShowcase';
 import { trackVisitor } from '../services/apiService';
 
 const FadingImageCollage = ({ images }) => {
@@ -460,7 +461,7 @@ const HomePage = () => {
           <p data-animate="true">
             Every missed call is a lost customer. Sonar picks up instantly, greets callers professionally, and handles bookings, FAQs, and transfers — so you never leave money on the table again.
           </p>
-          <AnimatedImageGrid images={slimImages} />
+          <CalendarShowcase />
           <div className="mt-12 flex justify-center">
             <Link to="/pricing" className="text-base font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity py-3 px-8">
               Try for free

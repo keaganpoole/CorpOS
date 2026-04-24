@@ -13,7 +13,7 @@
 .sb-aether-track {
   position: absolute;
   inset: -2px;
-  border-radius: 18px;
+  border-radius: 50%;
   padding: 2px;
   background: conic-gradient(var(--sb-accent-primary), var(--sb-accent-secondary), var(--sb-accent-rose), var(--sb-accent-primary));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -677,80 +677,131 @@
 /* Nodes */
 .sb-builder-node {
   position: absolute;
-  width: 220px;
-  height: 80px;
+  width: 120px;
+  height: 120px;
   transform: translate(-50%, -50%);
   cursor: grab;
   z-index: 5;
-  transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1);
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0.2, 1), filter 0.25s ease;
+}
+
+.sb-builder-node:hover {
+  transform: translate(-50%, -50%) scale(1.04);
+  filter: brightness(1.08);
+  z-index: 6;
 }
 
 .sb-builder-node:active {
   cursor: grabbing;
+  transform: translate(-50%, -50%) scale(1.02);
 }
 
 .sb-node-core {
   width: 100%;
   height: 100%;
-  background: rgba(25, 25, 30, 0.85);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(30, 30, 36, 0.95), rgba(18, 18, 22, 0.98));
+  backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 0 16px;
-  gap: 14px;
+  justify-content: center;
+  padding: 0;
+  gap: 0;
   position: relative;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 12px 40px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   overflow: visible;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.sb-node-core::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.04) 0%, transparent 60%);
+  pointer-events: none;
 }
 
 .sb-is-placeholder .sb-node-core {
-  background: rgba(255, 255, 255, 0.03);
+  background: linear-gradient(145deg, rgba(25, 25, 30, 0.6), rgba(14, 14, 18, 0.8));
   border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .sb-active-node .sb-node-core {
   border-color: var(--sb-accent-primary);
-  box-shadow: 0 0 0 1px var(--sb-accent-primary), 0 10px 30px rgba(50, 240, 217, 0.15);
+  box-shadow:
+    0 0 0 2px var(--sb-accent-primary),
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 16px 48px rgba(50, 240, 217, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Accent ring on configured nodes */
+.sb-is-configured .sb-node-core::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid var(--node-accent, transparent);
+  opacity: 0.3;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.sb-is-configured:hover .sb-node-core::after {
+  opacity: 0.5;
 }
 
 .sb-node-icon-wrapper {
-  width: 44px;
-  height: 44px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .sb-node-content {
-  flex: 1;
-  overflow: hidden;
+  align-items: center;
+  text-align: center;
+  margin-top: 2px;
 }
 
 .sb-node-category {
-  font-size: 10px;
+  font-size: 7px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.2px;
   color: var(--sb-text-dim);
-  margin: 0 0 2px 0;
+  margin: 0;
+  opacity: 0.6;
 }
 
 .sb-node-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  margin: 1px 0 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .sb-node-add {
   position: absolute;
-  right: -14px;
+  right: -4px;
+  bottom: -4px;
+  top: auto;
   width: 28px;
   height: 28px;
   background: #252529;
@@ -770,6 +821,31 @@
   border-color: var(--sb-accent-primary);
   color: #000;
   transform: scale(1.1);
+}
+
+/* Node label below the circle */
+.sb-node-label-below {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.sb-node-below-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.sb-node-below-desc {
+  font-size: 9px;
+  color: #71717a;
+  margin: 2px 0 0;
 }
 
 /* Panel */
@@ -1232,13 +1308,13 @@
 .sb-input-field {
   width: 100%;
   background: rgba(12, 12, 14, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
   padding: 10px 14px;
   color: #fff;
   font-size: 13px;
   outline: none;
-  transition: border 0.2s, background 0.2s, box-shadow 0.2s;
+  transition: border-color 0.25s ease, background 0.2s, box-shadow 0.25s ease;
   color-scheme: dark;
 }
 
@@ -1412,4 +1488,524 @@
   border-color: rgba(50, 240, 217, 0.3);
   color: var(--sb-accent-primary);
   padding: 3px 6px;
+}
+
+/* ─── Fallback Edge Styles ───────────────────────────────────────────── */
+.sb-edge-fallback {
+  stroke: #f59e0b;
+  stroke-dasharray: 8 4;
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.3));
+}
+
+.sb-filter-fallback .sb-filter-dot {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.sb-filter-fallback .sb-filter-label {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
+/* ─── Aether Tab Bar (Match Rules / Fallback) ────────────────────────── */
+.aether-tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.aether-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.aether-tab.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.aether-tab:hover:not(.active) {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ─── Aether Variables Section ────────────────────────────────────────── */
+.aether-variables-section {
+  margin-bottom: 16px;
+}
+
+.aether-variables-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: 10px;
+  color: #a78bfa;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.aether-variables-toggle:hover {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+.aether-variables-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.aether-variable-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(139, 92, 246, 0.1);
+  transition: all 0.2s ease;
+}
+
+.aether-variable-chip:hover {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+.aether-var-ref {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a78bfa;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.aether-var-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ─── Aether Fallback Panel ───────────────────────────────────────────── */
+.aether-fallback-panel {
+  padding: 16px 0;
+}
+
+.aether-fallback-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.aether-fallback-field {
+  margin-bottom: 16px;
+}
+
+.aether-fallback-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-radius: 10px;
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ─── Staged Action Config Form ───────────────────────────────────────── */
+.sb-action-config-form {
+  padding: 16px;
+}
+
+.sb-action-config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.sb-action-config-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sb-action-config-close {
+  background: none;
+  border: none;
+  color: #52525b;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sb-action-config-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sb-action-config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sb-action-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sb-action-field-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #52525b;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.sb-action-textarea-wrapper,
+.sb-action-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sb-action-textarea-wrapper .sb-input-field,
+.sb-action-input-wrapper .sb-input-field {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  color: #e4e4e7;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.sb-action-textarea-wrapper .sb-input-field:focus,
+.sb-action-input-wrapper .sb-input-field:focus {
+  border-color: var(--sb-accent-primary);
+  background: rgba(0, 0, 0, 0.8);
+  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.12);
+}
+
+/* Variable Insertion Chips */
+.sb-var-insert-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sb-var-insert-chip {
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.sb-var-insert-chip:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #c4b5fd;
+}
+
+.sb-action-config-save {
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px 0;
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sb-action-config-save:hover {
+  background: var(--sb-accent-primary);
+  transform: scale(1.01);
+}
+
+/* ─── Fallback Filter Pin Label ───────────────────────────────────────── */
+.sb-filter-fallback .sb-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ─── Variables Pane ─────────────────────────────────────── */
+.sb-variables-pane {
+  position: absolute;
+  width: 220px;
+  background: linear-gradient(135deg, rgba(14, 14, 18, 0.98), rgba(20, 20, 26, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 2px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+  animation: sb-vars-slide-in 0.2s ease-out;
+}
+
+@keyframes sb-vars-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sb-vars-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sb-vars-title {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #fff;
+}
+
+.sb-vars-field-label {
+  font-size: 9px;
+  color: #52525b;
+  font-weight: 600;
+}
+
+.sb-vars-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #52525b;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.sb-vars-close:hover {
+  color: #fff;
+}
+
+.sb-vars-scroll {
+  overflow-y: auto;
+  padding: 6px 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+
+.sb-vars-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sb-vars-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+
+/* Table Group */
+.sb-vars-table-group {
+  margin: 0 6px 2px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.sb-vars-table-group:hover {
+  border-color: var(--table-border);
+}
+
+.sb-vars-table-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--table-bg);
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: background 0.15s;
+}
+
+.sb-vars-table-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sb-vars-table-chevron {
+  color: #52525b;
+  display: flex;
+  align-items: center;
+}
+
+.sb-vars-table-icon {
+  display: flex;
+  align-items: center;
+}
+
+.sb-vars-table-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #e4e4e7;
+  letter-spacing: 0.02em;
+}
+
+.sb-vars-no-data {
+  margin-left: auto;
+  font-size: 8px;
+  color: #52525b;
+  font-style: italic;
+}
+
+/* Field list */
+.sb-vars-fields {
+  padding: 2px 4px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sb-vars-field {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: background 0.12s;
+}
+
+.sb-vars-field:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sb-vars-field-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--table-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-vars-field-value {
+  font-size: 9px;
+  color: #52525b;
+  font-weight: 500;
+  max-width: 90px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.sb-vars-empty {
+  font-size: 9px;
+  color: #52525b;
+  padding: 8px;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Variable chip inside input fields */
+.sb-var-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: default;
+  user-select: all;
+  vertical-align: middle;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.sb-var-chip-text {
+  user-select: text;
+}
+
+/* Input glow when variables pane table is hovered */
+.sb-input-field.sb-input-glow {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  animation: sb-breathe-glow 2s ease-in-out infinite;
+}
+
+@keyframes sb-breathe-glow {
+  0%, 100% { box-shadow: 0 0 0 1px var(--hover-glow-color, rgba(255,255,255,0.1)); }
+  50% { box-shadow: 0 0 0 2px var(--hover-glow-color-strong, rgba(255,255,255,0.2)); }
 }

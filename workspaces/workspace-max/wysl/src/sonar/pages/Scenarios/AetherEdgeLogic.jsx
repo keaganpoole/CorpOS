@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Database, Zap, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Database, Zap, X, ChevronDown, Variable, GitBranch } from 'lucide-react';
 import {
   LEAD_FIELDS,
   CONTACT_METHOD_OPTIONS,
@@ -14,6 +14,11 @@ import {
   TAG_OPTIONS,
   normalizeOptionValue,
 } from '../../lib/leadSchema';
+import {
+  getFieldsForContext,
+  getContextType,
+  DEFAULT_FIELDS,
+} from '../../lib/fieldContexts';
 
 const TYPE_LABELS = {
   text: 'Text',
@@ -108,6 +113,12 @@ const VALUE_OPTIONS_BY_FIELD = {
   payment_status: PAYMENT_STATUS_OPTIONS,
   call_route: CALL_ROUTE_OPTIONS,
   tags: TAG_OPTIONS,
+  appointment_status: [
+    { value: 'Pending' }, { value: 'Confirmed' }, { value: 'Cancelled' }, { value: 'Completed' }, { value: 'No Show' },
+  ],
+  call_status: CALL_STATUS_OPTIONS,
+  call_outcome: OUTCOME_OPTIONS,
+  sms_status: SMS_STATUS_OPTIONS,
 };
 
 const normalizeValue = (field, rawValue) => {
@@ -131,7 +142,13 @@ const normalizeValue = (field, rawValue) => {
   return rawValue === '' ? null : rawValue;
 };
 
-const getField = (fieldKey) => LEAD_FIELDS.find((field) => field.key === fieldKey);
+const getField = (fieldKey, contextFields) => {
+  // First check context-specific fields
+  const ctxField = contextFields.find(f => f.key === fieldKey);
+  if (ctxField) return ctxField;
+  // Fallback to LEAD_FIELDS
+  return LEAD_FIELDS.find((field) => field.key === fieldKey);
+};
 
 const getOperatorOptions = (field) => OPERATORS_BY_TYPE[field?.type] || OPERATORS_BY_TYPE.text;
 
@@ -225,8 +242,36 @@ const AetherEdgeLogic = ({
   onSave,
   onClose,
   style,
+  contextType = 'default',
+  availableVariables = [],
+  fallbackAction = '',
+  onFallbackChange,
+  isFallback = false,
+  onToggleFallback,
 }) => {
-  const fields = useMemo(() => LEAD_FIELDS.filter((field) => field.key !== 'created_at' && field.key !== 'updated_at'), []);
+  const [activeTab, setActiveTab] = useState('rules');
+  const [showVariables, setShowVariables] = useState(false);
+
+  // Get context-appropriate fields
+  const contextFields = useMemo(() => {
+    const fields = getFieldsForContext(contextType);
+    return fields.filter(f => f.type !== '__section');
+  }, [contextType]);
+
+  // Get section headers for default context
+  const sectionedFields = useMemo(() => {
+    if (contextType !== 'default') return null;
+    return getFieldsForContext('default');
+  }, [contextType]);
+
+  // Build the field list with section headers for default mode
+  const displayFields = useMemo(() => {
+    if (sectionedFields) return sectionedFields;
+    return contextFields;
+  }, [contextFields, sectionedFields]);
+
+  // Filter non-section fields for select options
+  const selectableFields = useMemo(() => displayFields.filter(f => f.type !== '__section'), [displayFields]);
 
   return (
     <div className="aether-logic-wrapper" style={style}>
@@ -245,72 +290,165 @@ const AetherEdgeLogic = ({
           </div>
         </div>
 
-        <div className="condition-group">
-          <div className="rule-stack">
-            {conditions.map((rule) => {
-              const field = getField(rule.variable);
-              const operators = getOperatorOptions(field);
-              return (
-                <div className="rule-card" key={rule.id}>
-                  <div className="input-container">
-                    <div className="variable-input">
-                      <Database size={12} className="variable-icon" />
-                      <select
-                        className="sb-input-field sb-select-field"
-                        value={rule.variable}
-                        onChange={(event) => {
-                          const nextField = getField(event.target.value);
-                          onUpdateRule(rule.id, 'variable', event.target.value);
-                          onUpdateRule(rule.id, 'operator', defaultOperatorForField(nextField));
-                          onUpdateRule(rule.id, 'value', nextField?.type === 'boolean' ? null : '');
-                        }}
-                      >
-                        <option value="">Map variable...</option>
-                        {fields.map((option) => (
-                          <option key={option.key} value={option.key}>
-                            {option.label} ({TYPE_LABELS[option.type] || 'Text'})
-                          </option>
-                        ))}
-                      </select>
+        {/* Tab bar: Match Rules / Fallback */}
+        {onToggleFallback && (
+          <div className="aether-tab-bar">
+            <button
+              type="button"
+              className={`aether-tab ${!isFallback ? 'active' : ''}`}
+              onClick={() => onToggleFallback(false)}
+            >
+              <Zap size={12} /> Match Rules
+            </button>
+            <button
+              type="button"
+              className={`aether-tab ${isFallback ? 'active' : ''}`}
+              onClick={() => onToggleFallback(true)}
+            >
+              <GitBranch size={12} /> Fallback
+            </button>
+          </div>
+        )}
+
+        {isFallback ? (
+          /* Fallback configuration */
+          <div className="aether-fallback-panel">
+            <p className="aether-fallback-desc">
+              This path executes when no other edge rules from this node match.
+            </p>
+            <div className="aether-fallback-field">
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6, display: 'block' }}>
+                Default Action
+              </label>
+              <select
+                className="sb-input-field sb-select-field"
+                value={fallbackAction}
+                onChange={(e) => onFallbackChange?.(e.target.value)}
+              >
+                <option value="">Select action...</option>
+                <option value="end_flow">End Flow</option>
+                <option value="continue">Continue to Next Step</option>
+                <option value="route_default">Route to Default</option>
+              </select>
+            </div>
+            <div className="aether-fallback-badge">
+              <GitBranch size={12} />
+              Fallback edges appear as dashed amber lines
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Available Variables Panel */}
+            {availableVariables.length > 0 && (
+              <div className="aether-variables-section">
+                <button
+                  type="button"
+                  className="aether-variables-toggle"
+                  onClick={() => setShowVariables(!showVariables)}
+                >
+                  <Variable size={12} />
+                  Available Variables ({availableVariables.length})
+                  <ChevronDown size={12} style={{ transform: showVariables ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+                </button>
+                {showVariables && (
+                  <div className="aether-variables-list">
+                    {availableVariables.map((v, i) => (
+                      <div key={i} className="aether-variable-chip" title={v.reference}>
+                        <span className="aether-var-ref">{v.displayRef || v.reference}</span>
+                        <span className="aether-var-label">{v.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="condition-group">
+              <div className="rule-stack">
+                {conditions.map((rule) => {
+                  const field = getField(rule.variable, selectableFields);
+                  const operators = getOperatorOptions(field);
+                  return (
+                    <div className="rule-card" key={rule.id}>
+                      <div className="input-container">
+                        <div className="variable-input">
+                          <Database size={12} className="variable-icon" />
+                          <select
+                            className="sb-input-field sb-select-field"
+                            value={rule.variable}
+                            onChange={(event) => {
+                              const nextField = getField(event.target.value, selectableFields);
+                              onUpdateRule(rule.id, 'variable', event.target.value);
+                              onUpdateRule(rule.id, 'operator', defaultOperatorForField(nextField));
+                              onUpdateRule(rule.id, 'value', nextField?.type === 'boolean' ? null : '');
+                            }}
+                          >
+                            <option value="">Map variable...</option>
+                            {/* Show context fields, with sections if default */}
+                            {sectionedFields ? (
+                              sectionedFields.map((option) => {
+                                if (option.type === '__section') {
+                                  return (
+                                    <option key={option.key} value={option.key} disabled style={{ fontWeight: 700, color: '#71717a' }}>
+                                      {option.label}
+                                    </option>
+                                  );
+                                }
+                                return (
+                                  <option key={option.key} value={option.key}>
+                                    {option.label} ({TYPE_LABELS[option.type] || 'Text'})
+                                  </option>
+                                );
+                              })
+                            ) : (
+                              selectableFields.map((option) => (
+                                <option key={option.key} value={option.key}>
+                                  {option.label} ({TYPE_LABELS[option.type] || 'Text'})
+                                </option>
+                              ))
+                            )}
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          className="sb-remove-btn"
+                          onClick={() => onRemoveRule(rule.id)}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      <div className="select-wrapper">
+                        <select
+                          className="sb-select-field"
+                          value={rule.operator}
+                          onChange={(event) => onUpdateRule(rule.id, 'operator', event.target.value)}
+                        >
+                          {operators.map((operator) => (
+                            <option key={operator.value} value={operator.value}>
+                              {operator.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {getValueComponent({ field, rule, onUpdateRule })}
                     </div>
-                    <button
-                      type="button"
-                      className="sb-remove-btn"
-                      onClick={() => onRemoveRule(rule.id)}
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
+                  );
+                })}
+              </div>
 
-                  <div className="select-wrapper">
-                    <select
-                      className="sb-select-field"
-                      value={rule.operator}
-                      onChange={(event) => onUpdateRule(rule.id, 'operator', event.target.value)}
-                    >
-                      {operators.map((operator) => (
-                        <option key={operator.value} value={operator.value}>
-                          {operator.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {getValueComponent({ field, rule, onUpdateRule })}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="sb-action-links">
-            <button type="button" className="sb-action-link" onClick={onAddRule}>
-              + Add AND rule
-            </button>
-            <button type="button" className="sb-action-link" onClick={onAddRule}>
-              + Add OR rule
-            </button>
-          </div>
-        </div>
+              <div className="sb-action-links">
+                <button type="button" className="sb-action-link" onClick={onAddRule}>
+                  + Add AND rule
+                </button>
+                <button type="button" className="sb-action-link" onClick={onAddRule}>
+                  + Add OR rule
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

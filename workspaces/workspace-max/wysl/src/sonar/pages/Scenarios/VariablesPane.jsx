@@ -1,0 +1,238 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import {
+  User, Calendar, Phone, ChevronDown, ChevronRight, X
+} from 'lucide-react';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+// Table definitions with colors, icons, and field metadata
+const TABLE_DEFS = [
+  {
+    key: 'people',
+    label: 'People',
+    color: '#32f0d9',
+    colorBg: 'rgba(50,240,217,0.08)',
+    colorBorder: 'rgba(50,240,217,0.2)',
+    icon: User,
+    fields: [
+      { key: 'first_name', label: 'First Name', type: 'text' },
+      { key: 'last_name', label: 'Last Name', type: 'text' },
+      { key: 'email', label: 'Email', type: 'email' },
+      { key: 'phone', label: 'Phone', type: 'phone' },
+      { key: 'status', label: 'Status', type: 'text' },
+      { key: 'source', label: 'Source', type: 'text' },
+      { key: 'notes', label: 'Notes', type: 'text' },
+      { key: 'created_at', label: 'Created At', type: 'timestamp' },
+    ],
+    fetch: async () => {
+      try {
+        const { data } = await supabase.from('people').select('*').limit(1);
+        return data?.[0] || null;
+      } catch { return null; }
+    },
+  },
+  {
+    key: 'appointments',
+    label: 'Appointments',
+    color: '#38bdf8',
+    colorBg: 'rgba(56,189,248,0.08)',
+    colorBorder: 'rgba(56,189,248,0.2)',
+    icon: Calendar,
+    fields: [
+      { key: 'client_name', label: 'Client Name', type: 'text' },
+      { key: 'date', label: 'Date', type: 'text' },
+      { key: 'time', label: 'Time', type: 'text' },
+      { key: 'duration', label: 'Duration', type: 'number' },
+      { key: 'status', label: 'Status', type: 'text' },
+      { key: 'notes', label: 'Notes', type: 'text' },
+    ],
+    fetch: async () => {
+      try {
+        const { data } = await supabase.from('appointments').select('*').limit(1);
+        return data?.[0] || null;
+      } catch { return null; }
+    },
+  },
+  {
+    key: 'hired_receptionists',
+    label: 'Receptionists',
+    color: '#f472b6',
+    colorBg: 'rgba(244,114,182,0.08)',
+    colorBorder: 'rgba(244,114,182,0.2)',
+    icon: Phone,
+    fields: [
+      { key: 'full_name', label: 'Name', type: 'text' },
+      { key: 'stereotype', label: 'Role', type: 'text' },
+      { key: 'phone_number', label: 'Phone', type: 'phone' },
+      { key: 'call_types', label: 'Call Types', type: 'text' },
+      { key: 'status', label: 'Status', type: 'text' },
+    ],
+    fetch: async () => {
+      try {
+        const { data } = await supabase.from('hired_receptionists').select('*').limit(1);
+        return data?.[0] || null;
+      } catch { return null; }
+    },
+  },
+];
+
+// Color lookup by table key
+export const TABLE_COLORS = {
+  people: '#32f0d9',
+  appointments: '#38bdf8',
+  hired_receptionists: '#f472b6',
+};
+
+export const TABLE_LABELS = {
+  people: 'People',
+  appointments: 'Appointment',
+  hired_receptionists: 'Receptionist',
+};
+
+// Build variable reference from table + field
+export const getVariableRef = (tableKey, fieldKey) => `{{${tableKey}.${fieldKey}}}`;
+
+// Render a value with {{table.field}} as styled chip HTML
+export const renderVarChipsHTML = (value) => {
+  if (!value || typeof value !== 'string') return '';
+  return value.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
+    const parts = ref.split('.');
+    if (parts.length !== 2) return match;
+    const color = TABLE_COLORS[parts[0]] || '#a78bfa';
+    const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
+    return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${tableLabel}.${parts[1]}</span>`;
+  });
+};
+
+// Parse variable references from a value string
+export const parseVariables = (value) => {
+  if (!value || typeof value !== 'string') return [];
+  const matches = [];
+  const regex = /\{\{([^}]+)\}\}/g;
+  let match;
+  while ((match = regex.exec(value)) !== null) {
+    const [full, ref] = match;
+    const parts = ref.split('.');
+    if (parts.length === 2) {
+      matches.push({ full, table: parts[0], field: parts[1] });
+    }
+  }
+  return matches;
+};
+
+const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, onTableHover, onClose, style = {} }) => {
+  const [samples, setSamples] = useState({});
+  const [expanded, setExpanded] = useState({});
+  const paneRef = useRef(null);
+
+  // Fetch sample records on mount
+  useEffect(() => {
+    if (!visible) return;
+    const fetchSamples = async () => {
+      const results = {};
+      for (const table of TABLE_DEFS) {
+        results[table.key] = await table.fetch();
+      }
+      setSamples(results);
+      const exp = {};
+      TABLE_DEFS.forEach(t => { exp[t.key] = true; });
+      setExpanded(exp);
+    };
+    fetchSamples();
+  }, [visible]);
+
+  if (!visible) return null;
+
+  const formatValue = (value, type) => {
+    if (value === null || value === undefined) return '—';
+    if (type === 'timestamp') {
+      try { return new Date(value).toLocaleDateString(); } catch { return String(value); }
+    }
+    if (Array.isArray(value)) return value.join(', ');
+    return String(value);
+  };
+
+  return (
+    <div
+      className="sb-variables-pane"
+      ref={paneRef}
+      style={style}
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
+    >
+      <div className="sb-vars-header">
+        <span className="sb-vars-title">Variables</span>
+        {fieldLabel && <span className="sb-vars-field-label">for {fieldLabel}</span>}
+      </div>
+      <div className="sb-vars-scroll">
+        {TABLE_DEFS.map((table) => {
+          const sample = samples[table.key];
+          const isExpanded = expanded[table.key];
+          const TableIcon = table.icon;
+
+          return (
+            <div key={table.key} className="sb-vars-table-group" style={{ '--table-color': table.color, '--table-bg': table.colorBg, '--table-border': table.colorBorder }} onMouseEnter={() => onTableHover?.(table.color)} onMouseLeave={() => onTableHover?.('')}>
+              <button
+                type="button"
+                className="sb-vars-table-header"
+                onClick={() => setExpanded(prev => ({ ...prev, [table.key]: !prev[table.key] }))}
+              >
+                <span className="sb-vars-table-chevron">
+                  {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </span>
+                <span className="sb-vars-table-icon" style={{ color: table.color }}>
+                  <TableIcon size={11} />
+                </span>
+                <span className="sb-vars-table-label">{table.label}</span>
+                {sample === null && <span className="sb-vars-no-data">No data</span>}
+              </button>
+
+              {isExpanded && sample && (
+                <div className="sb-vars-fields">
+                  {table.fields.map((field) => {
+                    const sampleValue = sample[field.key];
+                    const varRef = getVariableRef(table.key, field.key);
+                    const hasValue = sampleValue !== null && sampleValue !== undefined;
+
+                    return (
+                      <button
+                        key={field.key}
+                        type="button"
+                        className="sb-vars-field"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onInsertVariable?.(varRef, field.label, table.color);
+                        }}
+                        title={hasValue ? formatValue(sampleValue, field.type) : 'No value in sample'}
+                      >
+                        <span className="sb-vars-field-name" style={{ color: table.color }}>{field.label}</span>
+                        {hasValue && (
+                          <span className="sb-vars-field-value">{formatValue(sampleValue, field.type)}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {isExpanded && !sample && (
+                <div className="sb-vars-fields">
+                  <div className="sb-vars-empty">No records found</div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default VariablesPane;
