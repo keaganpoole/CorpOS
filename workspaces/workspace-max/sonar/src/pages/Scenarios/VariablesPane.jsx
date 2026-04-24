@@ -3,21 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 import {
   User, Calendar, Phone, ChevronDown, ChevronRight, X, Zap, Sparkles
 } from 'lucide-react';
-import { getSmartActionByKey, getSmartActions, GENERIC_SMART_ACTIONS } from './smartActions';
+import { getSmartActionByKey, getSmartActions } from './smartActions';
 
 // Build a map of smart action key → name for token rendering
 const SMART_ACTION_MAP = {};
 try {
   // Pre-populate with known smart actions
-  const _keys = ['reschedule_appointment', 'leave_voicemail_callback', 'cancel_appointment', 'send_followup_sms',
-    'send_confirmation_sms', 'send_reminder_call', 'send_directions_sms', 'offer_reschedule',
-    'send_cancellation_confirm', 'send_new_appt_confirm', 'welcome_call', 'confirm_new_time',
-    'send_reschedule_sms', 'send_prep_instructions', 'send_thank_you_sms', 'send_feedback_request',
-    'answer_greet', 'route_to_dept', 'take_message', 'return_call', 'send_missed_call_sms',
-    'leave_voicemail', 'return_voicemail_call', 'send_voicemail_sms', 'reply_sms',
-    'continue_conversation', 'escalate_to_call', 'deliver_message', 'verify_identity',
-    'retry_call', 'send_fallback_sms', 'send_payment_reminder', 'update_payment_sms',
-    'send_invoice_sms', 'send_payment_followup', 'welcome_message', 'send_message', 'make_call', 'send_sms'];
+  const _keys = ['confirm_receipt', 'verify_details', 'set_arrival_expectations', 'pre_visit_questions',
+    'reschedule_appointment', 'confirm_changes', 'verify_new_time', 'understand_reason',
+    'offer_reschedule', 'retain_customer', 'confirm_new_time', 'confirm_reminder',
+    'confirm_appointment', 'check_satisfaction', 'identify_unresolved', 'request_review',
+    'offer_additional', 'schedule_next', 'investigate_missed', 'discuss_cancellation_policy',
+    'leave_voicemail', 'identify_purpose', 'take_message', 'route_call', 'return_call',
+    'identify_reason', 'retry_call', 'address_voicemail', 'schedule_callback',
+    'verify_identity', 'deliver_message', 'address_question', 'follow_up',
+    'investigate_payment', 'offer_payment_plan', 'save_at_risk', 'confirm_billing',
+    'explain_charges', 'confirm_amount', 'confirm_payment', 'welcome_customer',
+    'collect_info', 'explain_services', 'verify_changes', 'confirm_deletion'];
   _keys.forEach(k => {
     const action = getSmartActionByKey(k);
     if (action) SMART_ACTION_MAP[k] = action.name;
@@ -234,7 +236,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
               <span className="sb-smart-actions-title">Smart Actions</span>
             </div>
             <div className="sb-smart-actions-list">
-              {(smartActions.length > 0 ? smartActions : GENERIC_SMART_ACTIONS).map((action) => (
+              {smartActions.map((action) => (
                 <button
                   key={action.key}
                   type="button"

@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   User, Calendar, Phone, ChevronDown, ChevronRight, X, Zap, Sparkles
 } from 'lucide-react';
-import { getSmartActionByKey, getSmartActions, GENERIC_SMART_ACTIONS } from './smartActions';
+import { getSmartActionByKey, getSmartActions } from './smartActions';
 
 // Build a map of smart action key → name for token rendering
 const SMART_ACTION_MAP = {};
@@ -234,7 +234,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
               <span className="sb-smart-actions-title">Smart Actions</span>
             </div>
             <div className="sb-smart-actions-list">
-              {(smartActions.length > 0 ? smartActions : GENERIC_SMART_ACTIONS).map((action) => (
+              {smartActions.map((action) => (
                 <button
                   key={action.key}
                   type="button"

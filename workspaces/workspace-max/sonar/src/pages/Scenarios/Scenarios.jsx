@@ -737,6 +737,15 @@ export default function ScenariosPage() {
     return trigger?.key || null;
   }, [edges, nodeMap]);
 
+  // Find the action key from the selected node
+  const findNodeActionKey = useCallback((nodeId) => {
+    const node = nodeMap[nodeId];
+    if (!node || node.categoryType !== 'ACTIONS') return null;
+    const allActions = AUTOMATION_HIERARCHY.ACTIONS.flatMap(a => a.sub_options);
+    const action = allActions.find(a => a.name === node.label);
+    return action?.key || null;
+  }, [nodeMap]);
+
   // Check if the selected node is a communication action
   const isSelectedNodeCommunication = useMemo(() => {
     if (!selectedNode || selectedNode.categoryType !== 'ACTIONS') return false;
@@ -1510,7 +1519,8 @@ export default function ScenariosPage() {
                       <p className="sb-comm-hint">Click to insert into the main content area</p>
                       <div className="sb-comm-smart-list">
                         {getSmartActions(
-                          findParentTriggerKey(selectedNodeId)
+                          findParentTriggerKey(selectedNodeId),
+                          findNodeActionKey(selectedNodeId)
                         ).map(action => (
                           <button
                             key={action.key}
