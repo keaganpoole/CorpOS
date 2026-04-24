@@ -2064,3 +2064,213 @@
   0%, 100% { box-shadow: 0 0 0 1px var(--hover-glow-color, rgba(255,255,255,0.1)); }
   50% { box-shadow: 0 0 0 2px var(--hover-glow-color-strong, rgba(255,255,255,0.2)); }
 }
+
+/* ─── Prompt Textarea (no toggle) ─── */
+.sb-prompt-textarea-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sb-suggested-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sb-suggested-action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 6px;
+  color: #c4b5fd;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+}
+
+.sb-suggested-action-chip.sb-chip-grey {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sb-suggested-action-chip:hover {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.4);
+  transform: translateY(-1px);
+}
+
+.sb-suggested-action-chip:active {
+  transform: translateY(0);
+}
+
+/* ─── First Message Toggle ─── */
+.sb-first-message-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.sb-first-message-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.sb-first-message-toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 36px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sb-first-message-toggle input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: all 0.2s ease;
+}
+
+.sb-first-message-toggle input[type="checkbox"]:checked {
+  background: var(--sb-accent-primary);
+  border-color: var(--sb-accent-primary);
+}
+
+.sb-first-message-toggle input[type="checkbox"]:checked::after {
+  background: #000;
+  transform: translateX(16px);
+}
+
+.sb-first-message-toggle-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  user-select: none;
+}
+
+.sb-smart-actions-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(168, 85, 247, 0.08));
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 6px;
+  color: #a855f7;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  width: fit-content;
+}
+
+.sb-smart-actions-trigger:hover {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.15));
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+/* ─── Smart Actions in Variables Pane ─── */
+.sb-smart-actions-section {
+  margin: 0 6px 8px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.04), rgba(168, 85, 247, 0.06), rgba(236, 72, 153, 0.04));
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 10px;
+  padding: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sb-smart-actions-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.4), rgba(56, 189, 248, 0.4), transparent);
+}
+
+.sb-smart-actions-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+  padding: 0 2px;
+}
+
+.sb-smart-actions-icon {
+  color: #a855f7;
+}
+
+.sb-smart-actions-title {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: linear-gradient(135deg, #38bdf8, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sb-smart-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sb-smart-action-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.sb-smart-action-item:hover {
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.sb-smart-action-item-icon {
+  color: #a855f7;
+  flex-shrink: 0;
+}
+
+.sb-smart-action-item-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: #e4e4e7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

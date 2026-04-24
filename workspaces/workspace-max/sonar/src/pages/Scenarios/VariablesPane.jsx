@@ -101,9 +101,9 @@ const TABLE_DEFS = [
   {
     key: 'businesses',
     label: 'Business',
-    color: '#a1a1aa',
-    colorBg: 'rgba(161,161,170,0.08)',
-    colorBorder: 'rgba(161,161,170,0.2)',
+    color: '#fbbf24',
+    colorBg: 'rgba(251,191,36,0.08)',
+    colorBorder: 'rgba(251,191,36,0.2)',
     icon: User,
     fields: [
       { key: 'name', label: 'Name', type: 'text' },
@@ -129,7 +129,7 @@ export const TABLE_COLORS = {
   people: '#32f0d9',
   appointments: '#38bdf8',
   hired_receptionists: '#f472b6',
-  businesses: '#a1a1aa',
+  businesses: '#fbbf24',
 };
 
 export const TABLE_LABELS = {

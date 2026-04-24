@@ -25,13 +25,15 @@ import {
   EyeOff,
   Pencil,
   GitBranch,
+  Sparkles,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
-import VariablesPane, { getVariableRef, parseVariables, renderVarChipsHTML } from './VariablesPane';
+import VariablesPane, { getVariableRef, parseVariables, renderVarChipsHTML, TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
 import { supabase } from '../../lib/supabase';
 import { LEAD_FIELDS } from '../../lib/leadSchema';
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
+import { getSmartActions, getSmartActionByKey } from './smartActions';
 
 const OPTION_ICONS = {
   phone_calls: Phone,
@@ -144,12 +146,14 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
-          { key: 'greeting', label: 'Greeting Message', type: 'textarea', placeholder: 'e.g. Hello {customer_name}, this is...' },
+          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be professional and offer available reschedule times...', smartActions: true },
+          { key: 'first_message', label: 'First Message', type: 'first_message_textarea', placeholder: 'e.g. Hi, this is [business name] calling...', smartActions: true, toggleLabel: 'Override First Message' },
           { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text', placeholder: 'Phone number to transfer after greeting' },
         ]},
         { key: 'call_phone_number', name: 'Call Phone Number', description: 'Call a specific number', configFields: [
           { key: 'phone_number', label: 'Phone Number', type: 'text', placeholder: 'e.g. +15551234567' },
-          { key: 'greeting', label: 'Greeting Message', type: 'textarea', placeholder: 'Optional greeting message' },
+          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be professional and helpful...', smartActions: true },
+          { key: 'first_message', label: 'First Message', type: 'first_message_textarea', placeholder: 'e.g. Hi, this is [business name] calling...', smartActions: true, toggleLabel: 'Override First Message' },
         ]},
       ],
     },
@@ -162,10 +166,10 @@ const AUTOMATION_HIERARCHY = {
       sub_options: [
         { key: 'send_to_phone_number', name: 'Send To Phone Number', description: 'Send SMS to any number', configFields: [
           { key: 'recipient', label: 'Recipient Number', type: 'text', placeholder: 'e.g. +15551234567' },
-          { key: 'message', label: 'Message Template', type: 'textarea', placeholder: 'e.g. Hi {customer_name}, your appointment is {appointment_date}' },
+          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and concise...', smartActions: true },
         ]},
         { key: 'send_to_customer', name: 'Send To Customer', description: 'Send SMS to an existing customer', configFields: [
-          { key: 'message', label: 'Message Template', type: 'textarea', placeholder: 'e.g. Hi {customer_name}, your appointment is confirmed for {appointment_date}' },
+          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and helpful...', smartActions: true },
         ]},
       ],
     },
@@ -453,16 +457,119 @@ export default function ScenariosPage() {
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
   const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage);
 
-  // Handle variable insertion from VariablesPane
+  // Handle variable insertion — inserts {{table.field}} syntax for rendering
   const handleInsertVariable = (varRef, fieldLabel, color) => {
     if (!varsPane.fieldKey) return;
-    // Find the next available slot in the config fields
     setActionConfig(prev => {
       const current = prev[varsPane.fieldKey] || '';
       const newVal = current ? `${current} ${varRef}` : varRef;
       return { ...prev, [varsPane.fieldKey]: newVal };
     });
-    // Keep the pane open so they can add more variables
+  };
+
+  // Find the trigger key from parent node for smart actions
+  const findParentTriggerKey = useCallback((nodeId) => {
+    const parentEdge = edges.find(e => e.to === nodeId);
+    if (!parentEdge) return null;
+    const parentNode = nodeMap[parentEdge.from];
+    if (!parentNode || parentNode.categoryType !== 'TRIGGERS') return null;
+    const allTriggers = AUTOMATION_HIERARCHY.TRIGGERS.flatMap(t => t.sub_options || []);
+    const trigger = allTriggers.find(t => t.name === parentNode.label);
+    return trigger?.key || null;
+  }, [edges, nodeMap]);
+
+  // Get the action key from the current action config
+  const currentActionKey = actionConfig?._key || null;
+
+  // Handle smart action insertion — inserts delimited token into raw value,
+  // overlay renders the display text as a styled chip
+  const handleInsertSmartAction = (smartAction, fieldKey) => {
+    const token = `{smart:${smartAction.key}}`;
+    setActionConfig(prev => {
+      const current = prev[fieldKey] || '';
+      const newVal = current ? `${current} \x1E${smartAction.instruction}\x1E` : `\x1E${smartAction.instruction}\x1E`;
+      return { ...prev, [fieldKey]: newVal };
+    });
+  };
+
+
+  // Convert smart action display text back to tokens before saving
+  // Uses sequential parsing to handle adjacent delimited strings correctly
+  const syncFieldTokens = (fieldKey) => {
+    setActionConfig(prev => {
+      const val = prev[fieldKey];
+      if (!val || typeof val !== 'string') return prev;
+      const triggerKey = findParentTriggerKey(selectedNodeId);
+      const actions = getSmartActions(triggerKey, currentActionKey);
+      const lookup = {};
+      actions.forEach(a => { lookup[a.instruction] = a.key; });
+
+      let result = '';
+      let i = 0;
+      while (i < val.length) {
+        if (val.charCodeAt(i) === 0x1E) {
+          const end = val.indexOf('\x1E', i + 1);
+          if (end !== -1) {
+            const displayText = val.substring(i + 1, end);
+            result += lookup[displayText] ? `{smart:${lookup[displayText]}}` : displayText;
+            i = end + 1;
+          } else { result += val[i]; i++; }
+        } else { result += val[i]; i++; }
+      }
+      return { ...prev, [fieldKey]: result };
+    });
+  };
+
+  // Simple HTML escape for chip display text
+  const escapeHTML = (str) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+  // Render chips for prompt_textarea fields — sequential parsing for correct handling
+  const renderFieldChipsHTML = (value) => {
+    if (!value || typeof value !== 'string') return '';
+    const triggerKey = findParentTriggerKey(selectedNodeId);
+    const actions = getSmartActions(triggerKey, currentActionKey);
+    const tokenLookup = {};
+    actions.forEach(a => { tokenLookup[`{smart:${a.key}}`] = a.instruction; });
+
+    let result = '';
+    let i = 0;
+    while (i < value.length) {
+      if (value.charCodeAt(i) === 0x1E) {
+        const end = value.indexOf('\x1E', i + 1);
+        if (end !== -1) {
+          result += escapeHTML(value.substring(i + 1, end));
+          i = end + 1;
+        } else { result += escapeHTML(value[i]); i++; }
+      } else if (value.substring(i, i + 7) === '{smart:') {
+        const end = value.indexOf('}', i);
+        if (end !== -1) {
+          const token = value.substring(i, end + 1);
+          const instruction = tokenLookup[token];
+          result += instruction
+            ? escapeHTML(instruction)
+            : escapeHTML(token);
+          i = end + 1;
+        } else { result += escapeHTML(value[i]); i++; }
+      } else if (value.substring(i, i + 2) === '{{') {
+        const end = value.indexOf('}}', i);
+        if (end !== -1) {
+          const ref = value.substring(i + 2, end);
+          const parts = ref.split('.');
+          if (parts.length === 2) {
+            const color = TABLE_COLORS[parts[0]] || '#a78bfa';
+            const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
+            result += `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;line-height:1.6;vertical-align:baseline;">${tableLabel}.${parts[1]}</span>`;
+          } else { result += escapeHTML(value.substring(i, end + 2)); }
+          i = end + 2;
+        } else { result += escapeHTML(value[i]); i++; }
+      } else {
+        // Handle newlines as <br> for the overlay
+        if (value[i] === '\n') { result += '<br>'; }
+        else { result += escapeHTML(value[i]); }
+        i++;
+      }
+    }
+    return result;
   };
 
   const repositionPanel = useCallback(() => {
@@ -1585,24 +1692,158 @@ export default function ScenariosPage() {
                                   <option key={opt} value={opt}>{opt}</option>
                                 ))}
                               </select>
+                            ) : field.type === 'prompt_textarea' ? (
+                              /* Prompt textarea — no toggle, suggested smart actions above */
+                              <div className="sb-prompt-textarea-wrap">
+                                {/* Suggested smart actions row */}
+                                <div className="sb-suggested-actions-row">
+                                  {getSmartActions(findParentTriggerKey(selectedNodeId), currentActionKey).map(action => (
+                                    <button
+                                      key={action.key}
+                                      type="button"
+                                      className="sb-suggested-action-chip"
+                                      onClick={() => handleInsertSmartAction(action, field.key)}
+                                      title={action.description}
+                                    >
+                                      <Sparkles size={10} />
+                                      {action.name}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div style={{ position: 'relative' }}>
+                                  <textarea
+                                    className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
+                                    value={rawVal}
+                                    onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                    onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                    onBlur={() => { syncFieldTokens(field.key); }}
+                                    placeholder=""
+                                    rows={4}
+                                    style={{
+                                      resize: 'none',
+                                      ...(rawVal.includes('{{') || rawVal.includes('\x1E') ? { color: 'transparent' } : {}),
+                                      ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
+                                        borderColor: hoveredTableColor,
+                                        boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                        '--hover-glow-color': `${hoveredTableColor}20`,
+                                        '--hover-glow-color-strong': `${hoveredTableColor}40`,
+                                      } : {}),
+                                    }}
+                                  />
+                                  {/* Chip overlay */}
+                                  {(rawVal.includes('{{') || rawVal.includes('\x1E')) && (
+                                    <div
+                                      className="sb-var-chip-overlay"
+                                      style={{
+                                        position: 'absolute', inset: 0, pointerEvents: 'none',
+                                        display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
+                                        fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                        fontFamily: 'Inter, sans-serif', lineHeight: '1.5', wordBreak: 'break-word',
+                                        whiteSpace: 'pre-wrap',
+                                      }}
+                                      dangerouslySetInnerHTML={{ __html: renderFieldChipsHTML(rawVal.replace(/\n$/, '')) }}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            ) : field.type === 'first_message_textarea' ? (
+                              /* First Message — hidden behind a toggle */
+                              <div className="sb-first-message-wrap">
+                                <label className="sb-first-message-toggle">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!actionConfig[`${field.key}_enabled`]}
+                                    onChange={e => setActionConfig(prev => ({ ...prev, [`${field.key}_enabled`]: e.target.checked }))}
+                                  />
+                                  <span className="sb-first-message-toggle-label">{field.toggleLabel || 'Override First Message'}</span>
+                                </label>
+                                {actionConfig[`${field.key}_enabled`] && (
+                                  <div style={{ marginTop: 8 }}>
+                                    {/* Business variable buttons */}
+                                    <div className="sb-suggested-actions-row" style={{ marginBottom: 6 }}>
+                                      {['name', 'city', 'state'].map(fKey => (
+                                        <button
+                                          key={fKey}
+                                          type="button"
+                                          className="sb-suggested-action-chip sb-chip-grey"
+                                          onClick={() => {
+                                            const varRef = `{{businesses.${fKey}}}`;
+                                            setActionConfig(prev => {
+                                              const current = prev[field.key] || '';
+                                              return { ...prev, [field.key]: current ? `${current} ${varRef}` : varRef };
+                                            });
+                                          }}
+                                        >
+                                          {{ name: 'Name', city: 'City', state: 'State' }[fKey]}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <div style={{ position: 'relative' }}>
+                                      <textarea
+                                        className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
+                                        value={rawVal}
+                                        onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                        onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                        placeholder={field.placeholder || ''}
+                                        rows={3}
+                                        style={{
+                                          resize: 'none',
+                                          ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
+                                          ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
+                                            borderColor: hoveredTableColor,
+                                            boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                          } : {}),
+                                        }}
+                                      />
+                                      {rawVal.includes('{{') && (
+                                        <div
+                                          className="sb-var-chip-overlay"
+                                          style={{
+                                            position: 'absolute', inset: 0, pointerEvents: 'none',
+                                            display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
+                                            fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                            fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                                          }}
+                                          dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
+                                        />
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             ) : field.type === 'textarea' ? (
-                              <textarea
-                                className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
-                                value={rawVal}
-                                onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
-                                placeholder={field.placeholder || ''}
-                                rows={3}
-                                style={{
-                                  resize: 'none',
-                                  ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
-                                    borderColor: hoveredTableColor,
-                                    boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
-                                    '--hover-glow-color': `${hoveredTableColor}20`,
-                                    '--hover-glow-color-strong': `${hoveredTableColor}40`,
-                                  } : {}),
-                                }}
-                              />
+                              <div style={{ position: 'relative' }}>
+                                <textarea
+                                  className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
+                                  value={rawVal}
+                                  onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                  onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                  placeholder={field.placeholder || ''}
+                                  rows={3}
+                                  style={{
+                                    resize: 'none',
+                                    ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
+                                    ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
+                                      borderColor: hoveredTableColor,
+                                      boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                      '--hover-glow-color': `${hoveredTableColor}20`,
+                                      '--hover-glow-color-strong': `${hoveredTableColor}40`,
+                                    } : {}),
+                                  }}
+                                />
+                                {rawVal.includes('{{') && (
+                                  <div
+                                    className="sb-var-chip-overlay"
+                                    style={{
+                                      position: 'absolute', inset: 0, pointerEvents: 'none',
+                                      display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
+                                      fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                      fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                                    }}
+                                    dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
+                                  />
+                                )}
+                              </div>
                             ) : (
                               <div style={{ position: 'relative' }}>
                                 <input
@@ -1622,22 +1863,14 @@ export default function ScenariosPage() {
                                     } : {}),
                                   }}
                                 />
-                                {/* Variable chip overlay — renders chips with color while input stays transparent */}
                                 {rawVal.includes('{{') && (
                                   <div
                                     className="sb-var-chip-overlay"
                                     style={{
-                                      position: 'absolute',
-                                      inset: 0,
-                                      pointerEvents: 'none',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      padding: '0 10px',
-                                      fontSize: 12,
-                                      color: '#e4e4e7',
-                                      overflow: 'hidden',
-                                      whiteSpace: 'nowrap',
-                                      fontFamily: 'Inter, sans-serif',
+                                      position: 'absolute', inset: 0, pointerEvents: 'none',
+                                      display: 'flex', alignItems: 'center', padding: '0 10px',
+                                      fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                      whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
                                     }}
                                     dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
                                   />
@@ -1649,9 +1882,24 @@ export default function ScenariosPage() {
                       })}
                     </div>
                     <button type="button" className="sb-action-config-save" onClick={() => {
+                      // Sync any pending display text → tokens before saving
+                      const syncedConfig = { ...actionConfig };
+                      if (syncedConfig._fields) {
+                        syncedConfig._fields.forEach(f => {
+                          const val = syncedConfig[f.key];
+                          if (val && typeof val === 'string') {
+                            syncedConfig[f.key] = val.replace(/\x1E([^\x1E]+)\x1E/g, (match, displayText) => {
+                              const triggerKey = findParentTriggerKey(selectedNodeId);
+                              const actions = getSmartActions(triggerKey, currentActionKey);
+                              const action = actions.find(a => a.instruction === displayText);
+                              return action ? `{smart:${action.key}}` : match;
+                            });
+                          }
+                        });
+                      }
                       // Save action config to the node
                       if (selectedNodeId) {
-                        setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, actionConfig: { ...actionConfig } } : n));
+                        setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, actionConfig: syncedConfig } : n));
                       }
                       setPanelStage('options');
                       setActionConfig(null);
@@ -1950,6 +2198,8 @@ export default function ScenariosPage() {
             targetFieldKey={varsPane.fieldKey}
             fieldLabel={varsPane.fieldLabel}
             onInsertVariable={handleInsertVariable}
+            onInsertSmartAction={handleInsertSmartAction}
+            smartActions={getSmartActions(findParentTriggerKey(selectedNodeId), currentActionKey)}
             onTableHover={(color) => setHoveredTableColor(color)}
             onClose={() => { setVarsPane({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' }); setHoveredTableColor(''); }}
             style={{

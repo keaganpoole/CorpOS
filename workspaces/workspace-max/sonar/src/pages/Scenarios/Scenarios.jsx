@@ -24,10 +24,13 @@ import {
   Eye,
   EyeOff,
   Pencil,
+  Sparkles,
+  GripVertical,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
 import { supabase } from '../../lib/supabase';
+import { getSmartActions, getSmartActionByKey } from './smartActions';
 
 const OPTION_ICONS = {
   phone_calls: Phone,
@@ -265,6 +268,12 @@ export default function ScenariosPage() {
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
 
+  // Communication action config state
+  const [focusMode, setFocusMode] = useState('prompt'); // 'prompt' or 'message'
+  const [firstMessageText, setFirstMessageText] = useState('');
+  const [mainBoxText, setMainBoxText] = useState('');
+  const mainBoxRef = useRef(null);
+
   // Fetch scenarios from Supabase on mount
   useEffect(() => {
     const fetchScenarios = async () => {
@@ -331,6 +340,26 @@ export default function ScenariosPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Load communication config when selected node changes
+  useEffect(() => {
+    if (selectedNode && isSelectedNodeCommunication && panelStage !== 'communicationConfig') {
+      setFocusMode(selectedNode.focus || 'prompt');
+      setFirstMessageText(selectedNode.firstMessage || '');
+      setMainBoxText(selectedNode.mainBox || '');
+    }
+  }, [selectedNodeId, isSelectedNodeCommunication, panelStage]);
+
+  // Auto-save communication config to node on any field change
+  useEffect(() => {
+    if (selectedNodeId && isSelectedNodeCommunication) {
+      setNodes(prev => prev.map(n =>
+        n.id === selectedNodeId
+          ? { ...n, firstMessage: firstMessageText, mainBox: mainBoxText, focus: focusMode }
+          : n
+      ));
+    }
+  }, [firstMessageText, mainBoxText, focusMode, selectedNodeId, isSelectedNodeCommunication]);
+
   useLayoutEffect(() => {
     if (initialFocusSet) return;
     const builderRect = builderRef.current?.getBoundingClientRect();
@@ -371,7 +400,7 @@ export default function ScenariosPage() {
     : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
-  const showNodeConfigText = panelStage !== 'subOptions';
+  const showNodeConfigText = panelStage !== 'subOptions' && panelStage !== 'communicationConfig';
 
   const repositionPanel = useCallback(() => {
     if (!selectedNodeId) {
@@ -430,6 +459,13 @@ export default function ScenariosPage() {
       if (node?.appointmentConfig) {
         setAppointmentConfig({ ...node.appointmentConfig });
         setPanelStage('appointmentConfig');
+      }
+      // If this node is a configured communication action, show comm config
+      else if (node?.configured && node?.isCommunication) {
+        setPanelStage('communicationConfig');
+        setFocusMode(node.focus || 'prompt');
+        setFirstMessageText(node.firstMessage || '');
+        setMainBoxText(node.mainBox || '');
       }
     },
     [initialNodeShifted, nodeMap]
@@ -606,6 +642,35 @@ export default function ScenariosPage() {
     setLogicPanel(null);
   }, []);
 
+  // Save communication config to the current node
+  const saveCommunicationConfig = useCallback(() => {
+    if (!selectedNodeId || !isSelectedNodeCommunication) return;
+    setNodes(prev => prev.map(n =>
+      n.id === selectedNodeId
+        ? { ...n, firstMessage: firstMessageText, mainBox: mainBoxText, focus: focusMode }
+        : n
+    ));
+  }, [selectedNodeId, isSelectedNodeCommunication, firstMessageText, mainBoxText, focusMode]);
+
+  // Insert a smart action token into the main box text area
+  const insertSmartAction = useCallback((smartAction) => {
+    const token = `{{smart:${smartAction.key}}}`;
+    if (mainBoxRef.current) {
+      const textarea = mainBoxRef.current;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newText = mainBoxText.substring(0, start) + token + mainBoxText.substring(end);
+      setMainBoxText(newText);
+      // Set cursor position after the inserted token
+      setTimeout(() => {
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = start + token.length;
+      }, 0);
+    } else {
+      setMainBoxText(prev => prev + token);
+    }
+  }, [mainBoxText]);
+
   const finalizeSelection = (label, detail, icon, categoryType, accentColor) => {
     if (!selectedNodeId) return;
     const meta = CATEGORY_META[categoryType] || CATEGORY_META.TRIGGERS;
@@ -654,13 +719,58 @@ export default function ScenariosPage() {
     'create_appointment', 'search_appointments', 'update_appointment', 'delete_appointment',
   ]);
 
+  // Communication actions that show First Message + Prompt/Message toggle + main box
+  const COMMUNICATION_ACTION_KEYS = new Set([
+    'call_customer', 'call_phone_number',
+    'send_to_phone_number', 'send_to_customer',
+  ]);
+
+  // Find the trigger key from the parent node connected to the selected node
+  const findParentTriggerKey = useCallback((nodeId) => {
+    const parentEdge = edges.find(e => e.to === nodeId);
+    if (!parentEdge) return null;
+    const parentNode = nodeMap[parentEdge.from];
+    if (!parentNode || parentNode.categoryType !== 'TRIGGERS') return null;
+    // Map node label to trigger key
+    const allTriggers = AUTOMATION_HIERARCHY.TRIGGERS.flatMap(t => t.sub_options);
+    const trigger = allTriggers.find(t => t.name === parentNode.label);
+    return trigger?.key || null;
+  }, [edges, nodeMap]);
+
+  // Check if the selected node is a communication action
+  const isSelectedNodeCommunication = useMemo(() => {
+    if (!selectedNode || selectedNode.categoryType !== 'ACTIONS') return false;
+    const allActions = AUTOMATION_HIERARCHY.ACTIONS.flatMap(a => a.sub_options);
+    const action = allActions.find(a => a.name === selectedNode.label);
+    return action ? COMMUNICATION_ACTION_KEYS.has(action.key) : false;
+  }, [selectedNode]);
+
   const handleSubOptionClick = (subOption) => {
     const subIcon = activeOption?.icon || categoryMeta.icon;
     const subAccent = activeOption?.accent || categoryMeta.accent;
+    
+    // Check if this is a communication action
+    const isCommAction = COMMUNICATION_ACTION_KEYS.has(subOption.key);
+    
     finalizeSelection(subOption.name, subOption.description, subIcon, panelCategory, subAccent);
     
+    // Mark the node as communication action
+    if (isCommAction) {
+      setNodes(prev => prev.map(n =>
+        n.id === selectedNodeId
+          ? { ...n, isCommunication: true, firstMessage: '', mainBox: '', focus: 'prompt' }
+          : n
+      ));
+      // Show communication config form
+      setFirstMessageText('');
+      setMainBoxText('');
+      setFocusMode('prompt');
+      setPanelStage('communicationConfig');
+      setIsPanelVisible(true);
+      setPanelIntent(true);
+    }
     // If this is an appointment action, show config form
-    if (APPOINTMENT_CONFIG_ACTIONS.has(subOption.key)) {
+    else if (APPOINTMENT_CONFIG_ACTIONS.has(subOption.key)) {
       setAppointmentConfig({
         key: subOption.key,
         client_name: '',
@@ -850,6 +960,10 @@ export default function ScenariosPage() {
         accent: n.accent,
         icon: n.icon?.name,
         appointmentConfig: n.appointmentConfig || null,
+        isCommunication: n.isCommunication || false,
+        firstMessage: n.firstMessage || '',
+        mainBox: n.mainBox || '',
+        focus: n.focus || 'prompt',
       })),
       edges_data: edges.map(e => ({
         id: e.id,
@@ -1215,12 +1329,17 @@ export default function ScenariosPage() {
             <div className="sb-panel-inner">
               <div className="sb-panel-header">
                 <div>
-                  {showNodeConfigText && (
+                  {panelStage === 'communicationConfig' ? (
+                    <>
+                      <p className="sb-panel-label">Communication</p>
+                      <h3 className="sb-panel-title">Configure Action</h3>
+                    </>
+                  ) : showNodeConfigText ? (
                     <>
                       <p className="sb-panel-label">Node Config</p>
                       <h3 className="sb-panel-title">Add Component</h3>
                     </>
-                  )}
+                  ) : null}
                 </div>
                 <div className="sb-panel-header-controls">
                   <button type="button" className="sb-panel-delete" onClick={handleDeleteNode}>
@@ -1302,7 +1421,117 @@ export default function ScenariosPage() {
                 ))}
               </div>
               <div className="sb-panel-actions">
-                {panelStage === 'appointmentConfig' ? (
+                {panelStage === 'communicationConfig' ? (
+                  <div className="sb-comm-config">
+                    {/* First Message */}
+                    <div className="sb-comm-section">
+                      <label className="sb-comm-label">First Message</label>
+                      <p className="sb-comm-hint">What the agent says when the call connects</p>
+                      <textarea
+                        className="sb-comm-textarea sb-comm-first-msg"
+                        value={firstMessageText}
+                        onChange={e => setFirstMessageText(e.target.value)}
+                        placeholder="e.g. Hi, this is [business name] calling about your appointment..."
+                        rows={3}
+                      />
+                    </div>
+
+                    {/* Focus Toggle + Main Box */}
+                    <div className="sb-comm-section">
+                      <div className="sb-comm-toggle-row">
+                        <label className="sb-comm-label" style={{ marginBottom: 0 }}>Main Content</label>
+                        <div className="sb-comm-toggle">
+                          <button
+                            type="button"
+                            className={`sb-comm-toggle-btn ${focusMode === 'prompt' ? 'active' : ''}`}
+                            onClick={() => setFocusMode('prompt')}
+                          >
+                            Prompt
+                          </button>
+                          <button
+                            type="button"
+                            className={`sb-comm-toggle-btn ${focusMode === 'message' ? 'active' : ''}`}
+                            onClick={() => setFocusMode('message')}
+                          >
+                            Message
+                          </button>
+                        </div>
+                      </div>
+                      <p className="sb-comm-hint">
+                        {focusMode === 'prompt'
+                          ? 'System prompt — instructions for how the agent should behave'
+                          : 'Message — what the agent should say to the customer'}
+                      </p>
+                      <textarea
+                        ref={mainBoxRef}
+                        className="sb-comm-textarea sb-comm-main-box"
+                        value={mainBoxText}
+                        onChange={e => setMainBoxText(e.target.value)}
+                        placeholder={focusMode === 'prompt'
+                          ? 'e.g. Be professional and offer available reschedule times...'
+                          : 'e.g. Hi {{caller_name}}, I noticed you missed your appointment...'}
+                        rows={5}
+                      />
+
+                      {/* Rendered token preview */}
+                      {mainBoxText && mainBoxText.includes('{{smart:') && (
+                        <div className="sb-comm-token-preview">
+                          <span className="sb-comm-preview-label">Preview:</span>
+                          <div className="sb-comm-preview-content">
+                            {mainBoxText.split(/(\{\{smart:[^}]+\}\})/).map((part, i) => {
+                              const smartMatch = part.match(/^\{\{smart:([^}]+)\}\}$/);
+                              if (smartMatch) {
+                                const action = getSmartActionByKey(smartMatch[1]);
+                                return action ? (
+                                  <span key={i} className="sb-comm-token-chip">
+                                    <Sparkles size={10} />
+                                    {action.name}
+                                  </span>
+                                ) : <span key={i}>{part}</span>;
+                              }
+                              // Also render variable tokens
+                              const varMatch = part.match(/^\{\{([^}]+)\}\}$/);
+                              if (varMatch) {
+                                return <span key={i} className="sb-comm-var-chip">{varMatch[1]}</span>;
+                              }
+                              return <span key={i}>{part}</span>;
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Smart Actions */}
+                    <div className="sb-comm-section sb-comm-smart-section">
+                      <label className="sb-comm-label sb-comm-smart-label">
+                        <Sparkles size={13} />
+                        Smart Actions
+                      </label>
+                      <p className="sb-comm-hint">Click to insert into the main content area</p>
+                      <div className="sb-comm-smart-list">
+                        {getSmartActions(
+                          findParentTriggerKey(selectedNodeId)
+                        ).map(action => (
+                          <button
+                            key={action.key}
+                            type="button"
+                            className="sb-comm-smart-card"
+                            onClick={() => insertSmartAction(action)}
+                            title={action.description}
+                          >
+                            <div className="sb-comm-smart-icon">
+                              <Zap size={14} />
+                            </div>
+                            <div className="sb-comm-smart-info">
+                              <span className="sb-comm-smart-name">{action.name}</span>
+                              <span className="sb-comm-smart-desc">{action.description}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : panelStage === 'appointmentConfig' ? (
                   <div style={{ padding: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                       <h4 style={{ fontSize: 12, fontWeight: 800, color: '#fff', margin: 0 }}>Configure Appointment</h4>
