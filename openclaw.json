@@ -20,7 +20,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "Openrouter/anthropic/claude-opus-4.6"
+        "primary": "Openrouter/xiaomi/mimo-v2-omni"
       },
       "models": {
         "openrouter/auto": {
