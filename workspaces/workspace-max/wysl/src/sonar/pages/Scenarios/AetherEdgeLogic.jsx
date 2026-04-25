@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Zap, X, ChevronDown, Variable } from 'lucide-react';
+import { Zap, X } from 'lucide-react';
 import {
   LEAD_FIELDS,
   CONTACT_METHOD_OPTIONS,
@@ -250,7 +250,6 @@ const AetherEdgeLogic = ({
   isFallback = false,
   onToggleFallback,
 }) => {
-  const [showVariables, setShowVariables] = useState(false);
   const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startPosTop: 0, startPosLeft: 0 });
 
   // No clamping — free drag anywhere
@@ -341,31 +340,6 @@ const AetherEdgeLogic = ({
             </button>
           </div>
         </div>
-
-        {/* Available Variables Panel */}
-        {availableVariables.length > 0 && (
-          <div className="aether-variables-section">
-            <button
-              type="button"
-              className="aether-variables-toggle"
-              onClick={() => setShowVariables(!showVariables)}
-            >
-              <Variable size={12} />
-              Available Variables ({availableVariables.length})
-              <ChevronDown size={12} style={{ transform: showVariables ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
-            </button>
-            {showVariables && (
-              <div className="aether-variables-list">
-                {availableVariables.map((v, i) => (
-                  <div key={i} className="aether-variable-chip" title={v.reference}>
-                    <span className="aether-var-ref">{v.displayRef || v.reference}</span>
-                    <span className="aether-var-label">{v.label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
         <div className="aether-rule-group">
           {conditions.map((rule, idx) => {

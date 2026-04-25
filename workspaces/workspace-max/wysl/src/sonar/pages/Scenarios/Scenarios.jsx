@@ -56,6 +56,14 @@ const OPTION_ICONS = {
 const AUTOMATION_HIERARCHY = {
   TRIGGERS: [
     {
+      key: 'no_trigger',
+      option: 'No Trigger',
+      description: 'Use a schedule instead of an event',
+      accent: '#32f0d9',
+      icon: Clock,
+      sub_options: [],
+    },
+    {
       key: 'phone_calls',
       option: 'Phone Calls',
       description: 'When something happens with a call',
@@ -365,6 +373,14 @@ export default function ScenariosPage() {
   // Track currently loaded scenario
   const [currentScenario, setCurrentScenario] = useState(null);
   
+  // Bottom toolbar state
+  const [noTriggerActive, setNoTriggerActive] = useState(false);
+  const [scenarioIsActive, setScenarioIsActive] = useState(true);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [recurringSchedule, setRecurringSchedule] = useState({ frequency: 'once', interval: 1, time: '09:00' });
+  const [scenarioNotes, setScenarioNotes] = useState('');
+  
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
   const [quantumOrbits, setQuantumOrbits] = useState({}); // { [nodeId]: [ring configs] }
@@ -485,6 +501,32 @@ export default function ScenariosPage() {
       return () => clearTimeout(timer);
     }
   }, [nodes.length]);
+
+  const formatScheduleDisplay = (config) => {
+    const { frequency, interval, time, daysOfWeek } = config;
+    const timeStr = time ? ` at ${time}` : '';
+    switch (frequency) {
+      case 'once': return 'Run once';
+      case 'hourly': return `Every ${interval}h`;
+      case 'daily': return `Every ${interval}d${timeStr}`;
+      case 'weekly': {
+        const days = daysOfWeek?.length ? ` (${daysOfWeek.join(', ')})` : '';
+        return `Every ${interval}w${days}${timeStr}`;
+      }
+      case 'monthly': return `Every ${interval}mo${timeStr}`;
+      case 'yearly': return `Every ${interval}yr${timeStr}`;
+      default: return 'Run once';
+    }
+  };
+
+  const handleToggleRecurring = async () => {
+    const newActive = !scenarioIsActive;
+    setScenarioIsActive(newActive);
+    // Persist to Supabase if editing existing scenario
+    if (currentScenario?.id) {
+      await supabase.from('scenarios').update({ is_active: newActive }).eq('id', currentScenario.id);
+    }
+  };
 
   const optionsForCategory = AUTOMATION_HIERARCHY[panelCategory] || [];
   const normalizedPanelSearch = panelSearch.trim().toLowerCase();
@@ -981,6 +1023,10 @@ export default function ScenariosPage() {
     setSelectedNodeId(null);
     setIsPanelVisible(false);
     setPanelIntent(false);
+    // Show toolbar for "No Trigger" option
+    if (label === 'No Trigger') {
+      setNoTriggerActive(true);
+    }
   };
 
   const handleOptionClick = (option) => {
@@ -1175,6 +1221,12 @@ export default function ScenariosPage() {
     setViewMode('builder');
     setNodes([INITIAL_NODE]);
     setNodesOpacity(1);
+    
+    // Reset toolbar state
+    setNoTriggerActive(false);
+    setScenarioIsActive(true);
+    setRecurringSchedule({ frequency: 'once', interval: 1, time: '09:00' });
+    setScenarioNotes('');
   };
 
   const handleBackToList = () => {
@@ -1228,6 +1280,16 @@ export default function ScenariosPage() {
       
       // Track current scenario for save logic
       setCurrentScenario(scenario);
+      
+      // Load toolbar state
+      if (scenario.schedule_config) {
+        setRecurringSchedule(scenario.schedule_config);
+      }
+      setScenarioNotes(scenario.notes || '');
+      setScenarioIsActive(scenario.is_active !== false); // default true
+      // Show toolbar if any node has "No Trigger" or if schedule/notes exist
+      const hasNoTrigger = nodesData?.some(n => n.label === 'No Trigger');
+      setNoTriggerActive(hasNoTrigger || !!scenario.schedule_config || !!scenario.notes);
       
       // Switch to builder view
       setViewMode('builder');
@@ -1287,7 +1349,10 @@ export default function ScenariosPage() {
         to: e.to,
         filter: e.filter
       })),
-      status: 'active'
+      status: 'active',
+      is_active: scenarioIsActive,
+      schedule_config: recurringSchedule,
+      notes: scenarioNotes,
     };
     
     let result;
@@ -1899,7 +1964,7 @@ export default function ScenariosPage() {
                                     value={rawVal}
                                     onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
                                     onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
-                                    onBlur={() => { syncFieldTokens(field.key); }}
+
                                     placeholder=""
                                     rows={4}
                                     style={{
@@ -2379,7 +2444,189 @@ export default function ScenariosPage() {
           {currentScenario ? 'Save' : 'Save Scenario'}
         </button>
         
-        {/* Save Scenario Modal */}
+        {/* Bottom Toolbar — shown after intro node is configured */}
+        {nodes[0]?.configured && (
+          <div className="sb-bottom-toolbar">
+            <div className="sb-toolbar-inner">
+            {/* Power toggle */}
+            <div className="sb-toolbar-toggle-group">
+              <button
+                type="button"
+                className={`sb-toolbar-switch ${scenarioIsActive ? 'active' : ''}`}
+                onClick={handleToggleRecurring}
+              >
+                <div className="sb-toolbar-switch-thumb" />
+              </button>
+            </div>
+            
+            {/* Schedule — only for No Trigger */}
+            {noTriggerActive && (
+              <button
+                type="button"
+                className="sb-toolbar-schedule"
+                onClick={() => setShowScheduleModal(true)}
+              >
+                <Clock size={12} />
+                <span>{formatScheduleDisplay(recurringSchedule)}</span>
+              </button>
+            )}
+            
+            {/* Notes */}
+            <button
+              type="button"
+              className="sb-toolbar-icon-btn"
+              onClick={() => setShowNotesModal(true)}
+              title="Notes"
+            >
+              <Pencil size={13} />
+            </button>
+          </div>
+        </div>
+        )}
+        
+        {/* Schedule Modal */}
+        {showScheduleModal && (
+          <div className="sb-schedule-modal-overlay" onClick={() => setShowScheduleModal(false)}>
+            <div className="sb-schedule-modal" onClick={e => e.stopPropagation()}>
+              <div className="sb-schedule-modal-header">
+                <div className="sb-schedule-modal-title">
+                  <Clock size={14} />
+                  Schedule
+                </div>
+                <button type="button" className="sb-schedule-modal-close" onClick={() => setShowScheduleModal(false)}>
+                  <X size={14} />
+                </button>
+              </div>
+              
+              <div className="sb-schedule-modal-body">
+                {/* Frequency dropdown */}
+                <div className="sb-schedule-field">
+                  <label className="sb-schedule-label">Frequency</label>
+                  <select
+                    className="sb-input-field sb-select-field"
+                    value={recurringSchedule.frequency}
+                    onChange={e => setRecurringSchedule(prev => ({ ...prev, frequency: e.target.value }))}
+                  >
+                    <option value="once">Run Once</option>
+                    <option value="hourly">Hourly</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+                
+                {/* Scheduling options — hidden for "Run Once" */}
+                {recurringSchedule.frequency !== 'once' && (
+                <>
+                {/* Interval */}
+                <div className="sb-schedule-field">
+                  <label className="sb-schedule-label">
+                    Every
+                  </label>
+                  <div className="sb-schedule-input-row">
+                    <input
+                      className="sb-input-field sb-schedule-num-input"
+                      type="number"
+                      min={1}
+                      max={recurringSchedule.frequency === 'hourly' ? 24 : recurringSchedule.frequency === 'daily' ? 365 : 52}
+                      value={recurringSchedule.interval}
+                      onChange={e => setRecurringSchedule(prev => ({ ...prev, interval: Math.max(1, parseInt(e.target.value) || 1) }))}
+                    />
+                    <span className="sb-schedule-unit">
+                      {recurringSchedule.frequency === 'hourly' ? 'hours' :
+                       recurringSchedule.frequency === 'daily' ? 'days' :
+                       recurringSchedule.frequency === 'weekly' ? 'weeks' :
+                       recurringSchedule.frequency === 'monthly' ? 'months' : 'years'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Time picker (not for hourly) */}
+                {recurringSchedule.frequency !== 'hourly' && (
+                  <div className="sb-schedule-field">
+                    <label className="sb-schedule-label">Time</label>
+                    <input
+                      className="sb-input-field"
+                      type="time"
+                      value={recurringSchedule.time}
+                      onChange={e => setRecurringSchedule(prev => ({ ...prev, time: e.target.value }))}
+                    />
+                  </div>
+                )}
+                
+                {/* Days of week (weekly only) */}
+                {recurringSchedule.frequency === 'weekly' && (
+                  <div className="sb-schedule-field">
+                    <label className="sb-schedule-label">Days</label>
+                    <div className="sb-schedule-days">
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => {
+                        const isSelected = (recurringSchedule.daysOfWeek || []).includes(day);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            className={`sb-schedule-day-btn ${isSelected ? 'active' : ''}`}
+                            onClick={() => {
+                              setRecurringSchedule(prev => {
+                                const current = prev.daysOfWeek || [];
+                                const updated = isSelected ? current.filter(d => d !== day) : [...current, day];
+                                return { ...prev, daysOfWeek: updated };
+                              });
+                            }}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                </>
+                )}
+              </div>
+              
+              <div className="sb-schedule-modal-footer">
+                <button className="sb-schedule-cancel-btn" onClick={() => setShowScheduleModal(false)}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Notes Modal */}
+        {showNotesModal && (
+          <div className="sb-notes-modal-overlay" onClick={() => setShowNotesModal(false)}>
+            <div className="sb-notes-modal" onClick={e => e.stopPropagation()}>
+              <div className="sb-notes-modal-header">
+                <div className="sb-notes-modal-title">
+                  <Pencil size={14} />
+                  Notes
+                </div>
+                <button type="button" className="sb-notes-modal-close" onClick={() => setShowNotesModal(false)}>
+                  <X size={14} />
+                </button>
+              </div>
+              
+              <div className="sb-notes-modal-body">
+                <textarea
+                  className="sb-input-field sb-notes-textarea"
+                  value={scenarioNotes}
+                  onChange={e => setScenarioNotes(e.target.value)}
+                  placeholder="Add notes about this scenario..."
+                  rows={6}
+                />
+              </div>
+              
+              <div className="sb-notes-modal-footer">
+                <button className="sb-schedule-cancel-btn" onClick={() => setShowNotesModal(false)}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {showSaveModal && (
           <div className="save-scenario-modal-overlay">
             <div className="save-scenario-modal">
