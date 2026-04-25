@@ -336,6 +336,7 @@ export default function ScenariosPage() {
     { id: 1, variable: 'status', operator: 'equals', value: '' },
   ]);
   const edgeRulesRef = useRef(edgeRules);
+  const restoringFromNodeRef = useRef(false);
   
   // Save scenario modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -394,6 +395,25 @@ export default function ScenariosPage() {
     edgeRulesRef.current = edgeRules;
   }, [edgeRules]);
 
+  // Auto-save config to node on every field change
+  useEffect(() => {
+    if (restoringFromNodeRef.current) { restoringFromNodeRef.current = false; return; }
+    if (!selectedNodeId || !actionConfig) return;
+    setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, actionConfig: { ...actionConfig } } : n));
+  }, [actionConfig]);
+
+  useEffect(() => {
+    if (restoringFromNodeRef.current) { restoringFromNodeRef.current = false; return; }
+    if (!selectedNodeId || !appointmentConfig?.key) return;
+    setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, appointmentConfig: { ...appointmentConfig } } : n));
+  }, [appointmentConfig]);
+
+  useEffect(() => {
+    if (restoringFromNodeRef.current) { restoringFromNodeRef.current = false; return; }
+    if (!selectedNodeId || !scheduleConfig?.key) return;
+    setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, scheduleConfig: { ...scheduleConfig } } : n));
+  }, [scheduleConfig]);
+
   const nodeMap = useMemo(() => nodes.reduce((acc, node) => ({ ...acc, [node.id]: node }), {}), [nodes]);
   const selectedNode = selectedNodeId ? nodeMap[selectedNodeId] : null;
 
@@ -402,7 +422,11 @@ export default function ScenariosPage() {
   useEffect(() => {
     if (!selectedNodeId) return;
     const defaultCategory = isPrimaryNode ? selectedNode?.categoryType || 'TRIGGERS' : 'ACTIONS';
-    setPanelStage('options');
+    // Don't reset panelStage if selected node already has a config form open — restore happens in openSelectionPanel
+    setPanelStage(prev => {
+      if (['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(prev)) return prev;
+      return 'options';
+    });
     setActiveOption(null);
     setPanelSearch('');
     setPanelCategory(defaultCategory);
@@ -627,16 +651,19 @@ export default function ScenariosPage() {
       // If this node has a schedule config, show the schedule config form
       const node = nodeMap[nodeId];
       if (node?.scheduleConfig) {
+        restoringFromNodeRef.current = true;
         setScheduleConfig({ ...node.scheduleConfig });
         setPanelStage('scheduleConfig');
       }
       // If this node has an appointment config, show the config form
       else if (node?.appointmentConfig) {
+        restoringFromNodeRef.current = true;
         setAppointmentConfig({ ...node.appointmentConfig });
         setPanelStage('appointmentConfig');
       }
       // If this node has an action config, show the action config form
       else if (node?.actionConfig?._fields?.length) {
+        restoringFromNodeRef.current = true;
         setActionConfig({ ...node.actionConfig });
         setPanelStage('actionConfig');
       }
@@ -911,7 +938,7 @@ export default function ScenariosPage() {
       );
       
       if (needsAppointmentConfig) {
-        setAppointmentConfig({
+        const initApptConfig = {
           key: subOption.key,
           client_name: '',
           date: '',
@@ -920,24 +947,30 @@ export default function ScenariosPage() {
           status: 'pending',
           assigned_receptionist: '',
           notes: '',
-        });
+        };
+        restoringFromNodeRef.current = true;
+        setAppointmentConfig(initApptConfig);
+        setNodes(prev => prev.map(n => n.id === currentNodeId ? { ...n, appointmentConfig: initApptConfig } : n));
         setPanelStage('appointmentConfig');
       } else if (TIME_CONFIG_ACTIONS.has(subOption.key)) {
-        setScheduleConfig({
+        const initSchedConfig = {
           key: subOption.key,
           date: '',
           time: '09:00',
-          // recurring fields
           days_of_week: [],
-          // reminder fields
           reminder_minutes: 30,
           timezone: 'America/New_York',
-        });
+        };
+        restoringFromNodeRef.current = true;
+        setScheduleConfig(initSchedConfig);
+        setNodes(prev => prev.map(n => n.id === currentNodeId ? { ...n, scheduleConfig: initSchedConfig } : n));
         setPanelStage('scheduleConfig');
       } else {
         const initialConfig = { _key: subOption.key, _fields: subOption.configFields };
         subOption.configFields.forEach(f => { initialConfig[f.key] = ''; });
+        restoringFromNodeRef.current = true;
         setActionConfig(initialConfig);
+        setNodes(prev => prev.map(n => n.id === currentNodeId ? { ...n, actionConfig: initialConfig } : n));
         setPanelStage('actionConfig');
       }
       // Keep panel open — don't call finalizeSelection
@@ -1009,6 +1042,7 @@ export default function ScenariosPage() {
     )
       return;
     if (!event.target.closest('.sb-builder-node')) {
+      // Config auto-saves to node — just close the panel, data is preserved
       setSelectedNodeId(null);
       setIsPanelVisible(false);
       setPanelIntent(false);
@@ -1881,34 +1915,7 @@ export default function ScenariosPage() {
                         );
                       })}
                     </div>
-                    <button type="button" className="sb-action-config-save" onClick={() => {
-                      // Sync any pending display text → tokens before saving
-                      const syncedConfig = { ...actionConfig };
-                      if (syncedConfig._fields) {
-                        syncedConfig._fields.forEach(f => {
-                          const val = syncedConfig[f.key];
-                          if (val && typeof val === 'string') {
-                            syncedConfig[f.key] = val.replace(/\x1E([^\x1E]+)\x1E/g, (match, displayText) => {
-                              const triggerKey = findParentTriggerKey(selectedNodeId);
-                              const actions = getSmartActions(triggerKey, currentActionKey);
-                              const action = actions.find(a => a.instruction === displayText);
-                              return action ? `{smart:${action.key}}` : match;
-                            });
-                          }
-                        });
-                      }
-                      // Save action config to the node
-                      if (selectedNodeId) {
-                        setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, actionConfig: syncedConfig } : n));
-                      }
-                      setPanelStage('options');
-                      setActionConfig(null);
-                      setSelectedNodeId(null);
-                      setIsPanelVisible(false);
-                      setPanelIntent(false);
-                    }}>
-                      Save Config
-                    </button>
+                    {/* Config auto-saves to node on every field change — no Save button needed */}
                   </div>
                 ) : panelStage === 'appointmentConfig' ? (
                   <div style={{ padding: '16px' }}>
@@ -1996,21 +2003,7 @@ export default function ScenariosPage() {
                         </div>
                       )}
                     </div>
-                    <button type="button" onClick={() => {
-                      // Save config to the selected node
-                      const targetNode = selectedNodeId || nodes.find(n => n.configured && n.label === appointmentConfig.key?.replace(/_/g, ' '))?.id;
-                      if (targetNode) {
-                        setNodes(prev => prev.map(n => n.id === targetNode ? { ...n, appointmentConfig: { ...appointmentConfig } } : n));
-                      }
-                      setPanelStage('options');
-                      setAppointmentConfig({});
-                      setSelectedNodeId(null);
-                      setIsPanelVisible(false);
-                      setPanelIntent(false);
-                    }}
-                      style={{ width: '100%', marginTop: 14, padding: '8px 0', background: '#fff', color: '#000', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer' }}>
-                      Save Config
-                    </button>
+                    {/* Config auto-saves to node on every field change — no Save button needed */}
                   </div>
                 ) : panelStage === 'scheduleConfig' ? (
                   <div style={{ padding: '16px' }}>
@@ -2113,20 +2106,7 @@ export default function ScenariosPage() {
                         </div>
                       )}
                     </div>
-                    <button type="button" onClick={() => {
-                      // Save schedule config to the selected node
-                      if (selectedNodeId) {
-                        setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, scheduleConfig: { ...scheduleConfig } } : n));
-                      }
-                      setPanelStage('options');
-                      setScheduleConfig({});
-                      setSelectedNodeId(null);
-                      setIsPanelVisible(false);
-                      setPanelIntent(false);
-                    }}
-                      style={{ width: '100%', marginTop: 14, padding: '8px 0', background: '#fff', color: '#000', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer' }}>
-                      Save Schedule
-                    </button>
+                    {/* Config auto-saves to node on every field change — no Save button needed */}
                   </div>
                 ) : panelStage === 'options' ? (
                   filteredOptions.length === 0 ? (

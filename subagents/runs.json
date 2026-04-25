@@ -910,6 +910,41 @@
       "frozenResultCapturedAt": 1776999316600,
       "endedHookEmittedAt": 1776999335424,
       "cleanupCompletedAt": 1776999335426
+    },
+    "55689f43-7c7d-493f-b759-709f572275fa": {
+      "runId": "55689f43-7c7d-493f-b759-709f572275fa",
+      "childSessionKey": "agent:main:subagent:932937a5-b9c3-4d0b-8d4c-dce96b942d81",
+      "controllerSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterSessionKey": "agent:main:discord:direct:289460310673195018",
+      "requesterOrigin": {
+        "channel": "discord",
+        "to": "channel:1488359049891283105",
+        "accountId": "default"
+      },
+      "requesterDisplayKey": "agent:main:discord:direct:289460310673195018",
+      "task": "You're working on the WYSL app (Sonar scenarios builder). The active code is at `C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max\\wysl/src/sonar/pages/Scenarios/`. There are 3 changes to make:\n\n## 1. Don't reset node selection when clicking outside + Auto-save node config\n\n**Problem:** When user selects an action for a node (e.g. \"Call Customer\") and clicks outside the node (on the canvas background), the selection panel closes. When they click the node again, it opens the selection panel at \"options\" stage instead of restoring the node's config form. The node loses its selection state.\n\n**Root cause in `openNodeSelectionPanel` (around line 613-645):** When clicking a node, if it has action/appointment/schedule config data, it restores the config form. But `handleSubOptionClick` (line 880-958) configures the node's label/type/etc but does NOT store the `actionConfig`, `appointmentConfig`, or `scheduleConfig` on the node object itself. So when the panel re-opens, there's no config data to restore.\n\n**Fix approach:**\n- In `handleSubOptionClick`: Store the `actionConfig` on the node when the user picks a sub-option. For actions with configFields, save `{ _key: subOption.key, _fields: subOption.configFields, ...initialValues }` to the node's `actionConfig`. For appointment actions, store `appointmentConfig` on the node. For schedule actions, store `scheduleConfig` on the node.\n- Remove the \"Save Config\" button from the action config form (around line 1884). Instead, auto-save the config to the node on every change via `setNodes`.\n- In `openNodeSelectionPanel`: When a node already has a label set (configured), AND has actionConfig/appointmentConfig/scheduleConfig on it, restore the config form directly — don't go back to the options panel.\n- Also: When user clicks outside (in `handlePagePointerDown`), don't close the panel if the node has a config form open. OR always close the panel but preserve the node's data so it restores when re-clicked.\n\n## 2. Auto-save to nodes on every config change\n\nInstead of a \"Save Config\" button, sync the config data to the node whenever a field changes:\n- For `actionConfig`: In every `setActionConfig` onChange handler, also update the node's `actionConfig` via `setNodes`.\n- For `appointmentConfig`: Same approach.\n- For `scheduleConfig`: Same approach.\n\nThis means `setActionConfig` calls in onChange handlers should also call `setNodes(prev => prev.map(n => n.id === currentNodeId ? { ...n, actionConfig: newConfig } : n))`.\n\n## 3. Fix condition modal viewport clipping + make it draggable\n\n**Problem:** The condition/logic modal (AetherEdgeLogic component) opens at absolute coordinates that can be outside the viewport. \n\n**Fix approach:**\n- In `AetherEdgeLogic.jsx`, add viewport clamping: constrain `top` and `left` so the modal stays within the viewport bounds (using window.innerWidth/innerHeight or the builder container dimensions).\n- Add drag functionality to the modal header so user can reposition it. Use pointer events (pointerdown on header, pointermove on window, pointerup) to track drag offset and update the modal's position.\n- The modal should receive an `onPositionChange` callback or manage its own internal position state.\n\nRead the current code in these files first:\n- `C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max\\wysl/src/sonar/pages/Scenarios/Scenarios.jsx`\n- `C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max\\wysl/src/sonar/pages/Scenarios/AetherEdgeLogic.jsx`\n- `C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max\\wysl/src/sonar/pages/Scenarios/Scenarios.css`\n\nMake the changes, then run `npm run build` in the `wysl/` directory to verify the build passes.\n\nIMPORTANT: The `wysl/` directory is the ACTIVE codebase. Make all changes there.",
+      "cleanup": "keep",
+      "expectsCompletionMessage": true,
+      "spawnMode": "run",
+      "label": "scenarios-builder-fix",
+      "model": "openrouter/xiaomi/mimo-v2-pro",
+      "workspaceDir": "C:\\Users\\vboxuser\\.openclaw\\workspaces\\workspace-max",
+      "runTimeoutSeconds": 0,
+      "createdAt": 1777076480282,
+      "startedAt": 1777076481467,
+      "sessionStartedAt": 1777076480282,
+      "accumulatedRuntimeMs": 0,
+      "cleanupHandled": true,
+      "retainAttachmentsOnKeep": false,
+      "endedAt": 1777076768107,
+      "outcome": {
+        "status": "ok"
+      },
+      "endedReason": "subagent-complete",
+      "frozenResultText": "Build passes. All three changes are implemented. Here's the summary:\n\n## Changes Made\n\n### 1. Don't reset node selection + auto-save node config (`Scenarios.jsx`)\n\n- **`handleSubOptionClick`**: Now stores `appointmentConfig` and `scheduleConfig` on the node object via `setNodes` (was already doing this for `actionConfig` but inconsistently). Also stores `scheduleConfig` for time-based triggers.\n- **`useEffect` for `selectedNodeId`**: No longer blindly resets `panelStage` to `'options'` — preserves `actionConfig`/`appointmentConfig`/`scheduleConfig` stages so config forms aren't overwritten when switching between nodes.\n- **`openSelectionPanel`**: Correctly restores config forms when a node already has `actionConfig`/`appointmentConfig`/`scheduleConfig` stored on it.\n- **`handlePagePointerDown`**: Config data is auto-saved to the node, so clicking outside just closes the panel — data is preserved and restores on re-click.\n\n### 2. Auto-save to nodes on every config change (`Scenarios.jsx`)\n\n- Added three `useEffect` hooks that watch `actionConfig`, `appointmentConfig`, and `scheduleConfig` state and sync changes to the node via `setNodes` on every field change.\n- Added `restoringFromNodeRef` to prevent the auto-save effects from firing during initial config restore (avoids redundant saves).\n- Removed all three \"Save Config\" / \"Save Schedule\" buttons — config persists automatically.\n- `openSelectionPanel` and `handleSubOptionClick` set the restoring flag before setting local config state.\n\n### 3. Fix condition modal viewport clipping + make it draggable (`AetherEdgeLogic.jsx`)\n\n- Added `clampPosition()` that constrains `top`/`left` to stay within viewport bounds (`window.innerWidth`/`innerHeight`).\n- Added internal `position` state initialized from clamped `style` prop, with `useLayoutEffect` to re-clamp when the edge position changes.\n- Added drag functionality: `onPointerDown` on the header starts tracking, `pointermove` on window updates position (with clamping), `pointerup` stops.\n- Header gets `cursor: move` and `user-select: none` CSS.\n\n### Files Modified\n- `wysl/src/sonar/pages/Scenarios/Scenarios.jsx`\n- `wysl/src/sonar/pages/Scenarios/AetherEdgeLogic.jsx`\n- `wysl/src/sonar/pages/Scenarios/Scenarios.css`\n\nBuild passes cleanly.",
+      "frozenResultCapturedAt": 1777076768188,
+      "endedHookEmittedAt": 1777076777270,
+      "cleanupCompletedAt": 1777076777272
     }
   }
 }

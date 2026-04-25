@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Database, Zap, X, ChevronDown, Variable, GitBranch } from 'lucide-react';
 import {
   LEAD_FIELDS,
@@ -251,6 +251,65 @@ const AetherEdgeLogic = ({
 }) => {
   const [activeTab, setActiveTab] = useState('rules');
   const [showVariables, setShowVariables] = useState(false);
+  const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startPosTop: 0, startPosLeft: 0 });
+
+  // Clamp position to viewport bounds
+  const clampPosition = useCallback((top, left) => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const panelW = Math.min(460, vw - 20);
+    const panelH = 500; // estimated max height
+    return {
+      top: Math.max(10, Math.min(vh - panelH, top)),
+      left: Math.max(10, Math.min(vw - panelW, left)),
+    };
+  }, []);
+
+  const [position, setPosition] = useState(() => clampPosition(style?.top || 100, style?.left || 100));
+
+  // Re-clamp when style prop changes (edge clicked at new position)
+  useLayoutEffect(() => {
+    if (style) {
+      setPosition(clampPosition(style.top, style.left));
+    }
+  }, [style?.top, style?.left, clampPosition]);
+
+  // Drag handlers
+  const handleHeaderPointerDown = useCallback((e) => {
+    if (e.target.closest('button')) return; // don't drag when clicking buttons
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = {
+      dragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      startPosTop: position.top,
+      startPosLeft: position.left,
+    };
+    document.body.style.userSelect = 'none';
+  }, [position.top, position.left]);
+
+  useEffect(() => {
+    const handlePointerMove = (e) => {
+      if (!dragRef.current.dragging) return;
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      setPosition(clampPosition(
+        dragRef.current.startPosTop + dy,
+        dragRef.current.startPosLeft + dx,
+      ));
+    };
+    const handlePointerUp = () => {
+      dragRef.current.dragging = false;
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [clampPosition]);
 
   // Get context-appropriate fields
   const contextFields = useMemo(() => {
@@ -274,9 +333,9 @@ const AetherEdgeLogic = ({
   const selectableFields = useMemo(() => displayFields.filter(f => f.type !== '__section'), [displayFields]);
 
   return (
-    <div className="aether-logic-wrapper" style={style}>
+    <div className="aether-logic-wrapper" style={position}>
       <div className="aether-condition-panel">
-        <div className="aether-panel-header">
+        <div className="aether-panel-header" onPointerDown={handleHeaderPointerDown} style={{ cursor: 'move', userSelect: 'none' }}>
           <span className="condition-label">
             <Zap size={14} /> Condition
           </span>
