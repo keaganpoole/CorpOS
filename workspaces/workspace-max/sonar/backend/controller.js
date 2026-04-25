@@ -30,6 +30,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const { EventSystem } = require('./events/EventSystem');
 const { syncAgentVoice } = require('./elevenlabs/sync-voice');
+const { ScenarioEngine } = require('./scenarios/ScenarioEngine');
 
 // ─── Supabase Helper ─────────────────────────────────────
 function getSBHeaders() {
@@ -77,6 +78,14 @@ class Controller {
 
     // Init event system with Supabase helpers
     this.events = new EventSystem(this.broadcast.bind(this), { sbQuery });
+
+    // Init scenario engine
+    this.scenarioEngine = new ScenarioEngine({
+      eventSystem: this.events,
+      sbQuery,
+      broadcast: this.broadcast.bind(this),
+      app: this.app,
+    });
 
     // In-memory agent state cache (seeded from Supabase)
     this.agentCache = [];
@@ -1152,8 +1161,16 @@ class Controller {
   // ─── Lifecycle ────────────────────────────────────────────
   start() {
     return new Promise((resolve, reject) => {
-      this.server.listen(this.port, '127.0.0.1', () => {
+      this.server.listen(this.port, '127.0.0.1', async () => {
         console.log(`[SONAR] Controller running on http://127.0.0.1:${this.port}`);
+
+        // Start scenario engine
+        try {
+          await this.scenarioEngine.start();
+        } catch (err) {
+          console.error('[SONAR] Scenario engine failed to start:', err.message);
+        }
+
         resolve(this.port);
       });
       this.server.on('error', reject);
