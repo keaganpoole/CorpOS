@@ -311,6 +311,7 @@ export default function ScenariosPage() {
   const [nodes, setNodes] = useState([INITIAL_NODE]);
   const [edges, setEdges] = useState([]);
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
+  const [viewportReady, setViewportReady] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState('node-1');
   const [panelStyle, setPanelStyle] = useState({ top: 0, left: 0 });
   const [isPanelVisible, setIsPanelVisible] = useState(false);
@@ -333,10 +334,27 @@ export default function ScenariosPage() {
   const [hoveredTableColor, setHoveredTableColor] = useState('');
   const [actionConfig, setActionConfig] = useState(null);
   const [edgeRules, setEdgeRules] = useState([
-    { id: 1, variable: 'status', operator: 'equals', value: '' },
+    { id: 1, variable: 'status', operator: 'equals', value: '', logic: 'and' },
   ]);
   const edgeRulesRef = useRef(edgeRules);
   const restoringFromNodeRef = useRef(false);
+
+  // Trigger quantum orbit rings on an unconfigured node
+  const triggerQuantumOrbit = useCallback((nodeId) => {
+    const rings = Array.from({ length: 8 }, (_, i) => ({
+      id: Date.now() + i,
+      size: 140 + i * 18,
+      delay: i * 0.05,
+    }));
+    setQuantumOrbits(prev => ({ ...prev, [nodeId]: rings }));
+    setTimeout(() => {
+      setQuantumOrbits(prev => {
+        const next = { ...prev };
+        delete next[nodeId];
+        return next;
+      });
+    }, 1500);
+  }, []);
   
   // Save scenario modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -349,6 +367,7 @@ export default function ScenariosPage() {
   
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
+  const [quantumOrbits, setQuantumOrbits] = useState({}); // { [nodeId]: [ring configs] }
 
   // Fetch scenarios from Supabase on mount
   useEffect(() => {
@@ -441,19 +460,10 @@ export default function ScenariosPage() {
 
   useLayoutEffect(() => {
     if (initialFocusSet) return;
-    const builderRect = builderRef.current?.getBoundingClientRect();
-    const startNode = nodeMap[INITIAL_NODE.id];
-    if (!builderRect || !startNode) return;
-    const targetScale = 1.15;
-    const centerX = builderRect.width / 2;
-    const centerY = builderRect.height / 2;
-    setView({
-      x: centerX / targetScale - startNode.x,
-      y: centerY / targetScale - startNode.y,
-      scale: targetScale,
-    });
+    setView({ x: 0, y: 0, scale: 1 });
     setInitialFocusSet(true);
-  }, [initialFocusSet, nodeMap]);
+    setViewportReady(true);
+  }, [initialFocusSet]);
 
   const optionsForCategory = AUTOMATION_HIERARCHY[panelCategory] || [];
   const normalizedPanelSearch = panelSearch.trim().toLowerCase();
@@ -474,9 +484,12 @@ export default function ScenariosPage() {
     [activeOption, normalizedPanelSearch]
   );
   const categoryMeta = CATEGORY_META[panelCategory] || CATEGORY_META.TRIGGERS;
-  const visibleCategories = isPrimaryNode
-    ? PANEL_CATEGORIES
-    : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
+  const hasConfiguredTrigger = nodes.some(n => n.categoryType === 'TRIGGERS' && n.configured);
+  const visibleCategories = !hasConfiguredTrigger
+    ? ['TRIGGERS']
+    : isPrimaryNode
+      ? PANEL_CATEGORIES
+      : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
   const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage);
@@ -637,7 +650,16 @@ export default function ScenariosPage() {
   const openSelectionPanel = useCallback(
     (nodeId) => {
       setPanelIntent(true);
-      if (nodeId === INITIAL_NODE.id && !initialNodeShifted) {
+      // If this is the initial node and it's still unconfigured (in CSS overlay),
+      // reset its position to a sensible canvas location before transitioning
+      if (nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
+        setNodes((prev) =>
+          prev.map((node) =>
+            node.id === INITIAL_NODE.id ? { ...node, x: INITIAL_NODE.x - INITIAL_NODE_SHIFT, y: INITIAL_NODE.y } : node
+          )
+        );
+        setInitialNodeShifted(true);
+      } else if (nodeId === INITIAL_NODE.id && !initialNodeShifted) {
         setNodes((prev) =>
           prev.map((node) =>
             node.id === INITIAL_NODE.id ? { ...node, x: node.x - INITIAL_NODE_SHIFT } : node
@@ -705,6 +727,10 @@ export default function ScenariosPage() {
     const handlePointerUp = () => {
       if (dragRef.current.id) {
         if (!dragRef.current.moved) {
+          const clickedNode = nodeMap[dragRef.current.id];
+          if (clickedNode && !clickedNode.configured) {
+            triggerQuantumOrbit(dragRef.current.id);
+          }
           openSelectionPanel(dragRef.current.id);
         }
         dragRef.current = { id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 };
@@ -718,7 +744,7 @@ export default function ScenariosPage() {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [nodeMap, openSelectionPanel, view.x, view.y, view.scale]);
+  }, [nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
 
   const handleNodePointerDown = (nodeId, event) => {
     event.stopPropagation();
@@ -797,10 +823,10 @@ export default function ScenariosPage() {
     setPanelIntent(false);
   }, [selectedNodeId]);
 
-  const addEdgeRule = useCallback(() => {
+  const addEdgeRule = useCallback((logicType = 'and') => {
     setEdgeRules((prev) => [
       ...prev,
-      { id: Date.now(), variable: 'status', operator: 'equals', value: '' },
+      { id: Date.now(), variable: 'status', operator: 'equals', value: '', logic: logicType },
     ]);
   }, []);
 
@@ -1022,8 +1048,8 @@ export default function ScenariosPage() {
     
     // Load existing filter rules into edgeRules state
     const newRules = edge.filter && edge.filter.rules 
-      ? edge.filter.rules 
-      : [{ id: Date.now(), variable: 'status', operator: 'equals', value: '' }];
+      ? edge.filter.rules.map(r => ({ ...r, logic: r.logic || 'and' }))
+      : [{ id: Date.now(), variable: 'status', operator: 'equals', value: '', logic: 'and' }];
     
     // Update the ref immediately
     edgeRulesRef.current = newRules;
@@ -1056,12 +1082,14 @@ export default function ScenariosPage() {
     setEdges([]);
     setView({ x: 0, y: 0, scale: 1 });
     setSelectedNodeId('node-1');
-    setEdgeRules([{ id: 1, variable: 'status', operator: 'equals', value: '' }]);
+    setEdgeRules([{ id: 1, variable: 'status', operator: 'equals', value: '', logic: 'and' }]);
     setLogicPanel(null);
     setIsPanelVisible(false);
     setPanelIntent(false);
     setPanelStage('options');
     setActiveOption(null);
+    setInitialFocusSet(false);
+    setViewportReady(false);
     
     // Clear current scenario
     setCurrentScenario(null);
@@ -1110,9 +1138,9 @@ export default function ScenariosPage() {
         const centerX = nodesWidth / 2;
         const centerY = nodesHeight / 2;
         
-        // Center the view on the nodes
-        const viewX = -centerX + 400; // Center in canvas
-        const viewY = -centerY + 300;
+        // Center the view on the nodes (adjusted for live pulse panel)
+        const viewX = -centerX + window.innerWidth / 2;
+        const viewY = -centerY + window.innerHeight / 2;
         
         setView({ x: viewX, y: viewY, scale: 1 });
       } else {
@@ -1421,10 +1449,20 @@ export default function ScenariosPage() {
           onWheel={handleWheel}
         >
           <div className="sb-canvas-grid" />
+          
+          {/* Quantum Reveal label — shown when initial node is unconfigured */}
+          {nodes.length === 1 && !nodes[0].configured && (
+            <>
+              <div className="sb-quantum-label">QUANTUM REVEAL</div>
+              <div className="sb-quantum-hint">Tap to configure</div>
+            </>
+          )}
           <div
             className="sb-canvas-viewport"
             style={{
               transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+              opacity: viewportReady ? 1 : 0,
+              transition: 'opacity 0.15s ease',
             }}
           >
             <svg className="sb-canvas-connections">
@@ -1485,9 +1523,10 @@ export default function ScenariosPage() {
             })}
             
             {nodes.map((node) => {
+              // Skip initial unconfigured node — rendered in centering overlay
+              if (node.id === INITIAL_NODE.id && !node.configured) return null;
               const Icon = node.icon || null;
               const isActive = selectedNodeId === node.id;
-              const isInitialNode = node.id === INITIAL_NODE.id && initialPulse;
               const accent = node.accent || '#e11d48';
               return (
                 <div
@@ -1498,68 +1537,104 @@ export default function ScenariosPage() {
                   }}
                   className={`sb-builder-node ${node.type === 'router' ? 'router-node' : ''} ${
                     isActive ? 'sb-active-node' : ''
-                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isInitialNode ? 'sb-initial-pulse' : ''}`}
+                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'}`}
                   style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                 >
-                  {isInitialNode && <div className="sb-aether-track" />}
+                  {node.configured ? (
+                    <>
+                      <div className="sb-node-inner-wrap">
+                        {/* Outer Ring / Aura — exact from concepts.txt */}
+                        <div className={`sb-node-aura ${accent ? 'sb-node-custom-gradient' : ''}`}
+                          style={accent ? { '--node-accent-color': accent } : {}}
+                        />
 
-                  <div className="sb-node-inner-wrap">
-                    {/* Outer Ring / Aura — exact from concepts.txt */}
-                    <div className={`sb-node-aura ${accent ? 'sb-node-custom-gradient' : ''}`}
-                      style={accent ? { '--node-accent-color': accent } : {}}
-                    />
+                        {/* Outer Boundary Stroke — Concentric design */}
+                        <div className="sb-node-ring" />
 
-                    {/* Outer Boundary Stroke — Concentric design */}
-                    <div className="sb-node-ring" />
+                        {/* The Primary Gradient Sphere */}
+                        <div
+                          className={`sb-node-sphere ${isActive ? 'sb-sphere-active' : ''}`}
+                          style={{ '--node-accent-color': accent }}
+                        >
+                          <div className="sb-node-specular" />
+                          <div className="sb-node-dots">
+                            <svg width="100%" height="100%">
+                              <pattern id={`grid-${node.id}`} width="12" height="12" patternUnits="userSpaceOnUse">
+                                <circle cx="1" cy="1" r="0.6" fill="white" />
+                              </pattern>
+                              <rect width="100%" height="100%" fill={`url(#grid-${node.id})`} />
+                            </svg>
+                          </div>
+                          <div className="sb-node-core-shadow" />
+                        </div>
 
-                    {/* The Primary Gradient Sphere */}
-                    <div
-                      className={`sb-node-sphere ${isActive ? 'sb-sphere-active' : ''}`}
-                      style={{ '--node-accent-color': accent }}
-                    >
-                      <div className="sb-node-specular" />
-                      <div className="sb-node-dots">
-                        <svg width="100%" height="100%">
-                          <pattern id={`grid-${node.id}`} width="12" height="12" patternUnits="userSpaceOnUse">
-                            <circle cx="1" cy="1" r="0.6" fill="white" />
-                          </pattern>
-                          <rect width="100%" height="100%" fill={`url(#grid-${node.id})`} />
-                        </svg>
+                        {/* Icon Container with Glassmorphism */}
+                        <div className="sb-node-icon-glass">
+                          {Icon ? <Icon size={48} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={48} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
+                        </div>
+
+                        {/* Pulse Effect for Activity */}
+                        <div className="sb-node-pulse-dot" />
+
+                        {/* Add button */}
+                        <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
+                          <Plus size={16} />
+                        </button>
                       </div>
-                      <div className="sb-node-core-shadow" />
-                    </div>
 
-                    {/* Icon Container with Glassmorphism */}
-                    <div className="sb-node-icon-glass">
-                      {Icon ? <Icon size={48} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={48} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
-                    </div>
+                      {/* Label below — typography from concepts.txt */}
+                      <div className="sb-node-label-below">
+                        <h3 className="sb-node-below-title">{node.label}</h3>
+                        {node.detail && <p className="sb-node-below-desc">{node.detail}</p>}
+                      </div>
 
-                    {/* Pulse Effect for Activity */}
-                    {node.configured && (
-                      <div className="sb-node-pulse-dot" />
-                    )}
-
-                    {/* Add button */}
-                    {node.configured && (
-                      <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
-                        <Plus size={16} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Label below — typography from concepts.txt */}
-                  <div className="sb-node-label-below">
-                    <h3 className="sb-node-below-title">{node.label}</h3>
-                    {node.detail && <p className="sb-node-below-desc">{node.detail}</p>}
-                  </div>
-
-                  {/* Connecting Line Indicator */}
-                  <div className="sb-node-connector-line" />
+                      {/* Connecting Line Indicator */}
+                      <div className="sb-node-connector-line" />
+                    </>
+                  ) : (
+                    <>
+                      {/* One centered wrapper for the entire node composition */}
+                      <div className="sb-quantum-composition" onClick={(e) => { e.stopPropagation(); handleNodePointerUp(node.id); }}>
+                        <div className="sb-quantum-circle" />
+                        <div className="sb-quantum-orbits">
+                          {(quantumOrbits[node.id] || []).map(ring => (
+                            <div key={ring.id} className="sb-quantum-orbit-ring"
+                              style={{ width: ring.size, height: ring.size, animationDelay: `${ring.delay}s` }} />
+                          ))}
+                        </div>
+                        <div className="sb-quantum-arrow" />
+                        <div className="sb-quantum-cta-text">Click it. Click it real good.</div>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
           </div>
+
+          {/* Centered overlay for initial unconfigured node */}
+          {nodes.length === 1 && !nodes[0].configured && (
+            <div className="sb-quantum-centering">
+              <div
+                className={`sb-builder-node ${selectedNodeId === nodes[0].id ? 'sb-active-node' : ''}`}
+                ref={(el) => { if (el) nodeRefs.current[nodes[0].id] = el; }}
+                onPointerDown={(event) => handleNodePointerDown(nodes[0].id, event)}
+              >
+                <div className="sb-quantum-composition">
+                  <div className="sb-quantum-circle" />
+                  <div className="sb-quantum-orbits">
+                    {(quantumOrbits[nodes[0].id] || []).map(ring => (
+                      <div key={ring.id} className="sb-quantum-orbit-ring"
+                        style={{ width: ring.size, height: ring.size, animationDelay: `${ring.delay}s` }} />
+                    ))}
+                  </div>
+                  <div className="sb-quantum-arrow" />
+                  <div className="sb-quantum-cta-text">Click it. Click it real good.</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {isPanelVisible && selectedNodeId && (
@@ -2195,7 +2270,8 @@ export default function ScenariosPage() {
           <AetherEdgeLogic
             style={{ top: logicPanel.top, left: logicPanel.left }}
             conditions={edgeRules}
-            onAddRule={addEdgeRule}
+            onAddRule={() => addEdgeRule('and')}
+            onAddOrRule={() => addEdgeRule('or')}
             onRemoveRule={removeEdgeRule}
             onUpdateRule={updateEdgeRule}
             onSave={saveLogicPanel}

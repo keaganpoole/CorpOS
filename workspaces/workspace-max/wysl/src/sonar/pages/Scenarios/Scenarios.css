@@ -10,22 +10,6 @@
 }
 
 /* PRISMATIC REFINEMENT LOGIC */
-.sb-aether-track {
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  padding: 2px;
-  background: conic-gradient(var(--sb-accent-primary), var(--sb-accent-secondary), var(--sb-accent-rose), var(--sb-accent-primary));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  animation: sbSpinAether 1.5s linear infinite;
-  z-index: 1;
-}
-
-@keyframes sbSpinAether {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
 
 .scenarios-container {
   width: 100%;
@@ -41,6 +25,7 @@
   color: #fff;
   font-family: var(--sb-font-main);
   overflow: hidden;
+  border: 3px solid red;
 }
 
 /* Scenarios List Page */
@@ -563,9 +548,9 @@
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: var(--sb-accent-primary);
+  border-color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .form-group textarea {
@@ -627,6 +612,7 @@
   position: relative;
   padding: 0;
   height: 100%;
+  width: 100%;
 }
 
 .sb-canvas {
@@ -820,20 +806,7 @@
   transform: translate(-50%, -50%) rotate(360deg);
 }
 
-.sb-is-placeholder .sb-node-sphere {
-  background: rgba(255, 255, 255, 0.03) !important;
-  box-shadow: 0 8px 20px -5px rgba(0, 0, 0, 0.3), inset 0 2px 12px rgba(255, 255, 255, 0.08) !important;
-}
 
-.sb-sphere-active.sb-is-placeholder .sb-node-sphere {
-  box-shadow: 0 10px 25px -8px rgba(225, 29, 72, 0.5), inset 0 4px 20px rgba(255,255,255,0.2), 0 0 0 2px #e11d48 !important;
-}
-
-.sb-is-placeholder .sb-node-ring {
-  border-style: dashed;
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.02);
-}
 
 .sb-node-add {
   position: absolute;
@@ -989,6 +962,12 @@
   font-size: 13px;
   color: #fff;
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sb-panel-search input:focus {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .sb-panel-search-icon {
@@ -1201,7 +1180,7 @@
   background: linear-gradient(135deg, rgba(18, 18, 22, 0.98) 0%, rgba(25, 25, 30, 0.98) 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
-  box-shadow: 
+  box-shadow:
     0 40px 120px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 0 0 1px rgba(255, 255, 255, 0.02);
@@ -1381,9 +1360,9 @@
 }
 
 .sb-input-field:focus {
-  border-color: var(--sb-accent-primary);
+  border-color: #ffffff;
   background: rgba(14, 14, 16, 0.98);
-  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .rule-card .sb-input-field:last-of-type {
@@ -1414,9 +1393,9 @@
 }
 
 .sb-select-field:focus {
-  border-color: var(--sb-accent-primary);
+  border-color: #ffffff;
   background: rgba(14, 14, 16, 0.98);
-  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .sb-select-field option {
@@ -1704,6 +1683,135 @@
   font-weight: 600;
 }
 
+/* ─── Aether Rule Rows (Minimal Redesign) ─────────────────────────────── */
+.aether-rule-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(64, 64, 70, 0.6) transparent;
+}
+
+.aether-rule-group::-webkit-scrollbar {
+  width: 6px;
+}
+
+.aether-rule-group::-webkit-scrollbar-thumb {
+  background: rgba(74, 74, 80, 0.6);
+  border-radius: 999px;
+}
+
+.aether-rule-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border-left: 3px solid var(--sb-accent-primary);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.aether-rule-row:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.09);
+  border-left-color: var(--sb-accent-primary);
+}
+
+.aether-rule-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(12, 12, 14, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 7px 28px 7px 10px;
+  color: #fff;
+  font-size: 12px;
+  font-family: var(--sb-font-main);
+  cursor: pointer;
+  outline: none;
+  color-scheme: dark;
+  min-width: 0;
+  flex: 1 1 0;
+  transition: border-color 0.15s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.35)' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.aether-rule-select:focus {
+  border-color: #ffffff;
+}
+
+.aether-rule-select option {
+  background: #0b0b0d;
+  color: #f4f4f5;
+}
+
+.aether-rule-select--op {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 100px;
+}
+
+.aether-rule-value {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.aether-rule-value .sb-input-field,
+.aether-rule-value .sb-select-field {
+  padding: 7px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  width: 100%;
+}
+
+.aether-rule-remove {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.aether-rule-remove:hover {
+  color: var(--sb-accent-rose);
+  background: rgba(244, 114, 182, 0.12);
+}
+
+.aether-rule-logic-pill {
+  display: inline-flex;
+  align-self: center;
+  margin-left: 8px;
+  padding: 2px 10px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: rgba(50, 240, 217, 0.85);
+  background: rgba(50, 240, 217, 0.08);
+  border: 1px solid rgba(50, 240, 217, 0.2);
+  border-radius: 999px;
+}
+
+.aether-rule-logic-pill--or {
+  color: rgba(56, 189, 248, 0.85);
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.2);
+}
+
 /* ─── Staged Action Config Form ───────────────────────────────────────── */
 .sb-action-config-form {
   padding: 16px;
@@ -1786,9 +1894,9 @@
 
 .sb-action-textarea-wrapper .sb-input-field:focus,
 .sb-action-input-wrapper .sb-input-field:focus {
-  border-color: var(--sb-accent-primary);
+  border-color: #ffffff;
   background: rgba(0, 0, 0, 0.8);
-  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 /* Variable Insertion Chips */
@@ -2276,4 +2384,218 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   QUANTUM REVEAL - Pure concepts.txt node (v2 clean replacement)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Non-initial unconfigured nodes: fixed wrapper size matching the composition */
+.sb-builder-node.sb-is-placeholder {
+  width: 300px;
+  height: 360px;
+}
+
+/* CSS-centered overlay for the initial unconfigured node */
+.sb-quantum-centering {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.sb-quantum-centering .sb-builder-node {
+  pointer-events: auto;
+  position: relative;
+  width: 300px;
+  height: 360px;
+  transform: none;
+}
+
+.sb-quantum-centering .sb-builder-node:hover {
+  transform: scale(1.005);
+}
+
+.sb-quantum-centering .sb-quantum-composition {
+  width: 300px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Base quantum composition (for non-overlay unconfigured nodes) */
+.sb-quantum-composition {
+  width: 300px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  gap: 0;
+  z-index: 10;
+}
+
+.sb-quantum-circle {
+  width: 240px;
+  height: 240px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: transparent;
+  animation: 
+    quantum-fade-in 1s 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    quantum-breathe 6s 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  opacity: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Orbit rings overlay (positioned over the circle) */
+.sb-quantum-orbits {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 240px;
+  height: 240px;
+  pointer-events: none;
+  z-index: 11;
+}
+
+.sb-quantum-orbit-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: quantum-orbit-expand 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.sb-quantum-arrow {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to top, white, transparent);
+  position: relative;
+  animation: arrow-bob 3s ease-in-out infinite;
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+
+.sb-quantum-arrow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-left: 1px solid white;
+  border-top: 1px solid white;
+  transform: translate(-50%, 0) rotate(45deg);
+}
+
+.sb-quantum-cta-text {
+  font-weight: 500;
+  font-size: 0.85rem;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  opacity: 0;
+  animation: cta-reveal 0.3s 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  flex-shrink: 0;
+  margin-top: 12px;
+}
+
+/* "QUANTUM REVEAL" label on canvas */
+.sb-quantum-label {
+  position: absolute;
+  top: 2rem;
+  left: 2rem;
+  font-weight: 300;
+  letter-spacing: 0.5em;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.8rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* "Tap to configure" hint */
+.sb-quantum-hint {
+  position: absolute;
+  bottom: 2rem;
+  width: 100%;
+  text-align: center;
+  color: #444;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Keyframes */
+@keyframes quantum-fade-in {
+  0% {
+    background: transparent;
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    background: white;
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes quantum-breathe {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0px rgba(255, 255, 255, 0);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 40px rgba(255, 255, 255, 0.15);
+  }
+}
+
+@keyframes quantum-orbit-expand {
+  0% {
+    transform: scale(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.5) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+@keyframes cta-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes arrow-bob {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
 }

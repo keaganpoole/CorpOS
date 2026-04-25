@@ -1,114 +1,207 @@
-import React, { useState } from 'react';
-import { Workflow } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Wire Reveal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;600;900&display=swap');
 
-const Node = ({ icon: Icon, gradient, shadowColor, title, description, delay }) => {
-  const [isHovered, setIsHovered] = useState(false);
-
-  return (
-    <div 
-      className="flex flex-col items-center group transition-all duration-700 ease-out"
-      style={{ 
-        animation: `fadeInUp 0.8s ease-out ${delay}s both`,
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* The Main Node Body */}
-      <div className="relative w-32 h-32 md:w-44 md:h-44 flex items-center justify-center cursor-pointer">
-        
-        {/* Outer Ring / Aura - Significantly tightened and reduced */}
-        <div 
-          className={`absolute inset-0 rounded-full transition-all duration-1000 blur-xl opacity-5 group-hover:opacity-10 group-hover:scale-95 ${gradient}`}
-        />
-
-        {/* The Outer Boundary Stroke - Concentric design */}
-        <div className="absolute inset-0 rounded-full border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-inner" />
-
-        {/* The Primary Gradient Sphere */}
-        <div 
-          className={`absolute inset-3 rounded-full shadow-2xl transition-all duration-500 overflow-hidden ${gradient} ${isHovered ? 'scale-105' : 'scale-100'}`}
-          style={{
-            boxShadow: isHovered 
-              ? `0 10px 25px -8px ${shadowColor}55, inset 0 4px 20px rgba(255,255,255,0.2)` 
-              : `0 8px 20px -5px ${shadowColor}44, inset 0 2px 12px rgba(255,255,255,0.15)`
-          }}
-        >
-          {/* Internal Specular Highlight (The "Glass" Look) */}
-          <div className="absolute top-[-30%] left-[-20%] w-[140%] h-[140%] bg-gradient-to-br from-white/40 via-transparent to-transparent pointer-events-none" />
-          
-          {/* Subtle Internal Pattern */}
-          <div className="absolute inset-0 opacity-20 mix-blend-overlay">
-            <svg width="100%" height="100%">
-              <pattern id="grid" width="12" height="12" patternUnits="userSpaceOnUse">
-                <circle cx="1" cy="1" r="0.6" fill="white" />
-              </pattern>
-              <rect width="100%" height="100%" fill="url(#grid)" />
-            </svg>
-          </div>
-
-          {/* Deep Core Shadow for dimension */}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,rgba(0,0,0,0.4)_100%)]" />
-        </div>
-
-        {/* Icon Container with Glassmorphism */}
-        <div className="relative z-10 flex items-center justify-center w-16 h-16 md:w-24 md:h-24 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 shadow-2xl group-hover:rotate-[360deg] transition-transform duration-1000 ease-in-out">
-          <Icon 
-            size={40} 
-            className="text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]" 
-            strokeWidth={1.5}
-          />
-        </div>
-      </div>
-
-      {/* Typography Section */}
-      <div className="mt-8 text-center max-w-[220px]">
-        <h3 className="text-xl md:text-2xl font-bold tracking-tight text-white transition-colors duration-300">
-          {title}
-        </h3>
-        <p className="mt-2 text-sm font-medium text-slate-400 leading-relaxed opacity-80 group-hover:opacity-100 transition-opacity">
-          {description}
-        </p>
-      </div>
-
-      {/* Connecting Line Indicator */}
-      <div className="mt-6 w-px h-16 bg-gradient-to-b from-white/20 to-transparent opacity-30 group-hover:h-20 transition-all duration-500" />
-    </div>
-  );
-};
-
-export default function App() {
-  const processHubNode = {
-    title: "Process Hub",
-    description: "Centralize your operational workflow management.",
-    icon: Workflow,
-    gradient: "bg-gradient-to-tr from-rose-600 via-red-500 to-orange-500",
-    shadowColor: "#e11d48",
-  };
-
-  return (
-    <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center overflow-hidden">
-      <style>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(40px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+        :root {
+            --bg: #050505;
+            --accent: #ffffff;
+            --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-breath: cubic-bezier(0.45, 0, 0.55, 1);
         }
+
         body {
-          background-color: #0a0a0c;
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-      `}</style>
-      
-      <div className="max-w-7xl mx-auto">
-        <Node 
-          {...processHubNode} 
-          delay={0}
-        />
-      </div>
+
+        .circle-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .main-circle {
+            width: 240px;
+            height: 240px;
+            background: transparent;
+            border: 2px solid white;
+            border-radius: 50%;
+            opacity: 0;
+            position: relative;
+            z-index: 10;
+            animation: 
+                quantum-fade 1s 0.5s var(--ease-expo) forwards,
+                quantum-breathe 6s 1.5s var(--ease-breath) infinite;
+        }
+
+        /* The CTA Text and Arrow */
+        .cta-container {
+            position: absolute;
+            bottom: -80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            opacity: 0;
+            /* Delayed by an extra 1.5s (Original 1.2s + 1.5s = 2.7s) */
+            animation: cta-appear 0.3s 1.8s var(--ease-expo) forwards;
+            pointer-events: none;
+        }
+
+        .cta-text {
+            font-weight: 500;
+            font-size: 0.85rem;
+            letter-spacing: -0.01em;
+            color: rgba(255, 255, 255, 0.9);
+            white-space: nowrap;
+        }
+
+        .cta-arrow {
+            width: 1px;
+            height: 40px;
+            background: linear-gradient(to top, white, transparent);
+            position: relative;
+            animation: arrow-float 3s ease-in-out infinite;
+        }
+
+        .cta-arrow::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 5px;
+            height: 5px;
+            border-left: 1px solid white;
+            border-top: 1px solid white;
+            transform: translate(-50%, 0) rotate(45deg);
+        }
+
+        .quantum-bit {
+            position: absolute;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: quantum-orbit 1.2s var(--ease-expo) forwards;
+        }
+
+        @keyframes cta-appear {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes arrow-float {
+            0%, 100% { transform: translateY(0); opacity: 0.4; }
+            50% { transform: translateY(-8px); opacity: 1; }
+        }
+
+        @keyframes quantum-orbit {
+            0% { transform: scale(0) rotate(0); opacity: 1; }
+            100% { transform: scale(1.5) rotate(180deg); opacity: 0; }
+        }
+
+        @keyframes quantum-fade {
+            0% { background: transparent; transform: scale(0.8); opacity: 0; }
+            100% { background: white; transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes quantum-breathe {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 0 0px rgba(255, 255, 255, 0);
+            }
+            50% { 
+                transform: scale(1.04); 
+                box-shadow: 0 0 40px rgba(255, 255, 255, 0.15);
+            }
+        }
+
+        .label {
+            position: absolute;
+            top: 2rem;
+            left: 2rem;
+            font-weight: 300;
+            letter-spacing: 0.5em;
+            color: rgba(255,255,255,0.4);
+            font-size: 0.8rem;
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 2rem;
+            width: 100%;
+            text-align: center;
+            color: #444;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="label">QUANTUM REVEAL</div>
+
+    <div id="container" class="circle-container" onclick="trigger()">
+        <div id="circle" class="main-circle"></div>
+        
+        <!-- CTA Element -->
+        <div class="cta-container" id="cta">
+            <div class="cta-arrow"></div>
+            <div class="cta-text">Click it. Click it real good.</div>
+        </div>
     </div>
-  );
-}
+
+    <div class="hint">Tap to re-sequence</div>
+
+    <script>
+        function trigger() {
+            const container = document.getElementById('container');
+            const circle = document.getElementById('circle');
+            const cta = document.getElementById('cta');
+
+            // Clear previous bits
+            const extras = container.querySelectorAll('.quantum-bit');
+            extras.forEach(el => el.remove());
+
+            // Force reflow for circle
+            circle.style.animation = 'none';
+            void circle.offsetWidth; 
+            circle.style.animation = 'quantum-fade 1s 0.5s var(--ease-expo) forwards, quantum-breathe 6s 1.5s var(--ease-breath) infinite';
+
+            // Force reflow for CTA to restart delayed entry
+            cta.style.animation = 'none';
+            void cta.offsetWidth;
+            cta.style.animation = 'cta-appear 1.2s 2.7s var(--ease-expo) forwards';
+
+            // Generate bits
+            for(let i=0; i<8; i++) {
+                const bit = document.createElement('div');
+                bit.className = 'quantum-bit';
+                bit.style.width = (200 + i*20) + 'px';
+                bit.style.height = (200 + i*20) + 'px';
+                bit.style.animationDelay = (i * 0.05) + 's';
+                container.appendChild(bit);
+            }
+        }
+
+        window.onload = trigger;
+    </script>
+</body>
+</html>
