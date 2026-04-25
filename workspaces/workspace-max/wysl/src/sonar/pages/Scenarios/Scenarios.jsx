@@ -631,8 +631,8 @@ export default function ScenariosPage() {
       return;
     }
     const rect = nodeEl.getBoundingClientRect();
-    const panelWidth = 480;
-    const panelHeight = 760;
+    const panelWidth = 400;
+    const panelHeight = 640;
     
     let left = rect.right - pageRect.left + 40;
     if (left + panelWidth > pageRect.width) {
@@ -1575,7 +1575,7 @@ export default function ScenariosPage() {
 
                         {/* Icon Container with Glassmorphism */}
                         <div className="sb-node-icon-glass">
-                          {Icon ? <Icon size={48} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={48} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
+                          {Icon ? <Icon size={42} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={42} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
                         </div>
 
                         {/* Pulse Effect for Activity */}
@@ -1583,7 +1583,7 @@ export default function ScenariosPage() {
 
                         {/* Add button */}
                         <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
-                          <Plus size={16} />
+                          <Plus size={13} />
                         </button>
                       </div>
 
@@ -2267,7 +2267,7 @@ export default function ScenariosPage() {
               position: 'absolute',
               top: panelStyle.top,
               left: Math.max(10, (panelStyle.left || 0) - 228 - 8),
-              height: 760,
+              height: 640,
             }}
           />
         )}

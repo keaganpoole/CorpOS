@@ -416,8 +416,8 @@ export default function ScenariosPage() {
       return;
     }
     const rect = nodeEl.getBoundingClientRect();
-    const panelWidth = 480;
-    const panelHeight = 760;
+    const panelWidth = 400;
+    const panelHeight = 640;
     
     let left = rect.right - pageRect.left + 40;
     if (left + panelWidth > pageRect.width) {
@@ -1307,7 +1307,7 @@ export default function ScenariosPage() {
                     <div className="sb-node-sphere" style={{ background: `linear-gradient(135deg, ${accent}, ${accent}99)` }}>
                       <div className="sb-node-core-shadow" />
                       <div className="sb-node-icon-wrapper" style={{ color: '#fff' }}>
-                        {Icon ? <Icon size={22} strokeWidth={1.5} /> : <Plus size={22} strokeWidth={1.5} />}
+                        {Icon ? <Icon size={19} strokeWidth={1.5} /> : <Plus size={19} strokeWidth={1.5} />}
                       </div>
                     </div>
                   </div>
@@ -1324,7 +1324,7 @@ export default function ScenariosPage() {
                   {/* Add child button */}
                   {node.configured && (
                     <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
-                      <Plus size={16} />
+                      <Plus size={12} />
                     </button>
                   )}
                 </div>

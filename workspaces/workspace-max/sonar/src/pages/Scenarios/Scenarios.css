@@ -677,8 +677,8 @@
 /* Nodes — Sphere Design (matching concepts.txt) */
 .sb-builder-node {
   position: absolute;
-  width: 140px;
-  height: 180px;
+  width: 108px;
+  height: 140px;
   transform: translate(-50%, -50%);
   cursor: grab;
   z-index: 5;
@@ -695,8 +695,8 @@
 /* Sphere body wrapper */
 .sb-node-core {
   position: relative;
-  width: 100px;
-  height: 100px;
+  width: 76px;
+  height: 76px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -788,8 +788,8 @@
 .sb-node-icon-wrapper {
   position: relative;
   z-index: 4;
-  width: 42px;
-  height: 42px;
+  width: 32px;
+  height: 32px;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   border-radius: 50%;
@@ -808,22 +808,22 @@
 /* Typography section below sphere */
 .sb-node-content {
   text-align: center;
-  margin-top: 14px;
-  max-width: 130px;
+  margin-top: 10px;
+  max-width: 100px;
   overflow: hidden;
 }
 
 .sb-node-category {
-  font-size: 9px;
+  font-size: 7px;
   text-transform: uppercase;
   letter-spacing: 1.5px;
   color: var(--sb-text-dim);
-  margin: 0 0 3px 0;
+  margin: 0 0 2px 0;
   font-weight: 700;
 }
 
 .sb-node-title {
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 700;
   margin: 0;
   color: #fff;
@@ -858,10 +858,10 @@
 /* Add child button — floating orb */
 .sb-node-add {
   position: absolute;
-  right: -16px;
-  bottom: 20px;
-  width: 28px;
-  height: 28px;
+  right: -13px;
+  bottom: 16px;
+  width: 22px;
+  height: 22px;
   background: #252529;
   border: 1px solid var(--sb-border-color);
   border-radius: 50%;
@@ -900,7 +900,7 @@
 /* Connecting line indicator (below sphere) */
 .sb-node-line {
   width: 1px;
-  height: 30px;
+  height: 22px;
   background: linear-gradient(to bottom, rgba(255,255,255,0.15), transparent);
   opacity: 0.3;
   margin-top: -2px;
@@ -908,14 +908,14 @@
 }
 
 .sb-builder-node:hover .sb-node-line {
-  height: 40px;
+  height: 30px;
 }
 
 /* Panel */
 .sb-selection-panel {
   position: absolute;
-  width: 480px;
-  height: 760px;
+  width: 400px;
+  height: 640px;
   background: var(--sb-bg-panel);
   backdrop-filter: blur(30px) saturate(150%);
   border-radius: 28px;
@@ -932,7 +932,7 @@
 }
 
 .sb-panel-inner {
-  padding: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -942,7 +942,7 @@
 .sb-panel-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .sb-panel-header-controls {
@@ -985,7 +985,7 @@
 
 .sb-panel-search {
   position: relative;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .sb-panel-search input {
@@ -993,7 +993,7 @@
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 10px 12px 10px 36px;
+  padding: 8px 10px 8px 32px;
   font-size: 13px;
   color: #fff;
   outline: none;
@@ -1011,13 +1011,13 @@
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   padding-bottom: 4px;
 }
 
 .sb-panel-tab {
   white-space: nowrap;
-  padding: 6px 14px;
+  padding: 5px 10px;
   border-radius: 20px;
   font-size: 12px;
   background: transparent;
@@ -1034,8 +1034,8 @@
 }
 
 .sb-panel-subheader {
-  margin: 0 0 12px;
-  font-size: 13px;
+  margin: 0 0 8px;
+  font-size: 12px;
   letter-spacing: 0.5px;
   color: var(--sb-text-dim);
 }
@@ -1046,7 +1046,7 @@
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
@@ -1069,8 +1069,8 @@
 .sb-panel-action-card {
   display: flex;
   align-items: center;
-  padding: 12px;
-  border-radius: 16px;
+  padding: 8px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid transparent;
   cursor: pointer;
@@ -1087,13 +1087,13 @@
 }
 
 .sb-panel-action-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 12px;
+  margin-right: 8px;
 }
 
 .sb-panel-action-info {
@@ -1102,13 +1102,13 @@
 
 .sb-panel-action-label {
   display: block;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   margin-bottom: 2px;
 }
 
 .sb-panel-action-detail {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--sb-text-dim);
   margin-top: 0;
   display: block;
@@ -1122,15 +1122,15 @@
 .sb-active-banner.sleek-cyber {
   background: #111114;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 20px 24px;
+  padding: 14px 16px;
   animation: sbSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .sb-cyber-inner {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .sb-cyber-header {
@@ -1140,7 +1140,7 @@
 }
 
 .sb-cyber-pill {
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 6px;
   font-size: 10px;
   font-weight: 700;
@@ -1165,8 +1165,8 @@
 }
 
 .sb-cyber-icon-box {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -1179,14 +1179,14 @@
 }
 
 .sb-cyber-title {
-  font-size: 18px;
+  font-size: 16px;
   margin: 0;
   color: #fff;
   letter-spacing: -0.5px;
 }
 
 .sb-cyber-desc {
-  font-size: 12px;
+  font-size: 11px;
   margin: 2px 0 0;
   color: rgba(255, 255, 255, 0.5);
 }
