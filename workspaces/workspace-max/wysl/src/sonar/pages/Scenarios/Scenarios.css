@@ -2495,9 +2495,10 @@
   height: 40px;
   background: linear-gradient(to top, white, transparent);
   position: relative;
-  animation: arrow-bob 3s ease-in-out infinite;
   flex-shrink: 0;
   margin-top: 24px;
+  opacity: 0;
+  animation: cta-reveal 0.3s 2.0s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .sb-quantum-arrow::after {
@@ -2522,6 +2523,18 @@
   animation: cta-reveal 0.3s 2.0s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   flex-shrink: 0;
   margin-top: 20px;
+}
+
+.sb-quantum-arrow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-left: 1px solid white;
+  border-top: 1px solid white;
+  transform: translate(-50%, 0) rotate(45deg);
 }
 
 /* "QUANTUM REVEAL" label on canvas */
@@ -2593,11 +2606,9 @@
 @keyframes cta-reveal {
   from {
     opacity: 0;
-    transform: translateY(10px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
