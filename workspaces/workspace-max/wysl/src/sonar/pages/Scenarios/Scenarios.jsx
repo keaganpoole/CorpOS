@@ -300,7 +300,6 @@ const CATEGORY_META = {
 const PANEL_CATEGORIES = ['TRIGGERS', 'ACTIONS', 'UTILITIES'];
 
 const INITIAL_NODE = { id: 'node-1', x: 200, y: 300, configured: false, label: 'Start Flow' };
-const INITIAL_NODE_SHIFT = 140;
 
 const sbLabelStyle = { fontSize: 9, fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 4, display: 'block' };
 const sbInputStyle = { width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: '#e4e4e7', outline: 'none', boxSizing: 'border-box' };
@@ -404,6 +403,9 @@ export default function ScenariosPage() {
   const builderRef = useRef(null);
   const canvasRef = useRef(null);
   const nodeRefs = useRef({});
+  const introCircleRef = useRef(null);
+  const circleRefs = useRef({}); // per-node circle element refs
+  const [debugOverlay, setDebugOverlay] = useState(null);
   const dragRef = useRef({ id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 });
   const panRef = useRef(null);
   const nodeIdCounter = useRef(1);
@@ -655,22 +657,82 @@ export default function ScenariosPage() {
     repositionPanel();
   }, [selectedNodeId, nodes, view.x, view.y, repositionPanel]);
 
+  // Debug overlay: measure circle positions for nodes with edges
+  useLayoutEffect(() => {
+    const pageRect = builderRef.current?.getBoundingClientRect();
+    if (!pageRect) return;
+    const overlays = [];
+    edges.forEach((edge) => {
+      const parentEl = nodeRefs.current[edge.from];
+      const childEl = nodeRefs.current[edge.to];
+      if (!parentEl || !childEl) return;
+      const parentCircle = circleRefs.current[edge.from] || parentEl;
+      const childCircle = circleRefs.current[edge.to] || childEl;
+      const parentRect = parentCircle.getBoundingClientRect();
+      const childRect = childCircle.getBoundingClientRect();
+      const parentCX = parentRect.left + parentRect.width / 2 - pageRect.left;
+      const parentCY = parentRect.top + parentRect.height / 2 - pageRect.top;
+      const childCX = childRect.left + childRect.width / 2 - pageRect.left;
+      const childCY = childRect.top + childRect.height / 2 - pageRect.top;
+      // Connector target = left edge of child circle
+      const targetX = childRect.left - pageRect.left;
+      overlays.push({ parentCX, parentCY, childCX, childCY, targetX, targetY: childCY });
+      console.log('[DEBUG NODES]', {
+        parentId: edge.from,
+        childId: edge.to,
+        parentCircleCenterY_relative: parentCY.toFixed(3),
+        childCircleCenterY_relative: childCY.toFixed(3),
+        connectorEndY_relative: childCY.toFixed(3),
+        childNodePositionY: childEl.getBoundingClientRect().top + childEl.getBoundingClientRect().height / 2 - pageRect.top,
+        measuredParentCircleY: circleCenterRef.current[edge.from]?.cy?.toFixed(3) ?? 'not measured',
+        measuredChildCircleY: circleCenterRef.current[edge.to]?.cy?.toFixed(3) ?? 'not measured',
+        difference: (childCY - parentCY).toFixed(3),
+        match: Math.abs(parentCY - childCY) < 0.5 ? '✅ ALIGNED' : `❌ MISALIGNED by ${(childCY - parentCY).toFixed(1)}px`,
+      });
+    });
+    setDebugOverlay(overlays.length > 0 ? overlays : null);
+  }, [edges, nodes, nodesOpacity]);
+
+  // Measure each node's actual circle center in canvas coordinates (no state mutation)
+  const circleCenterRef = useRef({});
+  useLayoutEffect(() => {
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+    nodes.forEach(node => {
+      const circleEl = circleRefs.current[node.id];
+      if (!circleEl) return;
+      const rect = circleEl.getBoundingClientRect();
+      circleCenterRef.current[node.id] = {
+        cx: (rect.left + rect.width / 2 - canvasRect.left - view.x) / view.scale,
+        cy: (rect.top + rect.height / 2 - canvasRect.top - view.y) / view.scale,
+        r: (rect.height / 2) / view.scale,
+      };
+    });
+  }, [nodes, nodesOpacity, view.x, view.y, view.scale]);
+
   const openSelectionPanel = useCallback(
     (nodeId) => {
       setPanelIntent(true);
       // If this is the initial node and it's still unconfigured (in CSS overlay),
-      // reset its position to a sensible canvas location before transitioning
+      // use the intro circle element's center for positioning — not the full wrapper
+      // which includes arrow + CTA text
       if (nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
+        let circleCenterX, circleCenterY;
+        if (introCircleRef.current) {
+          const circleRect = introCircleRef.current.getBoundingClientRect();
+          circleCenterX = circleRect.left + circleRect.width / 2;
+          circleCenterY = circleRect.top + circleRect.height / 2;
+        } else {
+          const builderRect = builderRef.current?.getBoundingClientRect();
+          circleCenterX = builderRect ? builderRect.left + builderRect.width / 2 : window.innerWidth / 2;
+          circleCenterY = builderRect ? builderRect.top + builderRect.height / 2 : window.innerHeight / 2;
+        }
+        // Convert circle center to canvas coordinates (undo viewport transform)
+        const canvasX = (circleCenterX - view.x) / view.scale;
+        const canvasY = (circleCenterY - view.y) / view.scale;
         setNodes((prev) =>
           prev.map((node) =>
-            node.id === INITIAL_NODE.id ? { ...node, x: INITIAL_NODE.x - INITIAL_NODE_SHIFT, y: INITIAL_NODE.y } : node
-          )
-        );
-        setInitialNodeShifted(true);
-      } else if (nodeId === INITIAL_NODE.id && !initialNodeShifted) {
-        setNodes((prev) =>
-          prev.map((node) =>
-            node.id === INITIAL_NODE.id ? { ...node, x: node.x - INITIAL_NODE_SHIFT } : node
+            node.id === INITIAL_NODE.id ? { ...node, x: canvasX, y: canvasY } : node
           )
         );
         setInitialNodeShifted(true);
@@ -698,7 +760,7 @@ export default function ScenariosPage() {
         setPanelStage('actionConfig');
       }
     },
-    [initialNodeShifted, nodeMap]
+    [initialNodeShifted, nodeMap, view.x, view.y]
   );
 
   useEffect(() => {
@@ -801,10 +863,17 @@ export default function ScenariosPage() {
     nodeIdCounter.current += 1;
     const siblingCount = edges.filter((edge) => edge.from === nodeId).length;
     const yOffset = siblingCount * 120 - (parent.type === 'router' ? 60 : 0);
+    // Configured nodes have the sphere at the top of the node div (above label + connector).
+    // The node div center (parent.y) is below the sphere center by ~54px.
+    // Offset so the child's node div center aligns with the parent's sphere center.
+    // Use the parent node's measured circle center Y (from useLayoutEffect)
+    // instead of node.div.center (parent.y) which doesn't match the sphere center
+    const measured = circleCenterRef.current[nodeId];
+    const parentCircleY = measured ? measured.cy : parent.y;
     const newNode = {
       id: nextId,
       x: parent.x + 280,
-      y: parent.y + yOffset,
+      y: parentCircleY + yOffset,
       configured: false,
       label: 'New Step',
     };
@@ -1481,9 +1550,14 @@ export default function ScenariosPage() {
                 if (!from || !to) return null;
                 const isDraft = !nodeMap[edge.to]?.configured;
                 const isFallback = edge.filter?.type === 'fallback';
+                // For unconfigured nodes, edge should target circle bottom (center + radius)
+                // Configured nodes already have node.y near sphere bottom due to label+connector below
+                const fromMeasured = circleCenterRef.current[edge.from];
+                const toMeasured = circleCenterRef.current[edge.to];
+                const fromY = !from.configured && fromMeasured ? fromMeasured.cy + fromMeasured.r : from.y;
+                const toY = !to.configured && toMeasured ? toMeasured.cy + toMeasured.r : to.y;
                 const dx = to.x - from.x;
-                const dy = to.y - from.y;
-                const path = `M ${from.x} ${from.y} C ${from.x + dx/2} ${from.y}, ${from.x + dx/2} ${to.y}, ${to.x} ${to.y}`;
+                const path = `M ${from.x} ${fromY} C ${from.x + dx/2} ${fromY}, ${from.x + dx/2} ${toY}, ${to.x} ${toY}`;
 
                 return (
                   <path
@@ -1502,8 +1576,12 @@ export default function ScenariosPage() {
               const from = nodeMap[edge.from];
               const to = nodeMap[edge.to];
               if (!from || !to) return null;
+              const fromMeasuredPin = circleCenterRef.current[edge.from];
+              const toMeasuredPin = circleCenterRef.current[edge.to];
+              const fromYPin = !from.configured && fromMeasuredPin ? fromMeasuredPin.cy + fromMeasuredPin.r : from.y;
+              const toYPin = !to.configured && toMeasuredPin ? toMeasuredPin.cy + toMeasuredPin.r : to.y;
               const midX = (from.x + to.x) / 2;
-              const midY = (from.y + to.y) / 2;
+              const midY = (fromYPin + toYPin) / 2;
               const isFallback = edge.filter?.type === 'fallback';
               return (
                 <div
@@ -1547,7 +1625,7 @@ export default function ScenariosPage() {
                 >
                   {node.configured ? (
                     <>
-                      <div className="sb-node-inner-wrap">
+                      <div className="sb-node-inner-wrap" ref={(el) => { if (el) circleRefs.current[node.id] = el.querySelector('.sb-node-sphere') || el; }}>
                         {/* Outer Ring / Aura — exact from concepts.txt */}
                         <div className={`sb-node-aura ${accent ? 'sb-node-custom-gradient' : ''}`}
                           style={accent ? { '--node-accent-color': accent } : {}}
@@ -1597,20 +1675,9 @@ export default function ScenariosPage() {
                       <div className="sb-node-connector-line" />
                     </>
                   ) : (
-                    <>
-                      {/* One centered wrapper for the entire node composition */}
-                      <div className="sb-quantum-composition" onClick={(e) => { e.stopPropagation(); handleNodePointerUp(node.id); }}>
-                        <div className="sb-quantum-circle" />
-                        <div className="sb-quantum-orbits">
-                          {(quantumOrbits[node.id] || []).map(ring => (
-                            <div key={ring.id} className="sb-quantum-orbit-ring"
-                              style={{ width: ring.size, height: ring.size, animationDelay: `${ring.delay}s` }} />
-                          ))}
-                        </div>
-                        <div className="sb-quantum-arrow" />
-                        <div className="sb-quantum-cta-text">Click it. Click it real good.</div>
-                      </div>
-                    </>
+                    <div className="sb-node-inner-wrap" ref={(el) => { if (el) circleRefs.current[node.id] = el.querySelector('.sb-quantum-circle') || el; }}>
+                      <div className="sb-quantum-circle" style={{ width: '100%', height: '100%', opacity: 1, transform: 'scale(1)', animation: 'quantum-breathe 6s 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite' }} />
+                    </div>
                   )}
                 </div>
               );
@@ -1633,7 +1700,7 @@ export default function ScenariosPage() {
                         style={{ width: ring.size, height: ring.size, animationDelay: `${ring.delay}s` }} />
                     ))}
                   </div>
-                  <div className="sb-quantum-circle" />
+                  <div className="sb-quantum-circle" ref={introCircleRef} />
                   <div className="sb-quantum-arrow" />
                   <div className="sb-quantum-cta-text">Click it. Click it real good.</div>
                 </div>
@@ -2290,6 +2357,20 @@ export default function ScenariosPage() {
             onToggleFallback={(val) => setLogicIsFallback(val)}
           />
         )}
+        
+        {/* Debug overlay */}
+        {debugOverlay && debugOverlay.map((d, i) => (
+          <div key={`debug-${i}`}>
+            {/* Red horizontal line at parent circle center */}
+            <div style={{ position: 'absolute', left: 0, right: 0, top: d.parentCY, height: 1, background: 'red', zIndex: 999, pointerEvents: 'none' }} />
+            {/* Blue dot at parent circle center */}
+            <div style={{ position: 'absolute', left: d.parentCX - 6, top: d.parentCY - 6, width: 12, height: 12, borderRadius: '50%', background: 'blue', border: '2px solid white', zIndex: 1000, pointerEvents: 'none' }} />
+            {/* Yellow dot at child circle center */}
+            <div style={{ position: 'absolute', left: d.childCX - 6, top: d.childCY - 6, width: 12, height: 12, borderRadius: '50%', background: 'yellow', border: '2px solid white', zIndex: 1000, pointerEvents: 'none' }} />
+            {/* Green dot at connector target */}
+            <div style={{ position: 'absolute', left: d.targetX - 6, top: d.targetY - 6, width: 12, height: 12, borderRadius: '50%', background: '#00ff00', border: '2px solid white', zIndex: 1000, pointerEvents: 'none' }} />
+          </div>
+        ))}
         
         {/* Back button for builder view */}
         <button 

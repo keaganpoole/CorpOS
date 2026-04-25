@@ -2392,8 +2392,8 @@
 
 /* Non-initial unconfigured nodes: fixed wrapper size matching the composition */
 .sb-builder-node.sb-is-placeholder {
-  width: 300px;
-  height: 360px;
+  width: auto;
+  height: auto;
 }
 
 /* Container fade-in (concepts.txt exact) */
