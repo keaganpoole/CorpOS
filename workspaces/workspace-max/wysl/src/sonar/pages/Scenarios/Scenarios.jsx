@@ -405,7 +405,7 @@ export default function ScenariosPage() {
   const nodeRefs = useRef({});
   const introCircleRef = useRef(null);
   const circleRefs = useRef({}); // per-node circle element refs
-  const [debugOverlay, setDebugOverlay] = useState(null);
+
   const dragRef = useRef({ id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 });
   const panRef = useRef(null);
   const nodeIdCounter = useRef(1);
@@ -443,11 +443,21 @@ export default function ScenariosPage() {
   useEffect(() => {
     if (!selectedNodeId) return;
     const defaultCategory = isPrimaryNode ? selectedNode?.categoryType || 'TRIGGERS' : 'ACTIONS';
-    // Don't reset panelStage if selected node already has a config form open — restore happens in openSelectionPanel
-    setPanelStage(prev => {
-      if (['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(prev)) return prev;
-      return 'options';
-    });
+    const node = nodeMap[selectedNodeId];
+    const hasSavedConfig = node?.actionConfig?._fields?.length || node?.appointmentConfig?.key || node?.scheduleConfig?.key;
+    // If node has saved config, let openSelectionPanel restore it — preserve config stages
+    if (hasSavedConfig) {
+      setPanelStage(prev => {
+        if (['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(prev)) return prev;
+        return 'options';
+      });
+    } else {
+      // New/unconfigured node — clear stale config from previous node
+      setActionConfig(null);
+      setAppointmentConfig({});
+      setScheduleConfig({});
+      setPanelStage('options');
+    }
     setActiveOption(null);
     setPanelSearch('');
     setPanelCategory(defaultCategory);
@@ -657,42 +667,6 @@ export default function ScenariosPage() {
     repositionPanel();
   }, [selectedNodeId, nodes, view.x, view.y, repositionPanel]);
 
-  // Debug overlay: measure circle positions for nodes with edges
-  useLayoutEffect(() => {
-    const pageRect = builderRef.current?.getBoundingClientRect();
-    if (!pageRect) return;
-    const overlays = [];
-    edges.forEach((edge) => {
-      const parentEl = nodeRefs.current[edge.from];
-      const childEl = nodeRefs.current[edge.to];
-      if (!parentEl || !childEl) return;
-      const parentCircle = circleRefs.current[edge.from] || parentEl;
-      const childCircle = circleRefs.current[edge.to] || childEl;
-      const parentRect = parentCircle.getBoundingClientRect();
-      const childRect = childCircle.getBoundingClientRect();
-      const parentCX = parentRect.left + parentRect.width / 2 - pageRect.left;
-      const parentCY = parentRect.top + parentRect.height / 2 - pageRect.top;
-      const childCX = childRect.left + childRect.width / 2 - pageRect.left;
-      const childCY = childRect.top + childRect.height / 2 - pageRect.top;
-      // Connector target = left edge of child circle
-      const targetX = childRect.left - pageRect.left;
-      overlays.push({ parentCX, parentCY, childCX, childCY, targetX, targetY: childCY });
-      console.log('[DEBUG NODES]', {
-        parentId: edge.from,
-        childId: edge.to,
-        parentCircleCenterY_relative: parentCY.toFixed(3),
-        childCircleCenterY_relative: childCY.toFixed(3),
-        connectorEndY_relative: childCY.toFixed(3),
-        childNodePositionY: childEl.getBoundingClientRect().top + childEl.getBoundingClientRect().height / 2 - pageRect.top,
-        measuredParentCircleY: circleCenterRef.current[edge.from]?.cy?.toFixed(3) ?? 'not measured',
-        measuredChildCircleY: circleCenterRef.current[edge.to]?.cy?.toFixed(3) ?? 'not measured',
-        difference: (childCY - parentCY).toFixed(3),
-        match: Math.abs(parentCY - childCY) < 0.5 ? '✅ ALIGNED' : `❌ MISALIGNED by ${(childCY - parentCY).toFixed(1)}px`,
-      });
-    });
-    setDebugOverlay(overlays.length > 0 ? overlays : null);
-  }, [edges, nodes, nodesOpacity]);
-
   // Measure each node's actual circle center in canvas coordinates (no state mutation)
   const circleCenterRef = useRef({});
   useLayoutEffect(() => {
@@ -894,6 +868,12 @@ export default function ScenariosPage() {
     setSelectedNodeId(null);
     setIsPanelVisible(false);
     setPanelIntent(false);
+    setPanelStage('options');
+    setActiveOption(null);
+    setActionConfig(null);
+    setAppointmentConfig({});
+    setScheduleConfig({});
+    setEdgeRules([{ id: 1, variable: 'status', operator: 'equals', value: '', logic: 'and' }]);
   }, [selectedNodeId]);
 
   const addEdgeRule = useCallback((logicType = 'and') => {
@@ -952,6 +932,19 @@ export default function ScenariosPage() {
     setLogicPanel(null);
   }, []);
 
+  // Snap the intro node from overlay center to matching canvas position
+  const snapIntroNodePosition = useCallback(() => {
+    if (!introCircleRef.current) return;
+    const circleRect = introCircleRef.current.getBoundingClientRect();
+    const cx = circleRect.left + circleRect.width / 2;
+    const cy = circleRect.top + circleRect.height / 2;
+    const canvasX = (cx - view.x) / view.scale;
+    const canvasY = (cy - view.y) / view.scale;
+    setNodes(prev => prev.map(n =>
+      n.id === INITIAL_NODE.id ? { ...n, x: canvasX, y: canvasY } : n
+    ));
+  }, [view.x, view.y, view.scale]);
+
   const finalizeSelection = (label, detail, icon, categoryType, accentColor) => {
     if (!selectedNodeId) return;
     const meta = CATEGORY_META[categoryType] || CATEGORY_META.TRIGGERS;
@@ -963,6 +956,10 @@ export default function ScenariosPage() {
             ? 'end_call'
           : 'utility'
         : meta.type;
+    // Snap intro node to overlay center before configuring
+    if (selectedNodeId === INITIAL_NODE.id) {
+      snapIntroNodePosition();
+    }
     setNodes((prev) =>
       prev.map((node) =>
         node.id === selectedNodeId
@@ -1014,6 +1011,10 @@ export default function ScenariosPage() {
     const needsActionConfig = subOption.configFields && subOption.configFields.length > 0;
     
     if (needsAppointmentConfig || needsActionConfig) {
+      // Snap intro node to overlay center before configuring
+      if (currentNodeId === INITIAL_NODE.id) {
+        snapIntroNodePosition();
+      }
       // Configure the node but DON'T close the panel yet
       const nodeType = 'action';
       setNodes((prev) =>
@@ -1141,13 +1142,11 @@ export default function ScenariosPage() {
     )
       return;
     if (!event.target.closest('.sb-builder-node')) {
-      // Config auto-saves to node — just close the panel, data is preserved
       setSelectedNodeId(null);
       setIsPanelVisible(false);
       setPanelIntent(false);
     }
     setLogicPanel(null);
-    setVarsPane(prev => ({ ...prev, visible: false }));
   };
 
   const handleCreateScenario = () => {
@@ -1822,7 +1821,7 @@ export default function ScenariosPage() {
                       <button
                         type="button"
                         className="sb-cyber-back"
-                        onClick={() => { setPanelStage('options'); setActionConfig(null); setAppointmentConfig({}); setScheduleConfig({}); }}
+                        onClick={() => { setPanelStage('options'); }}
                       >
                         <ChevronLeft size={14} /> Back
                       </button>
@@ -2357,20 +2356,6 @@ export default function ScenariosPage() {
             onToggleFallback={(val) => setLogicIsFallback(val)}
           />
         )}
-        
-        {/* Debug overlay */}
-        {debugOverlay && debugOverlay.map((d, i) => (
-          <div key={`debug-${i}`}>
-            {/* Red horizontal line at parent circle center */}
-            <div style={{ position: 'absolute', left: 0, right: 0, top: d.parentCY, height: 1, background: 'red', zIndex: 999, pointerEvents: 'none' }} />
-            {/* Blue dot at parent circle center */}
-            <div style={{ position: 'absolute', left: d.parentCX - 6, top: d.parentCY - 6, width: 12, height: 12, borderRadius: '50%', background: 'blue', border: '2px solid white', zIndex: 1000, pointerEvents: 'none' }} />
-            {/* Yellow dot at child circle center */}
-            <div style={{ position: 'absolute', left: d.childCX - 6, top: d.childCY - 6, width: 12, height: 12, borderRadius: '50%', background: 'yellow', border: '2px solid white', zIndex: 1000, pointerEvents: 'none' }} />
-            {/* Green dot at connector target */}
-            <div style={{ position: 'absolute', left: d.targetX - 6, top: d.targetY - 6, width: 12, height: 12, borderRadius: '50%', background: '#00ff00', border: '2px solid white', zIndex: 1000, pointerEvents: 'none' }} />
-          </div>
-        ))}
         
         {/* Back button for builder view */}
         <button 
