@@ -465,6 +465,14 @@ export default function ScenariosPage() {
     setViewportReady(true);
   }, [initialFocusSet]);
 
+  // Fire orbit rings once as intro — rings FIRST, then circle fades in
+  useEffect(() => {
+    if (nodes.length === 1 && !nodes[0].configured) {
+      const timer = setTimeout(() => triggerQuantumOrbit(nodes[0].id), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [nodes.length]);
+
   const optionsForCategory = AUTOMATION_HIERARCHY[panelCategory] || [];
   const normalizedPanelSearch = panelSearch.trim().toLowerCase();
   const filteredOptions = useMemo(
@@ -727,10 +735,6 @@ export default function ScenariosPage() {
     const handlePointerUp = () => {
       if (dragRef.current.id) {
         if (!dragRef.current.moved) {
-          const clickedNode = nodeMap[dragRef.current.id];
-          if (clickedNode && !clickedNode.configured) {
-            triggerQuantumOrbit(dragRef.current.id);
-          }
           openSelectionPanel(dragRef.current.id);
         }
         dragRef.current = { id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 };
@@ -1616,22 +1620,24 @@ export default function ScenariosPage() {
           {/* Centered overlay for initial unconfigured node */}
           {nodes.length === 1 && !nodes[0].configured && (
             <div className="sb-quantum-centering">
+              <div className="sb-quantum-container-fade">
               <div
                 className={`sb-builder-node ${selectedNodeId === nodes[0].id ? 'sb-active-node' : ''}`}
                 ref={(el) => { if (el) nodeRefs.current[nodes[0].id] = el; }}
                 onPointerDown={(event) => handleNodePointerDown(nodes[0].id, event)}
               >
                 <div className="sb-quantum-composition">
-                  <div className="sb-quantum-circle" />
                   <div className="sb-quantum-orbits">
                     {(quantumOrbits[nodes[0].id] || []).map(ring => (
                       <div key={ring.id} className="sb-quantum-orbit-ring"
                         style={{ width: ring.size, height: ring.size, animationDelay: `${ring.delay}s` }} />
                     ))}
                   </div>
+                  <div className="sb-quantum-circle" />
                   <div className="sb-quantum-arrow" />
                   <div className="sb-quantum-cta-text">Click it. Click it real good.</div>
                 </div>
+              </div>
               </div>
             </div>
           )}

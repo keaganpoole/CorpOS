@@ -2396,6 +2396,17 @@
   height: 360px;
 }
 
+/* Container fade-in (concepts.txt exact) */
+.sb-quantum-container-fade {
+  opacity: 0;
+  animation: container-fade 1.2s 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes container-fade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
 /* CSS-centered overlay for the initial unconfigured node */
 .sb-quantum-centering {
   position: absolute;
@@ -2447,20 +2458,20 @@
   border: 2px solid white;
   border-radius: 50%;
   background: transparent;
-  animation: 
-    quantum-fade-in 1s 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards,
-    quantum-breathe 6s 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation:
+    quantum-fade-in 1s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    quantum-breathe 6s 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   opacity: 0;
   cursor: pointer;
   flex-shrink: 0;
 }
 
-/* Orbit rings overlay (positioned over the circle) */
+/* Orbit rings layer — sibling of circle, inside composition */
 .sb-quantum-orbits {
   position: absolute;
-  top: 50%;
+  top: 0;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   width: 240px;
   height: 240px;
   pointer-events: none;
@@ -2472,6 +2483,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  transform-origin: center;
   border: 1px solid rgba(255,255,255,0.3);
   border-radius: 50%;
   pointer-events: none;
@@ -2485,7 +2497,7 @@
   position: relative;
   animation: arrow-bob 3s ease-in-out infinite;
   flex-shrink: 0;
-  margin-top: 8px;
+  margin-top: 24px;
 }
 
 .sb-quantum-arrow::after {
@@ -2507,9 +2519,9 @@
   color: rgba(255, 255, 255, 0.9);
   white-space: nowrap;
   opacity: 0;
-  animation: cta-reveal 0.3s 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: cta-reveal 0.3s 2.0s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   flex-shrink: 0;
-  margin-top: 12px;
+  margin-top: 20px;
 }
 
 /* "QUANTUM REVEAL" label on canvas */
@@ -2569,11 +2581,11 @@
 
 @keyframes quantum-orbit-expand {
   0% {
-    transform: scale(0) rotate(0deg);
+    transform: translate(-50%, -50%) scale(0) rotate(0deg);
     opacity: 1;
   }
   100% {
-    transform: scale(1.5) rotate(180deg);
+    transform: translate(-50%, -50%) scale(1.5) rotate(180deg);
     opacity: 0;
   }
 }

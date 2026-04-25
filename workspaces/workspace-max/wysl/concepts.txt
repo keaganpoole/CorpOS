@@ -120,7 +120,7 @@
         @keyframes quantum-fade {
             0% { background: transparent; transform: scale(0.8); opacity: 0; }
             100% { background: white; transform: scale(1); opacity: 1; }
-        }
+        } 
 
         @keyframes quantum-breathe {
             0%, 100% { 
