@@ -26,6 +26,7 @@ import {
   Pencil,
   GitBranch,
   Sparkles,
+  Filter,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
@@ -1147,6 +1148,7 @@ export default function ScenariosPage() {
       setPanelIntent(false);
     }
     setLogicPanel(null);
+    setVarsPane(prev => ({ ...prev, visible: false }));
   };
 
   const handleCreateScenario = () => {
@@ -1595,7 +1597,7 @@ export default function ScenariosPage() {
                     ) : edge.filter ? (
                       <Zap size={10} />
                     ) : (
-                      'Condition'
+                      <Filter size={12} />
                     )}
                   </div>
                   <div className="sb-filter-dot" />
