@@ -27,6 +27,8 @@ import {
   GitBranch,
   Sparkles,
   Filter,
+  Database,
+  Hash,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
@@ -1945,7 +1947,10 @@ export default function ScenariosPage() {
 
                         return (
                           <div key={field.key} className="sb-action-config-field">
-                            <label className="sb-action-field-label">{field.label}</label>
+                            <label className="sb-action-field-label">
+                              {field.key === 'target_table' && <Database size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />}
+                              {field.label}
+                            </label>
                             {field.type === 'select' ? (
                               <select
                                 className="sb-input-field sb-select-field"
@@ -2152,7 +2157,7 @@ export default function ScenariosPage() {
                       <div className="sb-record-fields-section">
                         {/* Record ID — only visible after table is selected */}
                         <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          <label className="sb-record-label">Record ID</label>
+                          <label className="sb-record-label" style={{ display: 'block' }}><Hash size={11} className="sb-record-label-icon" style={{ marginRight: 4, display: 'inline', verticalAlign: -1 }} />Record ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
                               className="sb-input-field"
