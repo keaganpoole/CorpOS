@@ -2151,7 +2151,7 @@ export default function ScenariosPage() {
                     {actionConfig.target_table && RECORD_TABLE_FIELDS[actionConfig.target_table] && (
                       <div className="sb-record-fields-section">
                         {/* Record ID — only visible after table is selected */}
-                        <div style={{ marginBottom: 16 }}>
+                        <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
                           <label className="sb-record-label">Record ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
