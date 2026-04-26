@@ -42,7 +42,8 @@ class ActionExecutor {
   async _executeAction(key, node, flowContext) {
     switch (key) {
       case 'send_to_customer':
-        return this._sendSMS(node, flowContext);
+        console.log('[ActionExecutor] SMS not configured yet — skipping');
+        return { success: true, data: { action: 'send_to_customer', skipped: true, reason: 'SMS not configured' } };
       case 'call_customer':
         return this._initiateCall(node, flowContext);
       case 'hang_up':
@@ -143,6 +144,7 @@ class ActionExecutor {
         business_hours: flowContext.business?.business_hours || '',
         receptionist_name: flowContext.receptionist?.first_name || 'Receptionist',
         customer_name: flowContext.lead?.name || flowContext.customer?.name || '',
+        flow_execution_id: flowContext._executionId || '',
         ...flowContext.agent, // Include any agent-captured data from previous calls
       };
 

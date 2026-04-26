@@ -897,4 +897,60 @@ router.post('/transfer-call', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/tools/set-agent-data
+ *
+ * Records data collected by the agent during a scenario call.
+ * Called by ElevenLabs when the agent uses the set_agent_data tool.
+ * Stores the data in the active flow_execution's context.
+ *
+ * Body: { key: "email", value: "test@example.com" }
+ * Headers: x-flow-execution-id (from call metadata) or query param
+ */
+router.post('/set-agent-data', async (req, res) => {
+  try {
+    const { key, value } = req.body;
+    const executionId = req.headers['x-flow-execution-id']
+      || req.query.execution_id
+      || req.body.execution_id
+      || req.body.flow_execution_id;
+
+    console.log(`[TOOLS] set-agent_data: ${key} = ${value} (execution: ${executionId || 'unknown'})`);
+
+    if (!key) {
+      return res.status(400).json({ error: 'key is required' });
+    }
+
+    if (executionId) {
+      // Update the flow execution's context with the agent data
+      try {
+        const records = await sbQuery('flow_executions', 'GET', null, `?id=eq.${executionId}&limit=1`);
+        const execution = records?.[0];
+        if (execution) {
+          const context = typeof execution.flow_context === 'string'
+            ? JSON.parse(execution.flow_context)
+            : (execution.flow_context || {});
+
+          context.agent = context.agent || {};
+          context.agent[key] = value;
+
+          await sbQuery('flow_executions', 'PATCH', {
+            flow_context: JSON.stringify(context),
+            updated_at: new Date().toISOString(),
+          }, `?id=eq.${executionId}`);
+
+          console.log(`[TOOLS] set-agent-data stored: agent.${key} in execution ${executionId}`);
+        }
+      } catch (err) {
+        console.error('[TOOLS] set-agent-data storage error:', err.message);
+      }
+    }
+
+    res.json({ success: true, key, value });
+  } catch (err) {
+    console.error('[TOOLS] set-agent-data failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = { router, init };

@@ -221,10 +221,11 @@ const AUTOMATION_HIERARCHY = {
           { key: 'source', label: 'Source', type: 'select', options: ['Phone', 'Text', 'Email', 'Website', 'Referral', 'Walk-In', 'Manual'] },
         ]},
         { key: 'update_record', name: 'Update Record', description: 'Modify an existing customer record', configFields: [
-          { key: 'record_lookup', label: 'Find Record By', type: 'select', options: ['Phone', 'Email', 'Name', 'Record ID'] },
-          { key: 'record_lookup_value', label: 'Lookup Value', type: 'text', placeholder: 'e.g. {caller_number}' },
-          { key: 'field_to_update', label: 'Field to Update', type: 'select', options: ['status', 'notes', 'tags', 'assigned_staff', 'email', 'phone', 'source'] },
-          { key: 'new_value', label: 'New Value', type: 'text', placeholder: 'New value for the field' },
+          { key: 'target_table', label: 'Table', type: 'select', options: ['leads', 'people', 'appointments', 'businesses'] },
+          { key: 'record_lookup', label: 'Find Record By', type: 'select', options: ['Record ID', 'Phone', 'Email', 'Name'] },
+          { key: 'record_lookup_value', label: 'Lookup Value', type: 'text', placeholder: 'e.g. {{agent.phone}} or {{lead.phone}}' },
+          { key: 'update_fields', label: 'Fields to Update (comma-separated)', type: 'prompt_textarea', placeholder: 'e.g. status, notes' },
+          { key: 'update_values', label: 'Values (one per line, matching field order)', type: 'prompt_textarea', placeholder: 'e.g.\n{{agent.outcome}}\n{{agent.notes}}' },
         ]},
         { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a customer record', configFields: [
           { key: 'record_id', label: 'Record ID', type: 'text', placeholder: 'Record ID to delete' },
@@ -2396,6 +2397,9 @@ export default function ScenariosPage() {
             smartActions={getSmartActions(findParentTriggerKey(selectedNodeId), currentActionKey)}
             onTableHover={(color) => setHoveredTableColor(color)}
             onClose={() => { setVarsPane({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' }); setHoveredTableColor(''); }}
+            nodes={nodes}
+            edges={edges}
+            currentNodeId={selectedNodeId}
             style={{
               position: 'absolute',
               top: panelStyle.top,

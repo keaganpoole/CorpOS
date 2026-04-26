@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
-  User, Calendar, Phone, ChevronDown, ChevronRight, X, Zap, Sparkles
+  User, Calendar, Phone, ChevronDown, ChevronRight, X, Zap, Sparkles, Mic
 } from 'lucide-react';
 import { getSmartActionByKey, getSmartActions } from './smartActions';
 
@@ -139,6 +139,16 @@ export const TABLE_LABELS = {
   businesses: 'Business',
 };
 
+// Default agent variables captured during calls
+const DEFAULT_AGENT_VARS = [
+  { key: 'name', label: 'Customer Name' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'notes', label: 'Call Notes' },
+  { key: 'outcome', label: 'Call Outcome' },
+  { key: 'callback_time', label: 'Callback Time' },
+];
+
 // Build variable reference from table + field
 export const getVariableRef = (tableKey, fieldKey) => `{{${tableKey}.${fieldKey}}}`;
 
@@ -151,10 +161,14 @@ export const renderVarChipsHTML = (value) => {
     if (!action) return match;
     return `<span class="sb-var-chip" style="background:linear-gradient(135deg,rgba(56,189,248,0.12),rgba(168,85,247,0.12));color:#a855f7;border:1px solid rgba(168,85,247,0.25);display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;gap:2px;">⚡ ${action}</span>`;
   });
-  // Then replace {{table.field}} tokens
+  // Then replace {{table.field}} and {{agent.*}} tokens
   result = result.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
     const parts = ref.split('.');
     if (parts.length !== 2) return match;
+    // Agent variables (from call)
+    if (parts[0] === 'agent') {
+      return `<span class="sb-var-chip" style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Agent.${parts[1]}</span>`;
+    }
     const color = TABLE_COLORS[parts[0]] || '#a78bfa';
     const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
     return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${tableLabel}.${parts[1]}</span>`;
@@ -178,7 +192,7 @@ export const parseVariables = (value) => {
   return matches;
 };
 
-const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, onInsertSmartAction, smartActions = [], onTableHover, onClose, style = {} }) => {
+const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, onInsertSmartAction, smartActions = [], onTableHover, onClose, style = {}, nodes = [], edges = [], currentNodeId = '' }) => {
   const [samples, setSamples] = useState({});
   const [expanded, setExpanded] = useState({});
   const paneRef = useRef(null);
@@ -200,6 +214,39 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   }, [visible]);
 
   if (!visible) return null;
+
+  // Check if there's a Call Customer node upstream of the current node
+  const hasCallNodeBefore = (() => {
+    if (!currentNodeId || !nodes.length) return false;
+    const callNodeIds = nodes
+      .filter(n => n.configured && (n.subOptionKey === 'call_customer' || n.actionConfig?._key === 'call_customer'))
+      .map(n => n.id);
+    if (callNodeIds.length === 0) return false;
+    const visited = new Set();
+    const queue = [currentNodeId];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (callNodeIds.includes(current)) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      for (const edge of edges) {
+        if (edge.to === current && !visited.has(edge.from)) {
+          queue.push(edge.from);
+        }
+      }
+    }
+    return false;
+  })();
+
+  // Check if current node is a phone call trigger (don't show From Call for these)
+  const isPhoneCallTrigger = (() => {
+    const node = nodes.find(n => n.id === currentNodeId);
+    if (!node || node.categoryType !== 'TRIGGERS') return false;
+    const phoneTriggers = ['incoming_call', 'call_answered', 'missed_call', 'call_failed', 'voicemail_received'];
+    return phoneTriggers.includes(node.subOptionKey || node.actionConfig?._key || '');
+  })();
+
+  const showFromCall = hasCallNodeBefore && !isPhoneCallTrigger;
 
   const formatValue = (value, type) => {
     if (value === null || value === undefined) return '—';
@@ -226,6 +273,49 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
         {fieldLabel && <span className="sb-vars-field-label">for {fieldLabel}</span>}
       </div>
       <div className="sb-vars-scroll">
+        {/* Agent Data Section — "From Call" variables (only after a Call node) */}
+        {showFromCall && (
+          <div className="sb-vars-table-group" style={{ '--table-color': '#32f0d9', '--table-bg': 'rgba(50,240,217,0.08)', '--table-border': 'rgba(50,240,217,0.2)' }} onMouseEnter={() => onTableHover?.('#32f0d9')} onMouseLeave={() => onTableHover?.('')}>
+            <button
+              type="button"
+              className="sb-vars-table-header"
+              onClick={() => setExpanded(prev => ({ ...prev, __agent: !prev.__agent }))}
+            >
+              <span className="sb-vars-table-chevron">
+                {expanded.__agent ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              </span>
+              <span className="sb-vars-table-icon" style={{ color: '#32f0d9' }}>
+                <Mic size={11} />
+              </span>
+              <span className="sb-vars-table-label">From Call</span>
+              <span className="sb-vars-table-badge">Agent Data</span>
+            </button>
+
+            {expanded.__agent && (
+              <div className="sb-vars-fields">
+                {DEFAULT_AGENT_VARS.map((field) => {
+                  const varRef = `{{agent.${field.key}}}`;
+                  return (
+                    <button
+                      key={field.key}
+                      type="button"
+                      className="sb-vars-field"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onInsertVariable?.(varRef, field.label, '#32f0d9');
+                      }}
+                      title={`Insert ${varRef} — populated by agent during call`}
+                    >
+                      <span className="sb-vars-field-name" style={{ color: '#32f0d9' }}>{field.label}</span>
+                      <span className="sb-vars-field-value" style={{ color: '#666', fontStyle: 'italic' }}>to be collected</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+        
         {/* Smart Actions Section */}
         {onInsertSmartAction && smartActions.length > 0 && (
           <div className="sb-smart-actions-section">

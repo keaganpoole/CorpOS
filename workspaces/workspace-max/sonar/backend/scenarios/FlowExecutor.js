@@ -83,6 +83,7 @@ class FlowExecutor {
       console.error('[FlowExecutor] Failed to create execution record:', err.message);
     }
 
+    context._executionId = executionId;
     console.log(`[FlowExecutor] Starting flow: ${scenario.name} from trigger: ${triggerNode.label}`);
     return this._executeFromNode(triggerNode.id, nodes, nodeMap, edgeMap, context, executionId, scenario);
   }
