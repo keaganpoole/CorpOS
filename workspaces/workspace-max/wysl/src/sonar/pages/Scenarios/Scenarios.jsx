@@ -53,6 +53,26 @@ const OPTION_ICONS = {
   time_schedule: Clock,
 };
 
+// Table field definitions for Update Record
+const RECORD_TABLE_FIELDS = {
+  People: [
+    { key: 'first_name', label: 'First Name' },
+    { key: 'last_name', label: 'Last Name' },
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'status', label: 'Status' },
+    { key: 'notes', label: 'Notes' },
+  ],
+  Appointments: [
+    { key: 'client_name', label: 'Client Name' },
+    { key: 'date', label: 'Date' },
+    { key: 'time', label: 'Time' },
+    { key: 'status', label: 'Status' },
+    { key: 'duration', label: 'Duration' },
+    { key: 'notes', label: 'Notes' },
+  ],
+};
+
 const AUTOMATION_HIERARCHY = {
   TRIGGERS: [
     {
@@ -221,11 +241,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'source', label: 'Source', type: 'select', options: ['Phone', 'Text', 'Email', 'Website', 'Referral', 'Walk-In', 'Manual'] },
         ]},
         { key: 'update_record', name: 'Update Record', description: 'Modify an existing customer record', configFields: [
-          { key: 'target_table', label: 'Table', type: 'select', options: ['leads', 'people', 'appointments', 'businesses'] },
-          { key: 'record_lookup', label: 'Find Record By', type: 'select', options: ['Record ID', 'Phone', 'Email', 'Name'] },
-          { key: 'record_lookup_value', label: 'Lookup Value', type: 'text', placeholder: 'e.g. {{agent.phone}} or {{lead.phone}}' },
-          { key: 'update_fields', label: 'Fields to Update (comma-separated)', type: 'prompt_textarea', placeholder: 'e.g. status, notes' },
-          { key: 'update_values', label: 'Values (one per line, matching field order)', type: 'prompt_textarea', placeholder: 'e.g.\n{{agent.outcome}}\n{{agent.notes}}' },
+          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
         ]},
         { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a customer record', configFields: [
           { key: 'record_id', label: 'Record ID', type: 'text', placeholder: 'Record ID to delete' },
@@ -2130,6 +2146,87 @@ export default function ScenariosPage() {
                         );
                       })}
                     </div>
+
+                    {/* Table-specific fields — dynamic based on selected table */}
+                    {actionConfig.target_table && RECORD_TABLE_FIELDS[actionConfig.target_table] && (
+                      <div className="sb-record-fields-section">
+                        {/* Record ID — only visible after table is selected */}
+                        <div style={{ marginBottom: 16 }}>
+                          <label className="sb-record-label">Record ID</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              className="sb-input-field"
+                              type="text"
+                              value={actionConfig.record_lookup_value || ''}
+                              onChange={e => setActionConfig(prev => ({ ...prev, record_lookup_value: e.target.value }))}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'record_lookup_value', fieldLabel: 'Record ID', fieldType: 'text' })}
+                              placeholder=""
+                              style={{
+                                ...(actionConfig.record_lookup_value?.includes('{{') ? { color: 'transparent' } : {}),
+                                ...(varsPane.visible && hoveredTableColor && 'record_lookup_value' === varsPane.fieldKey ? {
+                                  borderColor: hoveredTableColor,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                } : {}),
+                              }}
+                            />
+                            {(actionConfig.record_lookup_value || '').includes('{{') && (
+                              <div
+                                className="sb-var-chip-overlay"
+                                style={{
+                                  position: 'absolute', inset: 0, pointerEvents: 'none',
+                                  display: 'flex', alignItems: 'center', padding: '0 10px',
+                                  fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                  whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
+                                }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(actionConfig.record_lookup_value) }}
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="sb-record-fields-grid">
+                          {RECORD_TABLE_FIELDS[actionConfig.target_table].map((field) => {
+                            const fieldKey = `field_${field.key}`;
+                            const val = actionConfig[fieldKey] || '';
+                            return (
+                              <div key={field.key} className="sb-record-field">
+                                <label className="sb-record-label">{field.label}</label>
+                                <div style={{ position: 'relative' }}>
+                                  <input
+                                    className="sb-input-field"
+                                    type="text"
+                                    value={val}
+                                    onChange={e => setActionConfig(prev => ({ ...prev, [fieldKey]: e.target.value }))}
+                                    onFocus={() => setVarsPane({ visible: true, fieldKey, fieldLabel: field.label, fieldType: 'text' })}
+                                    placeholder=""
+                                    style={{
+                                      ...(val.includes('{{') ? { color: 'transparent' } : {}),
+                                      ...(varsPane.visible && hoveredTableColor && fieldKey === varsPane.fieldKey ? {
+                                        borderColor: hoveredTableColor,
+                                        boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                      } : {}),
+                                    }}
+                                  />
+                                  {val.includes('{{') && (
+                                    <div
+                                      className="sb-var-chip-overlay"
+                                      style={{
+                                        position: 'absolute', inset: 0, pointerEvents: 'none',
+                                        display: 'flex', alignItems: 'center', padding: '0 10px',
+                                        fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                        whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
+                                      }}
+                                      dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(val) }}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Config auto-saves to node on every field change — no Save button needed */}
                   </div>
                 ) : panelStage === 'appointmentConfig' ? (

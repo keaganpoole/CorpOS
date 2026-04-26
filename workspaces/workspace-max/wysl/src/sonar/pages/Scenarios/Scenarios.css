@@ -1344,7 +1344,7 @@
 .sb-input-field {
   width: 100%;
   background: rgba(12, 12, 14, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 10px;
   padding: 10px 14px;
   color: #fff;
@@ -1359,7 +1359,7 @@
 }
 
 .sb-input-field:focus {
-  border-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
   background: rgba(14, 14, 16, 0.98);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
@@ -1380,7 +1380,7 @@
   -webkit-appearance: none;
   width: 100%;
   background: rgba(12, 12, 14, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 10px;
   padding: 10px 14px;
   color: #fff;
@@ -2153,6 +2153,46 @@
 @keyframes sb-breathe-glow {
   0%, 100% { box-shadow: 0 0 0 1px var(--hover-glow-color, rgba(255,255,255,0.1)); }
   50% { box-shadow: 0 0 0 2px var(--hover-glow-color-strong, rgba(255,255,255,0.2)); }
+}
+
+/* ─── Record Fields Section ─── */
+.sb-record-fields-section {
+  margin-top: 20px;
+}
+
+.sb-record-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 14px 0;
+}
+
+.sb-record-fields-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sb-record-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sb-record-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a1a1aa;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sb-record-label-icon {
+  flex-shrink: 0;
+  opacity: 0.5;
 }
 
 /* ─── Prompt Textarea (no toggle) ─── */
