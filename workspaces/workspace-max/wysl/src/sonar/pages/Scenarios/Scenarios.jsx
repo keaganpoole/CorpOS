@@ -2151,8 +2151,7 @@ export default function ScenariosPage() {
                     {/* Table-specific fields — dynamic based on selected table */}
                     {actionConfig.target_table && (
                       <div className="sb-record-fields-section">
-                        {/* Record ID — shown for update and delete actions */}
-                        {(actionConfig._key === 'update_record' || actionConfig._key === 'delete_record') && (
+                        {/* Record ID — first field after table */}
                         <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
                           <label className="sb-record-label" style={{ display: 'block' }}><Hash size={11} className="sb-record-label-icon" style={{ marginRight: 4, display: 'inline', verticalAlign: -1 }} />Record ID</label>
                           <div style={{ position: 'relative' }}>
@@ -2185,7 +2184,6 @@ export default function ScenariosPage() {
                             )}
                           </div>
                         </div>
-                        )}
 
                         {/* Field inputs — shown for create and update actions */}
                         {(actionConfig._key === 'update_record' || actionConfig._key === 'create_new_record') && (
