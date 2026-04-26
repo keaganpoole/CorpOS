@@ -2724,6 +2724,18 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
+.sb-toolbar-schedule-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: auto;
+}
+
+.sb-toolbar-schedule-disabled:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+}
+
 .sb-toolbar-icon-btn {
   display: flex;
   align-items: center;

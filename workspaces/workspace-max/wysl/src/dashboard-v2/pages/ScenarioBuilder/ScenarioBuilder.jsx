@@ -162,10 +162,10 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.records,
       sub_options: [
-        { key: 'search_records', name: 'Search Records', description: 'Find customer records' },
-        { key: 'create_new_record', name: 'Create New Record', description: 'Create a new customer record' },
-        { key: 'update_record', name: 'Update Record', description: 'Modify an existing customer record' },
-        { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a customer record' },
+        { key: 'search_records', name: 'Search Records', description: 'Find records' },
+        { key: 'create_new_record', name: 'Create New Record', description: 'Create a new record' },
+        { key: 'update_record', name: 'Update Record', description: 'Modify an existing record' },
+        { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a record' },
       ],
     },
     {

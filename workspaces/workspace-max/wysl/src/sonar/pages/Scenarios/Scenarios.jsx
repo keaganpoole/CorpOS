@@ -136,9 +136,9 @@ const AUTOMATION_HIERARCHY = {
       accent: '#32f0d9',
       icon: OPTION_ICONS.records,
       sub_options: [
-        { key: 'record_created', name: 'Record Created', description: 'When a new customer record is created' },
-        { key: 'record_updated', name: 'Record Updated', description: 'When a customer record is updated' },
-        { key: 'record_deleted', name: 'Record Deleted', description: 'When a customer record is deleted' },
+        { key: 'record_created', name: 'Record Created', description: 'When a new record is created' },
+        { key: 'record_updated', name: 'Record Updated', description: 'When a record is updated' },
+        { key: 'record_deleted', name: 'Record Deleted', description: 'When a record is deleted' },
       ],
     },
     {
@@ -227,21 +227,21 @@ const AUTOMATION_HIERARCHY = {
     {
       key: 'records',
       option: 'Records',
-      description: 'Manage customer records in the database',
+      description: 'Manage records in the database',
       accent: '#38bdf8',
       icon: OPTION_ICONS.records,
       sub_options: [
-        { key: 'search_records', name: 'Search Records', description: 'Find customer records', configFields: [
+        { key: 'search_records', name: 'Search Records', description: 'Find records', configFields: [
           { key: 'search_field', label: 'Search By', type: 'select', options: ['Phone', 'Email', 'Name', 'Record ID'] },
           { key: 'search_value', label: 'Search Value', type: 'text', placeholder: 'e.g. {caller_number}' },
         ]},
-        { key: 'create_new_record', name: 'Create New Record', description: 'Create a new customer record', configFields: [
+        { key: 'create_new_record', name: 'Create New Record', description: 'Create a new record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
         ]},
-        { key: 'update_record', name: 'Update Record', description: 'Modify an existing customer record', configFields: [
+        { key: 'update_record', name: 'Update Record', description: 'Modify an existing record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
         ]},
-        { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a customer record', configFields: [
+        { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
         ]},
       ],
@@ -1302,9 +1302,9 @@ export default function ScenariosPage() {
       }
       setScenarioNotes(scenario.notes || '');
       setScenarioIsActive(scenario.is_active !== false); // default true
-      // Show toolbar if any node has "No Trigger" or if schedule/notes exist
+      // Show toolbar only if trigger node is "No Trigger"
       const hasNoTrigger = nodesData?.some(n => n.label === 'No Trigger');
-      setNoTriggerActive(hasNoTrigger || !!scenario.schedule_config || !!scenario.notes);
+      setNoTriggerActive(hasNoTrigger);
       
       // Switch to builder view
       setViewMode('builder');
@@ -2564,17 +2564,16 @@ export default function ScenariosPage() {
               </button>
             </div>
             
-            {/* Schedule — only for No Trigger */}
-            {noTriggerActive && (
-              <button
-                type="button"
-                className="sb-toolbar-schedule"
-                onClick={() => setShowScheduleModal(true)}
-              >
-                <Clock size={12} />
-                <span>{formatScheduleDisplay(recurringSchedule)}</span>
-              </button>
-            )}
+            {/* Schedule — greyed out when trigger is not "No Trigger" */}
+            <button
+              type="button"
+              className={`sb-toolbar-schedule ${!noTriggerActive ? 'sb-toolbar-schedule-disabled' : ''}`}
+              onClick={() => noTriggerActive && setShowScheduleModal(true)}
+              disabled={!noTriggerActive}
+            >
+              <Clock size={12} />
+              <span>{formatScheduleDisplay(recurringSchedule)}</span>
+            </button>
             
             {/* Notes */}
             <button

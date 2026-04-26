@@ -145,6 +145,7 @@ export const TABLE_LABELS = {
 
 // Default agent variables captured during calls
 const DEFAULT_AGENT_VARS = [
+  { key: 'record_id', label: 'Record ID' },
   { key: 'name', label: 'Customer Name' },
   { key: 'email', label: 'Email' },
   { key: 'phone', label: 'Phone' },
@@ -171,7 +172,7 @@ export const renderVarChipsHTML = (value) => {
     if (parts.length !== 2) return match;
     // Agent variables (from call)
     if (parts[0] === 'agent') {
-      return `<span class="sb-var-chip" style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Agent.${parts[1]}</span>`;
+      return `<span class="sb-var-chip" style="background:rgba(50,240,217,0.12);color:#32f0d9;border:1px solid rgba(50,240,217,0.25);display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Call.${parts[1]}</span>`;
     }
     const color = TABLE_COLORS[parts[0]] || '#a78bfa';
     const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
@@ -250,7 +251,15 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     return phoneTriggers.includes(node.subOptionKey || node.actionConfig?._key || '');
   })();
 
-  const showFromCall = hasCallNodeBefore && !isPhoneCallTrigger;
+  // Check if current node is a call action (don't show From Call for these either)
+  const isCallAction = (() => {
+    const node = nodes.find(n => n.id === currentNodeId);
+    if (!node) return false;
+    const callActions = ['call_customer', 'call_phone_number'];
+    return callActions.includes(node.subOptionKey || node.actionConfig?._key || '');
+  })();
+
+  const showFromCall = hasCallNodeBefore && !isPhoneCallTrigger && !isCallAction;
 
   const formatValue = (value, type) => {
     if (value === null || value === undefined) return '—';
