@@ -39,6 +39,7 @@ const TABLE_DEFS = [
     colorBorder: 'rgba(50,240,217,0.2)',
     icon: User,
     fields: [
+      { key: 'id', label: 'Record ID', type: 'text' },
       { key: 'first_name', label: 'First Name', type: 'text' },
       { key: 'last_name', label: 'Last Name', type: 'text' },
       { key: 'email', label: 'Email', type: 'email' },
@@ -63,6 +64,7 @@ const TABLE_DEFS = [
     colorBorder: 'rgba(56,189,248,0.2)',
     icon: Calendar,
     fields: [
+      { key: 'id', label: 'Record ID', type: 'text' },
       { key: 'client_name', label: 'Client Name', type: 'text' },
       { key: 'date', label: 'Date', type: 'text' },
       { key: 'time', label: 'Time', type: 'text' },
@@ -85,6 +87,7 @@ const TABLE_DEFS = [
     colorBorder: 'rgba(244,114,182,0.2)',
     icon: Phone,
     fields: [
+      { key: 'id', label: 'Record ID', type: 'text' },
       { key: 'full_name', label: 'Name', type: 'text' },
       { key: 'stereotype', label: 'Role', type: 'text' },
       { key: 'phone_number', label: 'Phone', type: 'phone' },
@@ -106,6 +109,7 @@ const TABLE_DEFS = [
     colorBorder: 'rgba(161,161,170,0.2)',
     icon: User,
     fields: [
+      { key: 'id', label: 'Record ID', type: 'text' },
       { key: 'name', label: 'Name', type: 'text' },
       { key: 'phone', label: 'Phone', type: 'phone' },
       { key: 'email', label: 'Email', type: 'email' },

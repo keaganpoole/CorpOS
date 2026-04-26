@@ -236,17 +236,13 @@ const AUTOMATION_HIERARCHY = {
           { key: 'search_value', label: 'Search Value', type: 'text', placeholder: 'e.g. {caller_number}' },
         ]},
         { key: 'create_new_record', name: 'Create New Record', description: 'Create a new customer record', configFields: [
-          { key: 'first_name', label: 'First Name', type: 'text', placeholder: 'e.g. {caller_name}' },
-          { key: 'last_name', label: 'Last Name', type: 'text', placeholder: 'Last name' },
-          { key: 'phone', label: 'Phone', type: 'text', placeholder: 'e.g. {caller_number}' },
-          { key: 'email', label: 'Email', type: 'text', placeholder: 'Email address' },
-          { key: 'source', label: 'Source', type: 'select', options: ['Phone', 'Text', 'Email', 'Website', 'Referral', 'Walk-In', 'Manual'] },
+          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
         ]},
         { key: 'update_record', name: 'Update Record', description: 'Modify an existing customer record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
         ]},
         { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a customer record', configFields: [
-          { key: 'record_id', label: 'Record ID', type: 'text', placeholder: 'Record ID to delete' },
+          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
         ]},
       ],
     },
@@ -2153,9 +2149,10 @@ export default function ScenariosPage() {
                     </div>
 
                     {/* Table-specific fields — dynamic based on selected table */}
-                    {actionConfig.target_table && RECORD_TABLE_FIELDS[actionConfig.target_table] && (
+                    {actionConfig.target_table && (
                       <div className="sb-record-fields-section">
-                        {/* Record ID — only visible after table is selected */}
+                        {/* Record ID — shown for update and delete actions */}
+                        {(actionConfig._key === 'update_record' || actionConfig._key === 'delete_record') && (
                         <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
                           <label className="sb-record-label" style={{ display: 'block' }}><Hash size={11} className="sb-record-label-icon" style={{ marginRight: 4, display: 'inline', verticalAlign: -1 }} />Record ID</label>
                           <div style={{ position: 'relative' }}>
@@ -2188,7 +2185,10 @@ export default function ScenariosPage() {
                             )}
                           </div>
                         </div>
+                        )}
 
+                        {/* Field inputs — shown for create and update actions */}
+                        {(actionConfig._key === 'update_record' || actionConfig._key === 'create_new_record') && (
                         <div className="sb-record-fields-grid">
                           {RECORD_TABLE_FIELDS[actionConfig.target_table].map((field) => {
                             const fieldKey = `field_${field.key}`;
@@ -2229,6 +2229,7 @@ export default function ScenariosPage() {
                             );
                           })}
                         </div>
+                        )}
                       </div>
                     )}
 
