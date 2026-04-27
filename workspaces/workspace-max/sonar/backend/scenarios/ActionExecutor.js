@@ -124,14 +124,21 @@ class ActionExecutor {
   async _initiateCall(node, flowContext) {
     try {
       const config = node.actionConfig || {};
-      let toNumber = config.to_phone || flowContext.lead?.phone || flowContext.customer?.phone;
+      console.log('[ActionExecutor] Call context:', { 
+        to_phone: config.to_phone, 
+        customer_phone: flowContext.customer?.phone,
+        person_phone: flowContext.person?.phone,
+        has_customer: !!flowContext.customer,
+        customer_keys: flowContext.customer ? Object.keys(flowContext.customer) : []
+      });
+      let toNumber = config.to_phone || flowContext.customer?.phone || flowContext.person?.phone;
 
       if (!toNumber) {
         return { success: false, error: 'No phone number for call' };
       }
 
       const elevenlabsKey = process.env.ELEVENLABS_API_KEY;
-      const agentId = process.env.ELEVENLABS_AGENT_ID;
+      const agentId = process.env.ELEVENLABS_AGENT_ID_OUTBOUND;
 
       if (!elevenlabsKey || !agentId) {
         return { success: false, error: 'ElevenLabs not configured' };
@@ -143,7 +150,7 @@ class ActionExecutor {
         company_name: flowContext.business?.name || '',
         business_hours: flowContext.business?.business_hours || '',
         receptionist_name: flowContext.receptionist?.first_name || 'Receptionist',
-        customer_name: flowContext.lead?.name || flowContext.customer?.name || '',
+        customer_name: flowContext.customer?.first_name || flowContext.customer?.name || '',
         flow_execution_id: flowContext._executionId || '',
         ...flowContext.agent, // Include any agent-captured data from previous calls
       };
@@ -155,7 +162,7 @@ class ActionExecutor {
         dynamicVars._scenario_prompt = `\nDuring this call, collect the following data:\n${varList}\nUse the set_agent_data tool to record each value.`;
       }
 
-      const res = await fetch(`${ELEVENLABS_API}/convai/conversation`, {
+      const res = await fetch(`${ELEVENLABS_API}/convai/twilio/outbound-call`, {
         method: 'POST',
         headers: {
           'xi-api-key': elevenlabsKey,
@@ -163,19 +170,10 @@ class ActionExecutor {
         },
         body: JSON.stringify({
           agent_id: agentId,
+          agent_phone_number_id: process.env.ELEVENLABS_PHONE_NUMBER_ID || '',
           to_number: toNumber,
-          conversation_config_override: {
-            conversation_config_override: {
-              conversation: {
-                client_events: ['agent_response'],
-              },
-            },
-          },
-          dynamic_variables: dynamicVars,
-          metadata: {
-            scenario_id: flowContext._scenarioId,
-            flow_execution_id: flowContext._executionId,
-            node_id: node.id,
+          conversation_initiation_client_data: {
+            dynamic_variables: dynamicVars,
           },
         }),
       });

@@ -175,8 +175,23 @@ class ScenarioEngine {
       actor: event.actor,
     };
 
+    // Fetch appointment data if appointment_id is available
+    const appointmentId = event.payload?.appointment_id;
+    if (appointmentId) {
+      try {
+        const appointments = await this.sbQuery('appointments', 'GET', null, `?id=eq.${appointmentId}&limit=1`);
+        if (appointments?.length > 0) {
+          context.appointment = appointments[0];
+          if (!context.lead_id && appointments[0].lead_id) context.lead_id = appointments[0].lead_id;
+          if (!context.people_id && appointments[0].people_id) context.people_id = appointments[0].people_id;
+        }
+      } catch (err) {
+        console.warn('[ScenarioEngine] Could not fetch appointment:', err.message);
+      }
+    }
+
     // Fetch business data if user_id is available
-    const userId = event.payload?.user_id || scenario.user_id;
+    const userId = event.payload?.user_id || scenario.user_id || scenario.created_by;
     if (userId) {
       try {
         const businesses = await this.sbQuery('businesses', 'GET', null, `?user_id=eq.${userId}&limit=1`);
@@ -189,7 +204,7 @@ class ScenarioEngine {
     }
 
     // Fetch lead data if lead_id is available
-    const leadId = event.payload?.lead_id;
+    const leadId = context.lead_id || event.payload?.lead_id;
     if (leadId) {
       try {
         const leads = await this.sbQuery('leads', 'GET', null, `?id=eq.${leadId}&limit=1`);
@@ -199,6 +214,20 @@ class ScenarioEngine {
         }
       } catch (err) {
         console.warn('[ScenarioEngine] Could not fetch lead:', err.message);
+      }
+    }
+
+    // Fetch person data — lead_id and people_id both point to people table
+    const peopleId = context.people_id || context.lead_id || event.payload?.people_id;
+    if (peopleId) {
+      try {
+        const people = await this.sbQuery('people', 'GET', null, `?id=eq.${peopleId}&limit=1`);
+        if (people?.length > 0) {
+          context.person = people[0];
+          context.customer = people[0];
+        }
+      } catch (err) {
+        console.warn('[ScenarioEngine] Could not fetch person:', err.message);
       }
     }
 
@@ -275,6 +304,11 @@ class ScenarioEngine {
       try {
         const { scenarioId } = req.params;
         const scenario = this.scenarios.find(s => s.id === scenarioId);
+        const event = {
+          event_type: 'manual_trigger',
+          payload: req.body,
+        };
+        const flowContext = await this._buildFlowContext(scenario, event);
 
         if (!scenario) {
           // Try fetching from Supabase
@@ -282,17 +316,11 @@ class ScenarioEngine {
           if (!records?.length) {
             return res.status(404).json({ error: 'Scenario not found' });
           }
-          const result = await this.flowExecutor.start(records[0], {
-            event_type: 'manual_trigger',
-            payload: req.body,
-          });
+          const result = await this.flowExecutor.start(records[0], event, flowContext);
           return res.json(result);
         }
 
-        const result = await this.flowExecutor.start(scenario, {
-          event_type: 'manual_trigger',
-          payload: req.body,
-        });
+        const result = await this.flowExecutor.start(scenario, event, flowContext);
 
         res.json(result);
       } catch (err) {

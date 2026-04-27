@@ -148,9 +148,8 @@ class Controller {
       agents = agents.map(a => this._mapAgentFields(a));
       const stateRows = await sbQuery('state', 'GET', null, '?id=eq.1') || [];
       if (stateRows.length > 0) control = stateRows[0];
-    } catch (err) {
-      console.error('[SONAR] Supabase fetch for initial state failed:', err.message);
-    }
+      // State table not configured, using defaults
+    } catch (err) {}
 
     const state = {
       type: 'initial_state',
@@ -881,7 +880,6 @@ class Controller {
         const jobs = await sbQuery('cron_jobs', 'GET', null, '?order=next_run_at.asc') || [];
         res.json(jobs);
       } catch (err) {
-        console.error('[SONAR] GET cron failed:', err.message);
         res.json([]);
       }
     });
@@ -1079,7 +1077,7 @@ class Controller {
 
     // ─── Sonar Management API (dashboard CRUD) ───────────────
     const { router: sonarApiRouter, init: initSonarApi } = require('./routes/sonar-api');
-    initSonarApi({ sbQuery });
+    initSonarApi({ sbQuery, eventSystem: this.events });
     this.app.use('/api/sonar', sonarApiRouter);
 
     // --- Call Router (pre-call resolution middleware) ---

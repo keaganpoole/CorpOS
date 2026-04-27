@@ -15,7 +15,7 @@ const router = express.Router();
 
 const EL = 'https://api.elevenlabs.io/v1';
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const SONAR_AGENT_ID = process.env.ELEVENLABS_AGENT_ID || 'agent_6101kp755r1aeg3vj6n3emg1ggft';
+const SONAR_AGENT_ID = process.env.ELEVENLABS_AGENT_ID_INBOUND || 'agent_6101kp755r1aeg3vj6n3emg1ggft';
 
 function sbQuery(table, method, body, query = '') {
   const url = `${process.env.SONAR_SUPABASE_URL}/rest/v1/${table}${query}`;

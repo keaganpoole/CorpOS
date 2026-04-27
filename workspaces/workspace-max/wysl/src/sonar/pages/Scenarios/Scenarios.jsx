@@ -29,6 +29,7 @@ import {
   Filter,
   Database,
   Hash,
+  Code,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
@@ -393,6 +394,7 @@ export default function ScenariosPage() {
   const [scenarioIsActive, setScenarioIsActive] = useState(true);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showJsonModal, setShowJsonModal] = useState(false);
   const [recurringSchedule, setRecurringSchedule] = useState({ frequency: 'once', interval: 1, time: '09:00' });
   const [scenarioNotes, setScenarioNotes] = useState('');
   
@@ -2584,6 +2586,16 @@ export default function ScenariosPage() {
             >
               <Pencil size={13} />
             </button>
+
+            {/* JSON viewer */}
+            <button
+              type="button"
+              className="sb-toolbar-icon-btn"
+              onClick={() => setShowJsonModal(true)}
+              title="View JSON"
+            >
+              <Code size={13} />
+            </button>
           </div>
         </div>
         )}
@@ -2727,6 +2739,55 @@ export default function ScenariosPage() {
                 <button className="sb-schedule-cancel-btn" onClick={() => setShowNotesModal(false)}>
                   Done
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showJsonModal && (
+          <div className="sb-json-modal-overlay" onClick={() => setShowJsonModal(false)}>
+            <div className="sb-json-modal" onClick={e => e.stopPropagation()}>
+              <div className="sb-json-modal-header">
+                <h3 className="sb-json-modal-title">Scenario JSON</h3>
+                <button type="button" className="sb-json-modal-close" onClick={() => setShowJsonModal(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="sb-json-modal-body">
+                <pre className="sb-json-content">
+                  {JSON.stringify({
+                    name: scenarioName || currentScenario?.name || '',
+                    description: scenarioDescription || currentScenario?.description || '',
+                    nodes_data: nodes.map(n => ({
+                      id: n.id,
+                      x: n.x,
+                      y: n.y,
+                      type: n.type,
+                      label: n.label,
+                      detail: n.detail,
+                      configured: n.configured,
+                      accent: n.accent,
+                      icon: n.icon?.name || n.icon,
+                      appointmentConfig: n.appointmentConfig || null,
+                      isCommunication: n.isCommunication || false,
+                      firstMessage: n.firstMessage || '',
+                      mainBox: n.mainBox || '',
+                      focus: n.focus || 'prompt',
+                      actionConfig: n.actionConfig || null,
+                      subOptionKey: n.subOptionKey || null,
+                      categoryKey: n.categoryKey || null,
+                      categoryType: n.categoryType || null,
+                    })),
+                    edges_data: edges.map(e => ({
+                      id: e.id,
+                      from: e.from,
+                      to: e.to,
+                      filter: e.filter,
+                    })),
+                    schedule_config: recurringSchedule,
+                    notes: scenarioNotes,
+                    is_active: scenarioIsActive,
+                  }, null, 2)}
+                </pre>
               </div>
             </div>
           </div>

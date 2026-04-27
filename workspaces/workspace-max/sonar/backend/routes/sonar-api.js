@@ -12,8 +12,10 @@ const router = express.Router();
 
 // ─── Supabase Helpers (injected by controller) ──────────
 let sbQuery;
+let eventSystem;
 function init(deps) {
   sbQuery = deps.sbQuery;
+  eventSystem = deps.eventSystem;
 }
 
 // ─── Helper: normalize phone ─────────────────────────────
@@ -386,7 +388,41 @@ router.put('/appointments/:id', async (req, res) => {
     if (Object.keys(payload).length === 0) return res.status(400).json({ error: 'No valid fields' });
 
     const result = await sbQuery('appointments', 'PATCH', payload, `?id=eq.${req.params.id}`);
-    res.json({ success: true, appointment: result?.[0] || payload });
+    const updated = result?.[0] || payload;
+
+    // Emit event if status changed
+    if (payload.status && eventSystem) {
+      const statusEventMap = {
+        cancelled: 'appointment_cancelled',
+        confirmed: 'appointment_confirmed',
+        completed: 'appointment_completed',
+        pending: 'appointment_updated',
+      };
+      const eventType = statusEventMap[payload.status] || 'appointment_updated';
+      eventSystem.emit({
+        event_type: eventType,
+        actor: 'api',
+        actor_type: 'system',
+        source: 'sonar-api',
+        message: `Appointment ${req.params.id} status → ${payload.status}`,
+        payload: {
+          appointment_id: req.params.id,
+          new_status: payload.status,
+          ...updated,
+        },
+      });
+    } else if (eventSystem) {
+      eventSystem.emit({
+        event_type: 'appointment_updated',
+        actor: 'api',
+        actor_type: 'system',
+        source: 'sonar-api',
+        message: `Appointment ${req.params.id} updated`,
+        payload: { appointment_id: req.params.id, ...updated },
+      });
+    }
+
+    res.json({ success: true, appointment: updated });
   } catch (err) {
     console.error('[SONAR-API] update appointment failed:', err.message);
     res.status(500).json({ error: err.message });
@@ -401,7 +437,20 @@ router.delete('/appointments/:id', async (req, res) => {
   try {
     // Soft delete — set status to cancelled
     const result = await sbQuery('appointments', 'PATCH', { status: 'cancelled' }, `?id=eq.${req.params.id}`);
-    res.json({ success: true, appointment: result?.[0] || { id: req.params.id, status: 'cancelled' } });
+    const updated = result?.[0] || { id: req.params.id, status: 'cancelled' };
+
+    if (eventSystem) {
+      eventSystem.emit({
+        event_type: 'appointment_cancelled',
+        actor: 'api',
+        actor_type: 'system',
+        source: 'sonar-api',
+        message: `Appointment ${req.params.id} cancelled (deleted)`,
+        payload: { appointment_id: req.params.id, new_status: 'cancelled', ...updated },
+      });
+    }
+
+    res.json({ success: true, appointment: updated });
   } catch (err) {
     console.error('[SONAR-API] delete appointment failed:', err.message);
     res.status(500).json({ error: err.message });
