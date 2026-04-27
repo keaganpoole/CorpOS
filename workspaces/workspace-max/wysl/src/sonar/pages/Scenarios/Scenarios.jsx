@@ -1359,6 +1359,7 @@ export default function ScenariosPage() {
         actionConfig: n.actionConfig || null,
         subOptionKey: n.subOptionKey || null,
         categoryKey: n.categoryKey || null,
+        categoryType: n.categoryType || null,
       })),
       edges_data: edges.map(e => ({
         id: e.id,

@@ -119,6 +119,8 @@ class ScenarioEngine {
     const eventType = event.event_type;
     if (!eventType) return;
 
+    console.log(`[ScenarioEngine] Received event: "${eventType}", active scenarios: ${this.scenarios.length}`);
+
     for (const scenario of this.scenarios) {
       const triggerMatch = this._checkTriggerMatch(scenario, eventType, event);
       if (triggerMatch) {
@@ -147,6 +149,12 @@ class ScenarioEngine {
     const triggerNodes = nodes.filter(n =>
       n.configured && n.categoryType === 'TRIGGERS'
     );
+
+    console.log(`[ScenarioEngine] Found ${triggerNodes.length} trigger nodes in "${scenario.name}"`);
+    triggerNodes.forEach(n => {
+      const key = n.subOptionKey || n.actionConfig?._key || '';
+      console.log(`[ScenarioEngine]   Trigger: ${n.label} subOptionKey=${n.subOptionKey} configured=${n.configured} categoryType=${n.categoryType}`);
+    });
 
     for (const node of triggerNodes) {
       const triggerKey = node.subOptionKey || node.actionConfig?._key || '';

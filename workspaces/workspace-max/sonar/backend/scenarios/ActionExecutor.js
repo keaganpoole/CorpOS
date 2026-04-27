@@ -152,8 +152,19 @@ class ActionExecutor {
         receptionist_name: flowContext.receptionist?.first_name || 'Receptionist',
         customer_name: flowContext.customer?.first_name || flowContext.customer?.name || '',
         flow_execution_id: flowContext._executionId || '',
+        mission: node.actionConfig?.main_content || '',
         ...flowContext.agent, // Include any agent-captured data from previous calls
       };
+
+      // Load core prompt — mission plugs in via {{mission}} dynamic variable
+      const fs = require('fs');
+      const path = require('path');
+      let corePrompt = '';
+      try {
+        corePrompt = fs.readFileSync(path.join(__dirname, '..', 'elevenlabs', 'core_prompt_outbound.txt'), 'utf8');
+      } catch (e) {
+        console.warn('[ActionExecutor] Could not load core_prompt_outbound.txt:', e.message);
+      }
 
       // Build prompt additions for agent variable capture
       const agentVars = this._extractAgentVariables(flowContext._scenario);
@@ -172,6 +183,13 @@ class ActionExecutor {
           agent_id: agentId,
           agent_phone_number_id: process.env.ELEVENLABS_PHONE_NUMBER_ID || '',
           to_number: toNumber,
+          conversation_config_override: {
+            agent: {
+              prompt: {
+                prompt: corePrompt,
+              },
+            },
+          },
           conversation_initiation_client_data: {
             dynamic_variables: dynamicVars,
           },
