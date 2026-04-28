@@ -150,17 +150,30 @@ export const TABLE_LABELS = {
 
 // Default agent variables captured during calls
 const DEFAULT_AGENT_VARS = [
-  { key: 'record_id', label: 'Record ID' },
-  { key: 'first_name', label: 'First Name' },
-  { key: 'last_name', label: 'Last Name' },
-  { key: 'email', label: 'Email' },
-  { key: 'notes', label: 'Notes' },
-  { key: 'last_outcome', label: 'Outcome' },
-  { key: 'callback_due_at', label: 'Callback Due At' },
-  { key: 'special_instructions', label: 'Special Instructions' },
-  { key: 'new_appt_date', label: 'Appointment Date' },
-  { key: 'new_appt_time', label: 'Appointment Time' },
-  { key: 'new_appt_service', label: 'Appointment Service' },
+  // Customer Record
+  { key: 'record_id', label: 'Record ID', category: 'people' },
+  { key: 'first_name', label: 'First Name', category: 'people' },
+  { key: 'last_name', label: 'Last Name', category: 'people' },
+  { key: 'email', label: 'Email', category: 'people' },
+  { key: 'notes', label: 'Notes', category: 'people' },
+  { key: 'last_outcome', label: 'Outcome', category: 'people' },
+  { key: 'last_call_status', label: 'Call Status', category: 'people' },
+  { key: 'callback_needed', label: 'Callback Needed', category: 'people' },
+  { key: 'callback_due_at', label: 'Callback Due At', category: 'people' },
+  { key: 'best_time_to_contact', label: 'Best Time to Contact', category: 'people' },
+  { key: 'special_instructions', label: 'Special Instructions', category: 'people' },
+  { key: 'consent_sms', label: 'Consent SMS', category: 'people' },
+  { key: 'consent_call', label: 'Consent Call', category: 'people' },
+  // Appointments
+  { key: 'new_appt_date', label: 'Appointment Date', category: 'appointments' },
+  { key: 'new_appt_time', label: 'Appointment Time', category: 'appointments' },
+  { key: 'new_appt_duration', label: 'Appointment Duration', category: 'appointments' },
+  { key: 'new_appt_service', label: 'Appointment Service', category: 'appointments' },
+  { key: 'new_appt_client_name', label: 'Appointment Client Name', category: 'appointments' },
+  { key: 'cancel_appt_id', label: 'Cancel Appointment ID', category: 'appointments' },
+  { key: 'update_appt_id', label: 'Update Appointment ID', category: 'appointments' },
+  { key: 'update_appt_date', label: 'Update Appointment Date', category: 'appointments' },
+  { key: 'update_appt_time', label: 'Update Appointment Time', category: 'appointments' },
 ];
 
 // Build variable reference from table + field
@@ -315,24 +328,55 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 
             {expanded.__agent && (
               <div className="sb-vars-fields">
-                {DEFAULT_AGENT_VARS.map((field) => {
-                  const varRef = `{{agent.${field.key}}}`;
+                {(() => {
+                  const currentNode = nodes.find(n => n.id === currentNodeId);
+                  const nodeCategory = currentNode?.categoryKey || '';
+                  const isAppointmentNode = nodeCategory === 'appointments' || nodeCategory === 'appointment_scheduling';
+
+                  if (isAppointmentNode) {
+                    return (
+                      <div>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: '#32f0d9', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '4px 0 2px 8px', opacity: 0.7 }}>Appointments</div>
+                        {DEFAULT_AGENT_VARS.filter(f => f.category === 'appointments').map((field) => {
+                          const varRef = `{{agent.${field.key}}}`;
+                          return (
+                            <button
+                              key={field.key}
+                              type="button"
+                              className="sb-vars-field"
+                              onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, '#32f0d9'); }}
+                              title={`Insert ${varRef} — populated by agent during call`}
+                            >
+                              <span className="sb-vars-field-name" style={{ color: '#32f0d9' }}>{field.label}</span>
+                              <span className="sb-vars-field-value" style={{ color: '#666', fontStyle: 'italic' }}>to be collected</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+
                   return (
-                    <button
-                      key={field.key}
-                      type="button"
-                      className="sb-vars-field"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onInsertVariable?.(varRef, field.label, '#32f0d9');
-                      }}
-                      title={`Insert ${varRef} — populated by agent during call`}
-                    >
-                      <span className="sb-vars-field-name" style={{ color: '#32f0d9' }}>{field.label}</span>
-                      <span className="sb-vars-field-value" style={{ color: '#666', fontStyle: 'italic' }}>to be collected</span>
-                    </button>
+                    <div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: '#32f0d9', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '4px 0 2px 8px', opacity: 0.7 }}>Customer Record</div>
+                      {DEFAULT_AGENT_VARS.filter(f => f.category === 'people').map((field) => {
+                        const varRef = `{{agent.${field.key}}}`;
+                        return (
+                          <button
+                            key={field.key}
+                            type="button"
+                            className="sb-vars-field"
+                            onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, '#32f0d9'); }}
+                            title={`Insert ${varRef} — populated by agent during call`}
+                          >
+                            <span className="sb-vars-field-name" style={{ color: '#32f0d9' }}>{field.label}</span>
+                            <span className="sb-vars-field-value" style={{ color: '#666', fontStyle: 'italic' }}>to be collected</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   );
-                })}
+                })()}
               </div>
             )}
           </div>

@@ -572,6 +572,23 @@ router.put('/people/:id', async (req, res) => {
     if (Object.keys(payload).length === 0) return res.status(400).json({ error: 'No valid fields' });
 
     const result = await sbQuery('people', 'PATCH', payload, `?id=eq.${req.params.id}`);
+
+    // Emit record_updated event
+    if (eventSystem) {
+      eventSystem.emit({
+        event_type: 'record_updated',
+        actor: 'api',
+        actor_type: 'system',
+        source: 'sonar-api',
+        message: `Person ${req.params.id} updated`,
+        payload: {
+          people_id: parseInt(req.params.id),
+          record_id: req.params.id,
+          ...payload,
+        },
+      });
+    }
+
     res.json({ success: true, person: result?.[0] || payload });
   } catch (err) {
     console.error('[SONAR-API] update person failed:', err.message);

@@ -311,23 +311,19 @@ class ScenarioEngine {
     router.post('/trigger/:scenarioId', async (req, res) => {
       try {
         const { scenarioId } = req.params;
-        const scenario = this.scenarios.find(s => s.id === scenarioId);
+
+        // Always fetch fresh from Supabase
+        const records = await this.sbQuery('scenarios', 'GET', null, `?id=eq.${scenarioId}&limit=1`);
+        if (!records?.length) {
+          return res.status(404).json({ error: 'Scenario not found' });
+        }
+
+        const scenario = records[0];
         const event = {
           event_type: 'manual_trigger',
           payload: req.body,
         };
         const flowContext = await this._buildFlowContext(scenario, event);
-
-        if (!scenario) {
-          // Try fetching from Supabase
-          const records = await this.sbQuery('scenarios', 'GET', null, `?id=eq.${scenarioId}&limit=1`);
-          if (!records?.length) {
-            return res.status(404).json({ error: 'Scenario not found' });
-          }
-          const result = await this.flowExecutor.start(records[0], event, flowContext);
-          return res.json(result);
-        }
-
         const result = await this.flowExecutor.start(scenario, event, flowContext);
 
         res.json(result);
