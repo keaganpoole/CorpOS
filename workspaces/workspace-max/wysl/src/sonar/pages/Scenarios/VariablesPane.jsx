@@ -43,11 +43,16 @@ const TABLE_DEFS = [
       { key: 'first_name', label: 'First Name', type: 'text' },
       { key: 'last_name', label: 'Last Name', type: 'text' },
       { key: 'email', label: 'Email', type: 'email' },
-      { key: 'phone', label: 'Phone', type: 'phone' },
-      { key: 'status', label: 'Status', type: 'text' },
-      { key: 'source', label: 'Source', type: 'text' },
       { key: 'notes', label: 'Notes', type: 'text' },
-      { key: 'created_at', label: 'Created At', type: 'timestamp' },
+      { key: 'special_instructions', label: 'Special Instructions', type: 'text' },
+      { key: 'best_time_to_contact', label: 'Best Time to Contact', type: 'text' },
+      { key: 'callback_needed', label: 'Callback Needed', type: 'text' },
+      { key: 'callback_due_at', label: 'Callback Due At', type: 'text' },
+      { key: 'status', label: 'Status', type: 'text' },
+      { key: 'last_call_status', label: 'Last Call Status', type: 'text' },
+      { key: 'last_outcome', label: 'Last Outcome', type: 'text' },
+      { key: 'consent_sms', label: 'Consent SMS', type: 'text' },
+      { key: 'consent_call', label: 'Consent Call', type: 'text' },
     ],
     fetch: async () => {
       try {
@@ -146,12 +151,16 @@ export const TABLE_LABELS = {
 // Default agent variables captured during calls
 const DEFAULT_AGENT_VARS = [
   { key: 'record_id', label: 'Record ID' },
-  { key: 'name', label: 'Customer Name' },
+  { key: 'first_name', label: 'First Name' },
+  { key: 'last_name', label: 'Last Name' },
   { key: 'email', label: 'Email' },
-  { key: 'phone', label: 'Phone' },
-  { key: 'notes', label: 'Call Notes' },
-  { key: 'outcome', label: 'Call Outcome' },
-  { key: 'callback_time', label: 'Callback Time' },
+  { key: 'notes', label: 'Notes' },
+  { key: 'last_outcome', label: 'Outcome' },
+  { key: 'callback_due_at', label: 'Callback Due At' },
+  { key: 'special_instructions', label: 'Special Instructions' },
+  { key: 'new_appt_date', label: 'Appointment Date' },
+  { key: 'new_appt_time', label: 'Appointment Time' },
+  { key: 'new_appt_service', label: 'Appointment Service' },
 ];
 
 // Build variable reference from table + field

@@ -156,12 +156,59 @@ class ActionExecutor {
         ...flowContext.agent, // Include any agent-captured data from previous calls
       };
 
-      // Build prompt additions for agent variable capture
+      // Categorized variable descriptions for agent data collection
+      const VAR_DESCRIPTIONS = {
+        // People / Customer Record fields
+        record_id: 'The unique ID of the customer record in the system',
+        first_name: 'The customer\'s first name',
+        last_name: 'The customer\'s last name',
+        email: 'The customer\'s email address',
+        notes: 'A brief summary of the conversation and key details discussed',
+        special_instructions: 'Any special notes or preferences about this customer',
+        best_time_to_contact: 'The best time to reach this customer',
+        callback_needed: 'Whether the customer requested a callback (true or false)',
+        callback_due_at: 'When the customer asked to be called back',
+        status: 'The customer\'s current status (e.g. "active", "inactive")',
+        last_call_status: 'The status of this call (e.g. "completed", "voicemail")',
+        last_outcome: 'The outcome of the call (e.g. "rescheduled", "cancelled", "no_answer")',
+        consent_sms: 'Whether the customer consented to SMS (true or false)',
+        consent_call: 'Whether the customer consented to calls (true or false)',
+        // Appointment fields
+        new_appt_date: 'The date the customer wants to book (YYYY-MM-DD)',
+        new_appt_time: 'The time the customer wants to book (HH:MM)',
+        new_appt_duration: 'How long the appointment should be in minutes',
+        new_appt_service: 'The service or appointment type the customer wants',
+        new_appt_client_name: 'The name to book the appointment under',
+        cancel_appt_id: 'The ID of the appointment being cancelled',
+        update_appt_id: 'The ID of the appointment being updated',
+        update_appt_date: 'The new date for the appointment (YYYY-MM-DD)',
+        update_appt_time: 'The new time for the appointment (HH:MM)',
+      };
+
+      // Categorize extracted variables
+      const APPOINTMENT_VARS = new Set(['new_appt_date', 'new_appt_time', 'new_appt_duration', 'new_appt_service', 'new_appt_client_name', 'cancel_appt_id', 'update_appt_id', 'update_appt_date', 'update_appt_time']);
+      const PEOPLE_VARS = new Set(['record_id', 'first_name', 'last_name', 'email', 'notes', 'special_instructions', 'best_time_to_contact', 'callback_needed', 'callback_due_at', 'status', 'last_call_status', 'last_outcome', 'consent_sms', 'consent_call']);
+
+      // Default intel values (prevent empty variable errors)
+      let intelAppointments = 'No appointment-related data to collect in this call.';
+      let intelPeople = 'No customer record data to collect in this call.';
+
+      // Build categorized intel from extracted variables
       const agentVars = this._extractAgentVariables(flowContext._scenario);
       if (agentVars.length > 0) {
-        const varList = agentVars.map(v => `- ${v}: collect this from the call`).join('\n');
-        dynamicVars._scenario_prompt = `\nDuring this call, collect the following data:\n${varList}\nUse the set_agent_data tool to record each value.`;
+        const apptVars = agentVars.filter(v => APPOINTMENT_VARS.has(v));
+        const peopleVars = agentVars.filter(v => PEOPLE_VARS.has(v));
+
+        if (apptVars.length > 0) {
+          intelAppointments = apptVars.map(v => `- ${v} — ${VAR_DESCRIPTIONS[v] || 'Collect this value'}`).join('\n');
+        }
+        if (peopleVars.length > 0) {
+          intelPeople = peopleVars.map(v => `- ${v} — ${VAR_DESCRIPTIONS[v] || 'Collect this value'}`).join('\n');
+        }
       }
+
+      dynamicVars.intel_appointments = intelAppointments;
+      dynamicVars.intel_people = intelPeople;
 
       const res = await fetch(`${ELEVENLABS_API}/convai/twilio/outbound-call`, {
         method: 'POST',
