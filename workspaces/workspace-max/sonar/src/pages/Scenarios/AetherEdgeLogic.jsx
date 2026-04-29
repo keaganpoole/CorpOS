@@ -1,19 +1,58 @@
-import React, { useMemo } from 'react';
-import { Database, Zap, X } from 'lucide-react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { Zap, X } from 'lucide-react';
 import {
   LEAD_FIELDS,
-  CONTACT_METHOD_OPTIONS,
-  STATUS_OPTIONS,
-  SOURCE_OPTIONS,
-  CALL_STATUS_OPTIONS,
-  OUTCOME_OPTIONS,
-  SMS_STATUS_OPTIONS,
-  EMAIL_STATUS_OPTIONS,
-  PAYMENT_STATUS_OPTIONS,
-  CALL_ROUTE_OPTIONS,
-  TAG_OPTIONS,
-  normalizeOptionValue,
 } from '../../lib/leadSchema';
+import { TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
+
+// Map field keys to their source tables
+const FIELD_TO_TABLE = {
+  // People fields
+  first_name: 'people', last_name: 'people', phone: 'people', email: 'people',
+  street_address: 'people', city: 'people', state: 'people', zip_code: 'people',
+  preferred_contact_method: 'people', preferred_language: 'people', best_time_to_contact: 'people',
+  consent_sms: 'people', consent_call: 'people', do_not_call: 'people', do_not_text: 'people',
+  status: 'people', source: 'people', lead_source_detail: 'people', tags: 'people',
+  created_at: 'people', updated_at: 'people',
+  last_inbound_call_at: 'people', last_outbound_call_at: 'people', last_call_status: 'people',
+  last_intent: 'people', last_outcome: 'people', missed_call_count: 'people',
+  last_inbound_sms_at: 'people', last_outbound_sms_at: 'people', last_sms_status: 'people',
+  last_inbound_email_at: 'people', last_outbound_email_at: 'people', last_email_status: 'people',
+  callback_needed: 'people', callback_due_at: 'people', handoff_required: 'people',
+  assigned_staff: 'people', call_route: 'people',
+  payment_status: 'people', balance_due: 'people', invoice_id: 'people',
+  notes: 'people', special_instructions: 'people',
+  // Payment fields
+  payment_amount: 'people', payment_status_record: 'people', payment_method: 'people',
+  payment_currency: 'people', payment_description: 'people', payment_receipt_url: 'people',
+  payment_created_at: 'people',
+};
+
+const VariableChip = ({ tableKey, fieldKey, fieldLabel }) => {
+  const color = TABLE_COLORS[tableKey] || '#a78bfa';
+  const tableLabel = TABLE_LABELS[tableKey] || tableKey;
+  const label = fieldLabel || fieldKey;
+  return (
+    <span
+      className="sb-var-chip"
+      style={{
+        background: `${color}18`,
+        color: color,
+        border: `1px solid ${color}25`,
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '1px 7px',
+        borderRadius: '4px',
+        fontSize: '10px',
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+        lineHeight: '1.7',
+      }}
+    >
+      {tableLabel}.{label}
+    </span>
+  );
+};
 
 const TYPE_LABELS = {
   text: 'Text',
@@ -97,40 +136,6 @@ const OPERATORS_BY_TYPE = {
   ],
 };
 
-const VALUE_OPTIONS_BY_FIELD = {
-  status: STATUS_OPTIONS,
-  source: SOURCE_OPTIONS,
-  preferred_contact_method: CONTACT_METHOD_OPTIONS,
-  last_call_status: CALL_STATUS_OPTIONS,
-  last_outcome: OUTCOME_OPTIONS,
-  last_sms_status: SMS_STATUS_OPTIONS,
-  last_email_status: EMAIL_STATUS_OPTIONS,
-  payment_status: PAYMENT_STATUS_OPTIONS,
-  call_route: CALL_ROUTE_OPTIONS,
-  tags: TAG_OPTIONS,
-};
-
-const normalizeValue = (field, rawValue) => {
-  if (rawValue == null) return null;
-  if (field?.type === 'boolean') {
-    if (rawValue === true || rawValue === 'true') return true;
-    if (rawValue === false || rawValue === 'false') return false;
-    return null;
-  }
-  if (field?.type === 'number' || field?.type === 'currency') {
-    if (rawValue === '') return null;
-    const parsed = Number(rawValue);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
-  if (field?.type === 'timestamp') {
-    return rawValue || null;
-  }
-  if (field?.type === 'multi_select') {
-    return Array.isArray(rawValue) ? rawValue : rawValue ? [normalizeOptionValue(rawValue)] : null;
-  }
-  return rawValue === '' ? null : rawValue;
-};
-
 const getField = (fieldKey) => LEAD_FIELDS.find((field) => field.key === fieldKey);
 
 const getOperatorOptions = (field) => OPERATORS_BY_TYPE[field?.type] || OPERATORS_BY_TYPE.text;
@@ -140,79 +145,88 @@ const defaultOperatorForField = (field) => {
   return operators[0]?.value || 'equals';
 };
 
-const getValueComponent = ({ field, rule, onUpdateRule }) => {
-  const value = rule.value;
-  const valueOptions = VALUE_OPTIONS_BY_FIELD[field?.key] || field?.options || [];
-
-  if (field?.type === 'boolean') {
-    return (
-      <div className="sb-rule-value-shell">
-        <select
-          className="sb-input-field sb-select-field"
-          value={value === true || value === 'true' ? 'true' : value === false || value === 'false' ? 'false' : ''}
-          onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-        >
-          <option value="">Select value</option>
-          <option value="true">True</option>
-          <option value="false">False</option>
-        </select>
-      </div>
-    );
+// Parse value string into text + chip parts
+const parseValueWithChips = (rawValue) => {
+  if (!rawValue || typeof rawValue !== 'string') return [];
+  const varRegex = /\{\{([^}]+)\}\}/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  while ((match = varRegex.exec(rawValue)) !== null) {
+    const idx = match.index;
+    if (idx > lastIndex) {
+      parts.push({ type: 'text', content: rawValue.slice(lastIndex, idx) });
+    }
+    const ref = match[1];
+    const dotIdx = ref.indexOf('.');
+    const tableKey = dotIdx > -1 ? ref.slice(0, dotIdx) : '';
+    const fieldKey = dotIdx > -1 ? ref.slice(dotIdx + 1) : ref;
+    const fieldDef = LEAD_FIELDS.find(f => f.key === fieldKey);
+    parts.push({ type: 'chip', tableKey, fieldKey, fieldLabel: fieldDef?.label || fieldKey });
+    lastIndex = idx + match[0].length;
   }
-
-  if (field?.type === 'number' || field?.type === 'currency') {
-    return (
-      <input
-        className="sb-input-field"
-        type="number"
-        inputMode="decimal"
-        value={value ?? ''}
-        onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-        placeholder="Value"
-      />
-    );
+  if (lastIndex < rawValue.length) {
+    parts.push({ type: 'text', content: rawValue.slice(lastIndex) });
   }
+  return parts;
+};
 
-  if (field?.type === 'timestamp') {
-    return (
-      <input
-        className="sb-input-field"
-        type="datetime-local"
-        value={value ?? ''}
-        onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-      />
-    );
-  }
+const TextValueWithChips = ({ value, onChange, field, placeholder }) => {
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef(null);
+  const rawValue = value || '';
+  const parts = parseValueWithChips(rawValue);
+  const hasChips = parts.some(p => p.type === 'chip');
 
-  if (field?.type === 'select' || field?.type === 'multi_select') {
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.setSelectionRange(inputRef.current.value.length, inputRef.current.value.length);
+    }
+  }, [editing]);
+
+  if (hasChips && !editing) {
     return (
-      <div className="sb-rule-value-shell">
-        <select
-          className="sb-input-field sb-select-field"
-          value={Array.isArray(value) ? value[0] || '' : value || ''}
-          onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-        >
-          <option value="">{field?.type === 'multi_select' ? 'Choose tag' : 'Select value'}</option>
-          {valueOptions.map((opt) => {
-            const optValue = typeof opt === 'string' ? opt : opt.value;
-            const normalized = normalizeOptionValue(optValue);
-            return (
-              <option key={normalized} value={normalized}>
-                {normalized}
-              </option>
-            );
-          })}
-        </select>
+      <div
+        className="sb-input-field sb-var-chip-display"
+        tabIndex={0}
+        onClick={() => setEditing(true)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setEditing(true); }}
+        style={{ cursor: 'text', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', minHeight: '20px' }}
+      >
+        {parts.map((part, i) =>
+          part.type === 'chip' ? (
+            <VariableChip key={i} tableKey={part.tableKey} fieldKey={part.fieldKey} fieldLabel={part.fieldLabel} />
+          ) : (
+            <span key={i} style={{ color: '#fff', fontSize: '13px' }}>{part.content}</span>
+          )
+        )}
       </div>
     );
   }
 
   return (
     <input
+      ref={inputRef}
+      className="sb-input-field"
+      value={rawValue}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => setEditing(false)}
+      onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }}
+      placeholder={placeholder}
+    />
+  );
+};
+
+const getValueComponent = ({ field, rule, onUpdateRule }) => {
+  const value = rule.value;
+
+  return (
+    <input
       className="sb-input-field"
       value={value || ''}
-      onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-      placeholder="Value"
+      onChange={(event) => onUpdateRule(rule.id, 'value', event.target.value)}
+      placeholder=""
     />
   );
 };
@@ -245,33 +259,44 @@ const AetherEdgeLogic = ({
           </div>
         </div>
 
-        <div className="condition-group">
+        <div className="condition-group" style={{ position: 'relative' }}>
+          <div style={{ position: 'absolute', top: -20, left: 0, background: '#ff0', color: '#000', fontSize: 11, padding: '2px 6px', zIndex: 9999, borderRadius: 3, fontWeight: 700 }}>
+            DEBUG: ACTIVE CONDITION MODAL FILE = AetherEdgeLogic.jsx
+          </div>
           <div className="rule-stack">
             {conditions.map((rule) => {
               const field = getField(rule.variable);
               const operators = getOperatorOptions(field);
               return (
                 <div className="rule-card" key={rule.id}>
+                  <div style={{ fontSize: 9, color: '#ff0', marginBottom: 4, fontWeight: 700 }}>
+                    KEY FIELD COMPONENT = TextValueWithChips | OPERATOR FIELD COMPONENT = select | VALUE FIELD COMPONENT = getValueComponent (plain input)
+                  </div>
                   <div className="input-container">
                     <div className="variable-input">
-                      <Database size={12} className="variable-icon" />
-                      <select
-                        className="sb-input-field sb-select-field"
-                        value={rule.variable}
-                        onChange={(event) => {
-                          const nextField = getField(event.target.value);
-                          onUpdateRule(rule.id, 'variable', event.target.value);
-                          onUpdateRule(rule.id, 'operator', defaultOperatorForField(nextField));
-                          onUpdateRule(rule.id, 'value', nextField?.type === 'boolean' ? null : '');
+                      <TextValueWithChips
+                        value={rule.variable ? `{{${FIELD_TO_TABLE[rule.variable] || 'people'}.${rule.variable}}}` : ''}
+                        onChange={(val) => {
+                          const varMatch = val.match(/^\{\{([^}]+)\}\}$/);
+                          if (varMatch) {
+                            const ref = varMatch[1];
+                            const dotIdx = ref.indexOf('.');
+                            const fieldKey = dotIdx > -1 ? ref.slice(dotIdx + 1) : ref;
+                            const nextField = getField(fieldKey);
+                            if (nextField) {
+                              onUpdateRule(rule.id, 'variable', fieldKey);
+                              onUpdateRule(rule.id, 'operator', defaultOperatorForField(nextField));
+                              onUpdateRule(rule.id, 'value', nextField?.type === 'boolean' ? null : '');
+                            }
+                          } else if (val === '') {
+                            onUpdateRule(rule.id, 'variable', '');
+                            onUpdateRule(rule.id, 'operator', '');
+                            onUpdateRule(rule.id, 'value', '');
+                          }
                         }}
-                      >
-                        <option value="">Map variable...</option>
-                        {fields.map((option) => (
-                          <option key={option.key} value={option.key}>
-                            {option.label} ({TYPE_LABELS[option.type] || 'Text'})
-                          </option>
-                        ))}
-                      </select>
+                        field={{ type: 'text' }}
+                        placeholder=""
+                      />
                     </div>
                     <button
                       type="button"

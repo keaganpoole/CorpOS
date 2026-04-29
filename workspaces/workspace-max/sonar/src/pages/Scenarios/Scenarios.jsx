@@ -252,7 +252,7 @@ export default function ScenariosPage() {
   const [logicPanel, setLogicPanel] = useState(null);
   const [appointmentConfig, setAppointmentConfig] = useState({});
   const [edgeRules, setEdgeRules] = useState([
-    { id: 1, variable: 'status', operator: 'equals', value: '' },
+    { id: 1, variable: '', operator: '', value: '' },
   ]);
   const edgeRulesRef = useRef(edgeRules);
   
@@ -600,7 +600,7 @@ export default function ScenariosPage() {
   const addEdgeRule = useCallback(() => {
     setEdgeRules((prev) => [
       ...prev,
-      { id: Date.now(), variable: 'status', operator: 'equals', value: '' },
+      { id: Date.now(), variable: '', operator: '', value: '' },
     ]);
   }, []);
 
@@ -814,9 +814,9 @@ export default function ScenariosPage() {
     const left = canvasRect.left + view.x + midX * view.scale;
     
     // Load existing filter rules into edgeRules state
-    const newRules = edge.filter && edge.filter.rules 
-      ? edge.filter.rules 
-      : [{ id: Date.now(), variable: 'status', operator: 'equals', value: '' }];
+    const newRules = edge.filter && edge.filter.rules
+      ? edge.filter.rules
+      : [{ id: Date.now(), variable: '', operator: '', value: '' }];
     
     // Update the ref immediately
     edgeRulesRef.current = newRules;
@@ -845,7 +845,7 @@ export default function ScenariosPage() {
     setEdges([]);
     setView({ x: 0, y: 0, scale: 1 });
     setSelectedNodeId('node-1');
-    setEdgeRules([{ id: 1, variable: 'status', operator: 'equals', value: '' }]);
+    setEdgeRules([{ id: 1, variable: '', operator: '', value: '' }]);
     setLogicPanel(null);
     setIsPanelVisible(false);
     setPanelIntent(false);

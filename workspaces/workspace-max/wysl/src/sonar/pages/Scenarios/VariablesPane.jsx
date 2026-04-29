@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
-  User, Calendar, Phone, ChevronDown, ChevronRight, X, Zap, Sparkles, Mic
+  User, Calendar, Phone, ChevronDown, ChevronRight, X, Zap, Sparkles, Mic, CreditCard
 } from 'lucide-react';
 import { getSmartActionByKey, getSmartActions } from './smartActions';
 
@@ -57,6 +57,32 @@ const TABLE_DEFS = [
     fetch: async () => {
       try {
         const { data } = await supabase.from('people').select('*').limit(1);
+        return data?.[0] || null;
+      } catch { return null; }
+    },
+  },
+  {
+    key: 'payments',
+    label: 'Payments',
+    color: '#f472b6',
+    colorBg: 'rgba(244,114,182,0.08)',
+    colorBorder: 'rgba(244,114,182,0.2)',
+    icon: CreditCard,
+    fields: [
+      { key: 'id', label: 'Payment ID', type: 'text' },
+      { key: 'amount', label: 'Amount', type: 'number' },
+      { key: 'currency', label: 'Currency', type: 'text' },
+      { key: 'status', label: 'Status', type: 'text' },
+      { key: 'payment_method', label: 'Payment Method', type: 'text' },
+      { key: 'description', label: 'Description', type: 'text' },
+      { key: 'receipt_url', label: 'Receipt URL', type: 'url' },
+      { key: 'stripe_payment_intent_id', label: 'Stripe Intent ID', type: 'text' },
+      { key: 'people_id', label: 'Customer ID', type: 'text' },
+      { key: 'created_at', label: 'Created At', type: 'timestamp' },
+    ],
+    fetch: async () => {
+      try {
+        const { data } = await supabase.from('payments').select('*').order('created_at', { ascending: false }).limit(1);
         return data?.[0] || null;
       } catch { return null; }
     },
@@ -136,6 +162,7 @@ const TABLE_DEFS = [
 // Color lookup by table key
 export const TABLE_COLORS = {
   people: '#32f0d9',
+  payments: '#f472b6',
   appointments: '#38bdf8',
   hired_receptionists: '#f472b6',
   businesses: '#a1a1aa',
@@ -143,6 +170,7 @@ export const TABLE_COLORS = {
 
 export const TABLE_LABELS = {
   people: 'People',
+  payments: 'Payment',
   appointments: 'Appointment',
   hired_receptionists: 'Receptionist',
   businesses: 'Business',

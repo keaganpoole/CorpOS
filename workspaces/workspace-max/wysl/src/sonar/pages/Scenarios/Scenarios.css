@@ -1700,8 +1700,14 @@
 }
 
 .aether-rule-value {
+  position: relative;
   flex: 1 1 0;
-  min-width: 0;
+}
+
+.aether-rule-value:has(.sb-var-chip-overlay) .sb-input-field,
+.aether-rule-row:has(.sb-var-chip-overlay) > input.aether-rule-select {
+  color: transparent;
+  caret-color: #fff;
 }
 
 .aether-rule-value .sb-input-field,

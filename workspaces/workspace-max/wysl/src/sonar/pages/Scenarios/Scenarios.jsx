@@ -304,16 +304,29 @@ const AUTOMATION_HIERARCHY = {
     {
       key: 'payments', option: 'Payments', description: 'Process payments and manage billing', accent: '#38bdf8', icon: OPTION_ICONS.payments,
       sub_options: [
-        { key: 'charge_customer', name: 'Charge Customer', description: 'Collect card and process a payment', configFields: [
+        { key: 'create_payment', name: 'Create Payment', description: 'Process a new payment', configFields: [
           { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
-          { key: 'description', label: 'Payment Description', type: 'prompt_textarea', placeholder: 'e.g. Service payment for appointment...', smartActions: true },
+          { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
+          { key: 'payment_method', label: 'Payment Method', type: 'select', options: ['card', 'ach', 'link'] },
+          { key: 'description', label: 'Description', type: 'prompt_textarea', placeholder: 'e.g. Service payment for appointment...', smartActions: true },
+          { key: 'customer_name', label: 'Customer Name', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
+          { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
+          { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
+        ]},
+        { key: 'update_payment', name: 'Update Payment', description: 'Update an existing payment record', configFields: [
+          { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID or {{payment.stripe_payment_intent_id}}' },
+          { key: 'status', label: 'Status', type: 'select', options: ['succeeded', 'failed', 'refunded', 'partial_refund', 'pending'] },
+          { key: 'amount', label: 'Refund Amount ($)', type: 'text', placeholder: 'e.g. 25.00 (leave blank for full refund)' },
+          { key: 'description', label: 'Description', type: 'prompt_textarea', placeholder: 'e.g. Update payment notes...', smartActions: true },
+          { key: 'notes', label: 'Notes', type: 'prompt_textarea', placeholder: 'e.g. Reason for update...', smartActions: true },
         ]},
         { key: 'check_payment_status', name: 'Check Payment Status', description: 'Verify if a payment went through', configFields: [
           { key: 'search_by', label: 'Look Up By', type: 'select', options: ['Customer Name', 'Payment ID', 'Amount'] },
           { key: 'search_value', label: 'Search Value', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
         ]},
         { key: 'issue_refund', name: 'Issue Refund', description: 'Process a refund for a previous charge', configFields: [
-          { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID' },
+          { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID or {{payment.stripe_payment_intent_id}}' },
+          { key: 'amount', label: 'Refund Amount ($)', type: 'text', placeholder: 'Leave blank for full refund' },
           { key: 'refund_reason', label: 'Refund Reason', type: 'prompt_textarea', placeholder: 'e.g. Customer requested cancellation...', smartActions: true },
         ]},
       ],
@@ -369,6 +382,7 @@ export default function ScenariosPage() {
   const [logicAvailableVars, setLogicAvailableVars] = useState([]);
   const [logicFallbackAction, setLogicFallbackAction] = useState('');
   const [logicIsFallback, setLogicIsFallback] = useState(false);
+  const [activeConditionField, setActiveConditionField] = useState(null); // { ruleId, field }
   const [appointmentConfig, setAppointmentConfig] = useState({});
   const [scheduleConfig, setScheduleConfig] = useState({});
   const [varsPane, setVarsPane] = useState({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
@@ -2532,22 +2546,70 @@ export default function ScenariosPage() {
         )}
 
         {logicPanel && (
-          <AetherEdgeLogic
-            style={{ top: logicPanel.top, left: logicPanel.left }}
-            conditions={edgeRules}
-            onAddRule={() => addEdgeRule('and')}
-            onAddOrRule={() => addEdgeRule('or')}
-            onRemoveRule={removeEdgeRule}
-            onUpdateRule={updateEdgeRule}
-            onSave={saveLogicPanel}
-            onClose={closeLogicPanel}
-            contextType={logicContextType}
-            availableVariables={logicAvailableVars}
-            fallbackAction={logicFallbackAction}
-            onFallbackChange={(val) => setLogicFallbackAction(val)}
-            isFallback={logicIsFallback}
-            onToggleFallback={(val) => setLogicIsFallback(val)}
-          />
+          <>
+            <VariablesPane
+              visible={true}
+              targetFieldKey={activeConditionField?.ruleId || ''}
+              fieldLabel="Condition"
+              onInsertVariable={(varRef, label, color) => {
+                // If a condition field has focus, insert the variable into it
+                if (activeConditionField) {
+                  const { ruleId, field } = activeConditionField;
+                  if (field === 'variable') {
+                    // Extract field key for variable field
+                    const varKey = varRef.replace(/\{\{/g, '').replace(/\}\}/g, '');
+                    updateEdgeRule(ruleId, 'variable', varKey);
+                  } else if (field === 'value') {
+                    // Append variable reference to value field
+                    const currentRule = edgeRules.find(r => r.id === activeConditionField.ruleId);
+                    const currentVal = currentRule?.value || '';
+                    const newVal = currentVal ? `${currentVal} ${varRef}` : varRef;
+                    updateEdgeRule(ruleId, 'value', newVal);
+                  }
+                  return;
+                }
+
+                // Fallback: set variable on the last rule
+                if (edgeRules.length === 0) {
+                  addEdgeRule('and');
+                }
+                const lastRule = edgeRules[edgeRules.length - 1];
+                if (lastRule) {
+                  const varKey = varRef.replace(/\{\{/g, '').replace(/\}\}/g, '');
+                  updateEdgeRule(lastRule.id, 'variable', varKey);
+                }
+              }}
+              onInsertSmartAction={null}
+              smartActions={[]}
+              onTableHover={(color) => setHoveredTableColor(color)}
+              onClose={() => setVarsPane({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' })}
+              nodes={nodes}
+              edges={edges}
+              currentNodeId={selectedNodeId}
+              style={{
+                position: 'absolute',
+                top: logicPanel.top,
+                left: Math.max(10, (logicPanel.left || 0) - 228 - 8),
+                height: 640,
+              }}
+            />
+            <AetherEdgeLogic
+              style={{ top: logicPanel.top, left: Math.max(10, (logicPanel.left || 0) - 228 - 8) + 228 + 8 }}
+              conditions={edgeRules}
+              onAddRule={() => addEdgeRule('and')}
+              onAddOrRule={() => addEdgeRule('or')}
+              onRemoveRule={removeEdgeRule}
+              onUpdateRule={updateEdgeRule}
+              onClose={closeLogicPanel}
+              onFieldFocus={(ruleId, field) => setActiveConditionField({ ruleId, field })}
+              contextType={logicContextType}
+              availableVariables={logicAvailableVars}
+              fallbackAction={logicFallbackAction}
+              onFallbackChange={(val) => setLogicFallbackAction(val)}
+              isFallback={logicIsFallback}
+              onToggleFallback={(val) => setLogicIsFallback(val)}
+            />
+          </>
         )}
         
         {/* Back button for builder view */}

@@ -19,6 +19,7 @@ import {
   getContextType,
   DEFAULT_FIELDS,
 } from '../../lib/fieldContexts';
+import { renderVarChipsHTML } from './VariablesPane';
 
 const TYPE_LABELS = {
   text: 'Text',
@@ -157,7 +158,7 @@ const defaultOperatorForField = (field) => {
   return operators[0]?.value || 'equals';
 };
 
-const getValueComponent = ({ field, rule, onUpdateRule }) => {
+const getValueComponent = ({ field, rule, onUpdateRule, onFieldFocus }) => {
   const value = rule.value;
   const valueOptions = VALUE_OPTIONS_BY_FIELD[field?.key] || field?.options || [];
 
@@ -178,15 +179,22 @@ const getValueComponent = ({ field, rule, onUpdateRule }) => {
   }
 
   if (field?.type === 'number' || field?.type === 'currency') {
+    const valStr = String(value ?? '');
+    const hasChips = valStr.includes('{{');
     return (
-      <input
-        className="sb-input-field"
-        type="number"
-        inputMode="decimal"
-        value={value ?? ''}
-        onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-        placeholder="Value"
-      />
+      <>
+        <input
+          className="sb-input-field"
+          type="number"
+          inputMode="decimal"
+          value={value ?? ''}
+          onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
+          onFocus={() => onFieldFocus?.(rule.id, 'value')}
+        />
+        {hasChips && (
+          <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '7px 10px', overflow: 'hidden', fontSize: 12, color: '#e4e4e7', fontFamily: 'Inter, sans-serif', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(valStr) }} />
+        )}
+      </>
     );
   }
 
@@ -197,6 +205,7 @@ const getValueComponent = ({ field, rule, onUpdateRule }) => {
         type="datetime-local"
         value={value ?? ''}
         onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
+        onFocus={() => onFieldFocus?.(rule.id, 'value')}
       />
     );
   }
@@ -224,13 +233,21 @@ const getValueComponent = ({ field, rule, onUpdateRule }) => {
     );
   }
 
+  // Default: text input with chip overlay for variables
+  const valStr = String(value || '');
+  const hasChips = valStr.includes('{{');
   return (
-    <input
-      className="sb-input-field"
-      value={value || ''}
-      onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-      placeholder="Value"
-    />
+    <>
+      <input
+        className="sb-input-field"
+        value={value || ''}
+        onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
+        onFocus={() => onFieldFocus?.(rule.id, 'value')}
+      />
+      {hasChips && (
+        <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '7px 10px', overflow: 'hidden', fontSize: 12, color: '#e4e4e7', fontFamily: 'Inter, sans-serif', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(valStr) }} />
+      )}
+    </>
   );
 };
 
@@ -240,8 +257,8 @@ const AetherEdgeLogic = ({
   onAddOrRule,
   onRemoveRule,
   onUpdateRule,
-  onSave,
   onClose,
+  onFieldFocus,
   style,
   contextType = 'default',
   availableVariables = [],
@@ -332,9 +349,6 @@ const AetherEdgeLogic = ({
             <Zap size={14} /> Condition
           </span>
           <div className="aether-header-actions">
-            <button type="button" className="aether-save" onClick={onSave}>
-              Save
-            </button>
             <button type="button" className="aether-close" onClick={onClose}>
               <X size={18} />
             </button>
@@ -348,9 +362,10 @@ const AetherEdgeLogic = ({
             return (
               <React.Fragment key={rule.id}>
                 {idx > 0 && <span className={`aether-rule-logic-pill ${rule.logic === 'or' ? 'aether-rule-logic-pill--or' : ''}`}>{(rule.logic || 'and').toUpperCase()}</span>}
-                <div className="aether-rule-row">
-                  <select
+                <div className="aether-rule-row" style={{ position: 'relative' }}>
+                  <input
                     className="aether-rule-select"
+                    type="text"
                     value={rule.variable}
                     onChange={(event) => {
                       const nextField = getField(event.target.value, selectableFields);
@@ -358,31 +373,24 @@ const AetherEdgeLogic = ({
                       onUpdateRule(rule.id, 'operator', defaultOperatorForField(nextField));
                       onUpdateRule(rule.id, 'value', nextField?.type === 'boolean' ? null : '');
                     }}
-                  >
-                    <option value="">Variable...</option>
-                    {sectionedFields ? (
-                      sectionedFields.map((option) => {
-                        if (option.type === '__section') {
-                          return (
-                            <option key={option.key} value={option.key} disabled style={{ fontWeight: 700, color: '#71717a' }}>
-                              {option.label}
-                            </option>
-                          );
-                        }
-                        return (
-                          <option key={option.key} value={option.key}>
-                            {option.label}
-                          </option>
-                        );
-                      })
-                    ) : (
-                      selectableFields.map((option) => (
-                        <option key={option.key} value={option.key}>
-                          {option.label}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    onFocus={() => {
+                      if (typeof onFieldFocus === 'function') {
+                        onFieldFocus(rule.id, 'variable');
+                      }
+                    }}
+                  />
+                  {rule.variable && (
+                    <div
+                      className="sb-var-chip-overlay"
+                      style={{
+                        position: 'absolute', inset: 0, pointerEvents: 'none',
+                        display: 'flex', alignItems: 'center', padding: '7px 10px', overflow: 'hidden',
+                        fontSize: 12, color: '#e4e4e7', fontFamily: 'Inter, sans-serif',
+                        whiteSpace: 'nowrap', zIndex: 1,
+                      }}
+                      dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rule.variable) }}
+                    />
+                  )}
                   <select
                     className="aether-rule-select aether-rule-select--op"
                     value={rule.operator}
@@ -395,7 +403,7 @@ const AetherEdgeLogic = ({
                     ))}
                   </select>
                   <div className="aether-rule-value">
-                    {getValueComponent({ field, rule, onUpdateRule })}
+                    {getValueComponent({ field, rule, onUpdateRule, onFieldFocus })}
                   </div>
                   <button
                     type="button"

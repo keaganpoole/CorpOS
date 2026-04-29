@@ -57,8 +57,10 @@ class ActionExecutor {
         return this._updateLeadStatus(node, flowContext);
       case 'update_records':
         return this._updateRecords(node, flowContext);
-      case 'charge_customer':
-        return this._chargeCustomer(node, flowContext);
+      case 'create_payment':
+        return this._createPayment(node, flowContext);
+      case 'update_payment':
+        return this._updatePayment(node, flowContext);
       case 'check_payment_status':
         return this._checkPaymentStatus(node, flowContext);
       case 'issue_refund':
@@ -444,13 +446,15 @@ class ActionExecutor {
   }
 
   /**
-   * Charge customer via Stripe
+   * Create a payment via Stripe
    */
-  async _chargeCustomer(node, flowContext) {
+  async _createPayment(node, flowContext) {
     try {
       const config = node.actionConfig || {};
       const amount = this._resolveVariables(config.amount || '', flowContext);
       const description = this._resolveVariables(config.description || '', flowContext);
+      const currency = this._resolveVariables(config.currency || 'usd', flowContext);
+      const paymentMethod = this._resolveVariables(config.payment_method || 'card', flowContext);
 
       if (!amount || parseFloat(amount) <= 0) {
         return { success: false, error: 'Invalid payment amount' };
@@ -462,9 +466,11 @@ class ActionExecutor {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: parseFloat(amount),
+          currency,
           people_id: flowContext.person?.id || flowContext.people_id,
           user_id: flowContext.business?.user_id,
           description,
+          payment_method: paymentMethod,
           scenario_id: flowContext._scenario?.id,
         }),
       });
@@ -477,15 +483,88 @@ class ActionExecutor {
       return {
         success: true,
         data: {
-          action: 'charge_customer',
+          action: 'create_payment',
           payment_intent_id: result.payment_intent_id,
           payment_id: result.payment_id,
           client_secret: result.client_secret,
           amount,
+          currency,
         },
       };
     } catch (err) {
       console.error('[ActionExecutor] chargeCustomer failed:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Update an existing payment record
+   */
+  async _updatePayment(node, flowContext) {
+    try {
+      const config = node.actionConfig || {};
+      const baseUrl = `http://127.0.0.1:${process.env.PORT || 7878}`;
+
+      // Resolve payment ID from config or flow context
+      let paymentId = this._resolveVariables(config.payment_id || '', flowContext);
+      if (!paymentId && flowContext.payment?.stripe_payment_intent_id) {
+        paymentId = flowContext.payment.stripe_payment_intent_id;
+      }
+      if (!paymentId) {
+        return { success: false, error: 'No payment ID provided for update' };
+      }
+
+      const status = this._resolveVariables(config.status || '', flowContext);
+      const amount = this._resolveVariables(config.amount || '', flowContext);
+      const description = this._resolveVariables(config.description || '', flowContext);
+      const notes = this._resolveVariables(config.notes || '', flowContext);
+
+      // If status is refund-related, use the refund endpoint
+      if (status === 'refunded' || status === 'partial_refund') {
+        const resp = await fetch(`${baseUrl}/api/sonar/payments/refund`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payment_id: paymentId,
+            amount: amount ? parseFloat(amount) : null,
+            reason: description || notes || '',
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error) {
+          return { success: false, error: result.error };
+        }
+        return {
+          success: true,
+          data: { action: 'update_payment', status: result.status, refund_id: result.refund_id },
+        };
+      }
+
+      // Otherwise update the payment record directly via Supabase
+      // Find the payment by stripe_payment_intent_id
+      const findResp = await fetch(`${baseUrl}/api/sonar/payments/${paymentId}`);
+      const findResult = await findResp.json();
+      if (!findResp.ok || findResult.error || !findResult.payment) {
+        return { success: false, error: 'Payment not found' };
+      }
+
+      // Use sbQuery PATCH for the update
+      const updateData = {};
+      if (status) updateData.status = status;
+      if (description) updateData.description = description;
+
+      const resp = await fetch(`${baseUrl}/api/sonar/payments/${findResult.payment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      });
+
+      return {
+        success: true,
+        data: { action: 'update_payment', payment_id: paymentId, status: status || 'updated' },
+      };
+    } catch (err) {
+      console.error('[ActionExecutor] updatePayment failed:', err.message);
       return { success: false, error: err.message };
     }
   }

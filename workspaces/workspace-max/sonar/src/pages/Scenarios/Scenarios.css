@@ -1449,6 +1449,30 @@
   background: rgba(12, 12, 14, 0.96);
 }
 
+/* Variable chip display in condition modal value field */
+.sb-var-chip-display {
+  background: rgba(12, 12, 14, 0.96) !important;
+  cursor: text !important;
+  min-height: 20px;
+}
+
+.sb-var-chip-display:focus {
+  border-color: var(--sb-accent-primary);
+  background: rgba(14, 14, 16, 0.98);
+  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.12);
+}
+
+/* Variable selector chip in condition modal key field */
+.sb-var-selector-chip {
+  background: rgba(12, 12, 14, 0.96) !important;
+  min-height: 40px;
+  padding: 10px 14px !important;
+}
+
+.sb-var-selector-chip:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 .sb-remove-btn {
   background: transparent;
   border: none;
