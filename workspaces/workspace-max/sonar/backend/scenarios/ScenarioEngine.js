@@ -198,19 +198,6 @@ class ScenarioEngine {
       }
     }
 
-    // Fetch business data if user_id is available
-    const userId = event.payload?.user_id || scenario.user_id || scenario.created_by;
-    if (userId) {
-      try {
-        const businesses = await this.sbQuery('businesses', 'GET', null, `?user_id=eq.${userId}&limit=1`);
-        if (businesses?.length > 0) {
-          context.business = businesses[0];
-        }
-      } catch (err) {
-        console.warn('[ScenarioEngine] Could not fetch business:', err.message);
-      }
-    }
-
     // Fetch lead data if lead_id is available
     const leadId = context.lead_id || event.payload?.lead_id;
     if (leadId) {
@@ -236,6 +223,22 @@ class ScenarioEngine {
         }
       } catch (err) {
         console.warn('[ScenarioEngine] Could not fetch person:', err.message);
+      }
+    }
+
+    // Fetch business data — use user_id from event, person, scenario, or created_by
+    const userId = event.payload?.user_id
+      || context.person?.user_id
+      || scenario.user_id
+      || scenario.created_by;
+    if (userId) {
+      try {
+        const businesses = await this.sbQuery('businesses', 'GET', null, `?user_id=eq.${userId}&limit=1`);
+        if (businesses?.length > 0) {
+          context.business = businesses[0];
+        }
+      } catch (err) {
+        console.warn('[ScenarioEngine] Could not fetch business:', err.message);
       }
     }
 
