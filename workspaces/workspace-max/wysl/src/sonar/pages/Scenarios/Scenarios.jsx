@@ -301,6 +301,23 @@ const AUTOMATION_HIERARCHY = {
         ]},
       ],
     },
+    {
+      key: 'payments', option: 'Payments', description: 'Process payments and manage billing', accent: '#38bdf8', icon: OPTION_ICONS.payments,
+      sub_options: [
+        { key: 'charge_customer', name: 'Charge Customer', description: 'Collect card and process a payment', configFields: [
+          { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
+          { key: 'description', label: 'Payment Description', type: 'prompt_textarea', placeholder: 'e.g. Service payment for appointment...', smartActions: true },
+        ]},
+        { key: 'check_payment_status', name: 'Check Payment Status', description: 'Verify if a payment went through', configFields: [
+          { key: 'search_by', label: 'Look Up By', type: 'select', options: ['Customer Name', 'Payment ID', 'Amount'] },
+          { key: 'search_value', label: 'Search Value', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
+        ]},
+        { key: 'issue_refund', name: 'Issue Refund', description: 'Process a refund for a previous charge', configFields: [
+          { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID' },
+          { key: 'refund_reason', label: 'Refund Reason', type: 'prompt_textarea', placeholder: 'e.g. Customer requested cancellation...', smartActions: true },
+        ]},
+      ],
+    },
   ],
   UTILITIES: [
     { key: 'wait', option: 'Wait', description: 'Pause the workflow temporarily', icon: OPTION_ICONS.wait, accent: '#f472b6' },
@@ -395,6 +412,7 @@ export default function ScenariosPage() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showJsonModal, setShowJsonModal] = useState(false);
+  const [testMode, setTestMode] = useState(false);
   const [recurringSchedule, setRecurringSchedule] = useState({ frequency: 'once', interval: 1, time: '09:00' });
   const [scenarioNotes, setScenarioNotes] = useState('');
   
@@ -2596,6 +2614,29 @@ export default function ScenariosPage() {
               title="View JSON"
             >
               <Code size={13} />
+            </button>
+
+            {/* Test Mode toggle */}
+            <button
+              type="button"
+              className={`sb-toolbar-test-toggle ${testMode ? 'active' : ''}`}
+              onClick={async () => {
+                const newMode = !testMode;
+                setTestMode(newMode);
+                try {
+                  await fetch('/api/sonar/payments/test-mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: newMode }),
+                  });
+                } catch (e) {
+                  console.error('[Scenarios] Failed to set test mode:', e);
+                }
+              }}
+              title={testMode ? 'Test mode ON — payments will use Stripe test keys' : 'Test mode OFF — payments will use live Stripe keys'}
+            >
+              <span className="sb-toolbar-test-dot" />
+              <span>{testMode ? 'TEST' : 'LIVE'}</span>
             </button>
           </div>
         </div>

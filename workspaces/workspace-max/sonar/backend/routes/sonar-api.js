@@ -863,4 +863,208 @@ router.get('/call-logs/stats', async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════
+// PAYMENTS (Stripe Integration)
+// ══════════════════════════════════════════════════════════
+
+const getStripe = () => {
+  const testMode = process.env.STRIPE_TEST_MODE === 'true';
+  const key = testMode
+    ? process.env.STRIPE_API_SECRET_TEST_KEY_CORPOS
+    : process.env.STRIPE_API_SECRET_KEY_CORPOS;
+  if (!key) throw new Error('Stripe API key not configured');
+  return require('stripe')(key);
+};
+
+/**
+ * POST /api/sonar/payments/test-mode
+ * Set Stripe test mode globally.
+ * Body: { enabled: true|false }
+ */
+router.post('/payments/test-mode', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    process.env.STRIPE_TEST_MODE = enabled ? 'true' : 'false';
+    console.log('[SONAR-API] Stripe test mode:', enabled ? 'ON' : 'OFF');
+    res.json({ success: true, testMode: enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/sonar/payments/test-mode
+ * Get current Stripe test mode status.
+ */
+router.get('/payments/test-mode', async (req, res) => {
+  res.json({ testMode: process.env.STRIPE_TEST_MODE === 'true' });
+});
+
+/**
+ * POST /api/sonar/payments/charge
+ * Create a Stripe PaymentIntent and record it.
+ * Body: { amount, currency, people_id, user_id, description, scenario_id }
+ */
+router.post('/payments/charge', async (req, res) => {
+  try {
+    const stripe = getStripe();
+    const { amount, currency = 'usd', people_id, user_id, description, scenario_id } = req.body;
+
+    if (!amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    // Amount in cents
+    const amountCents = Math.round(parseFloat(amount) * 100);
+
+    // Create PaymentIntent
+    const intent = await stripe.paymentIntents.create({
+      amount: amountCents,
+      currency,
+      description: description || 'Payment via Sonar',
+      metadata: { people_id: people_id || '', user_id: user_id || '' },
+      automatic_payment_methods: { enabled: true },
+    });
+
+    // Record in database
+    const paymentRecord = {
+      user_id: user_id || null,
+      people_id: people_id ? parseInt(people_id) : null,
+      scenario_id: scenario_id || null,
+      stripe_payment_intent_id: intent.id,
+      amount: amountCents,
+      currency,
+      status: 'pending',
+      description: description || 'Payment via Sonar',
+      metadata: JSON.stringify({ stripe_status: intent.status }),
+    };
+
+    const dbResult = await sbQuery('payments', 'POST', paymentRecord);
+    const payment = dbResult?.[0];
+
+    res.json({
+      success: true,
+      client_secret: intent.client_secret,
+      payment_intent_id: intent.id,
+      payment_id: payment?.id || null,
+    });
+  } catch (err) {
+    console.error('[SONAR-API] charge failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/sonar/payments/confirm
+ * Confirm a PaymentIntent succeeded (called after Stripe webhook or client confirmation).
+ * Body: { payment_intent_id }
+ */
+router.post('/payments/confirm', async (req, res) => {
+  try {
+    const stripe = getStripe();
+    const { payment_intent_id } = req.body;
+
+    const intent = await stripe.paymentIntents.retrieve(payment_intent_id);
+
+    // Update payment record
+    const updateData = {
+      status: intent.status === 'succeeded' ? 'succeeded' : 'processing',
+      receipt_url: intent.charges?.data?.[0]?.receipt_url || null,
+      metadata: JSON.stringify({ stripe_status: intent.status }),
+    };
+
+    await sbQuery('payments', 'PATCH', updateData, `?stripe_payment_intent_id=eq.${payment_intent_id}`);
+
+    res.json({ success: true, status: intent.status });
+  } catch (err) {
+    console.error('[SONAR-API] confirm payment failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/sonar/payments/refund
+ * Refund a previous charge.
+ * Body: { payment_id, amount (optional — partial refund), reason }
+ */
+router.post('/payments/refund', async (req, res) => {
+  try {
+    const stripe = getStripe();
+    const { payment_id, amount, reason } = req.body;
+
+    // Look up the payment record
+    const payments = await sbQuery('payments', 'GET', null, `?id=eq.${payment_id}&limit=1`);
+    if (!payments?.length) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+    const payment = payments[0];
+
+    // Create refund
+    const refundParams = { payment_intent: payment.stripe_payment_intent_id };
+    if (amount) refundParams.amount = Math.round(parseFloat(amount) * 100);
+    if (reason) refundParams.reason = reason;
+
+    const refund = await stripe.refunds.create(refundParams);
+
+    // Update payment record
+    const refundAmountCents = refund.amount || payment.amount;
+    const isFullRefund = refundAmountCents >= payment.amount;
+    const updateData = {
+      status: isFullRefund ? 'refunded' : 'partial_refund',
+      refunded_amount: refundAmountCents,
+      metadata: JSON.stringify({ refund_id: refund.id, refund_status: refund.status }),
+    };
+
+    await sbQuery('payments', 'PATCH', updateData, `?id=eq.${payment_id}`);
+
+    res.json({
+      success: true,
+      refund_id: refund.id,
+      status: isFullRefund ? 'refunded' : 'partial_refund',
+    });
+  } catch (err) {
+    console.error('[SONAR-API] refund failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/sonar/payments
+ * List payments with optional filters.
+ * Query: ?people_id=17&status=succeeded&limit=25
+ */
+router.get('/payments', async (req, res) => {
+  try {
+    const { people_id, status, user_id, limit = 50, offset = 0 } = req.query;
+    let query = '?order=created_at.desc';
+    if (people_id) query += `&people_id=eq.${people_id}`;
+    if (status) query += `&status=eq.${status}`;
+    if (user_id) query += `&user_id=eq.${user_id}`;
+    query += `&limit=${limit}&offset=${offset}`;
+
+    const payments = await sbQuery('payments', 'GET', null, query) || [];
+    res.json({ payments });
+  } catch (err) {
+    console.error('[SONAR-API] list payments failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/sonar/payments/:id
+ * Get a single payment by ID.
+ */
+router.get('/payments/:id', async (req, res) => {
+  try {
+    const payments = await sbQuery('payments', 'GET', null, `?id=eq.${req.params.id}&limit=1`);
+    if (!payments?.length) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+    res.json({ payment: payments[0] });
+  } catch (err) {
+    console.error('[SONAR-API] get payment failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = { router, init };

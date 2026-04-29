@@ -272,6 +272,31 @@ export const LEAD_FIELDS = [
   { key: 'balance_due', label: 'Balance Due', type: 'currency', required: false, table: true, tableWidth: '120px', section: 'financial', editable: true },
   { key: 'invoice_id', label: 'Invoice ID', type: 'text', required: false, table: false, section: 'financial', editable: true },
 
+  // Payment record fields (from payments table — used in condition builders)
+  { key: 'payment_amount', label: 'Payment Amount', type: 'currency', required: false, table: false, section: 'financial', editable: false },
+  {
+    key: 'payment_status_record',
+    label: 'Payment Record Status',
+    type: 'select',
+    options: [
+      { value: 'pending', color: 'amber' },
+      { value: 'processing', color: 'blue' },
+      { value: 'succeeded', color: 'emerald' },
+      { value: 'failed', color: 'rose' },
+      { value: 'refunded', color: 'indigo' },
+      { value: 'partial_refund', color: 'orange' },
+    ],
+    required: false,
+    table: false,
+    section: 'financial',
+    editable: false,
+  },
+  { key: 'payment_method', label: 'Payment Method', type: 'text', required: false, table: false, section: 'financial', editable: false },
+  { key: 'payment_currency', label: 'Payment Currency', type: 'text', required: false, table: false, section: 'financial', editable: false },
+  { key: 'payment_description', label: 'Payment Description', type: 'text', required: false, table: false, section: 'financial', editable: false },
+  { key: 'payment_receipt_url', label: 'Payment Receipt URL', type: 'url', required: false, table: false, section: 'financial', editable: false },
+  { key: 'payment_created_at', label: 'Payment Date', type: 'timestamp', required: false, table: false, section: 'financial', editable: false },
+
   // Notes
   { key: 'notes', label: 'Notes', type: 'textarea', required: false, table: false, section: 'notes', editable: true, appendOnly: true, description: 'Append only - never replace existing notes' },
   { key: 'special_instructions', label: 'Special Instructions', type: 'textarea', required: false, table: false, section: 'notes', editable: true },

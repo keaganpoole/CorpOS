@@ -32,6 +32,10 @@ const TRIGGER_EVENT_MAP = {
   appointment_updated: 'appointment_updated',
   appointment_cancelled: 'appointment_cancelled',
   appointment_reminder: 'appointment_reminder',
+  invoice_created: 'invoice_created',
+  invoice_paid: 'invoice_paid',
+  payment_failed: 'payment_failed',
+  payment_succeeded: 'payment_succeeded',
   manual_trigger: 'manual_trigger',
 };
 
@@ -223,6 +227,19 @@ class ScenarioEngine {
         }
       } catch (err) {
         console.warn('[ScenarioEngine] Could not fetch person:', err.message);
+      }
+    }
+
+    // Fetch payment data if payment_id is available
+    const paymentId = event.payload?.payment_id || event.payload?.stripe_payment_intent_id;
+    if (paymentId) {
+      try {
+        const payments = await this.sbQuery('payments', 'GET', null, `?id=eq.${paymentId}&limit=1`);
+        if (payments?.length > 0) {
+          context.payment = payments[0];
+        }
+      } catch (err) {
+        console.warn('[ScenarioEngine] Could not fetch payment:', err.message);
       }
     }
 

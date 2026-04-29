@@ -57,6 +57,12 @@ class ActionExecutor {
         return this._updateLeadStatus(node, flowContext);
       case 'update_records':
         return this._updateRecords(node, flowContext);
+      case 'charge_customer':
+        return this._chargeCustomer(node, flowContext);
+      case 'check_payment_status':
+        return this._checkPaymentStatus(node, flowContext);
+      case 'issue_refund':
+        return this._issueRefund(node, flowContext);
       default:
         console.warn(`[ActionExecutor] Unknown action key: ${key}`);
         return { success: false, error: `Unknown action: ${key}` };
@@ -163,6 +169,14 @@ class ActionExecutor {
         ...(missionText.includes('appointment') && flowContext.appointment ? Object.fromEntries(
           Object.entries(flowContext.appointment).filter(([k, v]) => v != null).map(([k, v]) => [`appt_${k}`, v])
         ) : {}),
+        // Include all payment fields if the prompt mentions payment-related words
+        ...((() => {
+          const paymentKeywords = ['payment', 'billing', 'card', 'charge', 'refund', 'invoice', 'receipt', 'subscription', 'balance'];
+          const needsPaymentData = paymentKeywords.some(kw => missionText.includes(kw));
+          return needsPaymentData && flowContext.payment ? Object.fromEntries(
+            Object.entries(flowContext.payment).filter(([k, v]) => v != null).map(([k, v]) => [`payment_${k}`, v])
+          ) : {};
+        })()),
       };
 
       // Categorized variable descriptions for agent data collection
@@ -427,6 +441,137 @@ class ActionExecutor {
     }
 
     return [...vars];
+  }
+
+  /**
+   * Charge customer via Stripe
+   */
+  async _chargeCustomer(node, flowContext) {
+    try {
+      const config = node.actionConfig || {};
+      const amount = this._resolveVariables(config.amount || '', flowContext);
+      const description = this._resolveVariables(config.description || '', flowContext);
+
+      if (!amount || parseFloat(amount) <= 0) {
+        return { success: false, error: 'Invalid payment amount' };
+      }
+
+      const baseUrl = `http://127.0.0.1:${process.env.PORT || 7878}`;
+      const resp = await fetch(`${baseUrl}/api/sonar/payments/charge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: parseFloat(amount),
+          people_id: flowContext.person?.id || flowContext.people_id,
+          user_id: flowContext.business?.user_id,
+          description,
+          scenario_id: flowContext._scenario?.id,
+        }),
+      });
+
+      const result = await resp.json();
+      if (!resp.ok || result.error) {
+        return { success: false, error: result.error };
+      }
+
+      return {
+        success: true,
+        data: {
+          action: 'charge_customer',
+          payment_intent_id: result.payment_intent_id,
+          payment_id: result.payment_id,
+          client_secret: result.client_secret,
+          amount,
+        },
+      };
+    } catch (err) {
+      console.error('[ActionExecutor] chargeCustomer failed:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Check payment status
+   */
+  async _checkPaymentStatus(node, flowContext) {
+    try {
+      const config = node.actionConfig || {};
+      const baseUrl = `http://127.0.0.1:${process.env.PORT || 7878}`;
+
+      // Build query params
+      const params = new URLSearchParams();
+      if (config.search_by === 'Customer Name' && flowContext.person) {
+        params.set('people_id', flowContext.person.id);
+      } else if (flowContext.payment?.id) {
+        // Direct payment lookup
+        const resp = await fetch(`${baseUrl}/api/sonar/payments/${flowContext.payment.id}`);
+        const result = await resp.json();
+        return { success: true, data: { action: 'check_payment_status', payment: result.payment } };
+      }
+      if (flowContext.business?.user_id) {
+        params.set('user_id', flowContext.business.user_id);
+      }
+
+      const resp = await fetch(`${baseUrl}/api/sonar/payments?${params.toString()}`);
+      const result = await resp.json();
+
+      return {
+        success: true,
+        data: {
+          action: 'check_payment_status',
+          payments: result.payments || [],
+        },
+      };
+    } catch (err) {
+      console.error('[ActionExecutor] checkPaymentStatus failed:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Issue refund
+   */
+  async _issueRefund(node, flowContext) {
+    try {
+      const config = node.actionConfig || {};
+      const baseUrl = `http://127.0.0.1:${process.env.PORT || 7878}`;
+
+      // Payment ID from config (resolved from variable) or from flow context
+      let paymentId = this._resolveVariables(config.payment_id || '', flowContext);
+      if (!paymentId && flowContext.payment?.id) {
+        paymentId = flowContext.payment.id;
+      }
+
+      if (!paymentId) {
+        return { success: false, error: 'No payment ID provided for refund' };
+      }
+
+      const resp = await fetch(`${baseUrl}/api/sonar/payments/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payment_id: paymentId,
+          reason: this._resolveVariables(config.refund_reason || '', flowContext),
+        }),
+      });
+
+      const result = await resp.json();
+      if (!resp.ok || result.error) {
+        return { success: false, error: result.error };
+      }
+
+      return {
+        success: true,
+        data: {
+          action: 'issue_refund',
+          refund_id: result.refund_id,
+          status: result.status,
+        },
+      };
+    } catch (err) {
+      console.error('[ActionExecutor] issueRefund failed:', err.message);
+      return { success: false, error: err.message };
+    }
   }
 }
 
