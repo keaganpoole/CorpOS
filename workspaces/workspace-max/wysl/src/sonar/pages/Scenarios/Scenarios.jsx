@@ -378,6 +378,7 @@ export default function ScenariosPage() {
   const [initialFocusSet, setInitialFocusSet] = useState(false);
   const [initialNodeShifted, setInitialNodeShifted] = useState(false);
   const [logicPanel, setLogicPanel] = useState(null);
+  const [logicPanelDragPos, setLogicPanelDragPos] = useState(null);
   const [logicContextType, setLogicContextType] = useState('default');
   const [logicAvailableVars, setLogicAvailableVars] = useState([]);
   const [logicFallbackAction, setLogicFallbackAction] = useState('');
@@ -389,7 +390,7 @@ export default function ScenariosPage() {
   const [hoveredTableColor, setHoveredTableColor] = useState('');
   const [actionConfig, setActionConfig] = useState(null);
   const [edgeRules, setEdgeRules] = useState([
-    { id: 1, variable: 'status', operator: 'equals', value: '', logic: 'and' },
+    { id: 1, variable: '', operator: 'equals', value: '', logic: 'and' },
   ]);
   const edgeRulesRef = useRef(edgeRules);
   const restoringFromNodeRef = useRef(false);
@@ -965,13 +966,13 @@ export default function ScenariosPage() {
     setActionConfig(null);
     setAppointmentConfig({});
     setScheduleConfig({});
-    setEdgeRules([{ id: 1, variable: 'status', operator: 'equals', value: '', logic: 'and' }]);
+    setEdgeRules([{ id: 1, variable: '', operator: 'equals', value: '', logic: 'and' }]);
   }, [selectedNodeId]);
 
   const addEdgeRule = useCallback((logicType = 'and') => {
     setEdgeRules((prev) => [
       ...prev,
-      { id: Date.now(), variable: 'status', operator: 'equals', value: '', logic: logicType },
+      { id: Date.now(), variable: '', operator: 'equals', value: '', logic: logicType },
     ]);
   }, []);
 
@@ -1200,7 +1201,7 @@ export default function ScenariosPage() {
     if (!from || !to) return;
     const midX = (from.x + to.x) / 2;
     const midY = (from.y + to.y) / 2;
-    const top = canvasRect.top + view.y + midY * view.scale;
+    const top = canvasRect.top + 32;
     const left = canvasRect.left + view.x + midX * view.scale;
     
     // Determine context type from source node
@@ -1219,13 +1220,14 @@ export default function ScenariosPage() {
     // Load existing filter rules into edgeRules state
     const newRules = edge.filter && edge.filter.rules 
       ? edge.filter.rules.map(r => ({ ...r, logic: r.logic || 'and' }))
-      : [{ id: Date.now(), variable: 'status', operator: 'equals', value: '', logic: 'and' }];
+      : [{ id: Date.now(), variable: '', operator: 'equals', value: '', logic: 'and' }];
     
     // Update the ref immediately
     edgeRulesRef.current = newRules;
     setEdgeRules(newRules);
     
     setLogicPanel({ edgeId: edge.id, top, left });
+    setLogicPanelDragPos(null);
   };
 
   const handlePagePointerDown = (event) => {
@@ -1251,7 +1253,7 @@ export default function ScenariosPage() {
     setEdges([]);
     setView({ x: 0, y: 0, scale: 1 });
     setSelectedNodeId('node-1');
-    setEdgeRules([{ id: 1, variable: 'status', operator: 'equals', value: '', logic: 'and' }]);
+    setEdgeRules([{ id: 1, variable: '', operator: 'equals', value: '', logic: 'and' }]);
     setLogicPanel(null);
     setIsPanelVisible(false);
     setPanelIntent(false);
@@ -2574,8 +2576,7 @@ export default function ScenariosPage() {
                 }
                 const lastRule = edgeRules[edgeRules.length - 1];
                 if (lastRule) {
-                  const varKey = varRef.replace(/\{\{/g, '').replace(/\}\}/g, '');
-                  updateEdgeRule(lastRule.id, 'variable', varKey);
+                  updateEdgeRule(lastRule.id, 'variable', varRef);
                 }
               }}
               onInsertSmartAction={null}
@@ -2587,12 +2588,13 @@ export default function ScenariosPage() {
               currentNodeId={selectedNodeId}
               style={{
                 position: 'absolute',
-                top: logicPanel.top,
-                left: Math.max(10, (logicPanel.left || 0) - 228 - 8),
+                top: logicPanelDragPos?.top ?? logicPanel.top,
+                left: Math.max(10, (logicPanelDragPos?.left ?? (logicPanel.left || 0)) - 228 - 8),
                 height: 640,
               }}
             />
             <AetherEdgeLogic
+              onPositionChange={(top, left) => setLogicPanelDragPos({ top, left })}
               style={{ top: logicPanel.top, left: Math.max(10, (logicPanel.left || 0) - 228 - 8) + 228 + 8 }}
               conditions={edgeRules}
               onAddRule={() => addEdgeRule('and')}

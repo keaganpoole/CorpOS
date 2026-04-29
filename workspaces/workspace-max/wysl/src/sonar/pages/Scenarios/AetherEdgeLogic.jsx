@@ -160,6 +160,7 @@ const AetherEdgeLogic = ({
   onUpdateRule,
   onClose,
   onFieldFocus,
+  onPositionChange,
   style,
   contextType = 'default',
   availableVariables = [],
@@ -204,10 +205,12 @@ const AetherEdgeLogic = ({
       if (!dragRef.current.dragging) return;
       const dx = e.clientX - dragRef.current.startX;
       const dy = e.clientY - dragRef.current.startY;
-      setPosition(clampPosition(
+      const newPos = clampPosition(
         dragRef.current.startPosTop + dy,
         dragRef.current.startPosLeft + dx,
-      ));
+      );
+      setPosition(newPos);
+      onPositionChange?.(newPos.top, newPos.left);
     };
     const handlePointerUp = () => {
       dragRef.current.dragging = false;

@@ -1170,7 +1170,7 @@
 .aether-logic-wrapper {
   position: absolute;
   width: 100%;
-  max-width: 460px;
+  max-width: 560px;
   z-index: 220;
   pointer-events: auto;
 }
@@ -1678,6 +1678,7 @@
   color-scheme: dark;
   min-width: 0;
   flex: 1 1 0;
+  caret-color: transparent;
   transition: border-color 0.15s ease;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.35)' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -1707,7 +1708,7 @@
 .aether-rule-value:has(.sb-var-chip-overlay) .sb-input-field,
 .aether-rule-row:has(.sb-var-chip-overlay) > input.aether-rule-select {
   color: transparent;
-  caret-color: #fff;
+  caret-color: transparent;
 }
 
 .aether-rule-value .sb-input-field,
