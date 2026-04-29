@@ -145,6 +145,7 @@ class ActionExecutor {
       }
 
       // Build dynamic variables for the agent from flow context
+      const missionText = (node.actionConfig?.main_content || '').toLowerCase();
       const dynamicVars = {
         user_id: flowContext.business?.user_id || '',
         company_name: flowContext.business?.name || '',
@@ -154,6 +155,14 @@ class ActionExecutor {
         flow_execution_id: flowContext._executionId || '',
         mission: node.actionConfig?.main_content || '',
         ...flowContext.agent, // Include any agent-captured data from previous calls
+        // Include all person/customer fields (auto-adapts when people table schema changes)
+        ...(flowContext.person ? Object.fromEntries(
+          Object.entries(flowContext.person).filter(([k, v]) => v != null && k !== 'user_id').map(([k, v]) => [`person_${k}`, v])
+        ) : {}),
+        // Include all appointment fields if the prompt mentions "appointment"
+        ...(missionText.includes('appointment') && flowContext.appointment ? Object.fromEntries(
+          Object.entries(flowContext.appointment).filter(([k, v]) => v != null).map(([k, v]) => [`appt_${k}`, v])
+        ) : {}),
       };
 
       // Categorized variable descriptions for agent data collection
