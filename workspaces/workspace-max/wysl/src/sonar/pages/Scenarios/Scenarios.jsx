@@ -2556,9 +2556,8 @@ export default function ScenariosPage() {
                 if (activeConditionField) {
                   const { ruleId, field } = activeConditionField;
                   if (field === 'variable') {
-                    // Extract field key for variable field
-                    const varKey = varRef.replace(/\{\{/g, '').replace(/\}\}/g, '');
-                    updateEdgeRule(ruleId, 'variable', varKey);
+                    // Insert variable with brackets so chip overlay renders
+                    updateEdgeRule(ruleId, 'variable', varRef);
                   } else if (field === 'value') {
                     // Append variable reference to value field
                     const currentRule = edgeRules.find(r => r.id === activeConditionField.ruleId);

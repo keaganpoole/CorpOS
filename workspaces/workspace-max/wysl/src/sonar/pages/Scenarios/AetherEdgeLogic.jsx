@@ -12,7 +12,6 @@ import {
   PAYMENT_STATUS_OPTIONS,
   CALL_ROUTE_OPTIONS,
   TAG_OPTIONS,
-  normalizeOptionValue,
 } from '../../lib/leadSchema';
 import {
   getFieldsForContext,
@@ -103,43 +102,10 @@ const OPERATORS_BY_TYPE = {
   ],
 };
 
-const VALUE_OPTIONS_BY_FIELD = {
-  status: STATUS_OPTIONS,
-  source: SOURCE_OPTIONS,
-  preferred_contact_method: CONTACT_METHOD_OPTIONS,
-  last_call_status: CALL_STATUS_OPTIONS,
-  last_outcome: OUTCOME_OPTIONS,
-  last_sms_status: SMS_STATUS_OPTIONS,
-  last_email_status: EMAIL_STATUS_OPTIONS,
-  payment_status: PAYMENT_STATUS_OPTIONS,
-  call_route: CALL_ROUTE_OPTIONS,
-  tags: TAG_OPTIONS,
-  appointment_status: [
-    { value: 'Pending' }, { value: 'Confirmed' }, { value: 'Cancelled' }, { value: 'Completed' }, { value: 'No Show' },
-  ],
-  call_status: CALL_STATUS_OPTIONS,
-  call_outcome: OUTCOME_OPTIONS,
-  sms_status: SMS_STATUS_OPTIONS,
-};
+// Value field is always a plain text input — no dropdowns, no options.
 
 const normalizeValue = (field, rawValue) => {
   if (rawValue == null) return null;
-  if (field?.type === 'boolean') {
-    if (rawValue === true || rawValue === 'true') return true;
-    if (rawValue === false || rawValue === 'false') return false;
-    return null;
-  }
-  if (field?.type === 'number' || field?.type === 'currency') {
-    if (rawValue === '') return null;
-    const parsed = Number(rawValue);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
-  if (field?.type === 'timestamp') {
-    return rawValue || null;
-  }
-  if (field?.type === 'multi_select') {
-    return Array.isArray(rawValue) ? rawValue : rawValue ? [normalizeOptionValue(rawValue)] : null;
-  }
   return rawValue === '' ? null : rawValue;
 };
 
@@ -158,94 +124,29 @@ const defaultOperatorForField = (field) => {
   return operators[0]?.value || 'equals';
 };
 
-const getValueComponent = ({ field, rule, onUpdateRule, onFieldFocus }) => {
-  const value = rule.value;
-  const valueOptions = VALUE_OPTIONS_BY_FIELD[field?.key] || field?.options || [];
-
-  if (field?.type === 'boolean') {
-    return (
-      <div className="sb-rule-value-shell">
-        <select
-          className="sb-input-field sb-select-field"
-          value={value === true || value === 'true' ? 'true' : value === false || value === 'false' ? 'false' : ''}
-          onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-        >
-          <option value="">Select value</option>
-          <option value="true">True</option>
-          <option value="false">False</option>
-        </select>
-      </div>
-    );
-  }
-
-  if (field?.type === 'number' || field?.type === 'currency') {
-    const valStr = String(value ?? '');
-    const hasChips = valStr.includes('{{');
-    return (
-      <>
-        <input
-          className="sb-input-field"
-          type="number"
-          inputMode="decimal"
-          value={value ?? ''}
-          onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-          onFocus={() => onFieldFocus?.(rule.id, 'value')}
-        />
-        {hasChips && (
-          <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '7px 10px', overflow: 'hidden', fontSize: 12, color: '#e4e4e7', fontFamily: 'Inter, sans-serif', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(valStr) }} />
-        )}
-      </>
-    );
-  }
-
-  if (field?.type === 'timestamp') {
-    return (
-      <input
-        className="sb-input-field"
-        type="datetime-local"
-        value={value ?? ''}
-        onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-        onFocus={() => onFieldFocus?.(rule.id, 'value')}
-      />
-    );
-  }
-
-  if (field?.type === 'select' || field?.type === 'multi_select') {
-    return (
-      <div className="sb-rule-value-shell">
-        <select
-          className="sb-input-field sb-select-field"
-          value={Array.isArray(value) ? value[0] || '' : value || ''}
-          onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
-        >
-          <option value="">{field?.type === 'multi_select' ? 'Choose tag' : 'Select value'}</option>
-          {valueOptions.map((opt) => {
-            const optValue = typeof opt === 'string' ? opt : opt.value;
-            const normalized = normalizeOptionValue(optValue);
-            return (
-              <option key={normalized} value={normalized}>
-                {normalized}
-              </option>
-            );
-          })}
-        </select>
-      </div>
-    );
-  }
-
-  // Default: text input with chip overlay for variables
-  const valStr = String(value || '');
+// Value field is always a plain text input — never a dropdown.
+const getValueComponent = ({ rule, onUpdateRule, onFieldFocus }) => {
+  const valStr = String(rule.value || '');
   const hasChips = valStr.includes('{{');
   return (
     <>
       <input
         className="sb-input-field"
-        value={value || ''}
-        onChange={(event) => onUpdateRule(rule.id, 'value', normalizeValue(field, event.target.value))}
+        value={rule.value ?? ''}
+        onChange={(event) => onUpdateRule(rule.id, 'value', event.target.value)}
         onFocus={() => onFieldFocus?.(rule.id, 'value')}
       />
       {hasChips && (
-        <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '7px 10px', overflow: 'hidden', fontSize: 12, color: '#e4e4e7', fontFamily: 'Inter, sans-serif', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(valStr) }} />
+        <div
+          className="sb-var-chip-overlay"
+          style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            display: 'flex', alignItems: 'center', padding: '7px 10px', overflow: 'hidden',
+            fontSize: 12, color: '#e4e4e7', fontFamily: 'Inter, sans-serif',
+            whiteSpace: 'nowrap',
+          }}
+          dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(valStr) }}
+        />
       )}
     </>
   );
@@ -371,7 +272,7 @@ const AetherEdgeLogic = ({
                       const nextField = getField(event.target.value, selectableFields);
                       onUpdateRule(rule.id, 'variable', event.target.value);
                       onUpdateRule(rule.id, 'operator', defaultOperatorForField(nextField));
-                      onUpdateRule(rule.id, 'value', nextField?.type === 'boolean' ? null : '');
+                      onUpdateRule(rule.id, 'value', '');
                     }}
                     onFocus={() => {
                       if (typeof onFieldFocus === 'function') {
@@ -403,7 +304,7 @@ const AetherEdgeLogic = ({
                     ))}
                   </select>
                   <div className="aether-rule-value">
-                    {getValueComponent({ field, rule, onUpdateRule, onFieldFocus })}
+                    {getValueComponent({ rule, onUpdateRule, onFieldFocus })}
                   </div>
                   <button
                     type="button"
