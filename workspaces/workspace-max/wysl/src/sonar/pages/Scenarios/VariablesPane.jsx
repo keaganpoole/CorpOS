@@ -416,6 +416,22 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     return count;
   };
 
+  // Returns a Set of field keys whose value matches the search query for the current record
+  const getMatchedFields = (tableKey, record) => {
+    const query = searchQueries[tableKey];
+    if (!query || !query.trim() || !record) return new Set();
+    const searchFields = SEARCH_FIELDS[tableKey] || [];
+    const lowerQuery = query.toLowerCase();
+    const matched = new Set();
+    for (const field of searchFields) {
+      const val = record[field];
+      if (val != null && String(val).toLowerCase().includes(lowerQuery)) {
+        matched.add(field);
+      }
+    }
+    return matched;
+  };
+
   return (
     <div
       className="sb-variables-pane"
@@ -508,6 +524,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           const isSearching = searchStates[table.key] || false;
           const editing = editingTables[table.key] || false;
           const resultCount = getCount(table.key);
+          const matchedFields = getMatchedFields(table.key, currentRecord);
           const TableIcon = table.icon;
 
           return (
@@ -525,10 +542,10 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                       onBlur={() => handleExit(table.key)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleExit(table.key); else if (e.key === 'Escape') { handleClear(table.key); handleExit(table.key); } }}
                       placeholder={`Search ${table.label.toLowerCase()}...`}
-                      style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 12, fontFamily: 'inherit', padding: '2px 0', minWidth: 0 }}
+                      style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 11, fontFamily: 'inherit', padding: '2px 0', minWidth: 0 }}
                     />
-                    {resultCount > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: table.color, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', opacity: 0.8 }}>{resultCount} found</span>}
-                    <button type="button" onClick={(e) => { e.stopPropagation(); handleClear(table.key); searchInputRefs.current[table.key]?.focus(); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}><X size={12} /></button>
+                    {resultCount > 0 && <span style={{ fontSize: 9, fontWeight: 600, color: table.color, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', opacity: 0.8 }}>{resultCount} found</span>}
+                    <button type="button" onClick={(e) => { e.stopPropagation(); handleClear(table.key); searchInputRefs.current[table.key]?.focus(); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}><X size={11} /></button>
                   </div>
                 ) : (
                   <>
@@ -536,21 +553,27 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                       {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                     </button>
                     <span className="sb-vars-table-icon" style={{ color: table.color }}><TableIcon size={11} /></span>
-                    <span className="sb-vars-table-label" onClick={() => handleStart(table.key)} style={{ cursor: 'text', flex: 1 }}>{table.label}</span>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginRight: 4 }}>{idx + 1}/{tableRecords.length}</span>
+                    <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{table.label}</span>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); handleStart(table.key); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '0 2px', display: 'flex', flexShrink: 0, opacity: 0.6 }}>
+                      <Search size={11} />
+                    </button>
                     {tableRecords.length === 0 && <span className="sb-vars-no-data">No data</span>}
                   </>
                 )}
               </button>
 
               {isExpanded && currentRecord && (
-                <div className={`sb-vars-fields ${isSearching ? 'sb-vars-fields-tuning' : ''}`}>
+                <div className={`sb-vars-fields ${isSearching ? 'sb-vars-fields-tuning' : ''}`} style={{ position: 'relative' }}>
+                  {isSearching && (
+                    <div className="sb-vars-varbar" style={{ '--varbar-color': table.color }} />
+                  )}
                   {table.fields.map((field) => {
                     const sampleValue = currentRecord[field.key];
                     const varRef = getVariableRef(table.key, field.key);
                     const hasValue = sampleValue !== null && sampleValue !== undefined;
+                    const isMatched = matchedFields.has(field.key);
                     return (
-                      <button key={field.key} type="button" className={`sb-vars-field ${isSearching ? 'sb-vars-field-tuning' : ''}`} onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, table.color); }} title={hasValue ? formatValue(sampleValue, field.type) : 'No value'}>
+                      <button key={field.key} type="button" className={`sb-vars-field ${isSearching ? 'sb-vars-field-tuning' : ''} ${isMatched ? 'sb-vars-field-matched' : ''}`} onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, table.color); }} title={hasValue ? formatValue(sampleValue, field.type) : 'No value'}>
                         <span className="sb-vars-field-name" style={{ color: table.color }}>{field.label}</span>
                         {hasValue && <span className="sb-vars-field-value">{formatValue(sampleValue, field.type)}</span>}
                       </button>
