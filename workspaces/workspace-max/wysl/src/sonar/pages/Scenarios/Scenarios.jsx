@@ -741,7 +741,7 @@ export default function ScenariosPage() {
     const panelWidth = 400;
     const panelHeight = 640;
     
-    let left = rect.right - pageRect.left + 40;
+    let left = rect.right - pageRect.left - rect.width * 0.13;
     if (left + panelWidth > pageRect.width) {
       left = rect.left - pageRect.left - panelWidth - 40;
     }
