@@ -111,6 +111,34 @@ const TABLE_DEFS = [
     },
   },
   {
+    key: 'services',
+    label: 'Services',
+    color: '#fb923c',
+    colorBg: 'rgba(251,146,60,0.08)',
+    colorBorder: 'rgba(251,146,60,0.2)',
+    icon: Zap,
+    fields: [
+      { key: 'id', label: 'Record ID', type: 'text' },
+      { key: 'name', label: 'Name', type: 'text' },
+      { key: 'description', label: 'Description', type: 'text' },
+      { key: 'price_type', label: 'Price Type', type: 'text' },
+      { key: 'price_min', label: 'Price Min', type: 'number' },
+      { key: 'price_max', label: 'Price Max', type: 'number' },
+      { key: 'unit', label: 'Unit', type: 'text' },
+      { key: 'category', label: 'Category', type: 'text' },
+      { key: 'is_active', label: 'Is Active', type: 'text' },
+      { key: 'sort_order', label: 'Sort Order', type: 'number' },
+      { key: 'created_at', label: 'Created At', type: 'timestamp' },
+      { key: 'updated_at', label: 'Updated At', type: 'timestamp' },
+    ],
+    fetch: async () => {
+      try {
+        const { data } = await supabase.from('services').select('*').limit(1);
+        return data?.[0] || null;
+      } catch { return null; }
+    },
+  },
+  {
     key: 'hired_receptionists',
     label: 'Receptionists',
     color: '#f472b6',
@@ -164,6 +192,7 @@ export const TABLE_COLORS = {
   people: '#32f0d9',
   payments: '#f472b6',
   appointments: '#38bdf8',
+  services: '#fb923c',
   hired_receptionists: '#f472b6',
   businesses: '#a1a1aa',
 };
@@ -172,6 +201,7 @@ export const TABLE_LABELS = {
   people: 'People',
   payments: 'Payment',
   appointments: 'Appointment',
+  services: 'Service',
   hired_receptionists: 'Receptionist',
   businesses: 'Business',
 };
