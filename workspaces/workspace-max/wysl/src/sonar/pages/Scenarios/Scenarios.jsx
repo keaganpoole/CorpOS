@@ -368,6 +368,7 @@ export default function ScenariosPage() {
   const [viewportReady, setViewportReady] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState('node-1');
   const [panelStyle, setPanelStyle] = useState({ top: 0, left: 0 });
+  const panelDragRef = useRef({ dragging: false, startX: 0, startY: 0, startTop: 0, startLeft: 0 });
   const [isPanelVisible, setIsPanelVisible] = useState(false);
   const [panelSearch, setPanelSearch] = useState('');
   const [panelStage, setPanelStage] = useState('options');
@@ -833,6 +834,16 @@ export default function ScenariosPage() {
 
   useEffect(() => {
     const handlePointerMove = (event) => {
+      if (panelDragRef.current.dragging) {
+        const dx = event.clientX - panelDragRef.current.startX;
+        const dy = event.clientY - panelDragRef.current.startY;
+        setPanelStyle({
+          top: panelDragRef.current.startTop + dy,
+          left: panelDragRef.current.startLeft + dx,
+        });
+        return;
+      }
+
       if (dragRef.current.id) {
         event.preventDefault();
         const node = nodeMap[dragRef.current.id];
@@ -863,6 +874,11 @@ export default function ScenariosPage() {
     };
 
     const handlePointerUp = () => {
+      if (panelDragRef.current.dragging) {
+        panelDragRef.current.dragging = false;
+        document.body.style.userSelect = '';
+        return;
+      }
       if (dragRef.current.id) {
         if (!dragRef.current.moved) {
           openSelectionPanel(dragRef.current.id);
@@ -1832,7 +1848,12 @@ export default function ScenariosPage() {
         {isPanelVisible && selectedNodeId && (
           <div className="sb-selection-panel" style={panelStyle}>
             <div className="sb-panel-inner">
-              <div className="sb-panel-header">
+              <div className="sb-panel-header" onPointerDown={(e) => {
+                if (e.target.closest('button')) return;
+                e.preventDefault();
+                panelDragRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, startTop: panelStyle.top, startLeft: panelStyle.left };
+                document.body.style.userSelect = 'none';
+              }} style={{ cursor: 'move' }}>
                 <div>
                   {showNodeConfigText && (
                     <>
