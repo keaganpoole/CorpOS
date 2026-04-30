@@ -2026,6 +2026,7 @@
   font-weight: 700;
   color: #e4e4e7;
   letter-spacing: 0.02em;
+  cursor: text;
 }
 
 .sb-vars-table-badge {
@@ -2126,6 +2127,31 @@
   padding: 8px;
   text-align: center;
   font-style: italic;
+}
+
+/* Search tuning animation */
+.sb-vars-fields-tuning {
+  opacity: 0.6;
+  transform: scale(0.98);
+  filter: blur(0.5px);
+  transition: all 0.2s ease;
+}
+
+.sb-vars-field-tuning {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.sb-vars-group-searching {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.sb-vars-header-searching {
+  background: rgba(255, 255, 255, 0.04);
+  cursor: text;
+}
+
+.sb-vars-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
 }
 
 /* Variable chip inside input fields */
