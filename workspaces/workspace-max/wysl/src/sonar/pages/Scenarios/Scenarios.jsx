@@ -384,6 +384,7 @@ export default function ScenariosPage() {
   const [logicFallbackAction, setLogicFallbackAction] = useState('');
   const [logicIsFallback, setLogicIsFallback] = useState(false);
   const [activeConditionField, setActiveConditionField] = useState(null); // { ruleId, field }
+  const activeConditionInputRef = useRef(null); // tracks the focused input element
   const [appointmentConfig, setAppointmentConfig] = useState({});
   const [scheduleConfig, setScheduleConfig] = useState({});
   const [varsPane, setVarsPane] = useState({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
@@ -2554,23 +2555,19 @@ export default function ScenariosPage() {
               targetFieldKey={activeConditionField?.ruleId || ''}
               fieldLabel="Condition"
               onInsertVariable={(varRef, label, color) => {
-                // If a condition field has focus, insert the variable into it
+                // If a condition field has focus, insert the variable at cursor position
                 if (activeConditionField) {
                   const { ruleId, field } = activeConditionField;
-                  if (field === 'variable') {
-                    // Insert variable with brackets so chip overlay renders
-                    updateEdgeRule(ruleId, 'variable', varRef);
-                  } else if (field === 'value') {
-                    // Append variable reference to value field
-                    const currentRule = edgeRules.find(r => r.id === activeConditionField.ruleId);
-                    const currentVal = currentRule?.value || '';
-                    const newVal = currentVal ? `${currentVal} ${varRef}` : varRef;
-                    updateEdgeRule(ruleId, 'value', newVal);
-                  }
+                  const inputEl = activeConditionInputRef.current;
+                  const currentRule = edgeRules.find(r => r.id === ruleId);
+                  const currentVal = (field === 'variable' ? currentRule?.variable : currentRule?.value) || '';
+                  const pos = inputEl?.selectionStart ?? currentVal.length;
+                  const newVal = currentVal.slice(0, pos) + varRef + currentVal.slice(pos);
+                  updateEdgeRule(ruleId, field, newVal);
                   return;
                 }
 
-                // Fallback: set variable on the last rule
+                // Fallback: insert at end of last rule's variable field
                 if (edgeRules.length === 0) {
                   addEdgeRule('and');
                 }
@@ -2602,7 +2599,10 @@ export default function ScenariosPage() {
               onRemoveRule={removeEdgeRule}
               onUpdateRule={updateEdgeRule}
               onClose={closeLogicPanel}
-              onFieldFocus={(ruleId, field) => setActiveConditionField({ ruleId, field })}
+              onFieldFocus={(ruleId, field, inputEl) => {
+                setActiveConditionField({ ruleId, field });
+                activeConditionInputRef.current = inputEl;
+              }}
               contextType={logicContextType}
               availableVariables={logicAvailableVars}
               fallbackAction={logicFallbackAction}

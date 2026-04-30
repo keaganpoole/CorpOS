@@ -134,7 +134,7 @@ const getValueComponent = ({ rule, onUpdateRule, onFieldFocus }) => {
         className="sb-input-field"
         value={rule.value ?? ''}
         onChange={(event) => onUpdateRule(rule.id, 'value', event.target.value)}
-        onFocus={() => onFieldFocus?.(rule.id, 'value')}
+        onFocus={(event) => onFieldFocus?.(rule.id, 'value', event.target)}
       />
       {hasChips && (
         <div
@@ -277,17 +277,17 @@ const AetherEdgeLogic = ({
                       onUpdateRule(rule.id, 'operator', defaultOperatorForField(nextField));
                       onUpdateRule(rule.id, 'value', '');
                     }}
-                    onFocus={() => {
+                    onFocus={(event) => {
                       if (typeof onFieldFocus === 'function') {
-                        onFieldFocus(rule.id, 'variable');
+                        onFieldFocus(rule.id, 'variable', event.target);
                       }
                     }}
                   />
-                  {rule.variable && (
+                  {rule.variable && rule.variable.includes('{{') && (
                     <div
                       className="sb-var-chip-overlay"
                       style={{
-                        position: 'absolute', inset: 0, pointerEvents: 'none',
+                        position: 'absolute', inset: 0, left: 13, pointerEvents: 'none',
                         display: 'flex', alignItems: 'center', padding: '7px 10px', overflow: 'hidden',
                         fontSize: 12, color: '#e4e4e7', fontFamily: 'Inter, sans-serif',
                         whiteSpace: 'nowrap', zIndex: 1,

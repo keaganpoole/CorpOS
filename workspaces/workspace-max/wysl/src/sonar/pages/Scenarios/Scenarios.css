@@ -1240,7 +1240,7 @@
 
 .aether-close {
   border: none;
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
   color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   opacity: 0.8;
@@ -1255,8 +1255,8 @@
 
 .aether-close:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: transparent;
+  color: var(--sb-accent-rose);
 }
 
 .condition-group {
@@ -1666,27 +1666,24 @@
 .aether-rule-select {
   appearance: none;
   -webkit-appearance: none;
-  background: rgba(12, 12, 14, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 12, 14, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 8px;
-  padding: 7px 28px 7px 10px;
+  padding: 7px 10px;
   color: #fff;
   font-size: 12px;
-  font-family: var(--sb-font-main);
   cursor: pointer;
   outline: none;
   color-scheme: dark;
   min-width: 0;
   flex: 1 1 0;
-  caret-color: transparent;
-  transition: border-color 0.15s ease;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.35)' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
+  transition: border-color 0.25s ease, background 0.2s, box-shadow 0.25s ease;
 }
 
 .aether-rule-select:focus {
-  border-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(14, 14, 16, 0.98);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .aether-rule-select option {
@@ -1736,7 +1733,7 @@
 
 .aether-rule-remove:hover {
   color: var(--sb-accent-rose);
-  background: rgba(244, 114, 182, 0.12);
+  background: transparent;
 }
 
 .aether-rule-logic-pill {
