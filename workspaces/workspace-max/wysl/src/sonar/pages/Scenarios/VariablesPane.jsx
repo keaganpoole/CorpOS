@@ -275,8 +275,8 @@ export const parseVariables = (value) => {
 
 // Sections menu for the variables panel
 const SECTIONS = [
-  { id: 'current', label: 'Current' },
-  { id: 'previous', label: 'Previous' },
+  { id: 'current', label: 'Database' },
+  { id: 'previous', label: 'Scenario' },
 ];
 
 // Node type → icon and display label mapping

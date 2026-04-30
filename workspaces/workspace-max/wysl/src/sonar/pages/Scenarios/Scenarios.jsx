@@ -492,6 +492,23 @@ export default function ScenariosPage() {
     edgeRulesRef.current = edgeRules;
   }, [edgeRules]);
 
+  // Auto-save edge rules to edges whenever rules change (while panel is open)
+  useEffect(() => {
+    if (!logicPanel || !logicPanel.edgeId) return;
+    setEdges((prevEdges) =>
+      prevEdges.map((edge) => {
+        if (edge.id !== logicPanel.edgeId) return edge;
+        const hasValidRules = edgeRules.some(rule => {
+          if (!rule.variable || !rule.operator) return false;
+          const noValueOperators = ['is_empty', 'is_not_empty'];
+          if (noValueOperators.includes(rule.operator)) return true;
+          return rule.value !== '' && rule.value !== null && rule.value !== undefined;
+        });
+        return { ...edge, filter: hasValidRules ? { label: 'Condition', rules: edgeRules } : null };
+      })
+    );
+  }, [edgeRules, logicPanel]);
+
   // Auto-save config to node on every field change
   useEffect(() => {
     if (restoringFromNodeRef.current) { restoringFromNodeRef.current = false; return; }
