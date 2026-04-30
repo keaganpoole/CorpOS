@@ -564,7 +564,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 
               {isExpanded && currentRecord && (
                 <div className={`sb-vars-fields ${isSearching ? 'sb-vars-fields-tuning' : ''}`} style={{ position: 'relative' }}>
-                  {isSearching && (
+                  {editing && (
                     <div className="sb-vars-varbar" style={{ '--varbar-color': table.color }} />
                   )}
                   {table.fields.map((field) => {

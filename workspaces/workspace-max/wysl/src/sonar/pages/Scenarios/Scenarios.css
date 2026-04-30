@@ -1989,7 +1989,7 @@
 }
 
 .sb-vars-table-group:hover {
-  border-color: var(--table-border);
+  border-color: transparent;
 }
 
 .sb-vars-table-header {
@@ -2173,7 +2173,7 @@
 }
 
 .sb-vars-group-searching {
-  border-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: transparent !important;
 }
 
 .sb-vars-header-searching {
