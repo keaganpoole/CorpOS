@@ -128,6 +128,7 @@ const defaultOperatorForField = (field) => {
 const getValueComponent = ({ rule, onUpdateRule, onFieldFocus }) => {
   const valStr = String(rule.value || '');
   const hasChips = valStr.includes('{{');
+  const isDisabled = rule.operator === 'is_empty' || rule.operator === 'is_not_empty';
   return (
     <>
       <input
@@ -135,6 +136,8 @@ const getValueComponent = ({ rule, onUpdateRule, onFieldFocus }) => {
         value={rule.value ?? ''}
         onChange={(event) => onUpdateRule(rule.id, 'value', event.target.value)}
         onFocus={(event) => onFieldFocus?.(rule.id, 'value', event.target)}
+        disabled={isDisabled}
+        style={isDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
       />
       {hasChips && (
         <div
