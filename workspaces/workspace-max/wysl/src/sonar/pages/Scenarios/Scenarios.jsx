@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Phone,
+  User,
   Bell,
   Zap,
   Plus,
@@ -178,6 +179,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
+          { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be professional and offer available reschedule times...', smartActions: true },
           { key: 'first_message', label: 'First Message', type: 'first_message_textarea', placeholder: 'e.g. Hi, this is [business name] calling...', smartActions: true, toggleLabel: 'Override First Message' },
           { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text', placeholder: 'Phone number to transfer after greeting' },
@@ -201,6 +203,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and concise...', smartActions: true },
         ]},
         { key: 'send_to_customer', name: 'Send To Customer', description: 'Send SMS to an existing customer', configFields: [
+          { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and helpful...', smartActions: true },
         ]},
       ],
@@ -232,18 +235,16 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.records,
       sub_options: [
-        { key: 'search_records', name: 'Search Records', description: 'Find records', configFields: [
-          { key: 'search_field', label: 'Search By', type: 'select', options: ['Phone', 'Email', 'Name', 'Record ID'] },
-          { key: 'search_value', label: 'Search Value', type: 'text', placeholder: 'e.g. {caller_number}' },
-        ]},
         { key: 'create_new_record', name: 'Create New Record', description: 'Create a new record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
         ]},
         { key: 'update_record', name: 'Update Record', description: 'Modify an existing record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
+          { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{people.id}}' },
         ]},
         { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
+          { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{people.id}}' },
         ]},
       ],
     },
@@ -254,13 +255,16 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.appointments,
       sub_options: [
-        { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment', configFields: [] },
-        { key: 'search_appointments', name: 'Search Appointments', description: 'Find existing appointments', configFields: [] },
+        { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment', configFields: [
+          { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
+        ] },
         { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment', configFields: [
-          { key: 'lookup_field', label: 'Find Appointment By', type: 'select', options: ['Customer Name', 'Date', 'Appointment ID'] },
-          { key: 'lookup_value', label: 'Lookup Value', type: 'text', placeholder: 'e.g. {customer_name}' },
-          { key: 'field_to_update', label: 'Field to Update', type: 'select', options: ['date', 'time', 'status', 'notes', 'duration'] },
-          { key: 'new_value', label: 'New Value', type: 'text', placeholder: 'New value' },
+          { key: 'appointment_id', label: 'Appointment ID', type: 'record_id', placeholder: 'e.g. {{appointments.id}}' },
+          { key: 'status', label: 'Status', type: 'select', options: ['pending', 'confirmed', 'cancelled'] },
+          { key: 'date', label: 'Date', type: 'date' },
+          { key: 'time', label: 'Time', type: 'time' },
+          { key: 'duration', label: 'Duration', type: 'select', options: ['15', '30', '45', '60', '90', '120'] },
+          { key: 'notes', label: 'Notes', type: 'textarea' },
         ]},
         { key: 'delete_appointment', name: 'Delete Appointment', description: 'Cancel and remove an appointment', configFields: [
           { key: 'appointment_id', label: 'Appointment ID', type: 'text', placeholder: 'Appointment ID to cancel' },
@@ -274,6 +278,7 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.email,
       sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email', configFields: [
+        { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
         { key: 'to', label: 'To', type: 'text', placeholder: 'e.g. {customer_email}' },
         { key: 'subject', label: 'Subject', type: 'text', placeholder: 'e.g. Appointment Confirmation' },
         { key: 'body', label: 'Body', type: 'textarea', placeholder: 'Email body with {variables}' },
@@ -287,6 +292,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.tags,
       sub_options: [
         { key: 'add_tag', name: 'Add Tag', description: 'Attach tag to record', configFields: [
+          { key: 'people_id', label: 'Record', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
           { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'e.g. VIP, Urgent, Callback' },
         ]},
         { key: 'search_tags', name: 'Search Tags', description: 'Find existing tags', configFields: [
@@ -305,6 +311,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'payments', option: 'Payments', description: 'Process payments and manage billing', accent: '#38bdf8', icon: OPTION_ICONS.payments,
       sub_options: [
         { key: 'create_payment', name: 'Create Payment', description: 'Process a new payment', configFields: [
+          { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
           { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'payment_method', label: 'Payment Method', type: 'select', options: ['card', 'ach', 'link'] },
@@ -1108,7 +1115,7 @@ export default function ScenariosPage() {
   };
 
   const APPOINTMENT_CONFIG_ACTIONS = new Set([
-    'create_appointment', 'search_appointments', 'update_appointment', 'delete_appointment',
+    'create_appointment', 'update_appointment', 'delete_appointment',
   ]);
   const TIME_CONFIG_ACTIONS = new Set([
     'specific_time', 'recurring_daily', 'recurring_weekly', 'appointment_reminder',
@@ -2302,47 +2309,105 @@ export default function ScenariosPage() {
                       </button>
                     </div>
                     <div style={{ fontSize: 10, color: '#71717a', marginBottom: 14, fontWeight: 600 }}>
-                      {appointmentConfig.key === 'create_appointment' && 'Set up the appointment details. Fields can reference variables like {caller_name}.'}
-                      {appointmentConfig.key === 'search_appointments' && 'Define search criteria to find appointments.'}
-                      {appointmentConfig.key === 'update_appointment' && 'Select appointment fields to update.'}
+                      {appointmentConfig.key === 'create_appointment' && 'Set up the appointment details.'}
+                      {appointmentConfig.key === 'update_appointment' && 'Update appointment fields.'}
                       {appointmentConfig.key === 'delete_appointment' && 'Set cancellation criteria.'}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {/* Client Name */}
-                      {(appointmentConfig.key === 'create_appointment') && (
-                        <div>
-                          <label style={sbLabelStyle}>Client Name</label>
-                          <input type="text" value={appointmentConfig.client_name || ''}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, client_name: e.target.value })}
-                            placeholder="e.g. {caller_name} or Maria Santos"
-                            style={sbInputStyle} />
-                        </div>
-                      )}
-                      {/* Date */}
-                      {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'search_appointments') && (
-                        <div>
-                          <label style={sbLabelStyle}>Date</label>
-                          <input type="date" value={appointmentConfig.date || ''}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, date: e.target.value })}
-                            style={sbInputStyle} />
-                        </div>
-                      )}
-                      {/* Time */}
+                    <div className="sb-record-fields-grid">
+                      {/* Customer — for create_appointment (people_id field) */}
                       {appointmentConfig.key === 'create_appointment' && (
-                        <div>
-                          <label style={sbLabelStyle}>Time</label>
-                          <input type="time" value={appointmentConfig.time || ''}
+                        <div className="sb-record-field">
+                          <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Customer</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              className="sb-input-field"
+                              type="text"
+                              value={appointmentConfig.people_id || ''}
+                              onChange={e => setAppointmentConfig({ ...appointmentConfig, people_id: e.target.value })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'people_id', fieldLabel: 'Customer', fieldType: 'people_id' })}
+                              placeholder="e.g. {{people.id}}"
+                              style={{
+                                ...(appointmentConfig.people_id?.includes('{{') ? { color: 'transparent' } : {}),
+                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'people_id' ? {
+                                  borderColor: hoveredTableColor,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                } : {}),
+                              }}
+                            />
+                            {(appointmentConfig.people_id || '').includes('{{') && (
+                              <div className="sb-var-chip-overlay"
+                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.people_id) }} />
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {/* Appointment ID — for update/delete_appointment (first field) */}
+                      {(appointmentConfig.key === 'update_appointment' || appointmentConfig.key === 'delete_appointment') && (
+                        <div className="sb-record-field">
+                          <label className="sb-record-label"><Hash size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Appointment ID</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              className="sb-input-field"
+                              type="text"
+                              value={appointmentConfig.appointment_id || ''}
+                              onChange={e => setAppointmentConfig({ ...appointmentConfig, appointment_id: e.target.value })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'appointment_id', fieldLabel: 'Appointment ID', fieldType: 'text' })}
+                              placeholder="e.g. {{appointments.id}}"
+                              style={{
+                                ...(appointmentConfig.appointment_id?.includes('{{') ? { color: 'transparent' } : {}),
+                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'appointment_id' ? {
+                                  borderColor: hoveredTableColor,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                } : {}),
+                              }}
+                            />
+                            {(appointmentConfig.appointment_id || '').includes('{{') && (
+                              <div className="sb-var-chip-overlay"
+                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.appointment_id) }} />
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {/* Status — for update_appointment (second field) */}
+                      {appointmentConfig.key === 'update_appointment' && (
+                        <div className="sb-record-field">
+                          <label className="sb-record-label">Status</label>
+                          <select className="sb-input-field sb-select-field" value={appointmentConfig.status || ''}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, status: e.target.value })}>
+                            <option value="">Select...</option>
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </div>
+                      )}
+                      {/* Date — for create and update_appointment */}
+                      {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
+                        <div className="sb-record-field">
+                          <label className="sb-record-label">Date</label>
+                          <input type="date" className="sb-input-field" value={appointmentConfig.date || ''}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, date: e.target.value })}
+                            style={{ colorScheme: 'dark' }} />
+                        </div>
+                      )}
+                      {/* Time — for create and update_appointment */}
+                      {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
+                        <div className="sb-record-field">
+                          <label className="sb-record-label">Time</label>
+                          <input type="time" className="sb-input-field" value={appointmentConfig.time || ''}
                             onChange={e => setAppointmentConfig({ ...appointmentConfig, time: e.target.value })}
-                            style={sbInputStyle} />
+                            style={{ colorScheme: 'dark' }} />
                         </div>
                       )}
                       {/* Duration */}
-                      {appointmentConfig.key === 'create_appointment' && (
-                        <div>
-                          <label style={sbLabelStyle}>Duration</label>
-                          <select value={appointmentConfig.duration || 30}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, duration: Number(e.target.value) })}
-                            style={sbInputStyle}>
+                      {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
+                        <div className="sb-record-field">
+                          <label className="sb-record-label">Duration</label>
+                          <select className="sb-input-field sb-select-field" value={appointmentConfig.duration || ''}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, duration: Number(e.target.value) })}>
+                            <option value="">Select...</option>
                             <option value={15}>15 min</option>
                             <option value={30}>30 min</option>
                             <option value={45}>45 min</option>
@@ -2352,29 +2417,33 @@ export default function ScenariosPage() {
                           </select>
                         </div>
                       )}
-                      {/* Status filter for search */}
-                      {appointmentConfig.key === 'search_appointments' && (
-                        <div>
-                          <label style={sbLabelStyle}>Status Filter</label>
-                          <select value={appointmentConfig.status || 'any'}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, status: e.target.value })}
-                            style={sbInputStyle}>
-                            <option value="any">Any Status</option>
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </div>
-                      )}
                       {/* Notes */}
-                      {appointmentConfig.key === 'create_appointment' && (
-                        <div>
-                          <label style={sbLabelStyle}>Notes</label>
-                          <textarea value={appointmentConfig.notes || ''}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, notes: e.target.value })}
-                            placeholder="e.g. {caller_reason} or Website consultation"
-                            rows={2}
-                            style={{ ...sbInputStyle, resize: 'none' }} />
+                      {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
+                        <div className="sb-record-field">
+                          <label className="sb-record-label">Notes</label>
+                          <div style={{ position: 'relative' }}>
+                            <textarea
+                              className="sb-input-field"
+                              value={appointmentConfig.notes || ''}
+                              onChange={e => setAppointmentConfig({ ...appointmentConfig, notes: e.target.value })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'notes', fieldLabel: 'Notes', fieldType: 'textarea' })}
+                              placeholder="e.g. {caller_reason} or Website consultation"
+                              rows={2}
+                              style={{
+                                resize: 'none',
+                                ...(appointmentConfig.notes?.includes('{{') ? { color: 'transparent' } : {}),
+                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'notes' ? {
+                                  borderColor: hoveredTableColor,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                } : {}),
+                              }}
+                            />
+                            {(appointmentConfig.notes || '').includes('{{') && (
+                              <div className="sb-var-chip-overlay"
+                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'flex-start', padding: '10px 14px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.notes) }} />
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2563,7 +2632,7 @@ export default function ScenariosPage() {
             style={{
               position: 'absolute',
               top: panelStyle.top,
-              left: Math.max(10, (panelStyle.left || 0) - 228 - 8),
+              left: Math.max(10, (panelStyle.left || 0) - 272 - 8),
               height: 640,
             }}
           />
@@ -2607,13 +2676,13 @@ export default function ScenariosPage() {
               style={{
                 position: 'absolute',
                 top: logicPanelDragPos?.top ?? logicPanel.top,
-                left: Math.max(10, (logicPanelDragPos?.left ?? (logicPanel.left || 0)) - 228 - 8),
+                left: Math.max(10, (logicPanelDragPos?.left ?? (logicPanel.left || 0)) - 272 - 8),
                 height: 640,
               }}
             />
             <AetherEdgeLogic
               onPositionChange={(top, left) => setLogicPanelDragPos({ top, left })}
-              style={{ top: logicPanel.top, left: Math.max(10, (logicPanel.left || 0) - 228 - 8) + 228 + 8 }}
+              style={{ top: logicPanel.top, left: Math.max(10, (logicPanel.left || 0) - 272 - 8) + 272 + 8 }}
               conditions={edgeRules}
               onAddRule={() => addEdgeRule('and')}
               onAddOrRule={() => addEdgeRule('or')}
@@ -2676,7 +2745,7 @@ export default function ScenariosPage() {
               onClick={() => noTriggerActive && setShowScheduleModal(true)}
               disabled={!noTriggerActive}
             >
-              <Clock size={12} />
+              <Clock size={10} />
               <span>{formatScheduleDisplay(recurringSchedule)}</span>
             </button>
             
@@ -2732,7 +2801,7 @@ export default function ScenariosPage() {
             <div className="sb-schedule-modal" onClick={e => e.stopPropagation()}>
               <div className="sb-schedule-modal-header">
                 <div className="sb-schedule-modal-title">
-                  <Clock size={14} />
+                  <Clock size={11} />
                   Schedule
                 </div>
                 <button type="button" className="sb-schedule-modal-close" onClick={() => setShowScheduleModal(false)}>

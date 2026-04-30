@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
-  User, Calendar, Phone, ChevronDown, ChevronRight, X, Zap, Sparkles, Mic, CreditCard, Search
+  User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, Mic, CreditCard, Search
 } from 'lucide-react';
 import { getSmartActionByKey, getSmartActions } from './smartActions';
 
@@ -273,6 +273,103 @@ export const parseVariables = (value) => {
   return matches;
 };
 
+// Sections menu for the variables panel
+const SECTIONS = [
+  { id: 'current', label: 'Current' },
+  { id: 'previous', label: 'Previous' },
+];
+
+// Node type → icon and display label mapping
+const NODE_DISPLAY = {
+  trigger: { icon: Zap, defaultLabel: 'Trigger' },
+  action: { icon: Sparkles, defaultLabel: 'Action' },
+  condition: { icon: ChevronRight, defaultLabel: 'Condition' },
+  router: { icon: ChevronRight, defaultLabel: 'Router' },
+  default: { icon: Zap, defaultLabel: 'Node' },
+};
+
+// Get display config for a node type
+const getNodeDisplay = (categoryType) => {
+  return NODE_DISPLAY[categoryType] || NODE_DISPLAY.default;
+};
+
+// Traverse graph backwards from current node, return ordered array of previous node data
+const getPreviousNodeData = (currentNodeId, nodes, edges) => {
+  if (!currentNodeId || !nodes.length) return [];
+
+  // Backwards BFS from current node
+  const visited = new Set([currentNodeId]);
+  const queue = [currentNodeId];
+  const predecessors = new Map();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    for (const edge of edges) {
+      if (edge.to === current && !visited.has(edge.from)) {
+        visited.add(edge.from);
+        queue.push(edge.from);
+        if (!predecessors.has(edge.to)) predecessors.set(edge.to, []);
+        predecessors.get(edge.to).push(edge.from);
+      }
+    }
+  }
+
+  // Topological order (BFS from intro)
+  const topoOrder = [];
+  const visitedTopo = new Set();
+  const introNode = nodes.find(n => n.id === 'node-1');
+  if (!introNode) return [];
+
+  const topoQueue = ['node-1'];
+  visitedTopo.add('node-1');
+  while (topoQueue.length > 0) {
+    const curr = topoQueue.shift();
+    topoOrder.push(curr);
+    for (const edge of edges) {
+      if (edge.from === curr && !visitedTopo.has(edge.to)) {
+        visitedTopo.add(edge.to);
+        topoQueue.push(edge.to);
+      }
+    }
+  }
+
+  // Filter to only previous nodes (before current), exclude current, reverse for most-recent-first
+  const currentIdx = topoOrder.indexOf(currentNodeId);
+  const previousIds = currentIdx > 0 ? topoOrder.slice(0, currentIdx).reverse() : [];
+
+  // Build node data
+  return previousIds.map(nodeId => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return null;
+    const display = getNodeDisplay(node.categoryType);
+    const label = node.label || display.defaultLabel;
+    const data = {};
+
+    // Extract data from node configs
+    if (node.actionConfig && typeof node.actionConfig === 'object') {
+      Object.entries(node.actionConfig).forEach(([key, val]) => {
+        if (val != null && key !== '_key') data[key] = val;
+      });
+    }
+    if (node.appointmentConfig && typeof node.appointmentConfig === 'object') {
+      Object.entries(node.appointmentConfig).forEach(([key, val]) => {
+        if (val != null && key !== '_key') data[key] = val;
+      });
+    }
+    if (node.scheduleConfig && typeof node.scheduleConfig === 'object') {
+      Object.entries(node.scheduleConfig).forEach(([key, val]) => {
+        if (val != null && key !== '_key') data[key] = val;
+      });
+    }
+    // Also include node-level fields
+    if (node.detail) data['detail'] = node.detail;
+    if (node.triggerKey) data['trigger'] = node.triggerKey;
+
+    return { nodeId, label, categoryType: node.categoryType, icon: display.icon, data };
+  }).filter(Boolean);
+};
+
+// Format a value for display
 const formatValue = (value, type) => {
   if (value === null || value === undefined) return '—';
   if (type === 'timestamp') {
@@ -282,6 +379,80 @@ const formatValue = (value, type) => {
   return String(value);
 };
 
+// Previous Node Variables — shows variables from previous nodes in the flow
+const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTableHover }) => {
+  const [expandedNodes, setExpandedNodes] = useState({});
+  const prevNodes = getPreviousNodeData(currentNodeId, nodes, edges);
+
+  if (prevNodes.length === 0) {
+    return (
+      <div className="sb-vars-empty" style={{ padding: '20px 12px' }}>
+        No previous nodes found
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {prevNodes.map((prev) => {
+        const NodeIcon = prev.icon;
+        const color = '#a78bfa';
+        const isExpanded = expandedNodes[prev.nodeId] !== false; // default expanded
+        const dataEntries = Object.entries(prev.data);
+        const nid = prev.nodeId;
+
+        return (
+          <div
+            key={nid}
+            className="sb-vars-table-group"
+            style={{ '--table-color': color, '--table-bg': 'rgba(167,139,250,0.08)', '--table-border': 'rgba(167,139,250,0.2)' }}
+            onMouseEnter={() => onTableHover?.(color)}
+            onMouseLeave={() => onTableHover?.('')}
+          >
+            <button
+              type="button"
+              className="sb-vars-table-header"
+              onClick={() => setExpandedNodes(prev => ({ ...prev, [nid]: !isExpanded }))}
+            >
+              <span className="sb-vars-table-chevron">
+                {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              </span>
+              <span className="sb-vars-table-icon" style={{ color }}><NodeIcon size={11} /></span>
+              <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{prev.label}</span>
+            </button>
+
+            {isExpanded && (
+              <div className="sb-vars-fields">
+                {dataEntries.length === 0 ? (
+                  <div className="sb-vars-empty">No variables</div>
+                ) : (
+                  dataEntries.map(([key, value]) => {
+                    const varRef = getVariableRef(prev.nodeId, key);
+                    const displayVal = formatValue(value);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className="sb-vars-field"
+                        onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, key, color); }}
+                        title={displayVal}
+                      >
+                        <span className="sb-vars-field-name" style={{ color }}>{key}</span>
+                        {displayVal && <span className="sb-vars-field-value">{displayVal}</span>}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+};
+
+
 const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, onInsertSmartAction, smartActions = [], onTableHover, onClose, style = {}, nodes = [], edges = [], currentNodeId = '' }) => {
   const [records, setRecords] = useState({});
   const [activeIndex, setActiveIndex] = useState({});
@@ -289,6 +460,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   const [searchQueries, setSearchQueries] = useState({});
   const [searchStates, setSearchStates] = useState({});
   const [editingTables, setEditingTables] = useState({});
+  const [activeSection, setActiveSection] = useState('current');
   const searchTimers = useRef({});
   const searchInputRefs = useRef({});
   const paneRef = useRef(null);
@@ -416,6 +588,36 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     return count;
   };
 
+  // Returns array of record indices that match the search query
+  const getMatchedIndices = (tableKey) => {
+    const query = searchQueries[tableKey];
+    if (!query || !query.trim()) return [];
+    const tableRecords = records[tableKey] || [];
+    const searchFields = SEARCH_FIELDS[tableKey] || [];
+    const lowerQuery = query.toLowerCase();
+    const indices = [];
+    for (let i = 0; i < tableRecords.length; i++) {
+      const record = tableRecords[i];
+      for (const field of searchFields) {
+        const val = record[field];
+        if (val != null && String(val).toLowerCase().includes(lowerQuery)) {
+          indices.push(i);
+          break;
+        }
+      }
+    }
+    return indices;
+  };
+
+  const navigateMatched = (tableKey, direction) => {
+    const indices = getMatchedIndices(tableKey);
+    if (indices.length <= 1) return;
+    const currentIdx = activeIndex[tableKey] || 0;
+    const posInMatched = indices.indexOf(currentIdx);
+    const nextPos = posInMatched === -1 ? 0 : (posInMatched + direction + indices.length) % indices.length;
+    setActiveIndex(prev => ({ ...prev, [tableKey]: indices[nextPos] }));
+  };
+
   // Returns a Set of field keys whose value matches the search query for the current record
   const getMatchedFields = (tableKey, record) => {
     const query = searchQueries[tableKey];
@@ -447,7 +649,24 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
         <span className="sb-vars-title">Variables</span>
         {fieldLabel && <span className="sb-vars-field-label">for {fieldLabel}</span>}
       </div>
+
+      {/* Section menu */}
+      <div className="sb-vars-section-menu">
+        {SECTIONS.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            className={`sb-vars-section-tab ${activeSection === section.id ? 'sb-vars-section-tab--active' : ''}`}
+            onClick={() => setActiveSection(section.id)}
+          >
+            {section.label}
+          </button>
+        ))}
+      </div>
+
       <div className="sb-vars-scroll">
+        {activeSection === 'current' && (
+        <>
         {showFromCall && (
           <div className="sb-vars-table-group" style={{ '--table-color': '#32f0d9', '--table-bg': 'rgba(50,240,217,0.08)', '--table-border': 'rgba(50,240,217,0.2)' }} onMouseEnter={() => onTableHover?.('#32f0d9')} onMouseLeave={() => onTableHover?.('')}>
             <button type="button" className="sb-vars-table-header" onClick={() => setExpanded(prev => ({ ...prev, __agent: !prev.__agent }))}>
@@ -544,7 +763,15 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                       placeholder={`Search ${table.label.toLowerCase()}...`}
                       style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 11, fontFamily: 'inherit', padding: '2px 0', minWidth: 0 }}
                     />
-                    {resultCount > 0 && <span style={{ fontSize: 9, fontWeight: 600, color: table.color, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', opacity: 0.8 }}>{resultCount} found</span>}
+                    {resultCount > 0 && (
+                      <>
+                        <span style={{ fontSize: 9, fontWeight: 600, color: table.color, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', opacity: 0.8 }}>{resultCount} found</span>
+                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', margin: '0 2px' }}>|</span>
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); navigateMatched(table.key, -1); }} style={{ background: 'none', border: 'none', color: table.color, cursor: 'pointer', padding: '0 1px', display: 'flex', flexShrink: 0, opacity: 0.7 }}><ChevronUp size={10} /></button>
+                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{getMatchedIndices(table.key).indexOf(idx) + 1}/{resultCount}</span>
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); navigateMatched(table.key, 1); }} style={{ background: 'none', border: 'none', color: table.color, cursor: 'pointer', padding: '0 1px', display: 'flex', flexShrink: 0, opacity: 0.7 }}><ChevronDown size={10} /></button>
+                      </>
+                    )}
                     <button type="button" onClick={(e) => { e.stopPropagation(); handleClear(table.key); searchInputRefs.current[table.key]?.focus(); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}><X size={11} /></button>
                   </div>
                 ) : (
@@ -588,6 +815,18 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
             </div>
           );
         })}
+        </> /* end activeSection === 'current' */
+        )}
+
+        {activeSection === 'previous' && (
+          <PreviousNodeVars
+            currentNodeId={currentNodeId}
+            nodes={nodes}
+            edges={edges}
+            onInsertVariable={onInsertVariable}
+            onTableHover={onTableHover}
+          />
+        )}
       </div>
     </div>
   );

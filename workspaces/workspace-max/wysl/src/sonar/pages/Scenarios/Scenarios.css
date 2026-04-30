@@ -1901,7 +1901,7 @@
 /* ─── Variables Pane ─────────────────────────────────────── */
 .sb-variables-pane {
   position: absolute;
-  width: 220px;
+  width: 264px;
   background: linear-gradient(135deg, rgba(14, 14, 18, 0.98), rgba(20, 20, 26, 0.98));
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-left: 2px solid rgba(255, 255, 255, 0.06);
@@ -1946,6 +1946,37 @@
   font-size: 9px;
   color: #52525b;
   font-weight: 600;
+}
+
+/* Section menu */
+.sb-vars-section-menu {
+  display: flex;
+  gap: 0;
+  padding: 0 8px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sb-vars-section-tab {
+  background: none;
+  border: none;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.sb-vars-section-tab:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sb-vars-section-tab--active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .sb-vars-close {
@@ -2169,7 +2200,7 @@
 
 .sb-vars-field-matched .sb-vars-field-value {
   font-weight: 700;
-  filter: brightness(1.3);
+  filter: brightness(1.5);
 }
 
 .sb-vars-group-searching {
@@ -2237,6 +2268,20 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.sb-record-field input[type="date"],
+.sb-record-field input[type="time"] {
+  background: rgba(12, 12, 14, 0.96);
+  color: #fff;
+  color-scheme: dark;
+}
+
+.sb-record-field input[type="date"]::-webkit-calendar-picker-indicator,
+.sb-record-field input[type="time"]::-webkit-calendar-picker-indicator {
+  width: 14px;
+  height: 14px;
+  opacity: 0.5;
 }
 
 .sb-record-label {
