@@ -1,0 +1,255 @@
+```text id="q3n8kp"
+You are implementing two targeted Scenario Builder tasks.
+
+## Location (Critical)
+
+All changes must be made inside:
+- The `wysl` project
+- Specifically within the **Scenarios Builder**
+
+Do not modify unrelated parts of the codebase.
+
+---
+
+Do not redesign the builder, nodes, Variables Panel, or action menus. Only modify behavior and data handling as defined below.
+
+---
+
+# Task 1 — Fix Database Tab Variable Set Visibility
+
+## Objective
+
+In the Database tab of the Variables Panel, only show variable sets for tables that would actually have data available at runtime.
+
+Do not show irrelevant or unrelated table variable sets.
+
+## Core Rule
+
+The available variable sets must be determined from:
+
+- The trigger/action data path
+- Previous node outputs
+- Valid foreign key relationships between records
+
+Do not show every table in the database.
+Do not grey out irrelevant variable sets.
+Hide irrelevant variable sets entirely.
+
+## Ordering Rule
+
+Show variable sets from bottom to top like this:
+
+- Most foundational/parent record at the bottom
+- More specific/related records above it
+- Newly introduced tables from later nodes continue stacking above the existing variable sets
+
+## Example 1
+
+Scenario:
+
+When a payment fails (trigger) > Create a payment (action)
+
+The failed payment trigger should expose:
+
+- The payment record from the trigger
+- The person/customer record attached to that payment through the foreign key relationship
+
+So when configuring the Create Payment action node, the Database tab should only show:
+
+Bottom: people  
+Above it: payments
+
+## Example 2
+
+Scenario:
+
+When an appointment is completed (trigger) > Create a payment (action) > Call customer
+
+The completed appointment trigger should expose:
+
+- The appointment record
+- The person/customer record attached to the appointment
+- The service record attached to the appointment, if the appointment has a service foreign key
+
+So when configuring the Create Payment action node, the Database tab should only show:
+
+Bottom: people  
+Above it: appointments  
+Above that: services, if a linked service record exists
+
+## Important Rules
+
+- Only show variable sets that are actually reachable from current scenario runtime data.
+- Reachability can come from the trigger, previous nodes, or valid foreign key relationships.
+- Irrelevant tables must not appear at all.
+- Do not show disabled/greyed-out irrelevant variable sets.
+
+---
+
+# Task 2 — Add Search Records Action
+
+## Objective
+
+Add a new Records action called:
+
+Search Records
+
+This action should allow the user to search records from a selected table, limit the number of returned records, and expose those records as structured variables for later nodes.
+
+## 1. Records Action Menu
+
+Inside the existing Records action button/menu, add:
+
+Search Records
+
+Selecting it should create a new action node in the Scenario Builder.
+
+## 2. Search Records Node Form
+
+The Search Records node configuration form should include:
+
+### User ID
+
+- Text input field
+- Placed at the top of the form
+- Used to scope which user’s records are queried
+
+### Table
+
+- Dropdown field
+- Options should include available database tables, for example:
+  - people
+  - payments
+  - appointments
+  - services
+- Use the same table/schema source already used by existing Records action nodes.
+
+### Limit
+
+- Number input
+- Controls the maximum number of records returned when the node runs
+- Prevent unlimited record fetching
+
+## 3. Run Node Behavior
+
+Allow the user to right-click the Search Records node and choose:
+
+Run Node
+
+When Run Node is selected:
+
+- Execute the Search Records node using the selected table, limit, and User ID
+- If User ID is provided:
+  - Filter all queries by this User ID
+  - This overrides the default session/user context for testing purposes
+- If User ID is empty:
+  - Fall back to the normal authenticated user/business/account context
+- Do not fetch records globally across all users
+- Return the results as structured JSON
+
+## 4. Scenario Tab Variable Output
+
+After the Search Records node runs successfully, show a new variable set in the Scenario tab of the Variables Panel called:
+
+Search Records
+
+This variable set should contain the records returned by the node.
+
+Example structure:
+
+Search Records
+  records
+    0
+      id
+      first_name
+      last_name
+      email
+      phone
+    1
+      id
+      first_name
+      last_name
+      email
+      phone
+
+Each returned record should be collapsible, similar to Make/Integromat bundle outputs.
+
+---
+
+## 4.1 Output Presentation & Visual Structure
+
+The Search Records variable set must be extremely clean, structured, and visually consistent with the existing Variables Panel design.
+
+### Requirements
+
+- The output must feel native to the Variables Panel (not like a raw JSON dump)
+- Maintain the same spacing, typography, and hierarchy used by existing variable sets
+- Each record must be clearly separated and easy to scan
+- Keys and values must be aligned and readable at a glance
+
+### Bundle Structure (Make/Integromat Style)
+
+- Each record should behave like a “bundle”
+- Bundles must be collapsible/expandable
+- Default state:
+  - Collapsed if there are many records
+  - Expanded if there are very few (e.g., 1–2)
+
+### Visual Hierarchy
+
+- Use indentation to clearly represent nested structure
+- Parent keys (like `records`, `0`, `1`) should be visually distinct from child fields
+- Maintain consistent vertical rhythm between fields
+
+### Structural Guides (Important)
+
+- Add subtle visual connector lines (tree-style guides) to show hierarchy:
+  - Vertical lines connecting child fields to their parent
+  - Clean, minimal, low-opacity lines (not heavy borders)
+- These lines should help users visually trace the structure of the data
+- Do not make the UI feel cluttered — lines should enhance clarity, not dominate it
+
+### Readability
+
+- Long datasets must remain easy to scan
+- Avoid cramming — prioritize spacing over density
+- Ensure labels (field names) are clearly distinguishable from values
+
+### Strict Constraints
+
+- Do not redesign the Variables Panel
+- Do not introduce new UI paradigms
+- Extend the existing design system only
+- The result should feel like a natural, polished extension of the current variable sets
+
+---
+
+## 5. Variable Selection
+
+Users must be able to select variables from the Search Records output and insert them into later node fields.
+
+Examples:
+
+- Search Records.records[0].email
+- Search Records.records[0].first_name
+- Search Records.records[1].id
+
+The output must be parsed into selectable variables.
+
+Do not display the search result as one raw JSON blob.
+
+## Important Rules
+
+- Do not redesign the Variables Panel.
+- Do not redesign node styling.
+- Do not create a modal for the records output.
+- Use the existing Scenario tab variable rendering pattern where possible.
+- Search Records output should only appear after the node has been run and has real output data.
+- If no records are returned, show an empty but valid output state.
+- If the query fails, show a non-breaking error state.
+- The returned records must be collapsible and structured like parsed JSON.
+- Future nodes must be able to consume these variables normally.
+- Do not expose User ID as a selectable variable in the Variables Panel.
+- Do not persist User ID as part of production logic (this is for testing/debugging only).
+- Ensure all queries consistently apply the User ID filter across all tables.
+```

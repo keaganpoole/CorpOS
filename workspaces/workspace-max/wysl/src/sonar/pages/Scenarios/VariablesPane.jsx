@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
-  User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, Mic, CreditCard, Search
+  User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, Mic, CreditCard, Search, Layers
 } from 'lucide-react';
 import { getSmartActionByKey, getSmartActions } from './smartActions';
 
@@ -36,6 +36,104 @@ const SEARCH_FIELDS = {
   businesses: ['name', 'email', 'phone', 'address', 'city', 'state'],
 };
 
+// ─── Trigger → Runtime Table Availability ──────────────────────────────────
+// Maps trigger keys to the tables that will have data at runtime.
+// Based on ScenarioEngine._buildFlowContext FK relationships.
+const TRIGGER_TABLE_MAP = {
+  appointment_created: ['appointments', 'people', 'services', 'businesses'],
+  appointment_updated: ['appointments', 'people', 'services', 'businesses'],
+  appointment_cancelled: ['appointments', 'people', 'services', 'businesses'],
+  appointment_rescheduled: ['appointments', 'people', 'services', 'businesses'],
+  appointment_confirmed: ['appointments', 'people', 'services', 'businesses'],
+  appointment_soon: ['appointments', 'people', 'services', 'businesses'],
+  appointment_completed: ['appointments', 'people', 'services', 'businesses'],
+  appointment_missed: ['appointments', 'people', 'services', 'businesses'],
+  record_created: ['people', 'businesses'],
+  record_updated: ['people', 'businesses'],
+  record_deleted: ['people', 'businesses'],
+  incoming_call: ['people', 'businesses', 'hired_receptionists'],
+  call_answered: ['people', 'businesses', 'hired_receptionists'],
+  missed_call: ['people', 'businesses'],
+  call_failed: ['people', 'businesses'],
+  voicemail_received: ['people', 'businesses'],
+  sms_received: ['people', 'businesses'],
+  sms_sent: ['people', 'businesses'],
+  sms_failed: ['people', 'businesses'],
+  customer_replied: ['people', 'businesses'],
+  invoice_created: ['payments', 'people', 'businesses'],
+  invoice_paid: ['payments', 'people', 'businesses'],
+  payment_failed: ['payments', 'people', 'businesses'],
+  invoice_sent: ['payments', 'people', 'businesses'],
+  manual_trigger: ['people', 'payments', 'appointments', 'services', 'hired_receptionists', 'businesses'],
+};
+
+// Fetch order from ScenarioEngine._buildFlowContext (first fetched = bottom, last fetched = top)
+const FETCH_ORDER = {
+  appointments: 1,
+  services: 2,
+  payments: 3,
+  businesses: 4,
+  hired_receptionists: 5,
+};
+const PEOPLE_SORT_KEY = -1; // Always pinned to bottom
+
+// Find parent trigger key for the current node
+const findTriggerKeyForNode = (currentNodeId, nodes, edges) => {
+  if (!currentNodeId || !nodes?.length) return null;
+  const nodeMap = {};
+  for (const n of nodes) nodeMap[n.id] = n;
+
+  const selected = nodeMap[currentNodeId];
+  if (!selected) return null;
+
+  // If the selected node itself is a trigger, use it directly
+  if (selected.categoryType === 'TRIGGERS') {
+    return selected.subOptionKey || selected.triggerKey || null;
+  }
+
+  // BFS backwards to find the nearest ancestor trigger
+  const visited = new Set();
+  const queue = [currentNodeId];
+  while (queue.length > 0) {
+    const nodeId = queue.shift();
+    if (visited.has(nodeId)) continue;
+    visited.add(nodeId);
+    const parentEdge = edges.find(e => e.to === nodeId);
+    if (!parentEdge) continue;
+    const parentNode = nodeMap[parentEdge.from];
+    if (!parentNode) continue;
+    if (parentNode.categoryType === 'TRIGGERS') {
+      return parentNode.subOptionKey || parentNode.triggerKey || null;
+    }
+    queue.push(parentEdge.from);
+  }
+  return null;
+};
+
+// Get available table defs for a given trigger key, sorted by fetch order
+const getAvailableTables = (triggerKey) => {
+  let tables;
+  if (!triggerKey) {
+    tables = [...TABLE_DEFS];
+  } else {
+    const availableKeys = TRIGGER_TABLE_MAP[triggerKey];
+    if (!availableKeys) {
+      tables = [...TABLE_DEFS];
+    } else {
+      tables = TABLE_DEFS.filter(t => availableKeys.includes(t.key));
+    }
+  }
+
+  // Sort: bottom = foundational (people always lowest), top = most specific
+  tables.sort((a, b) => {
+    const aKey = a.key === 'people' ? PEOPLE_SORT_KEY : (FETCH_ORDER[a.key] || 50);
+    const bKey = b.key === 'people' ? PEOPLE_SORT_KEY : (FETCH_ORDER[b.key] || 50);
+    return aKey - bKey;
+  });
+
+  return tables;
+};
+
 const TABLE_DEFS = [
   {
     key: 'people',
@@ -48,17 +146,29 @@ const TABLE_DEFS = [
       { key: 'id', label: 'Record ID', type: 'text' },
       { key: 'first_name', label: 'First Name', type: 'text' },
       { key: 'last_name', label: 'Last Name', type: 'text' },
+      { key: 'phone', label: 'Phone', type: 'phone' },
       { key: 'email', label: 'Email', type: 'email' },
-      { key: 'notes', label: 'Notes', type: 'text' },
-      { key: 'special_instructions', label: 'Special Instructions', type: 'text' },
+      { key: 'street_address', label: 'Street Address', type: 'text' },
+      { key: 'city', label: 'City', type: 'text' },
+      { key: 'state', label: 'State', type: 'text' },
+      { key: 'zip_code', label: 'Zip Code', type: 'text' },
+      { key: 'preferred_contact_method', label: 'Preferred Contact Method', type: 'text' },
+      { key: 'preferred_language', label: 'Preferred Language', type: 'text' },
       { key: 'best_time_to_contact', label: 'Best Time to Contact', type: 'text' },
-      { key: 'callback_needed', label: 'Callback Needed', type: 'text' },
-      { key: 'callback_due_at', label: 'Callback Due At', type: 'text' },
+      { key: 'consent_sms', label: 'Consent SMS', type: 'boolean' },
+      { key: 'consent_call', label: 'Consent Call', type: 'boolean' },
+      { key: 'do_not_call', label: 'Do Not Call', type: 'boolean' },
+      { key: 'do_not_text', label: 'Do Not Text', type: 'boolean' },
       { key: 'status', label: 'Status', type: 'text' },
+      { key: 'source', label: 'Source', type: 'text' },
+      { key: 'lead_source_detail', label: 'Source Detail', type: 'text' },
+      { key: 'tags', label: 'Tags', type: 'text' },
       { key: 'last_call_status', label: 'Last Call Status', type: 'text' },
+      { key: 'last_intent', label: 'Last Intent', type: 'text' },
       { key: 'last_outcome', label: 'Last Outcome', type: 'text' },
-      { key: 'consent_sms', label: 'Consent SMS', type: 'text' },
-      { key: 'consent_call', label: 'Consent Call', type: 'text' },
+      { key: 'missed_call_count', label: 'Missed Call Count', type: 'number' },
+      { key: 'created_at', label: 'Created At', type: 'timestamp' },
+      { key: 'updated_at', label: 'Updated At', type: 'timestamp' },
     ],
     fetch: async () => {
       try {
@@ -76,6 +186,8 @@ const TABLE_DEFS = [
     icon: CreditCard,
     fields: [
       { key: 'id', label: 'Payment ID', type: 'text' },
+      { key: 'person_id', label: 'Person ID', type: 'text' },
+      { key: 'appointment_id', label: 'Appointment ID', type: 'text' },
       { key: 'amount', label: 'Amount', type: 'number' },
       { key: 'currency', label: 'Currency', type: 'text' },
       { key: 'status', label: 'Status', type: 'text' },
@@ -83,8 +195,11 @@ const TABLE_DEFS = [
       { key: 'description', label: 'Description', type: 'text' },
       { key: 'receipt_url', label: 'Receipt URL', type: 'url' },
       { key: 'stripe_payment_intent_id', label: 'Stripe Intent ID', type: 'text' },
-      { key: 'people_id', label: 'Customer ID', type: 'text' },
+      { key: 'stripe_session_id', label: 'Stripe Session ID', type: 'text' },
+      { key: 'refunded_amount', label: 'Refunded Amount', type: 'number' },
+      { key: 'error_message', label: 'Error Message', type: 'text' },
       { key: 'created_at', label: 'Created At', type: 'timestamp' },
+      { key: 'updated_at', label: 'Updated At', type: 'timestamp' },
     ],
     fetch: async () => {
       try {
@@ -107,7 +222,13 @@ const TABLE_DEFS = [
       { key: 'time', label: 'Time', type: 'text' },
       { key: 'duration', label: 'Duration', type: 'number' },
       { key: 'status', label: 'Status', type: 'text' },
+      { key: 'assigned_receptionist', label: 'Assigned Receptionist', type: 'text' },
       { key: 'notes', label: 'Notes', type: 'text' },
+      { key: 'person_id', label: 'Person ID', type: 'text' },
+      { key: 'service_id', label: 'Service ID', type: 'text' },
+      { key: 'business_id', label: 'Business ID', type: 'text' },
+      { key: 'scenario_id', label: 'Scenario ID', type: 'text' },
+      { key: 'created_at', label: 'Created At', type: 'timestamp' },
     ],
     fetch: async () => {
       try {
@@ -153,11 +274,23 @@ const TABLE_DEFS = [
     icon: Phone,
     fields: [
       { key: 'id', label: 'Record ID', type: 'text' },
-      { key: 'full_name', label: 'Name', type: 'text' },
+      { key: 'catalog_id', label: 'Catalog ID', type: 'text' },
+      { key: 'full_name', label: 'Full Name', type: 'text' },
+      { key: 'first_name', label: 'First Name', type: 'text' },
+      { key: 'description', label: 'Description', type: 'text' },
       { key: 'stereotype', label: 'Role', type: 'text' },
-      { key: 'phone_number', label: 'Phone', type: 'phone' },
+      { key: 'avatar', label: 'Avatar', type: 'text' },
+      { key: 'voice', label: 'Voice', type: 'text' },
+      { key: 'elevenlabs_voice_id', label: 'ElevenLabs Voice ID', type: 'text' },
+      { key: 'age', label: 'Age', type: 'number' },
       { key: 'call_types', label: 'Call Types', type: 'text' },
+      { key: 'phone_number', label: 'Phone', type: 'phone' },
+      { key: 'is_active', label: 'Is Active', type: 'boolean' },
+      { key: 'language_model', label: 'Language Model', type: 'text' },
       { key: 'status', label: 'Status', type: 'text' },
+      { key: 'current_activity', label: 'Current Activity', type: 'text' },
+      { key: 'total_calls', label: 'Total Calls', type: 'number' },
+      { key: 'hired_at', label: 'Hired At', type: 'timestamp' },
     ],
     fetch: async () => {
       try {
@@ -178,11 +311,17 @@ const TABLE_DEFS = [
       { key: 'name', label: 'Name', type: 'text' },
       { key: 'phone', label: 'Phone', type: 'phone' },
       { key: 'email', label: 'Email', type: 'email' },
-      { key: 'website', label: 'Website', type: 'url' },
       { key: 'address', label: 'Address', type: 'text' },
       { key: 'city', label: 'City', type: 'text' },
       { key: 'state', label: 'State', type: 'text' },
       { key: 'zip', label: 'Zip', type: 'text' },
+      { key: 'website', label: 'Website', type: 'url' },
+      { key: 'about_us', label: 'About Us', type: 'text' },
+      { key: 'policies', label: 'Policies', type: 'text' },
+      { key: 'faq', label: 'FAQ', type: 'text' },
+      { key: 'business_hours', label: 'Business Hours', type: 'text' },
+      { key: 'created_at', label: 'Created At', type: 'timestamp' },
+      { key: 'updated_at', label: 'Updated At', type: 'timestamp' },
     ],
     fetch: async () => {
       try {
@@ -337,10 +476,12 @@ const getPreviousNodeData = (currentNodeId, nodes, edges) => {
   const currentIdx = topoOrder.indexOf(currentNodeId);
   const previousIds = currentIdx > 0 ? topoOrder.slice(0, currentIdx).reverse() : [];
 
-  // Build node data
+  // Build node data — exclude Search Records nodes (their runtime output is shown separately)
   return previousIds.map(nodeId => {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return null;
+    // Skip Search Records nodes — their output is shown via SearchRecordsOutput
+    if (node.actionConfig?._key === 'search_records') return null;
     const display = getNodeDisplay(node.categoryType);
     const label = node.label || display.defaultLabel;
     const data = {};
@@ -377,6 +518,125 @@ const formatValue = (value, type) => {
   }
   if (Array.isArray(value)) return value.join(', ');
   return String(value);
+};
+
+// Search Records Output — shows runtime output from Search Records nodes in Scenario tab
+const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, onTableHover }) => {
+  const [expandedRecords, setExpandedRecords] = useState({});
+
+  // Find ALL Search Records nodes reachable from currentNodeId (backwards), run or not
+  const getSearchRecordsNodes = () => {
+    if (!currentNodeId || !nodes.length) return [];
+    const visited = new Set([currentNodeId]);
+    const queue = [currentNodeId];
+    const results = [];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      for (const edge of edges) {
+        if (edge.to === current && !visited.has(edge.from)) {
+          visited.add(edge.from);
+          queue.push(edge.from);
+          const node = nodes.find(n => n.id === edge.from);
+          if (node?.actionConfig?._key === 'search_records') {
+            results.push({
+              nodeId: node.id,
+              label: node.label || 'Search Records',
+              table: node.actionConfig?.target_table || '',
+              records: node.searchResults || null,
+            });
+          }
+        }
+      }
+    }
+    return results.reverse(); // Most recent first
+  };
+
+  const searchNodes = getSearchRecordsNodes();
+
+  if (searchNodes.length === 0) return null;
+
+  const toggleRecord = (nodeId, idx) => {
+    const key = `${nodeId}-${idx}`;
+    setExpandedRecords(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  return (
+    <>
+      {searchNodes.map((node) => {
+        const color = '#32f0d9';
+        const hasResults = node.records && Array.isArray(node.records);
+        const records = hasResults ? node.records : [];
+        const isMany = records.length > 3;
+
+        return (
+          <div key={node.nodeId} className="sb-vars-table-group"
+            style={{ '--table-color': color, '--table-bg': 'rgba(50,240,217,0.08)', '--table-border': 'rgba(50,240,217,0.2)' }}
+            onMouseEnter={() => onTableHover?.(color)}
+            onMouseLeave={() => onTableHover?.('')}
+          >
+            <div className="sb-vars-table-header" style={{ cursor: 'default' }}>
+              <span className="sb-vars-table-icon" style={{ color }}><Layers size={11} /></span>
+              <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{node.label}</span>
+              {hasResults && <span className="sb-vars-table-badge">{records.length} records</span>}
+            </div>
+            <div className="sb-vars-fields">
+              {!hasResults ? (
+                <div className="sb-vars-empty" style={{ padding: '12px 8px' }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Run node to generate output</span>
+                </div>
+              ) : records.length === 0 ? (
+                <div className="sb-vars-empty">No records returned</div>
+              ) : (
+                records.map((record, idx) => {
+                  const key = `${node.nodeId}-${idx}`;
+                  const isExpanded = isMany ? (expandedRecords[key] === true) : (expandedRecords[key] !== false);
+                  const entries = Object.entries(record).filter(([k]) => k !== '_id' && k !== '__proto__');
+                  return (
+                    <div key={idx} className="sb-search-record-bundle">
+                      <button
+                        type="button"
+                        className="sb-vars-table-header"
+                        style={{ padding: '4px 8px', minHeight: 'auto' }}
+                        onClick={() => toggleRecord(node.nodeId, idx)}
+                      >
+                        <span className="sb-vars-table-chevron" style={{ opacity: 0.5 }}>
+                          {isExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                        </span>
+                        <span className="sb-vars-table-index" style={{ color, fontFamily: 'monospace', fontSize: 10, fontWeight: 600 }}>
+                          {idx}
+                        </span>
+                      </button>
+                      {isExpanded && (
+                        <div className="sb-vars-fields" style={{ paddingLeft: 18 }}>
+                          {entries.map(([fieldKey, fieldValue]) => {
+                            const varRef = getVariableRef(node.nodeId, `records.${idx}.${fieldKey}`);
+                            const displayVal = fieldValue == null ? '—' : (typeof fieldValue === 'object' ? JSON.stringify(fieldValue) : String(fieldValue));
+                            return (
+                              <button
+                                key={fieldKey}
+                                type="button"
+                                className="sb-vars-field"
+                                onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, fieldKey, color); }}
+                                title={`Insert {{${node.nodeId}.records.${idx}.${fieldKey}}}`}
+                              >
+                                <span className="sb-vars-field-name" style={{ color }}>{fieldKey}</span>
+                                <span className="sb-vars-field-value">{displayVal.length > 40 ? displayVal.slice(0, 40) + '…' : displayVal}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
 };
 
 // Previous Node Variables — shows variables from previous nodes in the flow
@@ -467,10 +727,13 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 
   useEffect(() => {
     if (!visible) return;
+    // Determine trigger key for filtering available tables
+    const triggerKey = findTriggerKeyForNode(currentNodeId, nodes, edges);
+    const available = getAvailableTables(triggerKey);
     const fetchAll = async () => {
       const results = {};
       const indices = {};
-      for (const table of TABLE_DEFS) {
+      for (const table of available) {
         const data = await table.fetch();
         results[table.key] = data;
         indices[table.key] = 0;
@@ -478,7 +741,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       setRecords(results);
       setActiveIndex(indices);
       const exp = {};
-      TABLE_DEFS.forEach(t => { exp[t.key] = true; });
+      available.forEach(t => { exp[t.key] = true; });
       setExpanded(exp);
     };
     fetchAll();
@@ -734,7 +997,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           </div>
         )}
 
-        {TABLE_DEFS.map((table) => {
+        {getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges)).map((table) => {
           const tableRecords = records[table.key] || [];
           const idx = activeIndex[table.key] || 0;
           const currentRecord = tableRecords[idx] || null;
@@ -819,13 +1082,22 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
         )}
 
         {activeSection === 'previous' && (
-          <PreviousNodeVars
-            currentNodeId={currentNodeId}
-            nodes={nodes}
-            edges={edges}
-            onInsertVariable={onInsertVariable}
-            onTableHover={onTableHover}
-          />
+          <>
+            <SearchRecordsOutput
+              currentNodeId={currentNodeId}
+              nodes={nodes}
+              edges={edges}
+              onInsertVariable={onInsertVariable}
+              onTableHover={onTableHover}
+            />
+            <PreviousNodeVars
+              currentNodeId={currentNodeId}
+              nodes={nodes}
+              edges={edges}
+              onInsertVariable={onInsertVariable}
+              onTableHover={onTableHover}
+            />
+          </>
         )}
       </div>
     </div>
@@ -833,3 +1105,4 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 };
 
 export default VariablesPane;
+

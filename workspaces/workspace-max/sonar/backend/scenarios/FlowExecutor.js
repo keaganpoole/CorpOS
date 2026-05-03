@@ -164,7 +164,8 @@ class FlowExecutor {
       }
 
       if (result.data) {
-        context[`result_${node.id}`] = result.data;
+        // Store action result keyed by node ID for variable access: {{nodeId.field}}
+        context[node.id] = result.data;
       }
 
       if (result.pause) {

@@ -62,9 +62,15 @@ const RECORD_TABLE_FIELDS = {
   People: [
     { key: 'first_name', label: 'First Name' },
     { key: 'last_name', label: 'Last Name' },
-    { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Phone' },
+    { key: 'email', label: 'Email' },
+    { key: 'street_address', label: 'Street Address' },
+    { key: 'city', label: 'City' },
+    { key: 'state', label: 'State' },
+    { key: 'zip_code', label: 'Zip Code' },
+    { key: 'preferred_contact_method', label: 'Preferred Contact Method' },
     { key: 'status', label: 'Status' },
+    { key: 'source', label: 'Source' },
     { key: 'notes', label: 'Notes' },
   ],
   Appointments: [
@@ -73,7 +79,57 @@ const RECORD_TABLE_FIELDS = {
     { key: 'time', label: 'Time' },
     { key: 'status', label: 'Status' },
     { key: 'duration', label: 'Duration' },
+    { key: 'assigned_receptionist', label: 'Assigned Receptionist' },
     { key: 'notes', label: 'Notes' },
+    { key: 'person_id', label: 'Person ID' },
+    { key: 'service_id', label: 'Service ID' },
+    { key: 'business_id', label: 'Business ID' },
+  ],
+  Services: [
+    { key: 'name', label: 'Name' },
+    { key: 'description', label: 'Description' },
+    { key: 'price_type', label: 'Price Type' },
+    { key: 'price_min', label: 'Price Min' },
+    { key: 'price_max', label: 'Price Max' },
+    { key: 'unit', label: 'Unit' },
+    { key: 'category', label: 'Category' },
+    { key: 'is_active', label: 'Is Active' },
+    { key: 'sort_order', label: 'Sort Order' },
+  ],
+  Payments: [
+    { key: 'person_id', label: 'Person ID' },
+    { key: 'appointment_id', label: 'Appointment ID' },
+    { key: 'amount', label: 'Amount' },
+    { key: 'currency', label: 'Currency' },
+    { key: 'status', label: 'Status' },
+    { key: 'payment_method', label: 'Payment Method' },
+    { key: 'description', label: 'Description' },
+    { key: 'stripe_payment_intent_id', label: 'Stripe Intent ID' },
+  ],
+  Businesses: [
+    { key: 'name', label: 'Name' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'email', label: 'Email' },
+    { key: 'address', label: 'Address' },
+    { key: 'city', label: 'City' },
+    { key: 'state', label: 'State' },
+    { key: 'zip', label: 'Zip' },
+    { key: 'website', label: 'Website' },
+    { key: 'about_us', label: 'About Us' },
+    { key: 'policies', label: 'Policies' },
+    { key: 'faq', label: 'FAQ' },
+    { key: 'business_hours', label: 'Business Hours' },
+  ],
+  'Hired Receptionists': [
+    { key: 'full_name', label: 'Full Name' },
+    { key: 'first_name', label: 'First Name' },
+    { key: 'stereotype', label: 'Role' },
+    { key: 'phone_number', label: 'Phone' },
+    { key: 'call_types', label: 'Call Types' },
+    { key: 'status', label: 'Status' },
+    { key: 'is_active', label: 'Is Active' },
+    { key: 'language_model', label: 'Language Model' },
+    { key: 'voice', label: 'Voice' },
   ],
 };
 
@@ -179,7 +235,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
-          { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be professional and offer available reschedule times...', smartActions: true },
           { key: 'first_message', label: 'First Message', type: 'first_message_textarea', placeholder: 'e.g. Hi, this is [business name] calling...', smartActions: true, toggleLabel: 'Override First Message' },
           { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text', placeholder: 'Phone number to transfer after greeting' },
@@ -203,7 +259,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and concise...', smartActions: true },
         ]},
         { key: 'send_to_customer', name: 'Send To Customer', description: 'Send SMS to an existing customer', configFields: [
-          { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and helpful...', smartActions: true },
         ]},
       ],
@@ -235,15 +291,20 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.records,
       sub_options: [
+        { key: 'search_records', name: 'Search Records', description: 'Find records from a table', configFields: [
+          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
+          { key: 'search_user_id', label: 'User ID', type: 'text', placeholder: 'e.g. abc123 (leave empty for default)' },
+          { key: 'search_limit', label: 'Limit', type: 'number', placeholder: '10' },
+        ]},
         { key: 'create_new_record', name: 'Create New Record', description: 'Create a new record', configFields: [
-          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
+          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
         ]},
         { key: 'update_record', name: 'Update Record', description: 'Modify an existing record', configFields: [
-          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
+          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
           { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{people.id}}' },
         ]},
         { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a record', configFields: [
-          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments'] },
+          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
           { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{people.id}}' },
         ]},
       ],
@@ -256,7 +317,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.appointments,
       sub_options: [
         { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment', configFields: [
-          { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
         ] },
         { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment', configFields: [
           { key: 'appointment_id', label: 'Appointment ID', type: 'record_id', placeholder: 'e.g. {{appointments.id}}' },
@@ -278,7 +339,7 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.email,
       sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email', configFields: [
-        { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
+        { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
         { key: 'to', label: 'To', type: 'text', placeholder: 'e.g. {customer_email}' },
         { key: 'subject', label: 'Subject', type: 'text', placeholder: 'e.g. Appointment Confirmation' },
         { key: 'body', label: 'Body', type: 'textarea', placeholder: 'Email body with {variables}' },
@@ -292,7 +353,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.tags,
       sub_options: [
         { key: 'add_tag', name: 'Add Tag', description: 'Attach tag to record', configFields: [
-          { key: 'people_id', label: 'Record', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Record', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
           { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'e.g. VIP, Urgent, Callback' },
         ]},
         { key: 'search_tags', name: 'Search Tags', description: 'Find existing tags', configFields: [
@@ -311,7 +372,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'payments', option: 'Payments', description: 'Process payments and manage billing', accent: '#38bdf8', icon: OPTION_ICONS.payments,
       sub_options: [
         { key: 'create_payment', name: 'Create Payment', description: 'Process a new payment', configFields: [
-          { key: 'people_id', label: 'Customer', type: 'people_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
           { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'payment_method', label: 'Payment Method', type: 'select', options: ['card', 'ach', 'link'] },
@@ -398,6 +459,7 @@ export default function ScenariosPage() {
   const [varsPane, setVarsPane] = useState({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
   const [hoveredTableColor, setHoveredTableColor] = useState('');
   const [actionConfig, setActionConfig] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, nodeId }
   const [edgeRules, setEdgeRules] = useState([
     { id: 1, variable: '', operator: 'equals', value: '', logic: 'and' },
   ]);
@@ -1781,6 +1843,12 @@ export default function ScenariosPage() {
                   } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'}`}
                   style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    if (node.actionConfig?._key === 'search_records' && node.configured) {
+                      setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
+                    }
+                  }}
                 >
                   {node.configured ? (
                     <>
@@ -2331,7 +2399,7 @@ export default function ScenariosPage() {
                       {appointmentConfig.key === 'delete_appointment' && 'Set cancellation criteria.'}
                     </div>
                     <div className="sb-record-fields-grid">
-                      {/* Customer — for create_appointment (people_id field) */}
+                      {/* Customer — for create_appointment (person_id field) */}
                       {appointmentConfig.key === 'create_appointment' && (
                         <div className="sb-record-field">
                           <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Customer</label>
@@ -2339,22 +2407,22 @@ export default function ScenariosPage() {
                             <input
                               className="sb-input-field"
                               type="text"
-                              value={appointmentConfig.people_id || ''}
-                              onChange={e => setAppointmentConfig({ ...appointmentConfig, people_id: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'people_id', fieldLabel: 'Customer', fieldType: 'people_id' })}
+                              value={appointmentConfig.person_id || ''}
+                              onChange={e => setAppointmentConfig({ ...appointmentConfig, person_id: e.target.value })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Customer', fieldType: 'person_id' })}
                               placeholder="e.g. {{people.id}}"
                               style={{
-                                ...(appointmentConfig.people_id?.includes('{{') ? { color: 'transparent' } : {}),
-                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'people_id' ? {
+                                ...(appointmentConfig.person_id?.includes('{{') ? { color: 'transparent' } : {}),
+                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'person_id' ? {
                                   borderColor: hoveredTableColor,
                                   boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
                                 } : {}),
                               }}
                             />
-                            {(appointmentConfig.people_id || '').includes('{{') && (
+                            {(appointmentConfig.person_id || '').includes('{{') && (
                               <div className="sb-var-chip-overlay"
                                 style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
-                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.people_id) }} />
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.person_id) }} />
                             )}
                           </div>
                         </div>
@@ -3060,7 +3128,62 @@ export default function ScenariosPage() {
   return (
     <div className="scenarios-container">
       {viewMode === 'list' ? renderListView() : renderBuilderView()}
-      
+
+      {/* Right-click context menu for Search Records Run Node */}
+      {contextMenu && (
+        <div
+          className="sb-context-menu-overlay"
+          onClick={() => setContextMenu(null)}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }}
+        >
+          <div
+            className="sb-context-menu"
+            style={{
+              position: 'fixed',
+              top: contextMenu.y,
+              left: contextMenu.x,
+              background: 'rgba(18, 18, 22, 0.98)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 8,
+              padding: 4,
+              zIndex: 201,
+              minWidth: 140,
+            }}
+            onClick={async (e) => {
+              e.stopPropagation();
+              const node = nodeMap[contextMenu.nodeId];
+              if (!node?.actionConfig) return;
+              const config = node.actionConfig;
+              // Convert display table name to lowercase key (e.g. "People" → "people")
+              const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+              const limit = config.search_limit || 10;
+              try {
+                let query = supabase.from(tableKey).select('*').limit(limit);
+                if (config.search_user_id) {
+                  query = query.eq('user', config.search_user_id);
+                }
+                const { data, error } = await query;
+                if (!error) {
+                  setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
+                    ? { ...n, searchResults: data || [] }
+                    : n
+                  ));
+                } else {
+                  console.error('[Search Records] Error:', error.message);
+                }
+              } catch (err) {
+                console.error('[Search Records] Request failed:', err.message);
+              }
+              setContextMenu(null);
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#38bdf8', padding: '6px 12px', cursor: 'pointer' }}>
+              ▶ Run Node
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal - Rendered at root level */}
       {deleteConfirmModal && (
         <div className="delete-confirm-overlay" onClick={handleCancelDelete}>
@@ -3092,3 +3215,4 @@ export default function ScenariosPage() {
     </div>
   );
 }
+

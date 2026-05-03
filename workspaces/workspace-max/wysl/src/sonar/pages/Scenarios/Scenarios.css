@@ -2189,6 +2189,55 @@
   50% { opacity: 0.6; }
 }
 
+/* Search Records Output Bundles */
+.sb-search-record-bundle {
+  margin: 2px 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sb-search-record-bundle .sb-vars-table-header {
+  background: rgba(50, 240, 217, 0.04);
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.sb-search-record-bundle .sb-vars-table-header:hover {
+  background: rgba(50, 240, 217, 0.08);
+}
+
+.sb-vars-table-index {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-weight: 600;
+  color: #32f0d9;
+  opacity: 0.7;
+}
+
+/* Tree connector lines for search record fields */
+.sb-search-record-bundle .sb-vars-fields .sb-vars-field {
+  position: relative;
+}
+
+.sb-search-record-bundle .sb-vars-fields .sb-vars-field::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 8px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sb-search-record-bundle .sb-vars-fields .sb-vars-field::after {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
 /* Matched field highlight */
 .sb-vars-field-matched {
   position: relative;

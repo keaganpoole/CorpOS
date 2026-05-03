@@ -507,6 +507,35 @@ router.get('/people/search', async (req, res) => {
 });
 
 /**
+ * GET /api/sonar/search-records?table=people&user_id=xxx&limit=10
+ * Generic search endpoint for scenario node execution.
+ * Queries any table filtered by user_id.
+ */
+router.get('/search-records', async (req, res) => {
+  try {
+    const { table, user_id, limit } = req.query;
+    if (!table) return res.status(400).json({ error: 'table parameter required' });
+
+    const allowedTables = ['people', 'appointments', 'services', 'payments', 'businesses', 'hired_receptionists', 'call_logs'];
+    if (!allowedTables.includes(table)) {
+      return res.status(400).json({ error: `Invalid table: ${table}. Allowed: ${allowedTables.join(', ')}` });
+    }
+
+    const maxRecords = Math.min(parseInt(limit) || 10, 100);
+    let query = `?order=created_at.desc&limit=${maxRecords}`;
+    if (user_id) {
+      query += `&user_id=eq.${user_id}`;
+    }
+
+    const results = await sbQuery(table, 'GET', null, query) || [];
+    res.json({ records: results, count: results.length, table });
+  } catch (err) {
+    console.error('[SONAR-API] search-records failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/sonar/people/:id
  * Get customer detail with appointment history.
  */

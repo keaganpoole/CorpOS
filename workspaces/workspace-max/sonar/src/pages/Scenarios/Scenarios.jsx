@@ -31,6 +31,7 @@ import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
 import { supabase } from '../../lib/supabase';
 import { getSmartActions, getSmartActionByKey } from './smartActions';
+import VariablesPane from './VariablesPane';
 
 const OPTION_ICONS = {
   phone_calls: Phone,
@@ -251,6 +252,8 @@ export default function ScenariosPage() {
   const [initialNodeShifted, setInitialNodeShifted] = useState(false);
   const [logicPanel, setLogicPanel] = useState(null);
   const [appointmentConfig, setAppointmentConfig] = useState({});
+  const [searchConfig, setSearchConfig] = useState({});
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, nodeId }
   const [edgeRules, setEdgeRules] = useState([
     { id: 1, variable: '', operator: '', value: '' },
   ]);
@@ -459,6 +462,11 @@ export default function ScenariosPage() {
       if (node?.appointmentConfig) {
         setAppointmentConfig({ ...node.appointmentConfig });
         setPanelStage('appointmentConfig');
+      }
+      // If this node has a search config, show the search config form
+      else if (node?.searchConfig) {
+        setSearchConfig({ ...node.searchConfig });
+        setPanelStage('searchRecordsConfig');
       }
       // If this node is a configured communication action, show comm config
       else if (node?.configured && node?.isCommunication) {
@@ -719,6 +727,8 @@ export default function ScenariosPage() {
     'create_appointment', 'search_appointments', 'update_appointment', 'delete_appointment',
   ]);
 
+  const SEARCH_RECORDS_ACTIONS = new Set(['search_records']);
+
   // Communication actions that show First Message + Prompt/Message toggle + main box
   const COMMUNICATION_ACTION_KEYS = new Set([
     'call_customer', 'call_phone_number',
@@ -753,6 +763,132 @@ export default function ScenariosPage() {
     const action = allActions.find(a => a.name === selectedNode.label);
     return action ? COMMUNICATION_ACTION_KEYS.has(action.key) : false;
   }, [selectedNode]);
+
+  // ─── Variable Availability: compute parent trigger key ──────────────────
+  const parentTriggerKey = useMemo(() => {
+    if (!selectedNodeId) return null;
+    const selected = nodeMap[selectedNodeId];
+    if (!selected) return null;
+
+    // If the selected node itself is a trigger, use it directly
+    if (selected.categoryType === 'TRIGGERS') {
+      const allTriggers = AUTOMATION_HIERARCHY.TRIGGERS.flatMap(t => t.sub_options);
+      const trigger = allTriggers.find(t => t.name === selected.label);
+      return trigger?.key || null;
+    }
+
+    // Otherwise traverse backwards to find the nearest ancestor trigger
+    const visited = new Set();
+    const queue = [selectedNodeId];
+    while (queue.length > 0) {
+      const nodeId = queue.shift();
+      if (visited.has(nodeId)) continue;
+      visited.add(nodeId);
+      const parentEdge = edges.find(e => e.to === nodeId);
+      if (!parentEdge) continue;
+      const parentNode = nodeMap[parentEdge.from];
+      if (!parentNode) continue;
+      if (parentNode.categoryType === 'TRIGGERS') {
+        const allTriggers = AUTOMATION_HIERARCHY.TRIGGERS.flatMap(t => t.sub_options);
+        const trigger = allTriggers.find(t => t.name === parentNode.label);
+        return trigger?.key || null;
+      }
+      queue.push(parentEdge.from);
+    }
+    return null;
+  }, [selectedNodeId, edges, nodeMap]);
+
+  // ─── Scenario Tab: collect previous node outputs via BFS backwards ────
+  const previousNodeOutputs = useMemo(() => {
+    if (!selectedNodeId) return [];
+    const visited = new Set();
+    const outputs = [];
+
+    // First: include the selected node itself if it's an action with results
+    const selected = nodeMap[selectedNodeId];
+    if (selected && selected.categoryType === 'ACTIONS' && selected.configured) {
+      const allActions = AUTOMATION_HIERARCHY.ACTIONS.flatMap(a => a.sub_options);
+      const actionDef = allActions.find(a => a.name === selected.label);
+      const actionKey = actionDef?.key || '';
+
+      const OUTPUT_FIELD_MAP = {
+        create_appointment: ['id', 'client_name', 'date', 'time', 'duration', 'status', 'assigned_receptionist', 'notes'],
+        create_payment: ['payment_intent_id', 'payment_id', 'amount', 'currency', 'status'],
+        update_records: ['table', 'record_id', 'updated_fields'],
+        update_lead_status: ['lead_id', 'status'],
+        transfer_call: ['transferred_to'],
+        call_customer: ['call_id', 'to', 'initiated_at'],
+        send_to_customer: ['message_sid', 'to', 'body'],
+        search_records: ['table', 'count'],
+      };
+
+      const outputFields = OUTPUT_FIELD_MAP[actionKey] || ['result'];
+      const outputObj = {};
+      outputFields.forEach(f => { outputObj[f] = `{{${selected.id}.${f}}}`; });
+
+      outputs.push({
+        nodeId: selected.id,
+        nodeLabel: selected.label,
+        actionKey,
+        outputFields: outputObj,
+        searchResults: actionKey === 'search_records' ? (selected.searchResults || null) : null,
+      });
+    }
+
+    // Then: BFS backwards for all ancestor action nodes
+    const queue = [selectedNodeId];
+
+    while (queue.length > 0) {
+      const nodeId = queue.shift();
+      if (visited.has(nodeId)) continue;
+      visited.add(nodeId);
+
+      // Find parent edge
+      const parentEdge = edges.find(e => e.to === nodeId);
+      if (!parentEdge) continue;
+      const parentNode = nodeMap[parentEdge.from];
+      if (!parentNode) continue;
+
+      // Only action nodes produce outputs
+      if (parentNode.categoryType === 'ACTIONS' && parentNode.configured) {
+        // Map the node label to an action key for identifying output shape
+        const allActions = AUTOMATION_HIERARCHY.ACTIONS.flatMap(a => a.sub_options);
+        const actionDef = allActions.find(a => a.name === parentNode.label);
+        const actionKey = actionDef?.key || '';
+
+        // Define known output fields per action type
+        const OUTPUT_FIELD_MAP = {
+          create_appointment: ['id', 'client_name', 'date', 'time', 'duration', 'status', 'assigned_receptionist', 'notes'],
+          create_payment: ['payment_intent_id', 'payment_id', 'amount', 'currency', 'status'],
+          update_records: ['table', 'record_id', 'updated_fields'],
+          update_lead_status: ['lead_id', 'status'],
+          transfer_call: ['transferred_to'],
+          call_customer: ['call_id', 'to', 'initiated_at'],
+          send_to_customer: ['message_sid', 'to', 'body'],
+          search_records: ['table', 'count'],
+        };
+
+        const outputFields = OUTPUT_FIELD_MAP[actionKey] || ['result'];
+        const outputObj = {};
+        outputFields.forEach(f => { outputObj[f] = `{{${parentNode.id}.${f}}}`; });
+
+        // For search_records, include actual search results if available
+        const searchResults = actionKey === 'search_records' ? (parentNode.searchResults || null) : null;
+
+        outputs.push({
+          nodeId: parentNode.id,
+          nodeLabel: parentNode.label,
+          actionKey,
+          outputFields: outputObj,
+          searchResults,
+        });
+      }
+
+      queue.push(parentEdge.from);
+    }
+
+    return outputs;
+  }, [selectedNodeId, edges, nodeMap]);
 
   const handleSubOptionClick = (subOption) => {
     const subIcon = activeOption?.icon || categoryMeta.icon;
@@ -791,6 +927,18 @@ export default function ScenariosPage() {
         notes: '',
       });
       setPanelStage('appointmentConfig');
+      setIsPanelVisible(true);
+      setPanelIntent(true);
+    }
+    // If this is a search records action, show search config form
+    else if (SEARCH_RECORDS_ACTIONS.has(subOption.key)) {
+      setSearchConfig({
+        key: subOption.key,
+        table: 'people',
+        user_id: '',
+        limit: 10,
+      });
+      setPanelStage('searchRecordsConfig');
       setIsPanelVisible(true);
       setPanelIntent(true);
     }
@@ -968,7 +1116,10 @@ export default function ScenariosPage() {
         configured: n.configured,
         accent: n.accent,
         icon: n.icon?.name,
+        categoryType: n.categoryType || null,
         appointmentConfig: n.appointmentConfig || null,
+        searchConfig: n.searchConfig || null,
+        searchResults: n.searchResults || null,
         isCommunication: n.isCommunication || false,
         firstMessage: n.firstMessage || '',
         mainBox: n.mainBox || '',
@@ -1298,6 +1449,12 @@ export default function ScenariosPage() {
                     animationDelay: `${idx * 0.08}s`,
                   }}
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    if (node.searchConfig && node.configured) {
+                      setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
+                    }
+                  }}
                 >
                   {/* Sphere body */}
                   <div className="sb-node-core">
@@ -1540,6 +1697,32 @@ export default function ScenariosPage() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Variables Panel — Database + Scenario tabs */}
+                    <div className="sb-comm-section">
+                      <VariablesPane
+                        visible={true}
+                        targetFieldKey="main_content"
+                        fieldLabel="Main Content"
+                        onInsertVariable={(varRef) => {
+                          if (mainBoxRef.current) {
+                            const textarea = mainBoxRef.current;
+                            const start = textarea.selectionStart;
+                            const end = textarea.selectionEnd;
+                            const newText = mainBoxText.substring(0, start) + varRef + mainBoxText.substring(end);
+                            setMainBoxText(newText);
+                            setTimeout(() => {
+                              textarea.focus();
+                              textarea.selectionStart = textarea.selectionEnd = start + varRef.length;
+                            }, 0);
+                          } else {
+                            setMainBoxText(prev => prev + varRef);
+                          }
+                        }}
+                        triggerKey={parentTriggerKey}
+                        previousNodeOutputs={previousNodeOutputs}
+                      />
+                    </div>
                   </div>
                 ) : panelStage === 'appointmentConfig' ? (
                   <div style={{ padding: '16px' }}>
@@ -1550,8 +1733,22 @@ export default function ScenariosPage() {
                         <X size={14} />
                       </button>
                     </div>
+                    {/* Variables panel for appointment config */}
+                    <VariablesPane
+                      visible={true}
+                      targetFieldKey="appointment_config"
+                      fieldLabel="Appointment Fields"
+                      onInsertVariable={(varRef, label, color) => {
+                        setAppointmentConfig(prev => ({
+                          ...prev,
+                          notes: (prev.notes || '') + varRef,
+                        }));
+                      }}
+                      triggerKey={parentTriggerKey}
+                      previousNodeOutputs={previousNodeOutputs}
+                    />
                     <div style={{ fontSize: 10, color: '#71717a', marginBottom: 14, fontWeight: 600 }}>
-                      {appointmentConfig.key === 'create_appointment' && 'Set up the appointment details. Fields can reference variables like {caller_name}.'}
+                      {appointmentConfig.key === 'create_appointment' && 'Set up the appointment details. Use the Variables panel to insert dynamic values.'}
                       {appointmentConfig.key === 'search_appointments' && 'Define search criteria to find appointments.'}
                       {appointmentConfig.key === 'update_appointment' && 'Select appointment fields to update.'}
                       {appointmentConfig.key === 'delete_appointment' && 'Set cancellation criteria.'}
@@ -1640,6 +1837,98 @@ export default function ScenariosPage() {
                       setPanelIntent(false);
                     }}
                       style={{ width: '100%', marginTop: 14, padding: '8px 0', background: '#fff', color: '#000', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer' }}>
+                      Save Config
+                    </button>
+                  </div>
+                ) : panelStage === 'searchRecordsConfig' ? (
+                  <div style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                      <h4 style={{ fontSize: 12, fontWeight: 800, color: '#fff', margin: 0 }}>Search Records</h4>
+                      <button type="button" onClick={() => { setPanelStage('options'); setSearchConfig({}); }}
+                        style={{ background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 10, color: '#71717a', marginBottom: 14, fontWeight: 600 }}>
+                      Query records from a table. Results become available as variables for downstream nodes.
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {/* User ID */}
+                      <div>
+                        <label style={sbLabelStyle}>User ID</label>
+                        <input type="text" value={searchConfig.user_id || ''}
+                          onChange={e => setSearchConfig({ ...searchConfig, user_id: e.target.value })}
+                          placeholder="e.g. abc123 (leave empty for default context)"
+                          style={sbInputStyle} />
+                      </div>
+                      {/* Table */}
+                      <div>
+                        <label style={sbLabelStyle}>Table</label>
+                        <select value={searchConfig.table || 'people'}
+                          onChange={e => setSearchConfig({ ...searchConfig, table: e.target.value })}
+                          style={sbInputStyle}>
+                          <option value="people">People</option>
+                          <option value="appointments">Appointments</option>
+                          <option value="services">Services</option>
+                          <option value="payments">Payments</option>
+                          <option value="businesses">Businesses</option>
+                          <option value="hired_receptionists">Receptionists</option>
+                          <option value="call_logs">Call Logs</option>
+                        </select>
+                      </div>
+                      {/* Limit */}
+                      <div>
+                        <label style={sbLabelStyle}>Limit</label>
+                        <input type="number" value={searchConfig.limit || 10}
+                          onChange={e => setSearchConfig({ ...searchConfig, limit: parseInt(e.target.value) || 10 })}
+                          min={1} max={100}
+                          style={sbInputStyle} />
+                      </div>
+                    </div>
+                    {/* Run Node button */}
+                    <button type="button" onClick={async () => {
+                      // Save config first
+                      if (selectedNodeId) {
+                        setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, searchConfig: { ...searchConfig } } : n));
+                      }
+                      // Execute the search
+                      try {
+                        const params = new URLSearchParams({
+                          table: searchConfig.table || 'people',
+                          limit: String(searchConfig.limit || 10),
+                        });
+                        if (searchConfig.user_id) params.set('user_id', searchConfig.user_id);
+                        const resp = await fetch(`http://127.0.0.1:7878/api/sonar/search-records?${params.toString()}`);
+                        const result = await resp.json();
+                        if (result.error) {
+                          console.error('[Search Records] Error:', result.error);
+                        } else {
+                          // Store search results on the node
+                          setNodes(prev => prev.map(n => n.id === selectedNodeId
+                            ? { ...n, searchConfig: { ...searchConfig }, searchResults: result.records }
+                            : n
+                          ));
+                          console.log('[Search Records] Found', result.count, 'records');
+                        }
+                      } catch (err) {
+                        console.error('[Search Records] Request failed:', err.message);
+                      }
+                    }}
+                      style={{ width: '100%', marginTop: 10, padding: '8px 0', background: 'rgba(56,189,248,0.15)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', borderRadius: 8, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer' }}>
+                      Run Node
+                    </button>
+                    {/* Save Config button */}
+                    <button type="button" onClick={() => {
+                      if (selectedNodeId) {
+                        setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, searchConfig: { ...searchConfig } } : n));
+                      }
+                      setPanelStage('options');
+                      setSearchConfig({});
+                      setSelectedNodeId(null);
+                      setIsPanelVisible(false);
+                      setPanelIntent(false);
+                    }}
+                      style={{ width: '100%', marginTop: 8, padding: '8px 0', background: '#fff', color: '#000', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer' }}>
                       Save Config
                     </button>
                   </div>
@@ -1737,7 +2026,58 @@ export default function ScenariosPage() {
           <Check size={16} />
           {currentScenario ? 'Save' : 'Save Scenario'}
         </button>
-        
+
+        {/* Right-click context menu for Run Node */}
+        {contextMenu && (
+          <div
+            className="sb-context-menu-overlay"
+            onClick={() => setContextMenu(null)}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }}
+          >
+            <div
+              className="sb-context-menu"
+              style={{
+                position: 'fixed',
+                top: contextMenu.y,
+                left: contextMenu.x,
+                background: 'rgba(18, 18, 22, 0.98)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8,
+                padding: 4,
+                zIndex: 201,
+                minWidth: 140,
+              }}
+              onClick={async (e) => {
+                e.stopPropagation();
+                const node = nodeMap[contextMenu.nodeId];
+                if (!node?.searchConfig) return;
+                try {
+                  const params = new URLSearchParams({
+                    table: node.searchConfig.table || 'people',
+                    limit: String(node.searchConfig.limit || 10),
+                  });
+                  if (node.searchConfig.user_id) params.set('user_id', node.searchConfig.user_id);
+                  const resp = await fetch(`http://127.0.0.1:7878/api/sonar/search-records?${params.toString()}`);
+                  const result = await resp.json();
+                  if (!result.error) {
+                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
+                      ? { ...n, searchResults: result.records }
+                      : n
+                    ));
+                  }
+                } catch (err) {
+                  console.error('[Run Node] Failed:', err.message);
+                }
+                setContextMenu(null);
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#38bdf8', padding: '6px 12px', cursor: 'pointer' }}>
+                ▶ Run Node
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Save Scenario Modal */}
         {showSaveModal && (
           <div className="save-scenario-modal-overlay">

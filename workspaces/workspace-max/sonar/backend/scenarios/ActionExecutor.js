@@ -57,6 +57,8 @@ class ActionExecutor {
         return this._updateLeadStatus(node, flowContext);
       case 'update_records':
         return this._updateRecords(node, flowContext);
+      case 'search_records':
+        return this._searchRecords(node, flowContext);
       case 'create_payment':
         return this._createPayment(node, flowContext);
       case 'update_payment':
@@ -366,6 +368,44 @@ class ActionExecutor {
       console.log(`[ActionExecutor] Updated ${table}:${recordId}`, Object.keys(updates));
       return { success: true, data: { table, record_id: recordId, updated_fields: Object.keys(updates) } };
     } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Search records from a table (for Search Records node)
+   */
+  async _searchRecords(node, flowContext) {
+    try {
+      const config = node.actionConfig || {};
+      const searchConfig = node.searchConfig || {};
+      const table = searchConfig.table || config.table || 'people';
+      const limit = searchConfig.limit || config.limit || 10;
+      const userId = searchConfig.user_id || config.user_id || flowContext.business?.user_id || '';
+
+      const baseUrl = `http://127.0.0.1:${process.env.PORT || 7878}`;
+      const params = new URLSearchParams({ table, limit: String(limit) });
+      if (userId) params.set('user_id', userId);
+
+      const resp = await fetch(`${baseUrl}/api/sonar/search-records?${params.toString()}`);
+      const result = await resp.json();
+
+      if (!resp.ok || result.error) {
+        return { success: false, error: result.error || 'Search failed' };
+      }
+
+      console.log(`[ActionExecutor] Search Records: ${table} → ${result.count} records`);
+      return {
+        success: true,
+        data: {
+          action: 'search_records',
+          table: result.table,
+          records: result.records,
+          count: result.count,
+        },
+      };
+    } catch (err) {
+      console.error('[ActionExecutor] searchRecords failed:', err.message);
       return { success: false, error: err.message };
     }
   }
