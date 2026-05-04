@@ -618,7 +618,12 @@ export default function ScenariosPage() {
     // If node has saved config, let openSelectionPanel restore it — preserve config stages
     if (hasSavedConfig) {
       setPanelStage(prev => {
-        if (['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(prev)) return prev;
+        if (['actionConfig'].includes(prev)) {
+          // Only preserve actionConfig if the new node actually has one
+          if (node?.actionConfig?._key) return prev;
+          return 'options';
+        }
+        if (['appointmentConfig', 'scheduleConfig'].includes(prev)) return prev;
         return 'options';
       });
     } else {
