@@ -1845,7 +1845,7 @@ export default function ScenariosPage() {
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
                     event.preventDefault();
-                    if (node.actionConfig?._key === 'search_records' && node.configured) {
+                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_payment') && node.configured) {
                       setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
                     }
                   }}
@@ -3154,26 +3154,57 @@ export default function ScenariosPage() {
               const node = nodeMap[contextMenu.nodeId];
               if (!node?.actionConfig) return;
               const config = node.actionConfig;
-              // Convert display table name to lowercase key (e.g. "People" → "people")
-              const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
-              const limit = config.search_limit || 10;
-              try {
-                let query = supabase.from(tableKey).select('*').limit(limit);
-                if (config.search_user_id) {
-                  query = query.eq('user', config.search_user_id);
+              const actionKey = config._key;
+
+              if (actionKey === 'search_records') {
+                const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+                const limit = config.search_limit || 10;
+                try {
+                  let query = supabase.from(tableKey).select('*').limit(limit);
+                  if (config.search_user_id) {
+                    query = query.eq('user_id', config.search_user_id);
+                  }
+                  const { data, error } = await query;
+                  if (!error) {
+                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
+                      ? { ...n, searchResults: data || [], outputData: data || [] }
+                      : n
+                    ));
+                  } else {
+                    console.error('[Run Node] Error:', error.message);
+                  }
+                } catch (err) {
+                  console.error('[Run Node] Request failed:', err.message);
                 }
-                const { data, error } = await query;
-                if (!error) {
-                  setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
-                    ? { ...n, searchResults: data || [] }
-                    : n
-                  ));
-                } else {
-                  console.error('[Search Records] Error:', error.message);
+              } else if (actionKey === 'create_payment') {
+                try {
+                  const amountCents = Math.round(Number(config.amount || 0) * 100);
+                  const resp = await fetch('/api/sonar/create-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      amount: amountCents,
+                      currency: 'usd',
+                      payment_method_type: config.payment_method || 'card',
+                      description: config.description || '',
+                      person_id: config.person_id || null,
+                      appointment_id: config.appointment_id || null,
+                    }),
+                  });
+                  const result = await resp.json();
+                  if (result.error) {
+                    console.error('[Create Payment] Error:', result.error);
+                  } else {
+                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
+                      ? { ...n, outputData: result }
+                      : n
+                    ));
+                  }
+                } catch (err) {
+                  console.error('[Create Payment] Request failed:', err.message);
                 }
-              } catch (err) {
-                console.error('[Search Records] Request failed:', err.message);
               }
+
               setContextMenu(null);
             }}
           >

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, Mic, CreditCard, Search, Layers
 } from 'lucide-react';
+import { getOutputVariables } from '../../../sonar/lib/fieldContexts';
 import { getSmartActionByKey, getSmartActions } from './smartActions';
 
 const SMART_ACTION_MAP = {};
@@ -68,14 +69,17 @@ const TRIGGER_TABLE_MAP = {
 };
 
 // Fetch order from ScenarioEngine._buildFlowContext (first fetched = bottom, last fetched = top)
+// Visual order bottom to top: people, services, businesses
+// After reverse render: array must be [businesses, services, people, ...rest]
 const FETCH_ORDER = {
-  appointments: 1,
+  businesses: 1,
   services: 2,
-  payments: 3,
-  businesses: 4,
-  hired_receptionists: 5,
+  people: 3,
+  appointments: 10,
+  payments: 11,
+  hired_receptionists: 12,
 };
-const PEOPLE_SORT_KEY = -1; // Always pinned to bottom
+const PEOPLE_SORT_KEY = 3; // People at the very bottom after reverse
 
 // Find parent trigger key for the current node
 const findTriggerKeyForNode = (currentNodeId, nodes, edges) => {
@@ -186,8 +190,6 @@ const TABLE_DEFS = [
     icon: CreditCard,
     fields: [
       { key: 'id', label: 'Payment ID', type: 'text' },
-      { key: 'person_id', label: 'Person ID', type: 'text' },
-      { key: 'appointment_id', label: 'Appointment ID', type: 'text' },
       { key: 'amount', label: 'Amount', type: 'number' },
       { key: 'currency', label: 'Currency', type: 'text' },
       { key: 'status', label: 'Status', type: 'text' },
@@ -224,10 +226,6 @@ const TABLE_DEFS = [
       { key: 'status', label: 'Status', type: 'text' },
       { key: 'assigned_receptionist', label: 'Assigned Receptionist', type: 'text' },
       { key: 'notes', label: 'Notes', type: 'text' },
-      { key: 'person_id', label: 'Person ID', type: 'text' },
-      { key: 'service_id', label: 'Service ID', type: 'text' },
-      { key: 'business_id', label: 'Business ID', type: 'text' },
-      { key: 'scenario_id', label: 'Scenario ID', type: 'text' },
       { key: 'created_at', label: 'Created At', type: 'timestamp' },
     ],
     fetch: async () => {
@@ -274,7 +272,6 @@ const TABLE_DEFS = [
     icon: Phone,
     fields: [
       { key: 'id', label: 'Record ID', type: 'text' },
-      { key: 'catalog_id', label: 'Catalog ID', type: 'text' },
       { key: 'full_name', label: 'Full Name', type: 'text' },
       { key: 'first_name', label: 'First Name', type: 'text' },
       { key: 'description', label: 'Description', type: 'text' },
@@ -553,6 +550,7 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
   };
 
   const searchNodes = getSearchRecordsNodes();
+  console.log('[SearchRecordsOutput] Found nodes:', searchNodes.length, searchNodes.map(n => ({ id: n.nodeId, hasResults: !!n.records, recordCount: n.records?.length })));
 
   if (searchNodes.length === 0) return null;
 
@@ -594,10 +592,9 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
                   const entries = Object.entries(record).filter(([k]) => k !== '_id' && k !== '__proto__');
                   return (
                     <div key={idx} className="sb-search-record-bundle">
-                      <button
-                        type="button"
+                      <div
                         className="sb-vars-table-header"
-                        style={{ padding: '4px 8px', minHeight: 'auto' }}
+                        style={{ padding: '4px 8px', minHeight: 'auto', cursor: 'pointer' }}
                         onClick={() => toggleRecord(node.nodeId, idx)}
                       >
                         <span className="sb-vars-table-chevron" style={{ opacity: 0.5 }}>
@@ -606,7 +603,7 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
                         <span className="sb-vars-table-index" style={{ color, fontFamily: 'monospace', fontSize: 10, fontWeight: 600 }}>
                           {idx}
                         </span>
-                      </button>
+                      </div>
                       {isExpanded && (
                         <div className="sb-vars-fields" style={{ paddingLeft: 18 }}>
                           {entries.map(([fieldKey, fieldValue]) => {
@@ -639,10 +636,57 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
   );
 };
 
-// Previous Node Variables — shows variables from previous nodes in the flow
+// Previous Node Variables — shows output variables from previous nodes in the flow
 const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTableHover }) => {
   const [expandedNodes, setExpandedNodes] = useState({});
-  const prevNodes = getPreviousNodeData(currentNodeId, nodes, edges);
+
+  // Find previous nodes in execution order
+  const getPreviousNodes = () => {
+    if (!currentNodeId || !nodes.length) return [];
+    const visited = new Set([currentNodeId]);
+    const queue = [currentNodeId];
+    const predecessors = new Map();
+    while (queue.length > 0) {
+      const current = queue.shift();
+      for (const edge of edges) {
+        if (edge.to === current && !visited.has(edge.from)) {
+          visited.add(edge.from);
+          queue.push(edge.from);
+          if (!predecessors.has(edge.to)) predecessors.set(edge.to, []);
+          predecessors.get(edge.to).push(edge.from);
+        }
+      }
+    }
+    // Topological order (BFS from intro)
+    const topoOrder = [];
+    const visitedTopo = new Set();
+    const topoQueue = ['node-1'];
+    visitedTopo.add('node-1');
+    while (topoQueue.length > 0) {
+      const curr = topoQueue.shift();
+      topoOrder.push(curr);
+      for (const edge of edges) {
+        if (edge.from === curr && !visitedTopo.has(edge.to)) {
+          visitedTopo.add(edge.to);
+          topoQueue.push(edge.to);
+        }
+      }
+    }
+    const currentIdx = topoOrder.indexOf(currentNodeId);
+    const previousIds = currentIdx > 0 ? topoOrder.slice(0, currentIdx).reverse() : [];
+    return previousIds.map(nodeId => {
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return null;
+      if (node.actionConfig?._key === 'search_records') return null;
+      const display = getNodeDisplay(node.categoryType);
+      const label = node.label || display.defaultLabel;
+      const outputVars = getOutputVariables(node);
+      const outputData = node.outputData || null;
+      return { nodeId, label, categoryType: node.categoryType, icon: display.icon, outputVars, outputData };
+    }).filter(Boolean);
+  };
+
+  const prevNodes = getPreviousNodes();
 
   if (prevNodes.length === 0) {
     return (
@@ -657,13 +701,12 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
       {prevNodes.map((prev) => {
         const NodeIcon = prev.icon;
         const color = '#a78bfa';
-        const isExpanded = expandedNodes[prev.nodeId] !== false; // default expanded
-        const dataEntries = Object.entries(prev.data);
-        const nid = prev.nodeId;
+        const isExpanded = expandedNodes[prev.nodeId] !== false;
+        const hasOutput = prev.outputData != null;
 
         return (
           <div
-            key={nid}
+            key={prev.nodeId}
             className="sb-vars-table-group"
             style={{ '--table-color': color, '--table-bg': 'rgba(167,139,250,0.08)', '--table-border': 'rgba(167,139,250,0.2)' }}
             onMouseEnter={() => onTableHover?.(color)}
@@ -672,33 +715,36 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
             <button
               type="button"
               className="sb-vars-table-header"
-              onClick={() => setExpandedNodes(prev => ({ ...prev, [nid]: !isExpanded }))}
+              onClick={() => setExpandedNodes(p => ({ ...p, [prev.nodeId]: !isExpanded }))}
             >
               <span className="sb-vars-table-chevron">
                 {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </span>
               <span className="sb-vars-table-icon" style={{ color }}><NodeIcon size={11} /></span>
               <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{prev.label}</span>
+              {hasOutput && <span className="sb-vars-table-badge">RUN</span>}
             </button>
 
             {isExpanded && (
               <div className="sb-vars-fields">
-                {dataEntries.length === 0 ? (
-                  <div className="sb-vars-empty">No variables</div>
+                {prev.outputVars.length === 0 ? (
+                  <div className="sb-vars-empty">No output variables</div>
                 ) : (
-                  dataEntries.map(([key, value]) => {
-                    const varRef = getVariableRef(prev.nodeId, key);
-                    const displayVal = formatValue(value);
+                  prev.outputVars.map((field) => {
+                    const varRef = getVariableRef(prev.nodeId, field.key);
+                    const rawValue = hasOutput ? (prev.outputData?.[field.key]) : undefined;
+                    const displayVal = hasOutput ? formatValue(rawValue, field.type) : '';
                     return (
                       <button
-                        key={key}
+                        key={field.key}
                         type="button"
                         className="sb-vars-field"
-                        onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, key, color); }}
-                        title={displayVal}
+                        onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, color); }}
+                        title={displayVal || `{{${prev.nodeId}.${field.key}}}`}
                       >
-                        <span className="sb-vars-field-name" style={{ color }}>{key}</span>
-                        {displayVal && <span className="sb-vars-field-value">{displayVal}</span>}
+                        <span className="sb-vars-field-name" style={{ color }}>{field.label}</span>
+                        {hasOutput && displayVal && <span className="sb-vars-field-value">{displayVal}</span>}
+                        {!hasOutput && <span className="sb-vars-field-type" style={{ opacity: 0.4 }}>—</span>}
                       </button>
                     );
                   })
@@ -997,7 +1043,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           </div>
         )}
 
-        {getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges)).map((table) => {
+        {getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges)).slice().reverse().map((table) => {
           const tableRecords = records[table.key] || [];
           const idx = activeIndex[table.key] || 0;
           const currentRecord = tableRecords[idx] || null;
@@ -1011,7 +1057,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 
           return (
             <div key={table.key} className={`sb-vars-table-group ${isSearching ? 'sb-vars-group-searching' : ''}`} style={{ '--table-color': table.color, '--table-bg': table.colorBg, '--table-border': table.colorBorder }} onMouseEnter={() => onTableHover?.(table.color)} onMouseLeave={() => onTableHover?.('')}>
-              <button type="button" className={`sb-vars-table-header ${editing ? 'sb-vars-header-searching' : ''}`} style={editing ? { padding: '4px 6px' } : undefined}>
+              <div type="button" className={`sb-vars-table-header ${editing ? 'sb-vars-header-searching' : ''}`} style={editing ? { padding: '4px 6px' } : undefined}>
                 {editing ? (
                   <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 4 }}>
                     <Search size={11} style={{ color: table.color, flexShrink: 0, opacity: 0.7 }} />
@@ -1050,7 +1096,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                     {tableRecords.length === 0 && <span className="sb-vars-no-data">No data</span>}
                   </>
                 )}
-              </button>
+              </div>
 
               {isExpanded && currentRecord && (
                 <div className={`sb-vars-fields ${isSearching ? 'sb-vars-fields-tuning' : ''}`} style={{ position: 'relative' }}>
