@@ -194,6 +194,7 @@ class ScenarioEngine {
         const appointments = await this.sbQuery('appointments', 'GET', null, `?id=eq.${appointmentId}&limit=1`);
         if (appointments?.length > 0) {
           context.appointment = appointments[0];
+          context.appointments = appointments[0]; // Table-name alias
           if (!context.lead_id && appointments[0].lead_id) context.lead_id = appointments[0].lead_id;
           if (!context.people_id && appointments[0].people_id) context.people_id = appointments[0].people_id;
         }
@@ -224,6 +225,7 @@ class ScenarioEngine {
         if (people?.length > 0) {
           context.person = people[0];
           context.customer = people[0];
+          context.people = people[0]; // Table-name alias for {{people.field}} references
         }
       } catch (err) {
         console.warn('[ScenarioEngine] Could not fetch person:', err.message);
@@ -237,6 +239,7 @@ class ScenarioEngine {
         const payments = await this.sbQuery('payments', 'GET', null, `?id=eq.${paymentId}&limit=1`);
         if (payments?.length > 0) {
           context.payment = payments[0];
+          context.payments = payments[0]; // Table-name alias
         }
       } catch (err) {
         console.warn('[ScenarioEngine] Could not fetch payment:', err.message);

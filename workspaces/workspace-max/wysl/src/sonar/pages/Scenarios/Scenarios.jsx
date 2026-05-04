@@ -1420,12 +1420,16 @@ export default function ScenariosPage() {
       if (nodesData) {
         nodesData.forEach(node => {
           if (node.actionConfig?._key && !node.actionConfig?._fields?.length) {
-            // Find the config fields from AUTOMATION_HIERARCHY
-            for (const cat of AUTOMATION_HIERARCHY) {
-              const match = cat.sub_options?.find(so => so.key === node.actionConfig._key);
-              if (match?.configFields) {
-                node.actionConfig._fields = match.configFields;
-                break;
+            const key = node.actionConfig._key;
+            // Search all categories and sub_options for matching config fields
+            for (const category of Object.values(AUTOMATION_HIERARCHY)) {
+              if (!Array.isArray(category)) continue;
+              for (const item of category) {
+                const match = (item.sub_options || []).find(so => so.key === key);
+                if (match?.configFields) {
+                  node.actionConfig._fields = match.configFields;
+                  return;
+                }
               }
             }
           }

@@ -56,9 +56,12 @@ class ActionExecutor {
       case 'update_lead_status':
         return this._updateLeadStatus(node, flowContext);
       case 'update_records':
+      case 'update_record':
         return this._updateRecords(node, flowContext);
       case 'search_records':
         return this._searchRecords(node, flowContext);
+      case 'create_new_record':
+        return this._createNewRecord(node, flowContext);
       case 'create_payment':
         return this._createPayment(node, flowContext);
       case 'update_payment':
@@ -342,18 +345,27 @@ class ActionExecutor {
   async _updateRecords(node, flowContext) {
     try {
       const config = node.actionConfig || {};
-      const table = config.table || 'leads';
+      // Support both formats: frontend (target_table + field_* keys) and backend (table + field_mappings)
+      const table = (config.target_table || config.table || 'leads').toLowerCase();
       const recordId = this._resolveVariables(config.record_id || '', flowContext);
 
       if (!recordId) {
         return { success: false, error: 'No record ID specified' };
       }
 
-      // Build update payload from configured field mappings
+      // Build update payload — support both field_mappings and flat field_* keys
       const updates = {};
       if (config.field_mappings && Array.isArray(config.field_mappings)) {
         for (const mapping of config.field_mappings) {
           updates[mapping.field] = this._resolveVariables(mapping.value, flowContext);
+        }
+      } else {
+        // Frontend format: flat keys with field_ prefix
+        const skipKeys = (key) => key.startsWith('_') || key === 'target_table' || key === 'record_id' || key === 'record_lookup_value';
+        for (const [key, value] of Object.entries(config)) {
+          if (skipKeys(key) || value == null || value === '') continue;
+          const columnKey = key.startsWith('field_') ? key.slice(6) : key;
+          updates[columnKey] = this._resolveVariables(String(value), flowContext);
         }
       }
 
@@ -366,7 +378,41 @@ class ActionExecutor {
       await this.sbQuery(table, 'PATCH', updates, `?id=eq.${recordId}`);
 
       console.log(`[ActionExecutor] Updated ${table}:${recordId}`, Object.keys(updates));
-      return { success: true, data: { table, record_id: recordId, updated_fields: Object.keys(updates) } };
+      return { success: true, data: { table, record_id: recordId, updated_fields: Object.keys(updates), ...updates } };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Create a new record in a Supabase table
+   */
+  async _createNewRecord(node, flowContext) {
+    try {
+      const config = node.actionConfig || {};
+      const table = (config.target_table || config.table || 'leads').toLowerCase();
+
+      // Build insert payload from flat field_* keys
+      const data = {};
+      const skipKeys = (key) => key.startsWith('_') || key === 'target_table' || key === 'record_id';
+      for (const [key, value] of Object.entries(config)) {
+        if (skipKeys(key) || value == null || value === '') continue;
+        const columnKey = key.startsWith('field_') ? key.slice(6) : key;
+        data[columnKey] = this._resolveVariables(String(value), flowContext);
+      }
+
+      if (Object.keys(data).length === 0) {
+        return { success: false, error: 'No fields to create' };
+      }
+
+      data.created_at = new Date().toISOString();
+      data.updated_at = data.created_at;
+
+      const result = await this.sbQuery(table, 'POST', data, '?select=id');
+      const recordId = Array.isArray(result) ? result[0]?.id : result?.id;
+
+      console.log(`[ActionExecutor] Created ${table}:${recordId}`, Object.keys(data));
+      return { success: true, data: { table, record_id: recordId, created_fields: Object.keys(data), ...data } };
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -379,7 +425,7 @@ class ActionExecutor {
     try {
       const config = node.actionConfig || {};
       const searchConfig = node.searchConfig || {};
-      const table = searchConfig.table || config.table || 'people';
+      const table = (searchConfig.table || config.table || 'people').toLowerCase();
       const limit = searchConfig.limit || config.limit || 10;
       const userId = searchConfig.user_id || config.user_id || flowContext.business?.user_id || '';
 
