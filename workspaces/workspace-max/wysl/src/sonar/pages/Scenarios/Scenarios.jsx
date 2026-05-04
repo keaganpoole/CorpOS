@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import {
   Phone,
   User,
@@ -31,6 +32,7 @@ import {
   Database,
   Hash,
   Code,
+  Play,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
@@ -438,6 +440,8 @@ const sbInputStyle = { width: '100%', background: 'rgba(0,0,0,0.6)', border: '1p
 
 export default function ScenariosPage() {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
+  const { session } = useAuth();
+  const userId = session?.user?.id || null;
   const [scenarios, setScenarios] = useState([]); // List of saved scenarios
   const [nodes, setNodes] = useState([INITIAL_NODE]);
   const [edges, setEdges] = useState([]);
@@ -510,6 +514,8 @@ export default function ScenariosPage() {
   const [testMode, setTestMode] = useState(false);
   const [recurringSchedule, setRecurringSchedule] = useState({ frequency: 'once', interval: 1, time: '09:00' });
   const [scenarioNotes, setScenarioNotes] = useState('');
+  const [isRunning, setIsRunning] = useState(false);
+  const [runProgress, setRunProgress] = useState('');
   
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
@@ -608,7 +614,7 @@ export default function ScenariosPage() {
     if (!selectedNodeId) return;
     const defaultCategory = isPrimaryNode ? selectedNode?.categoryType || 'TRIGGERS' : 'ACTIONS';
     const node = nodeMap[selectedNodeId];
-    const hasSavedConfig = node?.actionConfig?._fields?.length || node?.appointmentConfig?.key || node?.scheduleConfig?.key;
+    const hasSavedConfig = node?.configured || node?.appointmentConfig?.key || node?.scheduleConfig?.key;
     // If node has saved config, let openSelectionPanel restore it — preserve config stages
     if (hasSavedConfig) {
       setPanelStage(prev => {
@@ -918,7 +924,7 @@ export default function ScenariosPage() {
         setPanelStage('appointmentConfig');
       }
       // If this node has an action config, show the action config form
-      else if (node?.actionConfig?._fields?.length) {
+      else if (node?.configured && node?.actionConfig?._key) {
         restoringFromNodeRef.current = true;
         setActionConfig({ ...node.actionConfig });
         setPanelStage('actionConfig');
@@ -1409,6 +1415,22 @@ export default function ScenariosPage() {
       // Set nodes and edges from scenario data
       setNodes(nodesData || [INITIAL_NODE]);
       setEdges(edgesData || []);
+
+      // Reconstruct _fields for each node's actionConfig from AUTOMATION_HIERARCHY
+      if (nodesData) {
+        nodesData.forEach(node => {
+          if (node.actionConfig?._key && !node.actionConfig?._fields?.length) {
+            // Find the config fields from AUTOMATION_HIERARCHY
+            for (const cat of AUTOMATION_HIERARCHY) {
+              const match = cat.sub_options?.find(so => so.key === node.actionConfig._key);
+              if (match?.configFields) {
+                node.actionConfig._fields = match.configFields;
+                break;
+              }
+            }
+          }
+        });
+      }
       
       // Calculate center position for nodes
       if (nodesData && nodesData.length > 0) {
@@ -1484,6 +1506,7 @@ export default function ScenariosPage() {
 
   const handleConfirmSaveScenario = async () => {
     const scenarioData = {
+      user_id: userId,
       name: scenarioName 
         ? scenarioName.charAt(0).toUpperCase() + scenarioName.slice(1) 
         : `Scenario ${scenarios.length + 1}`,
@@ -1502,7 +1525,7 @@ export default function ScenariosPage() {
         icon: n.icon?.name,
         appointmentConfig: n.appointmentConfig || null,
         scheduleConfig: n.scheduleConfig || null,
-        actionConfig: n.actionConfig || null,
+        actionConfig: n.actionConfig ? Object.fromEntries(Object.entries(n.actionConfig).filter(([k]) => k !== '_fields')) : null,
         subOptionKey: n.subOptionKey || null,
         categoryKey: n.categoryKey || null,
         categoryType: n.categoryType || null,
@@ -1573,6 +1596,181 @@ export default function ScenariosPage() {
     setShowSaveModal(false);
     setScenarioName('');
     setScenarioDescription('');
+  };
+
+  // ─── Resolve Variable References (reads from resultsMap for live data) ──
+  const resolveVariableRefs = (value, resultsMap) => {
+    if (typeof value !== 'string' || !value.includes('{{')) return value;
+    return value.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
+      const parts = ref.split('.');
+      if (parts.length < 2) { console.log(`[Resolve] ❌ Bad format: ${ref}`); return match; }
+      const nodeId = parts[0];
+      const fieldPath = parts.slice(1);
+      const outputData = resultsMap[nodeId];
+      if (!outputData) { console.log(`[Resolve] ❌ No outputData for ${nodeId}`); return match; }
+      let current = outputData;
+      for (const key of fieldPath) {
+        if (current == null) { console.log(`[Resolve] ❌ Null at ${ref}`); return match; }
+        current = current[key];
+      }
+      if (current == null) { console.log(`[Resolve] ❌ Final value is null for ${ref}`); return match; }
+      console.log(`[Resolve] ✅ ${ref} → ${String(current).slice(0, 80)}`);
+      return String(current);
+    });
+  };
+
+  // ─── Run Entire Scenario ─────────────────────────────────────────────
+  const runScenario = async () => {
+    if (isRunning) return;
+    setIsRunning(true);
+    const log = (msg) => { console.log(`[Scenario Run] ${msg}`); setRunProgress(msg); };
+    log('▶ Starting...');
+
+    const triggerNode = nodes.find(n => n.categoryType === 'TRIGGERS');
+    if (!triggerNode) { log('❌ No trigger found'); setIsRunning(false); return; }
+
+    // Build execution order via BFS
+    const visited = new Set([triggerNode.id]);
+    const queue = [triggerNode.id];
+    const execOrder = [triggerNode];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      for (const edge of edges) {
+        if (edge.from === current && !visited.has(edge.to)) {
+          visited.add(edge.to);
+          queue.push(edge.to);
+          const node = nodes.find(n => n.id === edge.to);
+          if (node) execOrder.push(node);
+        }
+      }
+    }
+
+    // Mutable map — stores outputData per node ID for variable resolution
+    const resultsMap = {};
+    log(`📋 Execution order: ${execOrder.map(n => n.label || n.id).join(' → ')}`);
+
+    for (let i = 0; i < execOrder.length; i++) {
+      const node = execOrder[i];
+      const step = `[${i + 1}/${execOrder.length}]`;
+
+      if (!node.configured) { log(`⏭ ${step} ${node.label || node.id} — skipped (not configured)`); continue; }
+      const actionKey = node.actionConfig?._key;
+      if (!actionKey) { log(`⏭ ${step} ${node.label || node.id} — skipped (no action)`); continue; }
+
+      log(`⚙ ${step} ${node.label} — running...`);
+
+      try {
+        if (actionKey === 'search_records') {
+          const config = node.actionConfig;
+          const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+          const limit = config.search_limit || 10;
+          const userId = resolveVariableRefs(config.search_user_id, resultsMap) || config.search_user_id;
+          console.log(`[Scenario Run]   ├ Query: ${tableKey} | limit: ${limit} | user_id: ${userId || '(default)'}`);
+          let query = supabase.from(tableKey).select('*').limit(limit);
+          if (userId) query = query.eq('user_id', userId);
+          const { data, error } = await query;
+          if (!error) {
+            const resultData = data || [];
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, searchResults: resultData, outputData: resultData } : n));
+            resultsMap[node.id] = resultData;
+            log(`✅ ${step} ${node.label} — ${resultData.length} records found`);
+            console.log(`[Scenario Run]   └ ${tableKey} → ${resultData.length} rows`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${error.message}`);
+            console.error(`[Scenario Run]   └ Error:`, error.message);
+          }
+        } else if (actionKey === 'create_payment') {
+          const config = node.actionConfig;
+          const amountCents = Math.round(Number(resolveVariableRefs(config.amount, resultsMap) || config.amount || 0) * 100);
+          const body = { amount: amountCents, currency: config.currency || 'usd', payment_method_type: config.payment_method || 'card', description: resolveVariableRefs(config.description, resultsMap) || config.description || '', person_id: resolveVariableRefs(config.person_id, resultsMap) || config.person_id || null };
+          console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
+          const resp = await fetch('/api/sonar/create-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const result = await resp.json();
+          if (!result.error) {
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
+            resultsMap[node.id] = result;
+            log(`✅ ${step} ${node.label} — status: ${result.status} | intent: ${result.id}`);
+            console.log(`[Scenario Run]   └ PaymentIntent: ${result.id} | status: ${result.status}`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${result.error}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error);
+          }
+        } else if (actionKey === 'create_payment_profile') {
+          const config = node.actionConfig;
+          const amountCents = Math.round(Number(resolveVariableRefs(config.amount, resultsMap) || config.amount || 0) * 100);
+          const body = { amount: amountCents, currency: config.currency || 'usd', description: resolveVariableRefs(config.description, resultsMap) || config.description || '', person_id: resolveVariableRefs(config.person_id, resultsMap) || config.person_id || null, customer_name: resolveVariableRefs(config.customer_name, resultsMap) || config.customer_name || '', customer_email: resolveVariableRefs(config.customer_email, resultsMap) || config.customer_email || '' };
+          console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment-profile | person: ${body.person_id || '(none)'}`);
+          const resp = await fetch('/api/sonar/create-payment-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const result = await resp.json();
+          if (!result.error) {
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
+            resultsMap[node.id] = result;
+            log(`✅ ${step} ${node.label} — customer: ${result.customer_id} | payment URL: ${result.payment_url ? 'yes' : 'no'}`);
+            console.log(`[Scenario Run]   ├ Customer: ${result.customer_id}`);
+            console.log(`[Scenario Run]   ├ SetupIntent: ${result.setup_intent_id}`);
+            console.log(`[Scenario Run]   └ Payment URL: ${result.payment_url || result.checkout_error || 'none'}`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${result.error}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error);
+          }
+        } else if (actionKey === 'update_record' || actionKey === 'create_new_record') {
+          const config = node.actionConfig;
+          const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+          const resolvedRecordId = resolveVariableRefs(config.record_id, resultsMap) || config.record_id;
+          // Build update payload — skip meta keys, strip field_ prefix for actual column names
+          const skipKeys = (key) => key.startsWith('_') || key === 'target_table' || key === 'record_id' || key === 'record_lookup_value';
+          const updateData = {};
+          for (const [key, value] of Object.entries(config)) {
+            if (skipKeys(key)) continue;
+            if (value == null || value === '') continue;
+            // Strip "field_" prefix — it's used for form keys but the actual Supabase column is the name after "field_"
+            const columnKey = key.startsWith('field_') ? key.slice(6) : key;
+            updateData[columnKey] = resolveVariableRefs(value, resultsMap);
+          }
+          console.log(`[Scenario Run]   ├ Resolved update data:`, JSON.stringify(updateData));
+          console.log(`[Scenario Run]   ├ ${actionKey === 'update_record' ? 'PATCH' : 'POST'} /api/sonar/${tableKey} | data:`, JSON.stringify(updateData));
+          if (actionKey === 'update_record' && resolvedRecordId) {
+            // Update existing record via Supabase
+            const { data, error } = await supabase.from(tableKey).update(updateData).eq('id', resolvedRecordId).select().single();
+            if (!error) {
+              setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: data } : n));
+              resultsMap[node.id] = data;
+              log(`✅ ${step} ${node.label} — updated ${tableKey} record ${resolvedRecordId}`);
+              console.log(`[Scenario Run]   └ Updated: ${JSON.stringify(updateData)}`);
+            } else {
+              log(`❌ ${step} ${node.label} — error: ${error.message}`);
+              console.error(`[Scenario Run]   └ Error:`, error.message);
+            }
+          } else if (actionKey === 'create_new_record') {
+            // Create new record via Supabase
+            const { data, error } = await supabase.from(tableKey).insert(updateData).select().single();
+            if (!error) {
+              setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: data } : n));
+              resultsMap[node.id] = data;
+              log(`✅ ${step} ${node.label} — created ${tableKey} record ${data.id}`);
+              console.log(`[Scenario Run]   └ Created: ${data.id}`);
+            } else {
+              log(`❌ ${step} ${node.label} — error: ${error.message}`);
+              console.error(`[Scenario Run]   └ Error:`, error.message);
+            }
+          }
+        } else {
+          log(`⏭ ${step} ${node.label} — no executor for "${actionKey}" (skipped)`);
+          console.log(`[Scenario Run]   └ Node has no run executor. Type: ${actionKey}`);
+        }
+      } catch (err) {
+        log(`❌ ${step} ${node.label} — failed: ${err.message}`);
+        console.error(`[Scenario Run]   └ Exception:`, err);
+      }
+
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    setTimeout(() => {
+      log('✅ Scenario complete!');
+      setIsRunning(false);
+      setTimeout(() => setRunProgress(''), 5000);
+    }, 500);
   };
 
   const handleEditScenario = (scenario) => {
@@ -2892,6 +3090,20 @@ export default function ScenariosPage() {
               <span className="sb-toolbar-test-dot" />
               <span>{testMode ? 'TEST' : 'LIVE'}</span>
             </button>
+
+            {/* Run Scenario button — only for No Trigger */}
+            {noTriggerActive && (
+              <button
+                type="button"
+                className={`sb-toolbar-run-btn ${isRunning ? 'running' : ''}`}
+                onClick={runScenario}
+                disabled={isRunning}
+                title="Run entire scenario"
+              >
+                <Play size={13} />
+                <span>{isRunning ? runProgress : 'Run'}</span>
+              </button>
+            )}
           </div>
         </div>
         )}
@@ -3068,7 +3280,7 @@ export default function ScenariosPage() {
                       firstMessage: n.firstMessage || '',
                       mainBox: n.mainBox || '',
                       focus: n.focus || 'prompt',
-                      actionConfig: n.actionConfig || null,
+                      actionConfig: n.actionConfig ? Object.fromEntries(Object.entries(n.actionConfig).filter(([k]) => k !== '_fields')) : null,
                       subOptionKey: n.subOptionKey || null,
                       categoryKey: n.categoryKey || null,
                       categoryType: n.categoryType || null,
@@ -3290,4 +3502,5 @@ export default function ScenariosPage() {
     </div>
   );
 }
+
 

@@ -1134,19 +1134,32 @@ router.post('/create-payment-profile', async (req, res) => {
 
     // Create Stripe-hosted payment link (Customer Payment Page)
     let paymentUrl = null;
+    let checkoutError = null;
     try {
       const session = await stripe.checkout.sessions.create({
         customer: stripeCustomerId,
         mode: 'setup',
+        currency: currency || 'usd',
+        payment_method_types: ['card'],
         success_url: `${process.env.APP_URL || 'http://localhost:5173'}/settings?payment_profile=success`,
         cancel_url: `${process.env.APP_URL || 'http://localhost:5173'}/settings?payment_profile=cancelled`,
-        setup_intent_data: {
-          metadata: { person_id, amount: String(amount || ''), currency: currency || 'usd' },
-        },
       });
       paymentUrl = session.url;
     } catch (sessionErr) {
-      console.warn('[Create Payment Profile] Checkout session creation failed:', sessionErr.message);
+      checkoutError = sessionErr.message;
+      console.error('[Create Payment Profile] Checkout session creation failed:', sessionErr.message);
+      // Fallback: generate a direct Stripe Customer Portal link
+      try {
+        const portal = await stripe.billingPortal.sessions.create({
+          customer: stripeCustomerId,
+          return_url: `${process.env.APP_URL || 'http://localhost:5173'}/settings`,
+        });
+        paymentUrl = portal.url;
+        checkoutError = null;
+      } catch (portalErr) {
+        console.error('[Create Payment Profile] Portal fallback also failed:', portalErr.message);
+        checkoutError = `Checkout: ${sessionErr.message} | Portal: ${portalErr.message}`;
+      }
     }
 
     res.json({
@@ -1154,6 +1167,7 @@ router.post('/create-payment-profile', async (req, res) => {
       setup_intent_id: setupIntent.id,
       client_secret: setupIntent.client_secret,
       payment_url: paymentUrl,
+      checkout_error: checkoutError,
       amount: amount || 0,
       currency: currency || 'usd',
       status: setupIntent.status,

@@ -2951,6 +2951,40 @@
   background: #4ade80;
 }
 
+/* ─── Run Scenario Button ──────────────────────────────────────────── */
+.sb-toolbar-run-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(50, 240, 217, 0.12);
+  border: 1px solid rgba(50, 240, 217, 0.25);
+  border-radius: 8px;
+  color: #32f0d9;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+}
+
+.sb-toolbar-run-btn:hover:not(:disabled) {
+  background: rgba(50, 240, 217, 0.2);
+  border-color: rgba(50, 240, 217, 0.4);
+}
+
+.sb-toolbar-run-btn.running {
+  background: rgba(50, 240, 217, 0.08);
+  border-color: rgba(50, 240, 217, 0.2);
+  cursor: wait;
+}
+
+.sb-toolbar-run-btn:disabled {
+  opacity: 0.7;
+}
+
 /* ─── Schedule Modal ────────────────────────────────────────────────── */
 .sb-schedule-modal-overlay,
 .sb-notes-modal-overlay {
