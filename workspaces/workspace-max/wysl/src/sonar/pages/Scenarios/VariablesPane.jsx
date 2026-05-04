@@ -171,6 +171,8 @@ const TABLE_DEFS = [
       { key: 'last_intent', label: 'Last Intent', type: 'text' },
       { key: 'last_outcome', label: 'Last Outcome', type: 'text' },
       { key: 'missed_call_count', label: 'Missed Call Count', type: 'number' },
+      { key: 'stripe_customer_id', label: 'Stripe Customer ID', type: 'text' },
+      { key: 'stripe_payment_method_id', label: 'Stripe Payment Method ID', type: 'text' },
       { key: 'created_at', label: 'Created At', type: 'timestamp' },
       { key: 'updated_at', label: 'Updated At', type: 'timestamp' },
     ],

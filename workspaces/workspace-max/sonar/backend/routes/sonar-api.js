@@ -8,6 +8,7 @@
  */
 
 const express = require('express');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_TEST_KEY || process.env.STRIPE_API_SECRET_KEY);
 const router = express.Router();
 
 // ─── Supabase Helpers (injected by controller) ──────────
@@ -1092,6 +1093,146 @@ router.get('/payments/:id', async (req, res) => {
     res.json({ payment: payments[0] });
   } catch (err) {
     console.error('[SONAR-API] get payment failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/sonar/create-payment-profile
+ * Create a Stripe Customer + SetupIntent, return a payment link.
+ * The customer clicks the link to enter their card, which saves it for future charges.
+ */
+router.post('/create-payment-profile', async (req, res) => {
+  try {
+    const { amount, currency, description, person_id, customer_name, customer_email, customer_phone } = req.body;
+    if (!person_id) return res.status(400).json({ error: 'person_id required' });
+
+    // Look up person
+    const people = await sbQuery('people', 'GET', null, `?id=eq.${person_id}&limit=1`);
+    if (!people?.length) return res.status(404).json({ error: 'Person not found' });
+    const person = people[0];
+
+    // Create or retrieve Stripe Customer
+    let stripeCustomerId = person.stripe_customer_id;
+    if (!stripeCustomerId) {
+      const customerParams = { metadata: { person_id } };
+      if (customer_name) customerParams.name = customer_name;
+      if (customer_email) customerParams.email = customer_email;
+      if (customer_phone) customerParams.phone = customer_phone;
+      const stripeCustomer = await stripe.customers.create(customerParams);
+      stripeCustomerId = stripeCustomer.id;
+      // Store on person
+      await sbQuery('people', 'PATCH', { stripe_customer_id: stripeCustomerId }, `?id=eq.${person_id}`);
+    }
+
+    // Create SetupIntent (saves card for future use — no charge yet)
+    const setupIntent = await stripe.setupIntents.create({
+      customer: stripeCustomerId,
+      payment_method_types: ['card'],
+      metadata: { person_id, amount: String(amount || ''), currency: currency || 'usd' },
+    });
+
+    // Create Stripe-hosted payment link (Customer Payment Page)
+    let paymentUrl = null;
+    try {
+      const session = await stripe.checkout.sessions.create({
+        customer: stripeCustomerId,
+        mode: 'setup',
+        success_url: `${process.env.APP_URL || 'http://localhost:5173'}/settings?payment_profile=success`,
+        cancel_url: `${process.env.APP_URL || 'http://localhost:5173'}/settings?payment_profile=cancelled`,
+        setup_intent_data: {
+          metadata: { person_id, amount: String(amount || ''), currency: currency || 'usd' },
+        },
+      });
+      paymentUrl = session.url;
+    } catch (sessionErr) {
+      console.warn('[Create Payment Profile] Checkout session creation failed:', sessionErr.message);
+    }
+
+    res.json({
+      customer_id: stripeCustomerId,
+      setup_intent_id: setupIntent.id,
+      client_secret: setupIntent.client_secret,
+      payment_url: paymentUrl,
+      amount: amount || 0,
+      currency: currency || 'usd',
+      status: setupIntent.status,
+      customer_name: customer_name || person.first_name + ' ' + person.last_name,
+      customer_email: customer_email || person.email,
+    });
+  } catch (err) {
+    console.error('[SONAR-API] create-payment-profile failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+router.post('/create-payment', async (req, res) => {
+  try {
+    const { amount, currency, payment_method_type, description, person_id, appointment_id } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'amount (in cents) required' });
+
+    // If person_id provided, look up their Stripe IDs
+    let stripe_customer_id = null;
+    let stripe_payment_method_id = null;
+    if (person_id) {
+      try {
+        const people = await sbQuery('people', 'GET', null, `?id=eq.${person_id}&select=stripe_customer_id,stripe_payment_method_id&limit=1`);
+        if (people?.length) {
+          stripe_customer_id = people[0].stripe_customer_id;
+          stripe_payment_method_id = people[0].stripe_payment_method_id;
+        }
+      } catch (dbErr) {
+        console.error('[SONAR-API] Failed to look up person:', dbErr.message);
+      }
+    }
+
+    const params = {
+      amount: Math.round(amount),
+      currency: currency || 'usd',
+      payment_method_types: [payment_method_type || 'card'],
+      description: description || 'Scenario Builder test payment',
+    };
+    if (stripe_customer_id) params.customer = stripe_customer_id;
+    if (stripe_payment_method_id) params.payment_method = stripe_payment_method_id;
+    if (person_id) params.metadata = { person_id };
+    if (appointment_id) params.metadata = { ...(params.metadata || {}), appointment_id };
+
+    const paymentIntent = await stripe.paymentIntents.create(params);
+
+    // Store in Supabase payments table
+    try {
+      await sbQuery('payments', 'POST', {
+        id: paymentIntent.id,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        status: paymentIntent.status,
+        payment_method: payment_method_type || 'card',
+        description: description || '',
+        stripe_payment_intent_id: paymentIntent.id,
+        person_id: person_id || null,
+        appointment_id: appointment_id || null,
+      });
+    } catch (dbErr) {
+      console.error('[SONAR-API] Failed to store payment:', dbErr.message);
+    }
+
+    res.json({
+      id: paymentIntent.id,
+      object: paymentIntent.object,
+      amount: paymentIntent.amount,
+      amount_received: paymentIntent.amount_received,
+      currency: paymentIntent.currency,
+      status: paymentIntent.status,
+      client_secret: paymentIntent.client_secret,
+      customer: paymentIntent.customer,
+      payment_method: paymentIntent.payment_method,
+      description: paymentIntent.description,
+      created: paymentIntent.created,
+      receipt_email: paymentIntent.receipt_email,
+      latest_charge: paymentIntent.latest_charge,
+      metadata: paymentIntent.metadata,
+    });
+  } catch (err) {
+    console.error('[SONAR-API] create-payment failed:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

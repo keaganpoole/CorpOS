@@ -277,6 +277,17 @@ const OUTPUT_VARIABLE_MAP = {
     { key: 'status', label: 'Status', type: 'text' },
     { key: 'amount', label: 'Amount', type: 'number' },
   ],
+  create_payment_profile: [
+    { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
+    { key: 'setup_intent_id', label: 'Setup Intent ID', type: 'text' },
+    { key: 'client_secret', label: 'Client Secret', type: 'text' },
+    { key: 'payment_url', label: 'Payment URL', type: 'url' },
+    { key: 'amount', label: 'Amount', type: 'number' },
+    { key: 'currency', label: 'Currency', type: 'text' },
+    { key: 'status', label: 'Status', type: 'text' },
+    { key: 'customer_name', label: 'Customer Name', type: 'text' },
+    { key: 'customer_email', label: 'Customer Email', type: 'email' },
+  ],
   invoice_created: [
     { key: 'invoice_id', label: 'Invoice ID', type: 'text' },
     { key: 'amount', label: 'Amount', type: 'currency' },

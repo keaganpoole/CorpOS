@@ -381,6 +381,15 @@ const AUTOMATION_HIERARCHY = {
           { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
           { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
         ]},
+        { key: 'create_payment_profile', name: 'Create Payment Profile', description: 'Set up a Stripe customer and generate a payment link', configFields: [
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
+          { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
+          { key: 'description', label: 'Description', type: 'prompt_textarea', placeholder: 'e.g. Payment for appointment...', smartActions: true },
+          { key: 'customer_name', label: 'Customer Name', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
+          { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
+          { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
+        ]},
         { key: 'update_payment', name: 'Update Payment', description: 'Update an existing payment record', configFields: [
           { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID or {{payment.stripe_payment_intent_id}}' },
           { key: 'status', label: 'Status', type: 'select', options: ['succeeded', 'failed', 'refunded', 'partial_refund', 'pending'] },
@@ -1845,7 +1854,7 @@ export default function ScenariosPage() {
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
                     event.preventDefault();
-                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_payment') && node.configured) {
+                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'create_payment_profile') && node.configured) {
                       setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
                     }
                   }}
@@ -2727,6 +2736,10 @@ export default function ScenariosPage() {
           <>
             <VariablesPane
               visible={true}
+              currentNodeId={(() => {
+                const edge = edges.find(e => e.id === logicPanel.edgeId);
+                return edge?.from || currentNodeId;
+              })()}
               targetFieldKey={activeConditionField?.ruleId || ''}
               fieldLabel="Condition"
               onInsertVariable={(varRef, label, color) => {
@@ -2757,7 +2770,10 @@ export default function ScenariosPage() {
               onClose={() => setVarsPane({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' })}
               nodes={nodes}
               edges={edges}
-              currentNodeId={selectedNodeId}
+              currentNodeId={(() => {
+                const edge = edges.find(e => e.id === logicPanel.edgeId);
+                return edge?.from || selectedNodeId;
+              })()}
               style={{
                 position: 'absolute',
                 top: logicPanelDragPos?.top ?? logicPanel.top,
@@ -3202,6 +3218,34 @@ export default function ScenariosPage() {
                   }
                 } catch (err) {
                   console.error('[Create Payment] Request failed:', err.message);
+                }
+              } else if (actionKey === 'create_payment_profile') {
+                try {
+                  const amountCents = Math.round(Number(config.amount || 0) * 100);
+                  const resp = await fetch('/api/sonar/create-payment-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      amount: amountCents,
+                      currency: config.currency || 'usd',
+                      description: config.description || '',
+                      person_id: config.person_id || null,
+                      customer_name: config.customer_name || '',
+                      customer_email: config.customer_email || '',
+                      customer_phone: config.customer_phone || '',
+                    }),
+                  });
+                  const result = await resp.json();
+                  if (result.error) {
+                    console.error('[Create Payment Profile] Error:', result.error);
+                  } else {
+                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
+                      ? { ...n, outputData: result }
+                      : n
+                    ));
+                  }
+                } catch (err) {
+                  console.error('[Create Payment Profile] Request failed:', err.message);
                 }
               }
 

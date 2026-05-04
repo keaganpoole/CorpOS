@@ -6,12 +6,17 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Expose TEST_MODE to our React app
     'process.env.TEST_MODE': JSON.stringify(process.env.TEST_MODE),
   },
   server: {
-    host: true,  // <-- exposes the dev server to your LAN
-    port: 5173,  // optional, keeps the same port
+    host: true,
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:7878',
+        changeOrigin: true,
+      },
+    },
   },
   resolve: {
     alias: {
