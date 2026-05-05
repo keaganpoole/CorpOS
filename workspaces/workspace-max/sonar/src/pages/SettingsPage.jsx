@@ -910,7 +910,7 @@ const SettingsPage = () => {
       // Load business info from businesses table
       const { data: bizData, error: bizErr } = await supabase
         .from('businesses')
-        .select('id, name, phone, email, address, city, state, zip, business_hours, about_us, policies, faq')
+        .select('id, name, phone, email, address, city, state, zip, business_hours, business_timezone, about_us, policies, faq')
         .limit(1)
         .single();
 
@@ -948,7 +948,7 @@ const SettingsPage = () => {
           if (typeof h === 'object') return h;
           try { return JSON.parse(h); } catch { return {}; }
         })(),
-        business_timezone: config.business_timezone || 'America/New_York',
+        business_timezone: biz.business_timezone || config.business_timezone || 'America/New_York',
         // App config from account_settings
         ...config,
         // Knowledge base from businesses table
@@ -983,6 +983,7 @@ const SettingsPage = () => {
           state: settings.business_state,
           zip: settings.business_zip,
           business_hours: typeof settings.business_hours === 'object' ? JSON.stringify(settings.business_hours) : settings.business_hours,
+          business_timezone: settings.business_timezone || 'America/New_York',
           about_us: kb.about || '',
           policies: kb.policies || '',
           faq: kb.faq || '',

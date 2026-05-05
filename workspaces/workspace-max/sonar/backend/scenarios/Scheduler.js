@@ -7,7 +7,6 @@
  * - daily: Fire every N days at a specific time
  * - weekly: Fire every N weeks on specific days
  * - monthly: Fire every N months
- * - yearly: Fire every N years
  */
 
 const cron = require('node-cron');
@@ -19,6 +18,7 @@ class Scheduler {
     this.jobs = new Map(); // scenarioId → cron.Task
     this.reminderJob = null;
     this.reminderFireMap = new Map(); // dedupe key → timestamp
+    this.businessTimezoneCache = new Map(); // cache key → timezone
   }
 
   /**
@@ -53,15 +53,19 @@ class Scheduler {
           continue;
         }
 
+        const timezone = await this._getScenarioTimezone(scenario);
         const job = cron.schedule(cronExpr, () => {
           console.log(`[Scheduler] Firing: ${scenario.name}`);
           this._fireScenario(scenario).catch(err => {
             console.error(`[Scheduler] Failed to fire "${scenario.name}":`, err.message);
           });
-        });
+        }, timezone ? { timezone } : undefined);
 
         this.jobs.set(scenario.id, job);
-        console.log(`[Scheduler] Registered "${scenario.name}" → ${cronExpr} (${config.frequency})`);
+        console.log(
+          `[Scheduler] Registered "${scenario.name}" → ${cronExpr} (${config.frequency})` +
+          (timezone ? ` [${timezone}]` : '')
+        );
       } catch (err) {
         console.error(`[Scheduler] Failed to schedule "${scenario.name}":`, err.message);
       }
@@ -70,6 +74,33 @@ class Scheduler {
     this._startAppointmentSoonPolling(scenarios);
 
     console.log(`[Scheduler] Active jobs: ${this.jobs.size}`);
+  }
+
+  async _getBusinessTimezone(cacheKey) {
+    const key = cacheKey || 'default';
+    if (this.businessTimezoneCache.has(key)) {
+      return this.businessTimezoneCache.get(key);
+    }
+
+    try {
+      const query = cacheKey
+        ? `?user_id=eq.${cacheKey}&limit=1`
+        : '?limit=1';
+      const businesses = await this.sbQuery('businesses', 'GET', null, query) || [];
+      const timezone = businesses[0]?.business_timezone || 'UTC';
+      this.businessTimezoneCache.set(key, timezone);
+      return timezone;
+    } catch (err) {
+      console.warn(`[Scheduler] Could not load business timezone (${key}):`, err.message);
+      return 'UTC';
+    }
+  }
+
+  async _getScenarioTimezone(scenarioOrUserId) {
+    const key = typeof scenarioOrUserId === 'string' || typeof scenarioOrUserId === 'number'
+      ? scenarioOrUserId
+      : scenarioOrUserId?.user_id || scenarioOrUserId?.created_by || null;
+    return this._getBusinessTimezone(key);
   }
 
   /**
@@ -97,13 +128,62 @@ class Scheduler {
   _startAppointmentSoonPolling(scenarios) {
     if (!this.eventSystem) return;
 
-    console.log(`[Scheduler] Appointment Soon poller started (${scenarios.length} scenario(s) loaded)`);
+    console.log(`[Scheduler] 🟢 Appointment Soon poller started (${scenarios.length} scenario(s) loaded)`);
     this.reminderJob = cron.schedule('* * * * *', () => {
-      console.log('[Scheduler] Appointment Soon poll tick');
+      console.log('[Scheduler] 🕒 Appointment Soon tick');
       this._checkAppointmentSoonScenarios(scenarios).catch(err => {
-        console.error('[Scheduler] Appointment Soon poll failed:', err.message);
+        console.error('[Scheduler] ❌ Appointment Soon poll failed:', err.message);
       });
     });
+  }
+
+  _getZonedParts(date, timeZone) {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(date);
+    const map = {};
+    for (const part of parts) {
+      if (part.type !== 'literal') map[part.type] = part.value;
+    }
+
+    return {
+      year: Number(map.year),
+      month: Number(map.month),
+      day: Number(map.day),
+      hour: Number(map.hour),
+      minute: Number(map.minute),
+      second: Number(map.second),
+    };
+  }
+
+  _formatZonedDate(date, timeZone) {
+    const parts = this._getZonedParts(date, timeZone);
+    return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+  }
+
+  _formatZonedTime(date, timeZone) {
+    const parts = this._getZonedParts(date, timeZone);
+    return `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+  }
+
+  _zonedTimeToUtc(dateString, timeString, timeZone) {
+    const [year, month, day] = String(dateString).slice(0, 10).split('-').map(Number);
+    const [hour, minute] = String(timeString).slice(0, 5).split(':').map(Number);
+
+    const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+    const zoned = this._getZonedParts(utcGuess, timeZone);
+    const zonedAsUtc = Date.UTC(zoned.year, zoned.month - 1, zoned.day, zoned.hour, zoned.minute, zoned.second);
+    const offsetMs = zonedAsUtc - utcGuess.getTime();
+    return new Date(utcGuess.getTime() - offsetMs);
   }
 
   _getAppointmentSoonTriggers(scenario) {
@@ -167,16 +247,18 @@ class Scheduler {
       const userId = scenario.user_id || scenario.created_by;
       const triggers = this._getAppointmentSoonTriggers(scenario);
       if (triggers.length === 0) continue;
+      const timezone = await this._getScenarioTimezone(scenario);
 
       for (const trigger of triggers) {
         const triggerFilter = trigger.triggerFilter || {};
         const offsetMinutes = Math.max(0, Number(triggerFilter.offsetMinutes ?? ((Number(triggerFilter.hours) || 0) * 60 + (Number(triggerFilter.minutes) || 0))));
         const targetStart = new Date(now.getTime() + (offsetMinutes * 60 * 1000));
-        const queryDate = this._formatDateLocal(targetStart);
+        const queryDate = this._formatZonedDate(targetStart, timezone);
+        const queryTime = this._formatZonedTime(targetStart, timezone);
 
         console.log(
-          `[Scheduler] Checking Supabase for Appointment Soon: scenario="${scenario.name}", ` +
-          `user_id=${userId}, target_date=${queryDate}, offset=${offsetMinutes}m`
+          `[Scheduler] 🔎 ${scenario.name}: tz=${timezone}, user_id=${userId || 'n/a'}, ` +
+          `target=${queryDate} ${queryTime}, offset=${offsetMinutes}m`
         );
 
         let appointments = [];
@@ -192,45 +274,36 @@ class Scheduler {
             query
           ) || [];
           appointments = byUser.filter(appointment => {
-            const appointmentStart = this._parseAppointmentDateTime(appointment);
+            const appointmentStart = appointment.date && appointment.time
+              ? this._zonedTimeToUtc(appointment.date, appointment.time, timezone)
+              : this._parseAppointmentDateTime(appointment);
             if (!appointmentStart) return false;
 
-            const appointmentDate = this._formatDateLocal(appointmentStart);
+            const appointmentDate = this._formatZonedDate(appointmentStart, timezone);
             return appointmentDate === queryDate;
           });
-          console.log(
-            `[Scheduler] Supabase returned ${appointments.length} appointment(s) for "${scenario.name}"`
-          );
+          console.log(`[Scheduler] 📥 ${scenario.name}: ${appointments.length} appointment(s)`);
         } catch (err) {
-          console.warn(`[Scheduler] Could not load appointments for "${scenario.name}":`, err.message);
+          console.warn(`[Scheduler] ⚠️ ${scenario.name}: could not load appointments -`, err.message);
           continue;
         }
 
         for (const appointment of appointments) {
           if (!appointment || ['cancelled', 'completed'].includes(String(appointment.status || '').toLowerCase())) {
-            console.log(`[Scheduler] Skipping appointment ${appointment?.id || 'unknown'}: status=${appointment?.status || 'unknown'}`);
             continue;
           }
 
           const appointmentStart = this._parseAppointmentDateTime(appointment);
-          if (!appointmentStart) {
-            console.log(
-              `[Scheduler] Skipping appointment ${appointment.id}: could not parse start time ` +
-              `(date=${appointment.date || appointment.appointment_date || 'n/a'}, ` +
-              `time=${appointment.time || appointment.appointment_time || 'n/a'})`
-            );
+          const appointmentStartUtc = appointment.date && appointment.time
+            ? this._zonedTimeToUtc(appointment.date, appointment.time, timezone)
+            : appointmentStart;
+          const comparisonStart = appointmentStartUtc || appointmentStart;
+          if (!comparisonStart) {
             continue;
           }
 
-          const reminderAt = new Date(appointmentStart.getTime() - (offsetMinutes * 60 * 1000));
+          const reminderAt = new Date(comparisonStart.getTime() - (offsetMinutes * 60 * 1000));
           const matchesWindow = reminderAt >= windowStart && reminderAt < windowEnd;
-
-          console.log(
-            `[Scheduler] Appointment ${appointment.id}: start=${appointmentStart.toISOString()} ` +
-            `reminderAt=${reminderAt.toISOString()} now=${now.toISOString()} ` +
-            `window=[${windowStart.toISOString()} - ${windowEnd.toISOString()}) ` +
-            `match=${matchesWindow}`
-          );
 
           if (!matchesWindow) continue;
 
@@ -267,8 +340,7 @@ class Scheduler {
           };
 
           console.log(
-            `[Scheduler] Firing appointment reminder for appointment ${appointment.id} ` +
-            `from scenario "${scenario.name}"`
+            `[Scheduler] ✅ Fired reminder: appointment ${appointment.id} via "${scenario.name}"`
           );
           this.eventSystem.emit(event);
         }
@@ -325,12 +397,6 @@ class Scheduler {
         const m = Math.min(Math.max(interval, 1), 12);
         if (m === 1) return `${minute} ${hour} 1 * *`;
         return `${minute} ${hour} 1 */${m} *`;
-      }
-
-      case 'yearly': {
-        const y = Math.min(Math.max(interval, 1), 10);
-        if (y === 1) return `${minute} ${hour} 1 1 *`;
-        return `${minute} ${hour} 1 1 */${y}`;
       }
 
       default:

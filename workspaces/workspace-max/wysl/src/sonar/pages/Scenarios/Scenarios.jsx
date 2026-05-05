@@ -688,7 +688,6 @@ export default function ScenariosPage() {
         return `Every ${interval}w${days}${timeStr}`;
       }
       case 'monthly': return `Every ${interval}mo${timeStr}`;
-      case 'yearly': return `Every ${interval}yr${timeStr}`;
       default: return 'Run once';
     }
   };
@@ -3276,7 +3275,6 @@ export default function ScenariosPage() {
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
                   </select>
                 </div>
                 
@@ -3301,7 +3299,7 @@ export default function ScenariosPage() {
                       {recurringSchedule.frequency === 'hourly' ? 'hours' :
                        recurringSchedule.frequency === 'daily' ? 'days' :
                        recurringSchedule.frequency === 'weekly' ? 'weeks' :
-                       recurringSchedule.frequency === 'monthly' ? 'months' : 'years'}
+                       'months'}
                     </span>
                   </div>
                 </div>

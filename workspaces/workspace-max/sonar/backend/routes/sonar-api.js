@@ -53,6 +53,7 @@ router.get('/business/profile', async (req, res) => {
       zip: b.zip || '',
       website: b.website || '',
       hours: b.hours || '',
+      business_timezone: b.business_timezone || 'America/New_York',
     });
   } catch (err) {
     console.error('[SONAR-API] get profile failed:', err.message);
@@ -66,7 +67,7 @@ router.get('/business/profile', async (req, res) => {
  */
 router.put('/business/profile', async (req, res) => {
   try {
-    const allowedFields = ['name', 'phone', 'email', 'address', 'city', 'state', 'zip', 'website', 'hours'];
+    const allowedFields = ['name', 'phone', 'email', 'address', 'city', 'state', 'zip', 'website', 'hours', 'business_timezone'];
 
     const payload = {};
     for (const field of allowedFields) {
