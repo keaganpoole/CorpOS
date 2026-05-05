@@ -237,7 +237,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be professional and offer available reschedule times...', smartActions: true },
           { key: 'first_message', label: 'First Message', type: 'first_message_textarea', placeholder: 'e.g. Hi, this is [business name] calling...', smartActions: true, toggleLabel: 'Override First Message' },
           { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text', placeholder: 'Phone number to transfer after greeting' },
@@ -261,7 +261,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and concise...', smartActions: true },
         ]},
         { key: 'send_to_customer', name: 'Send To Customer', description: 'Send SMS to an existing customer', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and helpful...', smartActions: true },
         ]},
       ],
@@ -303,11 +303,11 @@ const AUTOMATION_HIERARCHY = {
         ]},
         { key: 'update_record', name: 'Update Record', description: 'Modify an existing record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
-          { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{person.id}}' },
         ]},
         { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
-          { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{person.id}}' },
         ]},
       ],
     },
@@ -319,7 +319,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.appointments,
       sub_options: [
         { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
         ] },
         { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment', configFields: [
           { key: 'appointment_id', label: 'Appointment ID', type: 'record_id', placeholder: 'e.g. {{appointments.id}}' },
@@ -341,7 +341,7 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.email,
       sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email', configFields: [
-        { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
+        { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
         { key: 'to', label: 'To', type: 'text', placeholder: 'e.g. {customer_email}' },
         { key: 'subject', label: 'Subject', type: 'text', placeholder: 'e.g. Appointment Confirmation' },
         { key: 'body', label: 'Body', type: 'textarea', placeholder: 'Email body with {variables}' },
@@ -355,7 +355,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.tags,
       sub_options: [
         { key: 'add_tag', name: 'Add Tag', description: 'Attach tag to record', configFields: [
-          { key: 'person_id', label: 'Record', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Record', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
           { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'e.g. VIP, Urgent, Callback' },
         ]},
         { key: 'search_tags', name: 'Search Tags', description: 'Find existing tags', configFields: [
@@ -374,7 +374,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'payments', option: 'Payments', description: 'Process payments and manage billing', accent: '#38bdf8', icon: OPTION_ICONS.payments,
       sub_options: [
         { key: 'create_payment', name: 'Create Payment', description: 'Process a new payment', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
           { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'payment_method', label: 'Payment Method', type: 'select', options: ['card', 'ach', 'link'] },
@@ -384,7 +384,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
         ]},
         { key: 'create_payment_profile', name: 'Create Payment Profile', description: 'Set up a Stripe customer and generate a payment link', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{people.id}}' },
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
           { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'description', label: 'Description', type: 'prompt_textarea', placeholder: 'e.g. Payment for appointment...', smartActions: true },
@@ -2756,7 +2756,7 @@ export default function ScenariosPage() {
                               value={appointmentConfig.person_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, person_id: e.target.value })}
                               onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Customer', fieldType: 'person_id' })}
-                              placeholder="e.g. {{people.id}}"
+                              placeholder="e.g. {{person.id}}"
                               style={{
                                 ...(appointmentConfig.person_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'person_id' ? {

@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID,
-  people_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
+  person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
   appointment_id UUID,
   scenario_id UUID,
   stripe_payment_intent_id TEXT UNIQUE,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 -- Indexes for common lookups
-CREATE INDEX IF NOT EXISTS idx_payments_people_id ON payments(people_id);
+CREATE INDEX IF NOT EXISTS idx_payments_person_id ON payments(person_id);
 CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
 CREATE INDEX IF NOT EXISTS idx_payments_stripe_payment_intent_id ON payments(stripe_payment_intent_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);

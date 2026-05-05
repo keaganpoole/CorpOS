@@ -1109,9 +1109,9 @@ router.post('/create-payment-profile', async (req, res) => {
     if (!person_id) return res.status(400).json({ error: 'person_id required' });
 
     // Look up person
-    const people = await sbQuery('people', 'GET', null, `?id=eq.${person_id}&limit=1`);
-    if (!people?.length) return res.status(404).json({ error: 'Person not found' });
-    const person = people[0];
+    const personRows = await sbQuery('people', 'GET', null, `?id=eq.${person_id}&limit=1`);
+    if (!personRows?.length) return res.status(404).json({ error: 'Person not found' });
+    const person = personRows[0];
 
     // Create or retrieve Stripe Customer
     let stripeCustomerId = person.stripe_customer_id;
@@ -1190,10 +1190,10 @@ router.post('/create-payment', async (req, res) => {
     let stripe_payment_method_id = null;
     if (person_id) {
       try {
-        const people = await sbQuery('people', 'GET', null, `?id=eq.${person_id}&select=stripe_customer_id,stripe_payment_method_id&limit=1`);
-        if (people?.length) {
-          stripe_customer_id = people[0].stripe_customer_id;
-          stripe_payment_method_id = people[0].stripe_payment_method_id;
+        const personRows = await sbQuery('people', 'GET', null, `?id=eq.${person_id}&select=stripe_customer_id,stripe_payment_method_id&limit=1`);
+        if (personRows?.length) {
+          stripe_customer_id = personRows[0].stripe_customer_id;
+          stripe_payment_method_id = personRows[0].stripe_payment_method_id;
         }
       } catch (dbErr) {
         console.error('[SONAR-API] Failed to look up person:', dbErr.message);

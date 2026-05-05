@@ -64,6 +64,8 @@ class ActionExecutor {
         return this._createNewRecord(node, flowContext);
       case 'create_payment':
         return this._createPayment(node, flowContext);
+      case 'create_payment_profile':
+        return this._createPaymentProfile(node, flowContext);
       case 'update_payment':
         return this._updatePayment(node, flowContext);
       case 'check_payment_status':
@@ -499,6 +501,10 @@ class ActionExecutor {
       let value = flowContext;
       for (const part of parts) {
         if (value == null) return match;
+        if (part === 'people' && value.people == null && value.person != null) {
+          value = value.person;
+          continue;
+        }
         value = value[part];
       }
       return value != null ? String(value) : match;
@@ -579,6 +585,59 @@ class ActionExecutor {
       };
     } catch (err) {
       console.error('[ActionExecutor] chargeCustomer failed:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Create a Stripe payment profile / setup link for a person
+   */
+  async _createPaymentProfile(node, flowContext) {
+    try {
+      const config = node.actionConfig || {};
+      const baseUrl = `http://127.0.0.1:${process.env.PORT || 7878}`;
+
+      const personId = flowContext.person?.id || flowContext.person_id;
+      if (!personId) {
+        return { success: false, error: 'No person ID available for payment profile creation' };
+      }
+
+      const resp = await fetch(`${baseUrl}/api/sonar/create-payment-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: config.amount ? parseFloat(this._resolveVariables(config.amount, flowContext)) : undefined,
+          currency: this._resolveVariables(config.currency || 'usd', flowContext),
+          description: this._resolveVariables(config.description || '', flowContext),
+          person_id: personId,
+          customer_name: this._resolveVariables(
+            config.customer_name || `${flowContext.person?.first_name || ''} ${flowContext.person?.last_name || ''}`.trim(),
+            flowContext
+          ),
+          customer_email: this._resolveVariables(config.customer_email || flowContext.person?.email || '', flowContext),
+          customer_phone: this._resolveVariables(config.customer_phone || flowContext.person?.phone || '', flowContext),
+        }),
+      });
+
+      const result = await resp.json();
+      if (!resp.ok || result.error) {
+        return { success: false, error: result.error || `Failed to create payment profile (${resp.status})` };
+      }
+
+      return {
+        success: true,
+        data: {
+          action: 'create_payment_profile',
+          customer_id: result.customer_id,
+          setup_intent_id: result.setup_intent_id,
+          client_secret: result.client_secret,
+          payment_url: result.payment_url,
+          checkout_error: result.checkout_error,
+          status: result.status,
+        },
+      };
+    } catch (err) {
+      console.error('[ActionExecutor] createPaymentProfile failed:', err.message);
       return { success: false, error: err.message };
     }
   }

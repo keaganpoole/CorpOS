@@ -229,7 +229,6 @@ class ScenarioEngine {
         if (people?.length > 0) {
           context.person = people[0];
           context.customer = people[0];
-          context.people = people[0]; // Table-name alias for {{people.field}} references
           context.person_id = people[0].id;
         }
       } catch (err) {

@@ -11,7 +11,7 @@ create table public.appointments (
   scenario_id uuid null,
   created_at timestamp with time zone null default now(),
   user_id uuid null,
-  people_id bigint null,
+  person_id bigint null,
   constraint appointments_pkey primary key (id),
   constraint appointments_lead_id_fkey foreign KEY (lead_id) references people (id) on delete CASCADE,
   constraint appointments_user_id_fkey foreign KEY (user_id) references users (id) on delete CASCADE,
