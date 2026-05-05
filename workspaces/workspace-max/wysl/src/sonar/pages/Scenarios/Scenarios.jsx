@@ -469,6 +469,8 @@ export default function ScenariosPage() {
   const activeConditionInputRef = useRef(null); // tracks the focused input element
   const [appointmentConfig, setAppointmentConfig] = useState({});
   const [scheduleConfig, setScheduleConfig] = useState({});
+  const [triggerFilter, setTriggerFilter] = useState({});
+  const triggerFilterSourceNodeRef = useRef(null);
   const [varsPane, setVarsPane] = useState({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
   const [hoveredTableColor, setHoveredTableColor] = useState('');
   const [actionConfig, setActionConfig] = useState(null);
@@ -605,6 +607,14 @@ export default function ScenariosPage() {
     setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, scheduleConfig: { ...scheduleConfig } } : n));
   }, [scheduleConfig]);
 
+  useEffect(() => {
+    if (restoringFromNodeRef.current) { restoringFromNodeRef.current = false; return; }
+    if (!selectedNodeId || !triggerFilter?.key) return;
+    if (triggerFilterSourceNodeRef.current !== selectedNodeId) return;
+    if (selectedNode?.subOptionKey !== 'appointment_soon' && selectedNode?.triggerFilter?.key !== 'appointment_soon') return;
+    setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, triggerFilter: normalizeAppointmentSoonFilter(triggerFilter) } : n));
+  }, [triggerFilter, selectedNodeId]);
+
   const nodeMap = useMemo(() => nodes.reduce((acc, node) => ({ ...acc, [node.id]: node }), {}), [nodes]);
   const selectedNode = selectedNodeId ? nodeMap[selectedNodeId] : null;
 
@@ -614,7 +624,7 @@ export default function ScenariosPage() {
     if (!selectedNodeId) return;
     const defaultCategory = isPrimaryNode ? selectedNode?.categoryType || 'TRIGGERS' : 'ACTIONS';
     const node = nodeMap[selectedNodeId];
-    const hasSavedConfig = node?.configured || node?.appointmentConfig?.key || node?.scheduleConfig?.key;
+    const hasSavedConfig = node?.configured || node?.appointmentConfig?.key || node?.scheduleConfig?.key || node?.triggerFilter?.key;
     // If node has saved config, let openSelectionPanel restore it — preserve config stages
     if (hasSavedConfig) {
       setPanelStage(prev => {
@@ -624,6 +634,10 @@ export default function ScenariosPage() {
           return 'options';
         }
         if (['appointmentConfig', 'scheduleConfig'].includes(prev)) return prev;
+        if (prev === 'triggerFilter') {
+          if (node?.triggerFilter?.key === 'appointment_soon') return prev;
+          return 'options';
+        }
         return 'options';
       });
     } else {
@@ -631,6 +645,8 @@ export default function ScenariosPage() {
       setActionConfig(null);
       setAppointmentConfig({});
       setScheduleConfig({});
+      setTriggerFilter({});
+      triggerFilterSourceNodeRef.current = null;
       setPanelStage('options');
     }
     setActiveOption(null);
@@ -713,7 +729,7 @@ export default function ScenariosPage() {
       : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
-  const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage);
+  const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter'].includes(panelStage);
 
   // Handle variable insertion — inserts {{table.field}} syntax for rendering
   const handleInsertVariable = (varRef, fieldLabel, color) => {
@@ -928,6 +944,13 @@ export default function ScenariosPage() {
         setAppointmentConfig({ ...node.appointmentConfig });
         setPanelStage('appointmentConfig');
       }
+      // If this node has an appointment soon filter, show the trigger filter form
+      else if (node?.triggerFilter?.key === 'appointment_soon') {
+        restoringFromNodeRef.current = true;
+        triggerFilterSourceNodeRef.current = nodeId;
+        setTriggerFilter(normalizeAppointmentSoonFilter(node.triggerFilter));
+        setPanelStage('triggerFilter');
+      }
       // If this node has an action config, show the action config form
       else if (node?.configured && node?.actionConfig?._key) {
         restoringFromNodeRef.current = true;
@@ -1089,6 +1112,8 @@ export default function ScenariosPage() {
     setActionConfig(null);
     setAppointmentConfig({});
     setScheduleConfig({});
+    setTriggerFilter({});
+    triggerFilterSourceNodeRef.current = null;
     setEdgeRules([{ id: 1, variable: '', operator: 'equals', value: '', logic: 'and' }]);
   }, [selectedNodeId]);
 
@@ -1219,12 +1244,62 @@ export default function ScenariosPage() {
   const TIME_CONFIG_ACTIONS = new Set([
     'specific_time', 'recurring_daily', 'recurring_weekly', 'appointment_reminder',
   ]);
+  const TRIGGER_FILTER_ACTIONS = new Set([
+    'appointment_soon',
+  ]);
+
+  const normalizeAppointmentSoonFilter = (value = {}) => {
+    const hours = Math.max(0, Number(value.hours) || 0);
+    const minutes = Math.max(0, Number(value.minutes) || 0);
+    return {
+      key: 'appointment_soon',
+      hours,
+      minutes,
+      offsetMinutes: hours * 60 + minutes,
+    };
+  };
 
   const handleSubOptionClick = (subOption) => {
     const subIcon = activeOption?.icon || categoryMeta.icon;
     const subAccent = activeOption?.accent || categoryMeta.accent;
     const meta = CATEGORY_META[panelCategory] || CATEGORY_META.TRIGGERS;
     const currentNodeId = selectedNodeId; // Capture before finalizeSelection clears it
+    const currentNode = nodeMap[currentNodeId];
+
+    if (TRIGGER_FILTER_ACTIONS.has(subOption.key)) {
+      const triggerFilterConfig = normalizeAppointmentSoonFilter(
+        currentNode?.triggerFilter?.key === 'appointment_soon'
+          ? currentNode.triggerFilter
+          : { key: subOption.key, hours: 0, minutes: 0 }
+      );
+      setNodes((prev) =>
+        prev.map((node) =>
+          node.id === currentNodeId
+            ? {
+                ...node,
+                configured: true,
+                label: subOption.name,
+                detail: subOption.description,
+                icon: subIcon,
+                type: meta.type,
+                category: meta.detail,
+                accent: subAccent,
+                categoryType: panelCategory,
+                subOptionKey: subOption.key,
+                categoryKey: activeOption?.key || '',
+                triggerFilter: triggerFilterConfig,
+              }
+            : node
+        )
+      );
+      restoringFromNodeRef.current = true;
+      triggerFilterSourceNodeRef.current = currentNodeId;
+      setActiveOption(null);
+      setPanelSearch('');
+      setTriggerFilter(triggerFilterConfig);
+      setPanelStage('triggerFilter');
+      return;
+    }
     
     // Check if this action needs config BEFORE finalizing
     const needsAppointmentConfig = APPOINTMENT_CONFIG_ACTIONS.has(subOption.key);
@@ -1401,6 +1476,7 @@ export default function ScenariosPage() {
     setScenarioIsActive(true);
     setRecurringSchedule({ frequency: 'once', interval: 1, time: '09:00' });
     setScenarioNotes('');
+    setTriggerFilter({});
   };
 
   const handleBackToList = () => {
@@ -1534,6 +1610,7 @@ export default function ScenariosPage() {
         icon: n.icon?.name,
         appointmentConfig: n.appointmentConfig || null,
         scheduleConfig: n.scheduleConfig || null,
+        triggerFilter: n.triggerFilter || null,
         actionConfig: n.actionConfig ? Object.fromEntries(Object.entries(n.actionConfig).filter(([k]) => k !== '_fields')) : null,
         subOptionKey: n.subOptionKey || null,
         categoryKey: n.categoryKey || null,
@@ -2187,8 +2264,8 @@ export default function ScenariosPage() {
                   </button>
                 </div>
               </div>
-              {panelStage === 'subOptions' && activeOption && (
-                <>
+                {panelStage === 'subOptions' && activeOption && (
+                  <>
                   <div
                     className="sb-active-banner sleek-cyber"
                     style={{ borderLeft: `4px solid ${categoryMeta.accent}` }}
@@ -2224,7 +2301,7 @@ export default function ScenariosPage() {
                   <p className="sb-panel-subheader">Select an action for {activeOption.option}</p>
                 </>
               )}
-              {!['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) && (
+              {!['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter'].includes(panelStage) && (
                 <>
                   <div className="sb-panel-search">
                     <Search className="sb-panel-search-icon" size={16} />
@@ -2254,7 +2331,7 @@ export default function ScenariosPage() {
                 </>
               )}
               {/* Action banner — persists across all config stages */}
-              {['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) && selectedNode && (
+              {['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter'].includes(panelStage) && selectedNode && (
                 <div
                   className="sb-active-banner sleek-cyber"
                   style={{ borderLeft: `4px solid ${selectedNode.accent || categoryMeta.accent}` }}
@@ -2295,6 +2372,60 @@ export default function ScenariosPage() {
                 </div>
               )}
               <div className="sb-panel-actions">
+                {panelStage === 'triggerFilter' && triggerFilter ? (
+                  <div className="sb-action-config-form">
+                    <div className="sb-action-config-header">
+                      <h4 className="sb-action-config-title">Filter</h4>
+                      <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="sb-trigger-filter-copy">
+                      Only fire this trigger when the current time matches the selected offset before the appointment.
+                    </div>
+                    <div className="sb-trigger-filter-section">
+                      <div className="sb-trigger-filter-rail" />
+                      <div className="sb-trigger-filter-body">
+                        <div className="sb-trigger-filter-kicker">Before appointment</div>
+                        <div className="sb-action-config-fields">
+                          <div className="sb-action-config-field">
+                            <label className="sb-action-field-label">Hours</label>
+                            <input
+                              type="number"
+                              min="0"
+                              className="sb-input-field"
+                              value={triggerFilter.hours ?? 0}
+                              onChange={(event) => {
+                                const hours = Math.max(0, parseInt(event.target.value, 10) || 0);
+                                setTriggerFilter(normalizeAppointmentSoonFilter({ ...triggerFilter, hours }));
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="sb-action-config-field">
+                            <label className="sb-action-field-label">Minutes</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="59"
+                              className="sb-input-field"
+                              value={triggerFilter.minutes ?? 0}
+                              onChange={(event) => {
+                                const minutes = Math.max(0, Math.min(59, parseInt(event.target.value, 10) || 0));
+                                setTriggerFilter(normalizeAppointmentSoonFilter({ ...triggerFilter, minutes }));
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <div className="sb-trigger-filter-summary">
+                          This trigger fires when the current time is {triggerFilter.hours || 0} hour{(triggerFilter.hours || 0) === 1 ? '' : 's'} {triggerFilter.minutes || 0} minute{(triggerFilter.minutes || 0) === 1 ? '' : 's'} before the appointment starts.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {panelStage === 'actionConfig' && actionConfig ? (
                   /* Staged Action Config Form */
                   <div className="sb-action-config-form">
@@ -2855,7 +2986,7 @@ export default function ScenariosPage() {
                   </div>
                 ) : panelStage === 'options' ? (
                   filteredOptions.length === 0 ? (
-                    <div className="sb-panel-empty" style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>No components found</div>
+                    null
                   ) : (
                     filteredOptions.map((option, index) => {
                       const hasChildren = option.sub_options?.length > 0;
@@ -2884,7 +3015,7 @@ export default function ScenariosPage() {
                     })
                   )
                 ) : filteredSubOptions.length === 0 ? (
-                  <div className="sb-panel-empty" style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>No components found</div>
+                  null
                 ) : (
                   filteredSubOptions.map((subOption, index) => {
                     const SubIcon = activeOption?.icon || categoryMeta.icon;
@@ -3285,6 +3416,7 @@ export default function ScenariosPage() {
                       accent: n.accent,
                       icon: n.icon?.name || n.icon,
                       appointmentConfig: n.appointmentConfig || null,
+                      triggerFilter: n.triggerFilter || null,
                       isCommunication: n.isCommunication || false,
                       firstMessage: n.firstMessage || '',
                       mainBox: n.mainBox || '',

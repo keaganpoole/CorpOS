@@ -32,6 +32,7 @@ const TRIGGER_EVENT_MAP = {
   appointment_updated: 'appointment_updated',
   appointment_cancelled: 'appointment_cancelled',
   appointment_reminder: 'appointment_reminder',
+  appointment_soon: 'appointment_reminder',
   invoice_created: 'invoice_created',
   invoice_paid: 'invoice_paid',
   payment_failed: 'payment_failed',
@@ -47,7 +48,10 @@ class ScenarioEngine {
     this.app = deps.app; // Express app for registering routes
 
     this.scenarios = []; // Active scenarios cache
-    this.scheduler = new Scheduler({ sbQuery: deps.sbQuery });
+    this.scheduler = new Scheduler({
+      sbQuery: deps.sbQuery,
+      eventSystem: deps.eventSystem,
+    });
     this.flowExecutor = null;
   }
 
@@ -196,7 +200,7 @@ class ScenarioEngine {
           context.appointment = appointments[0];
           context.appointments = appointments[0]; // Table-name alias
           if (!context.lead_id && appointments[0].lead_id) context.lead_id = appointments[0].lead_id;
-          if (!context.people_id && appointments[0].people_id) context.people_id = appointments[0].people_id;
+          if (!context.person_id && appointments[0].person_id) context.person_id = appointments[0].person_id;
         }
       } catch (err) {
         console.warn('[ScenarioEngine] Could not fetch appointment:', err.message);
@@ -217,15 +221,16 @@ class ScenarioEngine {
       }
     }
 
-    // Fetch person data — lead_id and people_id both point to people table
-    const peopleId = context.people_id || context.lead_id || event.payload?.people_id;
-    if (peopleId) {
+    // Fetch person data — person_id is the canonical field
+    const personId = context.person_id || context.lead_id || event.payload?.person_id;
+    if (personId) {
       try {
-        const people = await this.sbQuery('people', 'GET', null, `?id=eq.${peopleId}&limit=1`);
+        const people = await this.sbQuery('people', 'GET', null, `?id=eq.${personId}&limit=1`);
         if (people?.length > 0) {
           context.person = people[0];
           context.customer = people[0];
           context.people = people[0]; // Table-name alias for {{people.field}} references
+          context.person_id = people[0].id;
         }
       } catch (err) {
         console.warn('[ScenarioEngine] Could not fetch person:', err.message);

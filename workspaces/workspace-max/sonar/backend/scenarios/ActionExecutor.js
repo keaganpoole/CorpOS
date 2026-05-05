@@ -553,7 +553,7 @@ class ActionExecutor {
         body: JSON.stringify({
           amount: parseFloat(amount),
           currency,
-          people_id: flowContext.person?.id || flowContext.people_id,
+          person_id: flowContext.person?.id || flowContext.person_id,
           user_id: flowContext.business?.user_id,
           description,
           payment_method: paymentMethod,
@@ -666,7 +666,7 @@ class ActionExecutor {
       // Build query params
       const params = new URLSearchParams();
       if (config.search_by === 'Customer Name' && flowContext.person) {
-        params.set('people_id', flowContext.person.id);
+        params.set('person_id', flowContext.person.id);
       } else if (flowContext.payment?.id) {
         // Direct payment lookup
         const resp = await fetch(`${baseUrl}/api/sonar/payments/${flowContext.payment.id}`);

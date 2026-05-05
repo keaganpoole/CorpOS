@@ -15,7 +15,10 @@ const cron = require('node-cron');
 class Scheduler {
   constructor(deps) {
     this.sbQuery = deps.sbQuery;
+    this.eventSystem = deps.eventSystem;
     this.jobs = new Map(); // scenarioId → cron.Task
+    this.reminderJob = null;
+    this.reminderFireMap = new Map(); // dedupe key → timestamp
   }
 
   /**
@@ -64,6 +67,8 @@ class Scheduler {
       }
     }
 
+    this._startAppointmentSoonPolling(scenarios);
+
     console.log(`[Scheduler] Active jobs: ${this.jobs.size}`);
   }
 
@@ -75,6 +80,200 @@ class Scheduler {
       try { job.stop(); } catch (e) { /* ignore */ }
     }
     this.jobs.clear();
+
+    if (this.reminderJob) {
+      try { this.reminderJob.stop(); } catch (e) { /* ignore */ }
+      this.reminderJob = null;
+    }
+
+    this.reminderFireMap.clear();
+  }
+
+  /**
+   * Start one global poller for Appointment Soon triggers.
+   * This is lighter than creating a timer per scenario and keeps the trigger
+   * logic centralized in the backend.
+   */
+  _startAppointmentSoonPolling(scenarios) {
+    if (!this.eventSystem) return;
+
+    console.log(`[Scheduler] Appointment Soon poller started (${scenarios.length} scenario(s) loaded)`);
+    this.reminderJob = cron.schedule('* * * * *', () => {
+      console.log('[Scheduler] Appointment Soon poll tick');
+      this._checkAppointmentSoonScenarios(scenarios).catch(err => {
+        console.error('[Scheduler] Appointment Soon poll failed:', err.message);
+      });
+    });
+  }
+
+  _getAppointmentSoonTriggers(scenario) {
+    const nodes = typeof scenario.nodes_data === 'string'
+      ? JSON.parse(scenario.nodes_data)
+      : scenario.nodes_data;
+
+    if (!nodes?.length) return [];
+
+    return nodes.filter(node =>
+      node?.configured
+      && node?.categoryType === 'TRIGGERS'
+      && (node?.subOptionKey === 'appointment_soon' || node?.triggerFilter?.key === 'appointment_soon')
+    );
+  }
+
+  _parseAppointmentDateTime(appointment) {
+    if (!appointment?.date && !appointment?.appointment_date) return null;
+
+    const rawDate = appointment.date || appointment.appointment_date;
+    const rawTime = appointment.time || appointment.appointment_time || '00:00';
+
+    const dateString = String(rawDate).slice(0, 10);
+    const timeString = String(rawTime).slice(0, 5);
+    const dateTime = new Date(`${dateString}T${timeString}:00`);
+
+    return Number.isNaN(dateTime.getTime()) ? null : dateTime;
+  }
+
+  _formatDateLocal(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  _formatTimeLocal(date) {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  _purgeReminderKeys(now = Date.now()) {
+    const ttl = 24 * 60 * 60 * 1000;
+    for (const [key, firedAt] of this.reminderFireMap.entries()) {
+      if (now - firedAt > ttl) {
+        this.reminderFireMap.delete(key);
+      }
+    }
+  }
+
+  async _checkAppointmentSoonScenarios(scenarios) {
+    const now = new Date();
+    const windowStart = new Date(now);
+    windowStart.setSeconds(0, 0);
+    const windowEnd = new Date(windowStart.getTime() + 60 * 1000);
+
+    this._purgeReminderKeys(now.getTime());
+
+    for (const scenario of scenarios) {
+      const userId = scenario.user_id || scenario.created_by;
+      const triggers = this._getAppointmentSoonTriggers(scenario);
+      if (triggers.length === 0) continue;
+
+      for (const trigger of triggers) {
+        const triggerFilter = trigger.triggerFilter || {};
+        const offsetMinutes = Math.max(0, Number(triggerFilter.offsetMinutes ?? ((Number(triggerFilter.hours) || 0) * 60 + (Number(triggerFilter.minutes) || 0))));
+        const targetStart = new Date(now.getTime() + (offsetMinutes * 60 * 1000));
+        const queryDate = this._formatDateLocal(targetStart);
+
+        console.log(
+          `[Scheduler] Checking Supabase for Appointment Soon: scenario="${scenario.name}", ` +
+          `user_id=${userId}, target_date=${queryDate}, offset=${offsetMinutes}m`
+        );
+
+        let appointments = [];
+        try {
+          const query = userId
+            ? `?user_id=eq.${userId}&order=created_at.desc&limit=200`
+            : `?order=created_at.desc&limit=200`;
+
+          const byUser = await this.sbQuery(
+            'appointments',
+            'GET',
+            null,
+            query
+          ) || [];
+          appointments = byUser.filter(appointment => {
+            const appointmentStart = this._parseAppointmentDateTime(appointment);
+            if (!appointmentStart) return false;
+
+            const appointmentDate = this._formatDateLocal(appointmentStart);
+            return appointmentDate === queryDate;
+          });
+          console.log(
+            `[Scheduler] Supabase returned ${appointments.length} appointment(s) for "${scenario.name}"`
+          );
+        } catch (err) {
+          console.warn(`[Scheduler] Could not load appointments for "${scenario.name}":`, err.message);
+          continue;
+        }
+
+        for (const appointment of appointments) {
+          if (!appointment || ['cancelled', 'completed'].includes(String(appointment.status || '').toLowerCase())) {
+            console.log(`[Scheduler] Skipping appointment ${appointment?.id || 'unknown'}: status=${appointment?.status || 'unknown'}`);
+            continue;
+          }
+
+          const appointmentStart = this._parseAppointmentDateTime(appointment);
+          if (!appointmentStart) {
+            console.log(
+              `[Scheduler] Skipping appointment ${appointment.id}: could not parse start time ` +
+              `(date=${appointment.date || appointment.appointment_date || 'n/a'}, ` +
+              `time=${appointment.time || appointment.appointment_time || 'n/a'})`
+            );
+            continue;
+          }
+
+          const reminderAt = new Date(appointmentStart.getTime() - (offsetMinutes * 60 * 1000));
+          const matchesWindow = reminderAt >= windowStart && reminderAt < windowEnd;
+
+          console.log(
+            `[Scheduler] Appointment ${appointment.id}: start=${appointmentStart.toISOString()} ` +
+            `reminderAt=${reminderAt.toISOString()} now=${now.toISOString()} ` +
+            `window=[${windowStart.toISOString()} - ${windowEnd.toISOString()}) ` +
+            `match=${matchesWindow}`
+          );
+
+          if (!matchesWindow) continue;
+
+          const dedupeKey = [
+            scenario.id,
+            trigger.id || trigger.subOptionKey || 'appointment_soon',
+            appointment.id,
+            queryDate,
+            this._formatTimeLocal(targetStart),
+          ].join('|');
+
+          if (this.reminderFireMap.has(dedupeKey)) continue;
+          this.reminderFireMap.set(dedupeKey, now.getTime());
+
+          const event = {
+            event_type: 'appointment_reminder',
+            actor: 'scheduler',
+            actor_type: 'system',
+            source: 'scenario-scheduler',
+            message: `Appointment reminder fired for "${scenario.name}"`,
+            payload: {
+              ...appointment,
+              appointment_id: appointment.id,
+              scenario_id: scenario.id,
+              trigger_filter: {
+                key: 'appointment_soon',
+                hours: triggerFilter.hours || 0,
+                minutes: triggerFilter.minutes || 0,
+                offsetMinutes,
+              },
+              reminder_offset_minutes: offsetMinutes,
+              reminder_fire_at: now.toISOString(),
+            },
+          };
+
+          console.log(
+            `[Scheduler] Firing appointment reminder for appointment ${appointment.id} ` +
+            `from scenario "${scenario.name}"`
+          );
+          this.eventSystem.emit(event);
+        }
+      }
+    }
   }
 
   /**

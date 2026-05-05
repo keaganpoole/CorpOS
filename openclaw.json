@@ -20,7 +20,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "Openrouter/xiaomi/mimo-v2-omni"
+        "primary": "Openrouter/google/gemini-2.5-flash-lite"
       },
       "models": {
         "openrouter/auto": {

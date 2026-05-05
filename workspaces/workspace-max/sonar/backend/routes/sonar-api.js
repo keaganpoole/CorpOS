@@ -612,7 +612,7 @@ router.put('/people/:id', async (req, res) => {
         source: 'sonar-api',
         message: `Person ${req.params.id} updated`,
         payload: {
-          people_id: parseInt(req.params.id),
+          person_id: parseInt(req.params.id),
           record_id: req.params.id,
           ...payload,
         },
@@ -933,12 +933,12 @@ router.get('/payments/test-mode', async (req, res) => {
 /**
  * POST /api/sonar/payments/charge
  * Create a Stripe PaymentIntent and record it.
- * Body: { amount, currency, people_id, user_id, description, scenario_id }
+ * Body: { amount, currency, person_id, user_id, description, scenario_id }
  */
 router.post('/payments/charge', async (req, res) => {
   try {
     const stripe = getStripe();
-    const { amount, currency = 'usd', people_id, user_id, description, scenario_id } = req.body;
+    const { amount, currency = 'usd', person_id, user_id, description, scenario_id } = req.body;
 
     if (!amount || parseFloat(amount) <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
@@ -952,14 +952,14 @@ router.post('/payments/charge', async (req, res) => {
       amount: amountCents,
       currency,
       description: description || 'Payment via Sonar',
-      metadata: { people_id: people_id || '', user_id: user_id || '' },
+      metadata: { person_id: person_id || '', user_id: user_id || '' },
       automatic_payment_methods: { enabled: true },
     });
 
     // Record in database
     const paymentRecord = {
       user_id: user_id || null,
-      people_id: people_id ? parseInt(people_id) : null,
+      person_id: person_id ? parseInt(person_id) : null,
       scenario_id: scenario_id || null,
       stripe_payment_intent_id: intent.id,
       amount: amountCents,
@@ -1061,13 +1061,13 @@ router.post('/payments/refund', async (req, res) => {
 /**
  * GET /api/sonar/payments
  * List payments with optional filters.
- * Query: ?people_id=17&status=succeeded&limit=25
+ * Query: ?person_id=17&status=succeeded&limit=25
  */
 router.get('/payments', async (req, res) => {
   try {
-    const { people_id, status, user_id, limit = 50, offset = 0 } = req.query;
+    const { person_id, status, user_id, limit = 50, offset = 0 } = req.query;
     let query = '?order=created_at.desc';
-    if (people_id) query += `&people_id=eq.${people_id}`;
+    if (person_id) query += `&person_id=eq.${person_id}`;
     if (status) query += `&status=eq.${status}`;
     if (user_id) query += `&user_id=eq.${user_id}`;
     query += `&limit=${limit}&offset=${offset}`;

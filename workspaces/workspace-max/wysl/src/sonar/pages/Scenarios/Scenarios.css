@@ -1802,6 +1802,58 @@
   gap: 12px;
 }
 
+.sb-trigger-filter-form {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sb-trigger-filter-copy {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #71717a;
+  font-weight: 600;
+}
+
+.sb-trigger-filter-section {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  padding: 4px 0 0;
+}
+
+.sb-trigger-filter-rail {
+  width: 3px;
+  border-radius: 999px;
+  flex: 0 0 3px;
+  background: linear-gradient(180deg, rgba(50, 240, 217, 0.95), rgba(56, 189, 248, 0.8));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 0 18px rgba(50, 240, 217, 0.2);
+}
+
+.sb-trigger-filter-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sb-trigger-filter-kicker {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.sb-trigger-filter-summary {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .sb-action-config-field {
   display: flex;
   flex-direction: column;
