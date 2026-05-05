@@ -28,6 +28,12 @@ class Scheduler {
     // Stop existing jobs
     this.stop();
 
+    const schedulerEnabled = await this._isSchedulerEnabled();
+    if (!schedulerEnabled) {
+      console.log('[Scheduler] Disabled via system_config.scheduler_run = false');
+      return;
+    }
+
     for (const scenario of scenarios) {
       if (!scenario.schedule_config) continue;
 
@@ -74,6 +80,26 @@ class Scheduler {
     this._startAppointmentSoonPolling(scenarios);
 
     console.log(`[Scheduler] Active jobs: ${this.jobs.size}`);
+  }
+
+  /**
+   * Check whether the global scheduler should run.
+   * Defaults to false if the config row is missing or unreadable.
+   */
+  async _isSchedulerEnabled() {
+    try {
+      const records = await this.sbQuery(
+        'system_config',
+        'GET',
+        null,
+        '?id=is.true&select=scheduler_run&limit=1'
+      ) || [];
+
+      return records[0]?.scheduler_run === true;
+    } catch (err) {
+      console.warn('[Scheduler] Could not read system_config.scheduler_run:', err.message);
+      return false;
+    }
   }
 
   async _getBusinessTimezone(cacheKey) {
