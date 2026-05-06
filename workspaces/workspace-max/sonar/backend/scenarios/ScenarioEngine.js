@@ -34,6 +34,7 @@ const TRIGGER_EVENT_MAP = {
   appointment_reminder: 'appointment_reminder',
   appointment_soon: 'appointment_reminder',
   invoice_created: 'invoice_created',
+  invoice_sent: 'invoice_sent',
   invoice_paid: 'invoice_paid',
   payment_failed: 'payment_failed',
   payment_succeeded: 'payment_succeeded',

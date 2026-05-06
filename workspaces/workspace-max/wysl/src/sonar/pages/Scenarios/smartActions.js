@@ -129,10 +129,16 @@ const SMART_ACTIONS = {
     { key: 'confirm_payment', name: 'Confirm Payment', description: 'Verify payment was received', instruction: 'Confirm their payment was received and processed. Thank them for their payment.', appliesTo: ['call_customer', 'call_phone_number'] },
   ],
 
-  // ─── Invoice Sent ─────────────────────────────────────
+  // ─── Payment Link Sent ─────────────────────────────────
+  payment_link_sent: [
+    { key: 'confirm_receipt', name: 'Confirm Receipt', description: 'Make sure they got the payment link', instruction: 'Confirm they received the payment link. Ask if they have any questions about it.', appliesTo: ['call_customer', 'call_phone_number'] },
+    { key: 'explain_charges', name: 'Explain Charges', description: 'Walk them through the payment request', instruction: 'Walk the customer through the payment request. Explain each line item and answer any questions.', appliesTo: ['call_customer', 'call_phone_number'] },
+  ],
+
+  // Backward compatibility for older saved scenarios
   invoice_sent: [
-    { key: 'confirm_receipt', name: 'Confirm Receipt', description: 'Make sure they got the invoice', instruction: 'Confirm they received the invoice. Ask if they have any questions about it.', appliesTo: ['call_customer', 'call_phone_number'] },
-    { key: 'explain_charges', name: 'Explain Charges', description: 'Walk them through the invoice', instruction: 'Walk the customer through the invoice. Explain each line item and answer any questions.', appliesTo: ['call_customer', 'call_phone_number'] },
+    { key: 'confirm_receipt', name: 'Confirm Receipt', description: 'Make sure they got the payment link', instruction: 'Confirm they received the payment link. Ask if they have any questions about it.', appliesTo: ['call_customer', 'call_phone_number'] },
+    { key: 'explain_charges', name: 'Explain Charges', description: 'Walk them through the payment request', instruction: 'Walk the customer through the payment request. Explain each line item and answer any questions.', appliesTo: ['call_customer', 'call_phone_number'] },
   ],
 
   // ─── Record Created ───────────────────────────────────

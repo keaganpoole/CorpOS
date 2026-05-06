@@ -28,6 +28,30 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
+const TABLE_REF_ALIASES = {
+  people: 'person',
+  payments: 'payment',
+  invoices: 'invoice',
+  appointments: 'appointment',
+  services: 'service',
+  hired_receptionists: 'receptionist',
+  businesses: 'business',
+};
+
+const TABLE_REF_REVERSE_ALIASES = Object.fromEntries(
+  Object.entries(TABLE_REF_ALIASES).map(([tableKey, alias]) => [alias, tableKey])
+);
+
+const normalizeTableRefKey = (tableKey) => {
+  if (!tableKey) return tableKey;
+  return TABLE_REF_ALIASES[tableKey] || tableKey;
+};
+
+const normalizeParsedTableKey = (tableKey) => {
+  if (!tableKey) return tableKey;
+  return TABLE_REF_REVERSE_ALIASES[tableKey] || tableKey;
+};
+
 const SEARCH_FIELDS = {
   people: ['first_name', 'last_name', 'email', 'notes'],
   payments: ['description', 'status', 'payment_method'],
@@ -61,10 +85,11 @@ const TRIGGER_TABLE_MAP = {
   sms_sent: ['people', 'businesses'],
   sms_failed: ['people', 'businesses'],
   customer_replied: ['people', 'businesses'],
-  invoice_created: ['payments', 'people', 'businesses'],
-  invoice_paid: ['payments', 'people', 'businesses'],
-  payment_failed: ['payments', 'people', 'businesses'],
-  invoice_sent: ['payments', 'people', 'businesses'],
+  invoice_created: ['invoices', 'payments', 'people', 'businesses'],
+  invoice_paid: ['invoices', 'payments', 'people', 'businesses'],
+  payment_failed: ['invoices', 'payments', 'people', 'businesses'],
+  payment_link_sent: ['invoices', 'payments', 'people', 'businesses'],
+  invoice_sent: ['invoices', 'payments', 'people', 'businesses'],
   manual_trigger: ['people', 'payments', 'appointments', 'services', 'hired_receptionists', 'businesses'],
 };
 
@@ -77,6 +102,7 @@ const FETCH_ORDER = {
   people: 3,
   appointments: 10,
   payments: 11,
+  invoices: 11.5,
   hired_receptionists: 12,
 };
 const PEOPLE_SORT_KEY = 3; // People at the very bottom after reverse
@@ -213,6 +239,33 @@ const TABLE_DEFS = [
     },
   },
   {
+    key: 'invoices',
+    label: 'Invoices',
+    color: '#f59e0b',
+    colorBg: 'rgba(245,158,11,0.08)',
+    colorBorder: 'rgba(245,158,11,0.2)',
+    icon: CreditCard,
+    fields: [
+      { key: 'id', label: 'Invoice ID', type: 'text' },
+      { key: 'invoice_id', label: 'Invoice ID', type: 'text' },
+      { key: 'amount_due', label: 'Amount Due', type: 'number' },
+      { key: 'amount_paid', label: 'Amount Paid', type: 'number' },
+      { key: 'currency', label: 'Currency', type: 'text' },
+      { key: 'status', label: 'Status', type: 'text' },
+      { key: 'customer_id', label: 'Customer ID', type: 'text' },
+      { key: 'hosted_invoice_url', label: 'Hosted Invoice URL', type: 'url' },
+      { key: 'invoice_pdf', label: 'Invoice PDF', type: 'url' },
+      { key: 'due_date', label: 'Due Date', type: 'timestamp' },
+      { key: 'metadata', label: 'Metadata', type: 'text' },
+    ],
+    fetch: async () => {
+      try {
+        const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false }).limit(20);
+        return data || [];
+      } catch { return []; }
+    },
+  },
+  {
     key: 'appointments',
     label: 'Appointments',
     color: '#38bdf8',
@@ -334,6 +387,7 @@ const TABLE_DEFS = [
 export const TABLE_COLORS = {
   people: '#32f0d9',
   payments: '#f472b6',
+  invoices: '#f59e0b',
   appointments: '#38bdf8',
   services: '#fb923c',
   hired_receptionists: '#f472b6',
@@ -342,11 +396,19 @@ export const TABLE_COLORS = {
 
 export const TABLE_LABELS = {
   people: 'People',
-  payments: 'Payment',
-  appointments: 'Appointment',
-  services: 'Service',
-  hired_receptionists: 'Receptionist',
-  businesses: 'Business',
+  person: 'Person',
+  payments: 'Payments',
+  payment: 'Payment',
+  invoices: 'Invoices',
+  invoice: 'Invoice',
+  appointments: 'Appointments',
+  appointment: 'Appointment',
+  services: 'Services',
+  service: 'Service',
+  hired_receptionists: 'Receptionists',
+  receptionist: 'Receptionist',
+  businesses: 'Businesses',
+  business: 'Business',
 };
 
 const DEFAULT_AGENT_VARS = [
@@ -374,7 +436,7 @@ const DEFAULT_AGENT_VARS = [
   { key: 'update_appt_time', label: 'Update Appointment Time', category: 'appointments' },
 ];
 
-export const getVariableRef = (tableKey, fieldKey) => `{{${tableKey}.${fieldKey}}}`;
+export const getVariableRef = (tableKey, fieldKey) => `{{${normalizeTableRefKey(tableKey)}.${fieldKey}}}`;
 
 export const renderVarChipsHTML = (value) => {
   if (!value || typeof value !== 'string') return '';
@@ -389,8 +451,9 @@ export const renderVarChipsHTML = (value) => {
     if (parts[0] === 'agent') {
       return `<span class="sb-var-chip" style="background:rgba(50,240,217,0.12);color:#32f0d9;border:1px solid rgba(50,240,217,0.25);display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Call.${parts[1]}</span>`;
     }
-    const color = TABLE_COLORS[parts[0]] || '#a78bfa';
-    const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
+    const tableKey = normalizeParsedTableKey(parts[0]);
+    const color = TABLE_COLORS[tableKey] || '#a78bfa';
+    const tableLabel = TABLE_LABELS[parts[0]] || TABLE_LABELS[tableKey] || parts[0];
     return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${tableLabel}.${parts[1]}</span>`;
   });
   return result;
@@ -405,7 +468,7 @@ export const parseVariables = (value) => {
     const [full, ref] = match;
     const parts = ref.split('.');
     if (parts.length === 2) {
-      matches.push({ full, table: parts[0], field: parts[1] });
+      matches.push({ full, table: normalizeParsedTableKey(parts[0]), field: parts[1] });
     }
   }
   return matches;

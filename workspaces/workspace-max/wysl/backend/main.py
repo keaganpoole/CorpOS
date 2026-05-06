@@ -1,9 +1,11 @@
 # main.py
   
 import logging
+import os
 import stripe
 import json
 from uuid import UUID
+from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, timezone, timedelta
 from typing import List, Optional
 
@@ -29,7 +31,15 @@ from fastapi import BackgroundTasks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from jose import JWTError, jwt
-from config import supabase, stripe_webhook_secret, SECRET_KEY, ALGORITHM, TEST_MODE
+from config import (
+    supabase,
+    stripe_webhook_secret,
+    SECRET_KEY,
+    ALGORITHM,
+    TEST_MODE,
+    STRIPE_LIVE_SECRET_KEY,
+    STRIPE_TEST_SECRET_KEY,
+)
 
  
 from models import (
@@ -48,6 +58,7 @@ from dependencies import get_current_user, get_current_rep
 # --------------------------------------------------------------------------
 app = FastAPI(title="WYSL API")
 # scheduler = AsyncIOScheduler()
+PAYMENT_TEST_MODE = TEST_MODE
 
 app.include_router(phone_helper_router, prefix="/api", tags=["Phone Helper"])
 
@@ -117,6 +128,55 @@ class VisitorCreate(BaseModel):
 
 class ConfigStatusResponse(BaseModel):
     test_mode: bool
+
+class PaymentCreateRequest(BaseModel):
+    amount: int
+    currency: str = "usd"
+    payment_method_type: str = "card"
+    description: Optional[str] = None
+    person_id: Optional[str] = None
+    appointment_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+class PaymentProfileCreateRequest(BaseModel):
+    amount: int
+    currency: str = "usd"
+    description: Optional[str] = None
+    person_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+class InvoiceCreateRequest(BaseModel):
+    amount: int
+    currency: str = "usd"
+    description: Optional[str] = None
+    person_id: Optional[str] = None
+    appointment_id: Optional[str] = None
+    service_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    due_days: Optional[int] = 7
+
+class InvoiceSendRequest(BaseModel):
+    invoice_id: str
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    description: Optional[str] = None
+
+class PaymentUpdateRequest(BaseModel):
+    payment_id: str
+    status: str
+    amount: Optional[int] = None
+    description: Optional[str] = None
+    notes: Optional[str] = None
+
+class PaymentTestModeRequest(BaseModel):
+    enabled: bool
 
 # --------------------------------------------------------------------------
 # Middleware & Exception Handlers
@@ -241,6 +301,151 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def set_payment_test_mode(enabled: bool):
+    global PAYMENT_TEST_MODE
+    PAYMENT_TEST_MODE = enabled
+    stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
+    logging.info("Payment test mode set to %s", PAYMENT_TEST_MODE)
+
+def get_payment_mode_label() -> str:
+    return "test" if PAYMENT_TEST_MODE else "live"
+
+def get_payment_frontend_base_url() -> str:
+    if PAYMENT_TEST_MODE:
+        return os.environ.get("PAYMENT_TEST_FRONTEND_URL", "http://localhost:5173")
+    return os.environ.get("PAYMENT_LIVE_FRONTEND_URL", "https://keyquarters.com")
+
+def coerce_amount_to_cents(amount_value) -> int:
+    try:
+        return int(Decimal(str(amount_value)))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid amount value")
+
+def ensure_no_unresolved_templates(*values):
+    for value in values:
+        if isinstance(value, str) and "{{" in value and "}}" in value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unresolved variable reference received: {value}. Please resolve scenario variables before running this payment action.",
+            )
+
+def build_invoice_metadata(*, person_id: Optional[str] = None, appointment_id: Optional[str] = None, service_id: Optional[str] = None):
+    metadata = {"source": "wysl_scenarios"}
+    if person_id:
+        metadata["person_id"] = str(person_id)
+    if appointment_id:
+        metadata["appointment_id"] = str(appointment_id)
+    if service_id:
+        metadata["service_id"] = str(service_id)
+    return metadata
+
+def serialize_stripe_invoice(invoice):
+    if not invoice:
+        return {}
+    return {
+        "id": invoice.get("id"),
+        "invoice_id": invoice.get("id"),
+        "object": invoice.get("object"),
+        "status": invoice.get("status"),
+        "amount_due": invoice.get("amount_due"),
+        "amount_paid": invoice.get("amount_paid"),
+        "currency": invoice.get("currency"),
+        "customer_id": invoice.get("customer"),
+        "hosted_invoice_url": invoice.get("hosted_invoice_url"),
+        "invoice_pdf": invoice.get("invoice_pdf"),
+        "description": invoice.get("description"),
+        "number": invoice.get("number"),
+        "due_date": invoice.get("due_date"),
+        "created": invoice.get("created"),
+        "metadata": invoice.get("metadata"),
+    }
+
+def emit_payment_trigger(trigger_key: str, payload: dict):
+    trigger_payload = {
+        "trigger_key": trigger_key,
+        "payload": payload,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    logging.info("Payment trigger fired: %s", json.dumps(trigger_payload, default=str))
+    try:
+        supabase.table("scenario_events").insert(trigger_payload).execute()
+    except Exception as exc:
+        logging.debug("scenario_events insert skipped or failed: %s", exc)
+    return trigger_payload
+
+def build_payment_row(
+    *,
+    amount: int,
+    currency: str,
+    payment_method: str,
+    description: str,
+    status: str = "pending",
+    stripe_payment_intent_id: Optional[str] = None,
+    stripe_session_id: Optional[str] = None,
+    receipt_url: Optional[str] = None,
+    error_message: Optional[str] = None,
+):
+    return {
+        "amount": amount,
+        "currency": currency,
+        "status": status,
+        "payment_method": payment_method,
+        "description": description,
+        "receipt_url": receipt_url,
+        "stripe_payment_intent_id": stripe_payment_intent_id,
+        "stripe_session_id": stripe_session_id,
+        "refunded_amount": 0,
+        "error_message": error_message,
+    }
+
+def insert_payment_record(payment_row: dict):
+    try:
+        response = supabase.table("payments").insert(payment_row).execute()
+        return response.data[0] if response.data else payment_row
+    except Exception as exc:
+        logging.error("Failed to insert payment row: %s", exc, exc_info=True)
+        return payment_row
+
+def update_payment_record(match_field: str, match_value: str, update_data: dict):
+    response = supabase.table("payments").update(update_data).eq(match_field, match_value).execute()
+    return response.data[0] if response.data else None
+
+def upsert_payment_from_stripe(
+    *,
+    payment_intent_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    status: Optional[str] = None,
+    receipt_url: Optional[str] = None,
+    error_message: Optional[str] = None,
+):
+    query = None
+    if payment_intent_id:
+        query = supabase.table("payments").select("*").eq("stripe_payment_intent_id", payment_intent_id).limit(1)
+    elif session_id:
+        query = supabase.table("payments").select("*").eq("stripe_session_id", session_id).limit(1)
+    else:
+        return None
+
+    existing = query.execute()
+    if not existing.data:
+        return None
+
+    update_data = {}
+    if status is not None:
+        update_data["status"] = status
+    if receipt_url is not None:
+        update_data["receipt_url"] = receipt_url
+    if error_message is not None:
+        update_data["error_message"] = error_message
+    if not update_data:
+        return existing.data[0]
+
+    if payment_intent_id:
+        updated = supabase.table("payments").update(update_data).eq("stripe_payment_intent_id", payment_intent_id).execute()
+    else:
+        updated = supabase.table("payments").update(update_data).eq("stripe_session_id", session_id).execute()
+    return updated.data[0] if updated.data else existing.data[0]
 
 # --------------------------------------------------------------------------
 # API Endpoints
@@ -580,6 +785,302 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
     logging.error(f"Error creating checkout session for user {current_user_id}: {e}", exc_info=True)
     raise HTTPException(status_code=500, detail="An internal error occurred.")
 
+@app.post("/api/sonar/payments/test-mode", tags=["Sonar Payments"])
+async def set_sonar_payment_test_mode(request: PaymentTestModeRequest):
+    set_payment_test_mode(request.enabled)
+    return {"enabled": PAYMENT_TEST_MODE, "mode": get_payment_mode_label()}
+
+@app.post("/api/sonar/create-payment", tags=["Sonar Payments"])
+async def create_payment(request: PaymentCreateRequest):
+    description = request.description or ""
+    payment_method_type = (request.payment_method_type or "card").lower()
+    payment_method = "us_bank_account" if payment_method_type == "ach" else payment_method_type
+    ensure_no_unresolved_templates(request.person_id, request.appointment_id, description)
+
+    stripe_payment_intent = None
+    stripe_error = None
+    try:
+        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
+        if payment_method_type != "link":
+            payment_intent_payload = {
+                "amount": request.amount,
+                "currency": request.currency,
+                "description": description,
+                "payment_method_types": [payment_method],
+                "automatic_payment_methods": {"enabled": False},
+                "metadata": {
+                    "person_id": request.person_id or "",
+                    "appointment_id": request.appointment_id or "",
+                    "source": "wysl_scenarios",
+                },
+            }
+            stripe_payment_intent = stripe.PaymentIntent.create(**payment_intent_payload)
+    except Exception as exc:
+        stripe_error = str(exc)
+        logging.warning("Stripe payment intent creation failed, falling back to local payment row: %s", exc)
+
+    payment_row = build_payment_row(
+        amount=request.amount,
+        currency=request.currency,
+        payment_method=request.payment_method_type,
+        description=description,
+        status=(stripe_payment_intent.status if stripe_payment_intent else "created"),
+        stripe_payment_intent_id=(stripe_payment_intent.id if stripe_payment_intent else None),
+        receipt_url=None,
+        error_message=stripe_error,
+    )
+    saved_payment = insert_payment_record(payment_row)
+    emit_payment_trigger("invoice_created", {
+        "payment": saved_payment,
+        "stripe_payment_intent_id": stripe_payment_intent.id if stripe_payment_intent else None,
+    })
+
+    response_payload = dict(saved_payment)
+    if stripe_payment_intent:
+        response_payload.update({
+            "client_secret": stripe_payment_intent.client_secret,
+            "status": stripe_payment_intent.status,
+            "id": stripe_payment_intent.id,
+            "object": stripe_payment_intent.object,
+            "amount": stripe_payment_intent.amount,
+            "amount_received": stripe_payment_intent.amount_received,
+            "currency": stripe_payment_intent.currency,
+            "created": stripe_payment_intent.created,
+            "latest_charge": stripe_payment_intent.latest_charge,
+            "metadata": stripe_payment_intent.metadata,
+        })
+    else:
+        response_payload.update({
+            "client_secret": None,
+            "id": saved_payment.get("stripe_payment_intent_id") or saved_payment.get("id"),
+            "object": "payment_record",
+        })
+    return response_payload
+
+@app.post("/api/sonar/create-payment-profile", tags=["Sonar Payments"])
+async def create_payment_profile(request: PaymentProfileCreateRequest):
+    description = request.description or ""
+    payment_mode_base_url = get_payment_frontend_base_url()
+    ensure_no_unresolved_templates(request.person_id, request.customer_name, request.customer_email, request.customer_phone, description)
+    try:
+        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
+        customer_payload = {}
+        if request.customer_email:
+            customer_payload["email"] = request.customer_email
+        if request.customer_name:
+            customer_payload["name"] = request.customer_name
+        if request.customer_phone:
+            customer_payload["phone"] = request.customer_phone
+
+        customer = stripe.Customer.create(
+            **customer_payload,
+            metadata={
+                "person_id": request.person_id or "",
+                "source": "wysl_scenarios",
+            },
+        )
+
+        checkout_session = stripe.checkout.Session.create(
+            mode="payment",
+            customer=customer.id,
+            line_items=[{
+                "price_data": {
+                    "currency": request.currency,
+                    "product_data": {
+                        **({"name": request.customer_name} if request.customer_name else {"name": "Payment Profile"}),
+                        **({"description": description} if description else {}),
+                    },
+                    "unit_amount": request.amount,
+                },
+                "quantity": 1,
+            }],
+            success_url=f"{payment_mode_base_url}/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{payment_mode_base_url}/dashboard?payment=cancelled",
+            metadata={
+                "person_id": request.person_id or "",
+                "source": "wysl_scenarios",
+            },
+        )
+
+        payment_row = build_payment_row(
+            amount=request.amount,
+            currency=request.currency,
+            payment_method="link",
+            description=description,
+            status="sent",
+            stripe_session_id=checkout_session.id,
+        )
+        saved_payment = insert_payment_record(payment_row)
+        emit_payment_trigger("payment_link_sent", {
+            "payment": saved_payment,
+            "payment_id": saved_payment.get("id"),
+            "payment_url": checkout_session.url,
+            "stripe_session_id": checkout_session.id,
+            "customer_id": customer.id,
+            "amount": request.amount,
+            "currency": request.currency,
+        })
+
+        return {
+            "customer_id": customer.id,
+            "setup_intent_id": None,
+            "client_secret": None,
+            "payment_url": checkout_session.url,
+            "amount": request.amount,
+            "currency": request.currency,
+            "status": "sent",
+            "customer_name": request.customer_name,
+            "customer_email": request.customer_email,
+            "customer_phone": request.customer_phone,
+            "stripe_session_id": checkout_session.id,
+            "payment_id": saved_payment.get("id"),
+        }
+    except Exception as exc:
+        logging.error("Error creating payment profile: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/api/sonar/create-invoice", tags=["Sonar Payments"])
+async def create_invoice(request: InvoiceCreateRequest):
+    description = request.description or ""
+    ensure_no_unresolved_templates(
+        request.person_id,
+        request.appointment_id,
+        request.service_id,
+        request.customer_name,
+        request.customer_email,
+        request.customer_phone,
+        description,
+    )
+    try:
+        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
+
+        customer_payload = {}
+        if request.customer_email:
+            customer_payload["email"] = request.customer_email
+        if request.customer_name:
+            customer_payload["name"] = request.customer_name
+        if request.customer_phone:
+            customer_payload["phone"] = request.customer_phone
+
+        invoice_metadata = build_invoice_metadata(
+            person_id=request.person_id,
+            appointment_id=request.appointment_id,
+            service_id=request.service_id,
+        )
+
+        customer = stripe.Customer.create(
+            **customer_payload,
+            metadata=invoice_metadata,
+        )
+
+        stripe.InvoiceItem.create(
+            customer=customer.id,
+            amount=request.amount,
+            currency=request.currency,
+            description=description or "Invoice",
+            metadata=invoice_metadata,
+        )
+
+        invoice = stripe.Invoice.create(
+            customer=customer.id,
+            collection_method="send_invoice",
+            days_until_due=max(int(request.due_days or 7), 1),
+            auto_advance=False,
+            description=description or None,
+            metadata=invoice_metadata,
+        )
+
+        return serialize_stripe_invoice(invoice)
+    except Exception as exc:
+        logging.error("Error creating invoice: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/api/sonar/send-invoice", tags=["Sonar Payments"])
+async def send_invoice(request: InvoiceSendRequest):
+    ensure_no_unresolved_templates(
+        request.invoice_id,
+        request.customer_name,
+        request.customer_email,
+        request.customer_phone,
+        request.description,
+    )
+    try:
+        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
+
+        invoice = stripe.Invoice.retrieve(request.invoice_id)
+        if request.description:
+            modify_payload = {"metadata": dict(invoice.get("metadata") or {})}
+            if request.description:
+                modify_payload["description"] = request.description
+            invoice = stripe.Invoice.modify(request.invoice_id, **modify_payload)
+
+        customer_updates = {}
+        if request.customer_email:
+            customer_updates["email"] = request.customer_email
+        if request.customer_name:
+            customer_updates["name"] = request.customer_name
+        if request.customer_phone:
+            customer_updates["phone"] = request.customer_phone
+        if customer_updates and invoice.get("customer"):
+            stripe.Customer.modify(invoice.get("customer"), **customer_updates)
+
+        if invoice.get("status") == "draft":
+            invoice = stripe.Invoice.finalize_invoice(request.invoice_id)
+
+        sent_invoice = stripe.Invoice.send_invoice(request.invoice_id)
+
+        fresh_invoice = stripe.Invoice.retrieve(request.invoice_id)
+        return serialize_stripe_invoice(fresh_invoice)
+    except Exception as exc:
+        logging.error("Error sending invoice: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/api/sonar/update-payment", tags=["Sonar Payments"])
+async def update_payment(request: PaymentUpdateRequest):
+    ensure_no_unresolved_templates(request.payment_id, request.description, request.notes)
+    payment_record = None
+    if request.payment_id:
+        existing = supabase.table("payments").select("*").eq("stripe_payment_intent_id", request.payment_id).limit(1).execute()
+        if existing.data:
+            payment_record = existing.data[0]
+        else:
+            existing = supabase.table("payments").select("*").eq("id", request.payment_id).limit(1).execute()
+            if existing.data:
+                payment_record = existing.data[0]
+
+    if not payment_record:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    update_data = {"status": request.status}
+    if request.amount is not None:
+        update_data["amount"] = request.amount
+    if request.description is not None:
+        update_data["description"] = request.description
+    if request.notes is not None:
+        update_data["notes"] = request.notes
+
+    match_field = "stripe_payment_intent_id" if payment_record.get("stripe_payment_intent_id") == request.payment_id else "id"
+    match_value = request.payment_id if match_field == "stripe_payment_intent_id" else payment_record.get("id")
+    updated_payment = update_payment_record(match_field, match_value, update_data) or payment_record
+
+    if request.status in {"succeeded", "paid"}:
+        emit_payment_trigger("invoice_paid", {
+            "payment": updated_payment,
+            "payment_id": request.payment_id,
+            "amount": updated_payment.get("amount"),
+            "currency": updated_payment.get("currency"),
+            "status": updated_payment.get("status"),
+        })
+    elif request.status in {"failed", "error", "declined"}:
+        emit_payment_trigger("payment_failed", {
+            "payment": updated_payment,
+            "payment_id": request.payment_id,
+            "error_message": updated_payment.get("error_message"),
+            "status": updated_payment.get("status"),
+        })
+
+    return updated_payment
+
 @app.post("/stripe-webhook", tags=["Billing"])
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
     try:
@@ -591,6 +1092,14 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
+        if session.get("mode") == "payment":
+            payment_status = session.get("payment_status")
+            upsert_payment_from_stripe(
+                session_id=session.get("id"),
+                status="paid" if payment_status == "paid" else payment_status or "completed",
+            )
+            return {"status": "success"}
+
         customer_id = session.get('customer')
         subscription_id = session.get('subscription')
         subscription = stripe.Subscription.retrieve(subscription_id)
@@ -651,6 +1160,26 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         supabase.table('users').update(update_data).eq('stripe_customer_id', customer_id).execute()
         logging.info(f"Checkout session completed for user with customer ID: {customer_id}. Plan changed: {current_plan} -> {plan_name}")
 
+    elif event['type'] == 'invoice.created':
+        invoice = event['data']['object']
+        emit_payment_trigger("invoice_created", {
+            "invoice": invoice,
+            "customer_id": invoice.get("customer"),
+            "invoice_id": invoice.get("id"),
+            "amount_due": invoice.get("amount_due"),
+            "currency": invoice.get("currency"),
+            "status": invoice.get("status"),
+        })
+    elif event['type'] == 'invoice.sent':
+        invoice = event['data']['object']
+        emit_payment_trigger("invoice_sent", {
+            "invoice": invoice,
+            "customer_id": invoice.get("customer"),
+            "invoice_id": invoice.get("id"),
+            "amount_due": invoice.get("amount_due"),
+            "currency": invoice.get("currency"),
+            "hosted_invoice_url": invoice.get("hosted_invoice_url"),
+        })
     elif event['type'] == 'invoice.paid':
         invoice = event['data']['object']
         try:
@@ -692,6 +1221,14 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                     logging.error(f"Supabase update for user {user_id} subscription status affected no rows.", exc_info=True)
                     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update user's subscription status.")
                 logging.info(f"User {user_id} subscription status updated to 'active' and months_subscribed incremented to {updated_months_subscribed}.")
+                emit_payment_trigger("invoice_paid", {
+                    "invoice": invoice,
+                    "customer_id": customer_id,
+                    "amount_paid": amount_paid,
+                    "currency": invoice.get("currency"),
+                    "status": invoice.get("status"),
+                    "user_id": user_id,
+                })
 
                 # 2. Commission Calculation for Rep
                 if associate_rep_id:
@@ -786,10 +1323,48 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                     'latest_charge_attempt': datetime.now(timezone.utc).isoformat()
                 }
                 supabase.table('users').update(user_update_data).eq('id', user_id).execute()
+                emit_payment_trigger("payment_failed", {
+                    "invoice": invoice,
+                    "customer_id": customer_id,
+                    "user_id": user_id,
+                    "failure_reason": failure_reason,
+                    "currency": invoice.get("currency"),
+                    "status": invoice.get("status"),
+                })
             else:
                 logging.error(f"User not found for stripe_customer_id {customer_id} during payment_failed event.")
         else:
             logging.error(f"Customer ID missing in invoice.payment_failed event.")
+    elif event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        updated_payment = upsert_payment_from_stripe(
+            payment_intent_id=payment_intent.get("id"),
+            status="succeeded",
+            receipt_url=payment_intent.get("charges", {}).get("data", [{}])[0].get("receipt_url") if payment_intent.get("charges", {}).get("data") else None,
+        )
+        emit_payment_trigger("invoice_paid", {
+            "payment_intent": payment_intent,
+            "payment": updated_payment,
+            "amount": payment_intent.get("amount"),
+            "currency": payment_intent.get("currency"),
+            "status": payment_intent.get("status"),
+        })
+    elif event['type'] == 'payment_intent.payment_failed':
+        payment_intent = event['data']['object']
+        last_error = payment_intent.get("last_payment_error", {})
+        updated_payment = upsert_payment_from_stripe(
+            payment_intent_id=payment_intent.get("id"),
+            status="failed",
+            error_message=last_error.get("message"),
+        )
+        emit_payment_trigger("payment_failed", {
+            "payment_intent": payment_intent,
+            "payment": updated_payment,
+            "failure_reason": last_error.get("message"),
+            "amount": payment_intent.get("amount"),
+            "currency": payment_intent.get("currency"),
+            "status": payment_intent.get("status"),
+        })
 
     elif event['type'] == 'customer.subscription.deleted':
         subscription = event['data']['object']

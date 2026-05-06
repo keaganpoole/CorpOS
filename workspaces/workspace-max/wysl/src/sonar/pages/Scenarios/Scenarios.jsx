@@ -42,6 +42,31 @@ import { LEAD_FIELDS } from '../../lib/leadSchema';
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
 import { getSmartActions, getSmartActionByKey } from './smartActions';
 
+const TABLE_REF_ALIASES = {
+  person: 'people',
+  payment: 'payments',
+  invoice: 'invoices',
+  appointment: 'appointments',
+  service: 'services',
+  receptionist: 'hired_receptionists',
+  business: 'businesses',
+};
+
+const TABLE_REF_REVERSE_ALIASES = Object.fromEntries(
+  Object.entries(TABLE_REF_ALIASES).map(([alias, tableKey]) => [tableKey, alias])
+);
+
+const normalizeTableRefKey = (tableKey) => {
+  if (!tableKey) return tableKey;
+  return TABLE_REF_ALIASES[tableKey] || tableKey;
+};
+
+const getTableRefCandidates = (tableKey) => {
+  const normalized = normalizeTableRefKey(tableKey);
+  const reverseAlias = TABLE_REF_REVERSE_ALIASES[tableKey];
+  return [...new Set([tableKey, normalized, reverseAlias].filter(Boolean))];
+};
+
 const OPTION_ICONS = {
   phone_calls: Phone,
   text_messages: MessageSquare,
@@ -211,7 +236,8 @@ const AUTOMATION_HIERARCHY = {
         { key: 'invoice_created', name: 'Invoice Created', description: 'When a new invoice is created' },
         { key: 'invoice_paid', name: 'Invoice Paid', description: 'When an invoice is paid' },
         { key: 'payment_failed', name: 'Payment Failed', description: 'When a payment cannot process' },
-        { key: 'invoice_sent', name: 'Invoice Sent', description: 'When an invoice is sent to customer' },
+        { key: 'payment_link_sent', name: 'Payment Link Sent', description: 'When a payment link is sent to the customer' },
+        { key: 'invoice_sent', name: 'Invoice Sent', description: 'When a real invoice is sent to the customer' },
       ],
     },
     {
@@ -391,6 +417,25 @@ const AUTOMATION_HIERARCHY = {
           { key: 'customer_name', label: 'Customer Name', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
           { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
           { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
+        ]},
+        { key: 'create_invoice', name: 'Create Invoice', description: 'Create a real Stripe invoice with line items', configFields: [
+          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
+          { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
+          { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
+          { key: 'description', label: 'Description', type: 'prompt_textarea', placeholder: 'e.g. Invoice for appointment...', smartActions: true },
+          { key: 'customer_name', label: 'Customer Name', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
+          { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
+          { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
+          { key: 'appointment_id', label: 'Appointment ID', type: 'text', placeholder: 'e.g. {{appointment.id}}' },
+          { key: 'service_id', label: 'Service ID', type: 'text', placeholder: 'e.g. {{service.id}}' },
+          { key: 'due_days', label: 'Days Until Due', type: 'text', placeholder: 'e.g. 7' },
+        ]},
+        { key: 'send_invoice', name: 'Send Invoice', description: 'Finalize and send an existing invoice', configFields: [
+          { key: 'invoice_id', label: 'Invoice ID', type: 'text', placeholder: 'e.g. in_123 or {{invoice.invoice_id}}' },
+          { key: 'customer_name', label: 'Customer Name', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
+          { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
+          { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
+          { key: 'description', label: 'Internal Note', type: 'prompt_textarea', placeholder: 'Optional note before sending the invoice', smartActions: true },
         ]},
         { key: 'update_payment', name: 'Update Payment', description: 'Update an existing payment record', configFields: [
           { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID or {{payment.stripe_payment_intent_id}}' },
@@ -1704,6 +1749,91 @@ export default function ScenariosPage() {
     });
   };
 
+  const resolveTableVariableRefs = (value, resultsMap) => {
+    if (typeof value !== 'string' || !value.includes('{{')) return value;
+    return value.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
+      const parts = ref.split('.');
+      if (parts.length < 2) return match;
+      const tableKey = parts[0];
+      const fieldPath = parts.slice(1);
+      const tableCandidates = getTableRefCandidates(tableKey);
+
+      for (const candidate of tableCandidates) {
+        const outputData = resultsMap[candidate];
+        if (!outputData) continue;
+
+        let current = outputData;
+        if (Array.isArray(current)) {
+          current = current[0];
+        }
+
+        for (const key of fieldPath) {
+          if (current == null) break;
+          current = current[key];
+        }
+
+        if (current != null) {
+          return String(current);
+        }
+      }
+
+      return match;
+    });
+  };
+
+  const buildFlowResultsMap = (targetNodeId) => {
+    if (!targetNodeId || !nodes?.length) return {};
+
+    const visited = new Set(['node-1']);
+    const queue = ['node-1'];
+    const topoOrder = ['node-1'];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      for (const edge of edges) {
+        if (edge.from === current && !visited.has(edge.to)) {
+          visited.add(edge.to);
+          queue.push(edge.to);
+          topoOrder.push(edge.to);
+        }
+      }
+    }
+
+    const currentIdx = topoOrder.indexOf(targetNodeId);
+    const priorIds = currentIdx > 0 ? topoOrder.slice(0, currentIdx) : [];
+    const resultsMap = {};
+
+    for (const nodeId of priorIds) {
+      const node = nodeMap[nodeId];
+      if (!node || node.outputData == null) continue;
+
+      resultsMap[nodeId] = node.outputData;
+
+      const actionKey = node.actionConfig?._key;
+      const tableKey = normalizeTableRefKey((node.actionConfig?.target_table || '').toLowerCase().replace(/\s+/g, '_'));
+
+      if (actionKey === 'search_records' || actionKey === 'update_record' || actionKey === 'create_new_record') {
+        if (tableKey) {
+          resultsMap[tableKey] = node.outputData;
+          const alias = TABLE_REF_REVERSE_ALIASES[tableKey];
+          if (alias) resultsMap[alias] = node.outputData;
+        }
+      }
+
+      if (actionKey === 'create_payment' || actionKey === 'create_payment_profile' || actionKey === 'update_payment') {
+        resultsMap.payment = node.outputData;
+        resultsMap.payments = node.outputData;
+      }
+
+      if (actionKey === 'create_invoice' || actionKey === 'send_invoice') {
+        resultsMap.invoice = node.outputData;
+        resultsMap.invoices = node.outputData;
+      }
+    }
+
+    return resultsMap;
+  };
+
   // ─── Run Entire Scenario ─────────────────────────────────────────────
   const runScenario = async () => {
     if (isRunning) return;
@@ -1749,7 +1879,7 @@ export default function ScenariosPage() {
           const config = node.actionConfig;
           const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
           const limit = config.search_limit || 10;
-          const userId = resolveVariableRefs(config.search_user_id, resultsMap) || config.search_user_id;
+          const userId = resolveVariableRefs(resolveTableVariableRefs(config.search_user_id, resultsMap), resultsMap) || config.search_user_id;
           console.log(`[Scenario Run]   ├ Query: ${tableKey} | limit: ${limit} | user_id: ${userId || '(default)'}`);
           let query = supabase.from(tableKey).select('*').limit(limit);
           if (userId) query = query.eq('user_id', userId);
@@ -1758,6 +1888,8 @@ export default function ScenariosPage() {
             const resultData = data || [];
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, searchResults: resultData, outputData: resultData } : n));
             resultsMap[node.id] = resultData;
+            resultsMap[tableKey] = resultData;
+            resultsMap[normalizeTableRefKey(tableKey)] = resultData;
             log(`✅ ${step} ${node.label} — ${resultData.length} records found`);
             console.log(`[Scenario Run]   └ ${tableKey} → ${resultData.length} rows`);
           } else {
@@ -1766,14 +1898,22 @@ export default function ScenariosPage() {
           }
         } else if (actionKey === 'create_payment') {
           const config = node.actionConfig;
-          const amountCents = Math.round(Number(resolveVariableRefs(config.amount, resultsMap) || config.amount || 0) * 100);
-          const body = { amount: amountCents, currency: config.currency || 'usd', payment_method_type: config.payment_method || 'card', description: resolveVariableRefs(config.description, resultsMap) || config.description || '', person_id: resolveVariableRefs(config.person_id, resultsMap) || config.person_id || null };
+          const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
+          const body = {
+            amount: amountCents,
+            currency: config.currency || 'usd',
+            payment_method_type: config.payment_method || 'card',
+            description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
+            person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
+          };
           console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
           const resp = await fetch('/api/sonar/create-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (!result.error) {
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
             resultsMap[node.id] = result;
+            resultsMap.payment = result;
+            resultsMap.payments = result;
             log(`✅ ${step} ${node.label} — status: ${result.status} | intent: ${result.id}`);
             console.log(`[Scenario Run]   └ PaymentIntent: ${result.id} | status: ${result.status}`);
           } else {
@@ -1782,18 +1922,79 @@ export default function ScenariosPage() {
           }
         } else if (actionKey === 'create_payment_profile') {
           const config = node.actionConfig;
-          const amountCents = Math.round(Number(resolveVariableRefs(config.amount, resultsMap) || config.amount || 0) * 100);
-          const body = { amount: amountCents, currency: config.currency || 'usd', description: resolveVariableRefs(config.description, resultsMap) || config.description || '', person_id: resolveVariableRefs(config.person_id, resultsMap) || config.person_id || null, customer_name: resolveVariableRefs(config.customer_name, resultsMap) || config.customer_name || '', customer_email: resolveVariableRefs(config.customer_email, resultsMap) || config.customer_email || '' };
+          const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
+          const body = {
+            amount: amountCents,
+            currency: config.currency || 'usd',
+            description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
+            person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
+            customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
+            customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
+          };
           console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment-profile | person: ${body.person_id || '(none)'}`);
           const resp = await fetch('/api/sonar/create-payment-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (!result.error) {
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
             resultsMap[node.id] = result;
+            resultsMap.payment = result;
+            resultsMap.payments = result;
             log(`✅ ${step} ${node.label} — customer: ${result.customer_id} | payment URL: ${result.payment_url ? 'yes' : 'no'}`);
             console.log(`[Scenario Run]   ├ Customer: ${result.customer_id}`);
             console.log(`[Scenario Run]   ├ SetupIntent: ${result.setup_intent_id}`);
             console.log(`[Scenario Run]   └ Payment URL: ${result.payment_url || result.checkout_error || 'none'}`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${result.error}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error);
+          }
+        } else if (actionKey === 'create_invoice') {
+          const config = node.actionConfig;
+          const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
+          const body = {
+            amount: amountCents,
+            currency: config.currency || 'usd',
+            description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
+            person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
+            customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
+            customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
+            customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
+            appointment_id: resolveVariableRefs(resolveTableVariableRefs(config.appointment_id, resultsMap), resultsMap) || config.appointment_id || null,
+            service_id: resolveVariableRefs(resolveTableVariableRefs(config.service_id, resultsMap), resultsMap) || config.service_id || null,
+            due_days: resolveVariableRefs(resolveTableVariableRefs(config.due_days, resultsMap), resultsMap) || config.due_days || 7,
+          };
+          console.log(`[Scenario Run]   ├ POST /api/sonar/create-invoice | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
+          const resp = await fetch('/api/sonar/create-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const result = await resp.json();
+          if (!result.error) {
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
+            resultsMap[node.id] = result;
+            resultsMap.invoice = result;
+            resultsMap.invoices = result;
+            log(`✅ ${step} ${node.label} — invoice: ${result.invoice_id || result.id} | status: ${result.status || 'draft'}`);
+            console.log(`[Scenario Run]   └ Invoice: ${result.invoice_id || result.id} | status: ${result.status || 'draft'}`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${result.error}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error);
+          }
+        } else if (actionKey === 'send_invoice') {
+          const config = node.actionConfig;
+          const body = {
+            invoice_id: resolveVariableRefs(resolveTableVariableRefs(config.invoice_id, resultsMap), resultsMap) || config.invoice_id || null,
+            customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
+            customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
+            customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
+            description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
+          };
+          console.log(`[Scenario Run]   ├ POST /api/sonar/send-invoice | invoice: ${body.invoice_id || '(none)'}`);
+          const resp = await fetch('/api/sonar/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const result = await resp.json();
+          if (!result.error) {
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
+            resultsMap[node.id] = result;
+            resultsMap.invoice = result;
+            resultsMap.invoices = result;
+            log(`✅ ${step} ${node.label} — invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
+            console.log(`[Scenario Run]   └ Invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error}`);
             console.error(`[Scenario Run]   └ Error:`, result.error);
@@ -1810,7 +2011,7 @@ export default function ScenariosPage() {
             if (value == null || value === '') continue;
             // Strip "field_" prefix — it's used for form keys but the actual Supabase column is the name after "field_"
             const columnKey = key.startsWith('field_') ? key.slice(6) : key;
-            updateData[columnKey] = resolveVariableRefs(value, resultsMap);
+            updateData[columnKey] = resolveVariableRefs(resolveTableVariableRefs(value, resultsMap), resultsMap);
           }
           console.log(`[Scenario Run]   ├ Resolved update data:`, JSON.stringify(updateData));
           console.log(`[Scenario Run]   ├ ${actionKey === 'update_record' ? 'PATCH' : 'POST'} /api/sonar/${tableKey} | data:`, JSON.stringify(updateData));
@@ -1820,6 +2021,8 @@ export default function ScenariosPage() {
             if (!error) {
               setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: data } : n));
               resultsMap[node.id] = data;
+              resultsMap[tableKey] = data;
+              resultsMap[normalizeTableRefKey(tableKey)] = data;
               log(`✅ ${step} ${node.label} — updated ${tableKey} record ${resolvedRecordId}`);
               console.log(`[Scenario Run]   └ Updated: ${JSON.stringify(updateData)}`);
             } else {
@@ -1832,6 +2035,8 @@ export default function ScenariosPage() {
             if (!error) {
               setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: data } : n));
               resultsMap[node.id] = data;
+              resultsMap[tableKey] = data;
+              resultsMap[normalizeTableRefKey(tableKey)] = data;
               log(`✅ ${step} ${node.label} — created ${tableKey} record ${data.id}`);
               console.log(`[Scenario Run]   └ Created: ${data.id}`);
             } else {
@@ -2137,7 +2342,7 @@ export default function ScenariosPage() {
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
                     event.preventDefault();
-                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'create_payment_profile') && node.configured) {
+                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'create_payment_profile' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice') && node.configured) {
                       setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
                     }
                   }}
@@ -3545,6 +3750,7 @@ export default function ScenariosPage() {
                 }
               } else if (actionKey === 'create_payment') {
                 try {
+                  const flowResultsMap = buildFlowResultsMap(contextMenu.nodeId);
                   const amountCents = Math.round(Number(config.amount || 0) * 100);
                   const resp = await fetch('/api/sonar/create-payment', {
                     method: 'POST',
@@ -3553,9 +3759,9 @@ export default function ScenariosPage() {
                       amount: amountCents,
                       currency: 'usd',
                       payment_method_type: config.payment_method || 'card',
-                      description: config.description || '',
-                      person_id: config.person_id || null,
-                      appointment_id: config.appointment_id || null,
+                      description: resolveVariableRefs(resolveTableVariableRefs(config.description, flowResultsMap), flowResultsMap) || config.description || '',
+                      person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, flowResultsMap), flowResultsMap) || config.person_id || null,
+                      appointment_id: resolveVariableRefs(resolveTableVariableRefs(config.appointment_id, flowResultsMap), flowResultsMap) || config.appointment_id || null,
                     }),
                   });
                   const result = await resp.json();
@@ -3572,6 +3778,7 @@ export default function ScenariosPage() {
                 }
               } else if (actionKey === 'create_payment_profile') {
                 try {
+                  const flowResultsMap = buildFlowResultsMap(contextMenu.nodeId);
                   const amountCents = Math.round(Number(config.amount || 0) * 100);
                   const resp = await fetch('/api/sonar/create-payment-profile', {
                     method: 'POST',
@@ -3579,11 +3786,11 @@ export default function ScenariosPage() {
                     body: JSON.stringify({
                       amount: amountCents,
                       currency: config.currency || 'usd',
-                      description: config.description || '',
-                      person_id: config.person_id || null,
-                      customer_name: config.customer_name || '',
-                      customer_email: config.customer_email || '',
-                      customer_phone: config.customer_phone || '',
+                      description: resolveVariableRefs(resolveTableVariableRefs(config.description, flowResultsMap), flowResultsMap) || config.description || '',
+                      person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, flowResultsMap), flowResultsMap) || config.person_id || null,
+                      customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, flowResultsMap), flowResultsMap) || config.customer_name || '',
+                      customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, flowResultsMap), flowResultsMap) || config.customer_email || '',
+                      customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, flowResultsMap), flowResultsMap) || config.customer_phone || '',
                     }),
                   });
                   const result = await resp.json();
@@ -3597,6 +3804,64 @@ export default function ScenariosPage() {
                   }
                 } catch (err) {
                   console.error('[Create Payment Profile] Request failed:', err.message);
+                }
+              } else if (actionKey === 'create_invoice') {
+                try {
+                  const flowResultsMap = buildFlowResultsMap(contextMenu.nodeId);
+                  const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, flowResultsMap), flowResultsMap) || config.amount || 0) * 100);
+                  const resp = await fetch('/api/sonar/create-invoice', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      amount: amountCents,
+                      currency: config.currency || 'usd',
+                      description: resolveVariableRefs(resolveTableVariableRefs(config.description, flowResultsMap), flowResultsMap) || config.description || '',
+                      person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, flowResultsMap), flowResultsMap) || config.person_id || null,
+                      customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, flowResultsMap), flowResultsMap) || config.customer_name || '',
+                      customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, flowResultsMap), flowResultsMap) || config.customer_email || '',
+                      customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, flowResultsMap), flowResultsMap) || config.customer_phone || '',
+                      appointment_id: resolveVariableRefs(resolveTableVariableRefs(config.appointment_id, flowResultsMap), flowResultsMap) || config.appointment_id || null,
+                      service_id: resolveVariableRefs(resolveTableVariableRefs(config.service_id, flowResultsMap), flowResultsMap) || config.service_id || null,
+                      due_days: resolveVariableRefs(resolveTableVariableRefs(config.due_days, flowResultsMap), flowResultsMap) || config.due_days || 7,
+                    }),
+                  });
+                  const result = await resp.json();
+                  if (result.error) {
+                    console.error('[Create Invoice] Error:', result.error);
+                  } else {
+                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
+                      ? { ...n, outputData: result }
+                      : n
+                    ));
+                  }
+                } catch (err) {
+                  console.error('[Create Invoice] Request failed:', err.message);
+                }
+              } else if (actionKey === 'send_invoice') {
+                try {
+                  const flowResultsMap = buildFlowResultsMap(contextMenu.nodeId);
+                  const resp = await fetch('/api/sonar/send-invoice', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      invoice_id: resolveVariableRefs(resolveTableVariableRefs(config.invoice_id, flowResultsMap), flowResultsMap) || config.invoice_id || null,
+                      customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, flowResultsMap), flowResultsMap) || config.customer_name || '',
+                      customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, flowResultsMap), flowResultsMap) || config.customer_email || '',
+                      customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, flowResultsMap), flowResultsMap) || config.customer_phone || '',
+                      description: resolveVariableRefs(resolveTableVariableRefs(config.description, flowResultsMap), flowResultsMap) || config.description || '',
+                    }),
+                  });
+                  const result = await resp.json();
+                  if (result.error) {
+                    console.error('[Send Invoice] Error:', result.error);
+                  } else {
+                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
+                      ? { ...n, outputData: result }
+                      : n
+                    ));
+                  }
+                } catch (err) {
+                  console.error('[Send Invoice] Request failed:', err.message);
                 }
               }
 

@@ -19,6 +19,44 @@ function init(deps) {
   eventSystem = deps.eventSystem;
 }
 
+function emitPaymentEvent(eventType, { message, payload = {}, severity = 'info' } = {}) {
+  if (!eventSystem) return;
+
+  eventSystem.emit({
+    event_type: eventType,
+    actor: 'api',
+    actor_type: 'system',
+    source: 'sonar-api',
+    severity,
+    message: message || eventType,
+    payload,
+  });
+}
+
+function buildPaymentPayload({
+  payment = null,
+  intent = null,
+  person_id = null,
+  appointment_id = null,
+  scenario_id = null,
+  user_id = null,
+  extra = {},
+} = {}) {
+  return {
+    payment_id: payment?.id || null,
+    stripe_payment_intent_id: intent?.id || payment?.stripe_payment_intent_id || null,
+    person_id: person_id || payment?.person_id || intent?.metadata?.person_id || null,
+    appointment_id: appointment_id || payment?.appointment_id || intent?.metadata?.appointment_id || null,
+    scenario_id: scenario_id || payment?.scenario_id || null,
+    user_id: user_id || payment?.user_id || intent?.metadata?.user_id || null,
+    amount: payment?.amount ?? intent?.amount ?? null,
+    currency: payment?.currency || intent?.currency || null,
+    status: payment?.status || intent?.status || null,
+    description: payment?.description || intent?.description || null,
+    ...extra,
+  };
+}
+
 // ─── Helper: normalize phone ─────────────────────────────
 function normalizePhone(phone) {
   if (!phone) return null;
@@ -973,6 +1011,17 @@ router.post('/payments/charge', async (req, res) => {
     const dbResult = await sbQuery('payments', 'POST', paymentRecord);
     const payment = dbResult?.[0];
 
+    emitPaymentEvent('invoice_created', {
+      message: `Payment record created for ${intent.id}`,
+      payload: buildPaymentPayload({
+        payment: payment || paymentRecord,
+        intent,
+        person_id,
+        user_id,
+        scenario_id,
+      }),
+    });
+
     res.json({
       success: true,
       client_secret: intent.client_secret,
@@ -996,15 +1045,53 @@ router.post('/payments/confirm', async (req, res) => {
     const { payment_intent_id } = req.body;
 
     const intent = await stripe.paymentIntents.retrieve(payment_intent_id);
+    const isSucceeded = intent.status === 'succeeded';
+    const isFailed = intent.status === 'canceled'
+      || intent.status === 'requires_payment_method'
+      || Boolean(intent.last_payment_error);
 
     // Update payment record
     const updateData = {
-      status: intent.status === 'succeeded' ? 'succeeded' : 'processing',
+      status: isSucceeded ? 'succeeded' : (isFailed ? 'failed' : 'processing'),
       receipt_url: intent.charges?.data?.[0]?.receipt_url || null,
       metadata: JSON.stringify({ stripe_status: intent.status }),
     };
 
-    await sbQuery('payments', 'PATCH', updateData, `?stripe_payment_intent_id=eq.${payment_intent_id}`);
+    const updated = await sbQuery('payments', 'PATCH', updateData, `?stripe_payment_intent_id=eq.${payment_intent_id}`);
+    const payment = updated?.[0] || null;
+
+    if (isSucceeded) {
+      const payload = buildPaymentPayload({
+        payment,
+        intent,
+        person_id: payment?.person_id || intent.metadata?.person_id || null,
+        appointment_id: payment?.appointment_id || intent.metadata?.appointment_id || null,
+        user_id: payment?.user_id || intent.metadata?.user_id || null,
+      });
+      emitPaymentEvent('invoice_paid', {
+        message: `Payment succeeded: ${payment_intent_id}`,
+        payload,
+      });
+      emitPaymentEvent('payment_succeeded', {
+        message: `Payment succeeded: ${payment_intent_id}`,
+        payload,
+      });
+    } else if (isFailed) {
+      emitPaymentEvent('payment_failed', {
+        message: `Payment failed: ${payment_intent_id}`,
+        payload: buildPaymentPayload({
+          payment,
+          intent,
+          person_id: payment?.person_id || intent.metadata?.person_id || null,
+          appointment_id: payment?.appointment_id || intent.metadata?.appointment_id || null,
+          user_id: payment?.user_id || intent.metadata?.user_id || null,
+          extra: {
+            failure_message: intent.last_payment_error?.message || intent.cancellation_reason || 'Payment failed',
+          },
+        }),
+        severity: 'critical',
+      });
+    }
 
     res.json({ success: true, status: intent.status });
   } catch (err) {
@@ -1157,10 +1244,28 @@ router.post('/create-payment-profile', async (req, res) => {
         });
         paymentUrl = portal.url;
         checkoutError = null;
-      } catch (portalErr) {
+    } catch (portalErr) {
         console.error('[Create Payment Profile] Portal fallback also failed:', portalErr.message);
         checkoutError = `Checkout: ${sessionErr.message} | Portal: ${portalErr.message}`;
       }
+    }
+
+    if (paymentUrl) {
+      emitPaymentEvent('invoice_sent', {
+        message: `Payment profile link prepared for person ${person_id}`,
+        payload: {
+          person_id,
+          customer_id: stripeCustomerId,
+          setup_intent_id: setupIntent.id,
+          payment_url: paymentUrl,
+          amount: amount || 0,
+          currency: currency || 'usd',
+          status: setupIntent.status,
+          description: description || '',
+          checkout_error: checkoutError,
+          payment_profile: true,
+        },
+      });
     }
 
     res.json({
@@ -1214,8 +1319,9 @@ router.post('/create-payment', async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create(params);
 
     // Store in Supabase payments table
+    let paymentRow = null;
     try {
-      await sbQuery('payments', 'POST', {
+      const inserted = await sbQuery('payments', 'POST', {
         id: paymentIntent.id,
         amount: paymentIntent.amount,
         currency: paymentIntent.currency,
@@ -1226,8 +1332,50 @@ router.post('/create-payment', async (req, res) => {
         person_id: person_id || null,
         appointment_id: appointment_id || null,
       });
+      paymentRow = inserted?.[0] || null;
     } catch (dbErr) {
       console.error('[SONAR-API] Failed to store payment:', dbErr.message);
+    }
+
+    emitPaymentEvent('invoice_created', {
+      message: `Payment created: ${paymentIntent.id}`,
+      payload: buildPaymentPayload({
+        payment: paymentRow,
+        intent: paymentIntent,
+        person_id,
+        appointment_id,
+      }),
+    });
+
+    if (paymentIntent.status === 'succeeded') {
+      const payload = buildPaymentPayload({
+        payment: paymentRow,
+        intent: paymentIntent,
+        person_id,
+        appointment_id,
+      });
+      emitPaymentEvent('invoice_paid', {
+        message: `Payment succeeded: ${paymentIntent.id}`,
+        payload,
+      });
+      emitPaymentEvent('payment_succeeded', {
+        message: `Payment succeeded: ${paymentIntent.id}`,
+        payload,
+      });
+    } else if (paymentIntent.status === 'canceled' || paymentIntent.status === 'requires_payment_method') {
+      emitPaymentEvent('payment_failed', {
+        message: `Payment failed: ${paymentIntent.id}`,
+        payload: buildPaymentPayload({
+          payment: paymentRow,
+          intent: paymentIntent,
+          person_id,
+          appointment_id,
+          extra: {
+            failure_message: paymentIntent.last_payment_error?.message || 'Payment failed',
+          },
+        }),
+        severity: 'critical',
+      });
     }
 
     res.json({
