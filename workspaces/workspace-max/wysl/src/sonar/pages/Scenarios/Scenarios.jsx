@@ -32,7 +32,6 @@ import {
   Database,
   Hash,
   Code,
-  Play,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
@@ -74,7 +73,6 @@ const OPTION_ICONS = {
   records: Layers,
   payments: DollarSign,
   text_messaging: MessageSquare,
-  call_routing: Share2,
   email: Mail,
   tags: Tag,
   wait: Clock,
@@ -198,6 +196,18 @@ const AUTOMATION_HIERARCHY = {
       ],
     },
     {
+      key: 'records',
+      option: 'Records',
+      description: 'When something happens to a record',
+      accent: '#32f0d9',
+      icon: OPTION_ICONS.records,
+      sub_options: [
+        { key: 'record_created', name: 'Record Created', description: 'When a new record is created' },
+        { key: 'record_updated', name: 'Record Updated', description: 'When a record is updated' },
+        { key: 'record_deleted', name: 'Record Deleted', description: 'When a record is deleted' },
+      ],
+    },
+    {
       key: 'appointments',
       option: 'Appointments',
       description: 'When something happens with an appointment',
@@ -212,18 +222,6 @@ const AUTOMATION_HIERARCHY = {
         { key: 'appointment_soon', name: 'Appointment Soon', description: 'When appointment time is near' },
         { key: 'appointment_completed', name: 'Appointment Completed', description: 'When an appointment completes' },
         { key: 'appointment_missed', name: 'Appointment Missed', description: "When a customer doesn't show" },
-      ],
-    },
-    {
-      key: 'records',
-      option: 'Records',
-      description: 'When something happens to a record',
-      accent: '#32f0d9',
-      icon: OPTION_ICONS.records,
-      sub_options: [
-        { key: 'record_created', name: 'Record Created', description: 'When a new record is created' },
-        { key: 'record_updated', name: 'Record Updated', description: 'When a record is updated' },
-        { key: 'record_deleted', name: 'Record Deleted', description: 'When a record is deleted' },
       ],
     },
     {
@@ -293,26 +291,6 @@ const AUTOMATION_HIERARCHY = {
       ],
     },
     {
-      key: 'call_routing',
-      option: 'Call Routing',
-      description: 'Control where calls go',
-      accent: '#38bdf8',
-      icon: OPTION_ICONS.call_routing,
-      sub_options: [
-        { key: 'transfer_to_phone_number', name: 'Transfer To Phone Number', description: 'Forward call to a specific number', configFields: [
-          { key: 'phone_number', label: 'Phone Number', type: 'text', placeholder: 'e.g. +15551234567' },
-          { key: 'announce', label: 'Announce Before Transfer', type: 'textarea', placeholder: 'Optional message before transfer' },
-        ]},
-        { key: 'transfer_to_department', name: 'Transfer To Department', description: 'Route call to a department', configFields: [
-          { key: 'department', label: 'Department', type: 'select', options: ['Front Desk', 'Billing', 'Support', 'Sales', 'Urgent'] },
-        ]},
-        { key: 'transfer_to_staff_member', name: 'Transfer To Staff Member', description: 'Send call to a staff member', configFields: [
-          { key: 'staff_member', label: 'Staff Member', type: 'text', placeholder: 'Name or extension' },
-        ]},
-        { key: 'hang_up', name: 'Hang Up', description: 'End the current call' },
-      ],
-    },
-    {
       key: 'records',
       option: 'Records',
       description: 'Manage records in the database',
@@ -361,43 +339,11 @@ const AUTOMATION_HIERARCHY = {
       ],
     },
     {
-      key: 'email',
-      option: 'Email',
-      description: 'Manage email',
+      key: 'payments',
+      option: 'Payments',
+      description: 'Process payments and manage billing',
       accent: '#38bdf8',
-      icon: OPTION_ICONS.email,
-      sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email', configFields: [
-        { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
-        { key: 'to', label: 'To', type: 'text', placeholder: 'e.g. {customer_email}' },
-        { key: 'subject', label: 'Subject', type: 'text', placeholder: 'e.g. Appointment Confirmation' },
-        { key: 'body', label: 'Body', type: 'textarea', placeholder: 'Email body with {variables}' },
-      ]}],
-    },
-    {
-      key: 'tags',
-      option: 'Tags',
-      description: 'Manage record tags',
-      accent: '#38bdf8',
-      icon: OPTION_ICONS.tags,
-      sub_options: [
-        { key: 'add_tag', name: 'Add Tag', description: 'Attach tag to record', configFields: [
-          { key: 'person_id', label: 'Record', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
-          { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'e.g. VIP, Urgent, Callback' },
-        ]},
-        { key: 'search_tags', name: 'Search Tags', description: 'Find existing tags', configFields: [
-          { key: 'search_value', label: 'Search', type: 'text', placeholder: 'Tag to search for' },
-        ]},
-        { key: 'update_tag', name: 'Update Tag', description: 'Update an existing tag', configFields: [
-          { key: 'old_tag', label: 'Current Tag Name', type: 'text', placeholder: 'Tag to rename' },
-          { key: 'new_tag', label: 'New Tag Name', type: 'text', placeholder: 'New name' },
-        ]},
-        { key: 'delete_tag', name: 'Delete Tag', description: 'Remove a tag permanently', configFields: [
-          { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'Tag to remove' },
-        ]},
-      ],
-    },
-    {
-      key: 'payments', option: 'Payments', description: 'Process payments and manage billing', accent: '#38bdf8', icon: OPTION_ICONS.payments,
+      icon: OPTION_ICONS.payments,
       sub_options: [
         { key: 'create_payment', name: 'Create Payment', description: 'Process a new payment', configFields: [
           { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
@@ -448,6 +394,42 @@ const AUTOMATION_HIERARCHY = {
           { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID or {{payment.stripe_payment_intent_id}}' },
           { key: 'amount', label: 'Refund Amount ($)', type: 'text', placeholder: 'Leave blank for full refund' },
           { key: 'refund_reason', label: 'Refund Reason', type: 'prompt_textarea', placeholder: 'e.g. Customer requested cancellation...', smartActions: true },
+        ]},
+      ],
+    },
+    {
+      key: 'email',
+      option: 'Email',
+      description: 'Manage email',
+      accent: '#38bdf8',
+      icon: OPTION_ICONS.email,
+      sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email', configFields: [
+        { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
+        { key: 'to', label: 'To', type: 'text', placeholder: 'e.g. {customer_email}' },
+        { key: 'subject', label: 'Subject', type: 'text', placeholder: 'e.g. Appointment Confirmation' },
+        { key: 'body', label: 'Body', type: 'textarea', placeholder: 'Email body with {variables}' },
+      ]}],
+    },
+    {
+      key: 'tags',
+      option: 'Tags',
+      description: 'Manage record tags',
+      accent: '#38bdf8',
+      icon: OPTION_ICONS.tags,
+      sub_options: [
+        { key: 'add_tag', name: 'Add Tag', description: 'Attach tag to record', configFields: [
+          { key: 'person_id', label: 'Record', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
+          { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'e.g. VIP, Urgent, Callback' },
+        ]},
+        { key: 'search_tags', name: 'Search Tags', description: 'Find existing tags', configFields: [
+          { key: 'search_value', label: 'Search', type: 'text', placeholder: 'Tag to search for' },
+        ]},
+        { key: 'update_tag', name: 'Update Tag', description: 'Update an existing tag', configFields: [
+          { key: 'old_tag', label: 'Current Tag Name', type: 'text', placeholder: 'Tag to rename' },
+          { key: 'new_tag', label: 'New Tag Name', type: 'text', placeholder: 'New name' },
+        ]},
+        { key: 'delete_tag', name: 'Delete Tag', description: 'Remove a tag permanently', configFields: [
+          { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'Tag to remove' },
         ]},
       ],
     },
@@ -3427,19 +3409,6 @@ export default function ScenariosPage() {
               <span>{testMode ? 'TEST' : 'LIVE'}</span>
             </button>
 
-            {/* Run Scenario button — only for No Trigger */}
-            {noTriggerActive && (
-              <button
-                type="button"
-                className={`sb-toolbar-run-btn ${isRunning ? 'running' : ''}`}
-                onClick={runScenario}
-                disabled={isRunning}
-                title="Run entire scenario"
-              >
-                <Play size={13} />
-                <span>{isRunning ? runProgress : 'Run'}</span>
-              </button>
-            )}
           </div>
         </div>
         )}

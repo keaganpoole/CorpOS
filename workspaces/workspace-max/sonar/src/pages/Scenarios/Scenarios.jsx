@@ -40,7 +40,6 @@ const OPTION_ICONS = {
   records: Layers,
   payments: DollarSign,
   text_messaging: MessageSquare,
-  call_routing: Share2,
   email: Mail,
   tags: Tag,
   wait: Clock,
@@ -79,6 +78,18 @@ const AUTOMATION_HIERARCHY = {
       ],
     },
     {
+      key: 'records',
+      option: 'Records',
+      description: 'When something happens to a record',
+      accent: '#32f0d9',
+      icon: OPTION_ICONS.records,
+      sub_options: [
+        { key: 'record_created', name: 'Record Created', description: 'When a new customer record is created' },
+        { key: 'record_updated', name: 'Record Updated', description: 'When a customer record is updated' },
+        { key: 'record_deleted', name: 'Record Deleted', description: 'When a customer record is deleted' },
+      ],
+    },
+    {
       key: 'appointments',
       option: 'Appointments',
       description: 'When something happens with an appointment',
@@ -93,18 +104,6 @@ const AUTOMATION_HIERARCHY = {
         { key: 'appointment_soon', name: 'Appointment Soon', description: 'When appointment time is near' },
         { key: 'appointment_completed', name: 'Appointment Completed', description: 'When an appointment completes' },
         { key: 'appointment_missed', name: 'Appointment Missed', description: "When a customer doesn't show" },
-      ],
-    },
-    {
-      key: 'records',
-      option: 'Records',
-      description: 'When something happens to a record',
-      accent: '#32f0d9',
-      icon: OPTION_ICONS.records,
-      sub_options: [
-        { key: 'record_created', name: 'Record Created', description: 'When a new customer record is created' },
-        { key: 'record_updated', name: 'Record Updated', description: 'When a customer record is updated' },
-        { key: 'record_deleted', name: 'Record Deleted', description: 'When a customer record is deleted' },
       ],
     },
     {
@@ -145,19 +144,6 @@ const AUTOMATION_HIERARCHY = {
       ],
     },
     {
-      key: 'call_routing',
-      option: 'Call Routing',
-      description: 'Control where calls go',
-      accent: '#38bdf8',
-      icon: OPTION_ICONS.call_routing,
-      sub_options: [
-        { key: 'transfer_to_phone_number', name: 'Transfer To Phone Number', description: 'Forward call to a specific number' },
-        { key: 'transfer_to_department', name: 'Transfer To Department', description: 'Route call to a department' },
-        { key: 'transfer_to_staff_member', name: 'Transfer To Staff Member', description: 'Send call to a staff member' },
-        { key: 'hang_up', name: 'Hang Up', description: 'End the current call' },
-      ],
-    },
-    {
       key: 'records',
       option: 'Records',
       description: 'Manage customer records in the database',
@@ -181,6 +167,21 @@ const AUTOMATION_HIERARCHY = {
         { key: 'search_appointments', name: 'Search Appointments', description: 'Find existing appointments' },
         { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment' },
         { key: 'delete_appointment', name: 'Delete Appointment', description: 'Cancel and remove an appointment' },
+      ],
+    },
+    {
+      key: 'payments',
+      option: 'Payments',
+      description: 'Create and manage payments',
+      accent: '#38bdf8',
+      icon: OPTION_ICONS.payments,
+      sub_options: [
+        { key: 'create_payment', name: 'Create Payment', description: 'Charge a customer' },
+        { key: 'create_payment_profile', name: 'Create Payment Profile', description: 'Create a reusable payment setup link' },
+        { key: 'create_invoice', name: 'Create Invoice', description: 'Create a new invoice' },
+        { key: 'send_invoice', name: 'Send Invoice', description: 'Send an existing invoice' },
+        { key: 'update_payment', name: 'Update Payment', description: 'Modify an existing payment record' },
+        { key: 'check_payment_status', name: 'Check Payment Status', description: 'Look up payment status' },
       ],
     },
     {
@@ -1885,38 +1886,6 @@ export default function ScenariosPage() {
                           style={sbInputStyle} />
                       </div>
                     </div>
-                    {/* Run Node button */}
-                    <button type="button" onClick={async () => {
-                      // Save config first
-                      if (selectedNodeId) {
-                        setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, searchConfig: { ...searchConfig } } : n));
-                      }
-                      // Execute the search
-                      try {
-                        const params = new URLSearchParams({
-                          table: searchConfig.table || 'people',
-                          limit: String(searchConfig.limit || 10),
-                        });
-                        if (searchConfig.user_id) params.set('user_id', searchConfig.user_id);
-                        const resp = await fetch(`http://127.0.0.1:7878/api/sonar/search-records?${params.toString()}`);
-                        const result = await resp.json();
-                        if (result.error) {
-                          console.error('[Search Records] Error:', result.error);
-                        } else {
-                          // Store search results on the node
-                          setNodes(prev => prev.map(n => n.id === selectedNodeId
-                            ? { ...n, searchConfig: { ...searchConfig }, searchResults: result.records }
-                            : n
-                          ));
-                          console.log('[Search Records] Found', result.count, 'records');
-                        }
-                      } catch (err) {
-                        console.error('[Search Records] Request failed:', err.message);
-                      }
-                    }}
-                      style={{ width: '100%', marginTop: 10, padding: '8px 0', background: 'rgba(56,189,248,0.15)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', borderRadius: 8, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer' }}>
-                      Run Node
-                    </button>
                     {/* Save Config button */}
                     <button type="button" onClick={() => {
                       if (selectedNodeId) {
