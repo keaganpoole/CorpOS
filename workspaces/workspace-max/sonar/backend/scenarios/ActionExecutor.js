@@ -21,7 +21,6 @@ class ActionExecutor {
    */
   async execute(node, flowContext) {
     const label = node.label || node.actionConfig?._key || 'unknown';
-    console.log(`[ActionExecutor] Executing: ${label} (type: ${node.type})`);
 
     switch (node.type) {
       case 'action': {
@@ -42,7 +41,7 @@ class ActionExecutor {
   async _executeAction(key, node, flowContext) {
     switch (key) {
       case 'send_to_customer':
-        console.log('[ActionExecutor] SMS not configured yet — skipping');
+        console.log(`↪ ${label} skipped`);
         return { success: true, data: { action: 'send_to_customer', skipped: true, reason: 'SMS not configured' } };
       case 'call_customer':
         return this._initiateCall(node, flowContext);
@@ -66,6 +65,10 @@ class ActionExecutor {
         return this._createPayment(node, flowContext);
       case 'create_payment_profile':
         return this._createPaymentProfile(node, flowContext);
+      case 'create_invoice':
+        return this._createInvoice(node, flowContext);
+      case 'send_invoice':
+        return this._sendInvoice(node, flowContext);
       case 'update_payment':
         return this._updatePayment(node, flowContext);
       case 'check_payment_status':
@@ -125,7 +128,7 @@ class ActionExecutor {
       }
 
       const result = await res.json();
-      console.log(`[ActionExecutor] SMS sent: ${result.sid}`);
+      console.log(`📩 SMS sent`);
       return { success: true, data: { message_sid: result.sid, to: toNumber, body: message } };
     } catch (err) {
       return { success: false, error: err.message };
@@ -139,13 +142,6 @@ class ActionExecutor {
   async _initiateCall(node, flowContext) {
     try {
       const config = node.actionConfig || {};
-      console.log('[ActionExecutor] Call context:', { 
-        to_phone: config.to_phone, 
-        customer_phone: flowContext.customer?.phone,
-        person_phone: flowContext.person?.phone,
-        has_customer: !!flowContext.customer,
-        customer_keys: flowContext.customer ? Object.keys(flowContext.customer) : []
-      });
       let toNumber = config.to_phone || flowContext.customer?.phone || flowContext.person?.phone;
 
       if (!toNumber) {
@@ -264,7 +260,7 @@ class ActionExecutor {
       }
 
       const result = await res.json();
-      console.log(`[ActionExecutor] Call initiated: ${result.conversation_id || result.call_id || 'unknown'}`);
+      console.log(`📞 Call started`);
 
       // Pause the flow — it will resume when the call ends (webhook callback)
       return {
@@ -334,7 +330,7 @@ class ActionExecutor {
         updated_at: new Date().toISOString(),
       }, `?id=eq.${leadId}`);
 
-      console.log(`[ActionExecutor] Lead ${leadId} status → ${newStatus}`);
+      console.log(`✅ Lead updated`);
       return { success: true, data: { lead_id: leadId, status: newStatus } };
     } catch (err) {
       return { success: false, error: err.message };
@@ -379,7 +375,7 @@ class ActionExecutor {
 
       await this.sbQuery(table, 'PATCH', updates, `?id=eq.${recordId}`);
 
-      console.log(`[ActionExecutor] Updated ${table}:${recordId}`, Object.keys(updates));
+      console.log(`📝 ${table}:${recordId} updated`);
       return { success: true, data: { table, record_id: recordId, updated_fields: Object.keys(updates), ...updates } };
     } catch (err) {
       return { success: false, error: err.message };
@@ -413,7 +409,7 @@ class ActionExecutor {
       const result = await this.sbQuery(table, 'POST', data, '?select=id');
       const recordId = Array.isArray(result) ? result[0]?.id : result?.id;
 
-      console.log(`[ActionExecutor] Created ${table}:${recordId}`, Object.keys(data));
+      console.log(`🆕 ${table}:${recordId} created`);
       return { success: true, data: { table, record_id: recordId, created_fields: Object.keys(data), ...data } };
     } catch (err) {
       return { success: false, error: err.message };
@@ -442,7 +438,7 @@ class ActionExecutor {
         return { success: false, error: result.error || 'Search failed' };
       }
 
-      console.log(`[ActionExecutor] Search Records: ${table} → ${result.count} records`);
+      console.log(`🔎 ${table}: ${result.count}`);
       return {
         success: true,
         data: {
@@ -481,7 +477,7 @@ class ActionExecutor {
         };
 
         const result = await this.sbQuery('appointments', 'POST', appointment);
-        console.log(`[ActionExecutor] Appointment created: ${result?.[0]?.id}`);
+        console.log(`📅 Appointment created`);
         return { success: true, data: result?.[0] };
       }
 
@@ -509,6 +505,24 @@ class ActionExecutor {
       }
       return value != null ? String(value) : match;
     });
+  }
+
+  /**
+   * Convert a user-entered money value into cents.
+   * Accepts values like 5, "5", "$5", "5.00", "$5.00".
+   */
+  _parseMoneyToCents(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.round(value * 100);
+    }
+
+    const cleaned = String(value).trim().replace(/[$,]/g, '');
+    if (!cleaned) return null;
+
+    const numeric = Number(cleaned);
+    if (!Number.isFinite(numeric)) return null;
+    return Math.round(numeric * 100);
   }
 
   /**
@@ -544,11 +558,12 @@ class ActionExecutor {
     try {
       const config = node.actionConfig || {};
       const amount = this._resolveVariables(config.amount || '', flowContext);
+      const amountCents = this._parseMoneyToCents(amount);
       const description = this._resolveVariables(config.description || '', flowContext);
       const currency = this._resolveVariables(config.currency || 'usd', flowContext);
       const paymentMethod = this._resolveVariables(config.payment_method || 'card', flowContext);
 
-      if (!amount || parseFloat(amount) <= 0) {
+      if (!amountCents || amountCents <= 0) {
         return { success: false, error: 'Invalid payment amount' };
       }
 
@@ -557,7 +572,7 @@ class ActionExecutor {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: parseFloat(amount),
+          amount: amountCents,
           currency,
           person_id: flowContext.person?.id || flowContext.person_id,
           user_id: flowContext.business?.user_id,
@@ -579,7 +594,7 @@ class ActionExecutor {
           payment_intent_id: result.payment_intent_id,
           payment_id: result.payment_id,
           client_secret: result.client_secret,
-          amount,
+          amount: amountCents,
           currency,
         },
       };
@@ -643,6 +658,118 @@ class ActionExecutor {
   }
 
   /**
+   * Create a Stripe invoice draft with a single invoice item.
+   */
+  async _createInvoice(node, flowContext) {
+    try {
+      const config = node.actionConfig || {};
+      const baseUrl = `http://127.0.0.1:${process.env.PORT || 7878}`;
+      const personId = this._resolveVariables(config.person_id || '', flowContext) || flowContext.person?.id || flowContext.person_id;
+      const amount = this._resolveVariables(config.amount || '', flowContext);
+      const amountCents = this._parseMoneyToCents(amount);
+      const currency = this._resolveVariables(config.currency || 'usd', flowContext);
+      const description = this._resolveVariables(config.description || '', flowContext);
+      const customerName = this._resolveVariables(config.customer_name || `${flowContext.person?.first_name || ''} ${flowContext.person?.last_name || ''}`.trim(), flowContext);
+      const customerEmail = this._resolveVariables(config.customer_email || flowContext.person?.email || '', flowContext);
+      const customerPhone = this._resolveVariables(config.customer_phone || flowContext.person?.phone || '', flowContext);
+      const appointmentId = this._resolveVariables(config.appointment_id || '', flowContext) || flowContext.appointment?.id || null;
+      const serviceId = this._resolveVariables(config.service_id || '', flowContext) || flowContext.service?.id || null;
+      const dueDays = parseInt(this._resolveVariables(config.due_days || '7', flowContext), 10) || 7;
+
+      if (!personId) {
+        return { success: false, error: 'No person ID available for invoice creation' };
+      }
+      if (!amountCents || amountCents <= 0) {
+        return { success: false, error: 'Invalid invoice amount' };
+      }
+
+      const resp = await fetch(`${baseUrl}/api/sonar/create-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          person_id: personId,
+          amount: amountCents,
+          currency,
+          description,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
+          appointment_id: appointmentId,
+          service_id: serviceId,
+          due_days: dueDays,
+        }),
+      });
+
+      const result = await resp.json();
+      if (!resp.ok || result.error) {
+        return { success: false, error: result.error || `Failed to create invoice (${resp.status})` };
+      }
+
+      return {
+        success: true,
+        data: {
+          action: 'create_invoice',
+          invoice_id: result.invoice_id || result.id,
+          status: result.status,
+          amount_due: result.amount_due,
+          currency: result.currency,
+          customer_id: result.customer_id,
+          hosted_invoice_url: result.hosted_invoice_url,
+          invoice_pdf: result.invoice_pdf,
+          metadata: result.metadata,
+        },
+      };
+    } catch (err) {
+      console.error('[ActionExecutor] createInvoice failed:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Send an existing invoice by ID.
+   */
+  async _sendInvoice(node, flowContext) {
+    try {
+      const config = node.actionConfig || {};
+      const baseUrl = `http://127.0.0.1:${process.env.PORT || 7878}`;
+      const invoiceId = this._resolveVariables(config.invoice_id || '', flowContext) || flowContext.invoice?.invoice_id || flowContext.invoice?.id;
+
+      if (!invoiceId) {
+        return { success: false, error: 'No invoice ID provided for send invoice' };
+      }
+
+      const resp = await fetch(`${baseUrl}/api/sonar/send-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice_id: invoiceId }),
+      });
+
+      const result = await resp.json();
+      if (!resp.ok || result.error) {
+        return { success: false, error: result.error || `Failed to send invoice (${resp.status})` };
+      }
+
+      return {
+        success: true,
+        data: {
+          action: 'send_invoice',
+          invoice_id: result.invoice_id || result.id,
+          status: result.status,
+          amount_due: result.amount_due,
+          currency: result.currency,
+          customer_id: result.customer_id,
+          hosted_invoice_url: result.hosted_invoice_url,
+          invoice_pdf: result.invoice_pdf,
+          metadata: result.metadata,
+        },
+      };
+    } catch (err) {
+      console.error('[ActionExecutor] sendInvoice failed:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
    * Update an existing payment record
    */
   async _updatePayment(node, flowContext) {
@@ -671,7 +798,7 @@ class ActionExecutor {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             payment_id: paymentId,
-            amount: amount ? parseFloat(amount) : null,
+            amount: amount ? this._parseMoneyToCents(amount) : null,
             reason: description || notes || '',
           }),
         });

@@ -163,10 +163,6 @@ class InvoiceCreateRequest(BaseModel):
 
 class InvoiceSendRequest(BaseModel):
     invoice_id: str
-    customer_name: Optional[str] = None
-    customer_email: Optional[str] = None
-    customer_phone: Optional[str] = None
-    description: Optional[str] = None
 
 class PaymentUpdateRequest(BaseModel):
     payment_id: str
@@ -997,33 +993,11 @@ async def create_invoice(request: InvoiceCreateRequest):
 
 @app.post("/api/sonar/send-invoice", tags=["Sonar Payments"])
 async def send_invoice(request: InvoiceSendRequest):
-    ensure_no_unresolved_templates(
-        request.invoice_id,
-        request.customer_name,
-        request.customer_email,
-        request.customer_phone,
-        request.description,
-    )
+    ensure_no_unresolved_templates(request.invoice_id)
     try:
         stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
 
         invoice = stripe.Invoice.retrieve(request.invoice_id)
-        if request.description:
-            modify_payload = {"metadata": dict(invoice.get("metadata") or {})}
-            if request.description:
-                modify_payload["description"] = request.description
-            invoice = stripe.Invoice.modify(request.invoice_id, **modify_payload)
-
-        customer_updates = {}
-        if request.customer_email:
-            customer_updates["email"] = request.customer_email
-        if request.customer_name:
-            customer_updates["name"] = request.customer_name
-        if request.customer_phone:
-            customer_updates["phone"] = request.customer_phone
-        if customer_updates and invoice.get("customer"):
-            stripe.Customer.modify(invoice.get("customer"), **customer_updates)
-
         if invoice.get("status") == "draft":
             invoice = stripe.Invoice.finalize_invoice(request.invoice_id)
 

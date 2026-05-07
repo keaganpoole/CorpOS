@@ -60,7 +60,7 @@ class ScenarioEngine {
    * Start the engine: load scenarios, subscribe to events, register routes
    */
   async start() {
-    console.log('[ScenarioEngine] Starting...');
+    console.log('🚀 Scenarios engine started');
 
     // Initialize FlowExecutor
     this.flowExecutor = new FlowExecutor({
@@ -81,7 +81,6 @@ class ScenarioEngine {
     // Register API routes
     this._registerRoutes();
 
-    console.log(`[ScenarioEngine] Running with ${this.scenarios.length} active scenarios`);
   }
 
   /**
@@ -93,7 +92,6 @@ class ScenarioEngine {
         '?is_active=is.true&status=eq.active&order=created_at.desc'
       );
       this.scenarios = records || [];
-      console.log(`[ScenarioEngine] Loaded ${this.scenarios.length} active scenarios`);
     } catch (err) {
       console.error('[ScenarioEngine] Failed to load scenarios:', err.message);
       this.scenarios = [];
@@ -118,7 +116,7 @@ class ScenarioEngine {
       return result;
     };
 
-    console.log('[ScenarioEngine] Subscribed to EventSystem');
+    console.log('🔌 Listening for scenario events');
   }
 
   /**
@@ -128,12 +126,10 @@ class ScenarioEngine {
     const eventType = event.event_type;
     if (!eventType) return;
 
-    console.log(`[ScenarioEngine] Received event: "${eventType}", active scenarios: ${this.scenarios.length}`);
-
     for (const scenario of this.scenarios) {
       const triggerMatch = this._checkTriggerMatch(scenario, eventType, event);
       if (triggerMatch) {
-        console.log(`[ScenarioEngine] Event "${eventType}" matched scenario: ${scenario.name}`);
+        console.log(`⚡ ${eventType} → ${scenario.name}`);
 
         // Build flow context from event payload
         const flowContext = await this._buildFlowContext(scenario, event);
@@ -158,12 +154,6 @@ class ScenarioEngine {
     const triggerNodes = nodes.filter(n =>
       n.configured && n.categoryType === 'TRIGGERS'
     );
-
-    console.log(`[ScenarioEngine] Found ${triggerNodes.length} trigger nodes in "${scenario.name}"`);
-    triggerNodes.forEach(n => {
-      const key = n.subOptionKey || n.actionConfig?._key || '';
-      console.log(`[ScenarioEngine]   Trigger: ${n.label} subOptionKey=${n.subOptionKey} configured=${n.configured} categoryType=${n.categoryType}`);
-    });
 
     for (const node of triggerNodes) {
       const triggerKey = node.subOptionKey || node.actionConfig?._key || '';
@@ -251,6 +241,28 @@ class ScenarioEngine {
       }
     }
 
+    // Fetch invoice data if invoice_id is available
+    const invoicePayload = event.payload?.invoice;
+    if (invoicePayload) {
+      context.invoice = invoicePayload;
+      context.invoices = invoicePayload;
+    } else {
+      const invoiceId = event.payload?.invoice_id;
+      if (!invoiceId) {
+        // no invoice data to fetch
+      } else {
+      try {
+        const invoices = await this.sbQuery('invoices', 'GET', null, `?id=eq.${invoiceId}&limit=1`);
+        if (invoices?.length > 0) {
+          context.invoice = invoices[0];
+          context.invoices = invoices[0];
+        }
+      } catch (err) {
+        console.warn('[ScenarioEngine] Could not fetch invoice:', err.message);
+      }
+      }
+    }
+
     // Fetch business data — use user_id from event, person, scenario, or created_by
     const userId = event.payload?.user_id
       || context.person?.user_id
@@ -288,7 +300,7 @@ class ScenarioEngine {
    * Called when a flow pauses (async action like call)
    */
   _onFlowPause(executionId, node, context, pauseData) {
-    console.log(`[ScenarioEngine] Flow paused at "${node.label}" — execution ${executionId}`);
+    console.log(`⏸ ${node.label} (exec ${executionId})`);
     // The FlowExecutor already saved the state to Supabase
     // We just need to know when to resume (handled by the resume webhook)
   }
@@ -404,7 +416,7 @@ class ScenarioEngine {
     });
 
     this.app.use('/api/scenarios', router);
-    console.log('[ScenarioEngine] Routes registered at /api/scenarios/*');
+    console.log('🧭 Scenario routes ready');
   }
 
   /**

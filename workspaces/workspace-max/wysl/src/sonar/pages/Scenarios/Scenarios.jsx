@@ -432,10 +432,6 @@ const AUTOMATION_HIERARCHY = {
         ]},
         { key: 'send_invoice', name: 'Send Invoice', description: 'Finalize and send an existing invoice', configFields: [
           { key: 'invoice_id', label: 'Invoice ID', type: 'text', placeholder: 'e.g. in_123 or {{invoice.invoice_id}}' },
-          { key: 'customer_name', label: 'Customer Name', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
-          { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
-          { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
-          { key: 'description', label: 'Internal Note', type: 'prompt_textarea', placeholder: 'Optional note before sending the invoice', smartActions: true },
         ]},
         { key: 'update_payment', name: 'Update Payment', description: 'Update an existing payment record', configFields: [
           { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID or {{payment.stripe_payment_intent_id}}' },
@@ -1980,10 +1976,6 @@ export default function ScenariosPage() {
           const config = node.actionConfig;
           const body = {
             invoice_id: resolveVariableRefs(resolveTableVariableRefs(config.invoice_id, resultsMap), resultsMap) || config.invoice_id || null,
-            customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
-            customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
-            customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
-            description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
           };
           console.log(`[Scenario Run]   ├ POST /api/sonar/send-invoice | invoice: ${body.invoice_id || '(none)'}`);
           const resp = await fetch('/api/sonar/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -3845,10 +3837,6 @@ export default function ScenariosPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       invoice_id: resolveVariableRefs(resolveTableVariableRefs(config.invoice_id, flowResultsMap), flowResultsMap) || config.invoice_id || null,
-                      customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, flowResultsMap), flowResultsMap) || config.customer_name || '',
-                      customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, flowResultsMap), flowResultsMap) || config.customer_email || '',
-                      customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, flowResultsMap), flowResultsMap) || config.customer_phone || '',
-                      description: resolveVariableRefs(resolveTableVariableRefs(config.description, flowResultsMap), flowResultsMap) || config.description || '',
                     }),
                   });
                   const result = await resp.json();

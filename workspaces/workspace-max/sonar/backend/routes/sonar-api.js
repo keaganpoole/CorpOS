@@ -8,7 +8,7 @@
  */
 
 const express = require('express');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_TEST_KEY || process.env.STRIPE_API_SECRET_KEY);
+let stripe = require('stripe')(process.env.STRIPE_API_SECRET_TEST_KEY_CORPOS);
 const router = express.Router();
 
 // ─── Supabase Helpers (injected by controller) ──────────
@@ -57,7 +57,90 @@ function buildPaymentPayload({
   };
 }
 
+function buildInvoicePayload({
+  invoice = null,
+  person_id = null,
+  appointment_id = null,
+  service_id = null,
+  scenario_id = null,
+  user_id = null,
+  extra = {},
+} = {}) {
+  return {
+    invoice_id: invoice?.id || null,
+    customer_id: invoice?.customer || null,
+    person_id: person_id || invoice?.metadata?.person_id || null,
+    appointment_id: appointment_id || invoice?.metadata?.appointment_id || null,
+    service_id: service_id || invoice?.metadata?.service_id || null,
+    scenario_id,
+    user_id,
+    amount_due: invoice?.amount_due ?? null,
+    amount_paid: invoice?.amount_paid ?? null,
+    currency: invoice?.currency || null,
+    status: invoice?.status || null,
+    hosted_invoice_url: invoice?.hosted_invoice_url || null,
+    invoice_pdf: invoice?.invoice_pdf || null,
+    description: invoice?.description || null,
+    due_date: invoice?.due_date || null,
+    metadata: invoice?.metadata || null,
+    ...extra,
+  };
+}
+
 // ─── Helper: normalize phone ─────────────────────────────
+function normalizeStripeTimestamp(value) {
+  if (!value) return null;
+  const ts = typeof value === 'number' ? value * 1000 : Number(value) * 1000;
+  if (!Number.isFinite(ts)) return null;
+  return new Date(ts).toISOString();
+}
+
+function buildInvoiceRecord(invoice, overrides = {}) {
+  if (!invoice?.id) return null;
+
+  const metadata = invoice.metadata || {};
+  return {
+    user_id: overrides.user_id || metadata.user_id || null,
+    person_id: overrides.person_id || metadata.person_id || null,
+    appointment_id: overrides.appointment_id || metadata.appointment_id || null,
+    service_id: overrides.service_id || metadata.service_id || null,
+    payment_id: overrides.payment_id || metadata.payment_id || null,
+    stripe_invoice_id: invoice.id,
+    stripe_customer_id: invoice.customer || null,
+    stripe_payment_intent_id: invoice.payment_intent || null,
+    amount_due: invoice.amount_due ?? 0,
+    amount_paid: invoice.amount_paid ?? 0,
+    currency: invoice.currency || 'usd',
+    status: overrides.status || invoice.status || 'draft',
+    hosted_invoice_url: invoice.hosted_invoice_url || null,
+    invoice_pdf: invoice.invoice_pdf || null,
+    description: invoice.description || null,
+    due_date: normalizeStripeTimestamp(invoice.due_date),
+    paid_at: normalizeStripeTimestamp(invoice.status_transitions?.paid_at),
+    finalized_at: normalizeStripeTimestamp(invoice.status_transitions?.finalized_at),
+    voided_at: normalizeStripeTimestamp(invoice.status_transitions?.voided_at),
+    metadata,
+    raw_stripe_invoice: invoice,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function upsertInvoiceFromStripe(invoice, overrides = {}) {
+  if (!invoice?.id || !sbQuery) return null;
+
+  const payload = buildInvoiceRecord(invoice, overrides);
+  if (!payload) return null;
+
+  const existing = await sbQuery('invoices', 'GET', null, `?stripe_invoice_id=eq.${invoice.id}&limit=1`);
+  if (existing?.length) {
+    const updated = await sbQuery('invoices', 'PATCH', payload, `?stripe_invoice_id=eq.${invoice.id}`);
+    return updated?.[0] || existing[0] || null;
+  }
+
+  const inserted = await sbQuery('invoices', 'POST', payload);
+  return inserted?.[0] || null;
+}
+
 function normalizePhone(phone) {
   if (!phone) return null;
   let cleaned = phone.replace(/[^\d+]/g, '');
@@ -66,6 +149,16 @@ function normalizePhone(phone) {
     else if (cleaned.length === 11 && cleaned.startsWith('1')) cleaned = '+' + cleaned;
   }
   return cleaned;
+}
+
+function parseCentsAmount(input) {
+  if (input === null || input === undefined || input === '') return null;
+  if (typeof input === 'number' && Number.isFinite(input)) return Math.round(input);
+  const text = String(input).trim().replace(/[$,]/g, '');
+  if (!text) return null;
+  const numeric = Number(text);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.round(numeric * 100);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -937,10 +1030,7 @@ router.get('/call-logs/stats', async (req, res) => {
 // ══════════════════════════════════════════════════════════
 
 const getStripe = () => {
-  const testMode = process.env.STRIPE_TEST_MODE === 'true';
-  const key = testMode
-    ? process.env.STRIPE_API_SECRET_TEST_KEY_CORPOS
-    : process.env.STRIPE_API_SECRET_KEY_CORPOS;
+  const key = process.env.STRIPE_API_SECRET_TEST_KEY_CORPOS;
   if (!key) throw new Error('Stripe API key not configured');
   return require('stripe')(key);
 };
@@ -952,10 +1042,10 @@ const getStripe = () => {
  */
 router.post('/payments/test-mode', async (req, res) => {
   try {
-    const { enabled } = req.body;
-    process.env.STRIPE_TEST_MODE = enabled ? 'true' : 'false';
-    console.log('[SONAR-API] Stripe test mode:', enabled ? 'ON' : 'OFF');
-    res.json({ success: true, testMode: enabled });
+    process.env.STRIPE_TEST_MODE = 'true';
+    stripe = getStripe();
+    console.log('[SONAR-API] Stripe test mode: ON (locked to test key)');
+    res.json({ success: true, testMode: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1097,6 +1187,119 @@ router.post('/payments/confirm', async (req, res) => {
   } catch (err) {
     console.error('[SONAR-API] confirm payment failed:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/sonar/stripe/webhook
+ * Stripe webhook for invoice/payment events.
+ * Requires STRIPE_WEBHOOK_SECRET when signature verification is enabled.
+ */
+router.post('/stripe/webhook', async (req, res) => {
+  try {
+    const stripe = getStripe();
+    const signature = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    let event = null;
+    if (webhookSecret && signature && req.rawBody) {
+      event = stripe.webhooks.constructEvent(req.rawBody, signature, webhookSecret);
+    } else if (req.body?.type) {
+      event = req.body;
+    } else {
+      return res.status(400).json({ error: 'Invalid Stripe webhook payload' });
+    }
+
+    const invoice = event.data?.object || null;
+    const invoiceId = invoice?.id || null;
+    console.log(`[SONAR-API] Stripe webhook received: ${event.type}${invoiceId ? ` (${invoiceId})` : ''}`);
+
+    if (event.type === 'invoice.paid' || event.type === 'invoice.payment_succeeded') {
+      await upsertInvoiceFromStripe(invoice, {
+        status: 'paid',
+        person_id: invoice?.metadata?.person_id || null,
+        appointment_id: invoice?.metadata?.appointment_id || null,
+        service_id: invoice?.metadata?.service_id || null,
+        user_id: invoice?.metadata?.user_id || null,
+      });
+
+      emitPaymentEvent('invoice_paid', {
+        message: `Stripe invoice paid: ${invoiceId || 'unknown'}`,
+        payload: buildInvoicePayload({
+          invoice,
+          extra: {
+            invoice,
+            stripe_event_type: event.type,
+          },
+        }),
+      });
+    } else if (event.type === 'invoice.payment_failed') {
+      await upsertInvoiceFromStripe(invoice, {
+        status: 'open',
+        person_id: invoice?.metadata?.person_id || null,
+        appointment_id: invoice?.metadata?.appointment_id || null,
+        service_id: invoice?.metadata?.service_id || null,
+        user_id: invoice?.metadata?.user_id || null,
+      });
+
+      emitPaymentEvent('payment_failed', {
+        message: `Stripe invoice payment failed: ${invoiceId || 'unknown'}`,
+        payload: buildInvoicePayload({
+          invoice,
+          extra: {
+            invoice,
+            stripe_event_type: event.type,
+            failure_message: invoice?.last_finalization_error?.message || invoice?.attempted ? 'Invoice payment failed' : 'Invoice payment failed',
+          },
+        }),
+        severity: 'critical',
+      });
+    } else if (event.type === 'invoice.sent') {
+      await upsertInvoiceFromStripe(invoice, {
+        status: 'open',
+        person_id: invoice?.metadata?.person_id || null,
+        appointment_id: invoice?.metadata?.appointment_id || null,
+        service_id: invoice?.metadata?.service_id || null,
+        user_id: invoice?.metadata?.user_id || null,
+      });
+
+      emitPaymentEvent('invoice_sent', {
+        message: `Stripe invoice sent: ${invoiceId || 'unknown'}`,
+        payload: buildInvoicePayload({
+          invoice,
+          extra: {
+            invoice,
+            stripe_event_type: event.type,
+          },
+        }),
+      });
+    } else if (event.type === 'invoice.created') {
+      await upsertInvoiceFromStripe(invoice, {
+        status: invoice?.status || 'draft',
+        person_id: invoice?.metadata?.person_id || null,
+        appointment_id: invoice?.metadata?.appointment_id || null,
+        service_id: invoice?.metadata?.service_id || null,
+        user_id: invoice?.metadata?.user_id || null,
+      });
+
+      emitPaymentEvent('invoice_created', {
+        message: `Stripe invoice created: ${invoiceId || 'unknown'}`,
+        payload: buildInvoicePayload({
+          invoice,
+          extra: {
+            invoice,
+            stripe_event_type: event.type,
+          },
+        }),
+      });
+    } else {
+      console.log(`[SONAR-API] Stripe webhook ignored: ${event.type}`);
+    }
+
+    res.json({ received: true, type: event.type });
+  } catch (err) {
+    console.error('[SONAR-API] stripe webhook failed:', err.message);
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -1285,6 +1488,171 @@ router.post('/create-payment-profile', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+/**
+ * POST /api/sonar/create-invoice
+ * Create a Stripe draft invoice with one invoice item.
+ */
+router.post('/create-invoice', async (req, res) => {
+  try {
+    const {
+      amount,
+      currency,
+      description,
+      person_id,
+      appointment_id,
+      service_id,
+      customer_name,
+      customer_email,
+      customer_phone,
+      due_days,
+    } = req.body;
+
+    if (!person_id) return res.status(400).json({ error: 'person_id required' });
+    const amountCents = parseCentsAmount(amount);
+    if (!amountCents || amountCents <= 0) return res.status(400).json({ error: 'amount required' });
+
+    const personRows = await sbQuery('people', 'GET', null, `?id=eq.${person_id}&limit=1`);
+    if (!personRows?.length) return res.status(404).json({ error: 'Person not found' });
+    const person = personRows[0];
+
+    let stripeCustomerId = person.stripe_customer_id;
+    if (!stripeCustomerId) {
+      const customerParams = {
+        metadata: {
+          person_id,
+          appointment_id: appointment_id || '',
+          service_id: service_id || '',
+        },
+      };
+      if (customer_name || person.first_name || person.last_name) {
+        customerParams.name = customer_name || [person.first_name, person.last_name].filter(Boolean).join(' ');
+      }
+      if (customer_email || person.email) customerParams.email = customer_email || person.email;
+      if (customer_phone || person.phone) customerParams.phone = customer_phone || person.phone;
+
+      const stripeCustomer = await stripe.customers.create(customerParams);
+      stripeCustomerId = stripeCustomer.id;
+      await sbQuery('people', 'PATCH', { stripe_customer_id: stripeCustomerId }, `?id=eq.${person_id}`);
+    }
+
+    const invoiceMetadata = {
+      person_id: String(person_id),
+      appointment_id: appointment_id ? String(appointment_id) : '',
+      service_id: service_id ? String(service_id) : '',
+    };
+
+    const draftInvoice = await stripe.invoices.create({
+      customer: stripeCustomerId,
+      collection_method: 'send_invoice',
+      days_until_due: Math.max(parseInt(due_days, 10) || 7, 1),
+      auto_advance: false,
+      metadata: invoiceMetadata,
+      description: description || undefined,
+    });
+
+    const invoiceItem = await stripe.invoiceItems.create({
+      customer: stripeCustomerId,
+      invoice: draftInvoice.id,
+      amount: amountCents,
+      currency: currency || 'usd',
+      description: description || 'Invoice item',
+      metadata: invoiceMetadata,
+    });
+
+    const finalizedInvoice = await stripe.invoices.finalizeInvoice(draftInvoice.id);
+    await upsertInvoiceFromStripe(finalizedInvoice, {
+      person_id,
+      appointment_id,
+      service_id,
+    });
+
+    emitPaymentEvent('invoice_created', {
+      message: `Invoice created: ${finalizedInvoice.id}`,
+      payload: buildInvoicePayload({
+        invoice: finalizedInvoice,
+        person_id,
+        appointment_id,
+        service_id,
+        extra: {
+          invoice: finalizedInvoice,
+          invoice_item_id: invoiceItem.id,
+          amount: finalizedInvoice.amount_due,
+        },
+      }),
+    });
+
+    res.json({
+      invoice_id: finalizedInvoice.id,
+      id: finalizedInvoice.id,
+      customer_id: stripeCustomerId,
+      amount_due: finalizedInvoice.amount_due,
+      amount_paid: finalizedInvoice.amount_paid,
+      currency: finalizedInvoice.currency,
+      status: finalizedInvoice.status,
+      hosted_invoice_url: finalizedInvoice.hosted_invoice_url,
+      invoice_pdf: finalizedInvoice.invoice_pdf,
+      metadata: finalizedInvoice.metadata,
+      due_date: finalizedInvoice.due_date,
+    });
+  } catch (err) {
+    console.error('[SONAR-API] create-invoice failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/sonar/send-invoice
+ * Finalize and send an existing Stripe invoice.
+ */
+router.post('/send-invoice', async (req, res) => {
+  try {
+    const { invoice_id } = req.body;
+    if (!invoice_id) return res.status(400).json({ error: 'invoice_id required' });
+
+    const invoice = await stripe.invoices.retrieve(invoice_id);
+    let workingInvoice = invoice;
+    if (workingInvoice.status === 'draft') {
+      workingInvoice = await stripe.invoices.finalizeInvoice(invoice_id);
+    }
+
+    const sentInvoice = await stripe.invoices.sendInvoice(invoice_id);
+    await upsertInvoiceFromStripe(sentInvoice, {
+      person_id: sentInvoice.metadata?.person_id || null,
+      appointment_id: sentInvoice.metadata?.appointment_id || null,
+      service_id: sentInvoice.metadata?.service_id || null,
+      user_id: sentInvoice.metadata?.user_id || null,
+    });
+
+    emitPaymentEvent('invoice_sent', {
+      message: `Invoice sent: ${sentInvoice.id}`,
+      payload: buildInvoicePayload({
+        invoice: sentInvoice,
+        extra: {
+          invoice: sentInvoice,
+        },
+      }),
+    });
+
+    res.json({
+      invoice_id: sentInvoice.id,
+      id: sentInvoice.id,
+      customer_id: sentInvoice.customer,
+      amount_due: sentInvoice.amount_due,
+      amount_paid: sentInvoice.amount_paid,
+      currency: sentInvoice.currency,
+      status: sentInvoice.status,
+      hosted_invoice_url: sentInvoice.hosted_invoice_url,
+      invoice_pdf: sentInvoice.invoice_pdf,
+      metadata: sentInvoice.metadata,
+      due_date: sentInvoice.due_date,
+    });
+  } catch (err) {
+    console.error('[SONAR-API] send-invoice failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/create-payment', async (req, res) => {
   try {
     const { amount, currency, payment_method_type, description, person_id, appointment_id } = req.body;

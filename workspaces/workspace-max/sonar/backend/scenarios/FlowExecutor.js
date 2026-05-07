@@ -84,7 +84,7 @@ class FlowExecutor {
     }
 
     context._executionId = executionId;
-    console.log(`[FlowExecutor] Starting flow: ${scenario.name} from trigger: ${triggerNode.label}`);
+    console.log(`▶ ${scenario.name} (${triggerNode.label})`);
     return this._executeFromNode(triggerNode.id, nodes, nodeMap, edgeMap, context, executionId, scenario);
   }
 
@@ -126,7 +126,7 @@ class FlowExecutor {
         edgeMap[edge.from].push(edge);
       }
 
-      console.log(`[FlowExecutor] Resuming execution ${executionId} from node: ${execution.current_node_id}`);
+      console.log(`↩ ${scenario.name} (resume)`);
       return this._executeFromNode(execution.current_node_id, nodes, nodeMap, edgeMap, context, executionId, scenario);
     } catch (err) {
       console.error('[FlowExecutor] Resume failed:', err.message);
@@ -147,7 +147,7 @@ class FlowExecutor {
         break;
       }
 
-      console.log(`[FlowExecutor] Step ${steps}: ${node.label || currentNodeId} (type: ${node.type})`);
+      console.log(`• ${steps}. ${node.label || currentNodeId}`);
 
       // Trigger nodes — just follow edges
       if (node.categoryType === 'TRIGGERS' && !node.actionConfig?._key) {
@@ -158,7 +158,7 @@ class FlowExecutor {
       const result = await this.actionExecutor.execute(node, context);
 
       if (!result.success) {
-        console.error(`[FlowExecutor] Action failed at ${node.label}:`, result.error);
+        console.error(`❌ ${node.label}: ${result.error}`);
         await this._updateExecution(executionId, 'failed', currentNodeId, context, result.error);
         return { success: false, error: result.error, failed_at: currentNodeId };
       }
@@ -166,10 +166,20 @@ class FlowExecutor {
       if (result.data) {
         // Store action result keyed by node ID for variable access: {{nodeId.field}}
         context[node.id] = result.data;
+
+        // Keep common business objects available by name for downstream nodes.
+        if (result.data.action === 'create_invoice' || result.data.action === 'send_invoice') {
+          context.invoice = result.data;
+          context.invoices = result.data;
+        }
+        if (result.data.action === 'create_payment' || result.data.action === 'create_payment_profile' || result.data.action === 'update_payment') {
+          context.payment = result.data;
+          context.payments = result.data;
+        }
       }
 
       if (result.pause) {
-        console.log(`[FlowExecutor] Flow paused at ${node.label} (execution: ${executionId})`);
+        console.log(`⏸ ${node.label}`);
         await this._updateExecution(executionId, 'paused', currentNodeId, context, null, result.data);
         if (this.onPause) this.onPause(executionId, node, context, result.data);
         return { success: true, paused: true, executionId, at_node: currentNodeId };
@@ -184,7 +194,7 @@ class FlowExecutor {
       return { success: false, error: 'Max steps exceeded' };
     }
 
-    console.log(`[FlowExecutor] Flow completed: ${scenario.name}`);
+    console.log(`✅ ${scenario.name}`);
     await this._updateExecution(executionId, 'completed', null, context);
     return { success: true, completed: true, context };
   }
@@ -198,8 +208,7 @@ class FlowExecutor {
       if (edge.filter?.rules?.length > 0) {
         const passes = evaluateConditions(edge.filter.rules, context);
         if (!passes) {
-          console.log(`[FlowExecutor] Condition failed on edge ${edge.id}`);
-          return null;
+        return null;
         }
       }
       return edge.to;
@@ -209,7 +218,6 @@ class FlowExecutor {
       if (!edge.filter?.rules || edge.filter.rules.length === 0) continue;
       const passes = evaluateConditions(edge.filter.rules, context);
       if (passes) {
-        console.log(`[FlowExecutor] Condition matched on edge ${edge.id}`);
         return edge.to;
       }
     }
@@ -217,7 +225,6 @@ class FlowExecutor {
     const fallback = edges.find(e => !e.filter?.rules || e.filter.rules.length === 0);
     if (fallback) return fallback.to;
 
-    console.log(`[FlowExecutor] No matching condition from ${fromNodeId} — flow ends`);
     return null;
   }
 

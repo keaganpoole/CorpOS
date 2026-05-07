@@ -59,7 +59,11 @@ class Controller {
   constructor(port = 7878) {
     this.port = port;
     this.app = express();
-    this.app.use(express.json());
+    this.app.use(express.json({
+      verify: (req, res, buf) => {
+        req.rawBody = buf;
+      },
+    }));
     // Root health endpoint
     this.app.get('/', (req, res) => {
       res.json({ status: 'ok', service: 'sonar-backend', port: this.port });
