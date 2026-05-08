@@ -55,10 +55,21 @@ const TABLE_REF_REVERSE_ALIASES = Object.fromEntries(
   Object.entries(TABLE_REF_ALIASES).map(([alias, tableKey]) => [tableKey, alias])
 );
 
+const RECORD_ID_LABELS = {
+  People: 'Person ID',
+  Appointments: 'Appointment ID',
+  Services: 'Service ID',
+  Payments: 'Payment ID',
+  Businesses: 'Business ID',
+  'Hired Receptionists': 'Hired Receptionist ID',
+};
+
 const normalizeTableRefKey = (tableKey) => {
   if (!tableKey) return tableKey;
   return TABLE_REF_ALIASES[tableKey] || tableKey;
 };
+
+const getRecordIdLabelForTable = (tableName) => RECORD_ID_LABELS[tableName] || 'Record ID';
 
 const getTableRefCandidates = (tableKey) => {
   const normalized = normalizeTableRefKey(tableKey);
@@ -261,15 +272,10 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
-          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be professional and offer available reschedule times...', smartActions: true },
-          { key: 'first_message', label: 'First Message', type: 'first_message_textarea', placeholder: 'e.g. Hi, this is [business name] calling...', smartActions: true, toggleLabel: 'Override First Message' },
-          { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text', placeholder: 'Phone number to transfer after greeting' },
-        ]},
-        { key: 'call_phone_number', name: 'Call Phone Number', description: 'Call a specific number', configFields: [
-          { key: 'phone_number', label: 'Phone Number', type: 'text', placeholder: 'e.g. +15551234567' },
-          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be professional and helpful...', smartActions: true },
-          { key: 'first_message', label: 'First Message', type: 'first_message_textarea', placeholder: 'e.g. Hi, this is [business name] calling...', smartActions: true, toggleLabel: 'Override First Message' },
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
+          { key: 'first_message', label: 'First Message', type: 'first_message_textarea', smartActions: true, toggleLabel: 'Override First Message' },
+          { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text' },
         ]},
       ],
     },
@@ -281,12 +287,12 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.text_messaging,
       sub_options: [
         { key: 'send_to_phone_number', name: 'Send To Phone Number', description: 'Send SMS to any number', configFields: [
-          { key: 'recipient', label: 'Recipient Number', type: 'text', placeholder: 'e.g. +15551234567' },
-          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and concise...', smartActions: true },
+          { key: 'recipient', label: 'Recipient Number', type: 'text' },
+          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
         ]},
         { key: 'send_to_customer', name: 'Send To Customer', description: 'Send SMS to an existing customer', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
-          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', placeholder: 'e.g. Be friendly and helpful...', smartActions: true },
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
         ]},
       ],
     },
@@ -299,19 +305,17 @@ const AUTOMATION_HIERARCHY = {
       sub_options: [
         { key: 'search_records', name: 'Search Records', description: 'Find records from a table', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
-          { key: 'search_user_id', label: 'User ID', type: 'text', placeholder: 'e.g. abc123 (leave empty for default)' },
-          { key: 'search_limit', label: 'Limit', type: 'number', placeholder: '10' },
+          { key: 'search_user_id', label: 'User ID', type: 'text' },
+          { key: 'search_limit', label: 'Limit', type: 'number' },
         ]},
         { key: 'create_new_record', name: 'Create New Record', description: 'Create a new record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
         ]},
         { key: 'update_record', name: 'Update Record', description: 'Modify an existing record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
-          { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{person.id}}' },
         ]},
         { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a record', configFields: [
           { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
-          { key: 'record_id', label: 'Record ID', type: 'record_id', placeholder: 'e.g. {{person.id}}' },
         ]},
       ],
     },
@@ -323,10 +327,13 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.appointments,
       sub_options: [
         { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'service_id', label: 'Service ID', type: 'service_id' },
         ] },
         { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment', configFields: [
-          { key: 'appointment_id', label: 'Appointment ID', type: 'record_id', placeholder: 'e.g. {{appointments.id}}' },
+          { key: 'appointment_id', label: 'Appointment ID', type: 'record_id' },
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'service_id', label: 'Service ID', type: 'service_id' },
           { key: 'status', label: 'Status', type: 'select', options: ['pending', 'confirmed', 'cancelled'] },
           { key: 'date', label: 'Date', type: 'date' },
           { key: 'time', label: 'Time', type: 'time' },
@@ -334,7 +341,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'notes', label: 'Notes', type: 'textarea' },
         ]},
         { key: 'delete_appointment', name: 'Delete Appointment', description: 'Cancel and remove an appointment', configFields: [
-          { key: 'appointment_id', label: 'Appointment ID', type: 'text', placeholder: 'Appointment ID to cancel' },
+          { key: 'appointment_id', label: 'Appointment ID', type: 'text' },
         ]},
       ],
     },
@@ -346,54 +353,54 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.payments,
       sub_options: [
         { key: 'create_payment', name: 'Create Payment', description: 'Process a new payment', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
-          { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'amount', label: 'Amount ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'payment_method', label: 'Payment Method', type: 'select', options: ['card', 'ach', 'link'] },
-          { key: 'description', label: 'Description', type: 'prompt_textarea', placeholder: 'e.g. Service payment for appointment...', smartActions: true },
-          { key: 'customer_name', label: 'Customer Name', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
-          { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
-          { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
+          { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
+          { key: 'customer_name', label: 'Customer Name', type: 'text' },
+          { key: 'customer_email', label: 'Customer Email', type: 'text' },
+          { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
         ]},
         { key: 'create_payment_profile', name: 'Create Payment Profile', description: 'Set up a Stripe customer and generate a payment link', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
-          { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'amount', label: 'Amount ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
-          { key: 'description', label: 'Description', type: 'prompt_textarea', placeholder: 'e.g. Payment for appointment...', smartActions: true },
-          { key: 'customer_name', label: 'Customer Name', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
-          { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
-          { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
+          { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
+          { key: 'customer_name', label: 'Customer Name', type: 'text' },
+          { key: 'customer_email', label: 'Customer Email', type: 'text' },
+          { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
         ]},
         { key: 'create_invoice', name: 'Create Invoice', description: 'Create a real Stripe invoice with line items', configFields: [
-          { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
-          { key: 'amount', label: 'Amount ($)', type: 'text', placeholder: 'e.g. 50.00 or {{balance_due}}' },
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'amount', label: 'Amount ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
-          { key: 'description', label: 'Description', type: 'prompt_textarea', placeholder: 'e.g. Invoice for appointment...', smartActions: true },
-          { key: 'customer_name', label: 'Customer Name', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
-          { key: 'customer_email', label: 'Customer Email', type: 'text', placeholder: 'e.g. {{person_email}}' },
-          { key: 'customer_phone', label: 'Customer Phone', type: 'text', placeholder: 'e.g. {{person_phone}}' },
-          { key: 'appointment_id', label: 'Appointment ID', type: 'text', placeholder: 'e.g. {{appointment.id}}' },
-          { key: 'service_id', label: 'Service ID', type: 'text', placeholder: 'e.g. {{service.id}}' },
-          { key: 'due_days', label: 'Days Until Due', type: 'text', placeholder: 'e.g. 7' },
+          { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
+          { key: 'customer_name', label: 'Customer Name', type: 'text' },
+          { key: 'customer_email', label: 'Customer Email', type: 'text' },
+          { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
+          { key: 'appointment_id', label: 'Appointment ID', type: 'text' },
+          { key: 'service_id', label: 'Service ID', type: 'text' },
+          { key: 'due_days', label: 'Days Until Due', type: 'text' },
         ]},
         { key: 'send_invoice', name: 'Send Invoice', description: 'Finalize and send an existing invoice', configFields: [
-          { key: 'invoice_id', label: 'Invoice ID', type: 'text', placeholder: 'e.g. in_123 or {{invoice.invoice_id}}' },
+          { key: 'invoice_id', label: 'Invoice ID', type: 'text' },
         ]},
         { key: 'update_payment', name: 'Update Payment', description: 'Update an existing payment record', configFields: [
-          { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID or {{payment.stripe_payment_intent_id}}' },
+          { key: 'payment_id', label: 'Payment ID', type: 'text' },
           { key: 'status', label: 'Status', type: 'select', options: ['succeeded', 'failed', 'refunded', 'partial_refund', 'pending'] },
-          { key: 'amount', label: 'Refund Amount ($)', type: 'text', placeholder: 'e.g. 25.00 (leave blank for full refund)' },
-          { key: 'description', label: 'Description', type: 'prompt_textarea', placeholder: 'e.g. Update payment notes...', smartActions: true },
-          { key: 'notes', label: 'Notes', type: 'prompt_textarea', placeholder: 'e.g. Reason for update...', smartActions: true },
+          { key: 'amount', label: 'Refund Amount ($)', type: 'text' },
+          { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
+          { key: 'notes', label: 'Notes', type: 'prompt_textarea', smartActions: true },
         ]},
         { key: 'check_payment_status', name: 'Check Payment Status', description: 'Verify if a payment went through', configFields: [
           { key: 'search_by', label: 'Look Up By', type: 'select', options: ['Customer Name', 'Payment ID', 'Amount'] },
-          { key: 'search_value', label: 'Search Value', type: 'text', placeholder: 'e.g. {{person_first_name}} {{person_last_name}}' },
+          { key: 'search_value', label: 'Search Value', type: 'text' },
         ]},
         { key: 'issue_refund', name: 'Issue Refund', description: 'Process a refund for a previous charge', configFields: [
-          { key: 'payment_id', label: 'Payment ID', type: 'text', placeholder: 'Stripe Payment Intent ID or {{payment.stripe_payment_intent_id}}' },
-          { key: 'amount', label: 'Refund Amount ($)', type: 'text', placeholder: 'Leave blank for full refund' },
-          { key: 'refund_reason', label: 'Refund Reason', type: 'prompt_textarea', placeholder: 'e.g. Customer requested cancellation...', smartActions: true },
+          { key: 'payment_id', label: 'Payment ID', type: 'text' },
+          { key: 'amount', label: 'Refund Amount ($)', type: 'text' },
+          { key: 'refund_reason', label: 'Refund Reason', type: 'prompt_textarea', smartActions: true },
         ]},
       ],
     },
@@ -404,10 +411,10 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.email,
       sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email', configFields: [
-        { key: 'person_id', label: 'Customer', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
-        { key: 'to', label: 'To', type: 'text', placeholder: 'e.g. {customer_email}' },
-        { key: 'subject', label: 'Subject', type: 'text', placeholder: 'e.g. Appointment Confirmation' },
-        { key: 'body', label: 'Body', type: 'textarea', placeholder: 'Email body with {variables}' },
+        { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+        { key: 'to', label: 'To', type: 'text' },
+        { key: 'subject', label: 'Subject', type: 'text' },
+        { key: 'body', label: 'Body', type: 'textarea' },
       ]}],
     },
     {
@@ -418,8 +425,8 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.tags,
       sub_options: [
         { key: 'add_tag', name: 'Add Tag', description: 'Attach tag to record', configFields: [
-          { key: 'person_id', label: 'Record', type: 'person_id', placeholder: 'e.g. {{person.id}}' },
-          { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'e.g. VIP, Urgent, Callback' },
+          { key: 'person_id', label: 'Record', type: 'person_id' },
+          { key: 'tag_name', label: 'Tag Name', type: 'text' },
         ]},
         { key: 'search_tags', name: 'Search Tags', description: 'Find existing tags', configFields: [
           { key: 'search_value', label: 'Search', type: 'text', placeholder: 'Tag to search for' },
@@ -536,7 +543,6 @@ export default function ScenariosPage() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showJsonModal, setShowJsonModal] = useState(false);
-  const [testMode, setTestMode] = useState(false);
   const [recurringSchedule, setRecurringSchedule] = useState({ frequency: 'once', interval: 1, time: '09:00' });
   const [scenarioNotes, setScenarioNotes] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -1572,6 +1578,7 @@ export default function ScenariosPage() {
       
       // Track current scenario for save logic
       setCurrentScenario(scenario);
+      setScenarioName(scenario.name || '');
       
       // Load toolbar state
       if (scenario.schedule_config) {
@@ -1612,14 +1619,20 @@ export default function ScenariosPage() {
   };
 
   const handleConfirmSaveScenario = async () => {
+    const normalizedScenarioName = scenarioName?.trim()
+      ? scenarioName.trim().charAt(0).toUpperCase() + scenarioName.trim().slice(1)
+      : '';
+    const resolvedScenarioName = currentScenario
+      ? (normalizedScenarioName || currentScenario.name)
+      : (normalizedScenarioName || `Scenario ${scenarios.length + 1}`);
+    const resolvedDescription = scenarioDescription
+      ? scenarioDescription.charAt(0).toUpperCase() + scenarioDescription.slice(1)
+      : '';
     const scenarioData = {
       user_id: userId,
-      name: scenarioName 
-        ? scenarioName.charAt(0).toUpperCase() + scenarioName.slice(1) 
-        : `Scenario ${scenarios.length + 1}`,
-      description: scenarioDescription 
-        ? scenarioDescription.charAt(0).toUpperCase() + scenarioDescription.slice(1) 
-        : '',
+      created_by: currentScenario?.created_by || userId,
+      name: resolvedScenarioName,
+      description: resolvedDescription,
       nodes_data: nodes.map(n => ({
         id: n.id,
         x: n.x,
@@ -2061,10 +2074,11 @@ export default function ScenariosPage() {
     const scenario = window.selectedScenarioForDelete;
     if (!scenario) return;
 
-    const { error } = await supabase
-      .from('scenarios')
-      .delete()
-      .eq('id', scenario.id);
+    let deleteQuery = supabase.from('scenarios').delete().eq('id', scenario.id);
+    if (userId) {
+      deleteQuery = deleteQuery.or(`user_id.eq.${userId},created_by.eq.${userId}`);
+    }
+    const { error } = await deleteQuery;
     
     if (error) {
       console.error('[Scenarios] Error deleting scenario:', error);
@@ -2487,7 +2501,6 @@ export default function ScenariosPage() {
                       type="text"
                       value={panelSearch}
                       onChange={(event) => setPanelSearch(event.target.value)}
-                      placeholder="Search options..."
                     />
                   </div>
                   <div className="sb-panel-tabs">
@@ -2577,7 +2590,6 @@ export default function ScenariosPage() {
                                 const hours = Math.max(0, parseInt(event.target.value, 10) || 0);
                                 setTriggerFilter(normalizeAppointmentSoonFilter({ ...triggerFilter, hours }));
                               }}
-                              placeholder="0"
                             />
                           </div>
                           <div className="sb-action-config-field">
@@ -2592,7 +2604,6 @@ export default function ScenariosPage() {
                                 const minutes = Math.max(0, Math.min(59, parseInt(event.target.value, 10) || 0));
                                 setTriggerFilter(normalizeAppointmentSoonFilter({ ...triggerFilter, minutes }));
                               }}
-                              placeholder="0"
                             />
                           </div>
                         </div>
@@ -2659,7 +2670,6 @@ export default function ScenariosPage() {
                                     onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
                                     onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
 
-                                    placeholder=""
                                     rows={4}
                                     style={{
                                       resize: 'none',
@@ -2726,7 +2736,6 @@ export default function ScenariosPage() {
                                         value={rawVal}
                                         onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
                                         onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
-                                        placeholder={field.placeholder || ''}
                                         rows={3}
                                         style={{
                                           resize: 'none',
@@ -2760,7 +2769,6 @@ export default function ScenariosPage() {
                                   value={rawVal}
                                   onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
                                   onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
-                                  placeholder={field.placeholder || ''}
                                   rows={3}
                                   style={{
                                     resize: 'none',
@@ -2794,7 +2802,6 @@ export default function ScenariosPage() {
                                   value={rawVal}
                                   onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
                                   onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
-                                  placeholder={field.placeholder || ''}
                                   style={{
                                     ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
                                     ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
@@ -2827,26 +2834,26 @@ export default function ScenariosPage() {
                     {/* Table-specific fields — dynamic based on selected table */}
                     {actionConfig.target_table && (
                       <div className="sb-record-fields-section">
-                        {/* Record ID — first field after table */}
-                        <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          <label className="sb-record-label" style={{ display: 'block' }}><Hash size={11} className="sb-record-label-icon" style={{ marginRight: 4, display: 'inline', verticalAlign: -1 }} />Record ID</label>
+                        {/* Record ID — shown for update/delete actions */}
+                        {(actionConfig._key === 'update_record' || actionConfig._key === 'delete_record') && (
+                          <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <label className="sb-record-label" style={{ display: 'block' }}><Hash size={11} className="sb-record-label-icon" style={{ marginRight: 4, display: 'inline', verticalAlign: -1 }} />{getRecordIdLabelForTable(actionConfig.target_table)}</label>
                           <div style={{ position: 'relative' }}>
                             <input
                               className="sb-input-field"
                               type="text"
-                              value={actionConfig.record_lookup_value || ''}
-                              onChange={e => setActionConfig(prev => ({ ...prev, record_lookup_value: e.target.value }))}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'record_lookup_value', fieldLabel: 'Record ID', fieldType: 'text' })}
-                              placeholder=""
+                              value={actionConfig.record_id || ''}
+                              onChange={e => setActionConfig(prev => ({ ...prev, record_id: e.target.value }))}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'record_id', fieldLabel: getRecordIdLabelForTable(actionConfig.target_table), fieldType: 'text' })}
                               style={{
-                                ...(actionConfig.record_lookup_value?.includes('{{') ? { color: 'transparent' } : {}),
-                                ...(varsPane.visible && hoveredTableColor && 'record_lookup_value' === varsPane.fieldKey ? {
+                                ...(actionConfig.record_id?.includes('{{') ? { color: 'transparent' } : {}),
+                                ...(varsPane.visible && hoveredTableColor && 'record_id' === varsPane.fieldKey ? {
                                   borderColor: hoveredTableColor,
                                   boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
                                 } : {}),
                               }}
                             />
-                            {(actionConfig.record_lookup_value || '').includes('{{') && (
+                            {(actionConfig.record_id || '').includes('{{') && (
                               <div
                                 className="sb-var-chip-overlay"
                                 style={{
@@ -2855,11 +2862,12 @@ export default function ScenariosPage() {
                                   fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
                                   whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
                                 }}
-                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(actionConfig.record_lookup_value) }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(actionConfig.record_id) }}
                               />
                             )}
                           </div>
-                        </div>
+                          </div>
+                        )}
 
                         {/* Field inputs — shown for create and update actions */}
                         {(actionConfig._key === 'update_record' || actionConfig._key === 'create_new_record') && (
@@ -2877,7 +2885,6 @@ export default function ScenariosPage() {
                                     value={val}
                                     onChange={e => setActionConfig(prev => ({ ...prev, [fieldKey]: e.target.value }))}
                                     onFocus={() => setVarsPane({ visible: true, fieldKey, fieldLabel: field.label, fieldType: 'text' })}
-                                    placeholder=""
                                     style={{
                                       ...(val.includes('{{') ? { color: 'transparent' } : {}),
                                       ...(varsPane.visible && hoveredTableColor && fieldKey === varsPane.fieldKey ? {
@@ -2924,18 +2931,17 @@ export default function ScenariosPage() {
                       {appointmentConfig.key === 'delete_appointment' && 'Set cancellation criteria.'}
                     </div>
                     <div className="sb-record-fields-grid">
-                      {/* Customer — for create_appointment (person_id field) */}
-                      {appointmentConfig.key === 'create_appointment' && (
+                      {/* Customer ID — for create and update_appointment (person_id field) */}
+                      {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
                         <div className="sb-record-field">
-                          <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Customer</label>
+                          <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Customer ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
                               className="sb-input-field"
                               type="text"
                               value={appointmentConfig.person_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, person_id: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Customer', fieldType: 'person_id' })}
-                              placeholder="e.g. {{person.id}}"
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Customer ID', fieldType: 'person_id' })}
                               style={{
                                 ...(appointmentConfig.person_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'person_id' ? {
@@ -2952,6 +2958,19 @@ export default function ScenariosPage() {
                           </div>
                         </div>
                       )}
+                      {/* Service ID — for create and update_appointment */}
+                      {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
+                        <div className="sb-record-field">
+                          <label className="sb-record-label">Service ID</label>
+                          <input
+                            type="text"
+                            className="sb-input-field"
+                            value={appointmentConfig.service_id || ''}
+                            onChange={e => setAppointmentConfig({ ...appointmentConfig, service_id: e.target.value })}
+                            onFocus={() => setVarsPane({ visible: true, fieldKey: 'service_id', fieldLabel: 'Service ID', fieldType: 'service_id' })}
+                          />
+                        </div>
+                      )}
                       {/* Appointment ID — for update/delete_appointment (first field) */}
                       {(appointmentConfig.key === 'update_appointment' || appointmentConfig.key === 'delete_appointment') && (
                         <div className="sb-record-field">
@@ -2963,7 +2982,6 @@ export default function ScenariosPage() {
                               value={appointmentConfig.appointment_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, appointment_id: e.target.value })}
                               onFocus={() => setVarsPane({ visible: true, fieldKey: 'appointment_id', fieldLabel: 'Appointment ID', fieldType: 'text' })}
-                              placeholder="e.g. {{appointments.id}}"
                               style={{
                                 ...(appointmentConfig.appointment_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'appointment_id' ? {
@@ -3037,7 +3055,6 @@ export default function ScenariosPage() {
                               value={appointmentConfig.notes || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, notes: e.target.value })}
                               onFocus={() => setVarsPane({ visible: true, fieldKey: 'notes', fieldLabel: 'Notes', fieldType: 'textarea' })}
-                              placeholder="e.g. {caller_reason} or Website consultation"
                               rows={2}
                               style={{
                                 resize: 'none',
@@ -3386,29 +3403,6 @@ export default function ScenariosPage() {
               <Code size={13} />
             </button>
 
-            {/* Test Mode toggle */}
-            <button
-              type="button"
-              className={`sb-toolbar-test-toggle ${testMode ? 'active' : ''}`}
-              onClick={async () => {
-                const newMode = !testMode;
-                setTestMode(newMode);
-                try {
-                  await fetch('/api/sonar/payments/test-mode', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ enabled: newMode }),
-                  });
-                } catch (e) {
-                  console.error('[Scenarios] Failed to set test mode:', e);
-                }
-              }}
-              title={testMode ? 'Test mode ON — payments will use Stripe test keys' : 'Test mode OFF — payments will use live Stripe keys'}
-            >
-              <span className="sb-toolbar-test-dot" />
-              <span>{testMode ? 'TEST' : 'LIVE'}</span>
-            </button>
-
           </div>
         </div>
         )}
@@ -3542,7 +3536,6 @@ export default function ScenariosPage() {
                   className="sb-input-field sb-notes-textarea"
                   value={scenarioNotes}
                   onChange={e => setScenarioNotes(e.target.value)}
-                  placeholder="Add notes about this scenario..."
                   rows={6}
                 />
               </div>
@@ -3624,7 +3617,6 @@ export default function ScenariosPage() {
                     className="sb-input-field"
                     value={scenarioName}
                     onChange={(e) => setScenarioName(e.target.value)}
-                    placeholder="Enter scenario name..."
                     autoFocus
                   />
                 </div>
@@ -3636,7 +3628,6 @@ export default function ScenariosPage() {
                     className="sb-input-field"
                     value={scenarioDescription}
                     onChange={(e) => setScenarioDescription(e.target.value)}
-                    placeholder="Describe what this scenario does..."
                     rows={3}
                   />
                 </div>
