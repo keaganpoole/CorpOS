@@ -1741,9 +1741,18 @@ export default function ScenariosPage() {
     return value.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
       const parts = ref.split('.');
       if (parts.length < 2) { console.log(`[Resolve] ❌ Bad format: ${ref}`); return match; }
-      const nodeId = parts[0];
-      const fieldPath = parts.slice(1);
-      const outputData = resultsMap[nodeId];
+      const isSourcePrefixed = parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist';
+      const nodeId = isSourcePrefixed ? parts[1] : parts[0];
+      const fieldPath = isSourcePrefixed ? parts.slice(2) : parts.slice(1);
+      if (fieldPath.length === 0) { console.log(`[Resolve] ❌ Bad format: ${ref}`); return match; }
+      const lookupKeys = isSourcePrefixed ? getTableRefCandidates(nodeId) : [nodeId];
+      let outputData = null;
+      for (const key of lookupKeys) {
+        if (resultsMap[key] != null) {
+          outputData = resultsMap[key];
+          break;
+        }
+      }
       if (!outputData) { console.log(`[Resolve] ❌ No outputData for ${nodeId}`); return match; }
       let current = outputData;
       for (const key of fieldPath) {
@@ -1761,8 +1770,10 @@ export default function ScenariosPage() {
     return value.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
       const parts = ref.split('.');
       if (parts.length < 2) return match;
-      const tableKey = parts[0];
-      const fieldPath = parts.slice(1);
+      const isSourcePrefixed = parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist';
+      const tableKey = isSourcePrefixed ? parts[1] : parts[0];
+      const fieldPath = isSourcePrefixed ? parts.slice(2) : parts.slice(1);
+      if (fieldPath.length === 0) return match;
       const tableCandidates = getTableRefCandidates(tableKey);
 
       for (const candidate of tableCandidates) {

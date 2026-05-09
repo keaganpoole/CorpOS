@@ -435,7 +435,10 @@ const getFocusedTableKeyForNode = (node) => {
   return null;
 };
 
-export const getVariableRef = (tableKey, fieldKey) => `{{${normalizeTableRefKey(tableKey)}.${fieldKey}}}`;
+export const getVariableRef = (tableKey, fieldKey, sourcePrefix = '') => {
+  const normalizedTable = normalizeTableRefKey(tableKey);
+  return sourcePrefix ? `{{${sourcePrefix}.${normalizedTable}.${fieldKey}}}` : `{{${normalizedTable}.${fieldKey}}}`;
+};
 
 export const renderVarChipsHTML = (value) => {
   if (!value || typeof value !== 'string') return '';
@@ -446,6 +449,11 @@ export const renderVarChipsHTML = (value) => {
   });
   result = result.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
     const parts = ref.split('.');
+    if (parts.length === 3 && (parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist')) {
+      const tableKey = normalizeParsedTableKey(parts[1]);
+      const color = TABLE_COLORS[tableKey] || '#a78bfa';
+      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">rec.${tableKey}.${parts[2]}</span>`;
+    }
     if (parts.length !== 2) return match;
     if (parts[0] === 'agent' || parts[0] === 'receptionist') {
       const receptionistColor = TABLE_COLORS.appointments || '#38bdf8';
@@ -469,6 +477,8 @@ export const parseVariables = (value) => {
     const parts = ref.split('.');
     if (parts.length === 2) {
       matches.push({ full, table: normalizeParsedTableKey(parts[0]), field: parts[1] });
+    } else if (parts.length >= 3 && (parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist')) {
+      matches.push({ full, table: normalizeParsedTableKey(parts[1]), field: parts.slice(2).join('.') });
     }
   }
   return matches;
@@ -828,6 +838,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   const [activeSources, setActiveSources] = useState({});
   const searchTimers = useRef({});
   const searchInputRefs = useRef({});
+  const seenSourceLabelsRef = useRef(new Set());
   const paneRef = useRef(null);
   const currentNode = nodes.find(n => n.id === currentNodeId);
   const focusedTableKey = getFocusedTableKeyForNode(currentNode);
@@ -853,6 +864,40 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     };
     fetchAll();
   }, [visible, currentNodeId, nodes, edges]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const currentTriggerKey = findTriggerKeyForNode(currentNodeId, nodes, edges);
+    const tables = getAvailableTables(currentTriggerKey).slice().reverse();
+    const hasCallNodeBeforeLocal = (() => {
+      if (!currentNodeId || !nodes.length) return false;
+      const callNodeIds = nodes
+        .filter(n => n.configured && (n.subOptionKey === 'call_customer' || n.actionConfig?._key === 'call_customer'))
+        .map(n => n.id);
+      if (callNodeIds.length === 0) return false;
+      const visited = new Set();
+      const queue = [currentNodeId];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (callNodeIds.includes(current)) return true;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        for (const edge of edges) {
+          if (edge.to === current && !visited.has(edge.from)) {
+            queue.push(edge.from);
+          }
+        }
+      }
+      return false;
+    })();
+
+    tables.forEach((table) => {
+      const agentFields = getAgentFieldsForTable(table.key);
+      const hasAgentData = hasCallNodeBeforeLocal && agentFields.length > 0;
+      const activeSource = activeSources[sourceStateKey(table.key)] || (hasAgentData ? 'agent' : 'trigger');
+      seenSourceLabelsRef.current.add(`${sourceStateKey(table.key)}::${activeSource}`);
+    });
+  }, [visible, currentNodeId, nodes, edges, activeSources]);
 
   if (!visible) return null;
 
@@ -1075,6 +1120,8 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           const sourceBg = table.colorBg;
           const sourceBorder = table.colorBorder;
           const sourceLabel = showingAgent ? 'Receptionist' : 'Trigger';
+          const sourceSweepKey = `${sourceStateKey(table.key)}::${activeSource}`;
+          const shouldSweepSource = !seenSourceLabelsRef.current.has(sourceSweepKey);
 
           return (
             <div
@@ -1135,7 +1182,12 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                     {hasAgentData && (
                       <span className="sb-vars-table-source">
                         <span className="sb-vars-table-source-prefix">via</span>
-                        <span className="sb-vars-table-source-name" style={{ color: sourceColor }}>{sourceLabel}</span>
+                        <span
+                          className={`sb-vars-table-source-name${shouldSweepSource ? ' sb-vars-table-source-name--sweep' : ''}`}
+                          style={{ color: sourceColor }}
+                        >
+                          {sourceLabel}
+                        </span>
                       </span>
                     )}
                     <button type="button" onClick={(e) => { e.stopPropagation(); handleClear(table.key); searchInputRefs.current[table.key]?.focus(); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}><X size={11} /></button>
@@ -1149,7 +1201,12 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                     <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{table.label}</span>
                     <span className="sb-vars-table-source">
                       <span className="sb-vars-table-source-prefix">via</span>
-                      <span className="sb-vars-table-source-name" style={{ color: sourceColor }}>{sourceLabel}</span>
+                      <span
+                        className={`sb-vars-table-source-name${shouldSweepSource ? ' sb-vars-table-source-name--sweep' : ''}`}
+                        style={{ color: sourceColor }}
+                      >
+                        {sourceLabel}
+                      </span>
                     </span>
                     <button type="button" onClick={(e) => { e.stopPropagation(); handleStart(table.key); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '0 2px', display: 'flex', flexShrink: 0, opacity: 0.6 }}>
                       <Search size={11} />
@@ -1172,7 +1229,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                   {showingAgent ? (
                     <>
                       {agentFields.map((field) => {
-                        const varRef = `{{receptionist.${field.key}}}`;
+                        const varRef = getVariableRef(table.key, field.key, 'rec');
                         return (
                           <button
                             key={field.key}
