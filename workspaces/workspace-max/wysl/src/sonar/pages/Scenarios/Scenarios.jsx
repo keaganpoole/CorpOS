@@ -337,7 +337,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'status', label: 'Status', type: 'select', options: ['pending', 'confirmed', 'cancelled'] },
           { key: 'date', label: 'Date', type: 'date' },
           { key: 'time', label: 'Time', type: 'time' },
-          { key: 'duration', label: 'Duration', type: 'select', options: ['15', '30', '45', '60', '90', '120'] },
+          { key: 'duration', label: 'Duration', type: 'text' },
           { key: 'notes', label: 'Notes', type: 'textarea' },
         ]},
         { key: 'delete_appointment', name: 'Delete Appointment', description: 'Cancel and remove an appointment', configFields: [
@@ -467,6 +467,26 @@ const INITIAL_NODE = { id: 'node-1', x: 200, y: 300, configured: false, label: '
 
 const sbLabelStyle = { fontSize: 9, fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 4, display: 'block' };
 const sbInputStyle = { width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: '#e4e4e7', outline: 'none', boxSizing: 'border-box' };
+const sbModeToggleStyle = {
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'rgba(0,0,0,0.45)',
+  color: '#71717a',
+  fontSize: 9,
+  fontWeight: 700,
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
+  padding: '4px 8px',
+  borderRadius: 999,
+  cursor: 'pointer',
+  transition: 'all 0.18s ease',
+  lineHeight: 1,
+  whiteSpace: 'nowrap',
+};
+const sbModeToggleActiveStyle = {
+  color: '#38bdf8',
+  borderColor: 'rgba(56,189,248,0.35)',
+  background: 'rgba(56,189,248,0.12)',
+};
 
 export default function ScenariosPage() {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
@@ -758,6 +778,10 @@ export default function ScenariosPage() {
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
   const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter'].includes(panelStage);
+  const appointmentDateInputMode = appointmentConfig.date_input_mode || 'picker';
+  const appointmentTimeInputMode = appointmentConfig.time_input_mode || 'picker';
+  const scheduleDateInputMode = scheduleConfig.date_input_mode || 'picker';
+  const scheduleTimeInputMode = scheduleConfig.time_input_mode || 'picker';
 
   // Handle variable insertion — inserts {{table.field}} syntax for rendering
   const handleInsertVariable = (varRef, fieldLabel, color) => {
@@ -1382,7 +1406,9 @@ export default function ScenariosPage() {
           client_name: '',
           date: '',
           time: '',
-          duration: 30,
+          duration: '30',
+          date_input_mode: 'picker',
+          time_input_mode: 'picker',
           status: 'pending',
           assigned_receptionist: '',
           notes: '',
@@ -3069,35 +3095,146 @@ export default function ScenariosPage() {
                       {/* Date — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
                         <div className="sb-record-field">
-                          <label className="sb-record-label">Date</label>
-                          <input type="date" className="sb-input-field" value={appointmentConfig.date || ''}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, date: e.target.value })}
-                            style={{ colorScheme: 'dark' }} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                            <label className="sb-record-label" style={{ marginBottom: 0 }}>Date</label>
+                            <button
+                              type="button"
+                              onClick={() => setAppointmentConfig({ ...appointmentConfig, date_input_mode: appointmentDateInputMode === 'text' ? 'picker' : 'text' })}
+                              style={{ ...sbModeToggleStyle, ...(appointmentDateInputMode === 'text' ? sbModeToggleActiveStyle : {}) }}
+                            >
+                          {appointmentDateInputMode === 'picker' ? 'Picker' : 'Text'}
+                            </button>
+                          </div>
+                          <div style={{ position: 'relative' }}>
+                            {appointmentDateInputMode === 'picker' ? (
+                              <input
+                                type="date"
+                                className="sb-input-field"
+                                value={appointmentConfig.date || ''}
+                                onChange={e => setAppointmentConfig({ ...appointmentConfig, date: e.target.value })}
+                                style={{ colorScheme: 'dark' }}
+                              />
+                            ) : (
+                              <input
+                                type="text"
+                                className="sb-input-field"
+                                value={appointmentConfig.date || ''}
+                                onChange={e => setAppointmentConfig({ ...appointmentConfig, date: e.target.value })}
+                                onFocus={() => setVarsPane({ visible: true, fieldKey: 'date', fieldLabel: 'Date', fieldType: 'text' })}
+                              />
+                            )}
+                            {appointmentConfig.date_input_mode !== 'picker' && (appointmentConfig.date || '').includes('{{') && (
+                              <div
+                                className="sb-var-chip-overlay"
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  pointerEvents: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '0 10px',
+                                  fontSize: 12,
+                                  color: '#e4e4e7',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  fontFamily: 'Inter, sans-serif',
+                                }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.date) }}
+                              />
+                            )}
+                          </div>
                         </div>
                       )}
                       {/* Time — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
                         <div className="sb-record-field">
-                          <label className="sb-record-label">Time</label>
-                          <input type="time" className="sb-input-field" value={appointmentConfig.time || ''}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, time: e.target.value })}
-                            style={{ colorScheme: 'dark' }} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                            <label className="sb-record-label" style={{ marginBottom: 0 }}>Time</label>
+                            <button
+                              type="button"
+                              onClick={() => setAppointmentConfig({ ...appointmentConfig, time_input_mode: appointmentTimeInputMode === 'text' ? 'picker' : 'text' })}
+                              style={{ ...sbModeToggleStyle, ...(appointmentTimeInputMode === 'text' ? sbModeToggleActiveStyle : {}) }}
+                            >
+                              {appointmentTimeInputMode === 'picker' ? 'Picker' : 'Text'}
+                            </button>
+                          </div>
+                          <div style={{ position: 'relative' }}>
+                            {appointmentTimeInputMode === 'picker' ? (
+                              <input
+                                type="time"
+                                className="sb-input-field"
+                                value={appointmentConfig.time || ''}
+                                onChange={e => setAppointmentConfig({ ...appointmentConfig, time: e.target.value })}
+                                style={{ colorScheme: 'dark' }}
+                              />
+                            ) : (
+                              <input
+                                type="text"
+                                className="sb-input-field"
+                                value={appointmentConfig.time || ''}
+                                onChange={e => setAppointmentConfig({ ...appointmentConfig, time: e.target.value })}
+                                onFocus={() => setVarsPane({ visible: true, fieldKey: 'time', fieldLabel: 'Time', fieldType: 'text' })}
+                              />
+                            )}
+                            {appointmentConfig.time_input_mode !== 'picker' && (appointmentConfig.time || '').includes('{{') && (
+                              <div
+                                className="sb-var-chip-overlay"
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  pointerEvents: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '0 10px',
+                                  fontSize: 12,
+                                  color: '#e4e4e7',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  fontFamily: 'Inter, sans-serif',
+                                }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.time) }}
+                              />
+                            )}
+                          </div>
                         </div>
                       )}
                       {/* Duration */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
                         <div className="sb-record-field">
                           <label className="sb-record-label">Duration</label>
-                          <select className="sb-input-field sb-select-field" value={appointmentConfig.duration || ''}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, duration: Number(e.target.value) })}>
-                            <option value="">Select...</option>
-                            <option value={15}>15 min</option>
-                            <option value={30}>30 min</option>
-                            <option value={45}>45 min</option>
-                            <option value={60}>1 hour</option>
-                            <option value={90}>1.5 hours</option>
-                            <option value={120}>2 hours</option>
-                          </select>
+                          {(() => {
+                            const durationValue = appointmentConfig.duration == null ? '' : String(appointmentConfig.duration);
+                            return (
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="text"
+                              className="sb-input-field"
+                              value={durationValue}
+                              onChange={e => setAppointmentConfig({ ...appointmentConfig, duration: e.target.value })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'duration', fieldLabel: 'Duration', fieldType: 'text' })}
+                            />
+                            {durationValue.includes('{{') && (
+                              <div
+                                className="sb-var-chip-overlay"
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  pointerEvents: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '0 10px',
+                                  fontSize: 12,
+                                  color: '#e4e4e7',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  fontFamily: 'Inter, sans-serif',
+                                }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(durationValue) }}
+                              />
+                            )}
+                          </div>
+                            );
+                          })()}
                         </div>
                       )}
                       {/* Notes */}
@@ -3150,19 +3287,99 @@ export default function ScenariosPage() {
                       {/* Date picker for specific_time */}
                       {scheduleConfig.key === 'specific_time' && (
                         <div>
-                          <label style={sbLabelStyle}>Date</label>
-                          <input type="date" value={scheduleConfig.date || ''}
-                            onChange={e => setScheduleConfig({ ...scheduleConfig, date: e.target.value })}
-                            style={sbInputStyle} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                            <label style={{ ...sbLabelStyle, marginBottom: 0 }}>Date</label>
+                            <button
+                              type="button"
+                              onClick={() => setScheduleConfig({ ...scheduleConfig, date_input_mode: scheduleDateInputMode === 'text' ? 'picker' : 'text' })}
+                              style={{ ...sbModeToggleStyle, ...(scheduleDateInputMode === 'text' ? sbModeToggleActiveStyle : {}) }}
+                            >
+                              {scheduleDateInputMode === 'picker' ? 'Picker' : 'Text'}
+                            </button>
+                          </div>
+                          {scheduleDateInputMode === 'picker' ? (
+                            <input type="date" value={scheduleConfig.date || ''}
+                              onChange={e => setScheduleConfig({ ...scheduleConfig, date: e.target.value })}
+                              style={{ ...sbInputStyle, colorScheme: 'dark' }} />
+                          ) : (
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                type="text"
+                                value={scheduleConfig.date || ''}
+                                onChange={e => setScheduleConfig({ ...scheduleConfig, date: e.target.value })}
+                                onFocus={() => setVarsPane({ visible: true, fieldKey: 'date', fieldLabel: 'Date', fieldType: 'text' })}
+                                style={sbInputStyle}
+                              />
+                              {(scheduleConfig.date || '').includes('{{') && (
+                                <div
+                                  className="sb-var-chip-overlay"
+                                  style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  pointerEvents: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '0 10px',
+                                  fontSize: 12,
+                                  color: '#e4e4e7',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  fontFamily: 'Inter, sans-serif',
+                                  }}
+                                  dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(scheduleConfig.date) }}
+                                />
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                       {/* Time picker for all except appointment_reminder */}
                       {scheduleConfig.key !== 'appointment_reminder' && (
                         <div>
-                          <label style={sbLabelStyle}>Time</label>
-                          <input type="time" value={scheduleConfig.time || '09:00'}
-                            onChange={e => setScheduleConfig({ ...scheduleConfig, time: e.target.value })}
-                            style={sbInputStyle} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                            <label style={{ ...sbLabelStyle, marginBottom: 0 }}>Time</label>
+                            <button
+                              type="button"
+                              onClick={() => setScheduleConfig({ ...scheduleConfig, time_input_mode: scheduleTimeInputMode === 'text' ? 'picker' : 'text' })}
+                              style={{ ...sbModeToggleStyle, ...(scheduleTimeInputMode === 'text' ? sbModeToggleActiveStyle : {}) }}
+                            >
+                              {scheduleTimeInputMode === 'picker' ? 'Picker' : 'Text'}
+                            </button>
+                          </div>
+                          {scheduleTimeInputMode === 'picker' ? (
+                            <input type="time" value={scheduleConfig.time || '09:00'}
+                              onChange={e => setScheduleConfig({ ...scheduleConfig, time: e.target.value })}
+                              style={{ ...sbInputStyle, colorScheme: 'dark' }} />
+                          ) : (
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                type="text"
+                                value={scheduleConfig.time || '09:00'}
+                                onChange={e => setScheduleConfig({ ...scheduleConfig, time: e.target.value })}
+                                onFocus={() => setVarsPane({ visible: true, fieldKey: 'time', fieldLabel: 'Time', fieldType: 'text' })}
+                                style={sbInputStyle}
+                              />
+                              {(scheduleConfig.time || '').includes('{{') && (
+                                <div
+                                  className="sb-var-chip-overlay"
+                                  style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                  pointerEvents: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '0 10px',
+                                  fontSize: 12,
+                                  color: '#e4e4e7',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  fontFamily: 'Inter, sans-serif',
+                                }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(scheduleConfig.time) }}
+                              />
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                       {/* Timezone */}

@@ -452,7 +452,7 @@ export const renderVarChipsHTML = (value) => {
     if (parts.length === 3 && (parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist')) {
       const tableKey = normalizeParsedTableKey(parts[1]);
       const color = TABLE_COLORS[tableKey] || '#a78bfa';
-      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">rec.${tableKey}.${parts[2]}</span>`;
+      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">rec.${parts[1]}.${parts[2]}</span>`;
     }
     if (parts.length !== 2) return match;
     if (parts[0] === 'agent' || parts[0] === 'receptionist') {
