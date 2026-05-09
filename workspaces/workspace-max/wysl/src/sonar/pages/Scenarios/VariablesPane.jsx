@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
-  User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, Mic, CreditCard, Search, Layers
+  User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, CreditCard, Search, Layers
 } from 'lucide-react';
 import { getOutputVariables } from '../../../sonar/lib/fieldContexts';
 import { getSmartActionByKey, getSmartActions } from './smartActions';
@@ -411,30 +411,29 @@ export const TABLE_LABELS = {
   business: 'Business',
 };
 
-const DEFAULT_AGENT_VARS = [
-  { key: 'record_id', label: 'Record ID', category: 'people' },
-  { key: 'first_name', label: 'First Name', category: 'people' },
-  { key: 'last_name', label: 'Last Name', category: 'people' },
-  { key: 'email', label: 'Email', category: 'people' },
-  { key: 'notes', label: 'Notes', category: 'people' },
-  { key: 'last_outcome', label: 'Outcome', category: 'people' },
-  { key: 'last_call_status', label: 'Call Status', category: 'people' },
-  { key: 'callback_needed', label: 'Callback Needed', category: 'people' },
-  { key: 'callback_due_at', label: 'Callback Due At', category: 'people' },
-  { key: 'best_time_to_contact', label: 'Best Time to Contact', category: 'people' },
-  { key: 'special_instructions', label: 'Special Instructions', category: 'people' },
-  { key: 'consent_sms', label: 'Consent SMS', category: 'people' },
-  { key: 'consent_call', label: 'Consent Call', category: 'people' },
-  { key: 'new_appt_date', label: 'Appointment Date', category: 'appointments' },
-  { key: 'new_appt_time', label: 'Appointment Time', category: 'appointments' },
-  { key: 'new_appt_duration', label: 'Appointment Duration', category: 'appointments' },
-  { key: 'new_appt_service', label: 'Appointment Service', category: 'appointments' },
-  { key: 'new_appt_client_name', label: 'Appointment Client Name', category: 'appointments' },
-  { key: 'cancel_appt_id', label: 'Cancel Appointment ID', category: 'appointments' },
-  { key: 'update_appt_id', label: 'Update Appointment ID', category: 'appointments' },
-  { key: 'update_appt_date', label: 'Update Appointment Date', category: 'appointments' },
-  { key: 'update_appt_time', label: 'Update Appointment Time', category: 'appointments' },
-];
+const AGENT_SOURCE_TABLES = new Set(['people', 'appointments']);
+
+const getAgentFieldsForTable = (tableKey) => {
+  if (!AGENT_SOURCE_TABLES.has(tableKey)) return [];
+  return TABLE_DEFS.find((table) => table.key === tableKey)?.fields || [];
+};
+
+const getFocusedTableKeyForNode = (node) => {
+  if (!node) return null;
+  const actionKey = node.actionConfig?._key || node.subOptionKey || node.triggerKey || '';
+  const appointmentKey = node.appointmentConfig?.key || '';
+  if (appointmentKey === 'create_appointment' || appointmentKey === 'update_appointment' || appointmentKey === 'delete_appointment') {
+    return 'appointments';
+  }
+  if (actionKey === 'create_appointment' || actionKey === 'update_appointment' || actionKey === 'delete_appointment' || actionKey === 'search_appointments') {
+    return 'appointments';
+  }
+  if (['create_new_record', 'update_record', 'delete_record', 'search_records'].includes(actionKey)) {
+    const tableKey = (node.actionConfig?.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+    return normalizeTableRefKey(tableKey);
+  }
+  return null;
+};
 
 export const getVariableRef = (tableKey, fieldKey) => `{{${normalizeTableRefKey(tableKey)}.${fieldKey}}}`;
 
@@ -448,8 +447,9 @@ export const renderVarChipsHTML = (value) => {
   result = result.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
     const parts = ref.split('.');
     if (parts.length !== 2) return match;
-    if (parts[0] === 'agent') {
-      return `<span class="sb-var-chip" style="background:rgba(50,240,217,0.12);color:#32f0d9;border:1px solid rgba(50,240,217,0.25);display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Call.${parts[1]}</span>`;
+    if (parts[0] === 'agent' || parts[0] === 'receptionist') {
+      const receptionistColor = TABLE_COLORS.appointments || '#38bdf8';
+      return `<span class="sb-var-chip" style="background:${receptionistColor}18;color:${receptionistColor};border:1px solid ${receptionistColor}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Receptionist.${parts[1]}</span>`;
     }
     const tableKey = normalizeParsedTableKey(parts[0]);
     const color = TABLE_COLORS[tableKey] || '#a78bfa';
@@ -473,12 +473,6 @@ export const parseVariables = (value) => {
   }
   return matches;
 };
-
-// Sections menu for the variables panel
-const SECTIONS = [
-  { id: 'current', label: 'Database' },
-  { id: 'previous', label: 'Scenario' },
-];
 
 // Node type → icon and display label mapping
 const NODE_DISPLAY = {
@@ -582,7 +576,7 @@ const formatValue = (value, type) => {
   return String(value);
 };
 
-// Search Records Output — shows runtime output from Search Records nodes in Scenario tab
+// Search Records Output — shows runtime output from Search Records nodes in the variables pane
 const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, onTableHover }) => {
   const [expandedRecords, setExpandedRecords] = useState({});
 
@@ -831,10 +825,12 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   const [searchQueries, setSearchQueries] = useState({});
   const [searchStates, setSearchStates] = useState({});
   const [editingTables, setEditingTables] = useState({});
-  const [activeSection, setActiveSection] = useState('current');
+  const [activeSources, setActiveSources] = useState({});
   const searchTimers = useRef({});
   const searchInputRefs = useRef({});
   const paneRef = useRef(null);
+  const currentNode = nodes.find(n => n.id === currentNodeId);
+  const focusedTableKey = getFocusedTableKeyForNode(currentNode);
 
   useEffect(() => {
     if (!visible) return;
@@ -856,7 +852,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       setExpanded(exp);
     };
     fetchAll();
-  }, [visible]);
+  }, [visible, currentNodeId, nodes, edges]);
 
   if (!visible) return null;
 
@@ -883,17 +879,15 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   })();
 
   const isPhoneCallTrigger = (() => {
-    const node = nodes.find(n => n.id === currentNodeId);
-    if (!node || node.categoryType !== 'TRIGGERS') return false;
+    if (!currentNode || currentNode.categoryType !== 'TRIGGERS') return false;
     const phoneTriggers = ['incoming_call', 'call_answered', 'missed_call', 'call_failed', 'voicemail_received'];
-    return phoneTriggers.includes(node.subOptionKey || node.actionConfig?._key || '');
+    return phoneTriggers.includes(currentNode.subOptionKey || currentNode.actionConfig?._key || '');
   })();
 
   const isCallAction = (() => {
-    const node = nodes.find(n => n.id === currentNodeId);
-    if (!node) return false;
+    if (!currentNode) return false;
     const callActions = ['call_customer', 'call_phone_number'];
-    return callActions.includes(node.subOptionKey || node.actionConfig?._key || '');
+    return callActions.includes(currentNode.subOptionKey || currentNode.actionConfig?._key || '');
   })();
 
   const showFromCall = hasCallNodeBefore && !isPhoneCallTrigger && !isCallAction;
@@ -1008,6 +1002,26 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     return matched;
   };
 
+  const availableTables = getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges)).slice().reverse();
+  const sourceStateKey = (tableKey) => `${currentNodeId || 'none'}::${tableKey}`;
+
+  const getSourceCycleOrder = (tableKey) => {
+    const hasAgentFields = showFromCall && getAgentFieldsForTable(tableKey).length > 0;
+    return hasAgentFields ? ['agent', 'trigger'] : ['trigger'];
+  };
+
+  const cycleTableSource = (tableKey) => {
+    const sourceOrder = getSourceCycleOrder(tableKey);
+    if (sourceOrder.length <= 1) return;
+    setActiveSources(prev => {
+      const key = sourceStateKey(tableKey);
+      const current = prev[key] || (showFromCall && getAgentFieldsForTable(tableKey).length > 0 ? 'agent' : 'trigger');
+      const currentIndex = sourceOrder.indexOf(current);
+      const next = sourceOrder[(currentIndex + 1) % sourceOrder.length];
+      return { ...prev, [key]: next };
+    });
+  };
+
   return (
     <div
       className="sb-variables-pane"
@@ -1024,73 +1038,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
         {fieldLabel && <span className="sb-vars-field-label">for {fieldLabel}</span>}
       </div>
 
-      {/* Section menu */}
-      <div className="sb-vars-section-menu">
-        {SECTIONS.map((section) => (
-          <button
-            key={section.id}
-            type="button"
-            className={`sb-vars-section-tab ${activeSection === section.id ? 'sb-vars-section-tab--active' : ''}`}
-            onClick={() => setActiveSection(section.id)}
-          >
-            {section.label}
-          </button>
-        ))}
-      </div>
-
       <div className="sb-vars-scroll">
-        {activeSection === 'current' && (
-        <>
-        {showFromCall && (
-          <div className="sb-vars-table-group" style={{ '--table-color': '#32f0d9', '--table-bg': 'rgba(50,240,217,0.08)', '--table-border': 'rgba(50,240,217,0.2)' }} onMouseEnter={() => onTableHover?.('#32f0d9')} onMouseLeave={() => onTableHover?.('')}>
-            <button type="button" className="sb-vars-table-header" onClick={() => setExpanded(prev => ({ ...prev, __agent: !prev.__agent }))}>
-              <span className="sb-vars-table-chevron">{expanded.__agent ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
-              <span className="sb-vars-table-icon" style={{ color: '#32f0d9' }}><Mic size={11} /></span>
-              <span className="sb-vars-table-label">From Call</span>
-              <span className="sb-vars-table-badge">Agent Data</span>
-            </button>
-            {expanded.__agent && (
-              <div className="sb-vars-fields">
-                {(() => {
-                  const currentNode = nodes.find(n => n.id === currentNodeId);
-                  const nodeCategory = currentNode?.categoryKey || '';
-                  const isAppointmentNode = nodeCategory === 'appointments' || nodeCategory === 'appointment_scheduling';
-                  if (isAppointmentNode) {
-                    return (
-                      <div>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: '#32f0d9', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '4px 0 2px 8px', opacity: 0.7 }}>Appointments</div>
-                        {DEFAULT_AGENT_VARS.filter(f => f.category === 'appointments').map((field) => {
-                          const varRef = `{{agent.${field.key}}}`;
-                          return (
-                            <button key={field.key} type="button" className="sb-vars-field" onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, '#32f0d9'); }} title={`Insert ${varRef}`}>
-                              <span className="sb-vars-field-name" style={{ color: '#32f0d9' }}>{field.label}</span>
-                              <span className="sb-vars-field-value" style={{ color: '#666', fontStyle: 'italic' }}>to be collected</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  }
-                  return (
-                    <div>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: '#32f0d9', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '4px 0 2px 8px', opacity: 0.7 }}>Customer Record</div>
-                      {DEFAULT_AGENT_VARS.filter(f => f.category === 'people').map((field) => {
-                        const varRef = `{{agent.${field.key}}}`;
-                        return (
-                          <button key={field.key} type="button" className="sb-vars-field" onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, '#32f0d9'); }} title={`Insert ${varRef}`}>
-                            <span className="sb-vars-field-name" style={{ color: '#32f0d9' }}>{field.label}</span>
-                            <span className="sb-vars-field-value" style={{ color: '#666', fontStyle: 'italic' }}>to be collected</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
-        )}
-
         {onInsertSmartAction && smartActions.length > 0 && (
           <div className="sb-smart-actions-section">
             <div className="sb-smart-actions-header">
@@ -1108,7 +1056,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           </div>
         )}
 
-        {getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges)).slice().reverse().map((table) => {
+        {availableTables.map((table) => {
           const tableRecords = records[table.key] || [];
           const idx = activeIndex[table.key] || 0;
           const currentRecord = tableRecords[idx] || null;
@@ -1119,13 +1067,50 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           const resultCount = getCount(table.key);
           const matchedFields = getMatchedFields(table.key, currentRecord);
           const TableIcon = table.icon;
+          const agentFields = getAgentFieldsForTable(table.key);
+          const hasAgentData = showFromCall && agentFields.length > 0;
+          const activeSource = activeSources[sourceStateKey(table.key)] || (hasAgentData ? 'agent' : 'trigger');
+          const showingAgent = activeSource === 'agent';
+          const sourceColor = table.color;
+          const sourceBg = table.colorBg;
+          const sourceBorder = table.colorBorder;
+          const sourceLabel = showingAgent ? 'Receptionist' : 'Trigger';
 
           return (
-            <div key={table.key} className={`sb-vars-table-group ${isSearching ? 'sb-vars-group-searching' : ''}`} style={{ '--table-color': table.color, '--table-bg': table.colorBg, '--table-border': table.colorBorder }} onMouseEnter={() => onTableHover?.(table.color)} onMouseLeave={() => onTableHover?.('')}>
-              <div type="button" className={`sb-vars-table-header ${editing ? 'sb-vars-header-searching' : ''}`} style={editing ? { padding: '4px 6px' } : undefined}>
+            <div
+              key={table.key}
+              className={`sb-vars-table-group ${isSearching ? 'sb-vars-group-searching' : ''}`}
+              style={{
+                '--table-color': sourceColor,
+                '--table-bg': sourceBg,
+                '--table-border': sourceBorder,
+              }}
+              onMouseEnter={() => onTableHover?.(sourceColor)}
+              onMouseLeave={() => onTableHover?.('')}
+            >
+              <div
+                className={`sb-vars-table-header ${editing ? 'sb-vars-header-searching' : ''} ${hasAgentData ? 'sb-vars-table-header--cycle' : ''}`}
+                style={editing ? { padding: '4px 6px' } : undefined}
+                onClick={() => cycleTableSource(table.key)}
+                onKeyDown={(e) => {
+                  if (!hasAgentData) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    cycleTableSource(table.key);
+                  }
+                }}
+                role={hasAgentData ? 'button' : undefined}
+                tabIndex={hasAgentData ? 0 : undefined}
+                title={hasAgentData ? 'Click to switch source' : undefined}
+              >
                 {editing ? (
-                  <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 4 }}>
-                    <Search size={11} style={{ color: table.color, flexShrink: 0, opacity: 0.7 }} />
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 4 }}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <Search size={11} style={{ color: sourceColor, flexShrink: 0, opacity: 0.7 }} />
                     <input
                       ref={(el) => { searchInputRefs.current[table.key] = el; }}
                       type="text"
@@ -1135,16 +1120,23 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                       onBlur={() => handleExit(table.key)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleExit(table.key); else if (e.key === 'Escape') { handleClear(table.key); handleExit(table.key); } }}
                       placeholder={`Search ${table.label.toLowerCase()}...`}
+                      onClick={(e) => e.stopPropagation()}
                       style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 11, fontFamily: 'inherit', padding: '2px 0', minWidth: 0 }}
                     />
                     {resultCount > 0 && (
                       <>
-                        <span style={{ fontSize: 9, fontWeight: 600, color: table.color, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', opacity: 0.8 }}>{resultCount} found</span>
+                        <span style={{ fontSize: 9, fontWeight: 600, color: sourceColor, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', opacity: 0.8 }}>{resultCount} found</span>
                         <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', margin: '0 2px' }}>|</span>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); navigateMatched(table.key, -1); }} style={{ background: 'none', border: 'none', color: table.color, cursor: 'pointer', padding: '0 1px', display: 'flex', flexShrink: 0, opacity: 0.7 }}><ChevronUp size={10} /></button>
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); navigateMatched(table.key, -1); }} style={{ background: 'none', border: 'none', color: sourceColor, cursor: 'pointer', padding: '0 1px', display: 'flex', flexShrink: 0, opacity: 0.7 }}><ChevronUp size={10} /></button>
                         <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{getMatchedIndices(table.key).indexOf(idx) + 1}/{resultCount}</span>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); navigateMatched(table.key, 1); }} style={{ background: 'none', border: 'none', color: table.color, cursor: 'pointer', padding: '0 1px', display: 'flex', flexShrink: 0, opacity: 0.7 }}><ChevronDown size={10} /></button>
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); navigateMatched(table.key, 1); }} style={{ background: 'none', border: 'none', color: sourceColor, cursor: 'pointer', padding: '0 1px', display: 'flex', flexShrink: 0, opacity: 0.7 }}><ChevronDown size={10} /></button>
                       </>
+                    )}
+                    {hasAgentData && (
+                      <span className="sb-vars-table-source">
+                        <span className="sb-vars-table-source-prefix">via</span>
+                        <span className="sb-vars-table-source-name" style={{ color: sourceColor }}>{sourceLabel}</span>
+                      </span>
                     )}
                     <button type="button" onClick={(e) => { e.stopPropagation(); handleClear(table.key); searchInputRefs.current[table.key]?.focus(); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}><X size={11} /></button>
                   </div>
@@ -1153,8 +1145,12 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                     <button type="button" className="sb-vars-table-chevron" onClick={(e) => { e.stopPropagation(); setExpanded(prev => ({ ...prev, [table.key]: !prev[table.key] })); }}>
                       {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                     </button>
-                    <span className="sb-vars-table-icon" style={{ color: table.color }}><TableIcon size={11} /></span>
+                    <span className="sb-vars-table-icon" style={{ color: sourceColor }}><TableIcon size={11} /></span>
                     <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{table.label}</span>
+                    <span className="sb-vars-table-source">
+                      <span className="sb-vars-table-source-prefix">via</span>
+                      <span className="sb-vars-table-source-name" style={{ color: sourceColor }}>{sourceLabel}</span>
+                    </span>
                     <button type="button" onClick={(e) => { e.stopPropagation(); handleStart(table.key); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '0 2px', display: 'flex', flexShrink: 0, opacity: 0.6 }}>
                       <Search size={11} />
                     </button>
@@ -1163,53 +1159,61 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                 )}
               </div>
 
-              {isExpanded && currentRecord && (
-                <div className={`sb-vars-fields ${isSearching ? 'sb-vars-fields-tuning' : ''}`} style={{ position: 'relative' }}>
-                  {editing && (
-                    <div className="sb-vars-varbar" style={{ '--varbar-color': table.color }} />
+              {isExpanded && (
+                <div
+                  key={`${table.key}-${activeSource}`}
+                  className={`sb-vars-fields sb-vars-source-panel ${isSearching ? 'sb-vars-fields-tuning' : ''} ${showingAgent ? 'sb-vars-source-panel--agent' : ''}`}
+                  style={{ position: 'relative' }}
+                >
+                  {editing && !showingAgent && (
+                    <div className="sb-vars-varbar" style={{ '--varbar-color': sourceColor }} />
                   )}
-                  {table.fields.map((field) => {
-                    const sampleValue = currentRecord[field.key];
-                    const varRef = getVariableRef(table.key, field.key);
-                    const hasValue = sampleValue !== null && sampleValue !== undefined;
-                    const isMatched = matchedFields.has(field.key);
-                    return (
-                      <button key={field.key} type="button" className={`sb-vars-field ${isSearching ? 'sb-vars-field-tuning' : ''} ${isMatched ? 'sb-vars-field-matched' : ''}`} onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, table.color); }} title={hasValue ? formatValue(sampleValue, field.type) : 'No value'}>
-                        <span className="sb-vars-field-name" style={{ color: table.color }}>{field.label}</span>
-                        {hasValue && <span className="sb-vars-field-value">{formatValue(sampleValue, field.type)}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
 
-              {isExpanded && !currentRecord && (
-                <div className="sb-vars-fields"><div className="sb-vars-empty">No records found</div></div>
+                  {showingAgent ? (
+                    <>
+                      {agentFields.map((field) => {
+                        const varRef = `{{receptionist.${field.key}}}`;
+                        return (
+                          <button
+                            key={field.key}
+                            type="button"
+                            className="sb-vars-field sb-vars-field-agent"
+                            onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, sourceColor); }}
+                            title={`Insert ${varRef}`}
+                          >
+                            <span className="sb-vars-field-name" style={{ color: sourceColor }}>{field.label}</span>
+                            <span className="sb-vars-field-value">to be collected</span>
+                          </button>
+                        );
+                      })}
+                    </>
+                  ) : currentRecord ? (
+                    table.fields.map((field) => {
+                      const sampleValue = currentRecord[field.key];
+                      const varRef = getVariableRef(table.key, field.key);
+                      const hasValue = sampleValue !== null && sampleValue !== undefined;
+                      const isMatched = matchedFields.has(field.key);
+                      return (
+                        <button
+                          key={field.key}
+                          type="button"
+                          className={`sb-vars-field ${isSearching ? 'sb-vars-field-tuning' : ''} ${isMatched ? 'sb-vars-field-matched' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, sourceColor); }}
+                          title={hasValue ? formatValue(sampleValue, field.type) : 'No value'}
+                        >
+                          <span className="sb-vars-field-name" style={{ color: sourceColor }}>{field.label}</span>
+                          {hasValue && <span className="sb-vars-field-value">{formatValue(sampleValue, field.type)}</span>}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="sb-vars-empty">No records found</div>
+                  )}
+                </div>
               )}
             </div>
           );
         })}
-        </> /* end activeSection === 'current' */
-        )}
-
-        {activeSection === 'previous' && (
-          <>
-            <SearchRecordsOutput
-              currentNodeId={currentNodeId}
-              nodes={nodes}
-              edges={edges}
-              onInsertVariable={onInsertVariable}
-              onTableHover={onTableHover}
-            />
-            <PreviousNodeVars
-              currentNodeId={currentNodeId}
-              nodes={nodes}
-              edges={edges}
-              onInsertVariable={onInsertVariable}
-              onTableHover={onTableHover}
-            />
-          </>
-        )}
       </div>
     </div>
   );

@@ -762,11 +762,26 @@ export default function ScenariosPage() {
   // Handle variable insertion — inserts {{table.field}} syntax for rendering
   const handleInsertVariable = (varRef, fieldLabel, color) => {
     if (!varsPane.fieldKey) return;
-    setActionConfig(prev => {
-      const current = prev[varsPane.fieldKey] || '';
-      const newVal = current ? `${current} ${varRef}` : varRef;
-      return { ...prev, [varsPane.fieldKey]: newVal };
-    });
+    const applyInsert = (setter) => {
+      setter(prev => {
+        const base = prev || {};
+        const current = base[varsPane.fieldKey] || '';
+        const newVal = current ? `${current} ${varRef}` : varRef;
+        return { ...base, [varsPane.fieldKey]: newVal };
+      });
+    };
+
+    if (panelStage === 'appointmentConfig') {
+      applyInsert(setAppointmentConfig);
+      return;
+    }
+
+    if (panelStage === 'scheduleConfig') {
+      applyInsert(setScheduleConfig);
+      return;
+    }
+
+    applyInsert(setActionConfig);
   };
 
   // Find the trigger key from parent node for smart actions
@@ -788,9 +803,10 @@ export default function ScenariosPage() {
   const handleInsertSmartAction = (smartAction, fieldKey) => {
     const token = `{smart:${smartAction.key}}`;
     setActionConfig(prev => {
-      const current = prev[fieldKey] || '';
+      const base = prev || {};
+      const current = base[fieldKey] || '';
       const newVal = current ? `${current} \x1E${smartAction.instruction}\x1E` : `\x1E${smartAction.instruction}\x1E`;
-      return { ...prev, [fieldKey]: newVal };
+      return { ...base, [fieldKey]: newVal };
     });
   };
 
@@ -2962,13 +2978,41 @@ export default function ScenariosPage() {
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
                         <div className="sb-record-field">
                           <label className="sb-record-label">Service ID</label>
-                          <input
-                            type="text"
-                            className="sb-input-field"
-                            value={appointmentConfig.service_id || ''}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, service_id: e.target.value })}
-                            onFocus={() => setVarsPane({ visible: true, fieldKey: 'service_id', fieldLabel: 'Service ID', fieldType: 'service_id' })}
-                          />
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="text"
+                              className="sb-input-field"
+                              value={appointmentConfig.service_id || ''}
+                              onChange={e => setAppointmentConfig({ ...appointmentConfig, service_id: e.target.value })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'service_id', fieldLabel: 'Service ID', fieldType: 'service_id' })}
+                              style={{
+                                ...(appointmentConfig.service_id?.includes('{{') ? { color: 'transparent' } : {}),
+                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'service_id' ? {
+                                  borderColor: hoveredTableColor,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                } : {}),
+                              }}
+                            />
+                            {(appointmentConfig.service_id || '').includes('{{') && (
+                              <div
+                                className="sb-var-chip-overlay"
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  pointerEvents: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '0 10px',
+                                  fontSize: 12,
+                                  color: '#e4e4e7',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  fontFamily: 'Inter, sans-serif',
+                                }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.service_id) }}
+                              />
+                            )}
+                          </div>
                         </div>
                       )}
                       {/* Appointment ID — for update/delete_appointment (first field) */}
