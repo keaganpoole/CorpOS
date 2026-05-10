@@ -328,6 +328,7 @@ const VariablesPane = ({
   const [samples, setSamples] = useState({});
   const [expanded, setExpanded] = useState({});
   const [activeTab, setActiveTab] = useState('database');
+  const [activeReceptionist, setActiveReceptionist] = useState(null);
   const paneRef = useRef(null);
 
   // Resolve available tables based on trigger key
@@ -348,6 +349,48 @@ const VariablesPane = ({
     };
     fetchSamples();
   }, [visible, triggerKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!visible) return undefined;
+
+    const loadUserAndReceptionist = async () => {
+      try {
+        const { data: user } = await supabase.from('users').select('id').limit(1).single();
+        if (cancelled) return;
+        const resolvedUserId = user?.id || null;
+
+        if (!resolvedUserId) {
+          setActiveReceptionist(null);
+          return;
+        }
+
+        const { data: receptionistRows } = await supabase
+          .from('hired_receptionists')
+          .select('id, full_name, avatar, call_types, status, user_id')
+          .eq('user_id', resolvedUserId)
+          .or('call_types.eq.out,call_types.eq.both')
+          .limit(5);
+
+        if (cancelled) return;
+
+        const preferredReceptionist = (receptionistRows || []).sort((a, b) => {
+          const aScore = (a.status === 'active' ? 10 : 0) + (a.call_types === 'both' ? 2 : 1);
+          const bScore = (b.status === 'active' ? 10 : 0) + (b.call_types === 'both' ? 2 : 1);
+          return bScore - aScore;
+        })[0] || null;
+
+        setActiveReceptionist(preferredReceptionist);
+      } catch {
+        if (!cancelled) {
+          setActiveReceptionist(null);
+        }
+      }
+    };
+
+    loadUserAndReceptionist();
+    return () => { cancelled = true; };
+  }, [visible]);
 
   // Reset tab when pane reopens
   useEffect(() => {
@@ -427,9 +470,16 @@ const VariablesPane = ({
         {activeTab === 'database' ? (
           /* ── Database Tab: trigger-filtered tables ── */
           availableTables.map((table) => {
-            const sample = samples[table.key];
+            const isReceptionistTable = table.key === 'hired_receptionists';
+            const sample = isReceptionistTable && activeReceptionist
+              ? activeReceptionist
+              : samples[table.key];
             const isExpanded = expanded[table.key];
             const TableIcon = table.icon;
+            const tableLabel = isReceptionistTable && activeReceptionist?.full_name
+              ? activeReceptionist.full_name
+              : table.label;
+            const showReceptionistArt = isReceptionistTable && activeReceptionist?.avatar && ['out', 'both'].includes(activeReceptionist.call_types);
 
             return (
               <div key={table.key} className="sb-vars-table-group" style={{ '--table-color': table.color, '--table-bg': table.colorBg, '--table-border': table.colorBorder }} onMouseEnter={() => onTableHover?.(table.color)} onMouseLeave={() => onTableHover?.('')}>
@@ -438,13 +488,20 @@ const VariablesPane = ({
                   className="sb-vars-table-header"
                   onClick={() => setExpanded(prev => ({ ...prev, [table.key]: !prev[table.key] }))}
                 >
+                  {showReceptionistArt && (
+                    <span
+                      className="sb-vars-table-art"
+                      style={{ backgroundImage: `url(${activeReceptionist.avatar})` }}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span className="sb-vars-table-chevron">
                     {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   </span>
                   <span className="sb-vars-table-icon" style={{ color: table.color }}>
                     <TableIcon size={11} />
                   </span>
-                  <span className="sb-vars-table-label">{table.label}</span>
+                  <span className="sb-vars-table-label">{tableLabel}</span>
                   {sample === null && <span className="sb-vars-no-data">No data</span>}
                 </button>
 

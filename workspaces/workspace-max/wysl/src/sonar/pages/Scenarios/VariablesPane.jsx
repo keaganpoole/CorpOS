@@ -52,6 +52,12 @@ const normalizeParsedTableKey = (tableKey) => {
   return TABLE_REF_REVERSE_ALIASES[tableKey] || tableKey;
 };
 
+const getReceptionistBannerUrl = (bannerId) => (
+  bannerId
+    ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${bannerId}.png`
+    : null
+);
+
 const SEARCH_FIELDS = {
   people: ['first_name', 'last_name', 'email', 'notes'],
   payments: ['description', 'status', 'payment_method'],
@@ -836,6 +842,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   const [searchStates, setSearchStates] = useState({});
   const [editingTables, setEditingTables] = useState({});
   const [activeSources, setActiveSources] = useState({});
+  const [activeReceptionist, setActiveReceptionist] = useState(null);
   const searchTimers = useRef({});
   const searchInputRefs = useRef({});
   const seenSourceLabelsRef = useRef(new Set());
@@ -864,6 +871,69 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     };
     fetchAll();
   }, [visible, currentNodeId, nodes, edges]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!visible) return undefined;
+
+    const loadActiveReceptionist = async () => {
+      try {
+        const { data: user } = await supabase.from('users').select('id').limit(1).single();
+        if (cancelled) return;
+
+        const userId = user?.id;
+        if (!userId) {
+          setActiveReceptionist(null);
+          return;
+        }
+
+        const { data: rows } = await supabase
+          .from('hired_receptionists')
+          .select('id, full_name, first_name, avatar, call_types, status, user_id, catalog_id')
+          .eq('user_id', userId)
+          .or('call_types.eq.outbound,call_types.eq.both')
+          .limit(10);
+
+        if (cancelled) return;
+
+        const preferred = (rows || []).sort((a, b) => {
+          const aScore = (a.status === 'active' ? 10 : 0) + (a.call_types === 'both' ? 2 : 1);
+          const bScore = (b.status === 'active' ? 10 : 0) + (b.call_types === 'both' ? 2 : 1);
+          return bScore - aScore;
+        })[0] || null;
+
+        if (!preferred) {
+          setActiveReceptionist(null);
+          return;
+        }
+
+        let bannerId = null;
+        if (preferred.catalog_id) {
+          const { data: catalogRow } = await supabase
+            .from('receptionist_catalog')
+            .select('banner_id')
+            .eq('id', preferred.catalog_id)
+            .single();
+          if (!cancelled) {
+            bannerId = catalogRow?.banner_id || null;
+          }
+        }
+
+        if (cancelled) return;
+
+        setActiveReceptionist({
+          ...preferred,
+          banner_id: bannerId,
+          banner_url: getReceptionistBannerUrl(bannerId),
+        });
+      } catch {
+        if (!cancelled) setActiveReceptionist(null);
+      }
+    };
+
+    loadActiveReceptionist();
+    return () => { cancelled = true; };
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -1119,9 +1189,13 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           const sourceColor = table.color;
           const sourceBg = table.colorBg;
           const sourceBorder = table.colorBorder;
-          const sourceLabel = showingAgent ? 'Receptionist' : 'Trigger';
+          const receptionistName = activeReceptionist?.first_name?.trim() || activeReceptionist?.full_name?.trim();
+          const sourceLabel = showingAgent
+            ? (receptionistName || 'Receptionist')
+            : 'Trigger';
           const sourceSweepKey = `${sourceStateKey(table.key)}::${activeSource}`;
           const shouldSweepSource = !seenSourceLabelsRef.current.has(sourceSweepKey);
+          const showReceptionistArt = showingAgent && !!activeReceptionist?.banner_url;
 
           return (
             <div
@@ -1136,7 +1210,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
               onMouseLeave={() => onTableHover?.('')}
             >
               <div
-                className={`sb-vars-table-header ${editing ? 'sb-vars-header-searching' : ''} ${hasAgentData ? 'sb-vars-table-header--cycle' : ''}`}
+                className={`sb-vars-table-header ${editing ? 'sb-vars-header-searching' : ''} ${hasAgentData ? 'sb-vars-table-header--cycle' : ''} ${showReceptionistArt ? 'sb-vars-table-header--receptionist' : ''}`}
                 style={editing ? { padding: '4px 6px' } : undefined}
                 onClick={() => cycleTableSource(table.key)}
                 onKeyDown={(e) => {
@@ -1150,6 +1224,13 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                 tabIndex={hasAgentData ? 0 : undefined}
                 title={hasAgentData ? 'Click to switch source' : undefined}
               >
+                {showReceptionistArt && (
+                  <span
+                    className="sb-vars-table-art"
+                    style={{ backgroundImage: `url(${activeReceptionist.banner_url})` }}
+                    aria-hidden="true"
+                  />
+                )}
                 {editing ? (
                   <div
                     style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 4 }}

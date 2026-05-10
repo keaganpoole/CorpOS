@@ -2099,6 +2099,8 @@
   font-family: 'Inter', sans-serif;
   transition: background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease;
   position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .sb-vars-table-header:hover {
@@ -2111,6 +2113,33 @@
 
 .sb-vars-table-header--cycle:hover {
   transform: translateY(-0.25px);
+}
+
+.sb-vars-table-art {
+  position: absolute;
+  inset: 0;
+  background-position: right center;
+  background-repeat: no-repeat;
+  background-size: auto 180%;
+  opacity: 0.24;
+  filter: saturate(0.88) brightness(0.92);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sb-vars-table-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(12, 12, 16, 0.94) 0%, rgba(12, 12, 16, 0.88) 40%, rgba(12, 12, 16, 0.64) 68%, rgba(12, 12, 16, 0.74) 100%),
+    linear-gradient(135deg, var(--table-bg), transparent 58%);
+}
+
+.sb-vars-table-header > *:not(.sb-vars-table-art) {
+  position: relative;
+  z-index: 1;
 }
 
 .sb-vars-table-chevron {
@@ -2148,7 +2177,7 @@
 }
 
 .sb-vars-table-source-name {
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 800;
   text-transform: none;
   letter-spacing: 0.06em;

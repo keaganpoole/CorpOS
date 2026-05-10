@@ -1916,10 +1916,40 @@
   border-radius: 4px;
   transition: background 0.12s ease;
   color: rgba(255, 255, 255, 0.7);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .sb-vars-table-header:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+
+.sb-vars-table-art {
+  position: absolute;
+  inset: 0;
+  background-position: right center;
+  background-repeat: no-repeat;
+  background-size: auto 160%;
+  opacity: 0.18;
+  filter: saturate(0.85) brightness(0.9);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sb-vars-table-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(10, 10, 12, 0.92) 0%, rgba(10, 10, 12, 0.86) 42%, rgba(10, 10, 12, 0.62) 68%, rgba(10, 10, 12, 0.72) 100%),
+    linear-gradient(135deg, var(--table-bg), transparent 55%);
+}
+
+.sb-vars-table-header > *:not(.sb-vars-table-art) {
+  position: relative;
+  z-index: 1;
 }
 
 .sb-vars-table-chevron {
