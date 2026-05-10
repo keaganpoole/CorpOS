@@ -1952,6 +1952,8 @@
 
 /* ─── Variables Pane ─────────────────────────────────────── */
 .sb-variables-pane {
+  --sb-pane-rotate-x: 0deg;
+  --sb-pane-rotate-y: 8deg;
   position: absolute;
   width: 264px;
   background: linear-gradient(135deg, rgba(14, 14, 18, 0.98), rgba(20, 20, 26, 0.98));
@@ -1965,6 +1967,13 @@
   overflow: hidden;
   font-family: 'Inter', sans-serif;
   animation: sb-vars-slide-in 0.2s ease-out;
+  transform:
+    perspective(1600px)
+    rotateX(var(--sb-pane-rotate-x))
+    rotateY(var(--sb-pane-rotate-y));
+  transform-style: preserve-3d;
+  transform-origin: center center;
+  will-change: transform;
 }
 
 @keyframes sb-vars-slide-in {
@@ -2087,6 +2096,9 @@
 }
 
 .sb-vars-table-header {
+  --sb-header-lift: 0px;
+  --sb-parallax-rotate-x: 0deg;
+  --sb-parallax-rotate-y: 0deg;
   width: 100%;
   display: flex;
   align-items: center;
@@ -2101,6 +2113,13 @@
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  transform:
+    perspective(1200px)
+    translateY(var(--sb-header-lift))
+    rotateX(var(--sb-parallax-rotate-x))
+    rotateY(var(--sb-parallax-rotate-y));
+  transform-style: preserve-3d;
+  will-change: transform;
 }
 
 .sb-vars-table-header:hover {
@@ -2112,7 +2131,7 @@
 }
 
 .sb-vars-table-header--cycle:hover {
-  transform: translateY(-0.25px);
+  --sb-header-lift: -0.25px;
 }
 
 .sb-vars-table-art {
@@ -2140,6 +2159,7 @@
 .sb-vars-table-header > *:not(.sb-vars-table-art) {
   position: relative;
   z-index: 1;
+  transform: translateZ(12px);
 }
 
 .sb-vars-table-chevron {
