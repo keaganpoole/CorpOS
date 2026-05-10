@@ -334,7 +334,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'appointment_id', label: 'Appointment ID', type: 'record_id' },
           { key: 'person_id', label: 'Customer ID', type: 'person_id' },
           { key: 'service_id', label: 'Service ID', type: 'service_id' },
-          { key: 'status', label: 'Status', type: 'select', options: ['pending', 'confirmed', 'cancelled'] },
+          { key: 'status', label: 'Status', type: 'select', options: ['pending', 'confirmed', 'cancelled', 'missed'] },
           { key: 'date', label: 'Date', type: 'date' },
           { key: 'time', label: 'Time', type: 'time' },
           { key: 'duration', label: 'Duration', type: 'text' },
@@ -483,9 +483,9 @@ const sbModeToggleStyle = {
   whiteSpace: 'nowrap',
 };
 const sbModeToggleActiveStyle = {
-  color: '#38bdf8',
-  borderColor: 'rgba(56,189,248,0.35)',
-  background: 'rgba(56,189,248,0.12)',
+  color: '#e4e4e7',
+  borderColor: 'rgba(255,255,255,0.12)',
+  background: 'rgba(24,24,27,0.9)',
 };
 
 export default function ScenariosPage() {
@@ -2103,6 +2103,30 @@ export default function ScenariosPage() {
     }, 500);
   };
 
+  useEffect(() => {
+    const triggerNode = nodes.find(n => n.categoryType === 'TRIGGERS');
+    const triggerKey = triggerNode?.subOptionKey || triggerNode?.triggerKey || null;
+    if (!triggerKey) return undefined;
+
+    const channel = supabase
+      .channel(`scenario-events-${triggerKey}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'scenario_events' },
+        (payload) => {
+          const firedTriggerKey = payload?.new?.trigger_key;
+          if (firedTriggerKey !== triggerKey) return;
+          if (isRunning) return;
+          runScenario();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [nodes, isRunning]);
+
   const handleEditScenario = (scenario) => {
     // Load scenario and show save modal with current values
     handleLoadScenario(scenario);
@@ -3121,6 +3145,9 @@ export default function ScenariosPage() {
                                 value={appointmentConfig.date || ''}
                                 onChange={e => setAppointmentConfig({ ...appointmentConfig, date: e.target.value })}
                                 onFocus={() => setVarsPane({ visible: true, fieldKey: 'date', fieldLabel: 'Date', fieldType: 'text' })}
+                                style={{
+                                  ...(String(appointmentConfig.date || '').includes('{{') ? { color: 'transparent' } : {}),
+                                }}
                               />
                             )}
                             {appointmentConfig.date_input_mode !== 'picker' && (appointmentConfig.date || '').includes('{{') && (
@@ -3174,6 +3201,9 @@ export default function ScenariosPage() {
                                 value={appointmentConfig.time || ''}
                                 onChange={e => setAppointmentConfig({ ...appointmentConfig, time: e.target.value })}
                                 onFocus={() => setVarsPane({ visible: true, fieldKey: 'time', fieldLabel: 'Time', fieldType: 'text' })}
+                                style={{
+                                  ...(String(appointmentConfig.time || '').includes('{{') ? { color: 'transparent' } : {}),
+                                }}
                               />
                             )}
                             {appointmentConfig.time_input_mode !== 'picker' && (appointmentConfig.time || '').includes('{{') && (
@@ -3212,6 +3242,9 @@ export default function ScenariosPage() {
                               value={durationValue}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, duration: e.target.value })}
                               onFocus={() => setVarsPane({ visible: true, fieldKey: 'duration', fieldLabel: 'Duration', fieldType: 'text' })}
+                              style={{
+                                ...(durationValue.includes('{{') ? { color: 'transparent' } : {}),
+                              }}
                             />
                             {durationValue.includes('{{') && (
                               <div

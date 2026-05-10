@@ -113,7 +113,7 @@ router.post('/identify-caller', async (req, res) => {
     const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown';
 
     // Pull recent appointments for this customer, scoped by user_id
-    let aptFilter = `?lead_id=eq.${customer.id}&order=date.desc&limit=5`;
+    let aptFilter = `?person_id=eq.${customer.id}&order=date.desc&limit=5`;
     if (userId) {
       aptFilter += `&user_id=eq.${userId}`;
     }
@@ -244,7 +244,7 @@ router.post('/check-availability', async (req, res) => {
  * POST /api/tools/create-appointment
  * 
  * Books a new appointment. The agent calls this after confirming details with the caller.
- * If a lead_id is not provided, the system will attempt to find or create a person record.
+ * If a person_id is not provided, the system will attempt to look up the person record.
  * 
  * Body: {
  *   client_name: "John Smith",
@@ -255,14 +255,14 @@ router.post('/check-availability', async (req, res) => {
  *   service: "Consultation",
  *   notes: "First-time caller",
  *   receptionist_id: 5,
- *   lead_id: 123,  (optional — will look up or create)
+ *   person_id: 123,  (optional — will look up in people)
  *   user_id: "uuid"  (optional — business context)
  * }
  * Returns: { success: true, appointment: {...} }
  */
 router.post('/create-appointment', async (req, res) => {
   try {
-    const { client_name, phone, date, time, duration = 30, service, notes, receptionist_id, lead_id, user_id } = req.body;
+    const { client_name, phone, date, time, duration = 30, service, notes, receptionist_id, person_id, lead_id, user_id } = req.body;
 
     if (!client_name || !date || !time) {
       return res.status(400).json({ error: 'client_name, date, and time are required' });
@@ -292,20 +292,20 @@ router.post('/create-appointment', async (req, res) => {
       });
     }
 
-    // Resolve lead_id — must already exist in people table
-    let resolvedLeadId = lead_id || null;
-    if (!resolvedLeadId && phone) {
+    // Resolve person_id — must already exist in people table
+    let resolvedPersonId = person_id || lead_id || null;
+    if (!resolvedPersonId && phone) {
       const normalized = normalizePhone(phone);
       const people = await sbQuery('people', 'GET', null,
         `?phone=eq.${encodeURIComponent(normalized)}&limit=1`
       ) || [];
       if (people.length > 0) {
-        resolvedLeadId = people[0].id;
+        resolvedPersonId = people[0].id;
       }
     }
 
     // Customer must already exist — do NOT auto-create
-    if (!resolvedLeadId) {
+    if (!resolvedPersonId) {
       return res.status(400).json({
         error: 'Customer not found in the people table. Call create_customer first to add them, then try booking again.',
         code: 'CUSTOMER_NOT_FOUND',
@@ -324,7 +324,7 @@ router.post('/create-appointment', async (req, res) => {
 
     // Insert appointment
     const payload = {
-      lead_id: resolvedLeadId,
+      person_id: resolvedPersonId,
       client_name,
       date,
       time,
@@ -915,12 +915,15 @@ router.post('/set-agent-data', async (req, res) => {
       || req.body.execution_id
       || req.body.flow_execution_id;
 
-    console.log(`[TOOLS] set-agent_data: ${key} = ${value} (execution: ${executionId || 'unknown'})`);
+    console.log(`🧠 set_agent_data received: exec=${executionId || 'unknown'} | key=${key || '(none)'}`);
+    console.log(`🧠 set_agent_data body: ${JSON.stringify(req.body || {})}`);
 
     if (!key) {
       return res.status(400).json({ error: 'key is required' });
     }
 
+    let stored = false;
+    let agentSnapshot = null;
     if (executionId) {
       // Update the flow execution's context with the agent data
       try {
@@ -933,22 +936,34 @@ router.post('/set-agent-data', async (req, res) => {
 
           context.agent = context.agent || {};
           context.agent[key] = value;
+          agentSnapshot = { ...context.agent };
 
           await sbQuery('flow_executions', 'PATCH', {
             flow_context: JSON.stringify(context),
             updated_at: new Date().toISOString(),
           }, `?id=eq.${executionId}`);
 
-          console.log(`[TOOLS] set-agent-data stored: agent.${key} in execution ${executionId}`);
+          stored = true;
+          console.log(`✅ set_agent_data stored: agent.${key} | exec=${executionId}`);
         }
       } catch (err) {
-        console.error('[TOOLS] set-agent-data storage error:', err.message);
+        console.error(`❌ set_agent_data storage error: ${err.message}`);
       }
     }
 
-    res.json({ success: true, key, value });
+    const response = {
+      success: true,
+      execution_id: executionId || null,
+      key,
+      value,
+      stored,
+      agent_data: agentSnapshot,
+    };
+
+    console.log(`🧠 set_agent_data response: ${JSON.stringify(response)}`);
+    res.json(response);
   } catch (err) {
-    console.error('[TOOLS] set-agent-data failed:', err.message);
+    console.error(`❌ set_agent_data failed: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });

@@ -90,6 +90,7 @@ class FlowExecutor {
 
   async resume(executionId, resumeData = {}) {
     try {
+      console.log(`↩ Resume requested: exec=${executionId}`);
       const records = await this.sbQuery('flow_executions', 'GET', null, `?id=eq.${executionId}&limit=1`);
       const execution = records?.[0];
       if (!execution) return { success: false, error: `Execution ${executionId} not found` };
@@ -98,6 +99,10 @@ class FlowExecutor {
       const context = typeof execution.flow_context === 'string'
         ? JSON.parse(execution.flow_context)
         : execution.flow_context;
+
+      const pauseData = typeof execution.pause_data === 'string'
+        ? JSON.parse(execution.pause_data)
+        : execution.pause_data;
 
       if (resumeData.agent) {
         context.agent = { ...(context.agent || {}), ...resumeData.agent };
@@ -126,10 +131,19 @@ class FlowExecutor {
         edgeMap[edge.from].push(edge);
       }
 
-      console.log(`↩ ${scenario.name} (resume)`);
-      return this._executeFromNode(execution.current_node_id, nodes, nodeMap, edgeMap, context, executionId, scenario);
+      const resumeNodeId = pauseData?.resume_node_id || this._getNextNode(execution.current_node_id, edgeMap, context, nodeMap);
+      console.log(`▶ Resume: ${scenario.name} | exec=${executionId} | next=${resumeNodeId || 'end'}`);
+
+      if (!resumeNodeId) {
+        await this._updateExecution(executionId, 'completed', null, context);
+        console.log(`✅ Complete: ${scenario.name} | exec=${executionId}`);
+        return { success: true, completed: true, context };
+      }
+
+      await this._updateExecution(executionId, 'running', resumeNodeId, context);
+      return this._executeFromNode(resumeNodeId, nodes, nodeMap, edgeMap, context, executionId, scenario);
     } catch (err) {
-      console.error('[FlowExecutor] Resume failed:', err.message);
+      console.error(`❌ Resume failed: ${err.message}`);
       return { success: false, error: err.message };
     }
   }
@@ -179,10 +193,18 @@ class FlowExecutor {
       }
 
       if (result.pause) {
-        console.log(`⏸ ${node.label}`);
-        await this._updateExecution(executionId, 'paused', currentNodeId, context, null, result.data);
+        const pauseKeys = result.data && typeof result.data === 'object' ? Object.keys(result.data) : [];
+        const nextNodeId = this._getNextNode(currentNodeId, edgeMap, context, nodeMap);
+        const pauseData = {
+          ...(result.data || {}),
+          paused_node_id: node.id,
+          resume_node_id: nextNodeId,
+        };
+        console.log(`⏸ Pause: ${node.label} | exec=${executionId || 'unknown'} | next=${nextNodeId || 'end'}`);
+        console.log(`🧩 Agent data keys: ${pauseKeys.join(',') || '(none)'}`);
+        await this._updateExecution(executionId, 'paused', currentNodeId, context, null, pauseData);
         if (this.onPause) this.onPause(executionId, node, context, result.data);
-        return { success: true, paused: true, executionId, at_node: currentNodeId };
+        return { success: true, paused: true, executionId, at_node: currentNodeId, resume_node_id: nextNodeId };
       }
 
       currentNodeId = this._getNextNode(currentNodeId, edgeMap, context, nodeMap);

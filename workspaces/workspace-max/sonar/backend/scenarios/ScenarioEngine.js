@@ -31,6 +31,7 @@ const TRIGGER_EVENT_MAP = {
   appointment_created: 'appointment_created',
   appointment_updated: 'appointment_updated',
   appointment_cancelled: 'appointment_cancelled',
+  appointment_missed: 'appointment_missed',
   appointment_reminder: 'appointment_reminder',
   appointment_soon: 'appointment_reminder',
   invoice_created: 'invoice_created',
@@ -190,8 +191,8 @@ class ScenarioEngine {
         if (appointments?.length > 0) {
           context.appointment = appointments[0];
           context.appointments = appointments[0]; // Table-name alias
-          if (!context.lead_id && appointments[0].lead_id) context.lead_id = appointments[0].lead_id;
           if (!context.person_id && appointments[0].person_id) context.person_id = appointments[0].person_id;
+          if (!context.lead_id && appointments[0].lead_id) context.lead_id = appointments[0].lead_id;
         }
       } catch (err) {
         console.warn('[ScenarioEngine] Could not fetch appointment:', err.message);
@@ -213,7 +214,7 @@ class ScenarioEngine {
     }
 
     // Fetch person data — person_id is the canonical field
-    const personId = context.person_id || context.lead_id || event.payload?.person_id;
+    const personId = context.person_id || event.payload?.person_id || context.lead_id;
     if (personId) {
       try {
         const people = await this.sbQuery('people', 'GET', null, `?id=eq.${personId}&limit=1`);
@@ -300,7 +301,8 @@ class ScenarioEngine {
    * Called when a flow pauses (async action like call)
    */
   _onFlowPause(executionId, node, context, pauseData) {
-    console.log(`⏸ ${node.label} (exec ${executionId})`);
+    const nextNodeId = pauseData?.resume_node_id || 'end';
+    console.log(`⏸ Flow paused: ${node.label} | exec=${executionId} | next=${nextNodeId}`);
     // The FlowExecutor already saved the state to Supabase
     // We just need to know when to resume (handled by the resume webhook)
   }
@@ -318,31 +320,37 @@ class ScenarioEngine {
      * Resume a paused flow execution (called by ElevenLabs webhook when call ends)
      * Body: { execution_id, agent_data: { email: "...", notes: "..." }, call_sid }
      */
-    router.post('/resume', async (req, res) => {
-      try {
-        const { execution_id, agent_data, call_sid, call_outcome } = req.body;
+      router.post('/resume', async (req, res) => {
+        try {
+          const { execution_id, agent_data, call_sid, call_outcome } = req.body;
 
-        if (!execution_id) {
-          return res.status(400).json({ error: 'execution_id required' });
+          if (!execution_id) {
+            return res.status(400).json({ error: 'execution_id required' });
+          }
+
+          const agentKeys = agent_data ? Object.keys(agent_data) : [];
+          console.log(`▶ Resume webhook: exec=${execution_id} | call=${call_sid || 'none'} | outcome=${call_outcome || 'none'}`);
+          console.log(`🧩 Agent data keys: ${agentKeys.join(',') || '(none)'}`);
+
+          const resumeData = {
+            agent: agent_data || {},
+            call: { call_sid, call_outcome },
+          };
+
+          const result = await this.flowExecutor.resume(execution_id, resumeData);
+
+          if (result.success) {
+            console.log(`✅ Resume complete: exec=${execution_id} | paused=${!!result.paused} | completed=${!!result.completed}`);
+            res.json({ ok: true, paused: result.paused, completed: result.completed });
+          } else {
+            console.warn(`⚠ Resume failed: exec=${execution_id} | error=${result.error}`);
+            res.status(500).json({ error: result.error });
+          }
+        } catch (err) {
+          console.error(`❌ Resume error: ${err.message}`);
+          res.status(500).json({ error: err.message });
         }
-
-        const resumeData = {
-          agent: agent_data || {},
-          call: { call_sid, call_outcome },
-        };
-
-        const result = await this.flowExecutor.resume(execution_id, resumeData);
-
-        if (result.success) {
-          res.json({ ok: true, paused: result.paused, completed: result.completed });
-        } else {
-          res.status(500).json({ error: result.error });
-        }
-      } catch (err) {
-        console.error('[ScenarioEngine] Resume error:', err.message);
-        res.status(500).json({ error: err.message });
-      }
-    });
+      });
 
     /**
      * POST /api/scenarios/trigger/:scenarioId

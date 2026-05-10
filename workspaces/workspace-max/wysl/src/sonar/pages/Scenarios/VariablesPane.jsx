@@ -411,7 +411,7 @@ export const TABLE_LABELS = {
   business: 'Business',
 };
 
-const AGENT_SOURCE_TABLES = new Set(['people', 'appointments']);
+const AGENT_SOURCE_TABLES = new Set(['people', 'appointments', 'services']);
 
 const getAgentFieldsForTable = (tableKey) => {
   if (!AGENT_SOURCE_TABLES.has(tableKey)) return [];

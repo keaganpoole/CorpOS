@@ -464,7 +464,7 @@ class ActionExecutor {
 
       if (actionKey === 'create_appointment') {
         const appointment = {
-          lead_id: flowContext.lead?.id || null,
+          person_id: flowContext.person?.id || flowContext.person_id || flowContext.lead?.id || null,
           client_name: this._resolveVariables(appointmentConfig.client_name || config.client_name || '', flowContext),
           date: this._resolveVariables(appointmentConfig.date || config.date || '', flowContext),
           time: this._resolveVariables(appointmentConfig.time || config.time || '', flowContext),

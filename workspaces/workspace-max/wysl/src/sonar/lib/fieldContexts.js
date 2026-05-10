@@ -9,7 +9,7 @@ export const APPOINTMENT_FIELDS = [
   { key: 'appointment_time', label: 'Appointment Time', type: 'text' },
   { key: 'appointment_duration', label: 'Duration (min)', type: 'number' },
   { key: 'appointment_status', label: 'Appointment Status', type: 'select', options: [
-    { value: 'Pending' }, { value: 'Confirmed' }, { value: 'Cancelled' }, { value: 'Completed' }, { value: 'No Show' },
+    { value: 'Pending' }, { value: 'Confirmed' }, { value: 'Cancelled' }, { value: 'Completed' }, { value: 'No Show' }, { value: 'missed' },
   ]},
   { key: 'customer_name', label: 'Customer Name', type: 'text' },
   { key: 'service_type', label: 'Service Type', type: 'text' },

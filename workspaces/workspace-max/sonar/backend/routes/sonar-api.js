@@ -481,13 +481,13 @@ router.get('/appointments/:id', async (req, res) => {
  */
 router.post('/appointments', async (req, res) => {
   try {
-    const { lead_id, client_name, date, time, duration, status, assigned_receptionist, notes, scenario_id } = req.body;
+    const { person_id, lead_id, client_name, date, time, duration, status, assigned_receptionist, notes, scenario_id } = req.body;
     if (!client_name || !date || !time) {
       return res.status(400).json({ error: 'client_name, date, and time are required' });
     }
 
     const payload = {
-      lead_id: lead_id || null,
+      person_id: person_id || lead_id || null,
       client_name,
       date,
       time,
@@ -512,11 +512,16 @@ router.post('/appointments', async (req, res) => {
  */
 router.put('/appointments/:id', async (req, res) => {
   try {
-    const allowed = ['client_name', 'date', 'time', 'duration', 'status', 'assigned_receptionist', 'notes', 'lead_id'];
+    const allowed = ['client_name', 'date', 'time', 'duration', 'status', 'assigned_receptionist', 'notes', 'person_id', 'lead_id'];
     const payload = {};
     for (const field of allowed) {
       if (req.body[field] !== undefined) payload[field] = req.body[field];
     }
+
+    if (payload.person_id === undefined && payload.lead_id !== undefined) {
+      payload.person_id = payload.lead_id;
+    }
+    delete payload.lead_id;
 
     if (Object.keys(payload).length === 0) return res.status(400).json({ error: 'No valid fields' });
 
@@ -529,6 +534,7 @@ router.put('/appointments/:id', async (req, res) => {
         cancelled: 'appointment_cancelled',
         confirmed: 'appointment_confirmed',
         completed: 'appointment_completed',
+        missed: 'appointment_missed',
         pending: 'appointment_updated',
       };
       const eventType = statusEventMap[payload.status] || 'appointment_updated';
@@ -679,7 +685,7 @@ router.get('/people/:id', async (req, res) => {
 
     // Get their appointments
     const appointments = await sbQuery('appointments', 'GET', null,
-      `?lead_id=eq.${req.params.id}&order=date.desc&limit=20`
+      `?person_id=eq.${req.params.id}&order=date.desc&limit=20`
     ) || [];
 
     res.json({ ...person[0], appointments });

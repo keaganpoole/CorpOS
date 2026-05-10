@@ -376,10 +376,10 @@ RULES:
   // ─── Action Implementations ───────────────────────────────────────
 
   async _createAppointment(session, data) {
-    const leadId = session.state.caller_id;
+    const personId = session.state.caller_id;
     const clientName = data.client_name || session.state.caller_name || 'Unknown';
     const appointment = {
-      lead_id: leadId,
+      person_id: personId,
       client_name: clientName,
       date: data.date,
       time: data.time,
@@ -445,13 +445,13 @@ RULES:
   }
 
   async _lookupAppointments(session) {
-    const leadId = session.state.caller_id;
-    if (!leadId) return { appointments: [], message: 'No caller ID found' };
+    const personId = session.state.caller_id;
+    if (!personId) return { appointments: [], message: 'No caller ID found' };
 
     const { data, error } = await this.supabase
       .from('appointments')
       .select('*')
-      .eq('lead_id', leadId)
+      .eq('person_id', personId)
       .neq('status', 'cancelled')
       .order('date', { ascending: true })
       .order('time', { ascending: true });
@@ -461,17 +461,18 @@ RULES:
   }
 
   async _cancelAppointment(data) {
-    const { appointment_id, date, time, lead_id } = data;
+    const { appointment_id, date, time, person_id, lead_id } = data;
+    const resolvedPersonId = person_id || lead_id;
 
     let query = this.supabase.from('appointments').update({ status: 'cancelled' });
 
     if (appointment_id) {
       query = query.eq('id', appointment_id);
-    } else if (lead_id && date) {
-      query = query.eq('lead_id', lead_id).eq('date', date);
+    } else if (resolvedPersonId && date) {
+      query = query.eq('person_id', resolvedPersonId).eq('date', date);
       if (time) query = query.eq('time', time);
     } else {
-      throw new Error('Need appointment_id or lead_id + date to cancel');
+      throw new Error('Need appointment_id or person_id + date to cancel');
     }
 
     const { data: result, error } = await query.select().single();
