@@ -493,7 +493,8 @@ class ActionExecutor {
   _resolveVariables(text, flowContext) {
     if (typeof text !== 'string') return text;
     return text.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
-      const parts = key.trim().split('.');
+      const trimmedKey = key.trim();
+      const parts = trimmedKey.split('.');
       let value = flowContext;
       for (const part of parts) {
         if (value == null) return match;
@@ -502,6 +503,9 @@ class ActionExecutor {
           continue;
         }
         value = value[part];
+      }
+      if (value == null && flowContext?.agent && Object.prototype.hasOwnProperty.call(flowContext.agent, trimmedKey)) {
+        value = flowContext.agent[trimmedKey];
       }
       return value != null ? String(value) : match;
     });

@@ -16,6 +16,23 @@ function init(deps) {
   sbQuery = deps.sbQuery;
 }
 
+function setNestedPath(target, dottedKey, value) {
+  if (!target || !dottedKey || typeof dottedKey !== 'string') return;
+  const parts = dottedKey.split('.').map(part => part.trim()).filter(Boolean);
+  if (parts.length === 0) return;
+
+  let cursor = target;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (cursor[part] == null || typeof cursor[part] !== 'object' || Array.isArray(cursor[part])) {
+      cursor[part] = {};
+    }
+    cursor = cursor[part];
+  }
+
+  cursor[parts[parts.length - 1]] = value;
+}
+
 // ─── Helper: normalize phone to E.164 format ────────────
 function normalizePhone(phone) {
   if (!phone) return null;
@@ -936,6 +953,7 @@ router.post('/set-agent-data', async (req, res) => {
 
           context.agent = context.agent || {};
           context.agent[key] = value;
+          setNestedPath(context, key, value);
           agentSnapshot = { ...context.agent };
 
           await sbQuery('flow_executions', 'PATCH', {

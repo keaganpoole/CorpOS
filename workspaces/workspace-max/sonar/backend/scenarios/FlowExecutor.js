@@ -12,6 +12,30 @@
 const { evaluateConditions } = require('./ConditionEvaluator');
 const { ActionExecutor } = require('./ActionExecutor');
 
+function setNestedPath(target, dottedKey, value) {
+  if (!target || !dottedKey || typeof dottedKey !== 'string') return;
+  const parts = dottedKey.split('.').map(part => part.trim()).filter(Boolean);
+  if (parts.length === 0) return;
+
+  let cursor = target;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (cursor[part] == null || typeof cursor[part] !== 'object' || Array.isArray(cursor[part])) {
+      cursor[part] = {};
+    }
+    cursor = cursor[part];
+  }
+
+  cursor[parts[parts.length - 1]] = value;
+}
+
+function hydrateAgentPaths(context, agentData = {}) {
+  if (!context || !agentData || typeof agentData !== 'object') return;
+  for (const [key, value] of Object.entries(agentData)) {
+    setNestedPath(context, key, value);
+  }
+}
+
 class FlowExecutor {
   constructor(deps) {
     this.sbQuery = deps.sbQuery;
@@ -106,6 +130,7 @@ class FlowExecutor {
 
       if (resumeData.agent) {
         context.agent = { ...(context.agent || {}), ...resumeData.agent };
+        hydrateAgentPaths(context, resumeData.agent);
       }
       Object.assign(context, resumeData);
 
