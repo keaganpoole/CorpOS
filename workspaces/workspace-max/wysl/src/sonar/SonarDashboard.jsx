@@ -60,6 +60,7 @@ import SettingsPage from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
 import RoutesPage from './pages/RoutesPage';
 import WorkflowTreePage from './pages/WorkflowTreePage';
+import LiveMonitoringPage from './pages/LiveMonitoringPage';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Error Boundary
@@ -648,6 +649,7 @@ const SonarDashboard = () => {
   const navItems = [
     { id: 'receptionists', icon: <Users size={18} />, label: 'Receptionists' },
     { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
+    { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
     { id: 'calendar', icon: <Calendar size={18} />, label: 'Calendar' },
     { id: 'routes', icon: <Radio size={18} />, label: 'Routes' },
     { id: 'workflow', icon: <GitBranch size={18} />, label: 'Workflow' },
@@ -811,6 +813,8 @@ const SonarDashboard = () => {
         );
       case 'scenarios':
         return <ScenariosPage />;
+      case 'live-monitoring':
+        return <LiveMonitoringPage />;
       case 'settings':
         return <SettingsPage />;
       case 'calendar':
