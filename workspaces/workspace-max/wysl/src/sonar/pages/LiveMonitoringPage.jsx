@@ -33,18 +33,18 @@ const analyticsSeed = [
 
 const sankeyData = {
   nodes: [
-    { name: 'Incoming Calls', category: 'source' },
-    { name: 'Outgoing Calls', category: 'source' },
-    { name: 'Records', category: 'middle' },
-    { name: 'Appointments', category: 'middle' },
-    { name: 'Payments', category: 'middle' },
-    { name: 'Appointment Created', category: 'target' },
-    { name: 'Appointment Updated', category: 'target' },
-    { name: 'Appointment Cancelled', category: 'target' },
-    { name: 'Record Created', category: 'target' },
-    { name: 'Record Updated', category: 'target' },
-    { name: 'Payment Received', category: 'target' },
-    { name: 'Invoice Sent', category: 'target' },
+    { name: 'Incoming Calls', category: 'source', color: '#e4e4e7' },
+    { name: 'Outgoing Calls', category: 'source', color: '#a1a1aa' },
+    { name: 'Records', category: 'middle', color: '#32f0d9' },
+    { name: 'Appointments', category: 'middle', color: '#38bdf8' },
+    { name: 'Payments', category: 'middle', color: '#f59e0b' },
+    { name: 'Record Created', category: 'target', color: '#32f0d9' },
+    { name: 'Record Updated', category: 'target', color: '#32f0d9' },
+    { name: 'Appointment Created', category: 'target', color: '#38bdf8' },
+    { name: 'Appointment Updated', category: 'target', color: '#38bdf8' },
+    { name: 'Appointment Cancelled', category: 'target', color: '#38bdf8' },
+    { name: 'Payment Received', category: 'target', color: '#f59e0b' },
+    { name: 'Invoice Sent', category: 'target', color: '#f59e0b' },
   ],
   links: [
     { source: 0, target: 2, value: 88 },
@@ -53,11 +53,11 @@ const sankeyData = {
     { source: 1, target: 2, value: 56 },
     { source: 1, target: 3, value: 104 },
     { source: 1, target: 4, value: 48 },
-    { source: 3, target: 5, value: 162 },
-    { source: 3, target: 6, value: 78 },
-    { source: 3, target: 7, value: 40 },
-    { source: 2, target: 8, value: 82 },
-    { source: 2, target: 9, value: 62 },
+    { source: 2, target: 5, value: 82 },
+    { source: 2, target: 6, value: 62 },
+    { source: 3, target: 7, value: 162 },
+    { source: 3, target: 8, value: 78 },
+    { source: 3, target: 9, value: 40 },
     { source: 4, target: 10, value: 74 },
     { source: 4, target: 11, value: 46 },
   ],
@@ -71,6 +71,8 @@ const hexToRgba = (hex, alpha) => {
   const b = value & 255;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
+
+const nodeColor = (node) => node.color || COLORS[node.category];
 
 const formatValue = (item, value) => {
   const body = Math.round(value).toLocaleString();
@@ -185,7 +187,7 @@ function RealtimeSankey() {
 
       gradient.append('stop')
         .attr('offset', '0%')
-        .attr('stop-color', COLORS[link.source.category]);
+        .attr('stop-color', nodeColor(link.source));
 
       gradient.append('stop')
         .attr('offset', '52%')
@@ -193,7 +195,7 @@ function RealtimeSankey() {
 
       gradient.append('stop')
         .attr('offset', '100%')
-        .attr('stop-color', COLORS[link.target.category]);
+        .attr('stop-color', nodeColor(link.target));
     });
 
     const field = svg.append('g')
@@ -243,7 +245,7 @@ function RealtimeSankey() {
       .attr('height', 0)
       .attr('y', (item) => (item.y1 - item.y0) / 2)
       .attr('width', (item) => item.x1 - item.x0)
-      .attr('fill', (item) => COLORS[item.category])
+      .attr('fill', (item) => nodeColor(item))
       .style('filter', 'url(#live-monitoring-glow)')
       .transition()
       .duration(900)
@@ -308,9 +310,9 @@ function RealtimeSankey() {
         tooltip
           .style('opacity', 1)
           .html(`
-            <div style="font-weight:800;color:${COLORS[link.source.category]}">${link.source.name}</div>
+            <div style="font-weight:800;color:${nodeColor(link.source)}">${link.source.name}</div>
             <div style="margin:5px 0;color:#555">to</div>
-            <div style="font-weight:800;color:${COLORS[link.target.category]}">${link.target.name}</div>
+            <div style="font-weight:800;color:${nodeColor(link.target)}">${link.target.name}</div>
             <div style="margin-top:9px;font-size:14px;font-weight:900;color:#fff">${link.value} calls</div>
           `);
       })
