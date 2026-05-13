@@ -177,6 +177,8 @@ function RealtimeSankey() {
     });
 
     graph.links.forEach((link, index) => {
+      const flowColor = nodeColor(link.target);
+
       const gradient = defs.append('linearGradient')
         .attr('id', `live-monitoring-gradient-${index}`)
         .attr('gradientUnits', 'userSpaceOnUse')
@@ -187,15 +189,18 @@ function RealtimeSankey() {
 
       gradient.append('stop')
         .attr('offset', '0%')
-        .attr('stop-color', nodeColor(link.source));
+        .attr('stop-color', flowColor)
+        .attr('stop-opacity', 0.28);
 
       gradient.append('stop')
-        .attr('offset', '52%')
-        .attr('stop-color', COLORS.middle);
+        .attr('offset', '50%')
+        .attr('stop-color', flowColor)
+        .attr('stop-opacity', 0.82);
 
       gradient.append('stop')
         .attr('offset', '100%')
-        .attr('stop-color', nodeColor(link.target));
+        .attr('stop-color', flowColor)
+        .attr('stop-opacity', 1);
     });
 
     const field = svg.append('g')
