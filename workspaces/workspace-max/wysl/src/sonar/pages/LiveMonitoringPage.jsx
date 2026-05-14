@@ -1,14 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import * as d3 from 'd3';
 import { sankey, sankeyJustify, sankeyLinkHorizontal } from 'd3-sankey';
 import {
-  Activity,
   CalendarDays,
   CreditCard,
   Phone,
   UserRoundPlus,
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const COLORS = {
   source: '#00f2ff',
@@ -25,48 +25,196 @@ const OPACITY = {
 };
 
 const analyticsSeed = [
-  { label: 'Total Calls', value: 3872, delta: '+12.8%', icon: Phone, series: [18, 27, 31, 24, 39, 42, 40, 55, 61, 59] },
-  { label: 'Appointments', value: 2434, delta: '+8.4%', icon: CalendarDays, series: [20, 27, 30, 26, 39, 37, 47, 46, 58, 57] },
-  { label: 'New Customers', value: 3218, delta: '+5.9%', icon: UserRoundPlus, series: [31, 29, 30, 36, 35, 34, 41, 40, 42, 53] },
-  { label: 'Revenue', value: 68886, prefix: '$', delta: '+18.2%', icon: CreditCard, series: [21, 25, 27, 24, 35, 40, 42, 39, 44, 56] },
+  { key: 'calls', label: 'Total Calls', icon: Phone },
+  { key: 'appointments', label: 'Appointments', icon: CalendarDays },
+  { key: 'customers', label: 'New Customers', icon: UserRoundPlus },
+  { key: 'revenue', label: 'Revenue', prefix: '$', icon: CreditCard },
 ];
 
 const sankeyData = {
   nodes: [
-    { name: 'Incoming Calls', category: 'source', color: '#e4e4e7' },
-    { name: 'Outgoing Calls', category: 'source', color: '#a1a1aa' },
-    { name: 'Records', category: 'middle', color: '#32f0d9' },
-    { name: 'Appointments', category: 'middle', color: '#38bdf8' },
-    { name: 'Payments', category: 'middle', color: '#f59e0b' },
-    { name: 'Record Created', category: 'target', color: '#32f0d9' },
-    { name: 'Record Updated', category: 'target', color: '#32f0d9' },
-    { name: 'Appointment Created', category: 'target', color: '#38bdf8' },
-    { name: 'Appointment Updated', category: 'target', color: '#38bdf8' },
-    { name: 'Appointment Cancelled', category: 'target', color: '#38bdf8' },
-    { name: 'Payment Received', category: 'target', color: '#f59e0b' },
-    { name: 'Invoice Sent', category: 'target', color: '#f59e0b' },
+    { id: 'incoming', name: 'Incoming Calls', category: 'source', color: '#e4e4e7' },
+    { id: 'outgoing', name: 'Outgoing Calls', category: 'source', color: '#a1a1aa' },
+    { id: 'records', name: 'Records', category: 'middle', color: '#32f0d9' },
+    { id: 'appointments', name: 'Appointments', category: 'middle', color: '#38bdf8' },
+    { id: 'payments', name: 'Payments', category: 'middle', color: '#f59e0b' },
+    { id: 'record-created', name: 'Record Created', category: 'target', color: '#32f0d9' },
+    { id: 'record-updated', name: 'Record Updated', category: 'target', color: '#32f0d9' },
+    { id: 'appointment-created', name: 'Appointment Created', category: 'target', color: '#38bdf8' },
+    { id: 'appointment-updated', name: 'Appointment Updated', category: 'target', color: '#38bdf8' },
+    { id: 'appointment-cancelled', name: 'Appointment Cancelled', category: 'target', color: '#38bdf8' },
+    { id: 'payment-received', name: 'Payment Received', category: 'target', color: '#f59e0b' },
+    { id: 'invoice-sent', name: 'Invoice Sent', category: 'target', color: '#f59e0b' },
   ],
   links: [
-    { source: 0, target: 2, value: 88 },
-    { source: 0, target: 3, value: 176 },
-    { source: 0, target: 4, value: 72 },
-    { source: 1, target: 2, value: 56 },
-    { source: 1, target: 3, value: 104 },
-    { source: 1, target: 4, value: 48 },
-    { source: 2, target: 5, value: 82 },
-    { source: 2, target: 6, value: 62 },
-    { source: 3, target: 7, value: 162 },
-    { source: 3, target: 8, value: 78 },
-    { source: 3, target: 9, value: 40 },
-    { source: 4, target: 10, value: 74 },
-    { source: 4, target: 11, value: 46 },
+    { id: 'incoming-records', source: 0, target: 2, value: 1 },
+    { id: 'incoming-appointments', source: 0, target: 3, value: 1 },
+    { id: 'incoming-payments', source: 0, target: 4, value: 1 },
+    { id: 'outgoing-records', source: 1, target: 2, value: 1 },
+    { id: 'outgoing-appointments', source: 1, target: 3, value: 1 },
+    { id: 'outgoing-payments', source: 1, target: 4, value: 1 },
+    { id: 'records-record-created', source: 2, target: 5, value: 1 },
+    { id: 'records-record-updated', source: 2, target: 6, value: 1 },
+    { id: 'appointments-appointment-created', source: 3, target: 7, value: 1 },
+    { id: 'appointments-appointment-updated', source: 3, target: 8, value: 1 },
+    { id: 'appointments-appointment-cancelled', source: 3, target: 9, value: 1 },
+    { id: 'payments-payment-received', source: 4, target: 10, value: 1 },
+    { id: 'payments-invoice-sent', source: 4, target: 11, value: 1 },
   ],
 };
 
 const nodeColor = (node) => node.color || COLORS[node.category];
 
+const INTENT_ALIASES = {
+  intent_call_started: 'call_started',
+  intent_neutral_entered: 'neutral',
+  neutral_entered: 'neutral',
+  intent_appointments: 'appointments',
+  intent_records: 'records',
+  intent_payments: 'payments',
+  create_appointment: 'appointment_created',
+  update_appointment: 'appointment_updated',
+  cancel_appointment: 'appointment_cancelled',
+  delete_appointment: 'appointment_cancelled',
+  intent_appointment_created: 'appointment_created',
+  intent_appointment_updated: 'appointment_updated',
+  intent_appointment_cancelled: 'appointment_cancelled',
+  create_record: 'record_created',
+  update_record: 'record_updated',
+  intent_record_created: 'record_created',
+  intent_record_updated: 'record_updated',
+  create_payment: 'payment_received',
+  update_payment: 'payment_received',
+  create_invoice: 'invoice_sent',
+  send_invoice: 'invoice_sent',
+  intent_payment_received: 'payment_received',
+  intent_invoice_sent: 'invoice_sent',
+};
+
+const INTENT_ROUTES = {
+  appointments: { middle: 'appointments' },
+  records: { middle: 'records' },
+  payments: { middle: 'payments' },
+  appointment_created: { middle: 'appointments', target: 'appointment-created' },
+  appointment_updated: { middle: 'appointments', target: 'appointment-updated' },
+  appointment_cancelled: { middle: 'appointments', target: 'appointment-cancelled' },
+  record_created: { middle: 'records', target: 'record-created' },
+  record_updated: { middle: 'records', target: 'record-updated' },
+  payment_received: { middle: 'payments', target: 'payment-received' },
+  invoice_sent: { middle: 'payments', target: 'invoice-sent' },
+};
+
+const LINK_BY_ROUTE = Object.fromEntries(sankeyData.links.map((link) => {
+  const source = sankeyData.nodes[link.source]?.id;
+  const target = sankeyData.nodes[link.target]?.id;
+  return [`${source}->${target}`, link.id];
+}));
+
+const canonicalIntent = (intentKey) => {
+  const normalized = String(intentKey || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return INTENT_ALIASES[normalized] || normalized.replace(/^intent_/, '');
+};
+
+const rowPayload = (row) => row?.payload || row?.new?.payload || {};
+
+const checkpointTimestamp = (row) => (
+  rowPayload(row).timestamp || row?.created_at || new Date().toISOString()
+);
+
+const checkpointSortValue = (row) => new Date(checkpointTimestamp(row)).getTime() || 0;
+
+const sessionKeyForCheckpoint = (payload) => (
+  payload.call_id
+  || payload.conversation_id
+  || payload.execution_id
+  || payload.session_id
+  || `${payload.scenario_id || 'unknown'}:${payload.receptionist_id || payload.user_id || 'default'}`
+);
+
+const parseMaybeJson = (value, fallback) => {
+  if (!value) return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const scenarioDirection = (scenario) => {
+  if (!scenario) return 'outgoing';
+  const direct = String(
+    scenario.call_direction
+    || scenario.direction
+    || scenario.call_type
+    || scenario.call_types
+    || ''
+  ).toLowerCase();
+  if (direct.includes('inbound') || direct.includes('incoming')) return 'incoming';
+  if (direct.includes('outbound') || direct.includes('outgoing')) return 'outgoing';
+
+  const nodes = parseMaybeJson(scenario.nodes_data, []);
+  const triggerKeys = Array.isArray(nodes)
+    ? nodes.map((node) => String(node.subOptionKey || node.triggerKey || node.actionConfig?._key || '').toLowerCase())
+    : [];
+  if (triggerKeys.some((key) => ['incoming_call', 'call_answered', 'missed_call', 'call_failed', 'voicemail_received'].includes(key))) {
+    return 'incoming';
+  }
+
+  return 'outgoing';
+};
+
+const mergeRank = { idle: 0, dimmed: 1, pulsing: 2, active: 3, partial: 4, completed: 5 };
+
+const strongerState = (a = 'idle', b = 'idle') => (
+  (mergeRank[b] || 0) > (mergeRank[a] || 0) ? b : a
+);
+
+const TEN_ZERO_BUCKETS = Array.from({ length: 10 }, () => 0);
+
+const startOfLocalDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const addDays = (date, days) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const percentChange = (current, previous) => {
+  if (!previous && !current) return '0%';
+  if (!previous) return '+100%';
+  const pct = ((current - previous) / previous) * 100;
+  const sign = pct > 0 ? '+' : '';
+  return `${sign}${pct.toFixed(1)}%`;
+};
+
+const safeDate = (value) => {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const bucketSeries = (rows, valueForRow = () => 1) => {
+  const buckets = [...TEN_ZERO_BUCKETS];
+  const now = new Date();
+  const start = new Date(now.getTime() - 9 * 60 * 60 * 1000);
+
+  for (const row of rows || []) {
+    const dt = safeDate(row.created_at || row.started_at);
+    if (!dt || dt < start || dt > now) continue;
+    const idx = Math.min(9, Math.max(0, Math.floor((dt - start) / (60 * 60 * 1000))));
+    buckets[idx] += valueForRow(row);
+  }
+
+  return buckets;
+};
+
+const paymentValue = (payment) => {
+  const amount = Number(payment?.amount || 0);
+  return Number.isFinite(amount) ? amount / 100 : 0;
+};
+
 const formatValue = (item, value) => {
-  const body = Math.round(value).toLocaleString();
+  const body = Math.round(value || 0).toLocaleString();
   return `${item.prefix || ''}${body}`;
 };
 
@@ -97,14 +245,16 @@ function AnalyticsCard({ item, value, index }) {
       className="live-stat-card"
     >
       <div className="live-stat-head">
-        <p className="live-stat-label">{item.label}</p>
+        <div className="live-stat-copy">
+          <p className="live-stat-label">{item.label}</p>
+          <div className="live-stat-value-row">
+            <span className="live-stat-value">{formatValue(item, value)}</span>
+            <span className="live-stat-delta">{item.delta}</span>
+          </div>
+        </div>
         <div className="live-stat-icon">
           <Icon size={15} />
         </div>
-      </div>
-      <div className="live-stat-value-row">
-        <span className="live-stat-value">{formatValue(item, value)}</span>
-        <span className="live-stat-delta">{item.delta}</span>
       </div>
       <div className="live-stat-chart-row">
         <svg className="live-stat-line" viewBox="0 0 116 44" preserveAspectRatio="none" aria-hidden="true">
@@ -119,16 +269,374 @@ function AnalyticsCard({ item, value, index }) {
           <polyline className="live-stat-line-path" points={line.points} />
           <circle className="live-stat-line-dot" cx="116" cy={line.lastY} r="2.5" />
         </svg>
-        <span className="live-stat-menu">...</span>
       </div>
     </motion.div>
   );
 }
 
-function RealtimeSankey() {
+function useLiveAnalytics() {
+  const [analytics, setAnalytics] = useState(() => analyticsSeed.map((item) => ({
+    ...item,
+    value: 0,
+    delta: '0%',
+    series: TEN_ZERO_BUCKETS,
+  })));
+
+  const refreshAnalytics = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let refreshTimer = null;
+
+    const todayStart = startOfLocalDay(new Date());
+    const tomorrowStart = addDays(todayStart, 1);
+    const yesterdayStart = addDays(todayStart, -1);
+    const since = yesterdayStart.toISOString();
+
+    const betweenToday = (row) => {
+      const dt = safeDate(row.created_at || row.started_at);
+      return dt && dt >= todayStart && dt < tomorrowStart;
+    };
+
+    const betweenYesterday = (row) => {
+      const dt = safeDate(row.created_at || row.started_at);
+      return dt && dt >= yesterdayStart && dt < todayStart;
+    };
+
+    const fetchAnalytics = async () => {
+      try {
+        const [callsRes, appointmentsRes, customersRes, paymentsRes] = await Promise.all([
+          supabase.from('call_logs').select('id,created_at,started_at').gte('created_at', since),
+          supabase.from('appointments').select('id,created_at,status').gte('created_at', since),
+          supabase.from('people').select('id,created_at').gte('created_at', since),
+          supabase.from('payments').select('id,created_at,amount,status').gte('created_at', since),
+        ]);
+
+        if (cancelled) return;
+
+        const calls = callsRes.data || [];
+        const appointments = (appointmentsRes.data || []).filter((row) => row.status !== 'cancelled');
+        const customers = customersRes.data || [];
+        const revenuePayments = (paymentsRes.data || []).filter((row) => (
+          ['succeeded', 'paid', 'completed'].includes(String(row.status || '').toLowerCase())
+        ));
+
+        const todayCalls = calls.filter(betweenToday);
+        const yesterdayCalls = calls.filter(betweenYesterday);
+        const todayAppointments = appointments.filter(betweenToday);
+        const yesterdayAppointments = appointments.filter(betweenYesterday);
+        const todayCustomers = customers.filter(betweenToday);
+        const yesterdayCustomers = customers.filter(betweenYesterday);
+        const todayRevenueRows = revenuePayments.filter(betweenToday);
+        const yesterdayRevenueRows = revenuePayments.filter(betweenYesterday);
+        const todayRevenue = todayRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
+        const yesterdayRevenue = yesterdayRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
+
+        const byKey = {
+          calls: {
+            value: todayCalls.length,
+            delta: percentChange(todayCalls.length, yesterdayCalls.length),
+            series: bucketSeries(todayCalls),
+          },
+          appointments: {
+            value: todayAppointments.length,
+            delta: percentChange(todayAppointments.length, yesterdayAppointments.length),
+            series: bucketSeries(todayAppointments),
+          },
+          customers: {
+            value: todayCustomers.length,
+            delta: percentChange(todayCustomers.length, yesterdayCustomers.length),
+            series: bucketSeries(todayCustomers),
+          },
+          revenue: {
+            value: todayRevenue,
+            delta: percentChange(todayRevenue, yesterdayRevenue),
+            series: bucketSeries(todayRevenueRows, paymentValue),
+          },
+        };
+
+        setAnalytics(analyticsSeed.map((item) => ({ ...item, ...byKey[item.key] })));
+      } catch (err) {
+        console.error('[LiveMonitoring] analytics refresh failed:', err);
+      }
+    };
+
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(fetchAnalytics, 180);
+    };
+
+    refreshAnalytics.current = scheduleRefresh;
+    fetchAnalytics();
+
+    const channel = supabase
+      .channel('live-monitoring-analytics')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'people' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, scheduleRefresh)
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  return analytics;
+}
+
+function useLiveSankeyState() {
+  const [flowState, setFlowState] = useState({
+    linkStates: {},
+    nodeStates: {},
+    activeNodeIds: [],
+    activeLinkIds: [],
+    version: 0,
+  });
+  const scenarioCacheRef = useRef(new Map());
+  const sessionsRef = useRef(new Map());
+  const historyRef = useRef([]);
+  const seenCheckpointIdsRef = useRef(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    let recoveryTimer = null;
+    let catchupTimer = null;
+
+    const resolveScenario = async (scenarioId) => {
+      if (!scenarioId) return null;
+      if (scenarioCacheRef.current.has(scenarioId)) return scenarioCacheRef.current.get(scenarioId);
+      const { data, error } = await supabase
+        .from('scenarios')
+        .select('*')
+        .eq('id', scenarioId)
+        .limit(1)
+        .maybeSingle();
+      if (error) console.warn('[LiveMonitoring] scenario lookup failed:', error.message);
+      scenarioCacheRef.current.set(scenarioId, data || null);
+      return data || null;
+    };
+
+    const publishState = () => {
+      const linkStates = {};
+      const nodeStates = {};
+      const activeNodeIds = new Set();
+      const activeLinkIds = new Set();
+      const hasActiveSession = Array.from(sessionsRef.current.values()).some((session) => session.state !== 'history');
+
+      const applyNode = (id, state) => {
+        if (!id) return;
+        nodeStates[id] = strongerState(nodeStates[id], state);
+        if (['pulsing', 'active', 'partial', 'completed'].includes(state)) activeNodeIds.add(id);
+      };
+
+      const applyLink = (id, state) => {
+        if (!id) return;
+        linkStates[id] = strongerState(linkStates[id], state);
+        if (['active', 'partial', 'completed'].includes(state)) activeLinkIds.add(id);
+      };
+
+      historyRef.current.slice(-12).forEach((item) => {
+        applyNode(item.sourceId, 'dimmed');
+        applyNode(item.middleId, 'dimmed');
+        applyNode(item.targetId, item.completed ? 'completed' : 'dimmed');
+        applyLink(item.sourceLinkId, 'dimmed');
+        applyLink(item.targetLinkId, item.completed ? 'completed' : 'dimmed');
+      });
+
+      sessionsRef.current.forEach((session) => {
+        if (session.state === 'history') return;
+        if (session.intent === 'call_started') {
+          applyNode(session.sourceId, 'pulsing');
+          return;
+        }
+
+        applyNode(session.sourceId, 'active');
+        applyNode(session.middleId, 'active');
+        applyLink(session.sourceLinkId, session.phase === 'completed' ? 'completed' : 'active');
+
+        if (session.targetId) {
+          applyNode(session.targetId, session.phase === 'completed' ? 'completed' : 'active');
+          applyLink(session.targetLinkId, session.phase === 'completed' ? 'completed' : 'partial');
+        }
+      });
+
+      if (hasActiveSession) {
+        sankeyData.nodes.forEach((node) => {
+          if (!nodeStates[node.id]) nodeStates[node.id] = 'dimmed';
+        });
+        sankeyData.links.forEach((link) => {
+          if (!linkStates[link.id]) linkStates[link.id] = 'dimmed';
+        });
+      }
+
+      setFlowState((prev) => ({
+        linkStates,
+        nodeStates,
+        activeNodeIds: [...activeNodeIds],
+        activeLinkIds: [...activeLinkIds],
+        version: prev.version + 1,
+      }));
+    };
+
+    const checkpointIdentity = (row) => {
+      const payload = rowPayload(row);
+      return (
+        row?.id
+        || `${payload.scenario_id || row?.scenario_id || 'unknown'}:${payload.intent_key || 'unknown'}:${payload.phase || 'entered'}:${checkpointTimestamp(row)}`
+      );
+    };
+
+    const applyCheckpoint = async (row) => {
+      const identity = checkpointIdentity(row);
+      if (seenCheckpointIdsRef.current.has(identity)) return;
+      seenCheckpointIdsRef.current.add(identity);
+
+      const payload = rowPayload(row);
+      const intent = canonicalIntent(payload.intent_key);
+      const phase = String(payload.phase || 'entered').toLowerCase();
+      const scenarioId = String(payload.scenario_id || row?.scenario_id || '');
+      if (!scenarioId || cancelled) return;
+
+      const scenario = await resolveScenario(scenarioId);
+      if (cancelled) return;
+
+      const sourceId = scenarioDirection(scenario) === 'incoming' ? 'incoming' : 'outgoing';
+      const sessionKey = sessionKeyForCheckpoint({ ...payload, scenario_id: scenarioId });
+
+      if (intent === 'neutral') {
+        sessionsRef.current.forEach((session, key) => {
+          if (session.scenarioId !== scenarioId) return;
+          if (session.sourceLinkId || session.targetLinkId) {
+            historyRef.current.push({ ...session, completed: session.phase === 'completed' });
+          }
+          sessionsRef.current.delete(key);
+        });
+        publishState();
+        return;
+      }
+
+      if (intent === 'call_started') {
+        sessionsRef.current.set(sessionKey, {
+          scenarioId,
+          intent,
+          phase: 'entered',
+          state: 'source',
+          sourceId,
+          timestamp: checkpointTimestamp(row),
+        });
+        publishState();
+        return;
+      }
+
+      const route = INTENT_ROUTES[intent];
+      if (!route) return;
+
+      const middleId = route.middle;
+      const targetId = route.target || null;
+      const sourceLinkId = LINK_BY_ROUTE[`${sourceId}->${middleId}`];
+      const targetLinkId = targetId ? LINK_BY_ROUTE[`${middleId}->${targetId}`] : null;
+      const previous = sessionsRef.current.get(sessionKey);
+
+      if (previous && (previous.sourceLinkId || previous.targetLinkId) && previous.intent !== intent) {
+        historyRef.current.push({ ...previous, completed: previous.phase === 'completed' });
+      }
+
+      const nextSession = {
+        scenarioId,
+        intent,
+        phase,
+        state: phase === 'completed' ? 'completed' : 'active',
+        sourceId,
+        middleId,
+        targetId,
+        sourceLinkId,
+        targetLinkId,
+        timestamp: checkpointTimestamp(row),
+      };
+
+      sessionsRef.current.set(sessionKey, nextSession);
+      if (phase === 'completed') {
+        historyRef.current.push({ ...nextSession, completed: true });
+        historyRef.current = historyRef.current.slice(-20);
+      }
+      publishState();
+    };
+
+    const loadRecentCheckpoints = async (limit = 80) => {
+      const checkpointsRes = await supabase
+        .from('checkpoints')
+        .select('*')
+        .eq('trigger_key', 'intent_checkpoint')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (checkpointsRes.error) {
+        console.warn('[LiveMonitoring] checkpoints query failed:', checkpointsRes.error.message);
+      }
+
+      const rows = (checkpointsRes.data || [])
+        .sort((a, b) => checkpointSortValue(a) - checkpointSortValue(b));
+
+      for (const row of rows) await applyCheckpoint(row);
+    };
+
+    const recoverRecentCheckpoints = () => {
+      window.clearTimeout(recoveryTimer);
+      recoveryTimer = window.setTimeout(() => {
+        loadRecentCheckpoints(20).catch((err) => {
+          console.warn('[LiveMonitoring] checkpoint realtime recovery failed:', err);
+        });
+      }, 350);
+    };
+
+    loadRecentCheckpoints().catch((err) => console.warn('[LiveMonitoring] checkpoint warmup failed:', err));
+
+    const handleInsert = (payload) => {
+      console.info('[LiveMonitoring] realtime checkpoint received:', payload.new);
+      applyCheckpoint(payload.new).catch((err) => console.warn('[LiveMonitoring] checkpoint apply failed:', err));
+    };
+
+    const checkpointChannel = supabase
+      .channel('live-monitoring-checkpoints')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checkpoints' }, handleInsert)
+      .subscribe((status, err) => {
+        console.info('[LiveMonitoring] checkpoint realtime status:', status, err || '');
+        if (status === 'SUBSCRIBED') {
+          recoverRecentCheckpoints();
+          window.clearInterval(catchupTimer);
+          catchupTimer = window.setInterval(() => {
+            loadRecentCheckpoints(20).catch((recoveryErr) => {
+              console.warn('[LiveMonitoring] checkpoint catch-up failed:', recoveryErr);
+            });
+          }, 2500);
+          return;
+        }
+        if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) {
+          window.clearInterval(catchupTimer);
+          recoverRecentCheckpoints();
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(recoveryTimer);
+      window.clearInterval(catchupTimer);
+      supabase.removeChannel(checkpointChannel);
+    };
+  }, []);
+
+  return flowState;
+}
+
+function RealtimeSankey({ flowState }) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   const tooltipRef = useRef(null);
+  const graphRef = useRef(null);
+  const layersRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -145,9 +653,25 @@ function RealtimeSankey() {
     return () => resizeObserver.disconnect();
   }, []);
 
+  const linkOpacity = (state) => ({
+    idle: 0,
+    dimmed: 0.035,
+    active: 0.58,
+    partial: 0.72,
+    completed: 0.66,
+  }[state] ?? OPACITY.linkInitial);
+
+  const nodeOpacity = (state) => ({
+    idle: 0.55,
+    dimmed: 0.18,
+    pulsing: 1,
+    active: 0.92,
+    partial: 0.92,
+    completed: 1,
+  }[state] ?? 0.55);
+
   useEffect(() => {
     if (!dimensions.width || !dimensions.height) return;
-
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
@@ -191,81 +715,28 @@ function RealtimeSankey() {
       links: sankeyData.links.map((link) => ({ ...link })),
     });
 
-    graph.links.forEach((link, index) => {
-      const flowColor = nodeColor(link.target);
-
-      const gradient = defs.append('linearGradient')
-        .attr('id', `live-monitoring-gradient-${index}`)
-        .attr('gradientUnits', 'userSpaceOnUse')
-        .attr('x1', link.source.x1)
-        .attr('x2', link.target.x0)
-        .attr('y1', link.y0)
-        .attr('y2', link.y1);
-
-      gradient.append('stop')
-        .attr('offset', '0%')
-        .attr('stop-color', flowColor)
-        .attr('stop-opacity', 0.28);
-
-      gradient.append('stop')
-        .attr('offset', '50%')
-        .attr('stop-color', flowColor)
-        .attr('stop-opacity', 0.82);
-
-      gradient.append('stop')
-        .attr('offset', '100%')
-        .attr('stop-color', flowColor)
-        .attr('stop-opacity', 1);
-    });
-
     const field = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    const linkGroup = field.append('g')
+    const linkLayer = field.append('g')
       .attr('fill', 'none')
-      .selectAll('g')
-      .data(graph.links)
-      .join('g')
-      .style('mix-blend-mode', 'screen');
-
-    const paths = linkGroup.append('path')
-      .attr('d', sankeyLinkHorizontal())
-      .attr('stroke', (_, index) => `url(#live-monitoring-gradient-${index})`)
-      .attr('stroke-width', (link) => Math.max(1, link.width))
-      .attr('stroke-opacity', OPACITY.linkInitial)
-      .attr('class', 'live-monitoring-sankey-link')
-      .style('cursor', 'pointer');
-
-    paths.each(function animatePath(_, index) {
-      const length = this.getTotalLength();
-      d3.select(this)
-        .attr('stroke-dasharray', `${length} ${length}`)
-        .attr('stroke-dashoffset', length)
-        .transition()
-        .duration(1400)
-        .delay(index * 28)
-        .ease(d3.easeCubicInOut)
-        .attr('stroke-dashoffset', 0);
-    });
+      .attr('class', 'live-monitoring-link-layer');
 
     const node = field.append('g')
       .selectAll('g')
       .data(graph.nodes)
       .join('g')
+      .attr('class', 'live-monitoring-node')
       .attr('transform', (item) => `translate(${item.x0},${item.y0})`);
 
     node.append('rect')
-      .attr('height', 0)
-      .attr('y', (item) => (item.y1 - item.y0) / 2)
+      .attr('height', (item) => item.y1 - item.y0)
+      .attr('y', 0)
       .attr('width', (item) => item.x1 - item.x0)
       .attr('fill', (item) => nodeColor(item))
-      .style('filter', 'url(#live-monitoring-glow)')
-      .transition()
-      .duration(900)
-      .delay((_, index) => 180 + index * 28)
-      .ease(d3.easeCubicOut)
-      .attr('height', (item) => item.y1 - item.y0)
-      .attr('y', 0);
+      .attr('opacity', nodeOpacity('idle'))
+      .attr('class', 'live-node-bar live-node-idle')
+      .style('filter', 'url(#live-monitoring-glow)');
 
     node.append('text')
       .attr('x', (item) => {
@@ -291,18 +762,178 @@ function RealtimeSankey() {
       .transition()
       .duration(700)
       .delay(900)
-      .style('opacity', 0.9);
+      .style('opacity', Math.max(0.28, nodeOpacity('idle') * 0.9));
+
+    graphRef.current = { graph, width };
+    layersRef.current = { defs, linkLayer, nodeLayer: node };
+  }, [dimensions]);
+
+  useEffect(() => {
+    const graphRecord = graphRef.current;
+    const layers = layersRef.current;
+    if (!graphRecord || !layers) return;
+
+    const { graph } = graphRecord;
+    const { defs, linkLayer, nodeLayer } = layers;
+    const linkStates = flowState?.linkStates || {};
+    const nodeStates = flowState?.nodeStates || {};
+    const linkState = (link) => linkStates[link.id] || 'idle';
+    const nodeState = (node) => nodeStates[node.id] || 'idle';
+    const isVisibleLink = (link) => linkState(link) !== 'idle';
+    const visibleLinks = graph.links.filter(isVisibleLink);
+
+    const gradients = defs
+      .selectAll('linearGradient.live-flow-gradient')
+      .data(visibleLinks, (link) => link.id);
+
+    gradients.exit().remove();
+
+    const gradientsEnter = gradients.enter()
+      .append('linearGradient')
+      .attr('class', 'live-flow-gradient')
+      .attr('id', (link) => `live-monitoring-gradient-${link.id}`)
+      .attr('gradientUnits', 'userSpaceOnUse');
+
+    gradientsEnter.append('stop').attr('offset', '0%');
+    gradientsEnter.append('stop').attr('offset', '50%');
+    gradientsEnter.append('stop').attr('offset', '100%');
+
+    gradientsEnter.merge(gradients)
+      .attr('x1', (link) => link.source.x1)
+      .attr('x2', (link) => link.target.x0)
+      .attr('y1', (link) => link.y0)
+      .attr('y2', (link) => link.y1)
+      .each(function updateGradient(link) {
+        const flowColor = nodeColor(link.target);
+        d3.select(this).selectAll('stop')
+          .data([
+            ['0%', flowColor, 0.28],
+            ['50%', flowColor, 0.82],
+            ['100%', flowColor, 1],
+          ])
+          .attr('offset', (stop) => stop[0])
+          .attr('stop-color', (stop) => stop[1])
+          .attr('stop-opacity', (stop) => stop[2]);
+      });
+
+    const linkGroup = linkLayer
+      .selectAll('g.live-monitoring-link-group')
+      .data(visibleLinks, (link) => link.id)
+      .join(
+        (enter) => {
+          const group = enter.append('g')
+            .attr('class', 'live-monitoring-link-group')
+            .style('mix-blend-mode', 'screen');
+
+          group.append('path')
+            .attr('d', sankeyLinkHorizontal())
+            .attr('id', (link) => `live-flow-path-${link.id}`)
+            .attr('stroke', (link) => `url(#live-monitoring-gradient-${link.id})`)
+            .attr('stroke-width', (link) => Math.max(1, link.width))
+            .attr('stroke-opacity', 0)
+            .attr('class', (link) => `live-monitoring-sankey-link live-link-${linkState(link)}`)
+            .style('cursor', 'pointer')
+            .style('pointer-events', 'stroke');
+
+          return group;
+        },
+        (update) => update,
+        (exit) => exit.transition().duration(260).style('opacity', 0).remove()
+      );
+
+    linkGroup.select('path')
+      .attr('d', sankeyLinkHorizontal())
+      .attr('stroke', (link) => `url(#live-monitoring-gradient-${link.id})`)
+      .attr('stroke-width', (link) => Math.max(1, link.width))
+      .attr('class', (link) => `live-monitoring-sankey-link live-link-${linkState(link)}`)
+      .transition()
+      .duration(240)
+      .attr('stroke-opacity', (link) => linkOpacity(linkState(link)));
+
+    linkGroup.select('path').each(function animatePath(_, index) {
+      const datum = d3.select(this).datum();
+      const state = linkState(datum);
+      const length = this.getTotalLength();
+      const path = d3.select(this);
+      if (state === 'partial') {
+        path
+          .attr('stroke-dasharray', `${length * 0.56} ${length}`)
+          .attr('stroke-dashoffset', 0);
+        return;
+      }
+      if (state === 'active' && !this.dataset.liveAnimated) {
+        this.dataset.liveAnimated = 'true';
+        path
+          .attr('stroke-dasharray', `${length} ${length}`)
+          .attr('stroke-dashoffset', length)
+          .transition()
+          .duration(850)
+          .delay(index * 18)
+          .ease(d3.easeCubicInOut)
+          .attr('stroke-dashoffset', 0);
+        return;
+      }
+      if (state === 'completed' || state === 'dimmed') {
+        path.attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
+      }
+    });
+
+    linkGroup
+      .selectAll('circle.live-flow-particle')
+      .data((link) => (['active', 'partial'].includes(linkState(link))
+        ? [0, 1].map((offset) => ({ link, offset }))
+        : []), (item) => `${item.link.id}-${item.offset}`)
+      .join(
+        (enter) => {
+          const particle = enter.append('circle')
+            .attr('class', 'live-flow-particle')
+            .attr('r', 2.3)
+            .attr('fill', ({ link }) => nodeColor(link.target))
+            .attr('opacity', 0.86);
+
+          particle.append('animateMotion')
+            .attr('dur', ({ offset }) => `${2.2 + offset * 0.45}s`)
+            .attr('begin', ({ offset }) => `${offset * 0.7}s`)
+            .attr('repeatCount', 'indefinite')
+            .append('mpath')
+            .attr('href', ({ link }) => `#live-flow-path-${link.id}`);
+
+          return particle;
+        },
+        (update) => {
+          update.attr('fill', ({ link }) => nodeColor(link.target));
+          update.select('mpath')
+            .attr('href', ({ link }) => `#live-flow-path-${link.id}`);
+          return update;
+        },
+        (exit) => exit.remove()
+      );
+
+    nodeLayer.select('rect')
+      .transition()
+      .duration(240)
+      .attr('opacity', (item) => nodeOpacity(nodeState(item)))
+      .attr('class', (item) => `live-node-bar live-node-${nodeState(item)}`);
+
+    nodeLayer.select('text')
+      .transition()
+      .duration(240)
+      .style('opacity', (item) => Math.max(0.28, nodeOpacity(nodeState(item)) * 0.9));
 
     const tooltip = d3.select(tooltipRef.current);
+    const currentPaths = () => linkLayer.selectAll('path.live-monitoring-sankey-link');
 
-    node
+    nodeLayer
       .on('mouseenter', (event, hoveredNode) => {
         const connectedLinks = new Set([...hoveredNode.sourceLinks, ...hoveredNode.targetLinks]);
 
-        paths.transition().duration(180)
-          .style('stroke-opacity', (link) => connectedLinks.has(link) ? OPACITY.linkHover : OPACITY.linkDimmed);
+        currentPaths().transition().duration(180)
+          .style('stroke-opacity', (link) => {
+            if (!isVisibleLink(link)) return 0;
+            return connectedLinks.has(link) ? OPACITY.linkHover : OPACITY.linkDimmed;
+          });
 
-        node.transition().duration(180)
+        nodeLayer.transition().duration(180)
           .style('opacity', (candidate) => {
             const connected = candidate === hoveredNode
               || hoveredNode.sourceLinks.some((link) => link.target === candidate)
@@ -311,12 +942,13 @@ function RealtimeSankey() {
           });
       })
       .on('mouseleave', () => {
-        paths.transition().duration(180).style('stroke-opacity', OPACITY.linkInitial);
-        node.transition().duration(180).style('opacity', 1);
+        currentPaths().transition().duration(180).style('stroke-opacity', (link) => linkOpacity(linkState(link)));
+        nodeLayer.transition().duration(180).style('opacity', 1);
       });
 
-    paths
+    linkLayer.selectAll('path.live-monitoring-sankey-link')
       .on('mouseenter', (event, link) => {
+        if (!isVisibleLink(link)) return;
         d3.select(event.currentTarget).transition().duration(160)
           .style('stroke-opacity', OPACITY.linkHover);
 
@@ -326,7 +958,6 @@ function RealtimeSankey() {
             <div style="font-weight:800;color:${nodeColor(link.source)}">${link.source.name}</div>
             <div style="margin:5px 0;color:#555">to</div>
             <div style="font-weight:800;color:${nodeColor(link.target)}">${link.target.name}</div>
-            <div style="margin-top:9px;font-size:14px;font-weight:900;color:#fff">${link.value} calls</div>
           `);
       })
       .on('mousemove', (event) => {
@@ -336,10 +967,10 @@ function RealtimeSankey() {
       })
       .on('mouseleave', (event) => {
         d3.select(event.currentTarget).transition().duration(160)
-          .style('stroke-opacity', OPACITY.linkInitial);
+          .style('stroke-opacity', (link) => linkOpacity(linkState(link)));
         tooltip.style('opacity', 0);
       });
-  }, [dimensions]);
+  }, [flowState?.version, dimensions]);
 
   return (
     <section ref={containerRef} className="live-sankey-shell">
@@ -350,18 +981,8 @@ function RealtimeSankey() {
 }
 
 export default function LiveMonitoringPage() {
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => setTick((value) => value + 1), 2300);
-    return () => clearInterval(timer);
-  }, []);
-
-  const analytics = useMemo(() => analyticsSeed.map((item, index) => {
-    const wave = Math.sin((tick + index * 1.7) * 0.74);
-    const lift = Math.max(0, Math.round((wave + 1) * (index + 2)));
-    return { ...item, liveValue: item.value + tick * (index + 1) + lift };
-  }), [tick]);
+  const analytics = useLiveAnalytics();
+  const flowState = useLiveSankeyState();
 
   return (
     <div className="h-full overflow-hidden bg-[#020202] text-white relative">
@@ -377,13 +998,13 @@ export default function LiveMonitoringPage() {
 
         .live-stat-card {
           position: relative;
-          min-height: 146px;
+          min-height: 102px;
           overflow: hidden;
           border-radius: 10px;
           border: 1px solid #1f1f22;
           background: #070707;
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.025), 0 22px 48px rgba(0,0,0,0.34);
-          padding: 16px;
+          padding: 12px 16px;
         }
 
         .live-stat-card::before {
@@ -401,6 +1022,11 @@ export default function LiveMonitoringPage() {
           align-items: flex-start;
           justify-content: space-between;
           gap: 12px;
+        }
+
+        .live-stat-copy {
+          flex: 1;
+          min-width: 0;
         }
 
         .live-stat-icon {
@@ -421,8 +1047,7 @@ export default function LiveMonitoringPage() {
           font-size: 9px;
           font-weight: 800;
           text-transform: uppercase;
-          line-height: 1;
-          flex: 1;
+          line-height: 0.9;
           min-width: 0;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -435,7 +1060,7 @@ export default function LiveMonitoringPage() {
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-top: 12px;
+          margin-top: 15px;
         }
 
         .live-stat-value {
@@ -465,12 +1090,12 @@ export default function LiveMonitoringPage() {
           align-items: center;
           justify-content: space-between;
           gap: 18px;
-          margin-top: 26px;
+          margin-top: 10px;
         }
 
         .live-stat-line {
           width: 116px;
-          height: 44px;
+          height: 34px;
           flex: 0 1 116px;
           overflow: visible;
         }
@@ -504,14 +1129,6 @@ export default function LiveMonitoringPage() {
           filter: drop-shadow(0 0 6px #00d69b);
         }
 
-        .live-stat-menu {
-          color: #52525b;
-          font-size: 16px;
-          font-weight: 900;
-          line-height: 1;
-          transform: translateY(-2px);
-        }
-
         .live-sankey-shell {
           position: relative;
           min-height: 0;
@@ -525,6 +1142,44 @@ export default function LiveMonitoringPage() {
 
         .live-monitoring-sankey-link {
           transition: stroke-opacity 180ms ease;
+        }
+
+        .live-link-active,
+        .live-link-partial {
+          filter: drop-shadow(0 0 8px currentColor);
+        }
+
+        .live-link-completed {
+          filter: drop-shadow(0 0 10px rgba(255,255,255,0.22));
+        }
+
+        .live-node-bar {
+          transition: opacity 180ms ease;
+        }
+
+        .live-node-pulsing,
+        .live-node-active,
+        .live-node-partial {
+          animation: liveNodeBreath 1.7s ease-in-out infinite;
+        }
+
+        .live-node-completed {
+          animation: liveNodeConfirm 900ms ease-out 1;
+        }
+
+        .live-flow-particle {
+          filter: drop-shadow(0 0 7px currentColor);
+        }
+
+        @keyframes liveNodeBreath {
+          0%, 100% { opacity: 0.62; }
+          50% { opacity: 1; }
+        }
+
+        @keyframes liveNodeConfirm {
+          0% { opacity: 0.58; }
+          35% { opacity: 1; }
+          100% { opacity: 0.86; }
         }
 
         .live-sankey-tooltip {
@@ -549,23 +1204,13 @@ export default function LiveMonitoringPage() {
 
       <div className="live-monitor-grid h-full overflow-auto custom-scrollbar px-7 py-5">
         <div className="min-h-full flex flex-col gap-4">
-          <header className="shrink-0 flex items-center gap-4">
-            <div className="p-2.5 bg-cyan-500/5 rounded-xl border border-cyan-500/10 shadow-[0_0_20px_rgba(34,211,238,0.08)]">
-              <Activity className="text-cyan-300" size={22} />
-            </div>
-            <div>
-              <h1 className="text-[28px] font-black text-white leading-none">Live Monitoring</h1>
-              <p className="text-[9px] font-black text-zinc-600 uppercase mt-1">Operational nervous system</p>
-            </div>
-          </header>
-
           <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 shrink-0">
             {analytics.map((item, index) => (
-              <AnalyticsCard key={item.label} item={item} value={item.liveValue} index={index} />
+              <AnalyticsCard key={item.label} item={item} value={item.value} index={index} />
             ))}
           </section>
 
-          <RealtimeSankey />
+          <RealtimeSankey flowState={flowState} />
         </div>
       </div>
     </div>

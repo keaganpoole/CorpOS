@@ -178,20 +178,57 @@ class PaymentTestModeRequest(BaseModel):
 INTENT_PHASES = ("entered", "completed", "failed")
 INTENT_KEY_ALIASES = {
     "create_new_record": "create_record",
+    "intent_call_started": "call_started",
+    "call_start": "call_started",
+    "intent_appointments": "appointments",
+    "intent_records": "records",
+    "intent_payments": "payments",
+    "intent_appointment_created": "appointment_created",
+    "intent_appointment_updated": "appointment_updated",
+    "intent_appointment_cancelled": "appointment_cancelled",
+    "appointment_create": "appointment_created",
+    "appointment_update": "appointment_updated",
+    "appointment_cancel": "appointment_cancelled",
+    "create_appointment": "appointment_created",
+    "update_appointment": "appointment_updated",
     "delete_appointment": "cancel_appointment",
+    "cancel_appointment": "appointment_cancelled",
+    "intent_record_created": "record_created",
+    "intent_record_updated": "record_updated",
+    "create_record": "record_created",
+    "update_record": "record_updated",
+    "intent_payment_received": "payment_received",
+    "intent_invoice_sent": "invoice_sent",
+    "create_payment": "payment_received",
+    "update_payment": "payment_received",
+    "create_invoice": "invoice_sent",
+    "send_invoice": "invoice_sent",
+    "intent_neutral_entered": "neutral",
+    "neutral_entered": "neutral",
     "send_to_phone_number": "send_sms",
     "send_to_customer": "send_sms",
 }
 SUPPORTED_INTENT_KEYS = {
     "call_customer",
+    "call_started",
     "send_sms",
+    "appointments",
+    "records",
+    "payments",
     "search_records",
     "create_record",
     "update_record",
     "delete_record",
+    "appointment_created",
+    "appointment_updated",
+    "appointment_cancelled",
     "create_appointment",
     "update_appointment",
     "cancel_appointment",
+    "record_created",
+    "record_updated",
+    "payment_received",
+    "invoice_sent",
     "create_payment",
     "create_payment_profile",
     "create_invoice",
@@ -205,6 +242,7 @@ SUPPORTED_INTENT_KEYS = {
     "update_tag",
     "delete_tag",
     "wait",
+    "neutral",
     "intent_router",
     "end_call",
 }
@@ -214,6 +252,12 @@ class IntentCheckpointRequest(BaseModel):
     phase: Literal["entered", "completed", "failed"]
     timestamp: Optional[datetime] = None
     scenario_id: str
+    user_id: Optional[str] = None
+    receptionist_id: Optional[str] = None
+    call_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    execution_id: Optional[str] = None
+    session_id: Optional[str] = None
 
     class Config:
         populate_by_name = True
@@ -602,6 +646,12 @@ def emit_intent_checkpoint(request: IntentCheckpointRequest):
         "phase": request.phase,
         "timestamp": checkpoint_ts.isoformat(),
         "scenario_id": str(request.scenario_id),
+        "user_id": str(request.user_id) if request.user_id else None,
+        "receptionist_id": str(request.receptionist_id) if request.receptionist_id else None,
+        "call_id": str(request.call_id) if request.call_id else None,
+        "conversation_id": str(request.conversation_id) if request.conversation_id else None,
+        "execution_id": str(request.execution_id) if request.execution_id else None,
+        "session_id": str(request.session_id) if request.session_id else None,
     }
     event_record = {
         "trigger_key": "intent_checkpoint",

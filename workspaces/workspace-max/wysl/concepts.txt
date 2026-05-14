@@ -1,212 +1,107 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { User, CreditCard, Calendar, ChevronDown, Search, X, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, RotateCcw, Waves } from 'lucide-react';
 
-// Mock Data representing different records in the tables
-const MOCK_DATA = {
-  people: [
-    { id: 17, firstName: "Elsa", lastName: "Kennywon", email: "test@icloud.com", notes: "Regular client", specialInstructions: "Call after 5 PM", bestTimeToContact: "Evening", callbackNeeded: "false", callbackDueAt: "-", status: "Active", lastCallStatus: "Completed", lastOutcome: "Positive", consentSms: "false", consentCall: "false" },
-    { id: 42, firstName: "James", lastName: "Holden", email: "j.holden@rocinante.com", notes: "Priority lead", specialInstructions: "Coffee lover", bestTimeToContact: "Morning", callbackNeeded: "true", callbackDueAt: "2024-05-01", status: "Pending", lastCallStatus: "No Answer", lastOutcome: "Neutral", consentSms: "true", consentCall: "true" },
-    { id: 89, firstName: "Sarah", lastName: "Connor", email: "s.connor@resistance.io", notes: "Requires privacy", specialInstructions: "Encrypted only", bestTimeToContact: "Anytime", callbackNeeded: "false", callbackDueAt: "-", status: "Active", lastCallStatus: "Busy", lastOutcome: "Declined", consentSms: "false", consentCall: "false" }
-  ],
-  appointments: [
-    { id: "b5494df6...", clientName: "Elsa Kennywon", date: "2024-04-10", time: "13:00", duration: "30", status: "Booked" },
-    { id: "a123bcde...", clientName: "James Holden", date: "2024-05-12", time: "09:00", duration: "60", status: "Confirmed" }
-  ]
-};
-
-const VariableRow = ({ label, value, isSearching }) => (
-  <div className={`flex justify-between py-1.5 transition-all duration-300 ${isSearching ? 'opacity-40 scale-95 blur-[1px]' : 'opacity-100 scale-100 blur-0'}`}>
-    <span className="text-[#2dd4bf] font-medium text-sm w-1/2">{label}</span>
-    <span className="text-[#9ca3af] text-sm text-right w-1/2 truncate">
-      {value === "true" || value === "false" ? (
-        <span className={value === "true" ? "text-teal-400" : "text-gray-500"}>{value}</span>
-      ) : value}
-    </span>
-  </div>
+const WaveFlow = ({ active }) => (
+  <svg className="w-full h-full overflow-visible" viewBox="0 0 400 100">
+    <defs>
+      <pattern id="wave-pattern" x="0" y="0" width="40" height="20" patternUnits="userSpaceOnUse">
+        <path d="M 0 10 Q 10 0 20 10 T 40 10" fill="none" stroke="#60a5fa" strokeWidth="4" />
+      </pattern>
+      <mask id="wave-mask">
+        <rect 
+            x="40" y="40" 
+            width={active ? "320" : "0"} 
+            height="20" 
+            rx="10" 
+            fill="white" 
+            className="transition-all duration-700 ease-in-out"
+        />
+      </mask>
+    </defs>
+    {/* Base Path (Background) */}
+    <rect x="40" y="42" width="320" height="16" rx="8" fill="#1e293b" />
+    
+    {/* Animated Wave Layer */}
+    <g mask="url(#wave-mask)">
+       <rect x="40" y="42" width="320" height="16" rx="8" fill="#3b82f6" opacity="0.3" />
+       <rect x="0" y="42" width="400" height="16" fill="url(#wave-pattern)">
+          <animateTransform 
+            attributeName="transform" 
+            type="translate" 
+            from="0 0" 
+            to="40 0" 
+            dur="1s" 
+            repeatCount="indefinite" 
+          />
+       </rect>
+    </g>
+  </svg>
 );
 
-const SectionHeader = ({ icon: Icon, title, onSearch, currentSearch, isSearching, resultCount }) => {
-  const [isInputActive, setIsInputActive] = useState(false);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (isInputActive && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isInputActive]);
+export default function App() {
+  const [isActive, setIsActive] = useState(false);
 
   return (
-    <div 
-      className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all duration-300 mb-2 ${
-        isInputActive ? 'bg-[#1a1a1c] ring-1 ring-[#2dd4bf]/30' : 'hover:bg-[#1a1a1c]'
-      }`}
-      onClick={() => !isInputActive && setIsInputActive(true)}
-    >
-      <div className="flex items-center gap-3 flex-1">
-        <div className={`transition-transform duration-300 ${isInputActive ? 'rotate-90 text-[#2dd4bf]' : 'text-[#2dd4bf]'}`}>
-          <Icon size={18} />
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-100">
+      <div className="max-w-md w-full">
+        {/* Header Section */}
+        <div className="mb-8 space-y-2">
+          <div className="flex items-center gap-2 text-blue-400">
+            <Waves size={20} />
+            <span className="text-xs font-bold uppercase tracking-widest">Fluid Dynamics</span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Hydro Flux</h1>
+          <p className="text-slate-400 text-sm italic">Fluid harmonic oscillation concept</p>
         </div>
-        
-        {isInputActive ? (
-          <input
-            ref={inputRef}
-            type="text"
-            className="bg-transparent border-none outline-none text-white text-sm w-full font-medium placeholder:text-gray-600"
-            placeholder={`Search ${title}...`}
-            value={currentSearch}
-            onChange={(e) => onSearch(e.target.value)}
-            onBlur={() => !currentSearch && setIsInputActive(false)}
-            onKeyDown={(e) => e.key === 'Enter' && setIsInputActive(false)}
-          />
-        ) : (
-          <span className="text-white font-bold text-sm select-none">{title}</span>
-        )}
-      </div>
 
-      <div className="flex items-center gap-2">
-        {currentSearch && (
-          <span className="text-[10px] bg-[#2dd4bf]/20 text-[#2dd4bf] px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
-            {resultCount} Found
-          </span>
-        )}
-        <div className={`transition-opacity duration-300 ${isInputActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-          {isInputActive ? (
-            <X 
-              size={14} 
-              className="text-gray-500 hover:text-white" 
-              onClick={(e) => {
-                e.stopPropagation();
-                onSearch('');
-                setIsInputActive(false);
-              }}
-            />
-          ) : (
-            <Search size={14} className="text-gray-500" />
-          )}
+        <div 
+          onClick={() => setIsActive(!isActive)}
+          className={`group relative bg-slate-900/50 border rounded-3xl p-8 cursor-pointer transition-all duration-500 hover:bg-slate-900/80 ${
+            isActive 
+              ? 'border-blue-500/50 ring-1 ring-blue-500/20 shadow-2xl shadow-blue-900/20' 
+              : 'border-slate-800 hover:border-slate-700'
+          }`}
+        >
+          {/* Status Indicators */}
+          <div className="absolute top-6 right-6 flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              isActive ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'bg-slate-700'
+            }`} />
+            <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+              {isActive ? 'Active' : 'Standby'}
+            </span>
+          </div>
+
+          {/* Visualization Area */}
+          <div className="relative h-32 bg-slate-950/50 rounded-2xl overflow-hidden flex items-center justify-center">
+            {/* Nodal Endpoints */}
+            <div className={`absolute left-6 w-5 h-5 rounded-full border-4 border-slate-800 bg-slate-900 z-10 transition-transform duration-500 ${isActive ? 'scale-110' : ''}`} />
+            <div className={`absolute right-6 w-5 h-5 rounded-full border-4 border-slate-800 bg-slate-900 z-10 transition-transform duration-500 ${isActive ? 'scale-110' : ''}`} />
+            
+            {/* The Wave Component */}
+            <div className="w-full px-2">
+              <WaveFlow active={isActive} />
+            </div>
+          </div>
+
+          {/* Interaction Feedback */}
+          <div className={`mt-6 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-tighter transition-opacity duration-300 ${
+            isActive ? 'text-blue-400 opacity-100' : 'text-slate-600 opacity-0 group-hover:opacity-100'
+          }`}>
+            {isActive ? (
+              <><RotateCcw size={14} /> Click to Reset Flow</>
+            ) : (
+              <><Play size={14} fill="currentColor" /> Initialize Connection</>
+            )}
+          </div>
         </div>
-        {!isInputActive && <ChevronDown size={16} className="text-gray-500" />}
+
+        {/* Technical Footer */}
+        <div className="mt-8 pt-6 border-t border-slate-900 flex justify-between items-center text-slate-600 text-[10px] font-mono tracking-widest uppercase">
+          <span>Module // 002-HF</span>
+          <span>Status // Stable</span>
+        </div>
       </div>
     </div>
   );
-};
-
-const App = () => {
-  const [peopleIdx, setPeopleIdx] = useState(0);
-  const [appointmentsIdx, setAppointmentsIdx] = useState(0);
-  const [peopleSearch, setPeopleSearch] = useState('');
-  const [isTuning, setIsTuning] = useState(false);
-
-  // Simple "tuning" effect when searching
-  const handlePeopleSearch = (val) => {
-    setPeopleSearch(val);
-    setIsTuning(true);
-    
-    // Simulate finding a record
-    setTimeout(() => {
-      const foundIdx = MOCK_DATA.people.findIndex(p => 
-        p.firstName.toLowerCase().includes(val.toLowerCase()) || 
-        p.lastName.toLowerCase().includes(val.toLowerCase())
-      );
-      
-      if (foundIdx !== -1) {
-        setPeopleIdx(foundIdx);
-      }
-      setIsTuning(false);
-    }, 300);
-  };
-
-  const currentPerson = MOCK_DATA.people[peopleIdx];
-  const currentAppt = MOCK_DATA.appointments[appointmentsIdx];
-
-  return (
-    <div className="min-h-screen bg-[#080809] flex items-center justify-center p-4 font-sans text-gray-300">
-      <div className="w-[340px] bg-[#0d0d0f] rounded-2xl p-4 shadow-2xl border border-white/5 max-h-[90vh] overflow-y-auto custom-scrollbar">
-        
-        {/* Header Area */}
-        <div className="flex items-center justify-between mb-6 px-1">
-          <div className="flex items-baseline gap-2">
-            <h1 className="text-white font-black tracking-wider text-sm uppercase">Variables</h1>
-            <span className="text-gray-600 text-xs font-medium">for Amount ($)</span>
-          </div>
-          <div className="w-1.5 h-1.5 bg-[#2dd4bf] rounded-full animate-pulse shadow-[0_0_8px_#2dd4bf]"></div>
-        </div>
-
-        {/* People Section */}
-        <div className="mb-6">
-          <SectionHeader 
-            icon={User} 
-            title="People" 
-            onSearch={handlePeopleSearch}
-            currentSearch={peopleSearch}
-            isSearching={isTuning}
-            resultCount={peopleSearch ? 1 : 0}
-          />
-          
-          <div className="px-2 space-y-0.5">
-            <VariableRow label="Record ID" value={currentPerson.id} isSearching={isTuning} />
-            <VariableRow label="First Name" value={currentPerson.firstName} isSearching={isTuning} />
-            <VariableRow label="Last Name" value={currentPerson.lastName} isSearching={isTuning} />
-            <VariableRow label="Email" value={currentPerson.email} isSearching={isTuning} />
-            <VariableRow label="Notes" value={currentPerson.notes} isSearching={isTuning} />
-            <VariableRow label="Special Instructions" value={currentPerson.specialInstructions} isSearching={isTuning} />
-            <VariableRow label="Best Time to Contact" value={currentPerson.bestTimeToContact} isSearching={isTuning} />
-            <VariableRow label="Callback Needed" value={currentPerson.callbackNeeded} isSearching={isTuning} />
-            <VariableRow label="Callback Due At" value={currentPerson.callbackDueAt} isSearching={isTuning} />
-            <VariableRow label="Status" value={currentPerson.status} isSearching={isTuning} />
-            <VariableRow label="Last Call Status" value={currentPerson.lastCallStatus} isSearching={isTuning} />
-            <VariableRow label="Last Outcome" value={currentPerson.lastOutcome} isSearching={isTuning} />
-            <VariableRow label="Consent SMS" value={currentPerson.consentSms} isSearching={isTuning} />
-            <VariableRow label="Consent Call" value={currentPerson.consentCall} isSearching={isTuning} />
-          </div>
-        </div>
-
-        {/* Payments Section */}
-        <div className="mb-6">
-           <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#141417]/50 opacity-60">
-              <div className="flex items-center gap-3">
-                <CreditCard size={18} className="text-[#a855f7]" />
-                <span className="text-white font-bold text-sm">Payments</span>
-              </div>
-              <span className="text-[10px] text-gray-500 italic">No data</span>
-           </div>
-           <div className="text-center py-4 text-xs text-gray-600 italic select-none">
-             No records found
-           </div>
-        </div>
-
-        {/* Appointments Section */}
-        <div className="mb-2">
-          <SectionHeader icon={Calendar} title="Appointments" onSearch={() => {}} />
-          
-          <div className="px-2 space-y-0.5">
-            <VariableRow label="Record ID" value={currentAppt.id} />
-            <VariableRow label="Client Name" value={currentAppt.clientName} />
-            <VariableRow label="Date" value={currentAppt.date} />
-            <VariableRow label="Time" value={currentAppt.time} />
-            <VariableRow label="Duration" value={currentAppt.duration} />
-            <VariableRow label="Status" value={currentAppt.status} />
-          </div>
-        </div>
-
-      </div>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #1f1f23;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #2dd4bf;
-        }
-      `}} />
-    </div>
-  );
-};
-
-export default App;
+}
