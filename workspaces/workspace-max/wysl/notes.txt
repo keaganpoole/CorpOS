@@ -21,7 +21,9 @@ create table public.appointments (
         array[
           'pending'::text,
           'confirmed'::text,
-          'cancelled'::text
+          'cancelled'::text,
+          'completed'::text,
+          'missed'::text
         ]
       )
     )

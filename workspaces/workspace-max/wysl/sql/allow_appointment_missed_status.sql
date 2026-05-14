@@ -1,4 +1,5 @@
--- Allow appointments.status to accept "missed" for no-show workflows.
+-- Allow appointments.status to accept "completed" and "missed" for
+-- post-visit and no-show workflows.
 
 ALTER TABLE public.appointments
   DROP CONSTRAINT IF EXISTS appointments_status_check;
@@ -11,6 +12,7 @@ ALTER TABLE public.appointments
         'pending'::text,
         'confirmed'::text,
         'cancelled'::text,
+        'completed'::text,
         'missed'::text
       ]
     )

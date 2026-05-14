@@ -51,6 +51,7 @@ twilio_phone_number = os.environ.get("TWILIO_PHONE_NUMBER")
 # --- OpenAI Configuration ---
 openai_api_key = os.environ.get("OPENAI_API_KEY")
 openai_assistant_id = os.environ.get("OPENAI_ASSISTANT_ID")
+elevenlabs_webhook_secret = os.environ.get("ELEVENLABS_WEBHOOK_SECRET")
 
 try:
     supabase: Client = create_client(url, key)

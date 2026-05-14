@@ -19,6 +19,7 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const STATUS_CONFIG = {
   confirmed: { color: '#34d399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.2)', glow: 'rgba(52,211,153,0.4)', label: 'Confirmed' },
   pending:   { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)', glow: 'rgba(251,191,36,0.4)', label: 'Pending' },
+  completed: { color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', glow: 'rgba(34,197,94,0.4)', label: 'Completed' },
   missed:    { color: '#fb7185', bg: 'rgba(251,113,133,0.08)', border: 'rgba(251,113,133,0.2)', glow: 'rgba(251,113,133,0.4)', label: 'Missed' },
   cancelled: { color: '#f43f5e', bg: 'rgba(244,63,94,0.08)', border: 'rgba(244,63,94,0.2)', glow: 'rgba(244,63,94,0.4)', label: 'Cancelled' },
 };
@@ -485,6 +486,7 @@ export default function CalendarPage() {
                       className="w-full bg-black/60 border border-white/[0.06] rounded-xl px-3 py-3 text-[12px] text-zinc-300 font-medium focus:outline-none focus:border-cyan-500/30 transition-all appearance-none cursor-pointer">
                       <option value="pending">Pending</option>
                       <option value="confirmed">Confirmed</option>
+                      <option value="completed">Completed</option>
                       <option value="missed">Missed</option>
                     </select>
                   </div>

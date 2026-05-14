@@ -1,0 +1,237 @@
+intent_neutral_entered
+```json
+{
+  "type": "webhook",
+  "name": "intent_neutral_entered",
+  "description": "Emit a checkpoint when the call intent is being discussed or clarified.",
+  "disable_interruptions": false,
+  "force_pre_tool_speech": false,
+  "pre_tool_speech": "auto",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "tool_error_handling_mode": "auto",
+  "execution_mode": "immediate",
+  "api_schema": {
+    "url": "https://nila-pseudoeconomical-sandi.ngrok-free.dev/api/tools/report-intent-checkpoint",
+    "method": "POST",
+    "path_params_schema": [],
+    "query_params_schema": [],
+    "request_body_schema": {
+      "id": "body",
+      "type": "object",
+      "description": "Intent checkpoint payload",
+      "properties": [
+        {
+          "id": "intent_key",
+          "type": "string",
+          "value_type": "constant",
+          "description": "",
+          "dynamic_variable": "",
+          "constant_value": "neutral",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "phase",
+          "type": "string",
+          "value_type": "constant",
+          "description": "",
+          "dynamic_variable": "",
+          "constant_value": "entered",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "timestamp",
+          "type": "string",
+          "value_type": "dynamic_variable",
+          "description": "",
+          "dynamic_variable": "system__time_utc",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "scenario_id",
+          "type": "string",
+          "value_type": "dynamic_variable",
+          "description": "",
+          "dynamic_variable": "scenario_id",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "receptionist_id",
+          "type": "string",
+          "value_type": "dynamic_variable",
+          "description": "",
+          "dynamic_variable": "receptionist_id",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": false
+        },
+        {
+          "id": "user_id",
+          "type": "string",
+          "value_type": "dynamic_variable",
+          "description": "",
+          "dynamic_variable": "user_id",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": false
+        }
+      ],
+      "required": false,
+      "value_type": "llm_prompt"
+    },
+    "request_headers": [],
+    "content_type": "application/json",
+    "auth_connection": null
+  },
+  "assignments": [],
+  "response_timeout_secs": 20,
+  "dynamic_variables": {
+    "dynamic_variable_placeholders": {
+      "user_id": {
+        "type": "string_literal",
+        "value": ""
+      },
+      "receptionist_id": {
+        "type": "string_literal",
+        "value": ""
+      },
+      "scenario_id": {
+        "type": "string_literal",
+        "value": ""
+      }
+    }
+  },
+  "response_mocks": []
+}
+```
+
+intent_wrap_up_entered
+```json
+{
+  "type": "webhook",
+  "name": "intent_wrap_up_entered",
+  "description": "Emit a checkpoint when the call is entering final wrap-up or last questions.",
+  "disable_interruptions": false,
+  "force_pre_tool_speech": false,
+  "pre_tool_speech": "auto",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "tool_error_handling_mode": "auto",
+  "execution_mode": "immediate",
+  "api_schema": {
+    "url": "https://nila-pseudoeconomical-sandi.ngrok-free.dev/api/tools/report-intent-checkpoint",
+    "method": "POST",
+    "path_params_schema": [],
+    "query_params_schema": [],
+    "request_body_schema": {
+      "id": "body",
+      "type": "object",
+      "description": "Intent checkpoint payload",
+      "properties": [
+        {
+          "id": "intent_key",
+          "type": "string",
+          "value_type": "constant",
+          "description": "",
+          "dynamic_variable": "",
+          "constant_value": "wrap_up",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "phase",
+          "type": "string",
+          "value_type": "constant",
+          "description": "",
+          "dynamic_variable": "",
+          "constant_value": "entered",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "timestamp",
+          "type": "string",
+          "value_type": "dynamic_variable",
+          "description": "",
+          "dynamic_variable": "system__time_utc",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "scenario_id",
+          "type": "string",
+          "value_type": "dynamic_variable",
+          "description": "",
+          "dynamic_variable": "scenario_id",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "receptionist_id",
+          "type": "string",
+          "value_type": "dynamic_variable",
+          "description": "",
+          "dynamic_variable": "receptionist_id",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": false
+        },
+        {
+          "id": "user_id",
+          "type": "string",
+          "value_type": "dynamic_variable",
+          "description": "",
+          "dynamic_variable": "user_id",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": false
+        }
+      ],
+      "required": false,
+      "value_type": "llm_prompt"
+    },
+    "request_headers": [],
+    "content_type": "application/json",
+    "auth_connection": null
+  },
+  "assignments": [],
+  "response_timeout_secs": 20,
+  "dynamic_variables": {
+    "dynamic_variable_placeholders": {
+      "user_id": {
+        "type": "string_literal",
+        "value": ""
+      },
+      "receptionist_id": {
+        "type": "string_literal",
+        "value": ""
+      },
+      "scenario_id": {
+        "type": "string_literal",
+        "value": ""
+      }
+    }
+  },
+  "response_mocks": []
+}
+```

@@ -1953,7 +1953,7 @@
 /* ─── Variables Pane ─────────────────────────────────────── */
 .sb-variables-pane {
   --sb-pane-rotate-x: 0deg;
-  --sb-pane-rotate-y: 8deg;
+  --sb-pane-rotate-y: 6deg;
   position: absolute;
   width: 264px;
   background: linear-gradient(135deg, rgba(14, 14, 18, 0.98), rgba(20, 20, 26, 0.98));

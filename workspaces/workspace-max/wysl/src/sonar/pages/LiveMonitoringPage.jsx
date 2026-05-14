@@ -4,10 +4,10 @@ import * as d3 from 'd3';
 import { sankey, sankeyJustify, sankeyLinkHorizontal } from 'd3-sankey';
 import {
   Activity,
-  CalendarCheck,
+  CalendarDays,
   CreditCard,
-  PhoneCall,
-  UserPlus,
+  Phone,
+  UserRoundPlus,
 } from 'lucide-react';
 
 const COLORS = {
@@ -25,10 +25,10 @@ const OPACITY = {
 };
 
 const analyticsSeed = [
-  { label: 'Total Calls', value: 2847, delta: '+12.8%', accent: '#22d3ee', icon: PhoneCall },
-  { label: 'Appointments Booked', value: 386, delta: '+8.4%', accent: '#2dd4bf', icon: CalendarCheck },
-  { label: 'New Customers', value: 142, delta: '+5.9%', accent: '#a855f7', icon: UserPlus },
-  { label: 'Revenue Generated', value: 64780, prefix: '$', delta: '+18.2%', accent: '#ec4899', icon: CreditCard },
+  { label: 'Total Calls', value: 3872, delta: '+12.8%', icon: Phone, series: [18, 27, 31, 24, 39, 42, 40, 55, 61, 59] },
+  { label: 'Appointments', value: 2434, delta: '+8.4%', icon: CalendarDays, series: [20, 27, 30, 26, 39, 37, 47, 46, 58, 57] },
+  { label: 'New Customers', value: 3218, delta: '+5.9%', icon: UserRoundPlus, series: [31, 29, 30, 36, 35, 34, 41, 40, 42, 53] },
+  { label: 'Revenue', value: 68886, prefix: '$', delta: '+18.2%', icon: CreditCard, series: [21, 25, 27, 24, 35, 40, 42, 39, 44, 56] },
 ];
 
 const sankeyData = {
@@ -63,15 +63,6 @@ const sankeyData = {
   ],
 };
 
-const hexToRgba = (hex, alpha) => {
-  const clean = hex.replace('#', '');
-  const value = parseInt(clean, 16);
-  const r = (value >> 16) & 255;
-  const g = (value >> 8) & 255;
-  const b = value & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
 const nodeColor = (node) => node.color || COLORS[node.category];
 
 const formatValue = (item, value) => {
@@ -79,8 +70,24 @@ const formatValue = (item, value) => {
   return `${item.prefix || ''}${body}`;
 };
 
+const sparklinePoints = (series) => {
+  const width = 116;
+  const height = 42;
+  const min = Math.min(...series);
+  const max = Math.max(...series);
+  const span = max - min || 1;
+  const points = series.map((point, index) => {
+    const x = (index / (series.length - 1)) * width;
+    const y = height - ((point - min) / span) * height;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const lastY = points[points.length - 1].split(',')[1];
+  return { points: points.join(' '), area: `0,44 ${points.join(' ')} 116,44`, lastY };
+};
+
 function AnalyticsCard({ item, value, index }) {
   const Icon = item.icon;
+  const line = sparklinePoints(item.series);
 
   return (
     <motion.div
@@ -88,23 +95,31 @@ function AnalyticsCard({ item, value, index }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.04 }}
       className="live-stat-card"
-      style={{
-        '--accent': item.accent,
-        '--accent-border': hexToRgba(item.accent, 0.22),
-        '--accent-glow': hexToRgba(item.accent, 0.2),
-      }}
     >
-      <div className="flex items-center justify-between gap-4 relative z-10">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase text-zinc-600 truncate">{item.label}</p>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-[22px] font-black text-white leading-none">{formatValue(item, value)}</span>
-            <span className="text-[10px] font-bold text-zinc-500">{item.delta}</span>
-          </div>
-        </div>
+      <div className="live-stat-head">
+        <p className="live-stat-label">{item.label}</p>
         <div className="live-stat-icon">
           <Icon size={15} />
         </div>
+      </div>
+      <div className="live-stat-value-row">
+        <span className="live-stat-value">{formatValue(item, value)}</span>
+        <span className="live-stat-delta">{item.delta}</span>
+      </div>
+      <div className="live-stat-chart-row">
+        <svg className="live-stat-line" viewBox="0 0 116 44" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id={`live-stat-fill-${index}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#00d69b" stopOpacity="0.24" />
+              <stop offset="100%" stopColor="#00d69b" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <polygon className="live-stat-line-fill" points={line.area} fill={`url(#live-stat-fill-${index})`} />
+          <polyline className="live-stat-line-shadow" points={line.points} />
+          <polyline className="live-stat-line-path" points={line.points} />
+          <circle className="live-stat-line-dot" cx="116" cy={line.lastY} r="2.5" />
+        </svg>
+        <span className="live-stat-menu">...</span>
       </div>
     </motion.div>
   );
@@ -205,13 +220,6 @@ function RealtimeSankey() {
 
     const field = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
-
-    field.append('ellipse')
-      .attr('cx', width / 2)
-      .attr('cy', height / 2)
-      .attr('rx', width * 0.43)
-      .attr('ry', height * 0.38)
-      .attr('fill', 'rgba(112,0,255,0.04)');
 
     const linkGroup = field.append('g')
       .attr('fill', 'none')
@@ -369,34 +377,139 @@ export default function LiveMonitoringPage() {
 
         .live-stat-card {
           position: relative;
-          min-height: 82px;
+          min-height: 146px;
           overflow: hidden;
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          background: rgba(10, 10, 10, 0.62);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.045);
-          padding: 14px 16px;
+          border-radius: 10px;
+          border: 1px solid #1f1f22;
+          background: #070707;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.025), 0 22px 48px rgba(0,0,0,0.34);
+          padding: 16px;
         }
 
         .live-stat-card::before {
           content: "";
           position: absolute;
-          inset: -1px;
-          background: linear-gradient(90deg, var(--accent-border), transparent 42%);
-          opacity: 0.22;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(255,255,255,0.018), transparent 52%);
           pointer-events: none;
         }
 
+        .live-stat-head {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
         .live-stat-icon {
-          color: var(--accent);
-          width: 34px;
-          height: 34px;
+          width: 32px;
+          height: 32px;
           display: grid;
           place-items: center;
-          border-radius: 10px;
-          border: 1px solid rgba(255,255,255,0.05);
-          background: rgba(255,255,255,0.025);
-          box-shadow: 0 0 18px var(--accent-glow);
+          flex: 0 0 auto;
+          border-radius: 8px;
+          color: #a1a1aa;
+          border: 1px solid #27272a;
+          background: linear-gradient(180deg, rgba(39,39,42,0.62), rgba(24,24,27,0.35));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.055);
+        }
+
+        .live-stat-label {
+          color: #7c7c84;
+          font-size: 9px;
+          font-weight: 800;
+          text-transform: uppercase;
+          line-height: 1;
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .live-stat-value-row {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 12px;
+        }
+
+        .live-stat-value {
+          display: block;
+          color: #ffffff;
+          font-size: 24px;
+          font-weight: 900;
+          line-height: 1;
+          white-space: nowrap;
+        }
+
+        .live-stat-delta {
+          color: #18d79d;
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+          border-radius: 5px;
+          background: rgba(0,214,155,0.12);
+          padding: 4px 6px;
+          line-height: 1;
+        }
+
+        .live-stat-chart-row {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          margin-top: 26px;
+        }
+
+        .live-stat-line {
+          width: 116px;
+          height: 44px;
+          flex: 0 1 116px;
+          overflow: visible;
+        }
+
+        .live-stat-line-fill {
+          opacity: 1;
+        }
+
+        .live-stat-line-path,
+        .live-stat-line-shadow {
+          fill: none;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
+
+        .live-stat-line-shadow {
+          stroke: #00d69b;
+          stroke-width: 4;
+          opacity: 0.14;
+          filter: blur(2px);
+        }
+
+        .live-stat-line-path {
+          stroke: #00d69b;
+          stroke-width: 2;
+          opacity: 1;
+        }
+
+        .live-stat-line-dot {
+          fill: #00d69b;
+          filter: drop-shadow(0 0 6px #00d69b);
+        }
+
+        .live-stat-menu {
+          color: #52525b;
+          font-size: 16px;
+          font-weight: 900;
+          line-height: 1;
+          transform: translateY(-2px);
         }
 
         .live-sankey-shell {
@@ -408,15 +521,6 @@ export default function LiveMonitoringPage() {
           background: #020202;
           box-shadow: none;
           user-select: none;
-        }
-
-        .live-sankey-shell::before {
-          content: "";
-          position: absolute;
-          inset: 8% 11%;
-          border-radius: 999px;
-          background: radial-gradient(circle, rgba(112,0,255,0.07), transparent 62%);
-          pointer-events: none;
         }
 
         .live-monitoring-sankey-link {

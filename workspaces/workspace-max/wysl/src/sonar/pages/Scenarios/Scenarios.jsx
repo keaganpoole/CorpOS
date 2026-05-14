@@ -334,7 +334,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'appointment_id', label: 'Appointment ID', type: 'record_id' },
           { key: 'person_id', label: 'Customer ID', type: 'person_id' },
           { key: 'service_id', label: 'Service ID', type: 'service_id' },
-          { key: 'status', label: 'Status', type: 'select', options: ['pending', 'confirmed', 'cancelled', 'missed'] },
+          { key: 'status', label: 'Status', type: 'select', options: ['pending', 'confirmed', 'cancelled', 'completed', 'missed'] },
           { key: 'date', label: 'Date', type: 'date' },
           { key: 'time', label: 'Time', type: 'time' },
           { key: 'duration', label: 'Duration', type: 'text' },
@@ -2309,8 +2309,6 @@ export default function ScenariosPage() {
           {/* Quantum Reveal label — shown when initial node is unconfigured */}
           {nodes.length === 1 && !nodes[0].configured && (
             <>
-              <div className="sb-quantum-label">QUANTUM REVEAL</div>
-              <div className="sb-quantum-hint">Tap to configure</div>
             </>
           )}
           <div
@@ -4159,5 +4157,3 @@ export default function ScenariosPage() {
     </div>
   );
 }
-
-

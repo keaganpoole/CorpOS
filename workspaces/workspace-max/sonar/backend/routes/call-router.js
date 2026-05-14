@@ -87,6 +87,8 @@ router.post('/route', async (req, res) => {
       business_phone: business.phone || '',
       business_email: business.email || '',
       customer_name: '',  // populated by identify_caller tool during call
+      receptionist_id: receptionist?.id != null ? String(receptionist.id) : '',
+      scenario_id: receptionist?.scenario_id || '',
     };
 
     if (receptionist) {
@@ -112,6 +114,7 @@ router.post('/route', async (req, res) => {
       dynamic_variables,
       conversation_config_override: {},
     };
+    console.log('[CALL-ROUTER] dynamic variables:', dynamic_variables);
 
     // Personalized first message using user's intro message prompt
     let firstMessage = introMessagePrompt

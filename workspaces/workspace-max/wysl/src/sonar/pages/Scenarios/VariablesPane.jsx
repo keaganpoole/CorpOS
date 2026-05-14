@@ -199,6 +199,8 @@ const TABLE_DEFS = [
       { key: 'source', label: 'Source', type: 'text' },
       { key: 'lead_source_detail', label: 'Source Detail', type: 'text' },
       { key: 'tags', label: 'Tags', type: 'text' },
+      { key: 'notes', label: 'Notes', type: 'text' },
+      { key: 'special_instructions', label: 'Special Instructions', type: 'text' },
       { key: 'last_call_status', label: 'Last Call Status', type: 'text' },
       { key: 'last_intent', label: 'Last Intent', type: 'text' },
       { key: 'last_outcome', label: 'Last Outcome', type: 'text' },
@@ -974,7 +976,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     if (!visible || !panel || typeof window === 'undefined' || window.innerWidth < 1024) return undefined;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
 
-    const defaultRot = { x: 0, y: 8 };
+    const defaultRot = { x: 0, y: 6 };
     let currentRot = { ...defaultRot };
     let targetRot = { ...defaultRot };
     let frameId = null;
@@ -994,7 +996,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       const xPercent = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
       const yPercent = ((event.clientY - rect.top) / rect.height - 0.5) * -2;
 
-      targetRot.y = 8 - (xPercent * 3.6);
+      targetRot.y = 6 - (xPercent * 3.6);
       targetRot.x = yPercent * -2.8;
     };
 

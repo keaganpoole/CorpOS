@@ -162,8 +162,10 @@ class ActionExecutor {
         company_name: flowContext.business?.name || '',
         business_hours: flowContext.business?.business_hours || '',
         receptionist_name: flowContext.receptionist?.first_name || 'Receptionist',
+        receptionist_id: flowContext.receptionist?.id != null ? String(flowContext.receptionist.id) : '',
         customer_name: flowContext.customer?.first_name || flowContext.customer?.name || '',
         flow_execution_id: flowContext._executionId || '',
+        scenario_id: flowContext._scenario?.id || '',
         mission: node.actionConfig?.main_content || '',
         ...flowContext.agent, // Include any agent-captured data from previous calls
         // Include all person/customer fields (auto-adapts when people table schema changes)
@@ -237,6 +239,13 @@ class ActionExecutor {
 
       dynamicVars.intel_appointments = intelAppointments;
       dynamicVars.intel_people = intelPeople;
+      console.log('[ActionExecutor] outbound call dynamic variables:', {
+        user_id: dynamicVars.user_id,
+        receptionist_name: dynamicVars.receptionist_name,
+        receptionist_id: dynamicVars.receptionist_id,
+        scenario_id: dynamicVars.scenario_id,
+        flow_execution_id: dynamicVars.flow_execution_id,
+      });
 
       const res = await fetch(`${ELEVENLABS_API}/convai/twilio/outbound-call`, {
         method: 'POST',

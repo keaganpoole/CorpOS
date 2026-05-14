@@ -20,6 +20,7 @@ const ENDPOINTS = [
   { group: 'Server Tools', path: '/api/tools/get-services', method: 'GET', desc: 'List active services', icon: '📋', wsEvent: 'services' },
   { group: 'Server Tools', path: '/api/tools/get-business-info', method: 'POST', desc: 'Knowledge base lookup', icon: '📖', wsEvent: 'info' },
   { group: 'Server Tools', path: '/api/tools/log-call-outcome', method: 'POST', desc: 'Log call result', icon: '📊', wsEvent: 'log' },
+  { group: 'Server Tools', path: '/api/tools/report-intent-checkpoint', method: 'POST', desc: 'Emit live scenario intent checkpoint', icon: '🧭', wsEvent: 'intent' },
   { group: 'Server Tools', path: '/api/tools/transfer-call', method: 'POST', desc: 'Transfer to human', icon: '📞', wsEvent: 'transfer' },
   // Management API (dashboard)
   { group: 'Dashboard', path: '/api/sonar/business/profile', method: 'GET', desc: 'Business profile', icon: '🏢' },

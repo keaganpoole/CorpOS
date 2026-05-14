@@ -16,6 +16,42 @@ function init(deps) {
   sbQuery = deps.sbQuery;
 }
 
+const INTENT_KEY_ALIASES = {
+  create_new_record: 'create_record',
+  delete_appointment: 'cancel_appointment',
+  send_to_phone_number: 'send_sms',
+  send_to_customer: 'send_sms',
+};
+
+const SUPPORTED_INTENT_KEYS = new Set([
+  'call_customer',
+  'send_sms',
+  'search_records',
+  'create_record',
+  'update_record',
+  'delete_record',
+  'create_appointment',
+  'update_appointment',
+  'cancel_appointment',
+  'create_payment',
+  'create_payment_profile',
+  'create_invoice',
+  'send_invoice',
+  'update_payment',
+  'check_payment_status',
+  'issue_refund',
+  'send_email',
+  'add_tag',
+  'search_tags',
+  'update_tag',
+  'delete_tag',
+  'wait',
+  'neutral',
+  'wrap_up',
+  'intent_router',
+  'end_call',
+]);
+
 function setNestedPath(target, dottedKey, value) {
   if (!target || !dottedKey || typeof dottedKey !== 'string') return;
   const parts = dottedKey.split('.').map(part => part.trim()).filter(Boolean);
@@ -43,6 +79,94 @@ function normalizePhone(phone) {
     else if (cleaned.length === 11 && cleaned.startsWith('1')) cleaned = '+' + cleaned;
   }
   return cleaned;
+}
+
+function normalizeIntentKey(intentKey) {
+  const normalized = String(intentKey || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  return INTENT_KEY_ALIASES[normalized] || normalized;
+}
+
+function deepGet(obj, path) {
+  if (!obj || !path) return null;
+  return path.split('.').reduce((acc, part) => (
+    acc && typeof acc === 'object' ? acc[part] : null
+  ), obj);
+}
+
+function firstPresent(obj, paths) {
+  for (const path of paths) {
+    const value = deepGet(obj, path);
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return null;
+}
+
+function parseOptionalDate(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'number') {
+    const dt = new Date(value > 1e12 ? value : value * 1000);
+    return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+  const dt = new Date(value);
+  return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+}
+
+function stringifyTranscript(value) {
+  if (value == null) return null;
+  if (typeof value === 'string') return value || null;
+  if (Array.isArray(value)) {
+    const lines = value.map(item => {
+      if (item && typeof item === 'object') {
+        const speaker = item.speaker || item.role || item.agent || 'speaker';
+        const text = item.text || item.message || item.content || '';
+        return text ? `${speaker}: ${String(text).trim()}` : null;
+      }
+      return item ? String(item).trim() : null;
+    }).filter(Boolean);
+    return lines.length ? lines.join('\n') : null;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch (_) {
+    return String(value);
+  }
+}
+
+async function lookupReceptionist({ receptionistId, elevenlabsAgentId, phoneNumber }) {
+  try {
+    if (receptionistId) {
+      const rows = await sbQuery('hired_receptionists', 'GET', null, `?id=eq.${receptionistId}&limit=1`) || [];
+      if (rows.length) return rows[0];
+    }
+    if (elevenlabsAgentId) {
+      const rows = await sbQuery('hired_receptionists', 'GET', null, `?elevenlabs_voice_id=eq.${encodeURIComponent(elevenlabsAgentId)}&limit=1`) || [];
+      if (rows.length) return rows[0];
+    }
+    if (phoneNumber) {
+      const normalized = normalizePhone(String(phoneNumber));
+      if (normalized) {
+        const rows = await sbQuery('hired_receptionists', 'GET', null, `?phone_number=eq.${encodeURIComponent(normalized)}&limit=1`) || [];
+        if (rows.length) return rows[0];
+      }
+    }
+  } catch (err) {
+    console.warn('[TOOLS] receptionist lookup failed:', err.message);
+  }
+  return null;
+}
+
+async function lookupScenario({ scenarioId }) {
+  if (!scenarioId) return null;
+  try {
+    const rows = await sbQuery('scenarios', 'GET', null, `?id=eq.${encodeURIComponent(String(scenarioId))}&limit=1`) || [];
+    return rows[0] || null;
+  } catch (err) {
+    console.warn('[TOOLS] scenario lookup failed:', err.message);
+    return null;
+  }
 }
 
 // ─── Helper: format appointment for LLM response ────────
@@ -877,6 +1001,161 @@ router.post('/log-call-outcome', async (req, res) => {
     });
   } catch (err) {
     console.error('[TOOLS] log-call-outcome failed:', err.message);
+    res.status(500).json({ error: err.message, success: false });
+  }
+});
+
+/**
+ * POST /api/tools/report-intent-checkpoint
+ *
+ * Lightweight checkpoint event for live scenario progress.
+ *
+ * Body: {
+ *   intent_key: "create_appointment",
+ *   phase: "entered" | "completed" | "failed",
+ *   timestamp: "2026-05-11T19:30:00Z",
+ *   scenario_id: "scenario-id"
+ * }
+ */
+router.post('/report-intent-checkpoint', async (req, res) => {
+  try {
+    console.log('[TOOLS] checkpoint request body:', req.body || {});
+    const {
+      intent_key,
+      phase,
+      timestamp,
+      scenario_id,
+      user_id,
+      receptionist_id,
+    } = req.body || {};
+    const normalizedIntentKey = normalizeIntentKey(intent_key);
+
+    if (!SUPPORTED_INTENT_KEYS.has(normalizedIntentKey)) {
+      return res.status(400).json({ error: `Unsupported intent_key: ${intent_key}` });
+    }
+    if (!['entered', 'completed', 'failed'].includes(phase)) {
+      return res.status(400).json({ error: 'phase must be entered, completed, or failed' });
+    }
+    if (!scenario_id) {
+      return res.status(400).json({ error: 'scenario_id is required' });
+    }
+
+    const eventTimestamp = parseOptionalDate(timestamp) || new Date().toISOString();
+    const receptionist = await lookupReceptionist({ receptionistId: receptionist_id });
+    const scenario = await lookupScenario({ scenarioId: scenario_id });
+    const resolvedReceptionistId = receptionist?.id || receptionist_id || null;
+    const resolvedUserId =
+      user_id
+      || receptionist?.user_id
+      || scenario?.user_id
+      || scenario?.owner_user_id
+      || null;
+
+    const payload = {
+      intent_key: normalizedIntentKey,
+      phase,
+      timestamp: eventTimestamp,
+      scenario_id: String(scenario_id),
+      user_id: resolvedUserId ? String(resolvedUserId) : null,
+      receptionist_id: resolvedReceptionistId != null ? Number(resolvedReceptionistId) : null,
+    };
+
+    const eventRow = {
+      user_id: resolvedUserId ? String(resolvedUserId) : null,
+      receptionist_id: resolvedReceptionistId != null ? Number(resolvedReceptionistId) : null,
+      scenario_id: String(scenario_id),
+      trigger_key: 'intent_checkpoint',
+      payload,
+      created_at: eventTimestamp,
+    };
+
+    const result = await sbQuery('checkpoints', 'POST', eventRow);
+    console.log(`[TOOLS] 📍 checkpoint fired: ${normalizedIntentKey}.${phase} (scenario ${scenario_id})`);
+    res.json({
+      success: true,
+      checkpoint: payload,
+      event: result?.[0] || eventRow,
+    });
+  } catch (err) {
+    console.error('[TOOLS] report-intent-checkpoint failed:', err.message);
+    res.status(500).json({ error: err.message, success: false });
+  }
+});
+
+/**
+ * POST /api/tools/elevenlabs-post-call
+ *
+ * Ingests post-call analytics from ElevenLabs without requiring an in-call tool call.
+ * This is intended for ElevenLabs' dedicated post-call webhook setting.
+ */
+router.post('/elevenlabs-post-call', async (req, res) => {
+  try {
+    const configuredSecret = process.env.ELEVENLABS_WEBHOOK_SECRET;
+    if (configuredSecret) {
+      const headerSecret = req.headers['x-webhook-secret'];
+      const authHeader = req.headers.authorization || '';
+      const bearerSecret = authHeader.toLowerCase().startsWith('bearer ')
+        ? authHeader.slice(7).trim()
+        : null;
+      const presentedSecret = headerSecret || bearerSecret;
+      if (presentedSecret !== configuredSecret) {
+        return res.status(401).json({ error: 'Invalid webhook secret', success: false });
+      }
+    }
+
+    const payload = req.body || {};
+    const callId = firstPresent(payload, ['call_id', 'call.id', 'conversation_id', 'conversation.id']);
+    const agentId = firstPresent(payload, ['agent_id', 'agent.id', 'assistant_id', 'metadata.agent_id']);
+    const scenarioId = firstPresent(payload, ['scenario_id', 'metadata.scenario_id', 'dynamic_variables.scenario_id']);
+    const receptionistId = firstPresent(payload, ['hired_receptionist_id', 'metadata.hired_receptionist_id']);
+    const callerPhone = firstPresent(payload, ['from_number', 'caller.phone_number', 'customer.phone_number', 'metadata.from_number']);
+    const calledPhone = firstPresent(payload, ['to_number', 'agent_phone_number', 'phone_number', 'metadata.to_number']);
+    const callerName = firstPresent(payload, ['caller_name', 'caller.name', 'customer.name', 'metadata.caller_name']);
+    const outcome = firstPresent(payload, ['outcome', 'analysis.outcome', 'call_outcome', 'status']) || 'info_only';
+    const durationSecondsRaw = firstPresent(payload, ['duration_seconds', 'call_duration_secs', 'duration', 'metadata.duration_seconds']);
+    const durationSeconds = durationSecondsRaw == null ? null : Math.round(Number(durationSecondsRaw));
+    const startedAt = parseOptionalDate(firstPresent(payload, ['started_at', 'call.started_at', 'start_time', 'metadata.started_at'])) || new Date().toISOString();
+    const endedAt = parseOptionalDate(firstPresent(payload, ['ended_at', 'call.ended_at', 'end_time', 'metadata.ended_at'])) || new Date().toISOString();
+    const summary = firstPresent(payload, ['summary', 'analysis.summary', 'conversation_summary', 'metadata.summary']);
+    const transcriptText = stringifyTranscript(firstPresent(payload, ['transcript', 'conversation.transcript', 'analysis.transcript']));
+
+    const receptionist = await lookupReceptionist({
+      receptionistId,
+      elevenlabsAgentId: agentId,
+      phoneNumber: calledPhone,
+    });
+
+    let resolvedCallerId = null;
+    if (callerPhone) {
+      const normalized = normalizePhone(String(callerPhone));
+      if (normalized) {
+        const people = await sbQuery('people', 'GET', null, `?phone=eq.${encodeURIComponent(normalized)}&limit=1`) || [];
+        if (people.length > 0) resolvedCallerId = people[0].id;
+      }
+    }
+
+    const callLogRow = {
+      caller_phone: callerPhone ? normalizePhone(String(callerPhone)) || String(callerPhone) : null,
+      caller_name: callerName || null,
+      caller_id: resolvedCallerId,
+      receptionist_id: receptionist?.id || receptionistId || null,
+      scenario_id: scenarioId || null,
+      started_at: startedAt,
+      ended_at: endedAt,
+      duration_seconds: Number.isFinite(durationSeconds) ? durationSeconds : null,
+      outcome: String(outcome || 'info_only').toLowerCase(),
+      appointment_id: firstPresent(payload, ['appointment_id', 'metadata.appointment_id']) || null,
+      notes: summary || (callId ? `ElevenLabs call ${callId}` : 'ElevenLabs post-call webhook'),
+      raw_transcript: transcriptText || JSON.stringify(payload),
+    };
+
+    const result = await sbQuery('call_logs', 'POST', callLogRow);
+    res.json({
+      success: true,
+      call_log: result?.[0] || callLogRow,
+    });
+  } catch (err) {
+    console.error('[TOOLS] elevenlabs-post-call failed:', err.message);
     res.status(500).json({ error: err.message, success: false });
   }
 });

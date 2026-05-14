@@ -7,7 +7,7 @@ import json
 from uuid import UUID
 from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, timezone, timedelta
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 # --- Logging Configuration ---
 # Sets the root logger to output INFO level messages.
@@ -39,6 +39,7 @@ from config import (
     TEST_MODE,
     STRIPE_LIVE_SECRET_KEY,
     STRIPE_TEST_SECRET_KEY,
+    elevenlabs_webhook_secret,
 )
 
  
@@ -173,6 +174,49 @@ class PaymentUpdateRequest(BaseModel):
 
 class PaymentTestModeRequest(BaseModel):
     enabled: bool
+
+INTENT_PHASES = ("entered", "completed", "failed")
+INTENT_KEY_ALIASES = {
+    "create_new_record": "create_record",
+    "delete_appointment": "cancel_appointment",
+    "send_to_phone_number": "send_sms",
+    "send_to_customer": "send_sms",
+}
+SUPPORTED_INTENT_KEYS = {
+    "call_customer",
+    "send_sms",
+    "search_records",
+    "create_record",
+    "update_record",
+    "delete_record",
+    "create_appointment",
+    "update_appointment",
+    "cancel_appointment",
+    "create_payment",
+    "create_payment_profile",
+    "create_invoice",
+    "send_invoice",
+    "update_payment",
+    "check_payment_status",
+    "issue_refund",
+    "send_email",
+    "add_tag",
+    "search_tags",
+    "update_tag",
+    "delete_tag",
+    "wait",
+    "intent_router",
+    "end_call",
+}
+
+class IntentCheckpointRequest(BaseModel):
+    intent_key: str
+    phase: Literal["entered", "completed", "failed"]
+    timestamp: Optional[datetime] = None
+    scenario_id: str
+
+    class Config:
+        populate_by_name = True
 
 # --------------------------------------------------------------------------
 # Middleware & Exception Handlers
@@ -370,6 +414,218 @@ def emit_payment_trigger(trigger_key: str, payload: dict):
         logging.debug("scenario_events insert skipped or failed: %s", exc)
     return trigger_payload
 
+def normalize_intent_key(intent_key: str) -> str:
+    normalized = (intent_key or "").strip().lower().replace(" ", "_").replace("-", "_")
+    return INTENT_KEY_ALIASES.get(normalized, normalized)
+
+def deep_get(data, path, default=None):
+    current = data
+    for part in path.split("."):
+        if isinstance(current, dict):
+            current = current.get(part)
+        else:
+            return default
+        if current is None:
+            return default
+    return current
+
+def first_present(data, *paths):
+    for path in paths:
+        value = deep_get(data, path)
+        if value is not None and value != "":
+            return value
+    return None
+
+def parse_optional_datetime(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(value, tz=timezone.utc)
+        except Exception:
+            return None
+    if isinstance(value, str):
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if normalized.endswith("Z"):
+            normalized = normalized[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(normalized)
+            return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+        except ValueError:
+            return None
+    return None
+
+def stringify_transcript(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, list):
+        parts = []
+        for item in value:
+            if isinstance(item, dict):
+                speaker = item.get("speaker") or item.get("role") or item.get("agent") or "speaker"
+                text = item.get("text") or item.get("message") or item.get("content") or ""
+                text = str(text).strip()
+                if text:
+                    parts.append(f"{speaker}: {text}")
+            else:
+                text = str(item).strip()
+                if text:
+                    parts.append(text)
+        return "\n".join(parts) or None
+    if isinstance(value, dict):
+        text = value.get("text") or value.get("transcript") or value.get("content")
+        if text:
+            return str(text).strip() or None
+        try:
+            return json.dumps(value)
+        except Exception:
+            return str(value)
+    return str(value)
+
+def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id=None, phone_number=None):
+    try:
+        if hired_receptionist_id:
+            response = (
+                supabase.table("hired_receptionists")
+                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id")
+                .eq("id", str(hired_receptionist_id))
+                .limit(1)
+                .execute()
+            )
+            if response.data:
+                return response.data[0]
+
+        if elevenlabs_agent_id:
+            response = (
+                supabase.table("hired_receptionists")
+                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id")
+                .eq("elevenlabs_voice_id", str(elevenlabs_agent_id))
+                .limit(1)
+                .execute()
+            )
+            if response.data:
+                return response.data[0]
+
+        if phone_number:
+            response = (
+                supabase.table("hired_receptionists")
+                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id")
+                .eq("phone_number", str(phone_number))
+                .limit(1)
+                .execute()
+            )
+            if response.data:
+                return response.data[0]
+    except Exception as exc:
+        logging.warning("Failed to match hired receptionist for call log: %s", exc)
+    return None
+
+def extract_call_log_from_elevenlabs_payload(payload: dict):
+    call_id = first_present(payload, "call_id", "call.id", "conversation_id", "conversation.id")
+    conversation_id = first_present(payload, "conversation_id", "conversation.id", "metadata.conversation_id")
+    elevenlabs_agent_id = first_present(payload, "agent_id", "agent.id", "assistant_id", "metadata.agent_id")
+    hired_receptionist_id = first_present(payload, "hired_receptionist_id", "metadata.hired_receptionist_id")
+    scenario_id = first_present(payload, "scenario_id", "metadata.scenario_id", "dynamic_variables.scenario_id")
+    from_number = first_present(payload, "from_number", "caller.phone_number", "customer.phone_number", "metadata.from_number")
+    to_number = first_present(payload, "to_number", "agent_phone_number", "phone_number", "metadata.to_number")
+    started_at = parse_optional_datetime(first_present(payload, "started_at", "call.started_at", "start_time", "metadata.started_at"))
+    ended_at = parse_optional_datetime(first_present(payload, "ended_at", "call.ended_at", "end_time", "metadata.ended_at"))
+
+    duration_seconds = first_present(
+        payload,
+        "duration_seconds",
+        "call_duration_secs",
+        "duration",
+        "metadata.duration_seconds",
+    )
+    try:
+        duration_seconds = int(float(duration_seconds)) if duration_seconds is not None else None
+    except (TypeError, ValueError):
+        duration_seconds = None
+
+    status_value = first_present(payload, "status", "call_status", "analysis.status")
+    outcome_value = first_present(payload, "outcome", "analysis.outcome", "call_outcome", "metadata.outcome")
+    summary_value = first_present(payload, "summary", "analysis.summary", "conversation_summary", "metadata.summary")
+    transcript_value = first_present(payload, "transcript", "conversation.transcript", "analysis.transcript")
+    sentiment_value = first_present(payload, "sentiment", "analysis.sentiment", "analysis.call_sentiment")
+
+    receptionist = lookup_hired_receptionist(
+        hired_receptionist_id=hired_receptionist_id,
+        elevenlabs_agent_id=elevenlabs_agent_id,
+        phone_number=to_number,
+    )
+
+    return {
+        "source": "elevenlabs",
+        "external_call_id": str(call_id) if call_id else None,
+        "conversation_id": str(conversation_id) if conversation_id else None,
+        "elevenlabs_agent_id": str(elevenlabs_agent_id) if elevenlabs_agent_id else None,
+        "hired_receptionist_id": receptionist.get("id") if receptionist else (str(hired_receptionist_id) if hired_receptionist_id else None),
+        "user_id": receptionist.get("user_id") if receptionist else None,
+        "receptionist_name": receptionist.get("full_name") if receptionist else None,
+        "scenario_id": str(scenario_id) if scenario_id else None,
+        "from_number": str(from_number) if from_number else None,
+        "to_number": str(to_number) if to_number else (receptionist.get("phone_number") if receptionist else None),
+        "started_at": started_at.isoformat() if started_at else None,
+        "ended_at": ended_at.isoformat() if ended_at else None,
+        "duration_seconds": duration_seconds,
+        "status": str(status_value) if status_value else None,
+        "outcome": str(outcome_value) if outcome_value else None,
+        "summary": str(summary_value) if summary_value else None,
+        "transcript_text": stringify_transcript(transcript_value),
+        "sentiment": str(sentiment_value) if sentiment_value else None,
+        "raw_payload": payload,
+    }
+
+def emit_intent_checkpoint(request: IntentCheckpointRequest):
+    normalized_intent_key = normalize_intent_key(request.intent_key)
+    if normalized_intent_key not in SUPPORTED_INTENT_KEYS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported intent_key: {request.intent_key}",
+        )
+
+    if request.timestamp:
+        checkpoint_ts = (
+            request.timestamp.replace(tzinfo=timezone.utc)
+            if request.timestamp.tzinfo is None
+            else request.timestamp.astimezone(timezone.utc)
+        )
+    else:
+        checkpoint_ts = datetime.now(timezone.utc)
+    payload = {
+        "intent_key": normalized_intent_key,
+        "phase": request.phase,
+        "timestamp": checkpoint_ts.isoformat(),
+        "scenario_id": str(request.scenario_id),
+    }
+    event_record = {
+        "trigger_key": "intent_checkpoint",
+        "payload": payload,
+        "created_at": checkpoint_ts.isoformat(),
+    }
+
+    logging.info("Intent checkpoint fired: %s", json.dumps(event_record, default=str))
+    try:
+        response = supabase.table("scenario_events").insert(event_record).execute()
+    except Exception as exc:
+        logging.error("Failed to persist intent checkpoint: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist intent checkpoint",
+        ) from exc
+
+    saved_event = response.data[0] if getattr(response, "data", None) else event_record
+    return {
+        "ok": True,
+        "checkpoint": payload,
+        "event": saved_event,
+    }
+
 def build_payment_row(
     *,
     amount: int,
@@ -455,6 +711,106 @@ def root():
 async def get_config_status():
     """Returns the current configuration status, like TEST_MODE."""
     return {"test_mode": TEST_MODE}
+
+@app.post("/api/tools/report-intent-checkpoint", tags=["Server Tools"])
+async def report_intent_checkpoint(request: IntentCheckpointRequest):
+    return emit_intent_checkpoint(request)
+
+@app.post("/api/webhooks/elevenlabs/post-call", tags=["Server Tools"])
+async def elevenlabs_post_call_webhook(
+    request: Request,
+    x_webhook_secret: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    if elevenlabs_webhook_secret:
+        bearer_secret = None
+        if authorization and authorization.lower().startswith("bearer "):
+            bearer_secret = authorization.split(" ", 1)[1].strip()
+        presented_secret = x_webhook_secret or bearer_secret
+        if presented_secret != elevenlabs_webhook_secret:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook secret")
+
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook payload must be a JSON object")
+
+    call_log = extract_call_log_from_elevenlabs_payload(payload)
+    logging.info("ElevenLabs post-call webhook received: %s", json.dumps(call_log, default=str))
+
+    try:
+        response = supabase.table("call_logs").insert(call_log).execute()
+    except Exception as exc:
+        logging.error("Failed to persist call log: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist call log",
+        ) from exc
+
+    saved = response.data[0] if getattr(response, "data", None) else call_log
+    return {"ok": True, "call_log": saved}
+
+@app.get("/api/sonar/call-logs", tags=["Sonar Calls"])
+async def list_call_logs(limit: int = 50, current_user: dict = Depends(get_current_user)):
+    safe_limit = max(1, min(limit, 200))
+    query = (
+        supabase.table("call_logs")
+        .select("*")
+        .eq("user_id", str(current_user.id))
+        .order("created_at", desc=True)
+        .limit(safe_limit)
+    )
+    response = query.execute()
+    return response.data or []
+
+@app.get("/api/sonar/call-logs/stats", tags=["Sonar Calls"])
+async def get_call_log_stats(current_user: dict = Depends(get_current_user)):
+    response = (
+        supabase.table("call_logs")
+        .select("id,hired_receptionist_id,receptionist_name,duration_seconds,status,outcome,created_at")
+        .eq("user_id", str(current_user.id))
+        .order("created_at", desc=True)
+        .limit(1000)
+        .execute()
+    )
+    rows = response.data or []
+
+    total_calls = len(rows)
+    completed_calls = sum(1 for row in rows if (row.get("status") or "").lower() in {"completed", "done", "success"})
+    failed_calls = sum(1 for row in rows if (row.get("status") or "").lower() in {"failed", "error"})
+    total_duration = sum(int(row.get("duration_seconds") or 0) for row in rows)
+
+    by_receptionist = {}
+    for row in rows:
+        receptionist_key = row.get("hired_receptionist_id") or row.get("receptionist_name") or "unknown"
+        if receptionist_key not in by_receptionist:
+            by_receptionist[receptionist_key] = {
+                "hired_receptionist_id": row.get("hired_receptionist_id"),
+                "receptionist_name": row.get("receptionist_name"),
+                "total_calls": 0,
+                "completed_calls": 0,
+                "failed_calls": 0,
+                "total_duration_seconds": 0,
+            }
+        bucket = by_receptionist[receptionist_key]
+        bucket["total_calls"] += 1
+        bucket["total_duration_seconds"] += int(row.get("duration_seconds") or 0)
+        status_value = (row.get("status") or "").lower()
+        if status_value in {"completed", "done", "success"}:
+            bucket["completed_calls"] += 1
+        if status_value in {"failed", "error"}:
+            bucket["failed_calls"] += 1
+
+    return {
+        "total_calls": total_calls,
+        "completed_calls": completed_calls,
+        "failed_calls": failed_calls,
+        "average_duration_seconds": round(total_duration / total_calls, 2) if total_calls else 0,
+        "by_receptionist": list(by_receptionist.values()),
+    }
 
 # --- Messages Endpoint for Queue ---
 @app.get("/messages/queue", response_model=List[QueueItemResponse], tags=["Messages"])
