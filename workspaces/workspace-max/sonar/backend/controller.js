@@ -60,6 +60,7 @@ class Controller {
     this.port = port;
     this.app = express();
     this.app.use(express.json({
+      limit: '5mb',
       verify: (req, res, buf) => {
         req.rawBody = buf;
       },
@@ -99,6 +100,21 @@ class Controller {
 
     // Setup routes
     this._setupRoutes();
+    this.app.use((err, req, res, next) => {
+      if (err?.type === 'entity.too.large') {
+        console.warn('[SONAR] Request too large:', {
+          path: req.path,
+          limit: err.limit,
+          length: err.length,
+        });
+        return res.status(413).json({
+          success: false,
+          error: 'Request body is too large',
+          hint: 'Remove large conversation history fields from checkpoint webhooks or send a shorter summary.',
+        });
+      }
+      return next(err);
+    });
     this._setupWebSocket();
 
 

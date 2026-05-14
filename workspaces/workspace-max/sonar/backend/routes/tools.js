@@ -16,6 +16,30 @@ function init(deps) {
   sbQuery = deps.sbQuery;
 }
 
+function compactValue(value, max = 160) {
+  if (value == null || value === '') return null;
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}... (${text.length} chars)`;
+}
+
+function summarizeCheckpointBody(body = {}) {
+  return {
+    checkpoint_id: body.checkpoint_id || null,
+    intent_key: body.intent_key || null,
+    phase: body.phase || null,
+    label: body.checkpoint_label || null,
+    parent: body.parent_intent_key || null,
+    scenario_id: body.scenario_id || null,
+    conversation_id: body.conversation_id || body.system_conversation_id || null,
+    direction: body.direction || null,
+    duration: body.duration ?? null,
+    sid: body.sid || null,
+    caller_id: body.caller_id || null,
+    conversation: body.conversation ? compactValue(body.conversation, 120) : null,
+  };
+}
+
 const INTENT_KEY_ALIASES = {
   create_new_record: 'create_record',
   intent_call_started: 'call_started',
@@ -1056,9 +1080,12 @@ router.post('/log-call-outcome', async (req, res) => {
  */
 router.post('/report-intent-checkpoint', async (req, res) => {
   try {
-    console.log('[TOOLS] checkpoint request body:', req.body || {});
+    console.log('[TOOLS] checkpoint request:', summarizeCheckpointBody(req.body || {}));
     const {
+      checkpoint_id,
       intent_key,
+      parent_intent_key,
+      checkpoint_label,
       phase,
       timestamp,
       scenario_id,
@@ -1066,6 +1093,11 @@ router.post('/report-intent-checkpoint', async (req, res) => {
       receptionist_id,
       call_id,
       conversation_id,
+      system_conversation_id,
+      direction,
+      duration,
+      sid,
+      caller_id,
       execution_id,
       session_id,
     } = req.body || {};
@@ -1093,14 +1125,22 @@ router.post('/report-intent-checkpoint', async (req, res) => {
       || null;
 
     const payload = {
+      checkpoint_id: checkpoint_id ? String(checkpoint_id) : null,
       intent_key: normalizedIntentKey,
+      parent_intent_key: parent_intent_key ? String(parent_intent_key) : null,
+      checkpoint_label: checkpoint_label ? String(checkpoint_label) : null,
       phase,
       timestamp: eventTimestamp,
       scenario_id: String(scenario_id),
       user_id: resolvedUserId ? String(resolvedUserId) : null,
       receptionist_id: resolvedReceptionistId != null ? Number(resolvedReceptionistId) : null,
       call_id: call_id ? String(call_id) : null,
-      conversation_id: conversation_id ? String(conversation_id) : null,
+      conversation_id: (conversation_id || system_conversation_id) ? String(conversation_id || system_conversation_id) : null,
+      system_conversation_id: system_conversation_id ? String(system_conversation_id) : null,
+      direction: direction ? String(direction).toLowerCase() : null,
+      duration: duration != null && duration !== '' ? Number(duration) : null,
+      sid: sid ? String(sid) : null,
+      caller_id: caller_id ? String(caller_id) : null,
       execution_id: execution_id ? String(execution_id) : null,
       session_id: session_id ? String(session_id) : null,
     };
@@ -1115,11 +1155,23 @@ router.post('/report-intent-checkpoint', async (req, res) => {
     };
 
     const result = await sbQuery('checkpoints', 'POST', eventRow);
-    console.log(`[TOOLS] 📍 checkpoint fired: ${normalizedIntentKey}.${phase} (scenario ${scenario_id})`);
-    res.json({
+    const savedEvent = result?.[0] || eventRow;
+    console.log('[TOOLS] checkpoint saved:', {
+      id: savedEvent?.id || null,
+      checkpoint_id: payload.checkpoint_id,
+      intent: `${normalizedIntentKey}.${phase}`,
+      label: payload.checkpoint_label,
+      direction: payload.direction,
+      conversation_id: payload.conversation_id,
+      scenario_id: payload.scenario_id,
+    });
+    return res.json({
       success: true,
-      checkpoint: payload,
-      event: result?.[0] || eventRow,
+      checkpoint_id: payload.checkpoint_id,
+      intent_key: payload.intent_key,
+      phase: payload.phase,
+      checkpoint_label: payload.checkpoint_label,
+      event_id: savedEvent?.id || null,
     });
   } catch (err) {
     console.error('[TOOLS] report-intent-checkpoint failed:', err.message);

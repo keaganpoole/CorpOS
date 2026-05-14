@@ -164,6 +164,7 @@ class ActionExecutor {
         receptionist_name: flowContext.receptionist?.first_name || 'Receptionist',
         receptionist_id: flowContext.receptionist?.id != null ? String(flowContext.receptionist.id) : '',
         customer_name: flowContext.customer?.first_name || flowContext.customer?.name || '',
+        direction: 'outgoing',
         flow_execution_id: flowContext._executionId || '',
         scenario_id: flowContext._scenario?.id || '',
         mission: node.actionConfig?.main_content || '',
@@ -243,6 +244,7 @@ class ActionExecutor {
         user_id: dynamicVars.user_id,
         receptionist_name: dynamicVars.receptionist_name,
         receptionist_id: dynamicVars.receptionist_id,
+        direction: dynamicVars.direction,
         scenario_id: dynamicVars.scenario_id,
         flow_execution_id: dynamicVars.flow_execution_id,
       });

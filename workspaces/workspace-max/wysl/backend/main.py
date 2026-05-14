@@ -256,6 +256,8 @@ class IntentCheckpointRequest(BaseModel):
     receptionist_id: Optional[str] = None
     call_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    system_conversation_id: Optional[str] = None
+    direction: Optional[str] = None
     execution_id: Optional[str] = None
     session_id: Optional[str] = None
 
@@ -649,7 +651,9 @@ def emit_intent_checkpoint(request: IntentCheckpointRequest):
         "user_id": str(request.user_id) if request.user_id else None,
         "receptionist_id": str(request.receptionist_id) if request.receptionist_id else None,
         "call_id": str(request.call_id) if request.call_id else None,
-        "conversation_id": str(request.conversation_id) if request.conversation_id else None,
+        "conversation_id": str(request.conversation_id or request.system_conversation_id) if (request.conversation_id or request.system_conversation_id) else None,
+        "system_conversation_id": str(request.system_conversation_id) if request.system_conversation_id else None,
+        "direction": str(request.direction).lower() if request.direction else None,
         "execution_id": str(request.execution_id) if request.execution_id else None,
         "session_id": str(request.session_id) if request.session_id else None,
     }

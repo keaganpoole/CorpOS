@@ -166,6 +166,13 @@ const scenarioDirection = (scenario) => {
   return 'outgoing';
 };
 
+const payloadDirection = (payload) => {
+  const direct = String(payload?.direction || payload?.call_direction || '').toLowerCase();
+  if (direct.includes('inbound') || direct.includes('incoming')) return 'incoming';
+  if (direct.includes('outbound') || direct.includes('outgoing')) return 'outgoing';
+  return null;
+};
+
 const mergeRank = { idle: 0, dimmed: 1, pulsing: 2, active: 3, partial: 4, completed: 5 };
 
 const strongerState = (a = 'idle', b = 'idle') => (
@@ -507,10 +514,11 @@ function useLiveSankeyState() {
       const scenarioId = String(payload.scenario_id || row?.scenario_id || '');
       if (!scenarioId || cancelled) return;
 
-      const scenario = await resolveScenario(scenarioId);
+      const directDirection = payloadDirection(payload);
+      const scenario = directDirection ? null : await resolveScenario(scenarioId);
       if (cancelled) return;
 
-      const sourceId = scenarioDirection(scenario) === 'incoming' ? 'incoming' : 'outgoing';
+      const sourceId = (directDirection || scenarioDirection(scenario)) === 'incoming' ? 'incoming' : 'outgoing';
       const sessionKey = sessionKeyForCheckpoint({ ...payload, scenario_id: scenarioId });
 
       if (intent === 'neutral') {
