@@ -115,6 +115,8 @@ const canonicalIntent = (intentKey) => {
   return INTENT_ALIASES[normalized] || normalized.replace(/^intent_/, '');
 };
 
+const domId = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '-');
+
 const rowPayload = (row) => row?.payload || row?.new?.payload || {};
 
 const checkpointTimestamp = (row) => (
@@ -393,12 +395,14 @@ function useLiveSankeyState() {
     nodeStates: {},
     activeNodeIds: [],
     activeLinkIds: [],
+    flowLines: [],
     version: 0,
   });
   const scenarioCacheRef = useRef(new Map());
   const sessionsRef = useRef(new Map());
   const historyRef = useRef([]);
   const seenCheckpointIdsRef = useRef(new Set());
+  const flowInstancesRef = useRef([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -424,6 +428,7 @@ function useLiveSankeyState() {
       const nodeStates = {};
       const activeNodeIds = new Set();
       const activeLinkIds = new Set();
+      const flowLines = [];
       const hasActiveSession = Array.from(sessionsRef.current.values()).some((session) => session.state !== 'history');
 
       const applyNode = (id, state) => {
@@ -442,8 +447,6 @@ function useLiveSankeyState() {
         applyNode(item.sourceId, 'dimmed');
         applyNode(item.middleId, 'dimmed');
         applyNode(item.targetId, item.completed ? 'completed' : 'dimmed');
-        applyLink(item.sourceLinkId, 'dimmed');
-        applyLink(item.targetLinkId, item.completed ? 'completed' : 'dimmed');
       });
 
       sessionsRef.current.forEach((session) => {
@@ -467,16 +470,20 @@ function useLiveSankeyState() {
         sankeyData.nodes.forEach((node) => {
           if (!nodeStates[node.id]) nodeStates[node.id] = 'dimmed';
         });
-        sankeyData.links.forEach((link) => {
-          if (!linkStates[link.id]) linkStates[link.id] = 'dimmed';
-        });
       }
+
+      flowInstancesRef.current.slice(-80).forEach((flow) => {
+        flowLines.push(flow);
+        applyLink(flow.sourceLinkId, flow.state);
+        applyLink(flow.targetLinkId, flow.state);
+      });
 
       setFlowState((prev) => ({
         linkStates,
         nodeStates,
         activeNodeIds: [...activeNodeIds],
         activeLinkIds: [...activeLinkIds],
+        flowLines,
         version: prev.version + 1,
       }));
     };
@@ -544,7 +551,24 @@ function useLiveSankeyState() {
         historyRef.current.push({ ...previous, completed: previous.phase === 'completed' });
       }
 
+      const flowId = previous?.flowId || `${sessionKey}:${intent}:${checkpointTimestamp(row)}`;
+
       const nextSession = {
+        scenarioId,
+        intent,
+        phase,
+        state: phase === 'completed' ? 'completed' : 'active',
+        sourceId,
+        middleId,
+        targetId,
+        sourceLinkId,
+        targetLinkId,
+        flowId,
+        timestamp: checkpointTimestamp(row),
+      };
+
+      const nextFlow = {
+        id: flowId,
         scenarioId,
         intent,
         phase,
@@ -556,6 +580,16 @@ function useLiveSankeyState() {
         targetLinkId,
         timestamp: checkpointTimestamp(row),
       };
+      const existingFlowIndex = flowInstancesRef.current.findIndex((flow) => flow.id === flowId);
+      if (existingFlowIndex >= 0) {
+        flowInstancesRef.current[existingFlowIndex] = {
+          ...flowInstancesRef.current[existingFlowIndex],
+          ...nextFlow,
+        };
+      } else {
+        flowInstancesRef.current.push(nextFlow);
+      }
+      flowInstancesRef.current = flowInstancesRef.current.slice(-80);
 
       sessionsRef.current.set(sessionKey, nextSession);
       if (phase === 'completed') {
@@ -714,6 +748,7 @@ function RealtimeSankey({ flowState }) {
       nodes: sankeyData.nodes.map((node) => ({ ...node })),
       links: sankeyData.links.map((link) => ({ ...link })),
     });
+    const graphLinkById = new Map(graph.links.map((link) => [link.id, link]));
 
     const field = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
@@ -764,7 +799,7 @@ function RealtimeSankey({ flowState }) {
       .delay(900)
       .style('opacity', Math.max(0.28, nodeOpacity('idle') * 0.9));
 
-    graphRef.current = { graph, width };
+    graphRef.current = { graph, graphLinkById, width };
     layersRef.current = { defs, linkLayer, nodeLayer: node };
   }, [dimensions]);
 
@@ -773,14 +808,60 @@ function RealtimeSankey({ flowState }) {
     const layers = layersRef.current;
     if (!graphRecord || !layers) return;
 
-    const { graph } = graphRecord;
+    const { graph, graphLinkById } = graphRecord;
     const { defs, linkLayer, nodeLayer } = layers;
-    const linkStates = flowState?.linkStates || {};
     const nodeStates = flowState?.nodeStates || {};
-    const linkState = (link) => linkStates[link.id] || 'idle';
+    const linkState = (link) => link.state || 'idle';
     const nodeState = (node) => nodeStates[node.id] || 'idle';
     const isVisibleLink = (link) => linkState(link) !== 'idle';
-    const visibleLinks = graph.links.filter(isVisibleLink);
+    const routeCounts = new Map();
+    (flowState?.flowLines || []).forEach((flow) => {
+      const routeKey = `${flow.sourceLinkId || ''}->${flow.targetLinkId || ''}`;
+      routeCounts.set(routeKey, (routeCounts.get(routeKey) || 0) + 1);
+    });
+    const routeIndexes = new Map();
+    const visibleLinks = (flowState?.flowLines || []).flatMap((flow) => {
+      const sourceLink = graphLinkById.get(flow.sourceLinkId);
+      if (!sourceLink) return [];
+      const targetLink = flow.targetLinkId ? graphLinkById.get(flow.targetLinkId) : null;
+      const routeKey = `${flow.sourceLinkId || ''}->${flow.targetLinkId || ''}`;
+      const routeIndex = routeIndexes.get(routeKey) || 0;
+      routeIndexes.set(routeKey, routeIndex + 1);
+      const routeTotal = routeCounts.get(routeKey) || 1;
+      const offset = (routeIndex - (routeTotal - 1) / 2) * Math.max(4, sourceLink.width * 0.22);
+
+      const sourceSegment = {
+        ...sourceLink,
+        id: `${flow.id}-source`,
+        source: sourceLink.source,
+        target: sourceLink.target,
+        y0: sourceLink.y0 + offset,
+        y1: sourceLink.y1 + offset,
+        width: sourceLink.width,
+        flowId: flow.id,
+        baseLinkId: flow.sourceLinkId,
+        state: flow.state,
+        phase: flow.phase,
+      };
+
+      if (!targetLink) return [sourceSegment];
+
+      const targetSegment = {
+        ...targetLink,
+        id: `${flow.id}-target`,
+        source: targetLink.source,
+        target: targetLink.target,
+        y0: sourceSegment.y1,
+        y1: targetLink.y1 + offset,
+        width: targetLink.width,
+        flowId: flow.id,
+        baseLinkId: flow.targetLinkId,
+        state: flow.state === 'completed' ? 'completed' : 'partial',
+        phase: flow.phase,
+      };
+
+      return [sourceSegment, targetSegment];
+    });
 
     const gradients = defs
       .selectAll('linearGradient.live-flow-gradient')
@@ -791,7 +872,7 @@ function RealtimeSankey({ flowState }) {
     const gradientsEnter = gradients.enter()
       .append('linearGradient')
       .attr('class', 'live-flow-gradient')
-      .attr('id', (link) => `live-monitoring-gradient-${link.id}`)
+      .attr('id', (link) => `live-monitoring-gradient-${domId(link.id)}`)
       .attr('gradientUnits', 'userSpaceOnUse');
 
     gradientsEnter.append('stop').attr('offset', '0%');
@@ -827,8 +908,8 @@ function RealtimeSankey({ flowState }) {
 
           group.append('path')
             .attr('d', sankeyLinkHorizontal())
-            .attr('id', (link) => `live-flow-path-${link.id}`)
-            .attr('stroke', (link) => `url(#live-monitoring-gradient-${link.id})`)
+            .attr('id', (link) => `live-flow-path-${domId(link.id)}`)
+            .attr('stroke', (link) => `url(#live-monitoring-gradient-${domId(link.id)})`)
             .attr('stroke-width', (link) => Math.max(1, link.width))
             .attr('stroke-opacity', 0)
             .attr('class', (link) => `live-monitoring-sankey-link live-link-${linkState(link)}`)
@@ -843,11 +924,9 @@ function RealtimeSankey({ flowState }) {
 
     linkGroup.select('path')
       .attr('d', sankeyLinkHorizontal())
-      .attr('stroke', (link) => `url(#live-monitoring-gradient-${link.id})`)
+      .attr('stroke', (link) => `url(#live-monitoring-gradient-${domId(link.id)})`)
       .attr('stroke-width', (link) => Math.max(1, link.width))
       .attr('class', (link) => `live-monitoring-sankey-link live-link-${linkState(link)}`)
-      .transition()
-      .duration(240)
       .attr('stroke-opacity', (link) => linkOpacity(linkState(link)));
 
     linkGroup.select('path').each(function animatePath(_, index) {
@@ -855,6 +934,7 @@ function RealtimeSankey({ flowState }) {
       const state = linkState(datum);
       const length = this.getTotalLength();
       const path = d3.select(this);
+      path.attr('stroke-opacity', linkOpacity(state));
       if (state === 'partial') {
         path
           .attr('stroke-dasharray', `${length * 0.56} ${length}`)
@@ -865,7 +945,7 @@ function RealtimeSankey({ flowState }) {
         this.dataset.liveAnimated = 'true';
         path
           .attr('stroke-dasharray', `${length} ${length}`)
-          .attr('stroke-dashoffset', length)
+          .attr('stroke-dashoffset', 0)
           .transition()
           .duration(850)
           .delay(index * 18)
@@ -896,14 +976,14 @@ function RealtimeSankey({ flowState }) {
             .attr('begin', ({ offset }) => `${offset * 0.7}s`)
             .attr('repeatCount', 'indefinite')
             .append('mpath')
-            .attr('href', ({ link }) => `#live-flow-path-${link.id}`);
+            .attr('href', ({ link }) => `#live-flow-path-${domId(link.id)}`);
 
           return particle;
         },
         (update) => {
           update.attr('fill', ({ link }) => nodeColor(link.target));
           update.select('mpath')
-            .attr('href', ({ link }) => `#live-flow-path-${link.id}`);
+            .attr('href', ({ link }) => `#live-flow-path-${domId(link.id)}`);
           return update;
         },
         (exit) => exit.remove()
@@ -925,19 +1005,19 @@ function RealtimeSankey({ flowState }) {
 
     nodeLayer
       .on('mouseenter', (event, hoveredNode) => {
-        const connectedLinks = new Set([...hoveredNode.sourceLinks, ...hoveredNode.targetLinks]);
-
         currentPaths().transition().duration(180)
           .style('stroke-opacity', (link) => {
             if (!isVisibleLink(link)) return 0;
-            return connectedLinks.has(link) ? OPACITY.linkHover : OPACITY.linkDimmed;
+            return link.source === hoveredNode || link.target === hoveredNode ? OPACITY.linkHover : OPACITY.linkDimmed;
           });
 
         nodeLayer.transition().duration(180)
           .style('opacity', (candidate) => {
             const connected = candidate === hoveredNode
-              || hoveredNode.sourceLinks.some((link) => link.target === candidate)
-              || hoveredNode.targetLinks.some((link) => link.source === candidate);
+              || visibleLinks.some((link) => (
+                (link.source === hoveredNode && link.target === candidate)
+                || (link.target === hoveredNode && link.source === candidate)
+              ));
             return connected ? 1 : OPACITY.nodeDimmed;
           });
       })
