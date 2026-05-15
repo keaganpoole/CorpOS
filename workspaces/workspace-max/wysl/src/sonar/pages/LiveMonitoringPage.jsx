@@ -21,6 +21,7 @@ const OPACITY = {
   linkInitial: 0.5,
   linkHover: 0.95,
   linkDimmed: 0.1,
+  linkHistory: 0.34,
   nodeDimmed: 0.3,
 };
 
@@ -112,7 +113,9 @@ const LINK_BY_ROUTE = Object.fromEntries(sankeyData.links.map((link) => {
 
 const canonicalIntent = (intentKey) => {
   const normalized = String(intentKey || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
-  return INTENT_ALIASES[normalized] || normalized.replace(/^intent_/, '');
+  const withoutIntentPrefix = normalized.replace(/^intent_/, '');
+  const withoutPhaseSuffix = withoutIntentPrefix.replace(/_(entered|completed|failed)$/, '');
+  return INTENT_ALIASES[normalized] || INTENT_ALIASES[withoutIntentPrefix] || INTENT_ALIASES[withoutPhaseSuffix] || withoutPhaseSuffix;
 };
 
 const domId = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -200,7 +203,7 @@ const payloadDirection = (payload) => {
   return null;
 };
 
-const mergeRank = { idle: 0, dimmed: 1, pulsing: 2, active: 3, partial: 4, completed: 5 };
+const mergeRank = { idle: 0, dimmed: 1, history: 1, pulsing: 2, active: 3, partial: 4, completed: 5 };
 
 const strongerState = (a = 'idle', b = 'idle') => (
   (mergeRank[b] || 0) > (mergeRank[a] || 0) ? b : a
@@ -497,15 +500,15 @@ function useLiveSankeyState() {
 
       flowInstancesRef.current.slice(-160).forEach((flow) => {
         const isLatest = flow.conversationId === latestConversationId;
-        const renderState = isLatest ? flow.baseState : 'dimmed';
+        const renderState = isLatest ? flow.baseState : 'history';
         const activeNodeState = renderState === 'completed' ? 'completed' : 'active';
         const renderedFlow = { ...flow, state: renderState };
         flowLines.push(renderedFlow);
 
-        applyNode(renderedFlow.sourceId, renderState === 'dimmed' ? 'dimmed' : activeNodeState);
-        applyNode(renderedFlow.middleId, renderState === 'dimmed' ? 'dimmed' : activeNodeState);
+        applyNode(renderedFlow.sourceId, renderState === 'history' ? 'dimmed' : activeNodeState);
+        applyNode(renderedFlow.middleId, renderState === 'history' ? 'dimmed' : activeNodeState);
         if (renderedFlow.targetId) {
-          applyNode(renderedFlow.targetId, renderState);
+          applyNode(renderedFlow.targetId, renderState === 'history' ? 'dimmed' : renderState);
         }
         applyLink(renderedFlow.sourceLinkId, renderState);
         applyLink(renderedFlow.targetLinkId, renderState === 'active' ? 'partial' : renderState);
@@ -538,7 +541,6 @@ function useLiveSankeyState() {
     const applyCheckpoint = async (row, options = {}) => {
       const identity = checkpointIdentity(row);
       if (seenCheckpointIdsRef.current.has(identity)) return;
-      seenCheckpointIdsRef.current.add(identity);
 
       const payload = rowPayload(row);
       const intent = canonicalIntent(payload.intent_key);
@@ -549,6 +551,7 @@ function useLiveSankeyState() {
       const directDirection = payloadDirection(payload);
       const scenario = directDirection ? null : await resolveScenario(scenarioId);
       if (cancelled) return;
+      seenCheckpointIdsRef.current.add(identity);
 
       const sourceId = (directDirection || scenarioDirection(scenario)) === 'incoming' ? 'incoming' : 'outgoing';
       const conversationId = conversationKeyForCheckpoint({ ...payload, scenario_id: scenarioId }, row);
@@ -719,6 +722,7 @@ function RealtimeSankey({ flowState }) {
   const graphRef = useRef(null);
   const layersRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [graphVersion, setGraphVersion] = useState(0);
 
   useEffect(() => {
     const target = containerRef.current;
@@ -737,6 +741,7 @@ function RealtimeSankey({ flowState }) {
   const linkOpacity = (state) => ({
     idle: 0,
     dimmed: OPACITY.linkDimmed,
+    history: OPACITY.linkHistory,
     active: OPACITY.linkHover,
     partial: OPACITY.linkHover,
     completed: OPACITY.linkHover,
@@ -879,6 +884,7 @@ function RealtimeSankey({ flowState }) {
 
     graphRef.current = { graph, graphLinkById, width };
     layersRef.current = { defs, linkLayer, nodeLayer: node };
+    setGraphVersion((version) => version + 1);
   }, [dimensions]);
 
   useEffect(() => {
@@ -936,7 +942,7 @@ function RealtimeSankey({ flowState }) {
         visualWidth: sourceSegment.visualWidth,
         flowId: flow.id,
         baseLinkId: flow.targetLinkId,
-        state: flow.state === 'dimmed' ? 'dimmed' : (flow.state === 'completed' ? 'completed' : 'partial'),
+        state: ['dimmed', 'history'].includes(flow.state) ? flow.state : (flow.state === 'completed' ? 'completed' : 'partial'),
         phase: flow.phase,
       };
 
@@ -1075,7 +1081,7 @@ function RealtimeSankey({ flowState }) {
         return;
       }
 
-      if (state === 'completed' || state === 'dimmed') {
+      if (state === 'completed' || state === 'dimmed' || state === 'history') {
         path.attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
       }
       this.dataset.liveState = state;
@@ -1142,7 +1148,7 @@ function RealtimeSankey({ flowState }) {
           .style('stroke-opacity', (link) => linkOpacity(linkState(link)));
         tooltip.style('opacity', 0);
       });
-  }, [flowState?.version, dimensions]);
+  }, [flowState?.version, dimensions, graphVersion]);
 
   return (
     <section ref={containerRef} className="live-sankey-shell">

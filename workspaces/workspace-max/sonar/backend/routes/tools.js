@@ -1151,6 +1151,17 @@ router.post('/report-intent-checkpoint', async (req, res) => {
       scenario_id: String(scenario_id),
       trigger_key: 'intent_checkpoint',
       payload,
+      intent_key: payload.intent_key,
+      parent_intent_key: payload.parent_intent_key,
+      phase: payload.phase,
+      timestamp: payload.timestamp,
+      conversation_id: payload.conversation_id,
+      direction: payload.direction,
+      duration: payload.duration,
+      sid: payload.sid,
+      caller_id: payload.caller_id,
+      execution_id: payload.execution_id,
+      session_id: payload.session_id,
       created_at: eventTimestamp,
     };
 
