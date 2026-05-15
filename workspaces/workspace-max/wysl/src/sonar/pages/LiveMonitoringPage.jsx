@@ -257,10 +257,10 @@ const addDays = (date, days) => {
 
 const percentChange = (current, previous) => {
   if (!previous && !current) return '0%';
-  if (!previous) return '+100%';
+  if (!previous) return `+${Math.round(current * 100)}%`;
   const pct = ((current - previous) / previous) * 100;
   const sign = pct > 0 ? '+' : '';
-  return `${sign}${pct.toFixed(1)}%`;
+  return `${sign}${Math.round(pct)}%`;
 };
 
 const safeDate = (value) => {
@@ -268,15 +268,17 @@ const safeDate = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const bucketSeries = (rows, valueForRow = () => 1) => {
-  const buckets = [...TEN_ZERO_BUCKETS];
-  const now = new Date();
-  const start = new Date(now.getTime() - 9 * 60 * 60 * 1000);
+const bucketSeries = (rows, valueForRow = () => 1, start = null, bucketCount = 10, end = new Date()) => {
+  const buckets = Array.from({ length: bucketCount }, () => 0);
+  const windowEnd = safeDate(end) || new Date();
+  const windowStart = safeDate(start) || new Date(windowEnd.getTime() - ((bucketCount - 1) * 60 * 60 * 1000));
+  const span = Math.max(1, windowEnd.getTime() - windowStart.getTime());
 
   for (const row of rows || []) {
     const dt = safeDate(row.created_at || row.started_at);
-    if (!dt || dt < start || dt > now) continue;
-    const idx = Math.min(9, Math.max(0, Math.floor((dt - start) / (60 * 60 * 1000))));
+    if (!dt || dt < windowStart || dt > windowEnd) continue;
+    const relative = (dt.getTime() - windowStart.getTime()) / span;
+    const idx = Math.min(bucketCount - 1, Math.max(0, Math.floor(relative * bucketCount)));
     buckets[idx] += valueForRow(row);
   }
 
@@ -363,23 +365,22 @@ function useLiveAnalytics() {
     let cancelled = false;
     let refreshTimer = null;
 
-    const todayStart = startOfLocalDay(new Date());
-    const tomorrowStart = addDays(todayStart, 1);
-    const yesterdayStart = addDays(todayStart, -1);
-    const since = yesterdayStart.toISOString();
-
-    const betweenToday = (row) => {
-      const dt = safeDate(row.created_at || row.started_at);
-      return dt && dt >= todayStart && dt < tomorrowStart;
-    };
-
-    const betweenYesterday = (row) => {
-      const dt = safeDate(row.created_at || row.started_at);
-      return dt && dt >= yesterdayStart && dt < todayStart;
-    };
-
     const fetchAnalytics = async () => {
       try {
+        const now = new Date();
+        const weekStart = startOfCurrentLocalWeek();
+        const nextWeekStart = addDays(weekStart, 7);
+        const previousWeekStart = addDays(weekStart, -7);
+        const since = previousWeekStart.toISOString();
+        const inCurrentWeek = (row) => {
+          const dt = safeDate(row.created_at || row.started_at);
+          return dt && dt >= weekStart && dt < nextWeekStart;
+        };
+        const inPreviousWeek = (row) => {
+          const dt = safeDate(row.created_at || row.started_at);
+          return dt && dt >= previousWeekStart && dt < weekStart;
+        };
+
         const [callsRes, appointmentsRes, customersRes, paymentsRes] = await Promise.all([
           supabase.from('call_logs').select('id,created_at,started_at').gte('created_at', since),
           supabase.from('appointments').select('id,created_at,status').gte('created_at', since),
@@ -396,37 +397,37 @@ function useLiveAnalytics() {
           ['succeeded', 'paid', 'completed'].includes(String(row.status || '').toLowerCase())
         ));
 
-        const todayCalls = calls.filter(betweenToday);
-        const yesterdayCalls = calls.filter(betweenYesterday);
-        const todayAppointments = appointments.filter(betweenToday);
-        const yesterdayAppointments = appointments.filter(betweenYesterday);
-        const todayCustomers = customers.filter(betweenToday);
-        const yesterdayCustomers = customers.filter(betweenYesterday);
-        const todayRevenueRows = revenuePayments.filter(betweenToday);
-        const yesterdayRevenueRows = revenuePayments.filter(betweenYesterday);
-        const todayRevenue = todayRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
-        const yesterdayRevenue = yesterdayRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
+        const currentWeekCalls = calls.filter(inCurrentWeek);
+        const previousWeekCalls = calls.filter(inPreviousWeek);
+        const currentWeekAppointments = appointments.filter(inCurrentWeek);
+        const previousWeekAppointments = appointments.filter(inPreviousWeek);
+        const currentWeekCustomers = customers.filter(inCurrentWeek);
+        const previousWeekCustomers = customers.filter(inPreviousWeek);
+        const currentWeekRevenueRows = revenuePayments.filter(inCurrentWeek);
+        const previousWeekRevenueRows = revenuePayments.filter(inPreviousWeek);
+        const currentWeekRevenue = currentWeekRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
+        const previousWeekRevenue = previousWeekRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
 
         const byKey = {
           calls: {
-            value: todayCalls.length,
-            delta: percentChange(todayCalls.length, yesterdayCalls.length),
-            series: bucketSeries(todayCalls),
+            value: currentWeekCalls.length,
+            delta: percentChange(currentWeekCalls.length, previousWeekCalls.length),
+            series: bucketSeries(currentWeekCalls, () => 1, weekStart, 7, now),
           },
           appointments: {
-            value: todayAppointments.length,
-            delta: percentChange(todayAppointments.length, yesterdayAppointments.length),
-            series: bucketSeries(todayAppointments),
+            value: currentWeekAppointments.length,
+            delta: percentChange(currentWeekAppointments.length, previousWeekAppointments.length),
+            series: bucketSeries(currentWeekAppointments, () => 1, weekStart, 7, now),
           },
           customers: {
-            value: todayCustomers.length,
-            delta: percentChange(todayCustomers.length, yesterdayCustomers.length),
-            series: bucketSeries(todayCustomers),
+            value: currentWeekCustomers.length,
+            delta: percentChange(currentWeekCustomers.length, previousWeekCustomers.length),
+            series: bucketSeries(currentWeekCustomers, () => 1, weekStart, 7, now),
           },
           revenue: {
-            value: todayRevenue,
-            delta: percentChange(todayRevenue, yesterdayRevenue),
-            series: bucketSeries(todayRevenueRows, paymentValue),
+            value: currentWeekRevenue,
+            delta: percentChange(currentWeekRevenue, previousWeekRevenue),
+            series: bucketSeries(currentWeekRevenueRows, paymentValue, weekStart, 7, now),
           },
         };
 
