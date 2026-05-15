@@ -295,6 +295,143 @@ const formatValue = (item, value) => {
   return `${item.prefix || ''}${body}`;
 };
 
+const formatTooltipTime = (value) => {
+  const parsed = safeDate(value);
+  if (!parsed) return null;
+  return parsed.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const formatTooltipDuration = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  const rounded = Math.round(numeric);
+  if (rounded < 60) return `${rounded}s`;
+  const minutes = Math.floor(rounded / 60);
+  const seconds = rounded % 60;
+  if (!seconds) return `${minutes}m`;
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remainderMinutes = minutes % 60;
+    if (!remainderMinutes) return `${hours}h`;
+    return `${hours}h ${remainderMinutes}m`;
+  }
+  return `${minutes}m ${seconds}s`;
+};
+
+const titleCaseWords = (value) => String(value || '')
+  .split(/[\s_-]+/)
+  .filter(Boolean)
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+  .join(' ');
+
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const compactIdentifier = (value, { tail = 8 } = {}) => {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (text.length <= tail + 4) return text;
+  return `...${text.slice(-tail)}`;
+};
+
+const buildTooltipRows = (flow, link) => {
+  const details = flow?.details || {};
+  const rows = [];
+  const direction = flow?.sourceId === 'incoming' ? 'incoming' : 'outgoing';
+  const primaryName = direction === 'incoming'
+    ? (details.callerName || null)
+    : (details.customerName || details.callerName || null);
+  const primaryPhone = direction === 'incoming'
+    ? (details.callerPhone || null)
+    : (details.customerPhone || details.callerPhone || null);
+
+  if (primaryName) {
+    rows.push({ label: direction === 'incoming' ? 'Caller' : 'Contact', value: primaryName });
+  }
+  if (primaryPhone) {
+    rows.push({ label: 'Phone', value: primaryPhone, mono: true });
+  }
+  if (direction === 'incoming' && details.callerId) {
+    rows.push({ label: 'Caller ID', value: compactIdentifier(details.callerId), mono: true });
+  }
+  if (details.appointmentId && (link?.target?.id?.includes('appointment') || flow?.middleId === 'appointments')) {
+    rows.push({ label: 'Appointment', value: compactIdentifier(details.appointmentId), mono: true });
+  }
+  if (details.duration) {
+    const formattedDuration = formatTooltipDuration(details.duration);
+    if (formattedDuration) rows.push({ label: 'Length', value: formattedDuration });
+  }
+  if (flow?.phase === 'failed') {
+    rows.push({ label: 'Status', value: 'Failed' });
+  } else if (flow?.phase === 'entered') {
+    rows.push({ label: 'Status', value: 'In Progress' });
+  }
+
+  if (!rows.length && details.callId) {
+    rows.push({ label: 'Call', value: compactIdentifier(details.callId), mono: true });
+  } else if (!rows.length && details.conversationId) {
+    rows.push({ label: 'Session', value: compactIdentifier(details.conversationId), mono: true });
+  } else if (!rows.length && details.executionId) {
+    rows.push({ label: 'Run', value: compactIdentifier(details.executionId), mono: true });
+  } else if (!rows.length && details.sessionId) {
+    rows.push({ label: 'Session', value: compactIdentifier(details.sessionId), mono: true });
+  }
+
+  return rows.slice(0, 4);
+};
+
+const renderFlowTooltip = (link) => {
+  const flow = link?.flow || {};
+  const details = flow.details || {};
+  const timestampLabel = formatTooltipTime(details.timestamp || flow.timestamp);
+  const checkpointLabel = details.checkpointLabel
+    ? titleCaseWords(details.checkpointLabel)
+    : titleCaseWords(flow.intent || '');
+  const rows = buildTooltipRows(flow, link);
+  const badge = flow.phase === 'failed'
+    ? '<span class="live-tooltip-chip live-tooltip-chip-failed">Failed</span>'
+    : flow.phase === 'entered'
+      ? '<span class="live-tooltip-chip">Live</span>'
+      : '';
+  const rowsHtml = rows.length
+    ? `
+      <div class="live-tooltip-grid">
+        ${rows.map((row) => `
+          <div class="live-tooltip-row">
+            <span class="live-tooltip-key">${escapeHtml(row.label)}</span>
+            <span class="live-tooltip-val${row.mono ? ' live-tooltip-val-mono' : ''}">${escapeHtml(row.value)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `
+    : '';
+
+  return `
+    <div class="live-tooltip-card">
+      <div class="live-tooltip-topline">
+        <span class="live-tooltip-kicker">${escapeHtml(checkpointLabel || 'Flow')}</span>
+        <div class="live-tooltip-meta">
+          ${badge}
+          ${timestampLabel ? `<span class="live-tooltip-time">${escapeHtml(timestampLabel)}</span>` : ''}
+        </div>
+      </div>
+      <div class="live-tooltip-route">
+        <span style="color:${nodeColor(link.source)}">${escapeHtml(link.source.name)}</span>
+        <span class="live-tooltip-arrow">&rarr;</span>
+        <span style="color:${nodeColor(link.target)}">${escapeHtml(link.target.name)}</span>
+      </div>
+      ${rowsHtml}
+    </div>
+  `;
+};
+
 const sparklinePoints = (series) => {
   const width = 116;
   const height = 42;
@@ -651,6 +788,21 @@ function useLiveSankeyState() {
         sourceLinkId,
         targetLinkId,
         timestamp: checkpointTimestamp(row),
+        details: {
+          checkpointLabel: payload.checkpoint_label || null,
+          timestamp: checkpointTimestamp(row),
+          duration: payload.duration ?? null,
+          callerId: payload.caller_id || null,
+          callerName: payload.caller_name || null,
+          callerPhone: payload.caller_phone || payload.from_number || null,
+          customerName: payload.customer_name || null,
+          customerPhone: payload.customer_phone || null,
+          appointmentId: payload.appointment_id || null,
+          callId: payload.call_id || null,
+          conversationId: payload.conversation_id || payload.system_conversation_id || null,
+          executionId: payload.execution_id || null,
+          sessionId: payload.session_id || null,
+        },
       };
       const existingFlowIndex = flowInstancesRef.current.findIndex((flow) => flow.id === flowId);
       if (existingFlowIndex >= 0) {
@@ -1047,6 +1199,7 @@ function RealtimeSankey({ flowState }) {
         width: visualWidth,
         visualWidth,
         flowId: flow.id,
+        flow,
         baseLinkId: flow.sourceLinkId,
         state: flow.state,
         phase: flow.phase,
@@ -1066,6 +1219,7 @@ function RealtimeSankey({ flowState }) {
         width: sourceSegment.width,
         visualWidth: sourceSegment.visualWidth,
         flowId: flow.id,
+        flow,
         baseLinkId: flow.targetLinkId,
         state: ['dimmed', 'history'].includes(flow.state) ? flow.state : (flow.state === 'completed' ? 'completed' : 'partial'),
         phase: flow.phase,
@@ -1344,11 +1498,7 @@ function RealtimeSankey({ flowState }) {
 
         tooltip
           .style('opacity', 1)
-          .html(`
-            <div style="font-weight:800;color:${nodeColor(link.source)}">${link.source.name}</div>
-            <div style="margin:5px 0;color:#555">to</div>
-            <div style="font-weight:800;color:${nodeColor(link.target)}">${link.target.name}</div>
-          `);
+          .html(renderFlowTooltip(link));
       })
       .on('mousemove', (event) => {
         tooltip
@@ -1573,19 +1723,114 @@ export default function LiveMonitoringPage() {
           pointer-events: none;
           position: fixed;
           z-index: 50;
-          min-width: 140px;
+          min-width: 220px;
+          max-width: 280px;
           opacity: 0;
-          border-radius: 9px;
+          border-radius: 12px;
           border: 1px solid rgba(255,255,255,0.08);
-          background: rgba(9,9,11,0.92);
-          box-shadow: 0 0 30px rgba(0,0,0,0.8);
+          background: linear-gradient(180deg, rgba(9,9,11,0.96), rgba(6,6,8,0.94));
+          box-shadow: 0 18px 46px rgba(0,0,0,0.62);
           color: white;
-          padding: 14px;
+          padding: 12px 13px;
           font-size: 10px;
           font-weight: 700;
-          text-transform: uppercase;
           backdrop-filter: blur(18px);
           transition: opacity 160ms ease;
+        }
+
+        .live-tooltip-card {
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+
+        .live-tooltip-topline {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .live-tooltip-meta {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .live-tooltip-kicker,
+        .live-tooltip-time,
+        .live-tooltip-key {
+          color: #6b7280;
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .live-tooltip-time {
+          letter-spacing: 0.04em;
+        }
+
+        .live-tooltip-route {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+          font-weight: 800;
+          line-height: 1.2;
+        }
+
+        .live-tooltip-arrow {
+          color: #52525b;
+          font-size: 10px;
+        }
+
+        .live-tooltip-grid {
+          display: grid;
+          gap: 6px;
+          padding-top: 8px;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .live-tooltip-row {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .live-tooltip-val {
+          color: #f4f4f5;
+          font-size: 10px;
+          font-weight: 700;
+          text-align: right;
+        }
+
+        .live-tooltip-val-mono {
+          font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+          color: #d4d4d8;
+        }
+
+        .live-tooltip-chip {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          border: 1px solid rgba(6,182,212,0.28);
+          background: rgba(6,182,212,0.1);
+          color: #67e8f9;
+          padding: 2px 6px;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .live-tooltip-chip-failed {
+          border-color: rgba(244,63,94,0.26);
+          background: rgba(244,63,94,0.1);
+          color: #fda4af;
         }
       `}</style>
 
