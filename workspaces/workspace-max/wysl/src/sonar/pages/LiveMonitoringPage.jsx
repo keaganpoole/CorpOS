@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import * as d3 from 'd3';
-import { sankey, sankeyJustify, sankeyLinkHorizontal } from 'd3-sankey';
+import { sankey, sankeyJustify } from 'd3-sankey';
 import {
   CalendarDays,
   CreditCard,
@@ -121,8 +121,38 @@ const canonicalIntent = (intentKey) => {
 const domId = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '-');
 
 const moneyTableStrokeWidth = (link) => (
-  Math.max(1, Math.min(3.25, (link?.visualWidth || link?.width || 1) / 1.5))
+  Math.max(3, Math.min(9.75, ((link?.visualWidth || link?.width || 1) / 1.5) * 3))
 );
+
+const relaxedSankeyPath = (link) => {
+  const sourceX = link.source.x1;
+  const targetX = link.target.x0;
+  const sourceY = link.y0;
+  const targetY = link.y1;
+  const span = Math.max(1, targetX - sourceX);
+  const verticalDelta = targetY - sourceY;
+  const calmness = Math.max(0, Math.min(1, Math.abs(verticalDelta) / 260));
+  const lead = span * (0.48 + calmness * 0.08);
+  const carry = span * (0.52 + calmness * 0.08);
+  const lift = verticalDelta * 0.08;
+
+  return [
+    `M${sourceX},${sourceY}`,
+    `C${sourceX + lead},${sourceY + lift}`,
+    `${targetX - carry},${targetY - lift}`,
+    `${targetX},${targetY}`,
+  ].join(' ');
+};
+
+const stableUnit = (value) => {
+  let hash = 2166136261;
+  const input = String(value || '');
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+};
 
 const rowPayload = (row) => {
   const record = row?.new || row || {};
@@ -748,13 +778,13 @@ function RealtimeSankey({ flowState }) {
   }[state] ?? OPACITY.linkInitial);
 
   const nodeOpacity = (state) => ({
-    idle: 0.55,
-    dimmed: 0.18,
+    idle: 0.72,
+    dimmed: 0.36,
     pulsing: 1,
-    active: 0.92,
-    partial: 0.92,
+    active: 1,
+    partial: 1,
     completed: 1,
-  }[state] ?? 0.55);
+  }[state] ?? 0.72);
 
   useEffect(() => {
     if (!dimensions.width || !dimensions.height) return;
@@ -882,7 +912,7 @@ function RealtimeSankey({ flowState }) {
       .delay(900)
       .style('opacity', Math.max(0.28, nodeOpacity('idle') * 0.9));
 
-    graphRef.current = { graph, graphLinkById, width };
+    graphRef.current = { graph, graphLinkById, width, height };
     layersRef.current = { defs, linkLayer, nodeLayer: node };
     setGraphVersion((version) => version + 1);
   }, [dimensions]);
@@ -892,62 +922,206 @@ function RealtimeSankey({ flowState }) {
     const layers = layersRef.current;
     if (!graphRecord || !layers) return;
 
-    const { graph, graphLinkById } = graphRecord;
+    const { graph, graphLinkById, height: flowFieldHeight = dimensions.height } = graphRecord;
     const { defs, linkLayer, nodeLayer } = layers;
     const nodeStates = flowState?.nodeStates || {};
     const linkState = (link) => link.state || 'idle';
     const nodeState = (node) => nodeStates[node.id] || 'idle';
     const isVisibleLink = (link) => linkState(link) !== 'idle';
+    const effectiveLinkOpacity = (link) => linkOpacity(linkState(link));
+    const linkBlendMode = () => 'screen';
+    const calmLinkOpacity = (link) => {
+      const state = linkState(link);
+      const base = effectiveLinkOpacity(link);
+      if (state === 'history') return Math.max(0.22, base * 0.82);
+      if (state === 'dimmed') return Math.max(0.06, base * 0.8);
+      return base;
+    };
+    const flowNodesById = new Map();
     const routeCounts = new Map();
+    const nodeTouchCounts = new Map();
     (flowState?.flowLines || []).forEach((flow) => {
       const routeKey = `${flow.sourceLinkId || ''}->${flow.targetLinkId || ''}`;
       routeCounts.set(routeKey, (routeCounts.get(routeKey) || 0) + 1);
+      const flowNodeIds = [flow.sourceId, flow.middleId, flow.targetId].filter(Boolean);
+      flowNodesById.set(flow.id, new Set(flowNodeIds));
+      flowNodeIds.forEach((nodeId) => {
+        nodeTouchCounts.set(nodeId, (nodeTouchCounts.get(nodeId) || 0) + 1);
+      });
     });
+
+    const naturalY = (node, fallbackY, width, routeLane, routeTotal, seedKey) => {
+      if (!node) return fallbackY;
+      const inset = Math.max(5, moneyTableStrokeWidth({ width }) / 2);
+      const min = node.y0 + inset;
+      const max = node.y1 - inset;
+      const center = node.y0 + (node.y1 - node.y0) / 2;
+      if (min >= max) return center;
+
+      const usableHeight = max - min;
+      const laneComponent = routeTotal > 1
+        ? (routeLane / Math.max(1, (routeTotal - 1) / 2)) * usableHeight * 0.18
+        : 0;
+      const drift = (stableUnit(seedKey) - 0.5) * usableHeight * 0.28;
+      const anchor = center + laneComponent + drift;
+      const blended = fallbackY * 0.48 + anchor * 0.52;
+      return Math.max(min, Math.min(max, blended));
+    };
+
     const routeIndexes = new Map();
-    const visibleLinks = (flowState?.flowLines || []).flatMap((flow) => {
+    const preparedFlows = (flowState?.flowLines || []).map((flow) => {
       const sourceLink = graphLinkById.get(flow.sourceLinkId);
-      if (!sourceLink) return [];
+      if (!sourceLink) return null;
       const targetLink = flow.targetLinkId ? graphLinkById.get(flow.targetLinkId) : null;
       const routeKey = `${flow.sourceLinkId || ''}->${flow.targetLinkId || ''}`;
       const routeIndex = routeIndexes.get(routeKey) || 0;
       routeIndexes.set(routeKey, routeIndex + 1);
       const routeTotal = routeCounts.get(routeKey) || 1;
-      const offset = (routeIndex - (routeTotal - 1) / 2) * Math.max(4, moneyTableStrokeWidth(sourceLink) * 1.75);
+      const routeLane = routeIndex - (routeTotal - 1) / 2;
+      const widthScale = 0.9 + stableUnit(`${flow.id}:width`) * 0.2;
+      const visualWidth = sourceLink.width * widthScale;
+      return { flow, sourceLink, targetLink, routeTotal, routeLane, visualWidth };
+    }).filter(Boolean);
+
+    const laneGroups = new Map();
+    const addLaneCandidate = (node, prepared) => {
+      if (!node) return;
+      const laneKey = `${prepared.flow.id}:${node.id}`;
+      if (!laneGroups.has(node.id)) laneGroups.set(node.id, new Map());
+      laneGroups.get(node.id).set(laneKey, { node, prepared });
+    };
+
+    preparedFlows.forEach((prepared) => {
+      addLaneCandidate(prepared.sourceLink.source, prepared);
+      addLaneCandidate(prepared.sourceLink.target, prepared);
+      if (prepared.targetLink) addLaneCandidate(prepared.targetLink.target, prepared);
+    });
+
+    const laneYByFlowNode = new Map();
+    laneGroups.forEach((candidateMap) => {
+      const candidates = Array.from(candidateMap.values())
+        .sort((a, b) => {
+          const aWeight = a.prepared.routeLane + (stableUnit(`${a.prepared.flow.id}:${a.node.id}:lane`) - 0.5) * 0.35;
+          const bWeight = b.prepared.routeLane + (stableUnit(`${b.prepared.flow.id}:${b.node.id}:lane`) - 0.5) * 0.35;
+          return aWeight - bWeight;
+        });
+      const node = candidates[0]?.node;
+      if (!node) return;
+
+      const strokeWidths = candidates.map(({ prepared }) => moneyTableStrokeWidth({ width: prepared.visualWidth }));
+      const averageStrokeWidth = d3.mean(strokeWidths) || 0;
+      const idealGap = candidates.length > 1
+        ? Math.max(3, averageStrokeWidth * 0.42)
+        : 0;
+      const totalIdealHeight = d3.sum(strokeWidths) + idealGap * Math.max(0, candidates.length - 1);
+      const nodeCenter = node.y0 + (node.y1 - node.y0) / 2;
+      const gap = idealGap;
+      let cursor = nodeCenter - totalIdealHeight / 2;
+      if (cursor < 0) cursor = 0;
+      if (cursor + totalIdealHeight > flowFieldHeight) cursor = Math.max(0, flowFieldHeight - totalIdealHeight);
+
+      candidates.forEach(({ node: candidateNode, prepared }, index) => {
+        const strokeWidth = strokeWidths[index];
+        const y = cursor + strokeWidth / 2;
+        laneYByFlowNode.set(`${prepared.flow.id}:${candidateNode.id}`, y);
+        cursor += strokeWidth + gap;
+      });
+    });
+
+    const laneY = (flow, node, fallback, width, routeLane, routeTotal, seedKey) => (
+      laneYByFlowNode.get(`${flow.id}:${node?.id}`) ?? naturalY(node, fallback, width, routeLane, routeTotal, seedKey)
+    );
+
+    const visibleLinks = preparedFlows.flatMap(({ flow, sourceLink, targetLink, routeTotal, routeLane, visualWidth }) => {
+      const sourceY = laneY(flow, sourceLink.source, sourceLink.y0, visualWidth, routeLane, routeTotal, `${flow.id}:source`);
+      const middleY = laneY(flow, sourceLink.target, sourceLink.y1, visualWidth, -routeLane, routeTotal, `${flow.id}:middle`);
 
       const sourceSegment = {
         ...sourceLink,
         id: `${flow.id}-source`,
         source: sourceLink.source,
         target: sourceLink.target,
-        y0: sourceLink.y0 + offset,
-        y1: sourceLink.y1 + offset,
-        width: sourceLink.width,
-        visualWidth: sourceLink.width,
+        y0: sourceY,
+        y1: middleY,
+        width: visualWidth,
+        visualWidth,
         flowId: flow.id,
         baseLinkId: flow.sourceLinkId,
         state: flow.state,
         phase: flow.phase,
+        density: Math.max(routeTotal, nodeTouchCounts.get(sourceLink.source.id) || 1, nodeTouchCounts.get(sourceLink.target.id) || 1),
       };
 
       if (!targetLink) return [sourceSegment];
 
+      const targetY = laneY(flow, targetLink.target, targetLink.y1, sourceSegment.width, routeLane * -0.7, routeTotal, `${flow.id}:target`);
       const targetSegment = {
         ...targetLink,
         id: `${flow.id}-target`,
         source: targetLink.source,
         target: targetLink.target,
         y0: sourceSegment.y1,
-        y1: targetLink.y1 + offset,
+        y1: targetY,
         width: sourceSegment.width,
         visualWidth: sourceSegment.visualWidth,
         flowId: flow.id,
         baseLinkId: flow.targetLinkId,
         state: ['dimmed', 'history'].includes(flow.state) ? flow.state : (flow.state === 'completed' ? 'completed' : 'partial'),
         phase: flow.phase,
+        density: Math.max(
+          routeTotal,
+          nodeTouchCounts.get(targetLink.source.id) || 1,
+          nodeTouchCounts.get(targetLink.target.id) || 1
+        ),
       };
 
       return [sourceSegment, targetSegment];
     });
+
+    const nodeVisualBounds = new Map();
+    const addNodeVisualPoint = (node, y, width) => {
+      if (!node) return;
+      const halfHeight = moneyTableStrokeWidth({ width }) / 2;
+      const breathingRoom = Math.max(2, moneyTableStrokeWidth({ width }) * 0.24);
+      const previous = nodeVisualBounds.get(node.id) || { min: Infinity, max: -Infinity };
+      nodeVisualBounds.set(node.id, {
+        min: Math.min(previous.min, y - halfHeight - breathingRoom),
+        max: Math.max(previous.max, y + halfHeight + breathingRoom),
+      });
+    };
+
+    visibleLinks.forEach((link) => {
+      addNodeVisualPoint(link.source, link.y0, link.visualWidth || link.width);
+      addNodeVisualPoint(link.target, link.y1, link.visualWidth || link.width);
+    });
+
+    const visualNodeBox = (node) => {
+      const bounds = nodeVisualBounds.get(node.id);
+      const layoutHeight = node.y1 - node.y0;
+      const minHeight = nodeState(node) === 'idle' ? 22 : 30;
+
+      if (!bounds) {
+        const height = Math.min(layoutHeight, minHeight);
+        const center = node.y0 + layoutHeight / 2;
+        return {
+          y: center - height / 2,
+          height,
+          center,
+        };
+      }
+
+      const boundedMin = Math.max(0, bounds.min);
+      const boundedMax = Math.min(flowFieldHeight, bounds.max);
+      const center = (boundedMin + boundedMax) / 2;
+      const height = Math.max(2.4, boundedMax - boundedMin);
+      const finalHeight = height;
+
+      return {
+        y: center - finalHeight / 2,
+        height: finalHeight,
+        center,
+      };
+    };
 
     const gradients = defs
       .selectAll('linearGradient.live-flow-gradient')
@@ -969,8 +1143,10 @@ function RealtimeSankey({ flowState }) {
       .each(function updateGradient(link) {
         const stops = d3.select(this).selectAll('stop')
           .data([
-            ['0%', nodeColor(link.source)],
-            ['100%', nodeColor(link.target)],
+            ['0%', nodeColor(link.source), 0.28],
+            ['24%', nodeColor(link.source), 0.92],
+            ['76%', nodeColor(link.target), 0.92],
+            ['100%', nodeColor(link.target), 0.28],
           ]);
 
         stops.enter()
@@ -978,7 +1154,7 @@ function RealtimeSankey({ flowState }) {
           .merge(stops)
           .attr('offset', (stop) => stop[0])
           .attr('stop-color', (stop) => stop[1])
-          .attr('stop-opacity', 1);
+          .attr('stop-opacity', (stop) => stop[2]);
 
         stops.exit().remove();
       });
@@ -990,14 +1166,14 @@ function RealtimeSankey({ flowState }) {
         (enter) => {
           const group = enter.append('g')
             .attr('class', 'live-monitoring-link-group')
-            .style('mix-blend-mode', 'screen');
+            .style('mix-blend-mode', (link) => linkBlendMode(link));
 
           group.append('path')
-            .attr('d', sankeyLinkHorizontal())
+            .attr('d', relaxedSankeyPath)
             .attr('id', (link) => `live-flow-path-${domId(link.id)}`)
             .attr('stroke', (link) => `url(#live-monitoring-gradient-${domId(link.id)})`)
             .attr('stroke-width', (link) => moneyTableStrokeWidth(link))
-            .style('mix-blend-mode', 'screen')
+            .style('mix-blend-mode', (link) => linkBlendMode(link))
             .style('stroke-opacity', 0)
             .attr('class', (link) => `live-monitoring-sankey-link live-link-${linkState(link)}`)
             .style('cursor', 'pointer')
@@ -1010,13 +1186,15 @@ function RealtimeSankey({ flowState }) {
       );
 
     linkGroup.order();
+    linkGroup.style('mix-blend-mode', (link) => linkBlendMode(link));
 
     linkGroup.select('path')
-      .attr('d', sankeyLinkHorizontal())
+      .attr('d', relaxedSankeyPath)
       .attr('stroke', (link) => `url(#live-monitoring-gradient-${domId(link.id)})`)
       .attr('stroke-width', (link) => moneyTableStrokeWidth(link))
       .attr('class', (link) => `live-monitoring-sankey-link live-link-${linkState(link)}`)
-      .style('stroke-opacity', (link) => linkOpacity(linkState(link)));
+      .style('mix-blend-mode', (link) => linkBlendMode(link))
+      .style('stroke-opacity', (link) => calmLinkOpacity(link));
 
     linkGroup.select('path').each(function animatePath(_, index) {
       const datum = d3.select(this).datum();
@@ -1025,7 +1203,9 @@ function RealtimeSankey({ flowState }) {
       const partialLength = length * 0.56;
       const previousState = this.dataset.liveState;
       const path = d3.select(this);
-      path.interrupt().style('stroke-opacity', linkOpacity(state));
+      path.interrupt()
+        .style('mix-blend-mode', linkBlendMode(datum))
+        .style('stroke-opacity', calmLinkOpacity(datum));
 
       if (state === 'partial') {
         if (!this.dataset.liveMoneyTableAnimated) {
@@ -1090,45 +1270,76 @@ function RealtimeSankey({ flowState }) {
     nodeLayer.select('rect')
       .transition()
       .duration(240)
+      .attr('y', (item) => visualNodeBox(item).y - item.y0)
+      .attr('height', (item) => visualNodeBox(item).height)
+      .attr('width', (item) => Math.max(2.4, item.x1 - item.x0))
       .attr('opacity', (item) => nodeOpacity(nodeState(item)))
       .attr('class', (item) => `live-node-bar live-node-${nodeState(item)}`);
 
     nodeLayer.select('text')
       .transition()
       .duration(240)
+      .attr('y', (item) => visualNodeBox(item).center - item.y0)
       .style('opacity', (item) => Math.max(0.28, nodeOpacity(nodeState(item)) * 0.9));
 
     const tooltip = d3.select(tooltipRef.current);
     const currentPaths = () => linkLayer.selectAll('path.live-monitoring-sankey-link');
+    const highlightConnectedNodes = (nodeIds, duration = 100) => {
+      nodeLayer.transition().duration(duration)
+        .style('opacity', (candidate) => nodeIds.has(candidate.id) ? 1 : OPACITY.nodeDimmed);
+
+      nodeLayer.select('rect').transition().duration(duration)
+        .attr('opacity', (candidate) => {
+          if (nodeIds.has(candidate.id)) return 1;
+          return Math.min(nodeOpacity(nodeState(candidate)), OPACITY.nodeDimmed);
+        });
+
+      nodeLayer.select('text').transition().duration(duration)
+        .style('opacity', (candidate) => nodeIds.has(candidate.id) ? 1 : Math.max(0.22, OPACITY.nodeDimmed));
+    };
+
+    const restoreNodes = (duration = 100) => {
+      nodeLayer.transition().duration(duration).style('opacity', 1);
+      nodeLayer.select('rect').transition().duration(duration)
+        .attr('opacity', (candidate) => nodeOpacity(nodeState(candidate)));
+      nodeLayer.select('text').transition().duration(duration)
+        .style('opacity', (candidate) => Math.max(0.28, nodeOpacity(nodeState(candidate)) * 0.9));
+    };
 
     nodeLayer
       .on('mouseenter', (event, hoveredNode) => {
         currentPaths().transition().duration(100)
           .style('stroke-opacity', (link) => {
             if (!isVisibleLink(link)) return 0;
-            return link.source === hoveredNode || link.target === hoveredNode ? OPACITY.linkHover : OPACITY.linkDimmed;
+            return link.source === hoveredNode || link.target === hoveredNode
+              ? OPACITY.linkHover
+              : Math.min(OPACITY.linkDimmed, calmLinkOpacity(link) * 0.45);
           });
 
-        nodeLayer.transition().duration(100)
-          .style('opacity', (candidate) => {
-            const connected = candidate === hoveredNode
-              || visibleLinks.some((link) => (
-                (link.source === hoveredNode && link.target === candidate)
-                || (link.target === hoveredNode && link.source === candidate)
-              ));
-            return connected ? 1 : OPACITY.nodeDimmed;
-          });
+        const connectedNodes = new Set([hoveredNode.id]);
+        visibleLinks.forEach((link) => {
+          if (link.source === hoveredNode || link.target === hoveredNode) {
+            connectedNodes.add(link.source.id);
+            connectedNodes.add(link.target.id);
+          }
+        });
+        highlightConnectedNodes(connectedNodes);
       })
       .on('mouseleave', () => {
-        currentPaths().transition().duration(100).style('stroke-opacity', (link) => linkOpacity(linkState(link)));
-        nodeLayer.transition().duration(100).style('opacity', 1);
+        currentPaths().transition().duration(100)
+          .style('mix-blend-mode', (link) => linkBlendMode(link))
+          .style('stroke-opacity', (link) => calmLinkOpacity(link));
+        restoreNodes();
       });
 
     linkLayer.selectAll('path.live-monitoring-sankey-link')
       .on('mouseenter', (event, link) => {
         if (!isVisibleLink(link)) return;
+        const connectedNodes = flowNodesById.get(link.flowId) || new Set([link.source.id, link.target.id]);
         d3.select(event.currentTarget).transition().duration(100)
+          .style('mix-blend-mode', 'screen')
           .style('stroke-opacity', OPACITY.linkHover);
+        highlightConnectedNodes(connectedNodes);
 
         tooltip
           .style('opacity', 1)
@@ -1145,7 +1356,9 @@ function RealtimeSankey({ flowState }) {
       })
       .on('mouseleave', (event) => {
         d3.select(event.currentTarget).transition().duration(100)
-          .style('stroke-opacity', (link) => linkOpacity(linkState(link)));
+          .style('mix-blend-mode', (link) => linkBlendMode(link))
+          .style('stroke-opacity', (link) => calmLinkOpacity(link));
+        restoreNodes();
         tooltip.style('opacity', 0);
       });
   }, [flowState?.version, dimensions, graphVersion]);
@@ -1320,6 +1533,8 @@ export default function LiveMonitoringPage() {
 
         .live-monitoring-sankey-link {
           transition: stroke-opacity 180ms ease;
+          stroke-linecap: round;
+          stroke-linejoin: round;
         }
 
         .live-link-active,
