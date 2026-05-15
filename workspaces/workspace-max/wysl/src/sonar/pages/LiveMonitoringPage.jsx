@@ -18,10 +18,10 @@ const COLORS = {
 };
 
 const OPACITY = {
-  linkInitial: 0.24,
-  linkHover: 0.54,
-  linkDimmed: 0.045,
-  nodeDimmed: 0.18,
+  linkInitial: 0.5,
+  linkHover: 0.95,
+  linkDimmed: 0.1,
+  nodeDimmed: 0.3,
 };
 
 const analyticsSeed = [
@@ -117,7 +117,32 @@ const canonicalIntent = (intentKey) => {
 
 const domId = (value) => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '-');
 
-const rowPayload = (row) => row?.payload || row?.new?.payload || {};
+const moneyTableStrokeWidth = (link) => (
+  Math.max(1, Math.min(3.25, (link?.visualWidth || link?.width || 1) / 1.5))
+);
+
+const rowPayload = (row) => {
+  const record = row?.new || row || {};
+  const payload = record.payload || {};
+  return {
+    ...payload,
+    checkpoint_id: record.checkpoint_id ?? payload.checkpoint_id,
+    intent_key: record.intent_key ?? payload.intent_key,
+    parent_intent_key: record.parent_intent_key ?? payload.parent_intent_key,
+    checkpoint_label: record.checkpoint_label ?? payload.checkpoint_label,
+    phase: record.phase ?? payload.phase,
+    timestamp: record.timestamp ?? payload.timestamp,
+    conversation_id: record.conversation_id ?? payload.conversation_id,
+    system_conversation_id: record.system_conversation_id ?? payload.system_conversation_id,
+    direction: record.direction ?? payload.direction,
+    duration: record.duration ?? payload.duration,
+    sid: record.sid ?? payload.sid,
+    caller_id: record.caller_id ?? payload.caller_id,
+    call_id: record.call_id ?? payload.call_id,
+    execution_id: record.execution_id ?? payload.execution_id,
+    session_id: record.session_id ?? payload.session_id,
+  };
+};
 
 const checkpointTimestamp = (row) => (
   rowPayload(row).timestamp || row?.created_at || new Date().toISOString()
@@ -125,12 +150,14 @@ const checkpointTimestamp = (row) => (
 
 const checkpointSortValue = (row) => new Date(checkpointTimestamp(row)).getTime() || 0;
 
-const sessionKeyForCheckpoint = (payload) => (
-  payload.call_id
-  || payload.conversation_id
+const conversationKeyForCheckpoint = (payload, row) => (
+  payload.conversation_id
+  || payload.system_conversation_id
+  || payload.call_id
+  || payload.sid
   || payload.execution_id
   || payload.session_id
-  || `${payload.scenario_id || 'unknown'}:${payload.receptionist_id || payload.user_id || 'default'}`
+  || `legacy:${payload.scenario_id || row?.scenario_id || 'unknown'}:${checkpointTimestamp(row)}`
 );
 
 const parseMaybeJson = (value, fallback) => {
@@ -182,6 +209,12 @@ const strongerState = (a = 'idle', b = 'idle') => (
 const TEN_ZERO_BUCKETS = Array.from({ length: 10 }, () => 0);
 
 const startOfLocalDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const startOfCurrentLocalWeek = () => {
+  const start = startOfLocalDay(new Date());
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+};
 
 const addDays = (date, days) => {
   const next = new Date(date);
@@ -407,9 +440,10 @@ function useLiveSankeyState() {
   });
   const scenarioCacheRef = useRef(new Map());
   const sessionsRef = useRef(new Map());
-  const historyRef = useRef([]);
   const seenCheckpointIdsRef = useRef(new Set());
   const flowInstancesRef = useRef([]);
+  const latestConversationRef = useRef(null);
+  const initialLoadCompleteRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -436,7 +470,8 @@ function useLiveSankeyState() {
       const activeNodeIds = new Set();
       const activeLinkIds = new Set();
       const flowLines = [];
-      const hasActiveSession = Array.from(sessionsRef.current.values()).some((session) => session.state !== 'history');
+      const latestConversationId = latestConversationRef.current;
+      const hasActiveSession = Boolean(latestConversationId);
 
       const applyNode = (id, state) => {
         if (!id) return;
@@ -450,27 +485,30 @@ function useLiveSankeyState() {
         if (['active', 'partial', 'completed'].includes(state)) activeLinkIds.add(id);
       };
 
-      historyRef.current.slice(-12).forEach((item) => {
-        applyNode(item.sourceId, 'dimmed');
-        applyNode(item.middleId, 'dimmed');
-        applyNode(item.targetId, item.completed ? 'completed' : 'dimmed');
-      });
-
       sessionsRef.current.forEach((session) => {
-        if (session.state === 'history') return;
-        if (session.intent === 'call_started') {
-          applyNode(session.sourceId, 'pulsing');
+        if (session.conversationId !== latestConversationId) {
+          applyNode(session.sourceId, 'dimmed');
           return;
         }
-
-        applyNode(session.sourceId, 'active');
-        applyNode(session.middleId, 'active');
-        applyLink(session.sourceLinkId, session.phase === 'completed' ? 'completed' : 'active');
-
-        if (session.targetId) {
-          applyNode(session.targetId, session.phase === 'completed' ? 'completed' : 'active');
-          applyLink(session.targetLinkId, session.phase === 'completed' ? 'completed' : 'partial');
+        if (session.intent === 'call_started' && !flowInstancesRef.current.some((flow) => flow.conversationId === latestConversationId)) {
+          applyNode(session.sourceId, 'pulsing');
         }
+      });
+
+      flowInstancesRef.current.slice(-160).forEach((flow) => {
+        const isLatest = flow.conversationId === latestConversationId;
+        const renderState = isLatest ? flow.baseState : 'dimmed';
+        const activeNodeState = renderState === 'completed' ? 'completed' : 'active';
+        const renderedFlow = { ...flow, state: renderState };
+        flowLines.push(renderedFlow);
+
+        applyNode(renderedFlow.sourceId, renderState === 'dimmed' ? 'dimmed' : activeNodeState);
+        applyNode(renderedFlow.middleId, renderState === 'dimmed' ? 'dimmed' : activeNodeState);
+        if (renderedFlow.targetId) {
+          applyNode(renderedFlow.targetId, renderState);
+        }
+        applyLink(renderedFlow.sourceLinkId, renderState);
+        applyLink(renderedFlow.targetLinkId, renderState === 'active' ? 'partial' : renderState);
       });
 
       if (hasActiveSession) {
@@ -478,12 +516,6 @@ function useLiveSankeyState() {
           if (!nodeStates[node.id]) nodeStates[node.id] = 'dimmed';
         });
       }
-
-      flowInstancesRef.current.slice(-80).forEach((flow) => {
-        flowLines.push(flow);
-        applyLink(flow.sourceLinkId, flow.state);
-        applyLink(flow.targetLinkId, flow.state);
-      });
 
       setFlowState((prev) => ({
         linkStates,
@@ -503,7 +535,7 @@ function useLiveSankeyState() {
       );
     };
 
-    const applyCheckpoint = async (row) => {
+    const applyCheckpoint = async (row, options = {}) => {
       const identity = checkpointIdentity(row);
       if (seenCheckpointIdsRef.current.has(identity)) return;
       seenCheckpointIdsRef.current.add(identity);
@@ -519,23 +551,23 @@ function useLiveSankeyState() {
       if (cancelled) return;
 
       const sourceId = (directDirection || scenarioDirection(scenario)) === 'incoming' ? 'incoming' : 'outgoing';
-      const sessionKey = sessionKeyForCheckpoint({ ...payload, scenario_id: scenarioId });
+      const conversationId = conversationKeyForCheckpoint({ ...payload, scenario_id: scenarioId }, row);
+      const isLiveCheckpoint = options.mode !== 'history';
+
+      if (isLiveCheckpoint) {
+        latestConversationRef.current = conversationId;
+      }
 
       if (intent === 'neutral') {
-        sessionsRef.current.forEach((session, key) => {
-          if (session.scenarioId !== scenarioId) return;
-          if (session.sourceLinkId || session.targetLinkId) {
-            historyRef.current.push({ ...session, completed: session.phase === 'completed' });
-          }
-          sessionsRef.current.delete(key);
-        });
+        sessionsRef.current.delete(conversationId);
         publishState();
         return;
       }
 
       if (intent === 'call_started') {
-        sessionsRef.current.set(sessionKey, {
+        sessionsRef.current.set(conversationId, {
           scenarioId,
+          conversationId,
           intent,
           phase: 'entered',
           state: 'source',
@@ -553,19 +585,15 @@ function useLiveSankeyState() {
       const targetId = route.target || null;
       const sourceLinkId = LINK_BY_ROUTE[`${sourceId}->${middleId}`];
       const targetLinkId = targetId ? LINK_BY_ROUTE[`${middleId}->${targetId}`] : null;
-      const previous = sessionsRef.current.get(sessionKey);
-
-      if (previous && (previous.sourceLinkId || previous.targetLinkId) && previous.intent !== intent) {
-        historyRef.current.push({ ...previous, completed: previous.phase === 'completed' });
-      }
-
-      const flowId = previous?.flowId || `${sessionKey}:${intent}:${checkpointTimestamp(row)}`;
+      const flowId = conversationId;
+      const baseState = options.mode === 'history' ? 'dimmed' : (phase === 'completed' ? 'completed' : 'active');
 
       const nextSession = {
         scenarioId,
+        conversationId,
         intent,
         phase,
-        state: phase === 'completed' ? 'completed' : 'active',
+        state: baseState,
         sourceId,
         middleId,
         targetId,
@@ -577,10 +605,12 @@ function useLiveSankeyState() {
 
       const nextFlow = {
         id: flowId,
+        conversationId,
         scenarioId,
         intent,
         phase,
-        state: phase === 'completed' ? 'completed' : 'active',
+        baseState,
+        state: baseState,
         sourceId,
         middleId,
         targetId,
@@ -597,21 +627,20 @@ function useLiveSankeyState() {
       } else {
         flowInstancesRef.current.push(nextFlow);
       }
-      flowInstancesRef.current = flowInstancesRef.current.slice(-80);
+      flowInstancesRef.current = flowInstancesRef.current
+        .sort((a, b) => checkpointSortValue({ payload: a, created_at: a.timestamp }) - checkpointSortValue({ payload: b, created_at: b.timestamp }))
+        .slice(-160);
 
-      sessionsRef.current.set(sessionKey, nextSession);
-      if (phase === 'completed') {
-        historyRef.current.push({ ...nextSession, completed: true });
-        historyRef.current = historyRef.current.slice(-20);
-      }
+      sessionsRef.current.set(conversationId, nextSession);
       publishState();
     };
 
-    const loadRecentCheckpoints = async (limit = 80) => {
+    const loadRecentCheckpoints = async ({ limit = 1000, mode = 'live' } = {}) => {
       const checkpointsRes = await supabase
         .from('checkpoints')
         .select('*')
         .eq('trigger_key', 'intent_checkpoint')
+        .gte('created_at', startOfCurrentLocalWeek().toISOString())
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -622,19 +651,26 @@ function useLiveSankeyState() {
       const rows = (checkpointsRes.data || [])
         .sort((a, b) => checkpointSortValue(a) - checkpointSortValue(b));
 
-      for (const row of rows) await applyCheckpoint(row);
+      for (const row of rows) await applyCheckpoint(row, { mode });
     };
 
     const recoverRecentCheckpoints = () => {
       window.clearTimeout(recoveryTimer);
       recoveryTimer = window.setTimeout(() => {
-        loadRecentCheckpoints(20).catch((err) => {
+        loadRecentCheckpoints({
+          limit: 100,
+          mode: initialLoadCompleteRef.current ? 'live' : 'history',
+        }).catch((err) => {
           console.warn('[LiveMonitoring] checkpoint realtime recovery failed:', err);
         });
       }, 350);
     };
 
-    loadRecentCheckpoints().catch((err) => console.warn('[LiveMonitoring] checkpoint warmup failed:', err));
+    loadRecentCheckpoints({ limit: 1000, mode: 'history' })
+      .catch((err) => console.warn('[LiveMonitoring] checkpoint warmup failed:', err))
+      .finally(() => {
+        initialLoadCompleteRef.current = true;
+      });
 
     const handleInsert = (payload) => {
       console.info('[LiveMonitoring] realtime checkpoint received:', payload.new);
@@ -650,7 +686,10 @@ function useLiveSankeyState() {
           recoverRecentCheckpoints();
           window.clearInterval(catchupTimer);
           catchupTimer = window.setInterval(() => {
-            loadRecentCheckpoints(20).catch((recoveryErr) => {
+            loadRecentCheckpoints({
+              limit: 100,
+              mode: initialLoadCompleteRef.current ? 'live' : 'history',
+            }).catch((recoveryErr) => {
               console.warn('[LiveMonitoring] checkpoint catch-up failed:', recoveryErr);
             });
           }, 2500);
@@ -697,10 +736,10 @@ function RealtimeSankey({ flowState }) {
 
   const linkOpacity = (state) => ({
     idle: 0,
-    dimmed: 0.035,
-    active: 0.58,
-    partial: 0.72,
-    completed: 0.66,
+    dimmed: OPACITY.linkDimmed,
+    active: OPACITY.linkHover,
+    partial: OPACITY.linkHover,
+    completed: OPACITY.linkHover,
   }[state] ?? OPACITY.linkInitial);
 
   const nodeOpacity = (state) => ({
@@ -729,25 +768,15 @@ function RealtimeSankey({ flowState }) {
 
     const defs = svg.append('defs');
 
-    const glow = defs.append('filter')
-      .attr('id', 'live-monitoring-glow')
-      .attr('x', '-50%')
-      .attr('y', '-50%')
-      .attr('width', '200%')
-      .attr('height', '200%');
-
-    glow.append('feGaussianBlur')
-      .attr('stdDeviation', '2.6')
-      .attr('result', 'blur');
-
-    glow.append('feComposite')
-      .attr('in', 'SourceGraphic')
-      .attr('in2', 'blur')
-      .attr('operator', 'over');
+    const glow = defs.append('filter').attr('id', 'live-monitoring-glow');
+    glow.append('feGaussianBlur').attr('stdDeviation', '2.5').attr('result', 'coloredBlur');
+    const feMergeGlow = glow.append('feMerge');
+    feMergeGlow.append('feMergeNode').attr('in', 'coloredBlur');
+    feMergeGlow.append('feMergeNode').attr('in', 'SourceGraphic');
 
     const layout = sankey()
-      .nodeWidth(2)
-      .nodePadding(isCompact ? 24 : 38)
+      .nodeWidth(1.6)
+      .nodePadding(2)
       .nodeAlign(sankeyJustify)
       .nodeSort(null)
       .extent([[0, 0], [width, height]]);
@@ -756,6 +785,47 @@ function RealtimeSankey({ flowState }) {
       nodes: sankeyData.nodes.map((node) => ({ ...node })),
       links: sankeyData.links.map((link) => ({ ...link })),
     });
+
+    const graphYMin = d3.min(graph.nodes, (item) => item.y0) || 0;
+    const graphYMax = d3.max(graph.nodes, (item) => item.y1) || height;
+    const graphHeight = graphYMax - graphYMin;
+    const yOffset = (height - graphHeight) / 2 - graphYMin;
+
+    graph.nodes.forEach((item) => {
+      item.y0 += yOffset;
+      item.y1 += yOffset;
+    });
+    graph.links.forEach((link) => {
+      link.y0 += yOffset;
+      link.y1 += yOffset;
+      link.width *= 0.5;
+    });
+
+    graph.nodes.forEach((item) => {
+      const originalHeight = item.y1 - item.y0;
+      const newSourceHeight = d3.sum(item.sourceLinks, (link) => link.width);
+      const newTargetHeight = d3.sum(item.targetLinks, (link) => link.width);
+      const newHeight = Math.max(newSourceHeight, newTargetHeight);
+
+      if (originalHeight > 0) {
+        const yShift = (originalHeight - newHeight) / 2;
+        item.y0 += yShift;
+        item.y1 -= yShift;
+      }
+
+      let currentSourceY = item.y0;
+      item.sourceLinks.forEach((link) => {
+        link.y0 = currentSourceY + link.width / 2;
+        currentSourceY += link.width;
+      });
+
+      let currentTargetY = item.y0;
+      item.targetLinks.forEach((link) => {
+        link.y1 = currentTargetY + link.width / 2;
+        currentTargetY += link.width;
+      });
+    });
+
     const graphLinkById = new Map(graph.links.map((link) => [link.id, link]));
 
     const field = svg.append('g')
@@ -836,7 +906,7 @@ function RealtimeSankey({ flowState }) {
       const routeIndex = routeIndexes.get(routeKey) || 0;
       routeIndexes.set(routeKey, routeIndex + 1);
       const routeTotal = routeCounts.get(routeKey) || 1;
-      const offset = (routeIndex - (routeTotal - 1) / 2) * Math.max(4, sourceLink.width * 0.22);
+      const offset = (routeIndex - (routeTotal - 1) / 2) * Math.max(4, moneyTableStrokeWidth(sourceLink) * 1.75);
 
       const sourceSegment = {
         ...sourceLink,
@@ -846,6 +916,7 @@ function RealtimeSankey({ flowState }) {
         y0: sourceLink.y0 + offset,
         y1: sourceLink.y1 + offset,
         width: sourceLink.width,
+        visualWidth: sourceLink.width,
         flowId: flow.id,
         baseLinkId: flow.sourceLinkId,
         state: flow.state,
@@ -861,10 +932,11 @@ function RealtimeSankey({ flowState }) {
         target: targetLink.target,
         y0: sourceSegment.y1,
         y1: targetLink.y1 + offset,
-        width: targetLink.width,
+        width: sourceSegment.width,
+        visualWidth: sourceSegment.visualWidth,
         flowId: flow.id,
         baseLinkId: flow.targetLinkId,
-        state: flow.state === 'completed' ? 'completed' : 'partial',
+        state: flow.state === 'dimmed' ? 'dimmed' : (flow.state === 'completed' ? 'completed' : 'partial'),
         phase: flow.phase,
       };
 
@@ -883,26 +955,26 @@ function RealtimeSankey({ flowState }) {
       .attr('id', (link) => `live-monitoring-gradient-${domId(link.id)}`)
       .attr('gradientUnits', 'userSpaceOnUse');
 
-    gradientsEnter.append('stop').attr('offset', '0%');
-    gradientsEnter.append('stop').attr('offset', '50%');
-    gradientsEnter.append('stop').attr('offset', '100%');
-
     gradientsEnter.merge(gradients)
       .attr('x1', (link) => link.source.x1)
       .attr('x2', (link) => link.target.x0)
       .attr('y1', (link) => link.y0)
       .attr('y2', (link) => link.y1)
       .each(function updateGradient(link) {
-        const flowColor = nodeColor(link.target);
-        d3.select(this).selectAll('stop')
+        const stops = d3.select(this).selectAll('stop')
           .data([
-            ['0%', flowColor, 0.28],
-            ['50%', flowColor, 0.82],
-            ['100%', flowColor, 1],
-          ])
+            ['0%', nodeColor(link.source)],
+            ['100%', nodeColor(link.target)],
+          ]);
+
+        stops.enter()
+          .append('stop')
+          .merge(stops)
           .attr('offset', (stop) => stop[0])
           .attr('stop-color', (stop) => stop[1])
-          .attr('stop-opacity', (stop) => stop[2]);
+          .attr('stop-opacity', 1);
+
+        stops.exit().remove();
       });
 
     const linkGroup = linkLayer
@@ -918,8 +990,9 @@ function RealtimeSankey({ flowState }) {
             .attr('d', sankeyLinkHorizontal())
             .attr('id', (link) => `live-flow-path-${domId(link.id)}`)
             .attr('stroke', (link) => `url(#live-monitoring-gradient-${domId(link.id)})`)
-            .attr('stroke-width', (link) => Math.max(1, link.width))
-            .attr('stroke-opacity', 0)
+            .attr('stroke-width', (link) => moneyTableStrokeWidth(link))
+            .style('mix-blend-mode', 'screen')
+            .style('stroke-opacity', 0)
             .attr('class', (link) => `live-monitoring-sankey-link live-link-${linkState(link)}`)
             .style('cursor', 'pointer')
             .style('pointer-events', 'stroke');
@@ -930,72 +1003,83 @@ function RealtimeSankey({ flowState }) {
         (exit) => exit.transition().duration(260).style('opacity', 0).remove()
       );
 
+    linkGroup.order();
+
     linkGroup.select('path')
       .attr('d', sankeyLinkHorizontal())
       .attr('stroke', (link) => `url(#live-monitoring-gradient-${domId(link.id)})`)
-      .attr('stroke-width', (link) => Math.max(1, link.width))
+      .attr('stroke-width', (link) => moneyTableStrokeWidth(link))
       .attr('class', (link) => `live-monitoring-sankey-link live-link-${linkState(link)}`)
-      .attr('stroke-opacity', (link) => linkOpacity(linkState(link)));
+      .style('stroke-opacity', (link) => linkOpacity(linkState(link)));
 
     linkGroup.select('path').each(function animatePath(_, index) {
       const datum = d3.select(this).datum();
       const state = linkState(datum);
       const length = this.getTotalLength();
+      const partialLength = length * 0.56;
+      const previousState = this.dataset.liveState;
       const path = d3.select(this);
-      path.attr('stroke-opacity', linkOpacity(state));
+      path.interrupt().style('stroke-opacity', linkOpacity(state));
+
       if (state === 'partial') {
-        path
-          .attr('stroke-dasharray', `${length * 0.56} ${length}`)
-          .attr('stroke-dashoffset', 0);
+        if (!this.dataset.liveMoneyTableAnimated) {
+          this.dataset.liveMoneyTableAnimated = 'true';
+          path
+            .attr('stroke-dasharray', `${partialLength} ${length}`)
+            .attr('stroke-dashoffset', length)
+            .transition()
+            .duration(2000)
+            .delay(index * 50)
+            .ease(d3.easeCubicInOut)
+            .attr('stroke-dashoffset', length - partialLength);
+        } else {
+          path
+            .attr('stroke-dasharray', `${partialLength} ${length}`)
+            .attr('stroke-dashoffset', length - partialLength);
+        }
+        this.dataset.liveState = state;
         return;
       }
-      if (state === 'active' && !this.dataset.liveAnimated) {
-        this.dataset.liveAnimated = 'true';
+
+      if (state === 'completed' && previousState === 'partial') {
+        this.dataset.liveMoneyTableAnimated = 'true';
         path
           .attr('stroke-dasharray', `${length} ${length}`)
-          .attr('stroke-dashoffset', 0)
+          .attr('stroke-dashoffset', length - partialLength)
           .transition()
-          .duration(850)
-          .delay(index * 18)
+          .duration(2000)
+          .delay(index * 50)
           .ease(d3.easeCubicInOut)
-          .attr('stroke-dashoffset', 0);
+          .attr('stroke-dashoffset', 0)
+          .on('end', function clearDash() {
+            d3.select(this).attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
+          });
+        this.dataset.liveState = state;
         return;
       }
+
+      if ((state === 'active' || state === 'completed') && !this.dataset.liveMoneyTableAnimated) {
+        this.dataset.liveMoneyTableAnimated = 'true';
+        path
+          .attr('stroke-dasharray', `${length} ${length}`)
+          .attr('stroke-dashoffset', length)
+          .transition()
+          .duration(2000)
+          .delay(index * 50)
+          .ease(d3.easeCubicInOut)
+          .attr('stroke-dashoffset', 0)
+          .on('end', function clearDash() {
+            d3.select(this).attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
+          });
+        this.dataset.liveState = state;
+        return;
+      }
+
       if (state === 'completed' || state === 'dimmed') {
         path.attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
       }
+      this.dataset.liveState = state;
     });
-
-    linkGroup
-      .selectAll('circle.live-flow-particle')
-      .data((link) => (['active', 'partial'].includes(linkState(link))
-        ? [0, 1].map((offset) => ({ link, offset }))
-        : []), (item) => `${item.link.id}-${item.offset}`)
-      .join(
-        (enter) => {
-          const particle = enter.append('circle')
-            .attr('class', 'live-flow-particle')
-            .attr('r', 2.3)
-            .attr('fill', ({ link }) => nodeColor(link.target))
-            .attr('opacity', 0.86);
-
-          particle.append('animateMotion')
-            .attr('dur', ({ offset }) => `${2.2 + offset * 0.45}s`)
-            .attr('begin', ({ offset }) => `${offset * 0.7}s`)
-            .attr('repeatCount', 'indefinite')
-            .append('mpath')
-            .attr('href', ({ link }) => `#live-flow-path-${domId(link.id)}`);
-
-          return particle;
-        },
-        (update) => {
-          update.attr('fill', ({ link }) => nodeColor(link.target));
-          update.select('mpath')
-            .attr('href', ({ link }) => `#live-flow-path-${domId(link.id)}`);
-          return update;
-        },
-        (exit) => exit.remove()
-      );
 
     nodeLayer.select('rect')
       .transition()
@@ -1013,13 +1097,13 @@ function RealtimeSankey({ flowState }) {
 
     nodeLayer
       .on('mouseenter', (event, hoveredNode) => {
-        currentPaths().transition().duration(180)
+        currentPaths().transition().duration(100)
           .style('stroke-opacity', (link) => {
             if (!isVisibleLink(link)) return 0;
             return link.source === hoveredNode || link.target === hoveredNode ? OPACITY.linkHover : OPACITY.linkDimmed;
           });
 
-        nodeLayer.transition().duration(180)
+        nodeLayer.transition().duration(100)
           .style('opacity', (candidate) => {
             const connected = candidate === hoveredNode
               || visibleLinks.some((link) => (
@@ -1030,14 +1114,14 @@ function RealtimeSankey({ flowState }) {
           });
       })
       .on('mouseleave', () => {
-        currentPaths().transition().duration(180).style('stroke-opacity', (link) => linkOpacity(linkState(link)));
-        nodeLayer.transition().duration(180).style('opacity', 1);
+        currentPaths().transition().duration(100).style('stroke-opacity', (link) => linkOpacity(linkState(link)));
+        nodeLayer.transition().duration(100).style('opacity', 1);
       });
 
     linkLayer.selectAll('path.live-monitoring-sankey-link')
       .on('mouseenter', (event, link) => {
         if (!isVisibleLink(link)) return;
-        d3.select(event.currentTarget).transition().duration(160)
+        d3.select(event.currentTarget).transition().duration(100)
           .style('stroke-opacity', OPACITY.linkHover);
 
         tooltip
@@ -1054,7 +1138,7 @@ function RealtimeSankey({ flowState }) {
           .style('top', `${event.pageY - 18}px`);
       })
       .on('mouseleave', (event) => {
-        d3.select(event.currentTarget).transition().duration(160)
+        d3.select(event.currentTarget).transition().duration(100)
           .style('stroke-opacity', (link) => linkOpacity(linkState(link)));
         tooltip.style('opacity', 0);
       });
@@ -1233,12 +1317,9 @@ export default function LiveMonitoringPage() {
         }
 
         .live-link-active,
-        .live-link-partial {
-          filter: drop-shadow(0 0 8px currentColor);
-        }
-
+        .live-link-partial,
         .live-link-completed {
-          filter: drop-shadow(0 0 10px rgba(255,255,255,0.22));
+          filter: none;
         }
 
         .live-node-bar {
@@ -1253,10 +1334,6 @@ export default function LiveMonitoringPage() {
 
         .live-node-completed {
           animation: liveNodeConfirm 900ms ease-out 1;
-        }
-
-        .live-flow-particle {
-          filter: drop-shadow(0 0 7px currentColor);
         }
 
         @keyframes liveNodeBreath {
