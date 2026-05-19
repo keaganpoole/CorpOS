@@ -14,28 +14,64 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         let isMounted = true;
 
+        const ensureProfile = async (user) => {
+            const { data: existingProfile, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            if (!error && existingProfile) {
+                return existingProfile;
+            }
+
+            const fallbackProfile = {
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+                phone: user.user_metadata?.phone || null,
+            };
+
+            const { data: createdProfile } = await supabase
+                .from('users')
+                .upsert(fallbackProfile, { onConflict: 'id' })
+                .select()
+                .single();
+
+            return createdProfile || fallbackProfile;
+        };
+
+        const hydrateAuthState = async (nextSession) => {
+            if (!isMounted) return;
+            setSession(nextSession);
+
+            if (nextSession?.user) {
+                try {
+                    const data = await ensureProfile(nextSession.user);
+                    if (isMounted) setProfile(data || null);
+                } catch {
+                    if (isMounted) setProfile(null);
+                }
+            } else if (isMounted) {
+                setProfile(null);
+            }
+
+            if (isMounted) setIsLoading(false);
+        };
+
+        supabase.auth.getSession().then(({ data }) => {
+            hydrateAuthState(data.session ?? null);
+        }).catch(() => {
+            if (isMounted) {
+                setSession(null);
+                setProfile(null);
+                setIsLoading(false);
+            }
+        });
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, session) => {
-                if (!isMounted) return;
-                setSession(session);
-
-                if (session?.user) {
-                    // Fetch basic profile from Sonar Supabase
-                    try {
-                        const { data } = await supabase
-                            .from('users')
-                            .select('*')
-                            .eq('id', session.user.id)
-                            .single();
-                        if (isMounted) setProfile(data || null);
-                    } catch {
-                        if (isMounted) setProfile(null);
-                    }
-                } else {
-                    setProfile(null);
-                }
-
-                if (isMounted) setIsLoading(false);
+                await hydrateAuthState(session);
             }
         );
 
@@ -51,6 +87,16 @@ export const AuthProvider = ({ children }) => {
         isLoading,
         isAppLoading,
         setIsAppLoading,
+        refreshProfile: async () => {
+            if (!session?.user) return null;
+            const { data } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', session.user.id)
+                .maybeSingle();
+            setProfile(data || null);
+            return data || null;
+        },
         login: async (email, password) => {
             const { error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;

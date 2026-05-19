@@ -15,7 +15,7 @@ console.log('AuthPage: import.meta.env.VITE_FRONTEND_PUBLIC_URL =', import.meta.
 console.log('AuthPage: FRONTEND_PUBLIC_URL =', FRONTEND_PUBLIC_URL);
 
 const AuthPage = () => {
-    const { login, session } = useAuth();
+    const { login, session, profile, isLoading: isAuthLoading } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [isSignUp, setIsSignUp] = useState(location.state?.isSignUp || false);
@@ -34,7 +34,7 @@ const AuthPage = () => {
     }, []);
 
     useEffect(() => {
-        if (session) { // User is logged in
+        if (session && !isAuthLoading) { // User is logged in
             const pendingPlan = localStorage.getItem('pendingPlan');
             if (pendingPlan) {
                 localStorage.removeItem('pendingPlan');
@@ -59,11 +59,10 @@ const AuthPage = () => {
                 };
                 initiateStripeCheckout();
             } else {
-                // No pending plan, redirect to dashboard (or onboarding if applicable)
-                navigate('/dashboard');
+                navigate(profile?.onboarded ? '/dashboard' : '/onboarding');
             }
         }
-    }, [session, navigate]);
+    }, [session, profile, isAuthLoading, navigate]);
 
     useEffect(() => {
         if (resendTimer > 0) {

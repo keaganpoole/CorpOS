@@ -16,6 +16,42 @@ import SplashScreen from './components/SplashScreen';
 // Sonar Dashboard
 import SonarDashboard from './sonar/SonarDashboard';
 
+function DashboardGate() {
+  const { session, profile, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <SplashScreen />;
+  }
+
+  if (!session) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (!profile?.onboarded) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return <SonarDashboard />;
+}
+
+function OnboardingGate() {
+  const { session, profile, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <SplashScreen />;
+  }
+
+  if (!session) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (profile?.onboarded) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <OnboardingPage />;
+}
+
 
 function AppContent() {
   const { isLoading, isAppLoading } = useAuth();
@@ -40,14 +76,14 @@ function AppContent() {
         <Route path="/" element={<HomePage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/auth" element={<AuthPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/onboarding" element={<OnboardingGate />} />
         <Route path="/onboarding2" element={<Onboarding2Page />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
         {/* --- Dashboard (Sonar) --- */}
-        <Route path="/dashboard" element={<SonarDashboard />} />
-        <Route path="/dashboard/*" element={<SonarDashboard />} />
+        <Route path="/dashboard" element={<DashboardGate />} />
+        <Route path="/dashboard/*" element={<DashboardGate />} />
 
         {/* --- Fallback Route --- */}
         <Route path="*" element={<Navigate to="/" replace />} />

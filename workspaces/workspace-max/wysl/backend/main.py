@@ -138,6 +138,21 @@ class PaymentCreateRequest(BaseModel):
     person_id: Optional[str] = None
     appointment_id: Optional[str] = None
     customer_name: Optional[str] = None
+
+class OnboardingRequest(BaseModel):
+    business_name: str
+    industry: Optional[str] = None
+    sub_industry: Optional[str] = None
+    business_email: Optional[EmailStr] = None
+    business_street: Optional[str] = None
+    business_city: Optional[str] = None
+    business_state: Optional[str] = None
+    business_zip: Optional[str] = None
+    business_phone: Optional[str] = None
+    business_timezone: str = "America/New_York"
+    business_hours: Optional[dict] = None
+    appointment_settings: Optional[dict] = None
+    about_company: Optional[str] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
 
@@ -1805,7 +1820,13 @@ async def create_user(auth_data: AuthSignUpRequest):
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Supabase signup failed")
         
         user_id = auth_response.user.id
-        profile_data = {"id": str(user_id), "email": auth_data.email, "role": "user"}
+        user_metadata = getattr(auth_response.user, "user_metadata", {}) or {}
+        profile_data = {
+            "id": str(user_id),
+            "email": auth_data.email,
+            "full_name": user_metadata.get("full_name") or user_metadata.get("name"),
+            "phone": user_metadata.get("phone"),
+        }
         db_response = supabase.table('users').insert(profile_data).execute()
         
         if not db_response.data:
@@ -1827,28 +1848,14 @@ async def read_current_user(current_user: dict = Depends(get_current_user)):
             logging.info(f"User profile not found in public.users for ID: {current_user.id}. Attempting to create default profile.")
             
             user_email = current_user.email
+            user_metadata = getattr(current_user, "user_metadata", {}) or {}
             logging.info(f"Retrieved email from current_user object: {user_email}")
 
             profile_data = {
                 "id": str(current_user.id),
                 "email": user_email,
-                "role": "user",
-                "plan": "free", # Default plan
-                "source": None, # Initialize new source column
-                "billing_period": None, # Initialize new billing_period column
-                "display_intro": False,
-                "is_logged_in": True,
-                "manual_approval": True,
-                "daily_passwords_count": 0,
-                "total_passwords_count": 0,
-                "daily_messages_count": 0,
-                "total_messages_count": 0,
-                "daily_events_count": 0,
-                "total_events_count": 0,
-                "card_retries": 0,
-                "months_subscribed": 0,
-                "device": {}, # Default empty dict for device
-                "total_points": 0, # Initialize total_points for new users
+                "full_name": user_metadata.get("full_name") or user_metadata.get("name"),
+                "phone": user_metadata.get("phone"),
             }
             logging.info(f"Prepared profile_data for insertion: {profile_data}")
             
@@ -1899,6 +1906,63 @@ async def update_login_status(status_update: LoginStatusUpdate, current_user: di
         supabase.table('users').update(update_data).eq('id', str(current_user_id)).execute()
     except Exception as e:
         logging.error(f"ERROR: Could not update login status for user {current_user_id}: {e}")
+
+@app.post("/users/me/onboarding", status_code=status.HTTP_200_OK, tags=["Users"])
+async def complete_onboarding(
+    onboarding_data: OnboardingRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    current_user_id = str(current_user.id)
+
+    try:
+        user_update = {
+            "onboarded": True,
+            "phone": onboarding_data.business_phone,
+        }
+        supabase.table('users').update(user_update).eq('id', current_user_id).execute()
+
+        business_payload = {
+            "name": onboarding_data.business_name,
+            "phone": onboarding_data.business_phone,
+            "email": onboarding_data.business_email,
+            "address": onboarding_data.business_street,
+            "city": onboarding_data.business_city,
+            "state": onboarding_data.business_state,
+            "zip": onboarding_data.business_zip,
+            "about_us": onboarding_data.about_company or "",
+            "business_hours": json.dumps(onboarding_data.business_hours or {}),
+            "business_timezone": onboarding_data.business_timezone or "America/New_York",
+            "industry": {
+                "industry": onboarding_data.industry,
+                "sub_industry": onboarding_data.sub_industry,
+                "appointment_settings": onboarding_data.appointment_settings or {},
+            },
+            "user_id": current_user_id,
+        }
+
+        existing_business_response = supabase.table('businesses').select('id').eq('user_id', current_user_id).limit(1).execute()
+        existing_business = existing_business_response.data[0] if existing_business_response.data else None
+
+        if existing_business:
+            business_response = (
+                supabase.table('businesses')
+                .update(business_payload)
+                .eq('id', existing_business['id'])
+                .execute()
+            )
+        else:
+            business_response = supabase.table('businesses').insert(business_payload).execute()
+
+        return {
+            "onboarded": True,
+            "business": business_response.data[0] if business_response.data else None,
+        }
+    except Exception as e:
+        logging.error(f"Failed to complete onboarding for user {current_user_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save onboarding data.",
+        )
 
 # --- Leads Endpoints ---
 

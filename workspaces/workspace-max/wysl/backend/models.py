@@ -139,11 +139,18 @@ class PurchaseResponse(PurchaseBase):
 # USER MODELS
 # =============================================================================
 class UserBase(BaseModel):
+    full_name: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
+    phone: Optional[str] = None
     password: Optional[str] = None
     plan: Optional[str] = "free"
+    onboarded: Optional[bool] = False
+    user_agent: Optional[Dict[str, Any]] = None
+    stripe: Optional[Dict[str, Any]] = None
+    identity_questions: Optional[Any] = None
+    display: Optional[Dict[str, Any]] = None
     display_intro: Optional[bool] = False
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     last_login: Optional[date] = None
@@ -201,8 +208,11 @@ class UserCreate(UserBase):
     id: UUID
 
 class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    phone: Optional[str] = None
+    onboarded: Optional[bool] = None
     referral: Optional[str] = None
     industry: Optional[str] = None
     intent: Optional[str] = None

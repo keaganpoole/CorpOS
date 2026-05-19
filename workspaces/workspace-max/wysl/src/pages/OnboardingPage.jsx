@@ -1,9 +1,31 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import HireReceptionistModal from '../sonar/pages/HireReceptionistModal';
+import { useAuth } from '../contexts/AuthContext';
 
-const TOTAL_STEPS = 8;
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+const emptyToNull = (value) => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+};
+
+const formatApiError = (error) => {
+  const detail = error?.response?.data?.detail;
+
+  if (Array.isArray(detail)) {
+    return detail.map((item) => item?.msg || 'Invalid value').join(' ');
+  }
+
+  if (detail && typeof detail === 'object') {
+    return detail.msg || JSON.stringify(detail);
+  }
+
+  return detail || error?.message || 'Failed to finish onboarding.';
+};
+const TOTAL_STEPS = 6;
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -133,11 +155,9 @@ const stepMeta = [
   { eyebrow: 'Start', title: 'Business basics', helper: 'Just enough to shape your workspace.' },
   { eyebrow: 'Details', title: 'Full business info', helper: 'Optional now. Useful once calls go live.' },
   { eyebrow: '', title: '', helper: '' },
-  { eyebrow: 'Receptionist', title: 'Hire your receptionist', helper: 'Choose the voice and personality customers will meet first.' },
   { eyebrow: 'Availability', title: 'Hours of operation', helper: 'Tell Sonar when it should answer inbound calls.' },
   { eyebrow: '', title: '', helper: '' },
   { eyebrow: 'Company', title: 'About the company', helper: 'A simple natural summary works best.' },
-  { eyebrow: 'Services', title: 'What do you offer?', helper: 'Add the services customers usually ask about.' },
 ];
 
 const cn = (...classes) => classes.filter(Boolean).join(' ');
@@ -331,6 +351,7 @@ function DayHoursRow({ day, hours, onUpdate }) {
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
+  const { session, refreshProfile } = useAuth();
 
   const [step, setStep] = useState(1);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -347,14 +368,12 @@ export default function OnboardingPage() {
   const [businessZip, setBusinessZip] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
   const [businessTimezone, setBusinessTimezone] = useState('America/New_York');
-  const [selectedReceptionist, setSelectedReceptionist] = useState(null);
   const [businessHours, setBusinessHours] = useState(defaultHours);
   const [selectedScheduleDays, setSelectedScheduleDays] = useState(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
   const [showAdvancedSchedule, setShowAdvancedSchedule] = useState(false);
   const [appointmentDuration, setAppointmentDuration] = useState('30');
   const [appointmentBuffer, setAppointmentBuffer] = useState('15');
   const [aboutCompany, setAboutCompany] = useState('');
-  const [services, setServices] = useState('');
 
   const meta = stepMeta[step - 1];
 
@@ -421,30 +440,43 @@ export default function OnboardingPage() {
 
     try {
       const payload = {
-        business_name: businessName,
-        industry,
-        sub_industry: subIndustry,
-        business_email: businessEmail,
-        business_street: businessStreet,
-        business_city: businessCity,
-        business_state: businessState,
-        business_zip: businessZip,
-        business_phone: businessPhone,
+        business_name: businessName.trim(),
+        industry: emptyToNull(industry),
+        sub_industry: emptyToNull(subIndustry),
+        business_email: emptyToNull(businessEmail),
+        business_street: emptyToNull(businessStreet),
+        business_city: emptyToNull(businessCity),
+        business_state: emptyToNull(businessState),
+        business_zip: emptyToNull(businessZip),
+        business_phone: emptyToNull(businessPhone),
         business_timezone: businessTimezone,
-        receptionist: selectedReceptionist,
         business_hours: businessHours,
         appointment_settings: {
           default_duration_minutes: Number(appointmentDuration) || 30,
           buffer_minutes: Number(appointmentBuffer) || 0,
         },
-        about_company: aboutCompany,
-        services,
+        about_company: emptyToNull(aboutCompany),
       };
 
+      if (!session?.access_token) {
+        throw new Error('Please log in again before finishing onboarding.');
+      }
+
+      await axios.post(
+        `${API_BASE_URL}/users/me/onboarding`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
       localStorage.setItem('sonar-onboarding-draft', JSON.stringify(payload));
+      await refreshProfile?.();
       navigate('/dashboard');
     } catch (error) {
-      setSaveError(error?.message || 'Failed to finish onboarding.');
+      setSaveError(formatApiError(error));
     } finally {
       setIsSaving(false);
     }
@@ -472,11 +504,6 @@ export default function OnboardingPage() {
 
   const prevStep = () => {
     setStep((current) => Math.max(current - 1, 1));
-  };
-
-  const handleReceptionistHire = (receptionist) => {
-    setSelectedReceptionist(receptionist);
-    setStep((current) => Math.min(current + 1, TOTAL_STEPS));
   };
 
   const handleSignOut = async () => {
@@ -625,15 +652,6 @@ export default function OnboardingPage() {
       case 4:
         return (
           <StepShell meta={meta} step={step} onSkip={skipStep}>
-            <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-black/30">
-              <HireReceptionistModal embedded onHire={handleReceptionistHire} />
-            </div>
-          </StepShell>
-        );
-
-      case 5:
-        return (
-          <StepShell meta={meta} step={step} onSkip={skipStep}>
             <div className="space-y-5 rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
               <div>
                 <div className="mb-3 text-[13px] font-normal text-zinc-500">Days receptionist can answer</div>
@@ -705,7 +723,7 @@ export default function OnboardingPage() {
           </StepShell>
         );
 
-      case 6:
+      case 5:
         return (
           <StepShell meta={meta} step={step} onSkip={skipStep}>
             <QuietCelebration
@@ -716,7 +734,7 @@ export default function OnboardingPage() {
           </StepShell>
         );
 
-      case 7:
+      case 6:
         return (
           <StepShell meta={meta} step={step} onSkip={skipStep}>
             <Field label="Company summary">
