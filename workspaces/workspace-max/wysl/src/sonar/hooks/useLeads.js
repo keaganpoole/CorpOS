@@ -36,6 +36,8 @@ const TRIMMED_TEXT_FIELDS = new Set([
   'invoice_id',
 ]);
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+
 const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
   const next = { ...payload };
   const now = new Date().toISOString();
@@ -121,7 +123,7 @@ export function useLeads() {
 
   const notifyBackend = useCallback(async (eventType, record, oldRecord) => {
     try {
-      await fetch('http://127.0.0.1:7878/api/webhook/people', {
+      await fetch(`${API_BASE_URL}/api/webhook/people`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: eventType, record, old_record: oldRecord }),

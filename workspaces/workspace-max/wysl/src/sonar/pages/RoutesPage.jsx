@@ -2,11 +2,10 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Phone, AudioLines, Brain, Database, ArrowRight,
-  Circle, Clock, Zap, CheckCircle, XCircle, AlertTriangle,
   Wifi, WifiOff, Activity, Radio, Globe, Server,
 } from 'lucide-react';
 
-const BASE_URL = 'http://127.0.0.1:7878';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 // ─── All known endpoints ────────────────────────────────────
 const ENDPOINTS = [
@@ -197,63 +196,78 @@ export default function RoutesPage() {
   const [totalRequests, setTotalRequests] = useState(0);
   const [activeSource, setActiveSource] = useState(null);
   const feedRef = useRef(null);
-  const wsRef = useRef(null);
+  const lastAnimatedHitRef = useRef(null);
 
-  // Connect WebSocket for real-time route hits
+  // Poll FastAPI live pulse for recent route-hit events.
   useEffect(() => {
-    const connect = () => {
-      const ws = new WebSocket(`ws://${BASE_URL.replace('http://', '')}`);
-      wsRef.current = ws;
+    let cancelled = false;
 
-      ws.onopen = () => { setConnected(true); };
-      ws.onclose = () => { setConnected(false); setTimeout(connect, 2000); };
-      ws.onerror = () => { setConnected(false); };
+    const loadRecentRouteHits = async () => {
+      try {
+        const response = await fetch(`${BASE_URL}/api/events/live-pulse?limit=50`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
+        const data = await response.json();
+        if (cancelled) return;
 
-          if (data.type === 'route_hit') {
-            setHits(prev => [data, ...prev].slice(0, 200));
-            setTotalRequests(prev => prev + 1);
+        const routeHits = (Array.isArray(data) ? data : [])
+          .filter(event => event.type === 'route_hit' && event.endpoint)
+          .slice(0, 200);
 
-            // Update stats
-            setStats(prev => {
-              const key = data.endpoint;
-              const existing = prev[key] || { count: 0, durations: [] };
-              return {
-                ...prev,
-                [key]: {
-                  count: existing.count + 1,
-                  durations: [...existing.durations, data.duration].slice(-20),
-                },
-              };
-            });
+        const nextStats = routeHits.reduce((acc, hit) => {
+          const existing = acc[hit.endpoint] || { count: 0, durations: [] };
+          existing.count += 1;
+          existing.durations = [...existing.durations, hit.duration].slice(-20);
+          acc[hit.endpoint] = existing;
+          return acc;
+        }, {});
 
-            // Trigger flow animation
-            if (data.source === 'elevenlabs') {
-              setActiveSource('elevenlabs');
-              setFlowActive({ caller: true, elevenlabs: true, sonar: true, supabase: data.endpoint.includes('tools') });
-              setTimeout(() => {
-                setFlowActive({ caller: false, elevenlabs: false, sonar: false, supabase: false });
-                setActiveSource(null);
-              }, 1200);
-            } else if (data.source === 'dashboard') {
-              setActiveSource('dashboard');
-              setFlowActive({ caller: false, elevenlabs: false, sonar: true, supabase: true });
-              setTimeout(() => {
-                setFlowActive({ caller: false, elevenlabs: false, sonar: false, supabase: false });
-                setActiveSource(null);
-              }, 1000);
-            }
-          }
-        } catch (e) { /* ignore parse errors */ }
-      };
+        setConnected(true);
+        setHits(routeHits);
+        setStats(nextStats);
+        setTotalRequests(routeHits.length);
+      } catch (error) {
+        if (!cancelled) {
+          setConnected(false);
+        }
+      }
     };
 
-    connect();
-    return () => { if (wsRef.current) wsRef.current.close(); };
+    loadRecentRouteHits();
+    const timer = setInterval(loadRecentRouteHits, 2000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
+
+  useEffect(() => {
+    const latestHit = hits[0];
+    if (!latestHit?.id) return undefined;
+    if (lastAnimatedHitRef.current === latestHit.id) return undefined;
+    if (Date.now() - new Date(latestHit.timestamp).getTime() > 2000) return undefined;
+
+    lastAnimatedHitRef.current = latestHit.id;
+
+    if (latestHit.source === 'elevenlabs') {
+      setActiveSource('elevenlabs');
+      setFlowActive({ caller: true, elevenlabs: true, sonar: true, supabase: latestHit.endpoint.includes('tools') });
+      const timer = setTimeout(() => {
+        setFlowActive({ caller: false, elevenlabs: false, sonar: false, supabase: false });
+        setActiveSource(null);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+
+    setActiveSource('dashboard');
+    setFlowActive({ caller: false, elevenlabs: false, sonar: true, supabase: true });
+    const timer = setTimeout(() => {
+      setFlowActive({ caller: false, elevenlabs: false, sonar: false, supabase: false });
+      setActiveSource(null);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [hits]);
 
   // Auto-scroll feed
   useEffect(() => {
@@ -281,7 +295,7 @@ export default function RoutesPage() {
           {/* Connection status + counter */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-zinc-600 font-mono">{totalRequests} requests</span>
+              <span className="text-[10px] text-zinc-600 font-mono">{totalRequests} recent requests</span>
             </div>
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${
               connected

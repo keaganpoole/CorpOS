@@ -3,8 +3,8 @@
  * Handles REST fetches and WebSocket subscriptions
  */
 
-const API_BASE = window.sonar?.apiUrl || 'http://127.0.0.1:7878';
-const WS_URL = window.sonar?.wsUrl || 'ws://127.0.0.1:7878';
+const API_BASE = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const WS_URL = window.sonar?.wsUrl || import.meta.env.VITE_WS_URL || null;
 
 // ─── REST Helpers ───────────────────────────────────────────
 async function fetchJSON(endpoint) {
@@ -36,7 +36,7 @@ export const api = {
   updateAgentCallTypes: (agentId, callTypes) => postJSON(`/api/agents/${agentId}/call-types`, { call_types: callTypes }),
   patchAgent: (agentId, data) => patchJSON(`/api/agents/${agentId}`, data),
   getPendingRestarts: () => fetchJSON('/api/pending-restarts'),
-  clearPendingRestart: (id) => del(`/api/pending-restarts/${id}`),
+  clearPendingRestart: (id) => deleteJSON(`/api/pending-restarts/${id}`),
 
   // Control commands via REST (fallback when IPC unavailable)
   setRuntime: (mode) => postJSON('/api/control/runtime', { mode }),
@@ -95,6 +95,11 @@ const listeners = new Set();
 const eventListeners = new Map(); // event_type → Set of callbacks
 
 export function connectWebSocket(onStateChange) {
+  if (!WS_URL) {
+    if (onStateChange) onStateChange('disconnected');
+    return;
+  }
+
   if (ws && ws.readyState === WebSocket.OPEN) return;
 
   ws = new WebSocket(WS_URL);

@@ -4,6 +4,7 @@ import logging
 import os
 import stripe
 import json
+import time
 from uuid import UUID
 from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, timezone, timedelta
@@ -63,6 +64,80 @@ PAYMENT_TEST_MODE = TEST_MODE
 
 app.include_router(phone_helper_router, prefix="/api", tags=["Phone Helper"])
 
+CONTROL_STATE = {
+    "runtime_mode": "running",
+    "stage": "code_blue",
+    "zone": 1,
+}
+SESSION_STATE = {
+    "status": "running",
+    "started_at": datetime.now(timezone.utc).isoformat(),
+    "last_ping_at": None,
+}
+LIVE_PULSE_EVENTS: list[dict] = []
+SYSTEM_LOG_EVENTS: list[dict] = []
+CRON_JOBS: list[dict] = []
+REACTIONS_CACHE: list[dict] = []
+PENDING_RESTARTS: list[dict] = []
+ROUTE_HIT_EXCLUDE_PATHS = {
+    "/api/events/live-pulse",
+    "/api/logs",
+}
+
+
+def push_live_event(message: str, *, actor: str = "system", severity: str = "info", event_type: Optional[str] = None, payload: Optional[dict] = None):
+    timestamp = datetime.now(timezone.utc).isoformat()
+    event = {
+        "id": f"{int(datetime.now(timezone.utc).timestamp() * 1000)}-{len(LIVE_PULSE_EVENTS)}",
+        "timestamp": timestamp,
+        "message": message,
+        "actor": actor,
+        "severity": severity,
+        "event_type": event_type or "system_event",
+        "payload": payload or {},
+    }
+    LIVE_PULSE_EVENTS.insert(0, event)
+    del LIVE_PULSE_EVENTS[50:]
+
+    SYSTEM_LOG_EVENTS.insert(0, {
+        "timestamp": timestamp,
+        "level": severity,
+        "source": actor,
+        "message": message,
+    })
+    del SYSTEM_LOG_EVENTS[100:]
+
+
+def push_route_hit(method: str, endpoint: str, status_code: int, duration_ms: int, source: str):
+    timestamp = datetime.now(timezone.utc).isoformat()
+    LIVE_PULSE_EVENTS.insert(0, {
+        "id": f"route-{int(datetime.now(timezone.utc).timestamp() * 1000)}-{len(LIVE_PULSE_EVENTS)}",
+        "type": "route_hit",
+        "event_type": "route_hit",
+        "timestamp": timestamp,
+        "method": method,
+        "endpoint": endpoint,
+        "status": status_code,
+        "duration": duration_ms,
+        "source": source,
+        "message": f"{method} {endpoint} -> {status_code}",
+    })
+    del LIVE_PULSE_EVENTS[50:]
+
+
+def infer_route_source(request: Request) -> str:
+    path = request.url.path
+    user_agent = (request.headers.get("user-agent") or "").lower()
+
+    if path.startswith("/api/webhooks/elevenlabs") or "elevenlabs" in user_agent:
+        return "elevenlabs"
+    if "supabase" in user_agent:
+        return "supabase"
+    return "dashboard"
+
+
+push_live_event("FastAPI backend active on port 8000.", actor="system", severity="info", event_type="system_startup")
+
 
 # --------------------------------------------------------------------------
 # Scheduler Jobs
@@ -102,6 +177,21 @@ class RepTokenResponse(BaseModel):
 
 class LoginStatusUpdate(BaseModel):
     is_logged_in: bool
+
+class RuntimeModeRequest(BaseModel):
+    mode: str
+
+class StageRequest(BaseModel):
+    stage: str
+
+class ZoneRequest(BaseModel):
+    zone: int
+
+class AgentCallTypesRequest(BaseModel):
+    call_types: str
+
+class AgentModelRequest(BaseModel):
+    model: str
 
 class LeadDetailsForQueue(BaseModel):
     fullName: str
@@ -305,6 +395,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def capture_route_hits(request: Request, call_next):
+    path = request.url.path
+    should_track = (
+        request.method != "OPTIONS"
+        and path.startswith("/api/")
+        and path not in ROUTE_HIT_EXCLUDE_PATHS
+    )
+    started_at = time.perf_counter()
+
+    try:
+        response = await call_next(request)
+    except Exception:
+        if should_track:
+            duration_ms = int((time.perf_counter() - started_at) * 1000)
+            push_route_hit(
+                request.method,
+                path,
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                duration_ms,
+                infer_route_source(request),
+            )
+        raise
+
+    if should_track:
+        duration_ms = int((time.perf_counter() - started_at) * 1000)
+        push_route_hit(
+            request.method,
+            path,
+            response.status_code,
+            duration_ms,
+            infer_route_source(request),
+        )
+
+    return response
 
 
 
@@ -822,6 +949,200 @@ async def elevenlabs_post_call_webhook(
     saved = response.data[0] if getattr(response, "data", None) else call_log
     return {"ok": True, "call_log": saved}
 
+@app.get("/api/agents", tags=["Sonar Controller Compat"])
+async def get_sonar_agents():
+    try:
+        response = supabase.table('hired_receptionists').select('*').execute()
+        agents = []
+        for row in response.data or []:
+            agents.append({
+                **row,
+                "name": row.get("full_name") or row.get("first_name") or "Receptionist",
+                "role": row.get("stereotype") or "Receptionist",
+                "status": "active" if row.get("is_active", True) else "idle",
+                "current_activity": row.get("current_activity") or "Idle",
+                "model": row.get("model"),
+            })
+        return agents
+    except Exception as exc:
+        logging.error("Failed to fetch Sonar agents: %s", exc, exc_info=True)
+        return []
+
+@app.get("/api/system/summary", tags=["Sonar Controller Compat"])
+async def get_sonar_system_summary():
+    try:
+        agents = supabase.table('hired_receptionists').select('id,is_active').execute().data or []
+        active_agents = len([agent for agent in agents if agent.get('is_active', True)])
+        total_agents = len(agents)
+        return {
+            "ok": active_agents,
+            "warnings": 0,
+            "errors": 0,
+            "activeAgents": active_agents,
+            "totalAgents": total_agents,
+        }
+    except Exception:
+        return {"ok": 0, "warnings": 0, "errors": 0, "activeAgents": 0, "totalAgents": 0}
+
+@app.get("/api/events/live-pulse", tags=["Sonar Controller Compat"])
+async def get_live_pulse(limit: int = 30):
+    return LIVE_PULSE_EVENTS[:max(1, min(limit, 50))]
+
+@app.get("/api/logs", tags=["Sonar Controller Compat"])
+async def get_system_logs(limit: int = 50):
+    return SYSTEM_LOG_EVENTS[:max(1, min(limit, 100))]
+
+@app.get("/api/control-state", tags=["Sonar Controller Compat"])
+async def get_control_state():
+    return CONTROL_STATE
+
+@app.get("/api/session", tags=["Sonar Controller Compat"])
+async def get_session_state():
+    return SESSION_STATE
+
+@app.get("/api/pipeline", tags=["Sonar Controller Compat"])
+async def get_pipeline_state():
+    try:
+        people = supabase.table('people').select('id').execute().data or []
+    except Exception:
+        people = []
+    try:
+        appointments = supabase.table('appointments').select('id').execute().data or []
+    except Exception:
+        appointments = []
+    try:
+        payments = supabase.table('payments').select('id').execute().data or []
+    except Exception:
+        payments = []
+    try:
+        call_logs = supabase.table('call_logs').select('id').execute().data or []
+    except Exception:
+        call_logs = []
+
+    return {
+        "stages": [
+            {"id": "calls", "label": "Calls", "count": len(call_logs)},
+            {"id": "people", "label": "People", "count": len(people)},
+            {"id": "appointments", "label": "Appointments", "count": len(appointments)},
+            {"id": "payments", "label": "Payments", "count": len(payments)},
+        ],
+        "totalRelics": len(call_logs),
+        "qualifiedLeads": len(people),
+        "activeOutreach": len(appointments),
+    }
+
+@app.get("/api/cron", tags=["Sonar Controller Compat"])
+async def get_cron_jobs():
+    return CRON_JOBS
+
+@app.post("/api/cron", tags=["Sonar Controller Compat"])
+async def create_cron_job(job: dict):
+    cron_job = {
+        "id": f"cron-{len(CRON_JOBS) + 1}",
+        **job,
+    }
+    CRON_JOBS.append(cron_job)
+    push_live_event("Cron job created.", actor="system", severity="info", event_type="cron_created", payload=cron_job)
+    return cron_job
+
+@app.delete("/api/cron/{job_id}", tags=["Sonar Controller Compat"])
+async def delete_cron_job(job_id: str):
+    global CRON_JOBS
+    CRON_JOBS = [job for job in CRON_JOBS if job.get("id") != job_id]
+    push_live_event("Cron job deleted.", actor="system", severity="info", event_type="cron_deleted", payload={"id": job_id})
+    return {"ok": True}
+
+@app.get("/api/reactions", tags=["Sonar Controller Compat"])
+async def get_reactions():
+    try:
+        return supabase.table('reactions').select('*').execute().data or []
+    except Exception:
+        return REACTIONS_CACHE
+
+@app.post("/api/reactions", tags=["Sonar Controller Compat"])
+async def add_reaction(data: dict):
+    try:
+        response = supabase.table('reactions').insert(data).execute()
+        created = response.data[0] if response.data else data
+    except Exception:
+        created = {"id": f"reaction-{len(REACTIONS_CACHE) + 1}", **data}
+        REACTIONS_CACHE.append(created)
+    push_live_event("Reaction recorded.", actor="system", severity="info", event_type="reaction_added", payload=created)
+    return created
+
+@app.get("/api/openrouter/models", tags=["Sonar Controller Compat"])
+async def get_openrouter_models():
+    return []
+
+@app.get("/api/pending-restarts", tags=["Sonar Controller Compat"])
+async def get_pending_restarts():
+    return PENDING_RESTARTS
+
+@app.delete("/api/pending-restarts/{restart_id}", tags=["Sonar Controller Compat"])
+async def clear_pending_restart(restart_id: str):
+    global PENDING_RESTARTS
+    PENDING_RESTARTS = [item for item in PENDING_RESTARTS if item.get("id") != restart_id]
+    return {"ok": True}
+
+@app.post("/api/agents/{agent_id}/call-types", tags=["Sonar Controller Compat"])
+async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest):
+    response = supabase.table('hired_receptionists').update({'call_types': payload.call_types}).eq('id', agent_id).execute()
+    push_live_event("Agent call handling updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "call_types": payload.call_types})
+    return response.data[0] if response.data else {"id": agent_id, "call_types": payload.call_types}
+
+@app.post("/api/agents/{agent_id}/model", tags=["Sonar Controller Compat"])
+async def update_agent_model(agent_id: str, payload: AgentModelRequest):
+    try:
+        response = supabase.table('hired_receptionists').update({'model': payload.model}).eq('id', agent_id).execute()
+        updated = response.data[0] if response.data else {"id": agent_id, "model": payload.model}
+    except Exception:
+        updated = {"id": agent_id, "model": payload.model}
+    push_live_event("Agent model updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "model": payload.model})
+    return updated
+
+@app.patch("/api/agents/{agent_id}", tags=["Sonar Controller Compat"])
+async def patch_agent(agent_id: str, payload: dict):
+    response = supabase.table('hired_receptionists').update(payload).eq('id', agent_id).execute()
+    push_live_event("Agent updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, **payload})
+    return response.data[0] if response.data else {"id": agent_id, **payload}
+
+@app.post("/api/control/runtime", tags=["Sonar Controller Compat"])
+async def set_runtime_mode(payload: RuntimeModeRequest):
+    CONTROL_STATE["runtime_mode"] = payload.mode
+    SESSION_STATE["status"] = payload.mode
+    push_live_event(f"Runtime {payload.mode}.", actor="system", severity="info", event_type=f"runtime_{payload.mode}", payload={"mode": payload.mode})
+    return CONTROL_STATE
+
+@app.post("/api/control/stage", tags=["Sonar Controller Compat"])
+async def set_control_stage(payload: StageRequest):
+    CONTROL_STATE["stage"] = payload.stage
+    push_live_event(f"Stage set to {payload.stage}.", actor="system", severity="info", event_type="stage_changed", payload={"stage": payload.stage})
+    return CONTROL_STATE
+
+@app.post("/api/control/zone", tags=["Sonar Controller Compat"])
+async def set_control_zone(payload: ZoneRequest):
+    CONTROL_STATE["zone"] = payload.zone
+    push_live_event(f"Zone set to {payload.zone}.", actor="system", severity="info", event_type="zone_changed", payload={"zone": payload.zone})
+    return CONTROL_STATE
+
+@app.post("/api/control/ping-max", tags=["Sonar Controller Compat"])
+async def ping_max():
+    SESSION_STATE["last_ping_at"] = datetime.now(timezone.utc).isoformat()
+    push_live_event("Ping sent.", actor="keagan", severity="info", event_type="ping_sent")
+    return {"ok": True}
+
+@app.post("/api/webhook/people", tags=["Sonar Controller Compat"])
+async def people_webhook(payload: dict):
+    event_type = payload.get("type", "people_update")
+    push_live_event(
+        f"People event: {event_type}.",
+        actor="system",
+        severity="info",
+        event_type=f"lead_{str(event_type).lower()}",
+        payload=payload,
+    )
+    return {"ok": True}
+
 @app.get("/api/sonar/call-logs", tags=["Sonar Calls"])
 async def list_call_logs(limit: int = 50, current_user: dict = Depends(get_current_user)):
     safe_limit = max(1, min(limit, 200))
@@ -1150,6 +1471,11 @@ async def get_plans():
         logging.error(f"Error fetching plans: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch plans")
 
+
+@app.get("/api/sonar/pricing/plans", tags=["Sonar Payments"])
+async def get_sonar_pricing_plans():
+    return await get_plans()
+
 @app.post("/create-checkout-session", tags=["Billing"])
 async def create_checkout_session(request: CreateCheckoutSessionRequest, current_user: dict = Depends(get_current_user)):
   current_user_id = current_user.id
@@ -1206,10 +1532,23 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
     logging.error(f"Error creating checkout session for user {current_user_id}: {e}", exc_info=True)
     raise HTTPException(status_code=500, detail="An internal error occurred.")
 
+@app.get("/api/sonar/payments/test-mode", tags=["Sonar Payments"])
+async def get_sonar_payment_test_mode():
+    return {
+        "testMode": PAYMENT_TEST_MODE,
+        "enabled": PAYMENT_TEST_MODE,
+        "mode": get_payment_mode_label(),
+    }
+
+
 @app.post("/api/sonar/payments/test-mode", tags=["Sonar Payments"])
 async def set_sonar_payment_test_mode(request: PaymentTestModeRequest):
     set_payment_test_mode(request.enabled)
-    return {"enabled": PAYMENT_TEST_MODE, "mode": get_payment_mode_label()}
+    return {
+        "testMode": PAYMENT_TEST_MODE,
+        "enabled": PAYMENT_TEST_MODE,
+        "mode": get_payment_mode_label(),
+    }
 
 @app.post("/api/sonar/create-payment", tags=["Sonar Payments"])
 async def create_payment(request: PaymentCreateRequest):
