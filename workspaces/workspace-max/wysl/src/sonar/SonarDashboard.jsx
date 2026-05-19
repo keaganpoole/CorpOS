@@ -44,8 +44,9 @@ import {
   Target,
   GitBranch,
   Calendar,
-  Radio,
   Phone,
+  Copy,
+  CheckCircle2,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
@@ -58,8 +59,6 @@ import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 import ScenariosPage from './pages/Scenarios/Scenarios';
 import SettingsPage from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
-import RoutesPage from './pages/RoutesPage';
-import WorkflowTreePage from './pages/WorkflowTreePage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -200,7 +199,7 @@ const timeAgo = (timestamp) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...estOpts });
 };
 
-const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onTerminate }) => {
+const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onTerminate }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   const displayModel = pending || agent.model || 'Not set';
@@ -245,11 +244,54 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
       </div>
 
       <div className="p-5 space-y-3">
+        <div>
+          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Call Handling</p>
+          <div className="flex items-center gap-1.5 mb-2">
+            {[
+              { key: 'none', label: 'Off', activeClass: 'bg-zinc-700/10 border-zinc-700/20 text-zinc-600' },
+              { key: 'inbound', label: 'In', activeClass: 'bg-cyan-400/10 border-cyan-400/20 text-cyan-400' },
+              { key: 'outbound', label: 'Out', activeClass: 'bg-indigo-400/10 border-indigo-400/20 text-indigo-400' },
+              { key: 'both', label: 'Both', activeClass: 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' },
+            ].map(ct => {
+              const isAct = (agent.call_types || 'none') === ct.key;
+              return (
+                <button
+                  key={ct.key}
+                  onClick={async () => {
+                    const newVal = ct.key === (agent.call_types || 'none') ? 'none' : ct.key;
+                    try {
+                      await api.updateAgentCallTypes(agent.id, newVal);
+                    } catch (err) {
+                      console.error('[CallTypes] Failed:', err.message || err);
+                    }
+                  }}
+                  className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border
+                    ${isAct ? ct.activeClass : 'bg-transparent border-transparent text-zinc-700 hover:text-zinc-500 hover:bg-white/[0.02]'}`}
+                >
+                  {ct.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="pt-3 border-t border-white/[0.04]">
+            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Phone Number</p>
+            {(agent.call_types && agent.call_types !== 'none') ? (
+              <div className="flex items-center gap-1.5">
+                <Phone size={9} className="text-zinc-600" />
+                <span className="text-[10px] text-zinc-500 font-medium">{agent.phone_number || 'No number assigned'}</span>
+              </div>
+            ) : (
+              <span className="text-[10px] text-zinc-600">Enable call handling to assign a number</span>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center gap-2 text-zinc-500">
           <Terminal size={11} className="shrink-0 text-zinc-700" />
           <span className="text-[11px] font-medium truncate italic">{agent.current_activity || 'Idle'}</span>
         </div>
 
+        <div className="hidden">
         <div className="pt-3 border-t border-white/[0.04]">
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Language Model</p>
           <button
@@ -274,6 +316,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
               <Cpu size={11} className="text-cyan-500/60" />
             </div>
           </button>
+        </div>
         </div>
 
         <div className="pt-3 border-t border-white/[0.04]">
@@ -301,6 +344,28 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           </button>
         </div>
 
+        <div className="pt-3 border-t border-white/[0.04]">
+          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Number Forwarding</p>
+          <button
+            onClick={() => onOpenForwarding && onOpenForwarding(agent)}
+            className="w-full flex items-center justify-between group cursor-pointer"
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Repeat size={11} className="text-orange-400/70" />
+              <span className="text-[11px] font-bold text-orange-300/80 truncate group-hover:text-orange-300 transition-colors">
+                Forward business number
+              </span>
+            </div>
+            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
+                Setup
+              </span>
+              <ChevronRight size={11} className="text-orange-400/70" />
+            </div>
+          </button>
+        </div>
+
+        {false && (
         <div className="pt-3 border-t border-white/[0.04]">
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Call Handling</p>
           <div className="flex items-center gap-1.5 mb-2">
@@ -342,7 +407,239 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
             )}
           </div>
         </div>
+        )}
       </div>
+    </motion.div>
+  );
+};
+
+const PHONE_PROVIDERS = [
+  { id: 'verizon', label: 'Verizon', action: 'Open Verizon call forwarding, then forward calls to this number.' },
+  { id: 'att', label: 'AT&T', action: 'Open AT&T call forwarding, then forward calls to this number.' },
+  { id: 'tmobile', label: 'T-Mobile', action: 'Open T-Mobile call forwarding, then forward calls to this number.' },
+  { id: 'comcast', label: 'Comcast / Xfinity', action: 'Open Voice settings, then forward calls to this number.' },
+  { id: 'ringcentral', label: 'RingCentral', action: 'Open Phone System, then set forwarding to this number.' },
+  { id: 'google', label: 'Google Voice', action: 'Open Calls settings, then forward calls to this number.' },
+  { id: 'other', label: 'Other provider', action: 'Open your call forwarding settings, then forward calls to this number.' },
+];
+
+const ForwardNumberModal = ({ agent, onClose }) => {
+  const [slide, setSlide] = useState(0);
+  const [selectedProvider, setSelectedProvider] = useState(PHONE_PROVIDERS[0]);
+  const [copied, setCopied] = useState(false);
+  const forwardingNumber = agent?.phone_number || 'Number pending';
+  const hasNumber = Boolean(agent?.phone_number);
+  const totalSlides = 4;
+
+  const copyForwardingNumber = async () => {
+    if (!hasNumber || typeof navigator === 'undefined' || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(forwardingNumber);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  const goNext = () => {
+    if (slide === totalSlides - 1) {
+      onClose();
+      return;
+    }
+    setSlide((current) => Math.min(current + 1, totalSlides - 1));
+  };
+
+  const goBack = () => {
+    setSlide((current) => Math.max(current - 1, 0));
+  };
+
+  const renderSlide = () => {
+    if (slide === 0) {
+      return (
+        <div className="rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-600">Receptionist line</p>
+              <p className="mt-2 break-words text-2xl font-semibold tracking-[-0.03em] text-white">{forwardingNumber}</p>
+            </div>
+            <button
+              type="button"
+              onClick={copyForwardingNumber}
+              disabled={!hasNumber}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.035] text-zinc-400 transition hover:border-orange-400/40 hover:text-orange-300 disabled:cursor-not-allowed disabled:opacity-40"
+              title="Copy number"
+            >
+              {copied ? <CheckCircle2 size={17} /> : <Copy size={16} />}
+            </button>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-zinc-500">
+            This is the number your existing business line will forward calls to.
+          </p>
+          {!hasNumber && (
+            <p className="mt-3 text-xs leading-5 text-orange-300/80">
+              Assign a phone number before forwarding calls to this receptionist.
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    if (slide === 1) {
+      return (
+        <div className="rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
+          <p className="mb-3 text-[13px] font-normal text-zinc-500">Who handles your business number?</p>
+          <div className="grid max-h-[260px] grid-cols-2 gap-2 overflow-y-auto pr-1 custom-scrollbar sm:grid-cols-3">
+            {PHONE_PROVIDERS.map((provider) => {
+              const active = selectedProvider.id === provider.id;
+              return (
+                <button
+                  key={provider.id}
+                  type="button"
+                  onClick={() => setSelectedProvider(provider)}
+                  className={`rounded-2xl border px-3 py-2 text-left text-xs font-semibold transition ${
+                    active
+                      ? 'border-orange-400 bg-orange-400 text-black shadow-[0_0_22px_rgba(249,115,22,0.18)]'
+                      : 'border-white/[0.08] bg-black/20 text-zinc-400 hover:border-orange-400/40 hover:text-white'
+                  }`}
+                >
+                  {provider.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    if (slide === 2) {
+      return (
+        <div className="rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
+          <div className="mb-4 flex items-center gap-2">
+            <Repeat size={15} className="text-orange-300" />
+            <p className="text-[13px] font-normal text-zinc-400">{selectedProvider.action}</p>
+          </div>
+          <div className="space-y-2 text-sm text-zinc-500">
+            <p>1. Open your phone provider settings.</p>
+            <p>2. Turn on call forwarding.</p>
+            <p>3. Forward calls to <span className="font-semibold text-white">{forwardingNumber}</span>.</p>
+            <p>4. Save your changes.</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-white/[0.025]">
+        <div className="relative p-5 text-center">
+          <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-orange-400/20 bg-orange-400/[0.06] shadow-[0_0_44px_rgba(249,115,22,0.12)]">
+            <span className="absolute h-20 w-20 rounded-full border border-orange-300/25 animate-ping" />
+            <span className="absolute h-14 w-14 rounded-full border border-orange-300/20 animate-pulse" />
+            <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-orange-300 text-black shadow-[0_0_22px_rgba(249,115,22,0.22)]">
+              <Phone size={21} />
+            </div>
+          </div>
+
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-600">Test call</p>
+          <h3 className="mx-auto mt-3 max-w-sm text-2xl font-semibold tracking-[-0.04em] text-white">
+            Listening for your test call.
+          </h3>
+          <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-zinc-500">
+            Use your cell phone to call the number customers already use. If {agent?.first_name || agent?.name || 'your receptionist'} answers, forwarding is working.
+          </p>
+        </div>
+
+        <div className="border-t border-white/[0.06] bg-black/20 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-600">
+              Listening
+            </span>
+            <div className="flex items-center gap-2">
+              {[0, 1, 2].map((dot) => (
+                <span
+                  key={dot}
+                  className="h-1.5 w-1.5 rounded-full bg-orange-300 animate-pulse"
+                  style={{ animationDelay: `${dot * 160}ms` }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 p-4 text-white backdrop-blur-md sm:p-8 font-sans"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0, y: 18 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0, y: 18 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative max-h-[calc(100vh-32px)] w-full max-w-[520px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+      >
+        <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-orange-500/[0.07] blur-[90px]" />
+
+        <div className="relative p-5 sm:p-7">
+          <div className="mb-6 flex items-start justify-between gap-5">
+            <div className="min-w-0">
+              <p className="text-[13px] font-normal text-orange-300">Number forwarding</p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">Connect your business line.</h2>
+              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-500">
+                Forward your existing business number to {agent?.first_name || agent?.name || 'this receptionist'} so calls land here.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-orange-300 via-orange-400 to-orange-600 transition-all duration-500"
+              style={{ width: `${((slide + 1) / totalSlides) * 100}%` }}
+            />
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={slide}
+              initial={{ opacity: 0, x: 18 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -18 }}
+              transition={{ duration: 0.18 }}
+              className="min-h-[190px]"
+            >
+              {renderSlide()}
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="mt-5 space-y-3">
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!hasNumber}
+              className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {slide === totalSlides - 1 ? 'It worked' : 'Continue'}
+            </button>
+            <button
+              type="button"
+              onClick={slide === 0 ? onClose : goBack}
+              className="h-11 w-full rounded-full text-sm font-normal text-zinc-500 transition hover:text-white"
+            >
+              {slide === 0 ? 'Close' : 'Back'}
+            </button>
+          </div>
+
+        </div>
+      </motion.div>
     </motion.div>
   );
 };
@@ -549,7 +846,7 @@ const PlaceholderView = ({ title, body }) => (
 
 // ─── Main SonarDashboard Component ────────────────────────────────────────
 const SonarDashboard = () => {
-  const [currentRoute, setCurrentRoute] = useState('receptionists');
+  const [currentRoute, setCurrentRoute] = useState('live-monitoring');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [glitch, setGlitch] = useState(false);
   const [zoneOpen, setZoneOpen] = useState(false);
@@ -557,6 +854,7 @@ const SonarDashboard = () => {
   const [marketplaceAgent, setMarketplaceAgent] = useState(null);
   const [pendingModel, setPendingModel] = useState(null);
   const [receptionistsAgent, setReceptionistsAgent] = useState(null);
+  const [forwardingAgent, setForwardingAgent] = useState(null);
   const [showHireModal, setShowHireModal] = useState(false);
   const [showCommander, setShowCommander] = useState(false);
   const [logoHover, setLogoHover] = useState(false);
@@ -648,12 +946,10 @@ const SonarDashboard = () => {
   }, []);
 
   const navItems = [
+    { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
     { id: 'receptionists', icon: <Users size={18} />, label: 'Receptionists' },
     { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
-    { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
     { id: 'calendar', icon: <Calendar size={18} />, label: 'Calendar' },
-    { id: 'routes', icon: <Radio size={18} />, label: 'Routes' },
-    { id: 'workflow', icon: <GitBranch size={18} />, label: 'Workflow' },
     { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'People' },
     { id: 'settings', icon: <Settings size={18} />, label: 'Settings' },
   ];
@@ -697,6 +993,7 @@ const SonarDashboard = () => {
                     pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
                     onOpenMarketplace={setMarketplaceAgent}
                     onOpenScenarios={setReceptionistsAgent}
+                    onOpenForwarding={setForwardingAgent}
                     onTerminate={(agent) => setTerminateAgent(agent)}
                   />
                 );
@@ -743,6 +1040,15 @@ const SonarDashboard = () => {
                   agent={receptionistsAgent}
                   onClose={() => setReceptionistsAgent(null)}
                   onScenarioAssigned={() => { refresh(); loadAgentScenarios(); }}
+                />
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {forwardingAgent && (
+                <ForwardNumberModal
+                  agent={forwardingAgent}
+                  onClose={() => setForwardingAgent(null)}
                 />
               )}
             </AnimatePresence>
@@ -820,10 +1126,6 @@ const SonarDashboard = () => {
         return <SettingsPage />;
       case 'calendar':
         return <CalendarPage />;
-      case 'routes':
-        return <RoutesPage />;
-      case 'workflow':
-        return <WorkflowTreePage />;
       case 'pipeline':
         return <LeadsPage />;
       default:

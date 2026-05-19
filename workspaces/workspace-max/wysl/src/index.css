@@ -67,7 +67,7 @@ p {
 .pricing-page-bg .gradient-text { background: linear-gradient(90deg, var(--color1), var(--color2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
 .savings-gradient-text { background: linear-gradient(90deg, #00b950, #049142); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
 .pricing-page-bg .gradient-bg { background: linear-gradient(90deg, var(--color1), var(--color2)); }
-.plan-card { transition: transform 0.3s ease; position: relative; overflow: hidden; }
+.plan-card { transition: transform 0.3s ease; position: relative; overflow: visible; }
 .plan-card:not(.current-plan-glow):hover { transform: translateY(-5px); }
 .plan-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 1rem; border: 3px solid transparent; background: linear-gradient(90deg, var(--accent_color1), var(--accent_color2)) border-box; -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0); -webkit-mask-composite: destination-out; mask-composite: exclude; opacity: 0; transition: opacity 0.3s ease-in-out; pointer-events: none; }
 .plan-card:hover::before { opacity: 1; }

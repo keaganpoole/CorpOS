@@ -1066,6 +1066,29 @@ router.get('/payments/test-mode', async (req, res) => {
 });
 
 /**
+ * GET /api/sonar/pricing/plans
+ * Return active Stripe products + prices for the pricing page.
+ */
+router.get('/pricing/plans', async (req, res) => {
+  try {
+    const stripe = getStripe();
+    console.log('[SONAR-API] pricing plans requested');
+    const [products, prices] = await Promise.all([
+      stripe.products.list({ active: true, limit: 100 }),
+      stripe.prices.list({ active: true, limit: 100 }),
+    ]);
+
+    res.json({
+      products: products.data || [],
+      prices: prices.data || [],
+    });
+  } catch (err) {
+    console.error('[SONAR-API] pricing plans failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/sonar/payments/charge
  * Create a Stripe PaymentIntent and record it.
  * Body: { amount, currency, person_id, user_id, description, scenario_id }

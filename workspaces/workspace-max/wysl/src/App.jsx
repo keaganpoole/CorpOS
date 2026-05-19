@@ -7,6 +7,8 @@ import { Toaster } from 'react-hot-toast';
 import HomePage from './pages/HomePage';
 import PricingPage from './pages/PricingPage';
 import AuthPage from './pages/AuthPage';
+import OnboardingPage from './pages/OnboardingPage';
+import Onboarding2Page from './pages/Onboarding2Page';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import SplashScreen from './components/SplashScreen';
@@ -38,6 +40,8 @@ function AppContent() {
         <Route path="/" element={<HomePage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/onboarding2" element={<Onboarding2Page />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 

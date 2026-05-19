@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-const HireReceptionistModal = ({ onClose, onHire }) => {
+const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
   const [receptionists, setReceptionists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -97,8 +97,12 @@ const HireReceptionistModal = ({ onClose, onHire }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md"
-      onClick={onClose}
+      className={
+        embedded
+          ? 'relative z-0 flex items-center justify-center py-4'
+          : 'fixed inset-0 z-[1000] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md'
+      }
+      onClick={embedded ? undefined : onClose}
     >
       {/* Background decoration — blurred indigo/purple orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -109,18 +113,20 @@ const HireReceptionistModal = ({ onClose, onHire }) => {
       </div>
 
       {/* Close button */}
-      <button
-        onClick={onClose}
-        className="absolute top-6 right-6 z-[1010] p-2.5 rounded-xl text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
-      >
-        <X size={18} />
-      </button>
+      {!embedded && (
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 z-[1010] p-2.5 rounded-xl text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+        >
+          <X size={18} />
+        </button>
+      )}
 
       <motion.div
         initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
-        className="w-full max-w-[440px] flex flex-col items-center"
+        className="relative z-10 w-full max-w-[440px] flex flex-col items-center"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

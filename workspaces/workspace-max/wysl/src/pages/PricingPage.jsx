@@ -7,73 +7,80 @@ import { getCookie } from '../utils/cookieUtils';
 import colors from '../../color';
 
 // --- Data ---
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = '/api/sonar';
 const planHierarchy = { "Free": 0, "Essentials": 1, "Pro": 2, "Ultra": 3 };
 
 const plansConfig = [
     {
         name: "Ultra",
-        description: "Full-scale AI receptionist with advanced analytics, custom workflows, and priority support.",
+        description: "Built for high-scale operations, deeper customization, and maximum control.",
         prices: {
             Standard: { monthly: 999, annually: 799 },
             Sales: { monthly: 1249, annually: 999 },
             Social: { monthly: 999, annually: 799 },
         },
         features: [
-            "Everything in Pro",
-            "Advanced call analytics & reporting",
-            "Custom workflow builder",
-            "Dedicated account manager",
-            "Priority 24/7 support",
+            { label: "Everything in Pro", description: "Includes every Pro feature with more room to grow." },
+            { label: "Advanced AI Reasoning", description: "Gives receptionists stronger decision-making for more complex conversations." },
+            { label: "Voice Studio", description: "Customize voice experience more deeply for your team and brand." },
+            { label: "Professional Business Setup", description: "A dedicated onboarding specialist handles the setup, configuration, and optimization of your AI receptionist so it’s ready to start taking calls for your business." },
+            { label: "24/7 Human Support", description: "Reach real support anytime when you need help fast." },
+            { label: "Higher usage limits", description: "More capacity for your AI receptionists." }
         ],
         isRecommended: false
     },
     {
         name: "Pro",
-        description: "For growing businesses that need multi-language support, smart routing, and deeper integrations.",
+        description: "Advanced AI receptionist infrastructure designed to operate beyond the limitations of traditional staffing.",
         prices: {
             Standard: { monthly: 499, annually: 399 },
             Sales: { monthly: 624, annually: 499 },
             Social: { monthly: 499, annually: 399 },
         },
         features: [
-            "Everything in Essentials",
-            "Multi-language support",
-            "Smart call routing & transfers",
-            "CRM integrations",
-            "SMS & email follow-ups",
+            { label: "Everything in Essentials", description: "Starts with all Essentials features already included." },
+            { label: "25 Receptionists", description: "Run a larger receptionist team for different roles or workflows." },
+            { label: "AI Outbound Calling", description: "Place outgoing calls for follow-ups, reminders, or outreach." },
+            { label: "Payments & Invoicing", description: "Receptionists can take payments, send invoices to customers, and more." },
+            { label: "Unlock All Receptionists", description: "Full Access to the entire receptionist marketplace." },
+            { label: "AI Texting Automation", description: "Receptionists can send texts to customers." },
+            { label: "Unlimited Contacts", description: "Keep your full contact list without contact-based restrictions." },
+            { label: "Unlimited Scenarios", description: "Create as many workflow scenarios as your business needs." },
+            { label: "Train Receptionists", description: "Customize your receptionist with business context and behavioral instructions." },
+            { label: "Higher usage limits", description: "More capacity for your AI receptionists." }
         ],
         isRecommended: true
     },
     {
         name: "Essentials",
-        description: "24/7 AI call answering, appointment booking, and customer Q&A for your business.",
+        description: "Launch a fully operational AI receptionist that answers calls, books appointments, and handles customers 24/7.",
         prices: {
             Standard: { monthly: 99, annually: 79 },
             Sales: { monthly: 124, annually: 99 },
             Social: { monthly: 99, annually: 79 },
         },
         features: [
-            "24/7 AI call answering",
-            "Appointment booking",
-            "Customer Q&A",
-            "Call summaries & transcripts",
-            "Unlimited calls",
+            { label: "3 AI Receptionists", description: "Use up to three receptionists for different call styles or duties." },
+            { label: "24/7 AI Inbound Call Handling", description: "Answer incoming calls around the clock without missing opportunities." },
+            { label: "10 Scenarios", description: "Build up to ten workflows for calls, appointments, records, and more." },
+            { label: "Appointment Booking", description: "Book, update, and manage appointments during live conversations." },
+            { label: "Store 1,000 Contacts", description: "Keep up to one thousand contacts in your CRM." },
+            { label: "Live Call Monitoring", description: "Watch live call activity and follow what your system is doing." },
+            { label: "Call Analytics", description: "See summaries and performance data from your calls." }
         ],
         isRecommended: false
     },
     {
         name: "Free",
-        description: "Try Sonar risk-free with limited monthly minutes.",
+        description: "Try Sonar risk-free",
         prices: {
             Standard: { monthly: 0, annually: 0 },
             Sales: { monthly: 0, annually: 0 },
             Social: { monthly: 0, annually: 0 },
         },
         features: [
-            "Limited monthly minutes",
-            "AI call answering",
-            "Appointment booking",
+            "Business setup",
+            "Limited use of features"
         ],
         isRecommended: false
     },
@@ -133,6 +140,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
     const { session } = useAuth();
     const navigate = useNavigate();
     const [isCheckoutLoading, setCheckoutLoading] = useState(false);
+    const [openFeature, setOpenFeature] = useState(null);
 
     const price = plan.price?.[cycle];
     const isCurrent = plan.name.toLowerCase() === currentUserPlan.toLowerCase();
@@ -220,14 +228,43 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
                     <p ref={savingsRef} className="savings-text text-center text-xs font-semibold h-5">{'\u00A0'}</p>
                 </div>
                 <ul className="space-y-2.5">
-                    {plan.features.map(feature => (
-                        <li key={feature} className="flex items-center flex-nowrap">
+                    {plan.features.map((feature, featureIndex) => {
+                        const featureLabel = typeof feature === 'string' ? feature : feature.label;
+                        const featureDescription = typeof feature === 'string' ? null : feature.description;
+                        const showFeatureDescription = featureDescription && !featureLabel.toLowerCase().startsWith('everything in ');
+
+                        return (
+                        <li key={featureLabel} className="relative flex items-center">
                             <svg className="w-5 h-5 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24">
                                 <path stroke="url(#checkGradient)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path>
                             </svg>
-                            <span className="text-gray-300 text-sm min-w-0 overflow-hidden text-ellipsis">{feature}</span>
+                            <span className="text-gray-300 text-sm min-w-0 overflow-hidden text-ellipsis">{featureLabel}</span>
+                            {showFeatureDescription && (
+                                <div className="relative ml-2 flex-shrink-0">
+                                    <button
+                                        type="button"
+                                        onMouseEnter={() => setOpenFeature(featureIndex)}
+                                        onMouseLeave={() => setOpenFeature(null)}
+                                        onClick={() => setOpenFeature(openFeature === featureIndex ? null : featureIndex)}
+                                        className="flex h-3 w-3 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.015] text-[7px] font-semibold text-zinc-600 transition-colors hover:border-white/[0.14] hover:bg-white/[0.03] hover:text-zinc-400"
+                                        aria-label={`More info about ${featureLabel}`}
+                                    >
+                                        <span className="leading-none">i</span>
+                                    </button>
+                                    {openFeature === featureIndex && (
+                                        <div
+                                            onMouseEnter={() => setOpenFeature(featureIndex)}
+                                            onMouseLeave={() => setOpenFeature(null)}
+                                            className="absolute bottom-5 left-1/2 z-20 w-44 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-[#101010]/80 px-3 py-2.5 text-left text-[11px] leading-relaxed text-zinc-300 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md"
+                                        >
+                                            <div className="absolute bottom-[-4px] left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-white/[0.08] bg-[#101010]/80" />
+                                            {featureDescription}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </li>
-                    ))}
+                    )})}
                 </ul>
             </div>
             <div className="mt-8">
@@ -271,8 +308,8 @@ const PricingPage = () => {
     useEffect(() => {
         const fetchConfig = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/config/status`);
-                setIsTestMode(response.data.test_mode);
+                const response = await axios.get(`${API_BASE_URL}/payments/test-mode`);
+                setIsTestMode(Boolean(response.data.testMode));
             } catch (error) {
                 console.error("Error fetching server config:", error);
             }
@@ -312,7 +349,7 @@ const PricingPage = () => {
     useEffect(() => {
         const fetchPlans = async () => {
             try {
-                const { data } = await axios.get(`${API_BASE_URL}/plans`);
+                const { data } = await axios.get(`${API_BASE_URL}/pricing/plans`);
                 setStripeData(data);
             } catch (err) {
                 console.error("Error fetching plans:", err);

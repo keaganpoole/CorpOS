@@ -7,8 +7,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import googleIcon from '../assets/google.png'; // Import the local Google icon
 
-const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8000' : (import.meta.env.VITE_API_URL || 'https://keyquarters.onrender.com');
-const FRONTEND_PUBLIC_URL = import.meta.env.DEV ? 'http://localhost:5173' : (import.meta.env.VITE_FRONTEND_PUBLIC_URL || 'https://keyquarters.com'); // New variable for frontend's public URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const FRONTEND_PUBLIC_URL = import.meta.env.VITE_FRONTEND_PUBLIC_URL || window.location.origin;
 
 console.log('AuthPage: import.meta.env.DEV =', import.meta.env.DEV);
 console.log('AuthPage: import.meta.env.VITE_FRONTEND_PUBLIC_URL =', import.meta.env.VITE_FRONTEND_PUBLIC_URL);
