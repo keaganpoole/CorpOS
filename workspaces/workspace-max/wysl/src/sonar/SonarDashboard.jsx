@@ -60,6 +60,7 @@ import ScenariosPage from './pages/Scenarios/Scenarios';
 import SettingsPage from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
+import { useAuth } from '../contexts/AuthContext';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Error Boundary
@@ -846,6 +847,7 @@ const PlaceholderView = ({ title, body }) => (
 
 // ─── Main SonarDashboard Component ────────────────────────────────────────
 const SonarDashboard = () => {
+  const { session: authSession, profile } = useAuth();
   const [currentRoute, setCurrentRoute] = useState('live-monitoring');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [glitch, setGlitch] = useState(false);
@@ -858,15 +860,9 @@ const SonarDashboard = () => {
   const [showHireModal, setShowHireModal] = useState(false);
   const [showCommander, setShowCommander] = useState(false);
   const [logoHover, setLogoHover] = useState(false);
-  const [userId, setUserId] = useState(null);
   const [terminateAgent, setTerminateAgent] = useState(null);
   const [isLivePulseCollapsed, setIsLivePulseCollapsed] = useState(false);
-
-  useEffect(() => {
-    supabase.from('users').select('id').limit(1).single()
-      .then(({ data }) => { if (data?.id) setUserId(data.id); })
-      .catch(err => console.error('[App] Failed to fetch user_id:', err));
-  }, []);
+  const userId = authSession?.user?.id || profile?.id || null;
 
   const [agentScenarios, setAgentScenarios] = useState({});
 
