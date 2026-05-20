@@ -896,12 +896,6 @@ const SettingsPage = () => {
 
   useEffect(() => {
     loadSettings();
-
-    // Reload when tab becomes visible
-    const onVisible = () => { if (document.visibilityState === 'visible') loadSettings(); };
-    document.addEventListener('visibilitychange', onVisible);
-
-    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   const loadSettings = async () => {

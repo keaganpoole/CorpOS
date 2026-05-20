@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.jsx — Sonar Auth (simplified, no WYSL backend)
 
-import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext(null);
@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
     const [isSessionLoading, setIsSessionLoading] = useState(true);
     const [isProfileLoaded, setIsProfileLoaded] = useState(false);
     const [isAppLoading, setIsAppLoading] = useState(false);
+    const currentUserIdRef = useRef(null);
 
     const ensureProfile = useCallback(async (user) => {
         const { data: existingProfile, error } = await supabase
@@ -44,6 +45,10 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
+        currentUserIdRef.current = session?.user?.id ?? null;
+    }, [session?.user?.id]);
+
+    useEffect(() => {
         let isMounted = true;
 
         supabase.auth.getSession().then(({ data }) => {
@@ -63,10 +68,19 @@ export const AuthProvider = ({ children }) => {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             (_event, nextSession) => {
+                const nextUserId = nextSession?.user?.id ?? null;
+                const isSameUser = Boolean(nextUserId && nextUserId === currentUserIdRef.current);
+
                 setSession(nextSession ?? null);
-                setIsProfileLoaded(!nextSession?.user);
-                if (!nextSession?.user) {
+
+                if (!nextUserId) {
                     setProfile(null);
+                    setIsProfileLoaded(true);
+                    return;
+                }
+
+                if (!isSameUser) {
+                    setIsProfileLoaded(false);
                 }
             }
         );
@@ -104,7 +118,7 @@ export const AuthProvider = ({ children }) => {
         return () => {
             isCancelled = true;
         };
-    }, [ensureProfile, isSessionLoading, session?.access_token, session?.user]);
+    }, [ensureProfile, isSessionLoading, session?.user?.id]);
 
     const isLoading = isSessionLoading || Boolean(session?.user && !isProfileLoaded);
 

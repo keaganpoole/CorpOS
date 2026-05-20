@@ -62,6 +62,16 @@ import CalendarPage from './pages/CalendarPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import { useAuth } from '../contexts/AuthContext';
 
+const DASHBOARD_ROUTE_STORAGE_KEY = 'sonar-dashboard-route';
+const DEFAULT_DASHBOARD_ROUTE = 'live-monitoring';
+const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'pipeline', 'settings'];
+
+function getInitialDashboardRoute() {
+  if (typeof window === 'undefined') return DEFAULT_DASHBOARD_ROUTE;
+  const savedRoute = window.localStorage.getItem(DASHBOARD_ROUTE_STORAGE_KEY);
+  return DASHBOARD_ROUTES.includes(savedRoute) ? savedRoute : DEFAULT_DASHBOARD_ROUTE;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Error Boundary
 // ═══════════════════════════════════════════════════════════════════════════
@@ -848,7 +858,7 @@ const PlaceholderView = ({ title, body }) => (
 // ─── Main SonarDashboard Component ────────────────────────────────────────
 const SonarDashboard = () => {
   const { session: authSession, profile } = useAuth();
-  const [currentRoute, setCurrentRoute] = useState('live-monitoring');
+  const [currentRoute, setCurrentRoute] = useState(getInitialDashboardRoute);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [glitch, setGlitch] = useState(false);
   const [zoneOpen, setZoneOpen] = useState(false);
@@ -865,6 +875,10 @@ const SonarDashboard = () => {
   const userId = authSession?.user?.id || profile?.id || null;
 
   const [agentScenarios, setAgentScenarios] = useState({});
+
+  useEffect(() => {
+    window.localStorage.setItem(DASHBOARD_ROUTE_STORAGE_KEY, currentRoute);
+  }, [currentRoute]);
 
   const loadAgentScenarios = async () => {
     try {
