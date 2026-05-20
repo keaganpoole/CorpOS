@@ -5,7 +5,7 @@ import os
 import stripe
 import json
 import time
-from uuid import UUID
+from uuid import UUID, uuid4
 from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, timezone, timedelta
 from typing import List, Optional, Literal
@@ -86,10 +86,15 @@ ROUTE_HIT_EXCLUDE_PATHS = {
 }
 
 
+def next_live_event_id(prefix: Optional[str] = None) -> str:
+    base_id = uuid4().hex
+    return f"{prefix}-{base_id}" if prefix else base_id
+
+
 def push_live_event(message: str, *, actor: str = "system", severity: str = "info", event_type: Optional[str] = None, payload: Optional[dict] = None):
     timestamp = datetime.now(timezone.utc).isoformat()
     event = {
-        "id": f"{int(datetime.now(timezone.utc).timestamp() * 1000)}-{len(LIVE_PULSE_EVENTS)}",
+        "id": next_live_event_id(),
         "timestamp": timestamp,
         "message": message,
         "actor": actor,
@@ -112,7 +117,7 @@ def push_live_event(message: str, *, actor: str = "system", severity: str = "inf
 def push_route_hit(method: str, endpoint: str, status_code: int, duration_ms: int, source: str):
     timestamp = datetime.now(timezone.utc).isoformat()
     LIVE_PULSE_EVENTS.insert(0, {
-        "id": f"route-{int(datetime.now(timezone.utc).timestamp() * 1000)}-{len(LIVE_PULSE_EVENTS)}",
+        "id": next_live_event_id("route"),
         "type": "route_hit",
         "event_type": "route_hit",
         "timestamp": timestamp,
