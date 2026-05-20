@@ -32,11 +32,15 @@ export const AuthProvider = ({ children }) => {
                 phone: user.user_metadata?.phone || null,
             };
 
-            const { data: createdProfile } = await supabase
+            const { data: createdProfile, error: upsertError } = await supabase
                 .from('users')
                 .upsert(fallbackProfile, { onConflict: 'id' })
                 .select()
                 .single();
+
+            if (upsertError) {
+                throw upsertError;
+            }
 
             return createdProfile || fallbackProfile;
         };

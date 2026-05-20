@@ -3,10 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 
 // Sonar Supabase project
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Supabase URL or Anon Key is missing. Make sure to set them in your .env.local file.");
+  throw new Error("Supabase URL or publishable key is missing. Make sure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY are set.");
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

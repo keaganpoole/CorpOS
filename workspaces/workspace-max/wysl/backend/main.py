@@ -34,6 +34,7 @@ from apscheduler.triggers.cron import CronTrigger
 from jose import JWTError, jwt
 from config import (
     supabase,
+    supabase_admin,
     stripe_webhook_secret,
     SECRET_KEY,
     ALGORITHM,
@@ -2166,7 +2167,7 @@ async def create_user(auth_data: AuthSignUpRequest):
             "full_name": user_metadata.get("full_name") or user_metadata.get("name"),
             "phone": user_metadata.get("phone"),
         }
-        db_response = supabase.table('users').insert(profile_data).execute()
+        db_response = supabase_admin.table('users').insert(profile_data).execute()
         
         if not db_response.data:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create user profile")
@@ -2180,7 +2181,7 @@ async def create_user(auth_data: AuthSignUpRequest):
 async def read_current_user(current_user: dict = Depends(get_current_user)):
     logging.info(f"read_current_user called for user ID: {current_user.id}")
     try:
-        response = supabase.table('users').select('*').eq('id', str(current_user.id)).limit(1).execute()
+        response = supabase_admin.table('users').select('*').eq('id', str(current_user.id)).limit(1).execute()
         logging.info(f"Supabase select response (raw): {response}")
         
         if not response.data or not response.data[0]:
@@ -2198,7 +2199,7 @@ async def read_current_user(current_user: dict = Depends(get_current_user)):
             }
             logging.info(f"Prepared profile_data for insertion: {profile_data}")
             
-            insert_response = supabase.table('users').insert(profile_data).execute()
+            insert_response = supabase_admin.table('users').insert(profile_data).execute()
             logging.info(f"Supabase insert response: {insert_response}")
 
             if not insert_response.data:

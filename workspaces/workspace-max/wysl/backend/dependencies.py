@@ -5,11 +5,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel # type: ignore
-from config import supabase
-
-# Use Supabase JWT secret for consistency
-SECRET_KEY = os.environ.get("SUPABASE_KEY")
-ALGORITHM = "HS256"
+from config import ALGORITHM, SECRET_KEY, supabase_auth
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -18,7 +14,7 @@ class TokenData(BaseModel):
 
 async def get_current_user(token: str = Depends(HTTPBearer())):
     try:
-        user_info = supabase.auth.get_user(token.credentials)
+        user_info = supabase_auth.auth.get_user(token.credentials)
         if user_info and user_info.user:
             return user_info.user
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
