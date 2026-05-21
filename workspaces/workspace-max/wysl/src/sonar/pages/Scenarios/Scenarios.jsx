@@ -2104,27 +2104,10 @@ export default function ScenariosPage() {
   };
 
   useEffect(() => {
-    const triggerNode = nodes.find(n => n.categoryType === 'TRIGGERS');
-    const triggerKey = triggerNode?.subOptionKey || triggerNode?.triggerKey || null;
-    if (!triggerKey) return undefined;
-
-    const channel = supabase
-      .channel(`scenario-events-${triggerKey}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'scenario_events' },
-        (payload) => {
-          const firedTriggerKey = payload?.new?.trigger_key;
-          if (firedTriggerKey !== triggerKey) return;
-          if (isRunning) return;
-          runScenario();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Scenario execution now lives in the FastAPI backend.
+    // Keep manual testing in the UI, but avoid double-running flows from
+    // frontend realtime subscriptions and backend trigger execution.
+    return undefined;
   }, [nodes, isRunning]);
 
   const handleEditScenario = (scenario) => {

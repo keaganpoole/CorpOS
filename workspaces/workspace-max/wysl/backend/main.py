@@ -5,6 +5,7 @@ import os
 import stripe
 import json
 import time
+import asyncio
 from uuid import UUID, uuid4
 from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, timezone, timedelta
@@ -56,6 +57,7 @@ from models import (
 )
 from phone_helper import router as phone_helper_router
 from dependencies import get_current_user, get_current_rep
+from scenario_engine import ScenarioEngine
 
 # --------------------------------------------------------------------------
 # App Initialization
@@ -85,6 +87,7 @@ ROUTE_HIT_EXCLUDE_PATHS = {
     "/api/events/live-pulse",
     "/api/logs",
 }
+scenario_engine: Optional[ScenarioEngine] = None
 
 
 def next_live_event_id(prefix: Optional[str] = None) -> str:
@@ -176,7 +179,28 @@ def get_global_forwarding_target_number() -> str:
     return twilio_phone_number or "+12073092121"
 
 
+def schedule_backend_scenario_execution(event_type: str, payload: Optional[dict] = None):
+    global scenario_engine
+    if not scenario_engine:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    loop.create_task(scenario_engine.handle_event(event_type, payload or {}))
+
+
 push_live_event("FastAPI backend active on port 8000.", actor="system", severity="info", event_type="system_startup")
+
+
+@app.on_event("startup")
+async def startup_scenario_engine():
+    global scenario_engine
+    try:
+        if scenario_engine:
+            await scenario_engine.start()
+    except Exception as exc:
+        logging.error("Failed to start scenario engine: %s", exc, exc_info=True)
 
 
 # --------------------------------------------------------------------------
@@ -295,6 +319,11 @@ class BusinessForwardingUpdateRequest(BaseModel):
     status: Optional[Literal["draft", "pending_test", "verified"]] = "draft"
     confirmed_enabled: Optional[bool] = False
     verified: Optional[bool] = False
+
+class ScenarioTriggerRequest(BaseModel):
+    trigger_key: str
+    payload: Optional[dict] = None
+    created_at: Optional[datetime] = None
 
 class PaymentProfileCreateRequest(BaseModel):
     amount: int
@@ -650,7 +679,248 @@ def emit_payment_trigger(trigger_key: str, payload: dict):
         supabase.table("scenario_events").insert(trigger_payload).execute()
     except Exception as exc:
         logging.debug("scenario_events insert skipped or failed: %s", exc)
+    schedule_backend_scenario_execution(trigger_key, payload)
     return trigger_payload
+
+def emit_scenario_trigger(trigger_key: str, payload: Optional[dict] = None, created_at: Optional[datetime] = None):
+    normalized_trigger_key = (trigger_key or "").strip()
+    if not normalized_trigger_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="trigger_key is required")
+
+    event_created_at = created_at or datetime.now(timezone.utc)
+    if event_created_at.tzinfo is None:
+        event_created_at = event_created_at.replace(tzinfo=timezone.utc)
+    else:
+        event_created_at = event_created_at.astimezone(timezone.utc)
+
+    trigger_payload = {
+        "trigger_key": normalized_trigger_key,
+        "payload": payload or {},
+        "created_at": event_created_at.isoformat(),
+    }
+    logging.info("Scenario trigger fired: %s", json.dumps(trigger_payload, default=str))
+
+    saved_event = trigger_payload
+    persisted = False
+    try:
+        response = supabase.table("scenario_events").insert(trigger_payload).execute()
+        saved_event = response.data[0] if getattr(response, "data", None) else trigger_payload
+        persisted = True
+    except Exception as exc:
+        logging.warning("Scenario trigger persistence skipped: %s", exc)
+
+    schedule_backend_scenario_execution(normalized_trigger_key, payload or {})
+    return {"ok": True, "event": saved_event, "persisted": persisted}
+
+def normalize_phone_number(value) -> Optional[str]:
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if not digits:
+        return None
+    if len(digits) == 10:
+        return f"+1{digits}"
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+{digits}"
+    if raw.startswith("+"):
+        return f"+{digits}"
+    return digits
+
+def build_phone_match_values(value) -> list[str]:
+    normalized = normalize_phone_number(value)
+    if not normalized:
+        return []
+    digits = "".join(ch for ch in normalized if ch.isdigit())
+    values = {normalized, digits}
+    if digits.startswith("1") and len(digits) == 11:
+        values.add(digits[1:])
+        values.add(f"+{digits[1:]}")
+    return [item for item in values if item]
+
+def safe_json_loads(value):
+    if isinstance(value, (dict, list)):
+        return value
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except Exception:
+            return value
+    return value
+
+def parse_business_hours(value):
+    parsed = safe_json_loads(value)
+    return parsed if parsed is not None else value
+
+def load_business_by_id(business_id: Optional[str]):
+    if not business_id:
+        return None
+    try:
+        response = supabase.table("businesses").select("*").eq("id", str(business_id)).limit(1).execute()
+        return response.data[0] if response.data else None
+    except Exception:
+        return None
+
+def load_business_by_user_id(user_id: Optional[str]):
+    if not user_id:
+        return None
+    try:
+        response = supabase.table("businesses").select("*").eq("user_id", str(user_id)).limit(1).execute()
+        return response.data[0] if response.data else None
+    except Exception:
+        return None
+
+def load_receptionist_by_id(receptionist_id: Optional[str]):
+    if not receptionist_id:
+        return None
+    try:
+        response = supabase.table("hired_receptionists").select("*").eq("id", str(receptionist_id)).limit(1).execute()
+        return response.data[0] if response.data else None
+    except Exception:
+        return None
+
+def find_business_by_forwarded_number(forwarded_number: Optional[str]):
+    match_values = set(build_phone_match_values(forwarded_number))
+    if not match_values:
+        return None
+
+    try:
+        response = supabase.table("businesses").select("id,user_id,name,phone,forwarding_config").execute()
+    except Exception:
+        return None
+
+    for business in response.data or []:
+        config = normalize_forwarding_config(business.get("forwarding_config"))
+        for entry in config.get("numbers", []):
+            source_number = entry.get("source_number")
+            if set(build_phone_match_values(source_number)) & match_values:
+                return business
+        if set(build_phone_match_values(business.get("phone"))) & match_values:
+            return business
+    return None
+
+def resolve_business_context(payload: Optional[dict] = None):
+    payload = payload or {}
+
+    business_id = first_present(payload, "business_id", "businessId", "metadata.business_id")
+    user_id = first_present(payload, "user_id", "userId", "metadata.user_id")
+    receptionist_id = first_present(
+        payload,
+        "receptionist_id",
+        "receptionistId",
+        "hired_receptionist_id",
+        "metadata.receptionist_id",
+        "metadata.hired_receptionist_id",
+    )
+    receptionist_phone = first_present(payload, "receptionist_phone", "phone_number", "agent_phone_number", "to_number")
+    forwarded_from = first_present(
+        payload,
+        "forwarded_from",
+        "forwardedFrom",
+        "ForwardedFrom",
+        "metadata.forwarded_from",
+        "source_number",
+    )
+
+    receptionist = load_receptionist_by_id(receptionist_id)
+    if receptionist and not user_id:
+        user_id = receptionist.get("user_id")
+    if receptionist and not business_id:
+        business_id = receptionist.get("business_id")
+
+    business = load_business_by_id(business_id) if business_id else None
+    if not business and user_id:
+        business = load_business_by_user_id(user_id)
+    if not business and forwarded_from:
+        business = find_business_by_forwarded_number(forwarded_from)
+    if not business and receptionist_phone:
+        try:
+            response = supabase.table("hired_receptionists").select("*").eq("phone_number", str(receptionist_phone)).limit(1).execute()
+            receptionist = receptionist or (response.data[0] if response.data else None)
+            if receptionist:
+                user_id = user_id or receptionist.get("user_id")
+                business = load_business_by_id(receptionist.get("business_id")) or load_business_by_user_id(user_id)
+        except Exception:
+            pass
+
+    return {
+        "business": business,
+        "user_id": str(user_id or business.get("user_id")) if (user_id or business) else None,
+        "receptionist": receptionist,
+        "forwarded_from": normalize_phone_number(forwarded_from),
+    }
+
+async def parse_request_payload(request: Request) -> dict:
+    content_type = (request.headers.get("content-type") or "").lower()
+
+    if "application/json" in content_type:
+        try:
+            payload = await request.json()
+            return payload if isinstance(payload, dict) else {}
+        except Exception:
+            return {}
+
+    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        try:
+            form = await request.form()
+            return {key: value for key, value in form.multi_items()}
+        except Exception:
+            return {}
+
+    try:
+        payload = await request.json()
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        pass
+
+    return dict(request.query_params)
+
+def serialize_business_profile_row(row: dict):
+    if not row:
+        return None
+    return {
+        **row,
+        "business_hours": parse_business_hours(row.get("business_hours")),
+        "industry": safe_json_loads(row.get("industry")),
+        "forwarding_config": normalize_forwarding_config(row.get("forwarding_config")),
+    }
+
+def build_call_route_payload(payload: dict, request: Request):
+    forwarded_from = first_present(payload, "forwarded_from", "forwardedFrom", "ForwardedFrom", "source_number")
+    trigger_key = first_present(payload, "trigger_key", "trigger", "event", "type")
+    if not trigger_key:
+        call_status = str(first_present(payload, "call_status", "CallStatus", "status") or "").strip().lower()
+        if call_status in {"no-answer", "busy"}:
+            trigger_key = "missed_call"
+        elif call_status in {"failed", "canceled"}:
+            trigger_key = "call_failed"
+        elif call_status in {"in-progress", "ringing", "queued"}:
+            trigger_key = "incoming_call"
+        elif call_status == "completed":
+            trigger_key = "call_answered"
+        else:
+            trigger_key = "incoming_call"
+
+    call_payload = {
+        "trigger_key": str(trigger_key).strip().lower().replace(" ", "_"),
+        "call_id": first_present(payload, "call_id", "CallSid", "callSid", "conversation_id"),
+        "conversation_id": first_present(payload, "conversation_id", "ConversationSid"),
+        "from_number": normalize_phone_number(first_present(payload, "from_number", "From", "caller_phone", "caller")),
+        "to_number": normalize_phone_number(first_present(payload, "to_number", "To", "agent_phone_number", "phone_number")),
+        "forwarded_from": normalize_phone_number(forwarded_from),
+        "call_status": first_present(payload, "call_status", "CallStatus", "status"),
+        "direction": first_present(payload, "direction", "Direction"),
+        "provider": first_present(payload, "provider", "source") or "unknown",
+        "received_at": datetime.now(timezone.utc).isoformat(),
+        "path": request.url.path,
+        "raw_payload": payload,
+    }
+    return call_payload
 
 def normalize_intent_key(intent_key: str) -> str:
     normalized = (intent_key or "").strip().lower().replace(" ", "_").replace("-", "_")
@@ -958,9 +1228,282 @@ async def get_config_status():
     """Returns the current configuration status, like TEST_MODE."""
     return {"test_mode": TEST_MODE}
 
+@app.post("/api/scenarios/trigger", tags=["Scenarios"])
+async def trigger_scenario(request: ScenarioTriggerRequest):
+    return emit_scenario_trigger(request.trigger_key, request.payload, request.created_at)
+
+@app.post("/api/trigger-scenario", tags=["Scenarios"])
+async def trigger_scenario_legacy_alias(request: ScenarioTriggerRequest):
+    return emit_scenario_trigger(request.trigger_key, request.payload, request.created_at)
+
+@app.post("/api/scenarios/trigger/{scenario_id}", tags=["Scenarios"])
+async def trigger_specific_scenario(scenario_id: str, payload: dict):
+    if not scenario_engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
+    result = await scenario_engine.trigger_scenario(scenario_id, payload)
+    if not result.get("ok"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result.get("error") or "Scenario not found")
+    return result
+
+@app.post("/api/scenarios/resume", tags=["Scenarios"])
+async def resume_scenario_execution(payload: dict):
+    if not scenario_engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
+    execution_id = payload.get("execution_id")
+    if not execution_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="execution_id required")
+    resume_payload = {
+        "agent": payload.get("agent_data") or payload.get("agent") or {},
+        "call": {
+            "call_sid": payload.get("call_sid"),
+            "call_outcome": payload.get("call_outcome"),
+        },
+    }
+    result = await scenario_engine.resume_execution(execution_id, resume_payload)
+    if result.get("success"):
+        return {"ok": True, **result}
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result.get("error") or "Resume failed")
+
+@app.get("/api/scenarios/executions", tags=["Scenarios"])
+async def list_scenario_executions(limit: int = 20):
+    if not scenario_engine:
+        return []
+    return await scenario_engine.list_executions(max(1, min(limit, 100)))
+
+@app.get("/api/scenarios/executions/{execution_id}", tags=["Scenarios"])
+async def get_scenario_execution(execution_id: str):
+    if not scenario_engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
+    execution = await scenario_engine.get_execution(execution_id)
+    if not execution:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Execution not found")
+    return execution
+
+@app.post("/api/scenarios/reload", tags=["Scenarios"])
+async def reload_scenarios():
+    if not scenario_engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
+    scenarios = await scenario_engine.load_scenarios()
+    return {"ok": True, "count": len(scenarios)}
+
+@app.post("/api/call/route", tags=["Server Tools"])
+async def route_call_compat(request: Request):
+    payload = await parse_request_payload(request)
+    call_payload = build_call_route_payload(payload, request)
+    context = resolve_business_context(call_payload)
+
+    event_payload = {
+        **call_payload,
+        "user_id": context.get("user_id"),
+        "business_id": context.get("business", {}).get("id") if context.get("business") else None,
+        "business_name": context.get("business", {}).get("name") if context.get("business") else None,
+        "forwarding_target_number": get_global_forwarding_target_number(),
+    }
+
+    event = emit_scenario_trigger(call_payload["trigger_key"], event_payload)
+    push_live_event(
+        f"Call route trigger received ({call_payload['trigger_key']}).",
+        actor="system",
+        severity="info",
+        event_type="call_route",
+        payload=event_payload,
+    )
+
+    return {
+        "ok": True,
+        "message": "FastAPI call route compatibility endpoint handled the request.",
+        "route": event_payload,
+        "event": event.get("event"),
+    }
+
 @app.post("/api/tools/report-intent-checkpoint", tags=["Server Tools"])
 async def report_intent_checkpoint(request: IntentCheckpointRequest):
     return emit_intent_checkpoint(request)
+
+@app.api_route("/api/tools/{tool_name}", methods=["GET", "POST"], tags=["Server Tools"])
+async def legacy_server_tool(tool_name: str, request: Request):
+    payload = await parse_request_payload(request)
+    context = resolve_business_context(payload)
+    business = context.get("business")
+    user_id = context.get("user_id")
+    receptionist = context.get("receptionist")
+
+    normalized_tool = (tool_name or "").strip().lower().replace("_", "-")
+
+    if normalized_tool in {"identify-caller", "lookup-customer"}:
+        search_phone = normalize_phone_number(first_present(payload, "phone", "from_number", "caller_phone", "From"))
+        search_email = first_present(payload, "email", "caller_email")
+        search_name = str(first_present(payload, "name", "full_name", "customer_name") or "").strip().lower()
+
+        query = supabase.table("people").select("*")
+        if business and business.get("id"):
+            query = query.eq("business_id", business["id"])
+        elif user_id:
+            query = query.eq("user_id", user_id)
+        rows = query.limit(200).execute().data or []
+
+        filtered = rows
+        if search_phone:
+            phone_values = set(build_phone_match_values(search_phone))
+            filtered = [
+                row for row in filtered
+                if set(build_phone_match_values(row.get("phone"))) & phone_values
+            ]
+        if search_email:
+            filtered = [row for row in filtered if (row.get("email") or "").strip().lower() == str(search_email).strip().lower()]
+        if search_name:
+            filtered = [
+                row for row in filtered
+                if search_name in " ".join(filter(None, [row.get("first_name"), row.get("last_name")])).strip().lower()
+            ]
+
+        matches = filtered[:10]
+        return {
+            "ok": True,
+            "found": bool(matches),
+            "customer": matches[0] if matches else None,
+            "person": matches[0] if matches else None,
+            "matches": matches,
+            "count": len(matches),
+        }
+
+    if normalized_tool == "get-services":
+        query = supabase.table("services").select("*")
+        if business and business.get("id"):
+            try:
+                query = query.eq("business_id", business["id"])
+            except Exception:
+                pass
+        data = query.order("category").order("sort_order").execute().data or []
+        return {"ok": True, "services": data, "count": len(data)}
+
+    if normalized_tool == "get-business-info":
+        if not business:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
+        return {
+            "ok": True,
+            "business": serialize_business_profile_row(business),
+            "forwarding_target_number": get_global_forwarding_target_number(),
+        }
+
+    if normalized_tool == "check-availability":
+        appointment_date = first_present(payload, "date", "appointment_date")
+        appointment_time = first_present(payload, "time", "appointment_time")
+        query = supabase.table("appointments").select("*")
+        if business and business.get("id"):
+            try:
+                query = query.eq("business_id", business["id"])
+            except Exception:
+                pass
+        if appointment_date:
+            query = query.eq("date", appointment_date)
+        rows = query.limit(200).execute().data or []
+        conflicts = [
+            row for row in rows
+            if appointment_time and str(row.get("time") or "") == str(appointment_time)
+            and str(row.get("status") or "").lower() not in {"cancelled", "completed"}
+        ]
+        return {
+            "ok": True,
+            "available": len(conflicts) == 0,
+            "requested": {"date": appointment_date, "time": appointment_time},
+            "conflicts": conflicts,
+        }
+
+    if normalized_tool == "create-appointment":
+        appointment_row = {
+            "client_name": first_present(payload, "client_name", "name", "customer_name"),
+            "date": first_present(payload, "date", "appointment_date"),
+            "time": first_present(payload, "time", "appointment_time"),
+            "duration": first_present(payload, "duration", "appointment_duration") or 30,
+            "status": first_present(payload, "status") or "pending",
+            "assigned_receptionist": first_present(payload, "assigned_receptionist", "receptionist_name") or (receptionist or {}).get("full_name"),
+            "notes": first_present(payload, "notes"),
+            "person_id": first_present(payload, "person_id"),
+            "service_id": first_present(payload, "service_id"),
+            "business_id": business.get("id") if business else None,
+        }
+        response = supabase.table("appointments").insert(appointment_row).execute()
+        created = response.data[0] if response.data else appointment_row
+        emit_scenario_trigger("appointment_created", {"appointment": created, "business_id": business.get("id") if business else None})
+        return {"ok": True, "appointment": created}
+
+    if normalized_tool == "update-appointment":
+        appointment_id = first_present(payload, "appointment_id", "id")
+        if not appointment_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="appointment_id is required")
+        updates = {
+            key: value for key, value in {
+                "client_name": first_present(payload, "client_name", "name", "customer_name"),
+                "date": first_present(payload, "date", "appointment_date"),
+                "time": first_present(payload, "time", "appointment_time"),
+                "duration": first_present(payload, "duration", "appointment_duration"),
+                "status": first_present(payload, "status"),
+                "assigned_receptionist": first_present(payload, "assigned_receptionist", "receptionist_name"),
+                "notes": first_present(payload, "notes"),
+                "person_id": first_present(payload, "person_id"),
+                "service_id": first_present(payload, "service_id"),
+            }.items() if value is not None
+        }
+        response = supabase.table("appointments").update(updates).eq("id", appointment_id).execute()
+        updated = response.data[0] if response.data else {"id": appointment_id, **updates}
+        emit_scenario_trigger("appointment_updated", {"appointment": updated, "business_id": business.get("id") if business else None})
+        return {"ok": True, "appointment": updated}
+
+    if normalized_tool == "cancel-appointment":
+        appointment_id = first_present(payload, "appointment_id", "id")
+        if not appointment_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="appointment_id is required")
+        response = supabase.table("appointments").update({"status": "cancelled"}).eq("id", appointment_id).execute()
+        cancelled = response.data[0] if response.data else {"id": appointment_id, "status": "cancelled"}
+        emit_scenario_trigger("appointment_cancelled", {"appointment": cancelled, "business_id": business.get("id") if business else None})
+        return {"ok": True, "appointment": cancelled}
+
+    if normalized_tool == "log-call-outcome":
+        call_log = {
+            "source": "server_tool",
+            "external_call_id": first_present(payload, "call_id", "CallSid", "callSid"),
+            "conversation_id": first_present(payload, "conversation_id"),
+            "elevenlabs_agent_id": first_present(payload, "agent_id", "elevenlabs_agent_id"),
+            "hired_receptionist_id": (receptionist or {}).get("id") or first_present(payload, "hired_receptionist_id", "receptionist_id"),
+            "user_id": user_id,
+            "receptionist_name": (receptionist or {}).get("full_name") or first_present(payload, "receptionist_name"),
+            "scenario_id": first_present(payload, "scenario_id"),
+            "from_number": normalize_phone_number(first_present(payload, "from_number", "From", "caller_phone")),
+            "to_number": normalize_phone_number(first_present(payload, "to_number", "To", "phone_number")) or get_global_forwarding_target_number(),
+            "started_at": first_present(payload, "started_at"),
+            "ended_at": first_present(payload, "ended_at"),
+            "duration_seconds": first_present(payload, "duration_seconds", "duration"),
+            "status": first_present(payload, "status", "call_status"),
+            "outcome": first_present(payload, "outcome"),
+            "summary": first_present(payload, "summary"),
+            "transcript_text": first_present(payload, "transcript", "transcript_text"),
+            "sentiment": first_present(payload, "sentiment"),
+            "raw_payload": payload,
+        }
+        response = supabase.table("call_logs").insert(call_log).execute()
+        saved = response.data[0] if response.data else call_log
+        return {"ok": True, "call_log": saved}
+
+    if normalized_tool == "transfer-call":
+        transfer_payload = {
+            "business_id": business.get("id") if business else None,
+            "user_id": user_id,
+            "receptionist_id": (receptionist or {}).get("id"),
+            "target_number": first_present(payload, "target_number", "phone_number", "transfer_to"),
+            "reason": first_present(payload, "reason"),
+            "requested_at": datetime.now(timezone.utc).isoformat(),
+        }
+        push_live_event(
+            "Transfer call requested.",
+            actor="system",
+            severity="info",
+            event_type="transfer_call",
+            payload=transfer_payload,
+        )
+        return {"ok": True, "status": "queued", "transfer": transfer_payload}
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown server tool: {tool_name}")
 
 @app.post("/api/webhooks/elevenlabs/post-call", tags=["Server Tools"])
 async def elevenlabs_post_call_webhook(
@@ -997,6 +1540,34 @@ async def elevenlabs_post_call_webhook(
         ) from exc
 
     saved = response.data[0] if getattr(response, "data", None) else call_log
+
+    flow_execution_id = first_present(
+        payload,
+        "flow_execution_id",
+        "metadata.flow_execution_id",
+        "dynamic_variables.flow_execution_id",
+    )
+    agent_data = (
+        deep_get(payload, "agent_data")
+        or deep_get(payload, "analysis.data_collection_results")
+        or deep_get(payload, "analysis.extracted_variables")
+        or {}
+    )
+    if flow_execution_id and scenario_engine:
+        try:
+            await scenario_engine.resume_execution(
+                str(flow_execution_id),
+                {
+                    "agent": agent_data if isinstance(agent_data, dict) else {},
+                    "call": {
+                        "call_sid": call_log.get("external_call_id"),
+                        "call_outcome": call_log.get("outcome"),
+                    },
+                },
+            )
+        except Exception as exc:
+            logging.error("Failed to resume scenario execution %s: %s", flow_execution_id, exc, exc_info=True)
+
     return {"ok": True, "call_log": saved}
 
 @app.get("/api/agents", tags=["Sonar Controller Compat"])
@@ -1192,6 +1763,214 @@ async def people_webhook(payload: dict):
         payload=payload,
     )
     return {"ok": True}
+
+@app.get("/api/sonar/business/profile", tags=["Sonar Business"])
+async def get_sonar_business_profile(current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    return serialize_business_profile_row(business)
+
+@app.put("/api/sonar/business/profile", tags=["Sonar Business"])
+async def update_sonar_business_profile(payload: dict, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+
+    allowed_fields = {
+        "name", "phone", "email", "address", "city", "state", "zip", "website",
+        "about_us", "policies", "faq", "business_hours", "business_timezone", "industry",
+    }
+    updates = {key: value for key, value in payload.items() if key in allowed_fields}
+    if "business_hours" in updates and isinstance(updates["business_hours"], (dict, list)):
+        updates["business_hours"] = json.dumps(updates["business_hours"])
+    if "industry" in updates and isinstance(updates["industry"], (dict, list)):
+        updates["industry"] = updates["industry"]
+
+    response = supabase.table("businesses").update(updates).eq("id", business["id"]).execute()
+    updated = response.data[0] if response.data else {**business, **updates}
+    return serialize_business_profile_row(updated)
+
+@app.get("/api/sonar/people", tags=["Sonar People"])
+async def list_sonar_people(limit: int = 100, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    query = supabase.table("people").select("*")
+    if business:
+        query = query.eq("business_id", business["id"])
+    else:
+        query = query.eq("user_id", str(current_user.id))
+    response = query.order("created_at", desc=True).limit(max(1, min(limit, 500))).execute()
+    return response.data or []
+
+@app.get("/api/sonar/people/search", tags=["Sonar People"])
+async def search_sonar_people(q: str, limit: int = 25, current_user: dict = Depends(get_current_user)):
+    rows = await list_sonar_people(limit=200, current_user=current_user)
+    query_text = (q or "").strip().lower()
+    if not query_text:
+        return rows[:limit]
+    matches = []
+    for row in rows:
+        searchable = " ".join(
+            str(value) for value in [
+                row.get("first_name"),
+                row.get("last_name"),
+                row.get("phone"),
+                row.get("email"),
+                row.get("notes"),
+            ] if value
+        ).lower()
+        if query_text in searchable:
+            matches.append(row)
+    return matches[:max(1, min(limit, 100))]
+
+@app.get("/api/sonar/people/{person_id}", tags=["Sonar People"])
+async def get_sonar_person(person_id: str, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    query = supabase.table("people").select("*").eq("id", person_id)
+    if business:
+        query = query.eq("business_id", business["id"])
+    else:
+        query = query.eq("user_id", str(current_user.id))
+    response = query.limit(1).execute()
+    if not response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+    return response.data[0]
+
+@app.post("/api/sonar/people", tags=["Sonar People"])
+async def create_sonar_person(payload: dict, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    insert_payload = {**payload}
+    insert_payload["user_id"] = insert_payload.get("user_id") or str(current_user.id)
+    if business and "business_id" not in insert_payload:
+        insert_payload["business_id"] = business["id"]
+    response = supabase.table("people").insert(insert_payload).execute()
+    created = response.data[0] if response.data else insert_payload
+    schedule_backend_scenario_execution("record_created", {
+        "record_id": created.get("id"),
+        "person_id": created.get("id"),
+        "user_id": created.get("user_id") or str(current_user.id),
+        "business_id": created.get("business_id") or (business or {}).get("id"),
+        "person": created,
+        "record": created,
+    })
+    return created
+
+@app.put("/api/sonar/people/{person_id}", tags=["Sonar People"])
+async def update_sonar_person(person_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    existing_query = supabase.table("people").select("*").eq("id", person_id)
+    if business:
+        existing_query = existing_query.eq("business_id", business["id"])
+    else:
+        existing_query = existing_query.eq("user_id", str(current_user.id))
+    existing_response = existing_query.limit(1).execute()
+    if not existing_response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+
+    updates = {key: value for key, value in payload.items() if key not in {"id", "user_id", "business_id", "created_at"}}
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    response = supabase.table("people").update(updates).eq("id", person_id).execute()
+    updated = response.data[0] if response.data else {**existing_response.data[0], **updates}
+    schedule_backend_scenario_execution("record_updated", {
+        "record_id": updated.get("id") or person_id,
+        "person_id": updated.get("id") or person_id,
+        "user_id": updated.get("user_id") or existing_response.data[0].get("user_id") or str(current_user.id),
+        "business_id": updated.get("business_id") or existing_response.data[0].get("business_id") or (business or {}).get("id"),
+        "person": updated,
+        "record": updated,
+    })
+    return updated
+
+@app.delete("/api/sonar/people/{person_id}", tags=["Sonar People"])
+async def delete_sonar_person(person_id: str, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    existing_query = supabase.table("people").select("id").eq("id", person_id)
+    if business:
+        existing_query = existing_query.eq("business_id", business["id"])
+    else:
+        existing_query = existing_query.eq("user_id", str(current_user.id))
+    existing_response = existing_query.limit(1).execute()
+    if not existing_response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+
+    deleted = existing_response.data[0]
+    supabase.table("people").delete().eq("id", person_id).execute()
+    schedule_backend_scenario_execution("record_deleted", {
+        "record_id": person_id,
+        "person_id": person_id,
+        "user_id": deleted.get("user_id") or str(current_user.id),
+        "business_id": deleted.get("business_id") or (business or {}).get("id"),
+        "person": deleted,
+        "record": deleted,
+    })
+    return {"ok": True, "id": person_id}
+
+@app.get("/api/sonar/services", tags=["Sonar Services"])
+async def list_sonar_services(current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    query = supabase.table("services").select("*")
+    if business:
+        try:
+            query = query.eq("business_id", business["id"])
+        except Exception:
+            pass
+    response = query.order("category").order("sort_order").execute()
+    return response.data or []
+
+@app.post("/api/sonar/services", tags=["Sonar Services"])
+async def create_sonar_service(payload: dict, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    insert_payload = {**payload}
+    if business and "business_id" not in insert_payload:
+        insert_payload["business_id"] = business["id"]
+    response = supabase.table("services").insert(insert_payload).execute()
+    return response.data[0] if response.data else insert_payload
+
+@app.get("/api/sonar/appointments", tags=["Sonar Appointments"])
+async def list_sonar_appointments(limit: int = 100, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    query = supabase.table("appointments").select("*")
+    if business:
+        try:
+            query = query.eq("business_id", business["id"])
+        except Exception:
+            pass
+    response = query.order("date").order("time").limit(max(1, min(limit, 500))).execute()
+    return response.data or []
+
+@app.get("/api/sonar/appointments/stats", tags=["Sonar Appointments"])
+async def get_sonar_appointment_stats(current_user: dict = Depends(get_current_user)):
+    appointments = await list_sonar_appointments(limit=1000, current_user=current_user)
+    counts = defaultdict(int)
+    for row in appointments:
+        counts[str(row.get("status") or "unknown").lower()] += 1
+    return {
+        "total": len(appointments),
+        "by_status": dict(counts),
+    }
+
+@app.get("/api/sonar/receptionists/hired", tags=["Sonar Receptionists"])
+async def list_hired_receptionists(current_user: dict = Depends(get_current_user)):
+    response = (
+        supabase.table("hired_receptionists")
+        .select("*")
+        .eq("user_id", str(current_user.id))
+        .order("hired_at", desc=True)
+        .execute()
+    )
+    return response.data or []
+
+@app.get("/api/sonar/receptionists/catalog", tags=["Sonar Receptionists"])
+async def list_receptionist_catalog():
+    response = (
+        supabase.table("receptionist_catalog")
+        .select("*")
+        .eq("is_active", True)
+        .order("full_name")
+        .execute()
+    )
+    return response.data or []
 
 @app.get("/api/sonar/call-logs", tags=["Sonar Calls"])
 async def list_call_logs(limit: int = 50, current_user: dict = Depends(get_current_user)):
@@ -1822,6 +2601,38 @@ async def send_invoice(request: InvoiceSendRequest):
     except Exception as exc:
         logging.error("Error sending invoice: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+async def scenario_create_payment_callback(payload: dict):
+    request = PaymentCreateRequest(**payload)
+    return await create_payment(request)
+
+
+async def scenario_create_payment_profile_callback(payload: dict):
+    request = PaymentProfileCreateRequest(**payload)
+    return await create_payment_profile(request)
+
+
+async def scenario_create_invoice_callback(payload: dict):
+    request = InvoiceCreateRequest(**payload)
+    return await create_invoice(request)
+
+
+async def scenario_send_invoice_callback(payload: dict):
+    request = InvoiceSendRequest(**payload)
+    return await send_invoice(request)
+
+
+scenario_engine = ScenarioEngine(
+    supabase=supabase,
+    callbacks={
+        "create_payment": scenario_create_payment_callback,
+        "create_payment_profile": scenario_create_payment_profile_callback,
+        "create_invoice": scenario_create_invoice_callback,
+        "send_invoice": scenario_send_invoice_callback,
+    },
+    base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
+)
 
 @app.post("/api/sonar/update-payment", tags=["Sonar Payments"])
 async def update_payment(request: PaymentUpdateRequest):
