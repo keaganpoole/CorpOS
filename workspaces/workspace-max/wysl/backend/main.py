@@ -42,6 +42,7 @@ from config import (
     STRIPE_LIVE_SECRET_KEY,
     STRIPE_TEST_SECRET_KEY,
     elevenlabs_webhook_secret,
+    twilio_phone_number,
 )
 
  
@@ -140,6 +141,39 @@ def infer_route_source(request: Request) -> str:
     if "supabase" in user_agent:
         return "supabase"
     return "dashboard"
+
+
+def get_business_record_for_user(user_id: str) -> dict:
+    response = (
+        supabase
+        .table('businesses')
+        .select('id, phone, forwarding_config')
+        .eq('user_id', user_id)
+        .limit(1)
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+
+    return response.data[0]
+
+
+def normalize_forwarding_config(raw_config) -> dict:
+    config = raw_config if isinstance(raw_config, dict) else {}
+    numbers = config.get('numbers')
+    if not isinstance(numbers, list):
+        numbers = []
+
+    return {
+        "version": config.get("version", 1),
+        "active_number_id": config.get("active_number_id"),
+        "numbers": numbers,
+    }
+
+
+def get_global_forwarding_target_number() -> str:
+    return twilio_phone_number or "+12073092121"
 
 
 push_live_event("FastAPI backend active on port 8000.", actor="system", severity="info", event_type="system_startup")
@@ -251,6 +285,16 @@ class OnboardingRequest(BaseModel):
     about_company: Optional[str] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
+
+class BusinessForwardingUpdateRequest(BaseModel):
+    entry_id: Optional[str] = None
+    source_number: str
+    source_label: Optional[str] = None
+    provider: str
+    provider_label: Optional[str] = None
+    status: Optional[Literal["draft", "pending_test", "verified"]] = "draft"
+    confirmed_enabled: Optional[bool] = False
+    verified: Optional[bool] = False
 
 class PaymentProfileCreateRequest(BaseModel):
     amount: int
@@ -2307,6 +2351,152 @@ async def complete_onboarding(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save onboarding data.",
+        )
+
+
+@app.get("/businesses/me/forwarding", tags=["Businesses"])
+async def get_business_forwarding(
+    current_user: dict = Depends(get_current_user),
+):
+    current_user_id = str(current_user.id)
+
+    try:
+        business = get_business_record_for_user(current_user_id)
+        config = normalize_forwarding_config(business.get('forwarding_config'))
+
+        current_entry = None
+        if config.get("active_number_id"):
+            current_entry = next(
+                (entry for entry in config["numbers"] if entry.get("id") == config["active_number_id"]),
+                None,
+            )
+
+        return {
+            "business_id": business["id"],
+            "business_phone": business.get("phone"),
+            "forwarding_target_number": get_global_forwarding_target_number(),
+            "forwarding_config": config,
+            "current_entry": current_entry,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Failed to load forwarding config for user {current_user_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load forwarding settings.",
+        )
+
+
+@app.put("/businesses/me/forwarding", tags=["Businesses"])
+async def update_business_forwarding(
+    payload: BusinessForwardingUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    current_user_id = str(current_user.id)
+
+    try:
+        business = get_business_record_for_user(current_user_id)
+        config = normalize_forwarding_config(business.get('forwarding_config'))
+        now = datetime.now(timezone.utc).isoformat()
+        numbers = config["numbers"]
+
+        existing_entry = None
+        existing_index = None
+
+        for index, entry in enumerate(numbers):
+            if payload.entry_id and entry.get("id") == payload.entry_id:
+                existing_entry = entry
+                existing_index = index
+                break
+            if entry.get("source_number") == payload.source_number:
+                existing_entry = entry
+                existing_index = index
+                break
+
+        entry_id = payload.entry_id or (existing_entry or {}).get("id") or str(uuid4())
+        source_label = payload.source_label or (
+            "Main business line" if payload.source_number == business.get("phone") else payload.source_number
+        )
+        provider_label = payload.provider_label or payload.provider
+
+        confirmed_enabled_at = (existing_entry or {}).get("confirmed_enabled_at")
+        verified_at = (existing_entry or {}).get("verified_at")
+
+        if payload.confirmed_enabled:
+            confirmed_enabled_at = confirmed_enabled_at or now
+        elif payload.status == "draft":
+            confirmed_enabled_at = None
+
+        if payload.verified:
+            verified_at = now
+        elif payload.status != "verified":
+            verified_at = None
+
+        next_status = payload.status or (existing_entry or {}).get("status") or "draft"
+        if payload.verified:
+            next_status = "verified"
+        elif payload.confirmed_enabled and next_status == "draft":
+            next_status = "pending_test"
+
+        next_entry = {
+            "id": entry_id,
+            "source_number": payload.source_number,
+            "source_label": source_label,
+            "provider": payload.provider,
+            "provider_label": provider_label,
+            "target_number": get_global_forwarding_target_number(),
+            "status": next_status,
+            "confirmed_enabled_at": confirmed_enabled_at,
+            "verified_at": verified_at,
+            "updated_at": now,
+            "created_at": (existing_entry or {}).get("created_at") or now,
+        }
+
+        if existing_index is None:
+            numbers.append(next_entry)
+        else:
+            numbers[existing_index] = next_entry
+
+        config["active_number_id"] = entry_id
+
+        update_response = (
+            supabase
+            .table('businesses')
+            .update({"forwarding_config": config})
+            .eq('id', business["id"])
+            .execute()
+        )
+
+        if not update_response.data:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save forwarding settings")
+
+        push_live_event(
+            "Business forwarding updated.",
+            actor="system",
+            severity="info",
+            event_type="business_forwarding_updated",
+            payload={
+                "business_id": business["id"],
+                "source_number": payload.source_number,
+                "status": next_status,
+            },
+        )
+
+        return {
+            "business_id": business["id"],
+            "business_phone": business.get("phone"),
+            "forwarding_target_number": get_global_forwarding_target_number(),
+            "forwarding_config": config,
+            "entry": next_entry,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Failed to update forwarding config for user {current_user_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save forwarding settings.",
         )
 
 # --- Leads Endpoints ---

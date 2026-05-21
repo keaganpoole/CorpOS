@@ -210,11 +210,13 @@ const timeAgo = (timestamp) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...estOpts });
 };
 
-const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onTerminate }) => {
+const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, activeForwardingEntry = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onTerminate }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   const displayModel = pending || agent.model || 'Not set';
   const isOnline = agent.status === 'active';
+  const forwardingDisplayLabel = activeForwardingEntry?.source_label || activeForwardingEntry?.source_number || 'Forward business number';
+  const forwardingActionLabel = activeForwardingEntry?.status === 'verified' ? 'Change' : 'Setup';
 
   return (
     <motion.div
@@ -255,53 +257,6 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
       </div>
 
       <div className="p-5 space-y-3">
-        <div>
-          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Call Handling</p>
-          <div className="flex items-center gap-1.5 mb-2">
-            {[
-              { key: 'none', label: 'Off', activeClass: 'bg-zinc-700/10 border-zinc-700/20 text-zinc-600' },
-              { key: 'inbound', label: 'In', activeClass: 'bg-cyan-400/10 border-cyan-400/20 text-cyan-400' },
-              { key: 'outbound', label: 'Out', activeClass: 'bg-indigo-400/10 border-indigo-400/20 text-indigo-400' },
-              { key: 'both', label: 'Both', activeClass: 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' },
-            ].map(ct => {
-              const isAct = (agent.call_types || 'none') === ct.key;
-              return (
-                <button
-                  key={ct.key}
-                  onClick={async () => {
-                    const newVal = ct.key === (agent.call_types || 'none') ? 'none' : ct.key;
-                    try {
-                      await api.updateAgentCallTypes(agent.id, newVal);
-                    } catch (err) {
-                      console.error('[CallTypes] Failed:', err.message || err);
-                    }
-                  }}
-                  className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border
-                    ${isAct ? ct.activeClass : 'bg-transparent border-transparent text-zinc-700 hover:text-zinc-500 hover:bg-white/[0.02]'}`}
-                >
-                  {ct.label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="pt-3 border-t border-white/[0.04]">
-            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Phone Number</p>
-            {(agent.call_types && agent.call_types !== 'none') ? (
-              <div className="flex items-center gap-1.5">
-                <Phone size={9} className="text-zinc-600" />
-                <span className="text-[10px] text-zinc-500 font-medium">{agent.phone_number || 'No number assigned'}</span>
-              </div>
-            ) : (
-              <span className="text-[10px] text-zinc-600">Enable call handling to assign a number</span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-zinc-500">
-          <Terminal size={11} className="shrink-0 text-zinc-700" />
-          <span className="text-[11px] font-medium truncate italic">{agent.current_activity || 'Idle'}</span>
-        </div>
-
         <div className="hidden">
         <div className="pt-3 border-t border-white/[0.04]">
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Language Model</p>
@@ -364,19 +319,18 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
             <div className="flex items-center gap-1.5 min-w-0">
               <Repeat size={11} className="text-orange-400/70" />
               <span className="text-[11px] font-bold text-orange-300/80 truncate group-hover:text-orange-300 transition-colors">
-                Forward business number
+                {forwardingDisplayLabel}
               </span>
             </div>
             <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
-                Setup
+                {forwardingActionLabel}
               </span>
               <ChevronRight size={11} className="text-orange-400/70" />
             </div>
           </button>
         </div>
 
-        {false && (
         <div className="pt-3 border-t border-white/[0.04]">
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Call Handling</p>
           <div className="flex items-center gap-1.5 mb-2">
@@ -406,19 +360,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
               );
             })}
           </div>
-          <div className="pt-3 border-t border-white/[0.04]">
-            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Phone Number</p>
-            {(agent.call_types && agent.call_types !== 'none') ? (
-              <div className="flex items-center gap-1.5">
-                <Phone size={9} className="text-zinc-600" />
-                <span className="text-[10px] text-zinc-500 font-medium">{agent.phone_number || 'No number assigned'}</span>
-              </div>
-            ) : (
-              <span className="text-[10px] text-zinc-600">Enable call handling to assign a number</span>
-            )}
-          </div>
         </div>
-        )}
       </div>
     </motion.div>
   );
@@ -434,27 +376,248 @@ const PHONE_PROVIDERS = [
   { id: 'other', label: 'Other provider', action: 'Open your call forwarding settings, then forward calls to this number.' },
 ];
 
-const ForwardNumberModal = ({ agent, onClose }) => {
+const FORWARDING_API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
   const [slide, setSlide] = useState(0);
-  const [selectedProvider, setSelectedProvider] = useState(PHONE_PROVIDERS[0]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [selectedProviderId, setSelectedProviderId] = useState(PHONE_PROVIDERS[0].id);
   const [copied, setCopied] = useState(false);
-  const forwardingNumber = agent?.phone_number || 'Number pending';
-  const hasNumber = Boolean(agent?.phone_number);
+  const [entryId, setEntryId] = useState(null);
+  const [businessPhone, setBusinessPhone] = useState('');
+  const [forwardingTargetNumber, setForwardingTargetNumber] = useState('');
+  const [savedEntries, setSavedEntries] = useState([]);
+  const [sourceNumber, setSourceNumber] = useState('');
+  const [sourceLabel, setSourceLabel] = useState('');
+  const [forwardingStatus, setForwardingStatus] = useState('draft');
+  const [isAddingNewNumber, setIsAddingNewNumber] = useState(false);
+  const forwardingNumber = forwardingTargetNumber || '';
+  const hasTargetNumber = Boolean(forwardingNumber);
   const totalSlides = 4;
+  const selectedProvider = PHONE_PROVIDERS.find((provider) => provider.id === selectedProviderId) || PHONE_PROVIDERS[0];
+  const normalizedSourceNumber = sourceNumber.trim();
+  const sourceOptions = [];
+  const seenNumbers = new Set();
+
+  if (businessPhone) {
+    seenNumbers.add(businessPhone);
+    sourceOptions.push({
+      id: 'business-phone',
+      entryId: null,
+      source_number: businessPhone,
+      source_label: 'Main business line',
+      provider: '',
+      status: 'draft',
+    });
+  }
+
+  for (const entry of savedEntries) {
+    if (!entry?.source_number || seenNumbers.has(entry.source_number)) continue;
+    seenNumbers.add(entry.source_number);
+    sourceOptions.push({
+      id: entry.id || entry.source_number,
+      entryId: entry.id || null,
+      source_number: entry.source_number,
+      source_label: entry.source_label || entry.source_number,
+      provider: entry.provider || '',
+      status: entry.status || 'draft',
+    });
+  }
+
+  const selectedExistingEntry = savedEntries.find((entry) => {
+    if (!entry?.source_number) return false;
+    if (entryId && entry.id === entryId) return true;
+    return entry.source_number === normalizedSourceNumber;
+  }) || null;
+  const selectedExistingEntryIsVerified = selectedExistingEntry?.status === 'verified';
+  const activeSourceOption = sourceOptions.find((option) => {
+    if (entryId && option.entryId) return option.entryId === entryId;
+    return option.source_number === normalizedSourceNumber;
+  }) || null;
+
+  const selectSourceOption = (option) => {
+    setIsAddingNewNumber(false);
+    setEntryId(option.entryId || null);
+    setSourceNumber(option.source_number || '');
+    setSourceLabel(option.source_label || '');
+    if (option.provider) {
+      setSelectedProviderId(option.provider);
+    }
+    setForwardingStatus(option.status || 'draft');
+  };
+
+  const startAddingNewNumber = () => {
+    setIsAddingNewNumber(true);
+    setEntryId(null);
+    setSourceNumber('');
+    setSourceLabel('');
+    setForwardingStatus('draft');
+    setSelectedProviderId(PHONE_PROVIDERS[0].id);
+    setError('');
+  };
+
+  const requestForwarding = async (endpoint, options = {}) => {
+    if (!authSession?.access_token) {
+      throw new Error('Please log in again before editing forwarding settings.');
+    }
+
+    const response = await fetch(`${FORWARDING_API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`,
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.headers || {}),
+      },
+    });
+
+    if (!response.ok) {
+      let message = `HTTP ${response.status}`;
+      try {
+        const payload = await response.json();
+        message = payload?.detail || message;
+      } catch {
+        // Ignore JSON parsing failures and fall back to status text.
+      }
+      throw new Error(message);
+    }
+
+    return response.json();
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    const loadForwardingState = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const data = await requestForwarding('/businesses/me/forwarding');
+        if (!active) return;
+
+        const numbers = data?.forwarding_config?.numbers || [];
+        const currentEntry = data?.current_entry || null;
+
+        setSavedEntries(numbers);
+        setBusinessPhone(data?.business_phone || '');
+        setForwardingTargetNumber(data?.forwarding_target_number || '');
+
+        if (currentEntry) {
+          setEntryId(currentEntry.id || null);
+          setSourceNumber(currentEntry.source_number || data?.business_phone || '');
+          setSourceLabel(currentEntry.source_label || '');
+          setSelectedProviderId(currentEntry.provider || PHONE_PROVIDERS[0].id);
+          setForwardingStatus(currentEntry.status || 'draft');
+          setIsAddingNewNumber(false);
+          if (currentEntry.status === 'pending_test') {
+            setSlide(3);
+          } else {
+            setSlide(0);
+          }
+        } else {
+          setEntryId(null);
+          setSourceNumber(data?.business_phone || '');
+          setSourceLabel(data?.business_phone ? 'Main business line' : '');
+          setSelectedProviderId(PHONE_PROVIDERS[0].id);
+          setForwardingStatus('draft');
+          setIsAddingNewNumber(false);
+          setSlide(0);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err.message || 'Failed to load forwarding settings.');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadForwardingState();
+
+    return () => {
+      active = false;
+    };
+  }, [authSession?.access_token]);
 
   const copyForwardingNumber = async () => {
-    if (!hasNumber || typeof navigator === 'undefined' || !navigator.clipboard) return;
+    if (!hasTargetNumber || typeof navigator === 'undefined' || !navigator.clipboard) return;
     await navigator.clipboard.writeText(forwardingNumber);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };
 
-  const goNext = () => {
-    if (slide === totalSlides - 1) {
-      onClose();
+  const saveForwarding = async ({ status, confirmedEnabled = false, verified = false }) => {
+    setSaving(true);
+    setError('');
+
+    try {
+      const data = await requestForwarding('/businesses/me/forwarding', {
+        method: 'PUT',
+        body: JSON.stringify({
+          entry_id: entryId || undefined,
+          source_number: sourceNumber.trim(),
+          source_label: sourceLabel.trim() || undefined,
+          provider: selectedProvider.id,
+          provider_label: selectedProvider.label,
+          status,
+          confirmed_enabled: confirmedEnabled,
+          verified,
+        }),
+      });
+
+      const numbers = data?.forwarding_config?.numbers || [];
+      const entry = data?.entry || null;
+
+      setSavedEntries(numbers);
+      if (entry?.id) setEntryId(entry.id);
+      if (entry?.status) setForwardingStatus(entry.status);
+      if (entry && onSaved) onSaved(entry);
+
+      return entry;
+    } catch (err) {
+      setError(err.message || 'Failed to save forwarding settings.');
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const goNext = async () => {
+    if (!hasTargetNumber) {
+      setError('Assign a receptionist number before setting up forwarding.');
       return;
     }
-    setSlide((current) => Math.min(current + 1, totalSlides - 1));
+
+    if (slide === 0) {
+      if (!normalizedSourceNumber) {
+        setError('Choose or enter the business number you want to forward.');
+        return;
+      }
+      if (selectedExistingEntryIsVerified) {
+        const saved = await saveForwarding({ status: 'verified' });
+        if (saved) onClose();
+        return;
+      }
+      setError('');
+      setSlide(1);
+      return;
+    }
+
+    if (slide === 1) {
+      setSlide(2);
+      return;
+    }
+
+    if (slide === 2) {
+      const saved = await saveForwarding({ status: 'pending_test', confirmedEnabled: true });
+      if (saved) setSlide(3);
+      return;
+    }
+
+    const saved = await saveForwarding({ status: 'verified', confirmedEnabled: true, verified: true });
+    if (saved) onClose();
   };
 
   const goBack = () => {
@@ -464,27 +627,94 @@ const ForwardNumberModal = ({ agent, onClose }) => {
   const renderSlide = () => {
     if (slide === 0) {
       return (
-        <div className="rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-600">Receptionist line</p>
-              <p className="mt-2 break-words text-2xl font-semibold tracking-[-0.03em] text-white">{forwardingNumber}</p>
+        <div className="space-y-4 rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-600">Business number to forward</p>
+            <div className="mt-3 space-y-2">
+              {sourceOptions.map((option) => {
+                const active = sourceNumber === option.source_number;
+                const statusLabel = option.status === 'verified'
+                  ? 'Ready'
+                  : option.status === 'pending_test'
+                    ? 'Needs test'
+                    : 'Setup needed';
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => selectSourceOption(option)}
+                    className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                      active
+                        ? 'border-orange-400 bg-orange-400/12 text-white'
+                        : 'border-white/[0.08] bg-black/20 text-zinc-300 hover:border-white/[0.14] hover:text-white'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className={`truncate text-sm font-semibold ${active ? 'text-white' : 'text-zinc-200'}`}>
+                        {option.source_label || option.source_number}
+                      </div>
+                      <div className={`mt-1 truncate text-xs ${active ? 'text-orange-100' : 'text-zinc-500'}`}>
+                        {option.source_number}
+                      </div>
+                    </div>
+                    <div className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                      active
+                        ? 'bg-orange-300 text-black'
+                        : option.status === 'verified'
+                          ? 'bg-emerald-400/12 text-emerald-300'
+                          : 'bg-white/[0.06] text-zinc-500'
+                    }`}>
+                      {statusLabel}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
             <button
               type="button"
-              onClick={copyForwardingNumber}
-              disabled={!hasNumber}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.035] text-zinc-400 transition hover:border-orange-400/40 hover:text-orange-300 disabled:cursor-not-allowed disabled:opacity-40"
-              title="Copy number"
+              onClick={startAddingNewNumber}
+              className={`mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition ${
+                isAddingNewNumber
+                  ? 'border-orange-400/50 bg-orange-400/10 text-orange-200'
+                  : 'border-dashed border-white/[0.12] bg-transparent text-zinc-400 hover:border-orange-400/40 hover:text-white'
+              }`}
             >
-              {copied ? <CheckCircle2 size={17} /> : <Copy size={16} />}
+              <Plus size={14} />
+              Add new number
             </button>
+            {isAddingNewNumber && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <input
+                  type="text"
+                  value={sourceNumber}
+                  onChange={(event) => {
+                    setEntryId(null);
+                    setSourceNumber(event.target.value);
+                    setForwardingStatus('draft');
+                  }}
+                  placeholder="+1 (555) 123-4567"
+                  className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055]"
+                />
+                <input
+                  type="text"
+                  value={sourceLabel}
+                  onChange={(event) => setSourceLabel(event.target.value)}
+                  placeholder="Front desk"
+                  className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055]"
+                />
+              </div>
+            )}
           </div>
-          <p className="mt-4 text-sm leading-6 text-zinc-500">
-            This is the number your existing business line will forward calls to.
+
+          <p className="text-sm leading-6 text-zinc-500">
+            {isAddingNewNumber
+              ? 'Add the number customers call, then we’ll walk you through forwarding it to the shared receptionist line.'
+              : activeSourceOption
+                ? 'Choose a saved number to reuse, or add a new one if this line is not listed yet.'
+                : 'Choose one of your saved numbers or add a new one to get started.'}
           </p>
-          {!hasNumber && (
-            <p className="mt-3 text-xs leading-5 text-orange-300/80">
+          {!hasTargetNumber && (
+            <p className="text-xs leading-5 text-orange-300/80">
               Assign a phone number before forwarding calls to this receptionist.
             </p>
           )}
@@ -494,16 +724,51 @@ const ForwardNumberModal = ({ agent, onClose }) => {
 
     if (slide === 1) {
       return (
+        <div className="space-y-4 rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-5">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-600">Receptionist line</p>
+            <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">Copy this number</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-500">
+              This is the shared line every business number should forward to.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-[24px] border border-white/[0.08] bg-black/20 p-4">
+            <div className="min-w-0">
+              <p className="break-words text-3xl font-semibold tracking-[-0.04em] text-white">
+                {forwardingNumber || 'Number pending'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={copyForwardingNumber}
+              disabled={!hasTargetNumber}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.035] text-zinc-400 transition hover:border-orange-400/40 hover:text-orange-300 disabled:cursor-not-allowed disabled:opacity-40"
+              title="Copy number"
+            >
+              {copied ? <CheckCircle2 size={18} /> : <Copy size={17} />}
+            </button>
+          </div>
+
+          <p className="text-sm leading-6 text-zinc-500">
+            In your carrier or phone system settings, forward <span className="font-semibold text-white">{sourceNumber || 'your business number'}</span> to this number.
+          </p>
+        </div>
+      );
+    }
+
+    if (slide === 2) {
+      return (
         <div className="rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
           <p className="mb-3 text-[13px] font-normal text-zinc-500">Who handles your business number?</p>
           <div className="grid max-h-[260px] grid-cols-2 gap-2 overflow-y-auto pr-1 custom-scrollbar sm:grid-cols-3">
             {PHONE_PROVIDERS.map((provider) => {
-              const active = selectedProvider.id === provider.id;
+              const active = selectedProviderId === provider.id;
               return (
                 <button
                   key={provider.id}
                   type="button"
-                  onClick={() => setSelectedProvider(provider)}
+                  onClick={() => setSelectedProviderId(provider.id)}
                   className={`rounded-2xl border px-3 py-2 text-left text-xs font-semibold transition ${
                     active
                       ? 'border-orange-400 bg-orange-400 text-black shadow-[0_0_22px_rgba(249,115,22,0.18)]'
@@ -515,22 +780,17 @@ const ForwardNumberModal = ({ agent, onClose }) => {
               );
             })}
           </div>
-        </div>
-      );
-    }
-
-    if (slide === 2) {
-      return (
-        <div className="rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
-          <div className="mb-4 flex items-center gap-2">
-            <Repeat size={15} className="text-orange-300" />
-            <p className="text-[13px] font-normal text-zinc-400">{selectedProvider.action}</p>
-          </div>
-          <div className="space-y-2 text-sm text-zinc-500">
-            <p>1. Open your phone provider settings.</p>
-            <p>2. Turn on call forwarding.</p>
-            <p>3. Forward calls to <span className="font-semibold text-white">{forwardingNumber}</span>.</p>
-            <p>4. Save your changes.</p>
+          <div className="mt-4 border-t border-white/[0.06] pt-4">
+            <div className="mb-4 flex items-center gap-2">
+              <Repeat size={15} className="text-orange-300" />
+              <p className="text-[13px] font-normal text-zinc-400">{selectedProvider.action}</p>
+            </div>
+            <div className="space-y-2 text-sm text-zinc-500">
+              <p>1. Open your phone provider settings.</p>
+              <p>2. Turn on call forwarding.</p>
+              <p>3. Forward <span className="font-semibold text-white">{sourceNumber || 'your business number'}</span> to <span className="font-semibold text-white">{forwardingNumber}</span>.</p>
+              <p>4. Save your changes.</p>
+            </div>
           </div>
         </div>
       );
@@ -549,17 +809,19 @@ const ForwardNumberModal = ({ agent, onClose }) => {
 
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-600">Test call</p>
           <h3 className="mx-auto mt-3 max-w-sm text-2xl font-semibold tracking-[-0.04em] text-white">
-            Listening for your test call.
+            {forwardingStatus === 'verified' ? 'Forwarding verified.' : 'Listening for your test call.'}
           </h3>
           <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-zinc-500">
-            Use your cell phone to call the number customers already use. If {agent?.first_name || agent?.name || 'your receptionist'} answers, forwarding is working.
+            {forwardingStatus === 'verified'
+              ? `${sourceNumber || 'Your business number'} is now saved and marked as working with the shared receptionist line.`
+              : `Use your cell phone to call ${sourceNumber || 'the number customers already use'}. If the shared receptionist line answers, forwarding is working.`}
           </p>
         </div>
 
         <div className="border-t border-white/[0.06] bg-black/20 p-4">
           <div className="flex items-center justify-between gap-4">
             <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-600">
-              Listening
+              {forwardingStatus === 'verified' ? 'Verified' : 'Listening'}
             </span>
             <div className="flex items-center gap-2">
               {[0, 1, 2].map((dot) => (
@@ -599,7 +861,7 @@ const ForwardNumberModal = ({ agent, onClose }) => {
               <p className="text-[13px] font-normal text-orange-300">Number forwarding</p>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">Connect your business line.</h2>
               <p className="mt-3 max-w-md text-sm leading-6 text-zinc-500">
-                Forward your existing business number to {agent?.first_name || agent?.name || 'this receptionist'} so calls land here.
+                Forward your business number to the shared receptionist line, then save it here so you can reuse it later.
               </p>
             </div>
             <button
@@ -620,14 +882,20 @@ const ForwardNumberModal = ({ agent, onClose }) => {
 
           <AnimatePresence mode="wait">
             <motion.div
-              key={slide}
+              key={loading ? 'loading' : slide}
               initial={{ opacity: 0, x: 18 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -18 }}
               transition={{ duration: 0.18 }}
               className="min-h-[190px]"
             >
-              {renderSlide()}
+              {loading ? (
+                <div className="flex min-h-[190px] items-center justify-center text-[11px] uppercase tracking-[0.3em] text-zinc-700">
+                  Loading forwarding
+                </div>
+              ) : (
+                renderSlide()
+              )}
             </motion.div>
           </AnimatePresence>
 
@@ -635,18 +903,28 @@ const ForwardNumberModal = ({ agent, onClose }) => {
             <button
               type="button"
               onClick={goNext}
-              disabled={!hasNumber}
+              disabled={loading || saving || !hasTargetNumber}
               className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {slide === totalSlides - 1 ? 'It worked' : 'Continue'}
+              {saving
+                ? 'Saving...'
+                : slide === 0 && selectedExistingEntryIsVerified
+                  ? 'Use this number'
+                : slide === 2
+                  ? 'I turned forwarding on'
+                  : slide === totalSlides - 1
+                    ? (forwardingStatus === 'verified' ? 'Done' : 'It worked')
+                    : 'Continue'}
             </button>
             <button
               type="button"
               onClick={slide === 0 ? onClose : goBack}
-              className="h-11 w-full rounded-full text-sm font-normal text-zinc-500 transition hover:text-white"
+              disabled={saving}
+              className="h-11 w-full rounded-full text-sm font-normal text-zinc-500 transition hover:text-white disabled:opacity-40"
             >
               {slide === 0 ? 'Close' : 'Back'}
             </button>
+            {error && <p className="text-center text-sm text-red-400">{error}</p>}
           </div>
 
         </div>
@@ -867,6 +1145,7 @@ const SonarDashboard = () => {
   const [pendingModel, setPendingModel] = useState(null);
   const [receptionistsAgent, setReceptionistsAgent] = useState(null);
   const [forwardingAgent, setForwardingAgent] = useState(null);
+  const [activeForwardingEntry, setActiveForwardingEntry] = useState(null);
   const [showHireModal, setShowHireModal] = useState(false);
   const [showCommander, setShowCommander] = useState(false);
   const [logoHover, setLogoHover] = useState(false);
@@ -879,6 +1158,45 @@ const SonarDashboard = () => {
   useEffect(() => {
     window.localStorage.setItem(DASHBOARD_ROUTE_STORAGE_KEY, currentRoute);
   }, [currentRoute]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadForwardingState = async () => {
+      if (!authSession?.access_token) {
+        if (active) setActiveForwardingEntry(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${FORWARDING_API_BASE_URL}/businesses/me/forwarding`, {
+          headers: {
+            Authorization: `Bearer ${authSession.access_token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (active) {
+          setActiveForwardingEntry(data?.current_entry || null);
+        }
+      } catch (err) {
+        if (active) {
+          console.error('[Forwarding] Failed to load current entry:', err.message || err);
+          setActiveForwardingEntry(null);
+        }
+      }
+    };
+
+    loadForwardingState();
+
+    return () => {
+      active = false;
+    };
+  }, [authSession?.access_token]);
 
   const loadAgentScenarios = async () => {
     try {
@@ -1001,6 +1319,7 @@ const SonarDashboard = () => {
                     isActive={false}
                     reactions={reactionsMap[agent.name] || {}}
                     pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
+                    activeForwardingEntry={activeForwardingEntry}
                     onOpenMarketplace={setMarketplaceAgent}
                     onOpenScenarios={setReceptionistsAgent}
                     onOpenForwarding={setForwardingAgent}
@@ -1058,6 +1377,8 @@ const SonarDashboard = () => {
               {forwardingAgent && (
                 <ForwardNumberModal
                   agent={forwardingAgent}
+                  authSession={authSession}
+                  onSaved={setActiveForwardingEntry}
                   onClose={() => setForwardingAgent(null)}
                 />
               )}
