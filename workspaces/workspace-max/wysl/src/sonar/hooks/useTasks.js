@@ -77,16 +77,9 @@ export function useTasks() {
       })
       .subscribe();
 
-    // Polling fallback — refreshes every 4s in case Realtime isn't enabled
-    const pollTimer = setInterval(() => {
-      loadTasks();
-      loadColumns();
-    }, 4000);
-
     return () => {
       supabase.removeChannel(taskSub);
       supabase.removeChannel(colSub);
-      clearInterval(pollTimer);
     };
   }, [loadAll, loadTasks, loadColumns]);
 

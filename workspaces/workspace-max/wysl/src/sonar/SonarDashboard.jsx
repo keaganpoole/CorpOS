@@ -47,6 +47,8 @@ import {
   Phone,
   Copy,
   CheckCircle2,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
@@ -210,6 +212,19 @@ const timeAgo = (timestamp) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...estOpts });
 };
 
+const formatDisplayPhoneNumber = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return 'Unassigned';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return digits.slice(1);
+  }
+  if (digits.length === 10) {
+    return digits;
+  }
+  return raw.replace(/^\+/, '');
+};
+
 const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, activeForwardingEntry = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onTerminate }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
@@ -222,9 +237,8 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
     : normalizedAgentStatus === 'idle'
       ? 'Idle'
       : 'Offline';
-  const forwardingDisplayLabel = activeForwardingEntry?.status === 'verified'
-    ? (activeForwardingEntry?.source_number || activeForwardingEntry?.source_label || 'Unassigned')
-    : (activeForwardingEntry?.source_label || activeForwardingEntry?.source_number || 'Unassigned');
+  const forwardingSourceLabel = formatDisplayPhoneNumber(activeForwardingEntry?.source_number || activeForwardingEntry?.source_label || 'Unassigned');
+  const forwardingTargetLabel = formatDisplayPhoneNumber(activeForwardingEntry?.target_number || agent.phone_number || 'Unassigned');
   const forwardingActionLabel = activeForwardingEntry?.status === 'verified' ? 'Change' : 'Setup';
 
   return (
@@ -332,10 +346,16 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
             className="w-full flex items-center justify-between group/phone cursor-pointer"
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <Phone size={11} className="text-orange-400/70" />
-              <span className="text-[11px] font-bold text-zinc-500 truncate group-hover/phone:text-zinc-400 transition-colors">
-                {forwardingDisplayLabel}
-              </span>
+              <div className="min-w-0 flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 transition-colors group-hover/phone:text-zinc-400">
+                <span className="inline-flex shrink-0 items-center gap-1 text-zinc-600 group-hover/phone:text-zinc-500 transition-colors">
+                  <ArrowDown size={11} />
+                </span>
+                <span className="truncate">{forwardingSourceLabel}</span>
+                <span className="inline-flex shrink-0 items-center gap-1 text-zinc-600 group-hover/phone:text-zinc-500 transition-colors">
+                  <ArrowUpDown size={11} />
+                </span>
+                <span className="truncate">{forwardingTargetLabel}</span>
+              </div>
             </div>
             <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover/phone:opacity-100 transition-opacity">
               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
@@ -404,6 +424,25 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
   const [businessId, setBusinessId] = useState(null);
   const [businessName, setBusinessName] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
+  const [twilioNumber, setTwilioNumber] = useState('');
+  const [twilioNumberStatus, setTwilioNumberStatus] = useState('');
+  const [twilioNumberLabel, setTwilioNumberLabel] = useState('');
+  const [numberPurchaseCount, setNumberPurchaseCount] = useState(0);
+  const [numberPurchaseLimit, setNumberPurchaseLimit] = useState(0);
+  const [canPurchaseNumber, setCanPurchaseNumber] = useState(true);
+  const [defaultAreaCode, setDefaultAreaCode] = useState('');
+  const [defaultNearNumber, setDefaultNearNumber] = useState('');
+  const [availableTargetNumbers, setAvailableTargetNumbers] = useState([]);
+  const [targetNumbersLoading, setTargetNumbersLoading] = useState(false);
+  const [selectedTargetNumber, setSelectedTargetNumber] = useState(null);
+  const [targetSearch, setTargetSearch] = useState({
+    areaCode: '',
+    contains: '',
+    nearBusiness: true,
+  });
+  const [targetQualityState, setTargetQualityState] = useState('idle');
+  const [targetQualityMessage, setTargetQualityMessage] = useState('');
+  const [targetQualityStep, setTargetQualityStep] = useState(0);
   const [forwardingTargetNumber, setForwardingTargetNumber] = useState('');
   const [savedEntries, setSavedEntries] = useState([]);
   const [sourceNumber, setSourceNumber] = useState('');
@@ -412,8 +451,15 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
   const [isAddingNewNumber, setIsAddingNewNumber] = useState(false);
   const forwardingNumber = forwardingTargetNumber || '';
   const hasTargetNumber = Boolean(forwardingNumber);
+  const targetLineReady = hasTargetNumber && String(twilioNumberStatus || '').toLowerCase() === 'active';
+  const needsTargetNumberSelection = !targetLineReady;
   const totalSlides = 4;
   const selectedProvider = PHONE_PROVIDERS.find((provider) => provider.id === selectedProviderId) || PHONE_PROVIDERS[0];
+  const targetQualitySteps = [
+    'Reserving your number',
+    'Checking call quality',
+    'Connecting it to your receptionist',
+  ];
   const agentPronoun = (() => {
     const normalizedGender = String(agent?.gender || '').trim().toLowerCase();
     if (normalizedGender === 'she' || normalizedGender === 'her' || normalizedGender.startsWith('f')) return 'she';
@@ -422,7 +468,13 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
   })();
   const modalTitle =
     slide === 0
-      ? 'Connect your business line.'
+      ? targetQualityState === 'running'
+        ? 'Checking this number.'
+        : targetQualityState === 'passed'
+          ? 'Number verified.'
+          : needsTargetNumberSelection
+            ? 'Choose your business line.'
+            : 'Connect your business line.'
       : slide === 1
         ? 'Copy this number.'
         : slide === 2
@@ -519,6 +571,96 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
     return response.json();
   };
 
+  const loadAvailableTargetNumbers = async (filters) => {
+    if (!needsTargetNumberSelection || targetQualityState === 'running') return;
+
+    setTargetNumbersLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.areaCode?.trim()) params.set('area_code', filters.areaCode.trim());
+      if (filters.contains?.trim()) params.set('contains', filters.contains.trim());
+      if (filters.nearBusiness && defaultNearNumber) params.set('near_number', defaultNearNumber);
+      params.set('limit', '12');
+
+      const data = await requestForwarding(`/businesses/me/forwarding/available-numbers?${params.toString()}`);
+      const options = data?.options || [];
+      setAvailableTargetNumbers(options);
+      setCanPurchaseNumber(Boolean(data?.can_purchase_number));
+      setNumberPurchaseCount(data?.number_purchase_count || 0);
+      setNumberPurchaseLimit(data?.total_allowed_number_purchases || 0);
+
+      setSelectedTargetNumber((current) => {
+        if (current) {
+          const stillExists = options.find((option) => option.phone_number === current.phone_number);
+          if (stillExists) return stillExists;
+        }
+        return options[0] || null;
+      });
+    } catch (err) {
+      setAvailableTargetNumbers([]);
+      setSelectedTargetNumber(null);
+      setError(err.message || 'Failed to load available numbers.');
+    } finally {
+      setTargetNumbersLoading(false);
+    }
+  };
+
+  const claimSelectedTargetNumber = async () => {
+    if (!selectedTargetNumber?.phone_number) {
+      setError('Choose a number to continue.');
+      return;
+    }
+    if (!canPurchaseNumber) {
+      setError('This business has reached its number limit.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    setTargetQualityState('running');
+    setTargetQualityMessage('');
+    setTargetQualityStep(0);
+
+    try {
+      const data = await requestForwarding('/businesses/me/forwarding/claim-number', {
+        method: 'POST',
+        body: JSON.stringify({
+          phone_number: selectedTargetNumber.phone_number,
+          label: `${businessName || 'Business'} line`,
+        }),
+      });
+
+      setNumberPurchaseCount(data?.number_purchase_count || 0);
+      setNumberPurchaseLimit(data?.total_allowed_number_purchases || 0);
+
+      if (data?.verified) {
+        setTwilioNumber(data?.twilio_number || selectedTargetNumber.phone_number);
+        setTwilioNumberStatus(data?.twilio_number_status || 'active');
+        setTwilioNumberLabel(data?.twilio_number_label || selectedTargetNumber.friendly_name || '');
+        setForwardingTargetNumber(data?.twilio_number || selectedTargetNumber.phone_number);
+        setTargetQualityState('passed');
+        setTargetQualityMessage(data?.message || 'This number is ready to use.');
+        return;
+      }
+
+      setTwilioNumber('');
+      setTwilioNumberStatus('quality_failed');
+      setTwilioNumberLabel('');
+      setForwardingTargetNumber('');
+      setTargetQualityState('failed');
+      setTargetQualityMessage(data?.message || 'That number didn’t pass our quick quality check. Pick another one and we’ll try again.');
+    } catch (err) {
+      setTwilioNumber('');
+      setTwilioNumberStatus('quality_failed');
+      setTwilioNumberLabel('');
+      setForwardingTargetNumber('');
+      setTargetQualityState('failed');
+      setTargetQualityMessage(err.message || 'That number didn’t pass our quick quality check. Pick another one and we’ll try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -537,7 +679,22 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
         setSavedEntries(numbers);
         setBusinessName(data?.business_name || '');
         setBusinessPhone(data?.business_phone || '');
+        setTwilioNumber(data?.twilio_number || '');
+        setTwilioNumberStatus(data?.twilio_number_status || '');
+        setTwilioNumberLabel(data?.twilio_number_label || '');
+        setNumberPurchaseCount(data?.number_purchase_count || 0);
+        setNumberPurchaseLimit(data?.total_allowed_number_purchases || 0);
+        setCanPurchaseNumber(Boolean(data?.can_purchase_number));
+        setDefaultAreaCode(data?.default_area_code || '');
+        setDefaultNearNumber(data?.default_near_number || '');
         setForwardingTargetNumber(data?.forwarding_target_number || '');
+        setTargetQualityMessage(data?.twilio_number_quality_error || '');
+        setTargetQualityState('idle');
+        setTargetSearch({
+          areaCode: data?.default_area_code || '',
+          contains: '',
+          nearBusiness: Boolean(data?.default_near_number),
+        });
 
         if (currentEntry) {
           setEntryId(currentEntry.id || null);
@@ -575,6 +732,28 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
       active = false;
     };
   }, [authSession?.access_token]);
+
+  useEffect(() => {
+    if (!needsTargetNumberSelection || targetQualityState === 'running') {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      loadAvailableTargetNumbers(targetSearch);
+    }, 220);
+
+    return () => window.clearTimeout(timer);
+  }, [needsTargetNumberSelection, targetSearch, defaultNearNumber, targetQualityState]);
+
+  useEffect(() => {
+    if (targetQualityState !== 'running') return undefined;
+
+    const timer = window.setInterval(() => {
+      setTargetQualityStep((current) => (current + 1) % targetQualitySteps.length);
+    }, 1100);
+
+    return () => window.clearInterval(timer);
+  }, [targetQualityState]);
 
   useEffect(() => {
     if (slide !== 3 || !authSession?.access_token || !entryId || forwardingStatus === 'verified' || !businessId) {
@@ -673,6 +852,16 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
   };
 
   const goNext = async () => {
+    if (slide === 0 && needsTargetNumberSelection) {
+      if (targetQualityState === 'passed') {
+        setTargetQualityState('idle');
+        setTargetQualityMessage('');
+        return;
+      }
+      await claimSelectedTargetNumber();
+      return;
+    }
+
     if (!hasTargetNumber) {
       setError('Assign a receptionist number before setting up forwarding.');
       return;
@@ -709,11 +898,194 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
   };
 
   const goBack = () => {
+    if (slide === 0 && targetQualityState === 'passed') {
+      setTargetQualityState('idle');
+      setTargetQualityMessage('');
+      return;
+    }
     setSlide((current) => Math.max(current - 1, 0));
   };
 
   const renderSlide = () => {
     if (slide === 0) {
+      if (needsTargetNumberSelection || targetQualityState !== 'idle') {
+        if (targetQualityState === 'running' || targetQualityState === 'passed') {
+          const passed = targetQualityState === 'passed';
+          return (
+            <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-white/[0.025]">
+              <div className="relative p-5 text-center">
+                <div className={`relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border transition-all duration-500 ${
+                  passed
+                    ? 'border-emerald-400/20 bg-emerald-400/[0.06] shadow-[0_0_44px_rgba(52,211,153,0.16)]'
+                    : 'border-orange-400/20 bg-orange-400/[0.06] shadow-[0_0_44px_rgba(249,115,22,0.12)]'
+                }`}>
+                  <span className={`absolute h-20 w-20 rounded-full border ${passed ? 'border-emerald-300/25' : 'border-orange-300/25 animate-ping'}`} />
+                  <span className={`absolute h-14 w-14 rounded-full border ${passed ? 'border-emerald-300/20' : 'border-orange-300/20 animate-pulse'}`} />
+                  <div className={`relative flex h-12 w-12 items-center justify-center rounded-full text-black transition-all duration-500 ${
+                    passed
+                      ? 'bg-emerald-300 shadow-[0_0_22px_rgba(52,211,153,0.22)]'
+                      : 'bg-orange-300 shadow-[0_0_22px_rgba(249,115,22,0.22)]'
+                  }`}>
+                    {passed ? <CheckCircle2 size={21} /> : <Phone size={21} />}
+                  </div>
+                </div>
+
+                <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-zinc-500">
+                  {passed
+                    ? targetQualityMessage || 'This number is ready to use.'
+                    : `We’re making sure ${selectedTargetNumber?.phone_number || 'this number'} is ready for both inbound and outbound calls.`}
+                </p>
+              </div>
+
+              <div className="border-t border-white/[0.06] bg-black/20 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-600">
+                    {passed ? 'Verified' : targetQualitySteps[targetQualityStep]}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {[0, 1, 2].map((dot) => (
+                      <span
+                        key={dot}
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          passed ? 'bg-emerald-300' : dot <= targetQualityStep ? 'bg-orange-300' : 'bg-zinc-700'
+                        } ${passed ? '' : 'transition-colors duration-300'}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="max-h-[52vh] space-y-4 overflow-y-auto rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4 custom-scrollbar">
+            <div className="grid gap-3 sm:grid-cols-[110px,1fr]">
+              <label className="space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-600">Area code</span>
+                <input
+                  type="text"
+                  value={targetSearch.areaCode}
+                  maxLength={3}
+                  onChange={(event) => {
+                    setTargetQualityState('idle');
+                    setTargetQualityMessage('');
+                    setTargetSearch((current) => ({ ...current, areaCode: event.target.value.replace(/\D/g, '').slice(0, 3) }));
+                  }}
+                  placeholder="207"
+                  className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055]"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-600">Contains</span>
+                <input
+                  type="text"
+                  value={targetSearch.contains}
+                  onChange={(event) => {
+                    setTargetQualityState('idle');
+                    setTargetQualityMessage('');
+                    setTargetSearch((current) => ({ ...current, contains: event.target.value.replace(/[^\dA-Za-z+*$%]/g, '').slice(0, 16) }));
+                  }}
+                  placeholder="Ends with 22"
+                  className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055]"
+                />
+              </label>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setTargetQualityState('idle');
+                setTargetQualityMessage('');
+                setTargetSearch((current) => ({ ...current, nearBusiness: !current.nearBusiness }));
+              }}
+              className={`flex h-11 w-full items-center justify-between rounded-2xl border px-4 text-sm transition ${
+                targetSearch.nearBusiness
+                  ? 'border-orange-400/40 bg-orange-400/10 text-white'
+                  : 'border-white/[0.08] bg-black/20 text-zinc-400 hover:border-white/[0.14] hover:text-white'
+              }`}
+            >
+              <span className="font-semibold">Prefer numbers near my business line</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.22em]">
+                {targetSearch.nearBusiness ? 'On' : 'Off'}
+              </span>
+            </button>
+
+            <div className="space-y-2 rounded-[24px] border border-white/[0.06] bg-black/20 p-2">
+              {targetNumbersLoading ? (
+                <div className="flex min-h-[180px] items-center justify-center text-[11px] uppercase tracking-[0.3em] text-zinc-700">
+                  Loading numbers
+                </div>
+              ) : availableTargetNumbers.length ? (
+                <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+                  {availableTargetNumbers.map((option) => {
+                    const active = selectedTargetNumber?.phone_number === option.phone_number;
+                    return (
+                      <button
+                        key={option.phone_number}
+                        type="button"
+                        onClick={() => {
+                          setTargetQualityState('idle');
+                          setTargetQualityMessage('');
+                          setSelectedTargetNumber(option);
+                        }}
+                        className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                          active
+                            ? 'border-orange-400 bg-orange-400/12 text-white'
+                            : 'border-white/[0.08] bg-transparent text-zinc-300 hover:border-white/[0.14] hover:text-white'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className={`truncate text-sm font-semibold ${active ? 'text-white' : 'text-zinc-200'}`}>
+                            {option.friendly_name || option.phone_number}
+                          </div>
+                          <div className={`mt-1 truncate text-xs ${active ? 'text-orange-100' : 'text-zinc-500'}`}>
+                            {[option.phone_number, option.locality, option.region].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                        {active ? (
+                          <div className="shrink-0 rounded-full bg-orange-300 p-1 text-black">
+                            <CheckCircle2 size={14} />
+                          </div>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 px-6 text-center">
+                  <Search size={18} className="text-zinc-700" />
+                  <p className="text-sm leading-6 text-zinc-500">
+                    We couldn’t find numbers that match those filters yet. Try a broader area code or clear the pattern.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm leading-6 text-zinc-500">
+                Pick the business number you want customers to see. We’ll reserve it, test it quietly in the background, and only keep it if it passes.
+              </p>
+              <p className="text-xs leading-5 text-zinc-600">
+                {numberPurchaseLimit
+                  ? `${numberPurchaseCount} of ${numberPurchaseLimit} number purchases used for this business.`
+                  : `${numberPurchaseCount} number purchases used for this business.`}
+              </p>
+              {targetQualityState === 'failed' && targetQualityMessage ? (
+                <div className="rounded-2xl border border-rose-400/20 bg-rose-400/8 px-4 py-3 text-sm leading-6 text-rose-200">
+                  {targetQualityMessage}
+                </div>
+              ) : null}
+              {!canPurchaseNumber ? (
+                <div className="rounded-2xl border border-orange-400/20 bg-orange-400/8 px-4 py-3 text-sm leading-6 text-orange-200">
+                  This business has reached its number purchase limit right now.
+                </div>
+              ) : null}
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="space-y-4 rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
           <div className="space-y-2">
@@ -984,25 +1356,37 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
               <button
                 type="button"
                 onClick={goNext}
-                disabled={loading || saving || !hasTargetNumber}
+                disabled={
+                  loading
+                  || saving
+                  || targetQualityState === 'running'
+                  || (slide !== 0 && !hasTargetNumber)
+                  || (slide === 0 && needsTargetNumberSelection && (!selectedTargetNumber || !canPurchaseNumber))
+                }
                 className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {saving
-                  ? 'Saving...'
-                  : slide === 0 && selectedExistingEntryIsVerified
-                    ? 'Use this number'
-                  : slide === 2
-                    ? 'I turned forwarding on'
-                    : 'Continue'}
+                  ? targetQualityState === 'running'
+                    ? 'Checking number...'
+                    : 'Saving...'
+                  : slide === 0 && needsTargetNumberSelection
+                    ? targetQualityState === 'passed'
+                      ? 'Continue'
+                      : 'Use this number'
+                    : slide === 0 && selectedExistingEntryIsVerified
+                      ? 'Use this number'
+                    : slide === 2
+                      ? 'I turned forwarding on'
+                      : 'Continue'}
               </button>
             )}
             <button
               type="button"
-              onClick={slide === 0 ? onClose : goBack}
+              onClick={slide === 0 && targetQualityState !== 'passed' ? onClose : goBack}
               disabled={saving}
               className="h-11 w-full rounded-full text-sm font-normal text-zinc-500 transition hover:text-white disabled:opacity-40"
             >
-              {slide === 0 ? 'Close' : 'Back'}
+              {slide === 0 && targetQualityState !== 'passed' ? 'Close' : 'Back'}
             </button>
             {error && <p className="text-center text-sm text-red-400">{error}</p>}
           </div>

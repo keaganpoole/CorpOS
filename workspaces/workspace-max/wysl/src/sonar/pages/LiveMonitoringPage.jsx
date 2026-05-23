@@ -619,7 +619,6 @@ function useLiveSankeyState() {
   useEffect(() => {
     let cancelled = false;
     let recoveryTimer = null;
-    let catchupTimer = null;
 
     const resolveScenario = async (scenarioId) => {
       if (!scenarioId) return null;
@@ -870,19 +869,9 @@ function useLiveSankeyState() {
         console.info('[LiveMonitoring] checkpoint realtime status:', status, err || '');
         if (status === 'SUBSCRIBED') {
           recoverRecentCheckpoints();
-          window.clearInterval(catchupTimer);
-          catchupTimer = window.setInterval(() => {
-            loadRecentCheckpoints({
-              limit: 100,
-              mode: initialLoadCompleteRef.current ? 'live' : 'history',
-            }).catch((recoveryErr) => {
-              console.warn('[LiveMonitoring] checkpoint catch-up failed:', recoveryErr);
-            });
-          }, 2500);
           return;
         }
         if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) {
-          window.clearInterval(catchupTimer);
           recoverRecentCheckpoints();
         }
       });
@@ -890,7 +879,6 @@ function useLiveSankeyState() {
     return () => {
       cancelled = true;
       window.clearTimeout(recoveryTimer);
-      window.clearInterval(catchupTimer);
       supabase.removeChannel(checkpointChannel);
     };
   }, []);

@@ -8,6 +8,21 @@ from typing import Any, Callable, Optional
 import requests
 
 
+def normalize_phone_number(phone_value: Optional[str]) -> Optional[str]:
+    if phone_value is None:
+        return None
+    digits = "".join(ch for ch in str(phone_value) if ch.isdigit())
+    if not digits:
+        return None
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+{digits}"
+    if len(digits) == 10:
+        return f"+1{digits}"
+    if str(phone_value).strip().startswith("+"):
+        return str(phone_value).strip()
+    return f"+{digits}"
+
+
 TRIGGER_EVENT_MAP = {
     "incoming_call": "incoming_call",
     "call_answered": "call_answered",
@@ -135,6 +150,43 @@ class ScenarioActionExecutor:
         if not cleaned:
             return None
         return int(round(float(cleaned) * 100))
+
+    def _find_elevenlabs_phone_number_id_for_business(self, context: dict) -> str:
+        business = context.get("business") or {}
+        persisted_phone_number_id = (
+            business.get("elevenlabs_phone_number_id")
+            or context.get("elevenlabs_phone_number_id")
+        )
+        if persisted_phone_number_id:
+            return str(persisted_phone_number_id)
+
+        elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
+        business_twilio_number = normalize_phone_number(business.get("twilio_number"))
+        if not elevenlabs_key or not business_twilio_number:
+            return ""
+
+        try:
+            response = requests.get(
+                "https://api.elevenlabs.io/v1/convai/phone-numbers",
+                headers={
+                    "xi-api-key": elevenlabs_key,
+                    "Content-Type": "application/json",
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            for item in response.json() or []:
+                if normalize_phone_number(item.get("phone_number")) == business_twilio_number:
+                    phone_number_id = str(item.get("phone_number_id") or "")
+                    if phone_number_id:
+                        business["elevenlabs_phone_number_id"] = phone_number_id
+                        context["business"] = business
+                        context["elevenlabs_phone_number_id"] = phone_number_id
+                        return phone_number_id
+        except Exception as exc:
+            logging.warning("[ActionExecutor] Could not resolve ElevenLabs phone number for business: %s", exc)
+
+        return ""
 
     async def execute(self, node: dict, context: dict):
         if node.get("type") == "end_call":
@@ -316,9 +368,14 @@ class ScenarioActionExecutor:
 
             elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
             agent_id = os.environ.get("ELEVENLABS_AGENT_ID_OUTBOUND")
-            phone_number_id = os.environ.get("ELEVENLABS_PHONE_NUMBER_ID", "")
+            phone_number_id = (
+                self._find_elevenlabs_phone_number_id_for_business(context)
+                or os.environ.get("ELEVENLABS_PHONE_NUMBER_ID", "")
+            )
             if not elevenlabs_key or not agent_id:
                 return {"success": False, "error": "ElevenLabs not configured"}
+            if not phone_number_id:
+                return {"success": False, "error": "No outbound business phone number is configured"}
 
             dynamic_vars = {
                 "user_id": str((context.get("business") or {}).get("user_id") or context.get("user_id") or ""),
@@ -338,6 +395,7 @@ class ScenarioActionExecutor:
                 "direction": dynamic_vars["direction"],
                 "scenario_id": dynamic_vars["scenario_id"],
                 "flow_execution_id": dynamic_vars["flow_execution_id"],
+                "agent_phone_number_id": phone_number_id,
             }))
 
             response = requests.post(

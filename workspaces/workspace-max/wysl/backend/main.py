@@ -156,19 +156,86 @@ def infer_route_source(request: Request) -> str:
 
 
 def get_business_record_for_user(user_id: str) -> dict:
-    response = (
-        supabase
-        .table('businesses')
-        .select('id, name, phone, forwarding_config, twilio_number, twilio_number_status, twilio_number_label')
-        .eq('user_id', user_id)
-        .limit(1)
-        .execute()
+    select_with_optional_fields = (
+        'id, name, phone, forwarding_config, twilio_number, twilio_number_status, '
+        'twilio_number_label, elevenlabs_phone_number_id, twilio_number_purchase_count, '
+        'twilio_number_quality_error'
     )
+    try:
+        response = (
+            supabase
+            .table('businesses')
+            .select(select_with_optional_fields)
+            .eq('user_id', user_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        response = (
+            supabase
+            .table('businesses')
+            .select('id, name, phone, forwarding_config, twilio_number, twilio_number_status, twilio_number_label')
+            .eq('user_id', user_id)
+            .limit(1)
+            .execute()
+        )
 
     if not response.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
     return response.data[0]
+
+
+def get_system_number_purchase_limit() -> int:
+    try:
+        response = (
+            supabase
+            .table("system_config")
+            .select("total_allowed_number_purchases")
+            .limit(1)
+            .execute()
+        )
+        row = (response.data or [None])[0] or {}
+        value = row.get("total_allowed_number_purchases")
+        if value in (None, ""):
+            return 3
+        return max(1, int(float(value)))
+    except Exception as exc:
+        logging.warning("Failed to load total_allowed_number_purchases from system_config: %s", exc)
+        return 3
+
+
+def get_business_number_purchase_count(business: Optional[dict]) -> int:
+    if not business:
+        return 0
+    try:
+        return max(0, int(float(business.get("twilio_number_purchase_count") or 0)))
+    except Exception:
+        return 0
+
+
+def update_business_phone_metadata(business_id: str, update_payload: dict, fallback_payload: Optional[dict] = None) -> Optional[dict]:
+    try:
+        response = (
+            supabase
+            .table("businesses")
+            .update(update_payload)
+            .eq("id", business_id)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+    except Exception as exc:
+        logging.warning("Failed to update optional business phone metadata for %s: %s", business_id, exc)
+        if fallback_payload is None:
+            return None
+        response = (
+            supabase
+            .table("businesses")
+            .update(fallback_payload)
+            .eq("id", business_id)
+            .execute()
+        )
+        return response.data[0] if response.data else None
 
 
 def normalize_forwarding_config(raw_config) -> dict:
@@ -274,7 +341,7 @@ def maybe_auto_verify_business_forwarding(
 def get_business_forwarding_target_number(business: Optional[dict]) -> str:
     if business and business.get("twilio_number"):
         return str(business["twilio_number"])
-    return twilio_phone_number or "+12073092121"
+    return ""
 
 
 def get_global_forwarding_target_number() -> str:
@@ -301,12 +368,252 @@ def get_twilio_auth_tuple():
     return None
 
 
+def get_twilio_voice_test_destination() -> str:
+    return normalize_phone_number(os.environ.get("TWILIO_NUMBER_QUALITY_TEST_TO") or "+12076801233") or "+12076801233"
+
+
 def get_elevenlabs_headers() -> Optional[dict]:
     if not elevenlabs_api_key:
         return None
     return {
         "xi-api-key": elevenlabs_api_key,
         "Content-Type": "application/json",
+    }
+
+
+def delete_elevenlabs_phone_number(phone_number_id: Optional[str]) -> None:
+    headers = get_elevenlabs_headers()
+    if not headers or not phone_number_id:
+        return
+    try:
+        response = requests.delete(
+            f"https://api.elevenlabs.io/v1/convai/phone-numbers/{phone_number_id}",
+            headers=headers,
+            timeout=30,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        logging.warning("Failed to delete ElevenLabs phone number %s: %s", phone_number_id, exc)
+
+
+def search_available_twilio_numbers(
+    *,
+    area_code: Optional[str] = None,
+    contains: Optional[str] = None,
+    near_number: Optional[str] = None,
+    region: Optional[str] = None,
+    limit: int = 12,
+) -> list[dict]:
+    auth = get_twilio_auth_tuple()
+    if not twilio_account_sid or not auth:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Twilio provisioning is not configured.",
+        )
+
+    query_limit = max(1, min(limit, 20))
+    search_params = {
+        "VoiceEnabled": "true",
+        "SmsEnabled": "true",
+        "ExcludeAllAddressRequired": "true",
+        "Limit": query_limit,
+    }
+    if area_code and str(area_code).isdigit():
+        search_params["AreaCode"] = str(area_code)[:3]
+    if contains:
+        search_params["Contains"] = str(contains).strip()
+    if near_number:
+        normalized_near_number = normalize_phone_number(near_number)
+        if normalized_near_number:
+            search_params["NearNumber"] = normalized_near_number
+            search_params["Distance"] = 100
+    if region:
+        search_params["InRegion"] = str(region).strip()[:2].upper()
+
+    search_url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/AvailablePhoneNumbers/US/Local.json"
+    response = requests.get(search_url, params=search_params, auth=auth, timeout=30)
+    if not response.ok:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Twilio number search failed ({response.status_code}).",
+        )
+
+    options = []
+    for item in (response.json() or {}).get("available_phone_numbers") or []:
+        options.append({
+            "phone_number": item.get("phone_number"),
+            "friendly_name": item.get("friendly_name"),
+            "locality": item.get("locality"),
+            "region": item.get("region"),
+            "postal_code": item.get("postal_code"),
+            "beta": item.get("beta"),
+            "capabilities": item.get("capabilities") or {},
+        })
+    return options
+
+
+def release_twilio_number_by_sid(incoming_phone_number_sid: Optional[str]) -> None:
+    auth = get_twilio_auth_tuple()
+    if not twilio_account_sid or not auth or not incoming_phone_number_sid:
+        return
+    try:
+        response = requests.delete(
+            f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/IncomingPhoneNumbers/{incoming_phone_number_sid}.json",
+            auth=auth,
+            timeout=30,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        logging.warning("Failed to release Twilio number sid %s: %s", incoming_phone_number_sid, exc)
+
+
+def purchase_specific_twilio_number_for_business(business: dict, phone_number: str, label: Optional[str] = None) -> tuple[dict, dict]:
+    auth = get_twilio_auth_tuple()
+    if not twilio_account_sid or not auth:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Twilio provisioning is not configured.",
+        )
+
+    purchase_count = get_business_number_purchase_count(business)
+    purchase_limit = get_system_number_purchase_limit()
+    if purchase_count >= purchase_limit:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This business has reached its number purchase limit.",
+        )
+
+    normalized_phone_number = normalize_phone_number(phone_number)
+    if not normalized_phone_number:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose a valid phone number.")
+
+    incoming_url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/IncomingPhoneNumbers.json"
+    purchase_payload = {
+        "PhoneNumber": normalized_phone_number,
+        "FriendlyName": label or business.get("name") or f"Business {business.get('id')}",
+    }
+    purchase_response = requests.post(incoming_url, data=purchase_payload, auth=auth, timeout=30)
+    if not purchase_response.ok:
+        detail = purchase_response.text
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Twilio number purchase failed ({purchase_response.status_code}): {detail[:200]}",
+        )
+
+    purchased = purchase_response.json() or {}
+    updated_count = purchase_count + 1
+    update_payload = {
+        "twilio_number": purchased.get("phone_number") or normalized_phone_number,
+        "twilio_number_status": "quality_checking",
+        "twilio_number_label": purchased.get("friendly_name") or purchase_payload["FriendlyName"],
+        "twilio_number_purchase_count": updated_count,
+        "twilio_number_quality_error": None,
+    }
+    fallback_payload = {
+        "twilio_number": purchased.get("phone_number") or normalized_phone_number,
+        "twilio_number_status": "quality_checking",
+        "twilio_number_label": purchased.get("friendly_name") or purchase_payload["FriendlyName"],
+    }
+    updated_business = update_business_phone_metadata(business["id"], update_payload, fallback_payload) or {
+        **business,
+        **update_payload,
+    }
+    return updated_business, purchased
+
+
+def start_number_quality_test_call(phone_number_id: str, label: str) -> dict:
+    headers = get_elevenlabs_headers()
+    if not headers or not phone_number_id or not elevenlabs_agent_id_outbound:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Outbound quality testing is not configured.",
+        )
+
+    response = requests.post(
+        "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
+        headers=headers,
+        json={
+            "agent_id": elevenlabs_agent_id_outbound,
+            "agent_phone_number_id": phone_number_id,
+            "to_number": get_twilio_voice_test_destination(),
+            "conversation_initiation_client_data": {
+                "dynamic_variables": {
+                    "company_name": label,
+                    "direction": "outgoing",
+                    "mission": "Outbound deliverability quality check",
+                },
+            },
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json() or {}
+
+
+async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_seconds: int = 18) -> dict:
+    auth = get_twilio_auth_tuple()
+    if not twilio_account_sid or not auth or not call_sid:
+        return {
+            "passed": False,
+            "status": "failed",
+            "technical_reason": "Missing Twilio call sid for quality check.",
+        }
+
+    terminal_fail_statuses = {"busy", "failed", "canceled"}
+    success_statuses = {"completed", "in-progress", "ringing", "answered", "no-answer"}
+    started = time.monotonic()
+
+    while time.monotonic() - started < timeout_seconds:
+        response = requests.get(
+            f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/Calls/{call_sid}/Events.json",
+            auth=auth,
+            timeout=30,
+        )
+        response.raise_for_status()
+        events = (response.json() or {}).get("events") or []
+
+        last_status = None
+        last_sip_code = None
+        saw_positive_signal = False
+
+        for event in events:
+            parameters = ((event or {}).get("request") or {}).get("parameters") or {}
+            call_status = str(parameters.get("call_status") or "").strip().lower()
+            sip_response_code = str(parameters.get("sip_response_code") or "").strip()
+            if call_status:
+                last_status = call_status
+            if sip_response_code:
+                last_sip_code = sip_response_code
+            if call_status in {"ringing", "answered", "in-progress", "completed", "no-answer"}:
+                saw_positive_signal = True
+            if call_status in terminal_fail_statuses:
+                return {
+                    "passed": False,
+                    "status": call_status,
+                    "sip_response_code": sip_response_code or None,
+                    "technical_reason": f"Twilio reported {call_status}{f' (SIP {sip_response_code})' if sip_response_code else ''}.",
+                }
+            if sip_response_code and sip_response_code.startswith(("4", "5", "6")):
+                return {
+                    "passed": False,
+                    "status": call_status or "failed",
+                    "sip_response_code": sip_response_code,
+                    "technical_reason": f"Twilio reported SIP {sip_response_code}.",
+                }
+
+        if saw_positive_signal:
+            return {
+                "passed": True,
+                "status": last_status or "completed",
+                "sip_response_code": last_sip_code or None,
+            }
+
+        await asyncio.sleep(1.2)
+
+    return {
+        "passed": False,
+        "status": "timed_out",
+        "technical_reason": "The quality check did not complete in time.",
     }
 
 
@@ -404,20 +711,19 @@ def ensure_elevenlabs_phone_number_for_business(business: dict) -> dict:
         assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id)
 
     next_status = "active"
-    update_response = (
-        supabase
-        .table("businesses")
-        .update({
-            "twilio_number_status": next_status,
-            "twilio_number_label": label,
-        })
-        .eq("id", business["id"])
-        .execute()
-    )
-    updated_business = update_response.data[0] if update_response.data else {
-        **business,
+    update_payload = {
         "twilio_number_status": next_status,
         "twilio_number_label": label,
+        "elevenlabs_phone_number_id": phone_number_id,
+        "twilio_number_quality_error": None,
+    }
+    fallback_payload = {
+        "twilio_number_status": next_status,
+        "twilio_number_label": label,
+    }
+    updated_business = update_business_phone_metadata(business["id"], update_payload, fallback_payload) or {
+        **business,
+        **update_payload,
     }
 
     push_live_event(
@@ -743,6 +1049,19 @@ class BusinessForwardingUpdateRequest(BaseModel):
     status: Optional[Literal["draft", "pending_test", "verified"]] = "draft"
     confirmed_enabled: Optional[bool] = False
     verified: Optional[bool] = False
+
+
+class BusinessForwardingNumberSearchRequest(BaseModel):
+    area_code: Optional[str] = None
+    contains: Optional[str] = None
+    near_number: Optional[str] = None
+    region: Optional[str] = None
+    limit: Optional[int] = 12
+
+
+class BusinessForwardingNumberClaimRequest(BaseModel):
+    phone_number: str
+    label: Optional[str] = None
 
 class ScenarioTriggerRequest(BaseModel):
     trigger_key: str
@@ -3727,9 +4046,9 @@ async def get_business_forwarding(
 
     try:
         business = get_business_record_for_user(current_user_id)
-        if not business.get("twilio_number"):
-            business = provision_twilio_number_for_business(business)
         config = normalize_forwarding_config(business.get('forwarding_config'))
+        purchase_limit = get_system_number_purchase_limit()
+        purchase_count = get_business_number_purchase_count(business)
 
         current_entry = None
         if config.get("active_number_id"):
@@ -3745,8 +4064,16 @@ async def get_business_forwarding(
             "forwarding_target_number": get_business_forwarding_target_number(business),
             "forwarding_config": config,
             "current_entry": current_entry,
+            "twilio_number": business.get("twilio_number"),
             "twilio_number_status": business.get("twilio_number_status"),
             "twilio_number_label": business.get("twilio_number_label"),
+            "twilio_number_quality_error": business.get("twilio_number_quality_error"),
+            "number_purchase_count": purchase_count,
+            "total_allowed_number_purchases": purchase_limit,
+            "can_purchase_number": purchase_count < purchase_limit,
+            "number_selection_required": str(business.get("twilio_number_status") or "").lower() != "active",
+            "default_area_code": extract_us_area_code(business.get("phone")),
+            "default_near_number": normalize_phone_number(business.get("phone")),
         }
     except HTTPException:
         raise
@@ -3755,6 +4082,187 @@ async def get_business_forwarding(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to load forwarding settings.",
+        )
+
+
+@app.get("/businesses/me/forwarding/available-numbers", tags=["Businesses"])
+async def search_business_forwarding_numbers(
+    area_code: Optional[str] = None,
+    contains: Optional[str] = None,
+    near_number: Optional[str] = None,
+    region: Optional[str] = None,
+    limit: int = 12,
+    current_user: dict = Depends(get_current_user),
+):
+    current_user_id = str(current_user.id)
+
+    try:
+        business = get_business_record_for_user(current_user_id)
+        purchase_limit = get_system_number_purchase_limit()
+        purchase_count = get_business_number_purchase_count(business)
+
+        filters = {
+            "area_code": area_code or extract_us_area_code(business.get("phone")),
+            "contains": contains or None,
+            "near_number": near_number or normalize_phone_number(business.get("phone")),
+            "region": region or None,
+            "limit": limit,
+        }
+        options = search_available_twilio_numbers(**filters)
+
+        return {
+            "options": options,
+            "filters": filters,
+            "number_purchase_count": purchase_count,
+            "total_allowed_number_purchases": purchase_limit,
+            "can_purchase_number": purchase_count < purchase_limit,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to search forwarding numbers for user %s: %s", current_user_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load available phone numbers.",
+        )
+
+
+@app.post("/businesses/me/forwarding/claim-number", tags=["Businesses"])
+async def claim_business_forwarding_number(
+    payload: BusinessForwardingNumberClaimRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    current_user_id = str(current_user.id)
+
+    try:
+        business = get_business_record_for_user(current_user_id)
+        updated_business, purchased = purchase_specific_twilio_number_for_business(
+            business,
+            payload.phone_number,
+            payload.label or business.get("name") or "Dedicated forwarding line",
+        )
+
+        elevenlabs_business = ensure_elevenlabs_phone_number_for_business(updated_business)
+        phone_number_id = elevenlabs_business.get("elevenlabs_phone_number_id") or find_elevenlabs_phone_number(
+            elevenlabs_business.get("twilio_number")
+        )
+        if isinstance(phone_number_id, dict):
+            phone_number_id = phone_number_id.get("phone_number_id")
+
+        if not phone_number_id:
+            release_twilio_number_by_sid(purchased.get("sid"))
+            update_business_phone_metadata(
+                business["id"],
+                {
+                    "twilio_number": None,
+                    "twilio_number_status": "quality_failed",
+                    "twilio_number_label": None,
+                    "elevenlabs_phone_number_id": None,
+                    "twilio_number_quality_error": "We couldn’t finish preparing that number. Please choose another one.",
+                },
+                {
+                    "twilio_number": None,
+                    "twilio_number_status": "quality_failed",
+                    "twilio_number_label": None,
+                },
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="We couldn’t finish preparing that number. Please choose another one.",
+            )
+
+        test_call = start_number_quality_test_call(
+            str(phone_number_id),
+            payload.label or elevenlabs_business.get("name") or "Dedicated forwarding line",
+        )
+        quality_result = await wait_for_twilio_quality_test_result(
+            test_call.get("callSid") or test_call.get("call_sid")
+        )
+
+        if not quality_result.get("passed"):
+            delete_elevenlabs_phone_number(str(phone_number_id))
+            release_twilio_number_by_sid(purchased.get("sid"))
+            failure_message = "That number didn’t pass our quick quality check. Pick another one and we’ll try again."
+            cleared_business = update_business_phone_metadata(
+                business["id"],
+                {
+                    "twilio_number": None,
+                    "twilio_number_status": "quality_failed",
+                    "twilio_number_label": None,
+                    "elevenlabs_phone_number_id": None,
+                    "twilio_number_quality_error": failure_message,
+                },
+                {
+                    "twilio_number": None,
+                    "twilio_number_status": "quality_failed",
+                    "twilio_number_label": None,
+                },
+            ) or {
+                **business,
+                "twilio_number": None,
+                "twilio_number_status": "quality_failed",
+                "twilio_number_label": None,
+            }
+
+            return {
+                "ok": False,
+                "verified": False,
+                "message": failure_message,
+                "technical_reason": quality_result.get("technical_reason"),
+                "twilio_number_status": cleared_business.get("twilio_number_status"),
+                "number_purchase_count": get_business_number_purchase_count(cleared_business),
+                "total_allowed_number_purchases": get_system_number_purchase_limit(),
+            }
+
+        activated_business = update_business_phone_metadata(
+            business["id"],
+            {
+                "twilio_number": elevenlabs_business.get("twilio_number"),
+                "twilio_number_status": "active",
+                "twilio_number_label": payload.label or elevenlabs_business.get("name") or elevenlabs_business.get("twilio_number_label"),
+                "elevenlabs_phone_number_id": str(phone_number_id),
+                "twilio_number_quality_error": None,
+            },
+            {
+                "twilio_number": elevenlabs_business.get("twilio_number"),
+                "twilio_number_status": "active",
+                "twilio_number_label": payload.label or elevenlabs_business.get("name") or elevenlabs_business.get("twilio_number_label"),
+            },
+        ) or {
+            **elevenlabs_business,
+            "twilio_number_status": "active",
+        }
+
+        push_live_event(
+            "Dedicated Twilio number passed quality check.",
+            actor="system",
+            severity="info",
+            event_type="twilio_number_quality_verified",
+            payload={
+                "business_id": business.get("id"),
+                "twilio_number": activated_business.get("twilio_number"),
+                "phone_number_id": phone_number_id,
+            },
+        )
+
+        return {
+            "ok": True,
+            "verified": True,
+            "message": "This number passed our quick quality check and is ready to use.",
+            "twilio_number": activated_business.get("twilio_number"),
+            "twilio_number_label": activated_business.get("twilio_number_label"),
+            "twilio_number_status": activated_business.get("twilio_number_status"),
+            "elevenlabs_phone_number_id": str(phone_number_id),
+            "number_purchase_count": get_business_number_purchase_count(activated_business),
+            "total_allowed_number_purchases": get_system_number_purchase_limit(),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to claim forwarding number for user %s: %s", current_user_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to set up that phone number.",
         )
 
 
