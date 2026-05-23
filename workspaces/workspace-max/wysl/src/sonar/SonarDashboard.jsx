@@ -719,11 +719,6 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
           <div className="space-y-2">
             {sourceOptions.map((option) => {
                 const active = sourceNumber === option.source_number;
-                const statusLabel = option.status === 'verified'
-                  ? 'Ready'
-                  : option.status === 'pending_test'
-                    ? 'Needs test'
-                    : 'Setup needed';
                 return (
                   <button
                     key={option.id}
@@ -743,15 +738,11 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
                         {option.source_number}
                       </div>
                     </div>
-                    <div className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
-                      active
-                        ? 'bg-orange-300 text-black'
-                        : option.status === 'verified'
-                          ? 'bg-emerald-400/12 text-emerald-300'
-                          : 'bg-white/[0.06] text-zinc-500'
-                    }`}>
-                      {statusLabel}
-                    </div>
+                    {option.status === 'verified' ? (
+                      <div className={`shrink-0 rounded-full p-1 ${active ? 'bg-orange-300 text-black' : 'text-emerald-300'}`}>
+                        <CheckCircle2 size={14} />
+                      </div>
+                    ) : null}
                   </button>
                 );
               })}
