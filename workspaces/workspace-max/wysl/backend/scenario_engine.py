@@ -153,17 +153,16 @@ class ScenarioActionExecutor:
 
     def _find_elevenlabs_phone_number_id_for_business(self, context: dict) -> str:
         business = context.get("business") or {}
+        elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
+        business_twilio_number = normalize_phone_number(business.get("twilio_number"))
         persisted_phone_number_id = (
             business.get("elevenlabs_phone_number_id")
             or context.get("elevenlabs_phone_number_id")
         )
-        if persisted_phone_number_id:
-            return str(persisted_phone_number_id)
-
-        elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
-        business_twilio_number = normalize_phone_number(business.get("twilio_number"))
-        if not elevenlabs_key or not business_twilio_number:
-            return ""
+        if not elevenlabs_key:
+            return str(persisted_phone_number_id or "")
+        if not business_twilio_number:
+            return str(persisted_phone_number_id or "")
 
         try:
             response = requests.get(
@@ -179,6 +178,13 @@ class ScenarioActionExecutor:
                 if normalize_phone_number(item.get("phone_number")) == business_twilio_number:
                     phone_number_id = str(item.get("phone_number_id") or "")
                     if phone_number_id:
+                        if persisted_phone_number_id and str(persisted_phone_number_id) != phone_number_id:
+                            logging.info(
+                                "[ActionExecutor] Refreshing stale ElevenLabs phone number id for business %s: %s -> %s",
+                                business.get("id"),
+                                persisted_phone_number_id,
+                                phone_number_id,
+                            )
                         business["elevenlabs_phone_number_id"] = phone_number_id
                         context["business"] = business
                         context["elevenlabs_phone_number_id"] = phone_number_id
@@ -186,7 +192,7 @@ class ScenarioActionExecutor:
         except Exception as exc:
             logging.warning("[ActionExecutor] Could not resolve ElevenLabs phone number for business: %s", exc)
 
-        return ""
+        return str(persisted_phone_number_id or "")
 
     async def execute(self, node: dict, context: dict):
         if node.get("type") == "end_call":
