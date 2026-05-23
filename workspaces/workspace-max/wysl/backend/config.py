@@ -57,12 +57,18 @@ ALGORITHM = "HS256"
 # --- Twilio Configuration ---
 twilio_account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
 twilio_auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+twilio_api_key = os.environ.get("TWILIO_API_KEY")
+twilio_api_secret = os.environ.get("TWILIO_API_SECRET")
 twilio_phone_number = os.environ.get("TWILIO_PHONE_NUMBER")
+twilio_voice_webhook_url = os.environ.get("TWILIO_VOICE_WEBHOOK_URL")
 
 # --- OpenAI Configuration ---
 openai_api_key = os.environ.get("OPENAI_API_KEY")
 openai_assistant_id = os.environ.get("OPENAI_ASSISTANT_ID")
 elevenlabs_webhook_secret = os.environ.get("ELEVENLABS_WEBHOOK_SECRET")
+elevenlabs_api_key = os.environ.get("ELEVENLABS_API_KEY")
+elevenlabs_agent_id_inbound = os.environ.get("ELEVENLABS_AGENT_ID_INBOUND")
+elevenlabs_agent_id_outbound = os.environ.get("ELEVENLABS_AGENT_ID_OUTBOUND")
 
 try:
     if not url:
