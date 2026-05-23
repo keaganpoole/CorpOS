@@ -27,7 +27,6 @@ import {
   Sparkles,
   Heart,
   AlertTriangle,
-  Info,
   ChevronDown,
   ChevronUp,
   ChevronLeft,
@@ -245,7 +244,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={`bg-[#0A0A0A] border ${borderClass} rounded-2xl w-[320px] flex flex-col hover:border-white/10 transition-all duration-500 relative group overflow-hidden`}
+      className={`bg-[#0A0A0A] border ${borderClass} rounded-2xl w-[320px] flex flex-col hover:border-white/10 transition-all duration-500 relative group overflow-visible`}
     >
       <div className="relative h-[200px] overflow-hidden">
         <img
@@ -340,19 +339,27 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         </div>
 
         <div className="pt-3 border-t border-white/[0.04]">
-          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Phone Number</p>
+          <p className="mb-1 text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Phone Number</p>
           <button
             onClick={() => onOpenForwarding && onOpenForwarding(agent)}
             className="w-full flex items-center justify-between group/phone cursor-pointer"
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <div className="min-w-0 flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 transition-colors group-hover/phone:text-zinc-400">
-                <span className="inline-flex shrink-0 items-center gap-1 text-zinc-600 group-hover/phone:text-zinc-500 transition-colors">
-                  <ArrowDown size={11} />
+                <span className="relative inline-flex shrink-0 items-center gap-1 text-orange-400/70 group-hover/phone:text-orange-300/80 transition-colors group/phone-arrow">
+                  <ArrowDown size={11} className="text-orange-400/70 transition-colors group-hover/phone:text-orange-300/80" />
+                  <span className="pointer-events-none absolute bottom-5 left-1/2 z-20 hidden w-40 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-[#101010]/80 px-3 py-2.5 text-left text-[11px] leading-relaxed text-zinc-300 backdrop-blur-md group-hover/phone-arrow:block">
+                    <span className="absolute bottom-[-4px] left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-white/[0.08] bg-[#101010]/80" />
+                    This number can receive calls.
+                  </span>
                 </span>
                 <span className="truncate">{forwardingSourceLabel}</span>
-                <span className="inline-flex shrink-0 items-center gap-1 text-zinc-600 group-hover/phone:text-zinc-500 transition-colors">
-                  <ArrowUpDown size={11} />
+                <span className="relative inline-flex shrink-0 items-center gap-1 text-orange-400/70 group-hover/phone:text-orange-300/80 transition-colors group/assigned-arrow">
+                  <ArrowUpDown size={11} className="text-orange-400/70 transition-colors group-hover/phone:text-orange-300/80" />
+                  <span className="pointer-events-none absolute bottom-5 left-1/2 z-20 hidden w-40 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-[#101010]/80 px-3 py-2.5 text-left text-[11px] leading-relaxed text-zinc-300 backdrop-blur-md group-hover/assigned-arrow:block">
+                    <span className="absolute bottom-[-4px] left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-white/[0.08] bg-[#101010]/80" />
+                    This number can make and receive calls.
+                  </span>
                 </span>
                 <span className="truncate">{forwardingTargetLabel}</span>
               </div>
