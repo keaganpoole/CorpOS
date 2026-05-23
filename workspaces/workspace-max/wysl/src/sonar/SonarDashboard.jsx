@@ -277,10 +277,10 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Language Model</p>
           <button
             onClick={() => onOpenMarketplace && onOpenMarketplace(agent)}
-            className="w-full flex items-center justify-between group cursor-pointer"
+            className="w-full flex items-center justify-between group/model cursor-pointer"
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className={`text-[11px] font-bold truncate transition-colors ${pending ? 'text-amber-400/80' : 'text-cyan-400/80 group-hover:text-cyan-400'}`}>
+              <span className={`text-[11px] font-bold truncate transition-colors ${pending ? 'text-amber-400/80' : 'text-cyan-400/80 group-hover/model:text-cyan-400/90'}`}>
                 {displayModel?.replace(/^openrouter\//, '') || displayModel}
               </span>
               {pending ? (
@@ -292,7 +292,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
                 <span className="shrink-0 text-emerald-400">✓</span>
               )}
             </div>
-            <div className="flex items-center gap-2 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2 shrink-0 ml-2 opacity-0 group-hover/model:opacity-100 transition-opacity">
               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">Change</span>
               <Cpu size={11} className="text-cyan-500/60" />
             </div>
@@ -304,19 +304,19 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Scenario</p>
           <button
             onClick={() => onOpenScenarios && onOpenScenarios(agent)}
-            className="w-full flex items-center justify-between group cursor-pointer"
+            className="w-full flex items-center justify-between group/scenario cursor-pointer"
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <Target size={11} className="text-indigo-400/60" />
               {(agent.scenario_name) ? (
-                <span className="text-[11px] font-bold text-indigo-400/80 truncate group-hover:text-indigo-400 transition-colors">
+                <span className="text-[11px] font-bold text-zinc-500 truncate group-hover/scenario:text-zinc-400 transition-colors">
                   {agent.scenario_name}
                 </span>
               ) : (
                 <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">No Scenario</span>
               )}
             </div>
-            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover/scenario:opacity-100 transition-opacity">
               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
                 {(agent.scenario_name) ? 'Change' : 'Assign'}
               </span>
@@ -329,15 +329,15 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Phone Number</p>
           <button
             onClick={() => onOpenForwarding && onOpenForwarding(agent)}
-            className="w-full flex items-center justify-between group cursor-pointer"
+            className="w-full flex items-center justify-between group/phone cursor-pointer"
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <Phone size={11} className="text-orange-400/70" />
-              <span className="text-[11px] font-bold text-orange-300/80 truncate group-hover:text-orange-300 transition-colors">
+              <span className="text-[11px] font-bold text-zinc-500 truncate group-hover/phone:text-zinc-400 transition-colors">
                 {forwardingDisplayLabel}
               </span>
             </div>
-            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover/phone:opacity-100 transition-opacity">
               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
                 {forwardingActionLabel}
               </span>
