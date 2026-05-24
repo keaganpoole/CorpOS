@@ -153,24 +153,18 @@ class ScenarioActionExecutor:
 
     def _find_elevenlabs_phone_number_id_for_business(self, context: dict) -> str:
         business = context.get("business") or {}
-        forwarding_config = business.get("forwarding_config") or {}
-        active_forwarding_id = forwarding_config.get("active_number_id")
-        if active_forwarding_id:
-            for entry in forwarding_config.get("numbers") or []:
-                if entry.get("id") != active_forwarding_id:
-                    continue
-                if str(entry.get("caller_id_verification_status") or "").lower() == "verified":
-                    caller_id_phone_number_id = entry.get("caller_id_elevenlabs_phone_number_id")
-                    if caller_id_phone_number_id:
-                        return str(caller_id_phone_number_id)
-                break
-
         elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
         business_twilio_number = normalize_phone_number(business.get("twilio_number"))
         persisted_phone_number_id = (
             business.get("elevenlabs_phone_number_id")
             or context.get("elevenlabs_phone_number_id")
         )
+        if persisted_phone_number_id:
+            logging.info(
+                "[ActionExecutor] Using assigned business line phone_number_id=%s business_id=%s",
+                persisted_phone_number_id,
+                business.get("id"),
+            )
         if not elevenlabs_key:
             return str(persisted_phone_number_id or "")
         if not business_twilio_number:
@@ -200,6 +194,12 @@ class ScenarioActionExecutor:
                         business["elevenlabs_phone_number_id"] = phone_number_id
                         context["business"] = business
                         context["elevenlabs_phone_number_id"] = phone_number_id
+                        logging.info(
+                            "[ActionExecutor] Resolved assigned business line by phone number business_id=%s phone_number=%s phone_number_id=%s",
+                            business.get("id"),
+                            business_twilio_number,
+                            phone_number_id,
+                        )
                         return phone_number_id
         except Exception as exc:
             logging.warning("[ActionExecutor] Could not resolve ElevenLabs phone number for business: %s", exc)
@@ -386,13 +386,15 @@ class ScenarioActionExecutor:
 
             elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
             agent_id = os.environ.get("ELEVENLABS_AGENT_ID_OUTBOUND")
-            phone_number_id = (
-                self._find_elevenlabs_phone_number_id_for_business(context)
-                or os.environ.get("ELEVENLABS_PHONE_NUMBER_ID", "")
-            )
+            phone_number_id = self._find_elevenlabs_phone_number_id_for_business(context)
             if not elevenlabs_key or not agent_id:
                 return {"success": False, "error": "ElevenLabs not configured"}
             if not phone_number_id:
+                logging.error(
+                    "[ActionExecutor] No assigned business line resolved for outbound call business_id=%s business_twilio_number=%s",
+                    (context.get("business") or {}).get("id"),
+                    normalize_phone_number((context.get("business") or {}).get("twilio_number")),
+                )
                 return {"success": False, "error": "No outbound business phone number is configured"}
 
             dynamic_vars = {
@@ -414,6 +416,7 @@ class ScenarioActionExecutor:
                 "scenario_id": dynamic_vars["scenario_id"],
                 "flow_execution_id": dynamic_vars["flow_execution_id"],
                 "agent_phone_number_id": phone_number_id,
+                "to_number": normalize_phone_number(to_number),
             }))
 
             response = requests.post(
@@ -821,6 +824,47 @@ class ScenarioEngine:
         response = self.supabase.table("flow_executions").select("*").eq("id", execution_id).limit(1).execute()
         return response.data[0] if response.data else None
 
+    def _hydrate_business_with_assigned_line(self, business: Optional[dict]) -> Optional[dict]:
+        if not business or business.get("id") is None:
+            return business
+        try:
+            response = (
+                self.supabase.table("purchased_numbers")
+                .select("*")
+                .eq("business_id", business.get("id"))
+                .eq("kind", "assigned_line")
+                .order("created_at", desc=False)
+                .execute()
+            )
+            rows = response.data or []
+        except Exception as exc:
+            logging.warning("[ScenarioEngine] Could not fetch purchased numbers for business %s: %s", business.get("id"), exc)
+            return business
+
+        active_assigned = next(
+            (
+                row for row in rows
+                if row.get("is_active")
+                and str(row.get("status") or "").lower() not in {"released", "quality_failed"}
+            ),
+            None,
+        )
+        if active_assigned is None:
+            candidates = [
+                row for row in rows
+                if str(row.get("status") or "").lower() in {"active", "quality_checking", "inactive"}
+            ]
+            active_assigned = candidates[-1] if candidates else None
+
+        hydrated = dict(business)
+        hydrated["purchased_numbers"] = rows
+        hydrated["active_purchased_number"] = active_assigned
+        hydrated["twilio_number"] = (active_assigned or {}).get("phone_number")
+        hydrated["twilio_number_status"] = (active_assigned or {}).get("status")
+        hydrated["twilio_number_label"] = (active_assigned or {}).get("friendly_name")
+        hydrated["elevenlabs_phone_number_id"] = (active_assigned or {}).get("elevenlabs_phone_number_id")
+        return hydrated
+
     async def _build_flow_context(self, scenario: dict, event_type: str, payload: dict):
         context = {
             **payload,
@@ -885,9 +929,10 @@ class ScenarioEngine:
             else:
                 response = None
             if response and response.data:
-                context["business"] = response.data[0]
-                context["business_id"] = response.data[0].get("id")
-                context["user_id"] = response.data[0].get("user_id")
+                hydrated_business = self._hydrate_business_with_assigned_line(response.data[0]) or response.data[0]
+                context["business"] = hydrated_business
+                context["business_id"] = hydrated_business.get("id")
+                context["user_id"] = hydrated_business.get("user_id")
         except Exception as exc:
             logging.warning("[ScenarioEngine] Could not fetch business: %s", exc)
 
