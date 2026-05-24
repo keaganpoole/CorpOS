@@ -153,6 +153,18 @@ class ScenarioActionExecutor:
 
     def _find_elevenlabs_phone_number_id_for_business(self, context: dict) -> str:
         business = context.get("business") or {}
+        forwarding_config = business.get("forwarding_config") or {}
+        active_forwarding_id = forwarding_config.get("active_number_id")
+        if active_forwarding_id:
+            for entry in forwarding_config.get("numbers") or []:
+                if entry.get("id") != active_forwarding_id:
+                    continue
+                if str(entry.get("caller_id_verification_status") or "").lower() == "verified":
+                    caller_id_phone_number_id = entry.get("caller_id_elevenlabs_phone_number_id")
+                    if caller_id_phone_number_id:
+                        return str(caller_id_phone_number_id)
+                break
+
         elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
         business_twilio_number = normalize_phone_number(business.get("twilio_number"))
         persisted_phone_number_id = (
