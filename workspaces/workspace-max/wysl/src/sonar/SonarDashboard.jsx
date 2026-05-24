@@ -1533,6 +1533,16 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
           </AnimatePresence>
 
           <div className="mt-5 space-y-3">
+            {slide === 3 && forwardingStatus === 'verified' && (
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={loading || saving || callerIdStarting}
+                className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Finish Setup
+              </button>
+            )}
             {slide !== totalSlides - 1 && (
               <button
                 type="button"

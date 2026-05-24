@@ -628,6 +628,7 @@ def delete_elevenlabs_phone_number(phone_number_id: Optional[str]) -> None:
     if not headers or not phone_number_id:
         return
     try:
+        logging.info("Deleting ElevenLabs phone number phone_number_id=%s", phone_number_id)
         response = requests.delete(
             f"https://api.elevenlabs.io/v1/convai/phone-numbers/{phone_number_id}",
             headers=headers,
@@ -699,6 +700,7 @@ def release_twilio_number_by_sid(incoming_phone_number_sid: Optional[str]) -> No
     if not twilio_account_sid or not auth or not incoming_phone_number_sid:
         return
     try:
+        logging.info("Releasing Twilio number sid=%s", incoming_phone_number_sid)
         response = requests.delete(
             f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/IncomingPhoneNumbers/{incoming_phone_number_sid}.json",
             auth=auth,
@@ -734,15 +736,37 @@ def purchase_specific_twilio_number_for_business(business: dict, phone_number: s
         "PhoneNumber": normalized_phone_number,
         "FriendlyName": label or business.get("name") or f"Business {business.get('id')}",
     }
+    logging.info(
+        "Starting Twilio number purchase business_id=%s requested_number=%s label=%s purchase_count=%s purchase_limit=%s",
+        business.get("id"),
+        normalized_phone_number,
+        purchase_payload["FriendlyName"],
+        purchase_count,
+        purchase_limit,
+    )
     purchase_response = requests.post(incoming_url, data=purchase_payload, auth=auth, timeout=30)
     if not purchase_response.ok:
         detail = purchase_response.text
+        logging.warning(
+            "Twilio number purchase failed business_id=%s requested_number=%s status_code=%s detail=%s",
+            business.get("id"),
+            normalized_phone_number,
+            purchase_response.status_code,
+            detail[:300],
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Twilio number purchase failed ({purchase_response.status_code}): {detail[:200]}",
         )
 
     purchased = purchase_response.json() or {}
+    logging.info(
+        "Twilio number purchased business_id=%s requested_number=%s purchased_number=%s incoming_sid=%s",
+        business.get("id"),
+        normalized_phone_number,
+        purchased.get("phone_number"),
+        purchased.get("sid"),
+    )
     purchased_row = save_purchased_number_record(
         int(business["id"]),
         purchased.get("phone_number") or normalized_phone_number,
@@ -771,13 +795,21 @@ def start_number_quality_test_call(phone_number_id: str, label: str) -> dict:
             detail="Outbound quality testing is not configured.",
         )
 
+    test_destination = get_twilio_voice_test_destination()
+    logging.info(
+        "Starting quality test call phone_number_id=%s outbound_agent_id=%s to=%s label=%s",
+        phone_number_id,
+        elevenlabs_agent_id_outbound,
+        test_destination,
+        label,
+    )
     response = requests.post(
         "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
         headers=headers,
         json={
             "agent_id": elevenlabs_agent_id_outbound,
             "agent_phone_number_id": phone_number_id,
-            "to_number": get_twilio_voice_test_destination(),
+            "to_number": test_destination,
             "conversation_initiation_client_data": {
                 "dynamic_variables": {
                     "company_name": label,
@@ -789,7 +821,13 @@ def start_number_quality_test_call(phone_number_id: str, label: str) -> dict:
         timeout=30,
     )
     response.raise_for_status()
-    return response.json() or {}
+    payload = response.json() or {}
+    logging.info(
+        "Quality test call created phone_number_id=%s call_sid=%s",
+        phone_number_id,
+        payload.get("callSid") or payload.get("call_sid"),
+    )
+    return payload
 
 
 async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_seconds: int = 18) -> dict:
@@ -805,8 +843,10 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
     success_statuses = {"completed", "in-progress", "ringing", "no-answer"}
     pending_statuses = {"queued", "initiated"}
     started = time.monotonic()
+    poll_count = 0
 
     while time.monotonic() - started < timeout_seconds:
+        poll_count += 1
         response = requests.get(
             f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/Calls/{call_sid}.json",
             auth=auth,
@@ -835,6 +875,13 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
         )
 
         if call_status in success_statuses:
+            logging.info(
+                "Twilio quality check passed sid=%s poll=%s status=%s duration=%s",
+                call_sid,
+                poll_count,
+                call_status,
+                duration_seconds,
+            )
             return {
                 "passed": True,
                 "status": call_status,
@@ -842,6 +889,13 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
             }
 
         if duration_seconds > 0:
+            logging.info(
+                "Twilio quality check passed via duration sid=%s poll=%s status=%s duration=%s",
+                call_sid,
+                poll_count,
+                call_status,
+                duration_seconds,
+            )
             return {
                 "passed": True,
                 "status": call_status or "completed",
@@ -849,6 +903,13 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
             }
 
         if call_status in terminal_fail_statuses:
+            logging.warning(
+                "Twilio quality check failed sid=%s poll=%s status=%s duration=%s",
+                call_sid,
+                poll_count,
+                call_status,
+                duration_seconds,
+            )
             return {
                 "passed": False,
                 "status": call_status,
@@ -860,6 +921,7 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
 
         await asyncio.sleep(1.2)
 
+    logging.warning("Twilio quality check timed out sid=%s timeout_seconds=%s", call_sid, timeout_seconds)
     return {
         "passed": False,
         "status": "timed_out",
@@ -1114,6 +1176,7 @@ def import_elevenlabs_phone_number(phone_number: str, label: str) -> Optional[st
         "token": twilio_auth_token,
     }
     try:
+        logging.info("Importing Twilio number into ElevenLabs phone_number=%s label=%s", phone_number, label)
         response = requests.post(
             "https://api.elevenlabs.io/v1/convai/phone-numbers",
             headers=headers,
@@ -1121,7 +1184,9 @@ def import_elevenlabs_phone_number(phone_number: str, label: str) -> Optional[st
             timeout=60,
         )
         response.raise_for_status()
-        return (response.json() or {}).get("phone_number_id")
+        phone_number_id = (response.json() or {}).get("phone_number_id")
+        logging.info("Imported Twilio number into ElevenLabs phone_number=%s phone_number_id=%s", phone_number, phone_number_id)
+        return phone_number_id
     except Exception as exc:
         logging.warning("Failed to import Twilio number into ElevenLabs: %s", exc)
         return None
@@ -1144,6 +1209,11 @@ def assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id: str) -> boo
         return False
 
     try:
+        logging.info(
+            "Assigning ElevenLabs phone number to inbound agent phone_number_id=%s inbound_agent_id=%s",
+            phone_number_id,
+            elevenlabs_agent_id_inbound,
+        )
         response = requests.patch(
             f"https://api.elevenlabs.io/v1/convai/phone-numbers/{phone_number_id}",
             headers=headers,
@@ -1151,6 +1221,11 @@ def assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id: str) -> boo
             timeout=60,
         )
         response.raise_for_status()
+        logging.info(
+            "Assigned ElevenLabs phone number to inbound agent phone_number_id=%s inbound_agent_id=%s",
+            phone_number_id,
+            elevenlabs_agent_id_inbound,
+        )
         return True
     except Exception as exc:
         logging.warning("Failed to assign ElevenLabs phone number %s to inbound agent: %s", phone_number_id, exc)
@@ -1165,6 +1240,12 @@ def ensure_elevenlabs_phone_number_for_business(business: dict) -> dict:
     label = business.get("name") or business.get("twilio_number_label") or f"Business {business.get('id')}"
     existing_phone = find_elevenlabs_phone_number(phone_number)
     phone_number_id = existing_phone.get("phone_number_id") if existing_phone else None
+    logging.info(
+        "Ensuring ElevenLabs phone number for business business_id=%s phone_number=%s existing_phone_number_id=%s",
+        business.get("id"),
+        phone_number,
+        phone_number_id,
+    )
 
     if not phone_number_id:
         phone_number_id = import_elevenlabs_phone_number(phone_number, label)
@@ -4687,10 +4768,24 @@ async def claim_business_forwarding_number(
 
     try:
         business = get_business_record_for_user(current_user_id)
+        logging.info(
+            "Claim forwarding number requested user_id=%s business_id=%s requested_number=%s current_active_number=%s",
+            current_user_id,
+            business.get("id"),
+            normalize_phone_number(payload.phone_number),
+            business.get("twilio_number"),
+        )
         updated_business, purchased, purchased_row = purchase_specific_twilio_number_for_business(
             business,
             payload.phone_number,
             payload.label or business.get("name") or "Dedicated forwarding line",
+        )
+        logging.info(
+            "Forwarding number purchased and saved business_id=%s purchased_number=%s purchased_row_id=%s incoming_sid=%s",
+            business.get("id"),
+            purchased.get("phone_number"),
+            purchased_row.get("id") if isinstance(purchased_row, dict) else None,
+            purchased.get("sid"),
         )
 
         elevenlabs_business = ensure_elevenlabs_phone_number_for_business(updated_business)
@@ -4701,6 +4796,12 @@ async def claim_business_forwarding_number(
             phone_number_id = phone_number_id.get("phone_number_id")
 
         if not phone_number_id:
+            logging.warning(
+                "Forwarding number setup failed before quality test business_id=%s purchased_number=%s incoming_sid=%s reason=missing_elevenlabs_phone_number_id",
+                business.get("id"),
+                purchased.get("phone_number"),
+                purchased.get("sid"),
+            )
             release_twilio_number_by_sid(purchased.get("sid"))
             save_purchased_number_record(
                 int(business["id"]),
@@ -4726,8 +4827,24 @@ async def claim_business_forwarding_number(
             str(phone_number_id),
             payload.label or elevenlabs_business.get("name") or "Dedicated forwarding line",
         )
+        logging.info(
+            "Forwarding number quality test started business_id=%s purchased_number=%s phone_number_id=%s call_sid=%s",
+            business.get("id"),
+            purchased.get("phone_number"),
+            phone_number_id,
+            test_call.get("callSid") or test_call.get("call_sid"),
+        )
         quality_result = await wait_for_twilio_quality_test_result(
             test_call.get("callSid") or test_call.get("call_sid")
+        )
+        logging.info(
+            "Forwarding number quality test completed business_id=%s purchased_number=%s phone_number_id=%s passed=%s status=%s technical_reason=%s",
+            business.get("id"),
+            purchased.get("phone_number"),
+            phone_number_id,
+            quality_result.get("passed"),
+            quality_result.get("status"),
+            quality_result.get("technical_reason"),
         )
 
         if not quality_result.get("passed"):
@@ -4752,6 +4869,15 @@ async def claim_business_forwarding_number(
                 },
             )
             cleared_business = hydrate_business_with_purchased_number_data(business) or business
+            logging.warning(
+                "Forwarding number quality test failed and cleaned up business_id=%s purchased_number=%s incoming_sid=%s phone_number_id=%s message=%s technical_reason=%s",
+                business.get("id"),
+                purchased.get("phone_number"),
+                purchased.get("sid"),
+                phone_number_id,
+                failure_message,
+                quality_result.get("technical_reason"),
+            )
 
             return {
                 "ok": False,
@@ -4783,6 +4909,14 @@ async def claim_business_forwarding_number(
         )
         deactivate_other_purchased_numbers(int(business["id"]), activated_row.get("id"), kind="assigned_line")
         activated_business = hydrate_business_with_purchased_number_data(business) or business
+        logging.info(
+            "Forwarding number activated business_id=%s active_number=%s incoming_sid=%s phone_number_id=%s activated_row_id=%s",
+            business.get("id"),
+            activated_business.get("twilio_number"),
+            purchased.get("sid"),
+            phone_number_id,
+            activated_row.get("id") if isinstance(activated_row, dict) else None,
+        )
 
         push_live_event(
             "Dedicated Twilio number passed quality check.",
