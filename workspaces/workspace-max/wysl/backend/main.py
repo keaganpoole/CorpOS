@@ -14,6 +14,28 @@ from typing import List, Optional, Literal
 from urllib.parse import urlsplit, urlunsplit
 from email.utils import parsedate_to_datetime
 
+SUPPRESSED_ACCESS_LOG_PATHS = {
+    "/api/session",
+    "/api/control-state",
+    "/api/logs",
+    "/api/events/live-pulse",
+    "/api/agents",
+    "/api/system/summary",
+    "/api/pipeline",
+    "/api/cron",
+    "/api/reactions",
+    "/businesses/me/forwarding",
+}
+
+
+class UvicornAccessFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if '"GET ' not in message:
+            return True
+        return not any(f'"GET {path}' in message for path in SUPPRESSED_ACCESS_LOG_PATHS)
+
+
 # --- Logging Configuration ---
 # Sets the root logger to output INFO level messages.
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,6 +44,8 @@ logging.info("Logging configured.")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("hpack").setLevel(logging.WARNING)
+for handler in logging.getLogger("uvicorn.access").handlers:
+    handler.addFilter(UvicornAccessFilter())
 
 # --- End Logging Configuration ---
 
@@ -236,6 +260,8 @@ def hydrate_business_with_purchased_number_data(business: Optional[dict]) -> Opt
     hydrated["twilio_number_label"] = (active_assigned or {}).get("friendly_name")
     hydrated["elevenlabs_phone_number_id"] = (active_assigned or {}).get("elevenlabs_phone_number_id")
     hydrated["twilio_number_quality_error"] = (active_assigned or {}).get("quality_failure_reason")
+    hydrated["quality_check_status"] = (active_assigned or {}).get("quality_check_status")
+    hydrated["quality_checked_at"] = (active_assigned or {}).get("quality_checked_at")
     hydrated["twilio_number_purchase_count"] = len([
         row for row in purchased_numbers
         if str(row.get("status") or "").lower() != "released"
@@ -243,23 +269,40 @@ def hydrate_business_with_purchased_number_data(business: Optional[dict]) -> Opt
     return hydrated
 
 
-def get_system_number_purchase_limit() -> int:
+def get_system_config_row() -> dict:
     try:
         response = (
             supabase
             .table("system_config")
-            .select("total_allowed_number_purchases")
+            .select("total_allowed_number_purchases,verify_caller_id")
             .limit(1)
             .execute()
         )
-        row = (response.data or [None])[0] or {}
-        value = row.get("total_allowed_number_purchases")
-        if value in (None, ""):
-            return 3
-        return max(1, int(float(value)))
+        return (response.data or [None])[0] or {}
     except Exception as exc:
-        logging.warning("Failed to load total_allowed_number_purchases from system_config: %s", exc)
+        logging.warning("Failed to load system_config: %s", exc)
+        return {}
+
+
+def get_system_number_purchase_limit() -> int:
+    row = get_system_config_row()
+    value = row.get("total_allowed_number_purchases")
+    if value in (None, ""):
         return 3
+    try:
+        return max(1, int(float(value)))
+    except Exception:
+        return 3
+
+
+def get_system_verify_caller_id_enabled() -> bool:
+    row = get_system_config_row()
+    value = row.get("verify_caller_id")
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "t", "yes", "y", "on"}
 
 
 def get_business_number_purchase_count(business: Optional[dict]) -> int:
@@ -759,53 +802,61 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
         }
 
     terminal_fail_statuses = {"busy", "failed", "canceled"}
-    success_statuses = {"completed", "in-progress", "ringing", "answered", "no-answer"}
+    success_statuses = {"completed", "in-progress", "ringing", "no-answer"}
+    pending_statuses = {"queued", "initiated"}
     started = time.monotonic()
 
     while time.monotonic() - started < timeout_seconds:
         response = requests.get(
-            f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/Calls/{call_sid}/Events.json",
+            f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/Calls/{call_sid}.json",
             auth=auth,
             timeout=30,
         )
         response.raise_for_status()
-        events = (response.json() or {}).get("events") or []
+        call = response.json() or {}
 
-        last_status = None
-        last_sip_code = None
-        saw_positive_signal = False
+        call_status = str(call.get("status") or "").strip().lower()
+        duration_value = str(call.get("duration") or "").strip()
+        answered_by = call.get("answered_by")
 
-        for event in events:
-            parameters = ((event or {}).get("request") or {}).get("parameters") or {}
-            call_status = str(parameters.get("call_status") or "").strip().lower()
-            sip_response_code = str(parameters.get("sip_response_code") or "").strip()
-            if call_status:
-                last_status = call_status
-            if sip_response_code:
-                last_sip_code = sip_response_code
-            if call_status in {"ringing", "answered", "in-progress", "completed", "no-answer"}:
-                saw_positive_signal = True
-            if call_status in terminal_fail_statuses:
-                return {
-                    "passed": False,
-                    "status": call_status,
-                    "sip_response_code": sip_response_code or None,
-                    "technical_reason": f"Twilio reported {call_status}{f' (SIP {sip_response_code})' if sip_response_code else ''}.",
-                }
-            if sip_response_code and sip_response_code.startswith(("4", "5", "6")):
-                return {
-                    "passed": False,
-                    "status": call_status or "failed",
-                    "sip_response_code": sip_response_code,
-                    "technical_reason": f"Twilio reported SIP {sip_response_code}.",
-                }
+        try:
+            duration_seconds = int(duration_value) if duration_value else 0
+        except (TypeError, ValueError):
+            duration_seconds = 0
 
-        if saw_positive_signal:
+        logging.info(
+            "Twilio quality check status sid=%s status=%s duration=%s from=%s to=%s answered_by=%s",
+            call_sid,
+            call_status,
+            duration_seconds,
+            call.get("from"),
+            call.get("to"),
+            answered_by,
+        )
+
+        if call_status in success_statuses:
             return {
                 "passed": True,
-                "status": last_status or "completed",
-                "sip_response_code": last_sip_code or None,
+                "status": call_status,
+                "duration_seconds": duration_seconds,
             }
+
+        if duration_seconds > 0:
+            return {
+                "passed": True,
+                "status": call_status or "completed",
+                "duration_seconds": duration_seconds,
+            }
+
+        if call_status in terminal_fail_statuses:
+            return {
+                "passed": False,
+                "status": call_status,
+                "technical_reason": f"Twilio reported {call_status}.",
+            }
+
+        if call_status not in pending_statuses and call_status:
+            logging.info("Twilio quality check waiting on non-terminal status sid=%s status=%s", call_sid, call_status)
 
         await asyncio.sleep(1.2)
 
@@ -976,6 +1027,55 @@ def maybe_auto_verify_business_forwarding_from_recent_twilio_call(business: Opti
         business.get("id"),
     )
     return maybe_auto_verify_business_forwarding(business, called_number=target_number)
+
+
+def maybe_sync_business_caller_id_verification_from_twilio(business: Optional[dict]) -> Optional[dict]:
+    if not business:
+        return None
+    config = normalize_forwarding_config(business.get("forwarding_config"))
+    active_number_id = config.get("active_number_id")
+    if not active_number_id:
+        return None
+    numbers = config.get("numbers", [])
+    active_index = next((index for index, entry in enumerate(numbers) if entry.get("id") == active_number_id), None)
+    if active_index is None:
+        return None
+    active_entry = numbers[active_index]
+    if str(active_entry.get("status") or "").lower() != "verified":
+        return None
+    if str(active_entry.get("caller_id_verification_status") or "").lower() == "verified":
+        return None
+    source_number = normalize_phone_number(active_entry.get("source_number"))
+    if not source_number:
+        return None
+    verified_caller_id = find_twilio_outgoing_caller_id(source_number)
+    if not verified_caller_id:
+        return None
+    phone_number_id = ensure_elevenlabs_outbound_caller_id(
+        source_number,
+        active_entry.get("source_label") or business.get("name") or "Verified Caller ID",
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    numbers[active_index] = {
+        **active_entry,
+        "caller_id_verification_status": "verified",
+        "caller_id_phone_number": source_number,
+        "caller_id_outgoing_caller_id_sid": verified_caller_id.get("sid"),
+        "caller_id_verified_at": active_entry.get("caller_id_verified_at") or now,
+        "caller_id_validation_code": None,
+        "caller_id_failure_reason": None,
+        "caller_id_elevenlabs_phone_number_id": phone_number_id,
+        "updated_at": now,
+    }
+    config["numbers"] = numbers
+    persist_business_forwarding_config(business["id"], config)
+    logging.info(
+        "Twilio outgoing caller ID already verified; synced forwarding entry business_id=%s entry_id=%s source_number=%s",
+        business.get("id"),
+        active_entry.get("id"),
+        source_number,
+    )
+    return numbers[active_index]
 
 
 def find_elevenlabs_phone_number(phone_number: Optional[str]) -> Optional[dict]:
@@ -1916,7 +2016,7 @@ def find_business_by_forwarded_number(forwarded_number: Optional[str]):
         return None
 
     try:
-        response = supabase.table("businesses").select("id,user_id,name,phone,forwarding_config,twilio_number,twilio_number_status,twilio_number_label").execute()
+        response = supabase.table("businesses").select("id,user_id,name,phone,forwarding_config").execute()
     except Exception:
         return None
 
@@ -4492,6 +4592,8 @@ async def get_business_forwarding(
         business = get_business_record_for_user(current_user_id)
         maybe_auto_verify_business_forwarding_from_recent_twilio_call(business)
         business = get_business_record_for_user(current_user_id)
+        maybe_sync_business_caller_id_verification_from_twilio(business)
+        business = get_business_record_for_user(current_user_id)
         config = normalize_forwarding_config(business.get('forwarding_config'))
         purchase_limit = get_system_number_purchase_limit()
         purchase_count = get_business_number_purchase_count(business)
@@ -4514,8 +4616,11 @@ async def get_business_forwarding(
             "twilio_number_status": business.get("twilio_number_status"),
             "twilio_number_label": business.get("twilio_number_label"),
             "twilio_number_quality_error": business.get("twilio_number_quality_error"),
+            "quality_check_status": business.get("quality_check_status"),
+            "quality_checked_at": business.get("quality_checked_at"),
             "number_purchase_count": purchase_count,
             "total_allowed_number_purchases": purchase_limit,
+            "verify_caller_id": get_system_verify_caller_id_enabled(),
             "can_purchase_number": purchase_count < purchase_limit,
             "number_selection_required": str(business.get("twilio_number_status") or "").lower() != "active",
             "default_area_code": extract_us_area_code(business.get("phone")),
@@ -4654,6 +4759,9 @@ async def claim_business_forwarding_number(
                 "message": failure_message,
                 "technical_reason": quality_result.get("technical_reason"),
                 "twilio_number_status": cleared_business.get("twilio_number_status"),
+                "quality_check_status": "failed",
+                "quality_checked_at": datetime.now(timezone.utc).isoformat(),
+                "twilio_number_quality_error": failure_message,
                 "number_purchase_count": get_business_number_purchase_count(cleared_business),
                 "total_allowed_number_purchases": get_system_number_purchase_limit(),
             }
@@ -4695,6 +4803,9 @@ async def claim_business_forwarding_number(
             "twilio_number": activated_business.get("twilio_number"),
             "twilio_number_label": activated_business.get("twilio_number_label"),
             "twilio_number_status": activated_business.get("twilio_number_status"),
+            "quality_check_status": "passed",
+            "quality_checked_at": activated_row.get("quality_checked_at"),
+            "twilio_number_quality_error": None,
             "elevenlabs_phone_number_id": str(phone_number_id),
             "number_purchase_count": get_business_number_purchase_count(activated_business),
             "total_allowed_number_purchases": get_system_number_purchase_limit(),
@@ -4717,6 +4828,8 @@ async def start_business_forwarding_caller_id_verification(
     current_user_id = str(current_user.id)
 
     try:
+        if not get_system_verify_caller_id_enabled():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Caller ID verification is currently turned off.")
         business = get_business_record_for_user(current_user_id)
         config = normalize_forwarding_config(business.get("forwarding_config"))
         entry = None

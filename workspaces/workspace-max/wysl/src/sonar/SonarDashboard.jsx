@@ -459,12 +459,13 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
   const [callerIdMessage, setCallerIdMessage] = useState('');
   const [callerIdValidationCode, setCallerIdValidationCode] = useState('');
   const [callerIdStarting, setCallerIdStarting] = useState(false);
+  const [verifyCallerIdEnabled, setVerifyCallerIdEnabled] = useState(false);
   const [isAddingNewNumber, setIsAddingNewNumber] = useState(false);
   const forwardingNumber = forwardingTargetNumber || '';
   const hasTargetNumber = Boolean(forwardingNumber);
   const targetLineReady = hasTargetNumber && String(twilioNumberStatus || '').toLowerCase() === 'active';
   const needsTargetNumberSelection = !targetLineReady;
-  const totalSlides = 5;
+  const totalSlides = verifyCallerIdEnabled ? 5 : 4;
   const selectedProvider = PHONE_PROVIDERS.find((provider) => provider.id === selectedProviderId) || PHONE_PROVIDERS[0];
   const targetQualitySteps = [
     'Reserving your number',
@@ -494,9 +495,11 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
             ? forwardingStatus === 'verified'
               ? 'Forwarding verified.'
               : 'Listening for your test call.'
-            : callerIdStatus === 'verified'
-              ? 'Caller ID verified.'
-              : 'Use your business number for outbound calls.';
+            : verifyCallerIdEnabled
+              ? callerIdStatus === 'verified'
+                ? 'Caller ID verified.'
+                : 'Use your business number for outbound calls.'
+              : 'Forwarding verified.';
   const normalizedSourceNumber = sourceNumber.trim();
   const sourceOptions = [];
   const seenNumbers = new Set();
@@ -713,6 +716,7 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
 
         const numbers = data?.forwarding_config?.numbers || [];
         const currentEntry = data?.current_entry || null;
+        const verifyCallerId = Boolean(data?.verify_caller_id);
 
         setBusinessId(data?.business_id || null);
         setSavedEntries(numbers);
@@ -724,6 +728,7 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
         setNumberPurchaseCount(data?.number_purchase_count || 0);
         setNumberPurchaseLimit(data?.total_allowed_number_purchases || 0);
         setCanPurchaseNumber(Boolean(data?.can_purchase_number));
+        setVerifyCallerIdEnabled(Boolean(data?.verify_caller_id));
         setDefaultAreaCode(data?.default_area_code || '');
         setDefaultNearNumber(data?.default_near_number || '');
         setForwardingTargetNumber(data?.forwarding_target_number || '');
@@ -745,7 +750,13 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
           setIsAddingNewNumber(false);
           if (currentEntry.status === 'pending_test') {
             setSlide(3);
-          } else if (currentEntry.caller_id_verification_status === 'pending') {
+          } else if (
+            verifyCallerId
+            && currentEntry.status === 'verified'
+            && currentEntry.caller_id_verification_status !== 'verified'
+          ) {
+            setSlide(4);
+          } else if (verifyCallerId && currentEntry.caller_id_verification_status === 'pending') {
             setSlide(4);
           } else {
             setSlide(0);
@@ -800,7 +811,7 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
 
   useEffect(() => {
     const needsForwardingWatch = slide === 3 && forwardingStatus !== 'verified';
-    const needsCallerIdWatch = slide === 4 && callerIdStatus === 'pending';
+    const needsCallerIdWatch = verifyCallerIdEnabled && slide === 4 && callerIdStatus === 'pending';
     if ((!needsForwardingWatch && !needsCallerIdWatch) || !authSession?.access_token || !entryId || !businessId) {
       return undefined;
     }
@@ -823,6 +834,14 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
           setForwardingStatus(matchingEntry.status);
           if (matchingEntry.status === 'verified' && onSaved) {
             onSaved(matchingEntry);
+          }
+          if (
+            verifyCallerIdEnabled
+            && slide === 3
+            && matchingEntry.status === 'verified'
+            && matchingEntry?.caller_id_verification_status !== 'verified'
+          ) {
+            setSlide(4);
           }
         }
         applyCallerIdEntryState(matchingEntry);
@@ -946,7 +965,13 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
       }
       if (selectedExistingEntryIsVerified) {
         const saved = await saveForwarding({ status: 'verified' });
-        if (saved) onClose();
+        if (saved) {
+          if (verifyCallerIdEnabled && saved?.caller_id_verification_status !== 'verified') {
+            setSlide(4);
+          } else {
+            onClose();
+          }
+        }
         return;
       }
       setError('');
@@ -970,7 +995,11 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
         setError('Finish the quick test call first so we know forwarding is working.');
         return;
       }
-      setSlide(4);
+      if (verifyCallerIdEnabled) {
+        setSlide(4);
+        return;
+      }
+      onClose();
       return;
     }
 
