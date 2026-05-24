@@ -210,6 +210,46 @@ const [reactions, setReactions] = useState([]);
     }
   }, []);
 
+  const updateAgentCallTypes = useCallback(async (agentId, nextCallTypes) => {
+    let previousAgent = null;
+
+    setAgents(prev => prev.map(agent => {
+      if (String(agent.id) !== String(agentId)) return agent;
+      previousAgent = agent;
+      const normalized = String(nextCallTypes || 'none').trim().toLowerCase();
+      const nextStatus = normalized === 'none' || normalized === 'off' || normalized === ''
+        ? 'Idle'
+        : 'Online';
+      return {
+        ...agent,
+        call_types: nextCallTypes,
+        status: nextStatus,
+      };
+    }));
+
+    const result = await api.updateAgentCallTypes(agentId, nextCallTypes);
+    if (!result) {
+      if (previousAgent) {
+        setAgents(prev => prev.map(agent => (
+          String(agent.id) === String(agentId) ? previousAgent : agent
+        )));
+      }
+      return null;
+    }
+
+    setAgents(prev => prev.map(agent => (
+      String(agent.id) === String(agentId)
+        ? {
+            ...agent,
+            ...result,
+            call_types: result.call_types ?? nextCallTypes,
+            status: result.status ?? agent.status,
+          }
+        : agent
+    )));
+    return result;
+  }, []);
+
   return {
     tasks,
     agents,
@@ -227,6 +267,7 @@ const [reactions, setReactions] = useState([]);
     setStage,
     setZone,
     pingMax,
+    updateAgentCallTypes,
     refresh: loadInitialData,
   };
 }

@@ -224,7 +224,7 @@ const formatDisplayPhoneNumber = (value) => {
   return raw.replace(/^\+/, '');
 };
 
-const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, activeForwardingEntry = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onTerminate }) => {
+const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, activeForwardingEntry = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onUpdateCallTypes, onTerminate }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   const displayModel = pending || agent.model || 'Not set';
@@ -378,9 +378,9 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           <div className="flex items-center gap-1.5 mb-2">
             {[
               { key: 'none', label: 'Off', activeClass: 'bg-zinc-700/10 border-zinc-700/20 text-zinc-600' },
-              { key: 'inbound', label: 'In', activeClass: 'bg-cyan-400/10 border-cyan-400/20 text-cyan-400' },
-              { key: 'outbound', label: 'Out', activeClass: 'bg-indigo-400/10 border-indigo-400/20 text-indigo-400' },
-              { key: 'both', label: 'Both', activeClass: 'bg-emerald-400/10 border-emerald-400/20 text-emerald-400' },
+              { key: 'inbound', label: 'In', activeClass: 'bg-orange-400/10 border-orange-400/20 text-orange-400' },
+              { key: 'outbound', label: 'Out', activeClass: 'bg-orange-400/10 border-orange-400/20 text-orange-400' },
+              { key: 'both', label: 'Both', activeClass: 'bg-orange-400/10 border-orange-400/20 text-orange-400' },
             ].map(ct => {
               const isAct = (agent.call_types || 'none') === ct.key;
               return (
@@ -389,7 +389,11 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
                   onClick={async () => {
                     const newVal = ct.key === (agent.call_types || 'none') ? 'none' : ct.key;
                     try {
-                      await api.updateAgentCallTypes(agent.id, newVal);
+                      if (onUpdateCallTypes) {
+                        await onUpdateCallTypes(agent.id, newVal);
+                      } else {
+                        await api.updateAgentCallTypes(agent.id, newVal);
+                      }
                     } catch (err) {
                       console.error('[CallTypes] Failed:', err.message || err);
                     }
@@ -1524,7 +1528,7 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
             >
               {loading ? (
                 <div className="flex min-h-[190px] items-center justify-center text-[11px] uppercase tracking-[0.3em] text-zinc-700">
-                  Loading forwarding
+                  Loading...
                 </div>
               ) : (
                 renderSlide()
@@ -1898,6 +1902,7 @@ const SonarDashboard = () => {
     setStage,
     setZone,
     pingMax,
+    updateAgentCallTypes,
     refresh,
   } = useSonarState();
 
@@ -1982,6 +1987,7 @@ const SonarDashboard = () => {
                     onOpenMarketplace={setMarketplaceAgent}
                     onOpenScenarios={setReceptionistsAgent}
                     onOpenForwarding={setForwardingAgent}
+                    onUpdateCallTypes={updateAgentCallTypes}
                     onTerminate={(agent) => setTerminateAgent(agent)}
                   />
                 );
