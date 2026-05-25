@@ -310,14 +310,14 @@ const DayHoursRow = ({ day, settings, onChange }) => {
             type="time"
             value={hours.open}
             onChange={(e) => update('open', e.target.value)}
-            className="bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 focus:outline-none focus:border-cyan-500/40 transition-all"
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 focus:outline-none focus:border-cyan-500/40 transition-all appearance-none"
           />
           <span className="text-[11px] text-zinc-600">to</span>
           <input
             type="time"
             value={hours.close}
             onChange={(e) => update('close', e.target.value)}
-            className="bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 focus:outline-none focus:border-cyan-500/40 transition-all"
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 focus:outline-none focus:border-cyan-500/40 transition-all appearance-none"
           />
         </div>
       ) : (
@@ -1182,25 +1182,6 @@ const SettingsPage = () => {
                   <span className="text-[12px] text-zinc-500">minutes</span>
                 </div>
               </Field>
-
-              <div className="border-t border-white/[0.03]" />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[12px] font-medium text-zinc-300">Allow Cancellations</div>
-                  <div className="text-[10px] text-zinc-600 mt-0.5">Let callers cancel their appointments</div>
-                </div>
-                <Toggle value={settings.allow_cancellations} onChange={(v) => update('allow_cancellations', v)} />
-              </div>
-
-              {settings.allow_cancellations && (
-                <Field label="Cancellation Window">
-                  <div className="flex items-center gap-2">
-                    <NumberInput value={settings.cancellation_window_hours} onChange={(v) => update('cancellation_window_hours', v)} min={0} max={168} step={1} />
-                    <span className="text-[12px] text-zinc-500">hours before appointment</span>
-                  </div>
-                </Field>
-              )}
             </div>
           </Section>
 

@@ -50,6 +50,25 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+.time-input-no-icon::-webkit-calendar-picker-indicator {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  width: 0;
+  height: 0;
+}
+
+.time-input-no-icon::-webkit-clear-button,
+.time-input-no-icon::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
 h1, h2, h3, h4 {
     font-weight: 700;
     margin-top: 0;
