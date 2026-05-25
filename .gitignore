@@ -1,5 +1,9 @@
-.env
-memory/
-node_modules/
+/wysl/node_modules/
+/wysl/dist/
+/wysl/venv/
+/wysl/.env
+/wysl/.env.local
+/wysl/.env.*.local
+/wysl/backend/.env
+/wysl/backend/__pycache__/
 *.log
-agents/
