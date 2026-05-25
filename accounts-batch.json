@@ -1,0 +1,12 @@
+[
+  {"path": "channels.telegram.accounts.brian", "value": {"token": "8731998873:AAEWpZJ2mu15bz-yjAXh64G1-qSE8YintkQ"}},
+  {"path": "channels.telegram.accounts.tyler", "value": {"token": "8646341249:AAHTxWk_6a40TQFFghYiofEJqxbzF51iVLg"}},
+  {"path": "channels.telegram.accounts.lauren", "value": {"token": "8777471205:AAGhr78pLIQglAyK706-yBIabMCe_rVqThs"}},
+  {"path": "channels.telegram.accounts.yanna", "value": {"token": "8666709785:AAGoJy-wzXxFDAA-LkDcEVlwui2D9zTbj64"}},
+  {"path": "channels.telegram.accounts.allie", "value": {"token": "8027398701:AAGtvp9dB048MWmBvzACHJFVWlM4zKD8b-k"}},
+  {"path": "channels.telegram.accounts.jenna", "value": {"token": "8528346341:AAFS2uV2nhcuRNaEQa_745dfVsWhJ1OxrPg"}},
+  {"path": "channels.telegram.accounts.devan", "value": {"token": "8732952550:AAFJUVkVyZJkaIpEby-X9qpndlHrqvrBbDs"}},
+  {"path": "channels.telegram.accounts.brie", "value": {"token": "8331960291:AAFOL1qPm6csnfMHIKKlvWmemBHMtQKBSVo"}},
+  {"path": "channels.telegram.accounts.leah", "value": {"token": "8740363547:AAGiTl9w3mlOpDpvMG_AkEz4BbzVLYoY9-M"}},
+  {"path": "channels.telegram.accounts.kelly", "value": {"token": "8290236899:AAGFTCf-DGSVIHo7n-jZaBvC6sbAomDuNh0"}}
+]

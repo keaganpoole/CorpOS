@@ -1,0 +1,117 @@
+Last Updated: September 16, 2025
+
+Keyquarters ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, store, and protect your personal information when you use our website, mobile applications, and services (collectively, the "Service").
+
+By accessing or using our Service, you agree to the terms of this Privacy Policy. If you do not agree, please do not use the Service.
+
+1. Information We Collect
+1.1 Information You Provide Directly
+
+Account Information: When you create an account, we collect your email address and password. Your password is stored securely.
+
+Profile Information: You may provide your name and optional details to personalize your experience. If you cancel a subscription, we may collect your reason for cancellation.
+
+Device Information: To provide AI assistance through our "Breezy" helper, we collect device type and operating system information. You may optionally provide additional context for AI assistance.
+
+Password Vault Data: If you use the Key Vault, you provide and store sensitive account credentials and related notes. These are access-restricted, with proper encryption planned for future implementation.
+
+AI Chat Data: Messages exchanged with the AI, conversation identifiers, and optional conversation titles are collected.
+
+Payment Information: Subscriptions are processed via Stripe. We do not store credit card numbers or billing addresses. We store payment-related identifiers and subscription status.
+
+1.2 Information Collected Automatically
+
+Usage Data: Information about your interactions with the Service, such as features used, pages visited, and session duration.
+
+Cookies and Local Storage: Used to maintain sessions, remember preferences, and for authentication.
+
+2. How We Use Your Information
+
+We use the information we collect to:
+
+Operate and maintain the Service
+
+Personalize your experience
+
+Protect accounts and prevent fraud
+
+Respond to inquiries and provide support
+
+Process payments and manage subscriptions
+
+Enable AI-powered assistance
+
+Analyze usage and improve features
+
+Comply with legal obligations
+
+3. How We Share Your Information
+
+We may share your information:
+
+With Your Consent
+
+With Service Providers:
+
+Supabase: Database, authentication, and storage
+
+Stripe: Payment processing
+
+OpenAI: AI processing of messages and device context
+
+Hosting Providers: Standard server hosting services
+
+Business Transfers: In the event of mergers, acquisitions, or sales
+
+Legal Requirements & Protection of Rights
+
+Aggregated or Anonymized Data
+
+4. Data Storage and Security
+
+Storage Location: Data is stored on secure servers.
+
+Security Measures:
+
+Data in transit is encrypted (TLS/SSL)
+
+Passwords and Key Vault entries are access-restricted; proper encryption will be implemented
+
+Access to personal information is limited to authorized personnel
+
+5. Cookies and Tracking
+
+Essential Cookies: Used for authentication, session management, and remembering preferences.
+
+No Third-Party Analytics or Advertising Cookies: Currently, we do not track your activity across other websites.
+
+6. Your Privacy Rights
+
+Depending on your location (e.g., GDPR, CCPA), you may have the right to:
+
+Access, correct, or delete your personal information
+
+Restrict or object to processing
+
+Receive your information in a portable format
+
+Opt-out of the sale of personal information (we do not sell personal data)
+
+To exercise these rights, contact us at support@keyquarters.com
+.
+
+7. Data Retention
+
+We retain personal information only as long as necessary to provide the Service, fulfill legal obligations, or resolve disputes.
+
+8. Children’s Privacy
+
+Our Service is not intended for individuals under 13. We do not knowingly collect personal information from children under 13.
+
+9. Changes to This Privacy Policy
+
+We may update this Privacy Policy to reflect changes in practices or legal requirements. We encourage you to review it periodically.
+
+10. Contact Us
+
+Email: support@keyquarters.com

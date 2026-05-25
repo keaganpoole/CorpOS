@@ -1,0 +1,163 @@
+api.js:49 
+        
+        
+       POST http://127.0.0.1:7878/api/agents/max/call-types 500 (Internal Server Error)
+postJSON @ api.js:49
+updateAgentCallTypes @ api.js:36
+onClick @ App.jsx:523
+callCallback2 @ chunk-PJEEZAML.js?v=9f888d0d:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=9f888d0d:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=9f888d0d:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-PJEEZAML.js?v=9f888d0d:3736
+executeDispatch @ chunk-PJEEZAML.js?v=9f888d0d:7014
+processDispatchQueueItemsInOrder @ chunk-PJEEZAML.js?v=9f888d0d:7034
+processDispatchQueue @ chunk-PJEEZAML.js?v=9f888d0d:7043
+dispatchEventsForPlugins @ chunk-PJEEZAML.js?v=9f888d0d:7051
+(anonymous) @ chunk-PJEEZAML.js?v=9f888d0d:7174
+batchedUpdates$1 @ chunk-PJEEZAML.js?v=9f888d0d:18913
+batchedUpdates @ chunk-PJEEZAML.js?v=9f888d0d:3579
+dispatchEventForPluginEventSystem @ chunk-PJEEZAML.js?v=9f888d0d:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-PJEEZAML.js?v=9f888d0d:5478
+dispatchEvent @ chunk-PJEEZAML.js?v=9f888d0d:5472
+dispatchDiscreteEvent @ chunk-PJEEZAML.js?v=9f888d0d:5449
+Show 15 more frames
+Show less
+api.js:57 [SONARAPI] POST failed: /api/agents/max/call-types HTTP 500
+postJSON @ api.js:57
+await in postJSON
+updateAgentCallTypes @ api.js:36
+onClick @ App.jsx:523
+callCallback2 @ chunk-PJEEZAML.js?v=9f888d0d:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=9f888d0d:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=9f888d0d:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-PJEEZAML.js?v=9f888d0d:3736
+executeDispatch @ chunk-PJEEZAML.js?v=9f888d0d:7014
+processDispatchQueueItemsInOrder @ chunk-PJEEZAML.js?v=9f888d0d:7034
+processDispatchQueue @ chunk-PJEEZAML.js?v=9f888d0d:7043
+dispatchEventsForPlugins @ chunk-PJEEZAML.js?v=9f888d0d:7051
+(anonymous) @ chunk-PJEEZAML.js?v=9f888d0d:7174
+batchedUpdates$1 @ chunk-PJEEZAML.js?v=9f888d0d:18913
+batchedUpdates @ chunk-PJEEZAML.js?v=9f888d0d:3579
+dispatchEventForPluginEventSystem @ chunk-PJEEZAML.js?v=9f888d0d:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-PJEEZAML.js?v=9f888d0d:5478
+dispatchEvent @ chunk-PJEEZAML.js?v=9f888d0d:5472
+dispatchDiscreteEvent @ chunk-PJEEZAML.js?v=9f888d0d:5449
+Show 15 more frames
+Show less
+api.js:49 
+        
+        
+       POST http://127.0.0.1:7878/api/agents/max/call-types 500 (Internal Server Error)
+postJSON @ api.js:49
+updateAgentCallTypes @ api.js:36
+onClick @ App.jsx:523
+callCallback2 @ chunk-PJEEZAML.js?v=9f888d0d:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=9f888d0d:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=9f888d0d:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-PJEEZAML.js?v=9f888d0d:3736
+executeDispatch @ chunk-PJEEZAML.js?v=9f888d0d:7014
+processDispatchQueueItemsInOrder @ chunk-PJEEZAML.js?v=9f888d0d:7034
+processDispatchQueue @ chunk-PJEEZAML.js?v=9f888d0d:7043
+dispatchEventsForPlugins @ chunk-PJEEZAML.js?v=9f888d0d:7051
+(anonymous) @ chunk-PJEEZAML.js?v=9f888d0d:7174
+batchedUpdates$1 @ chunk-PJEEZAML.js?v=9f888d0d:18913
+batchedUpdates @ chunk-PJEEZAML.js?v=9f888d0d:3579
+dispatchEventForPluginEventSystem @ chunk-PJEEZAML.js?v=9f888d0d:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-PJEEZAML.js?v=9f888d0d:5478
+dispatchEvent @ chunk-PJEEZAML.js?v=9f888d0d:5472
+dispatchDiscreteEvent @ chunk-PJEEZAML.js?v=9f888d0d:5449
+Show 15 more frames
+Show less
+api.js:57 [SONARAPI] POST failed: /api/agents/max/call-types HTTP 500
+postJSON @ api.js:57
+await in postJSON
+updateAgentCallTypes @ api.js:36
+onClick @ App.jsx:523
+callCallback2 @ chunk-PJEEZAML.js?v=9f888d0d:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=9f888d0d:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=9f888d0d:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-PJEEZAML.js?v=9f888d0d:3736
+executeDispatch @ chunk-PJEEZAML.js?v=9f888d0d:7014
+processDispatchQueueItemsInOrder @ chunk-PJEEZAML.js?v=9f888d0d:7034
+processDispatchQueue @ chunk-PJEEZAML.js?v=9f888d0d:7043
+dispatchEventsForPlugins @ chunk-PJEEZAML.js?v=9f888d0d:7051
+(anonymous) @ chunk-PJEEZAML.js?v=9f888d0d:7174
+batchedUpdates$1 @ chunk-PJEEZAML.js?v=9f888d0d:18913
+batchedUpdates @ chunk-PJEEZAML.js?v=9f888d0d:3579
+dispatchEventForPluginEventSystem @ chunk-PJEEZAML.js?v=9f888d0d:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-PJEEZAML.js?v=9f888d0d:5478
+dispatchEvent @ chunk-PJEEZAML.js?v=9f888d0d:5472
+dispatchDiscreteEvent @ chunk-PJEEZAML.js?v=9f888d0d:5449
+Show 15 more frames
+Show less
+api.js:49 
+        
+        
+       POST http://127.0.0.1:7878/api/agents/max/call-types 500 (Internal Server Error)
+postJSON @ api.js:49
+updateAgentCallTypes @ api.js:36
+onClick @ App.jsx:523
+callCallback2 @ chunk-PJEEZAML.js?v=9f888d0d:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=9f888d0d:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=9f888d0d:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-PJEEZAML.js?v=9f888d0d:3736
+executeDispatch @ chunk-PJEEZAML.js?v=9f888d0d:7014
+processDispatchQueueItemsInOrder @ chunk-PJEEZAML.js?v=9f888d0d:7034
+processDispatchQueue @ chunk-PJEEZAML.js?v=9f888d0d:7043
+dispatchEventsForPlugins @ chunk-PJEEZAML.js?v=9f888d0d:7051
+(anonymous) @ chunk-PJEEZAML.js?v=9f888d0d:7174
+batchedUpdates$1 @ chunk-PJEEZAML.js?v=9f888d0d:18913
+batchedUpdates @ chunk-PJEEZAML.js?v=9f888d0d:3579
+dispatchEventForPluginEventSystem @ chunk-PJEEZAML.js?v=9f888d0d:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-PJEEZAML.js?v=9f888d0d:5478
+dispatchEvent @ chunk-PJEEZAML.js?v=9f888d0d:5472
+dispatchDiscreteEvent @ chunk-PJEEZAML.js?v=9f888d0d:5449
+Show 15 more frames
+Show less
+api.js:57 [SONARAPI] POST failed: /api/agents/max/call-types HTTP 500
+postJSON @ api.js:57
+await in postJSON
+updateAgentCallTypes @ api.js:36
+onClick @ App.jsx:523
+callCallback2 @ chunk-PJEEZAML.js?v=9f888d0d:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=9f888d0d:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=9f888d0d:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-PJEEZAML.js?v=9f888d0d:3736
+executeDispatch @ chunk-PJEEZAML.js?v=9f888d0d:7014
+processDispatchQueueItemsInOrder @ chunk-PJEEZAML.js?v=9f888d0d:7034
+processDispatchQueue @ chunk-PJEEZAML.js?v=9f888d0d:7043
+dispatchEventsForPlugins @ chunk-PJEEZAML.js?v=9f888d0d:7051
+(anonymous) @ chunk-PJEEZAML.js?v=9f888d0d:7174
+batchedUpdates$1 @ chunk-PJEEZAML.js?v=9f888d0d:18913
+batchedUpdates @ chunk-PJEEZAML.js?v=9f888d0d:3579
+dispatchEventForPluginEventSystem @ chunk-PJEEZAML.js?v=9f888d0d:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-PJEEZAML.js?v=9f888d0d:5478
+dispatchEvent @ chunk-PJEEZAML.js?v=9f888d0d:5472
+dispatchDiscreteEvent @ chunk-PJEEZAML.js?v=9f888d0d:5449
+Show 15 more frames
+Show less
+api.js:49 
+        
+        
+       POST http://127.0.0.1:7878/api/agents/max/call-types 500 (Internal Server Error)
+postJSON @ api.js:49
+updateAgentCallTypes @ api.js:36
+onClick @ App.jsx:523
+callCallback2 @ chunk-PJEEZAML.js?v=9f888d0d:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=9f888d0d:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=9f888d0d:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-PJEEZAML.js?v=9f888d0d:3736
+executeDispatch @ chunk-PJEEZAML.js?v=9f888d0d:7014
+processDispatchQueueItemsInOrder @ chunk-PJEEZAML.js?v=9f888d0d:7034
+processDispatchQueue @ chunk-PJEEZAML.js?v=9f888d0d:7043
+dispatchEventsForPlugins @ chunk-PJEEZAML.js?v=9f888d0d:7051
+(anonymous) @ chunk-PJEEZAML.js?v=9f888d0d:7174
+batchedUpdates$1 @ chunk-PJEEZAML.js?v=9f888d0d:18913
+batchedUpdates @ chunk-PJEEZAML.js?v=9f888d0d:3579
+dispatchEventForPluginEventSystem @ chunk-PJEEZAML.js?v=9f888d0d:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-PJEEZAML.js?v=9f888d0d:5478
+dispatchEvent @ chunk-PJEEZAML.js?v=9f888d0d:5472
+dispatchDiscreteEvent @ chunk-PJEEZAML.js?v=9f888d0d:5449
+Show 15 more frames
+Show less
+api.js:57 [SONARAPI] POST failed: /api/agents/max/call-types HTTP 500

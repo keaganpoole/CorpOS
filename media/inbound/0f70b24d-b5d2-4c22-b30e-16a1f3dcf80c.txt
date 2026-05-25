@@ -1,0 +1,246 @@
+You are implementing a **new inline “Search Records” feature** inside the existing Variables Panel.
+
+You are NOT redesigning anything. You are ONLY adding functionality that integrates seamlessly into the current UI.
+
+Your reference implementation is here:
+
+
+---
+
+## 🎯 OBJECTIVE
+
+Add an **inline search interaction per table section (People, Appointments, etc.)** that allows users to:
+
+* Click into a section header (e.g., “People”)
+* Instantly transform it into a search input (no modal, no layout shift)
+* Search records within that table
+* Dynamically update the visible variable values based on the matched record
+* Exit search cleanly and revert to default state
+
+This must feel **native, fluid, and invisible** — like it was always part of the panel.
+
+---
+
+## ⚠️ HARD CONSTRAINTS
+
+* DO NOT redesign the variables panel
+* DO NOT change spacing, layout, typography, or structure
+* DO NOT introduce modals, popups, or overlays
+* DO NOT move elements around
+* DO NOT restyle components
+
+You are **only enhancing behavior inside existing components**
+
+---
+
+## 🧠 CORE UX BEHAVIOR
+
+### 1. Header → Search Transformation
+
+Each section header (e.g., “People”) must:
+
+* On click → become an inline input field
+* Maintain exact same size and layout
+* Autofocus immediately
+* Placeholder: `"Search {Table Name}..."`
+
+---
+
+### 2. Search Logic
+
+When user types:
+
+* Perform **real-time filtering** on that table’s records
+* Match against relevant fields (e.g., name, email, etc.)
+* Case-insensitive partial matching
+
+---
+
+### 3. Record Selection Behavior
+
+* When a match is found:
+
+  * Instantly switch the panel to that record
+  * Update all variable rows to reflect that record’s data
+* If multiple matches:
+
+  * Select the **first best match** (no dropdown UI)
+
+---
+
+### 4. “Tuning” Transition Effect
+
+When search is active:
+
+* Existing variable rows should:
+
+  * Slightly fade (opacity ↓)
+  * Slightly scale down
+  * Optional subtle blur
+
+* After match resolves:
+
+  * Smoothly transition back to normal
+
+This creates a **“live tuning” / “system locking onto record” feel**
+
+---
+
+### 5. Result Indicator
+
+When searching:
+
+* Show a small inline indicator in the header:
+
+  * Example: `1 FOUND`
+* Only visible when search has input
+* Automatically updates
+
+---
+
+### 6. Exit Behavior
+
+User exits search when:
+
+* Presses `Enter`
+* Clicks away (blur)
+* Clicks clear (X)
+
+On exit:
+
+* If input is empty → revert header to normal label
+* If input has value → keep selected record but exit input mode
+
+---
+
+### 7. Clear Button (X)
+
+* Appears when input is active
+* Clicking it:
+
+  * Clears search
+  * Resets to default record
+  * Exits search mode
+
+---
+
+## 🧩 IMPLEMENTATION STRUCTURE
+
+You must implement this using:
+
+### Component Pattern
+
+Create or enhance a reusable section header component:
+
+```
+SectionHeader({
+  title,
+  icon,
+  onSearch,
+  currentSearch,
+  isSearching,
+  resultCount
+})
+```
+
+---
+
+### State Requirements (per table)
+
+Each table must manage:
+
+* `searchQuery`
+* `activeRecordIndex`
+* `isSearching` (for animation state)
+
+---
+
+### Search Handler Pattern
+
+For each table:
+
+```
+onSearch(value):
+  set searchQuery
+  set isSearching = true
+
+  debounce or delay (~200–300ms)
+
+  find matching record index
+
+  if found:
+    update activeRecordIndex
+
+  set isSearching = false
+```
+
+---
+
+### Data Binding
+
+All variable rows must always render from:
+
+```
+currentRecord = tableData[activeRecordIndex]
+```
+
+---
+
+### Visual State Binding
+
+Pass `isSearching` into variable rows:
+
+```
+<VariableRow isSearching={isSearching} />
+```
+
+Rows must react visually (fade/scale/blur) during search
+
+---
+
+## 🔁 APPLY TO ALL TABLES
+
+This feature must be reusable and work identically for:
+
+* People
+* Appointments
+* Any future tables
+
+---
+
+## 🧪 ACCEPTANCE CRITERIA
+
+* Clicking a section header smoothly turns it into a search input
+* Typing immediately updates the displayed record
+* No layout shifts occur
+* No new UI containers appear
+* Rows animate subtly during search
+* Clearing search resets correctly
+* Entire interaction feels instant and “built-in”
+
+---
+
+## ❌ FAILURE CONDITIONS
+
+You failed if:
+
+* The panel layout changes at all
+* A modal or dropdown is introduced
+* Search results appear in a list instead of updating the panel
+* Animations feel abrupt or missing
+* The search input looks visually different from the header space
+
+---
+
+## 🧠 MENTAL MODEL
+
+This is **NOT a search UI**.
+
+This is a **“record tuner” embedded inside the variables panel**.
+
+User is not browsing results —
+they are **locking onto a record instantly**.
+
+---
+
+Implement exactly to this behavior.

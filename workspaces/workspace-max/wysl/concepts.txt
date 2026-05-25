@@ -1,0 +1,107 @@
+import React, { useState } from 'react';
+import { Play, RotateCcw, Waves } from 'lucide-react';
+
+const WaveFlow = ({ active }) => (
+  <svg className="w-full h-full overflow-visible" viewBox="0 0 400 100">
+    <defs>
+      <pattern id="wave-pattern" x="0" y="0" width="40" height="20" patternUnits="userSpaceOnUse">
+        <path d="M 0 10 Q 10 0 20 10 T 40 10" fill="none" stroke="#60a5fa" strokeWidth="4" />
+      </pattern>
+      <mask id="wave-mask">
+        <rect 
+            x="40" y="40" 
+            width={active ? "320" : "0"} 
+            height="20" 
+            rx="10" 
+            fill="white" 
+            className="transition-all duration-700 ease-in-out"
+        />
+      </mask>
+    </defs>
+    {/* Base Path (Background) */}
+    <rect x="40" y="42" width="320" height="16" rx="8" fill="#1e293b" />
+    
+    {/* Animated Wave Layer */}
+    <g mask="url(#wave-mask)">
+       <rect x="40" y="42" width="320" height="16" rx="8" fill="#3b82f6" opacity="0.3" />
+       <rect x="0" y="42" width="400" height="16" fill="url(#wave-pattern)">
+          <animateTransform 
+            attributeName="transform" 
+            type="translate" 
+            from="0 0" 
+            to="40 0" 
+            dur="1s" 
+            repeatCount="indefinite" 
+          />
+       </rect>
+    </g>
+  </svg>
+);
+
+export default function App() {
+  const [isActive, setIsActive] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-100">
+      <div className="max-w-md w-full">
+        {/* Header Section */}
+        <div className="mb-8 space-y-2">
+          <div className="flex items-center gap-2 text-blue-400">
+            <Waves size={20} />
+            <span className="text-xs font-bold uppercase tracking-widest">Fluid Dynamics</span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Hydro Flux</h1>
+          <p className="text-slate-400 text-sm italic">Fluid harmonic oscillation concept</p>
+        </div>
+
+        <div 
+          onClick={() => setIsActive(!isActive)}
+          className={`group relative bg-slate-900/50 border rounded-3xl p-8 cursor-pointer transition-all duration-500 hover:bg-slate-900/80 ${
+            isActive 
+              ? 'border-blue-500/50 ring-1 ring-blue-500/20 shadow-2xl shadow-blue-900/20' 
+              : 'border-slate-800 hover:border-slate-700'
+          }`}
+        >
+          {/* Status Indicators */}
+          <div className="absolute top-6 right-6 flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              isActive ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'bg-slate-700'
+            }`} />
+            <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+              {isActive ? 'Active' : 'Standby'}
+            </span>
+          </div>
+
+          {/* Visualization Area */}
+          <div className="relative h-32 bg-slate-950/50 rounded-2xl overflow-hidden flex items-center justify-center">
+            {/* Nodal Endpoints */}
+            <div className={`absolute left-6 w-5 h-5 rounded-full border-4 border-slate-800 bg-slate-900 z-10 transition-transform duration-500 ${isActive ? 'scale-110' : ''}`} />
+            <div className={`absolute right-6 w-5 h-5 rounded-full border-4 border-slate-800 bg-slate-900 z-10 transition-transform duration-500 ${isActive ? 'scale-110' : ''}`} />
+            
+            {/* The Wave Component */}
+            <div className="w-full px-2">
+              <WaveFlow active={isActive} />
+            </div>
+          </div>
+
+          {/* Interaction Feedback */}
+          <div className={`mt-6 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-tighter transition-opacity duration-300 ${
+            isActive ? 'text-blue-400 opacity-100' : 'text-slate-600 opacity-0 group-hover:opacity-100'
+          }`}>
+            {isActive ? (
+              <><RotateCcw size={14} /> Click to Reset Flow</>
+            ) : (
+              <><Play size={14} fill="currentColor" /> Initialize Connection</>
+            )}
+          </div>
+        </div>
+
+        {/* Technical Footer */}
+        <div className="mt-8 pt-6 border-t border-slate-900 flex justify-between items-center text-slate-600 text-[10px] font-mono tracking-widest uppercase">
+          <span>Module // 002-HF</span>
+          <span>Status // Stable</span>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,7 @@
+Skybox Design Theme
+
+Ultra dark, almost pitch-black aesthetic with neon cyan and magenta accents. Gives cyberpunk command-center meets luxury tech vibes — cold, precise, and high-status. The kind of UI that feels expensive and serious.
+
+Everything lives in deep blacks with barely-visible borders and transparent layers. Text is muted zinc tones that brighten on interaction. Typography is bold, uppercase, and tightly tracked — labels feel stamped, not written.
+
+Subtle glows, gradient sweeps, and CRT scanline textures add life without feeling busy. The overall mood is corporate black-ops — intense, calculated, and elite. Every detail communicates control.

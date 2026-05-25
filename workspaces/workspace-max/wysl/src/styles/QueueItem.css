@@ -1,0 +1,213 @@
+/* src/styles/QueueItem.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* src/styles/QueueItem.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Inherit from global styles or define specific for QueueItem */
+  --queue-item-bg: #1a1c23; /* Darker background for cards */
+  --queue-item-border: rgba(255, 255, 255, 0.08);
+  --text-primary: #e5e7eb;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+
+  /* Aligned with global brand colors */
+  --approve-gradient: linear-gradient(135deg, var(--color-brand-pink), var(--color-brand-purple));
+  --reject-color: #ff6565; /* DNC status color */
+  --action-btn-hover-bg: rgba(255, 255, 255, 0.05); /* Subtle hover for icons */
+  --input-border-focus: #A5B4FC; /* From global form styles */
+  --input-shadow-focus: rgba(165, 180, 252, 0.15); /* From global form styles */
+}
+
+/* Import global variables from index.css if not already available */
+/* This assumes index.css is loaded before QueueItem.css or variables are globally accessible */
+/* If not, you might need to explicitly import or define them here */
+/* For now, assuming they are accessible via :root */
+
+.queue-item-wrapper {
+  padding: 8px 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.queue-item {
+  background-color: var(--queue-item-bg);
+  border: 1px solid var(--queue-item-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.queue-item:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.lead-info {
+  display: flex;
+  flex-direction: column; /* Stack lead name and campaign name */
+  align-items: flex-start;
+  gap: 2px; /* Smaller gap between stacked items */
+}
+
+.lead-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 16px; /* Slightly larger for prominence */
+}
+
+.campaign-name {
+  font-size: 12px; /* Slightly smaller for secondary info */
+  color: var(--text-tertiary); /* More subtle color */
+  font-weight: 500;
+}
+
+.timestamp {
+  font-style: normal; /* Remove italic */
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.item-body {
+  cursor: text;
+}
+
+.message-text {
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-size: 15px;
+  white-space: pre-wrap; /* Respect newlines */
+  padding: 8px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.message-text:hover {
+  background-color: var(--action-btn-hover-bg); /* Use consistent hover background */
+}
+
+.message-textarea {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 12px;
+  font-size: 15px;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.message-textarea:focus {
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px var(--input-shadow-focus);
+}
+
+.item-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.action-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--action-btn-hover-bg);
+}
+
+.main-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.approve-btn {
+  background-image: var(--approve-gradient);
+  color: white;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  gap: 8px;
+  box-shadow: 0 2px 10px rgba(255, 46, 248, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.approve-btn:hover {
+  transform: scale(1.02); /* Slightly less aggressive hover */
+  box-shadow: 0 4px 15px rgba(255, 46, 248, 0.3);
+}
+
+.reject-btn {
+  background-color: transparent; /* Make background transparent */
+  border: 1px solid var(--queue-item-border); /* Add a subtle border */
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text-secondary); /* Default color */
+  transition: all 0.2s ease;
+}
+
+.reject-btn:hover {
+  background-color: var(--action-btn-hover-bg); /* Consistent hover background */
+  border-color: var(--reject-color); /* Highlight border on hover */
+  color: var(--reject-color); /* Change icon color on hover */
+}
+
+.secondary-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.edit-btn, .save-btn {
+  background-color: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.edit-btn:hover, .save-btn:hover {
+  background-color: var(--action-btn-hover-bg);
+  color: var(--text-primary);
+}
+
+/* Ensure global variables are available for use here */
+/* If not, you might need to add them to :root in this file or ensure index.css is loaded first */
+:root {
+  --color-brand-pink: #ff32ac;
+  --color-brand-purple: #8B5CF6;
+  --color-accent-blue: #007aff;
+  --color-status-dnc: #ff6565; /* Used for reject-color */
+}

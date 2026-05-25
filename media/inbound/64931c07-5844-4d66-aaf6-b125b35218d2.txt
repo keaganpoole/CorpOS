@@ -1,0 +1,503 @@
+api.js:123 [SONAR] WebSocket error: undefined
+ws.onerror @ api.js:123
+api.js:116 [SONAR] WebSocket disconnected
+api.js:87 [SONAR] WebSocket connected
+App.jsx:544 Uncaught ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=d46b9700:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=d46b9700:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=d46b9700:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19765:15)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+AgentNode @ App.jsx:544
+renderWithHooks @ chunk-PJEEZAML.js?v=d46b9700:11548
+mountIndeterminateComponent @ chunk-PJEEZAML.js?v=d46b9700:14926
+beginWork @ chunk-PJEEZAML.js?v=d46b9700:15914
+callCallback2 @ chunk-PJEEZAML.js?v=d46b9700:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=d46b9700:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=d46b9700:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=d46b9700:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=d46b9700:19198
+workLoopSync @ chunk-PJEEZAML.js?v=d46b9700:19137
+renderRootSync @ chunk-PJEEZAML.js?v=d46b9700:19116
+performConcurrentWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18678
+workLoop @ chunk-PJEEZAML.js?v=d46b9700:197
+flushWork @ chunk-PJEEZAML.js?v=d46b9700:176
+performWorkUntilDeadline @ chunk-PJEEZAML.js?v=d46b9700:384
+Show 14 more frames
+Show less
+App.jsx:544 Uncaught ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=d46b9700:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=d46b9700:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=d46b9700:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19765:15)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+AgentNode @ App.jsx:544
+renderWithHooks @ chunk-PJEEZAML.js?v=d46b9700:11548
+mountIndeterminateComponent @ chunk-PJEEZAML.js?v=d46b9700:14926
+beginWork @ chunk-PJEEZAML.js?v=d46b9700:15914
+callCallback2 @ chunk-PJEEZAML.js?v=d46b9700:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=d46b9700:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=d46b9700:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=d46b9700:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=d46b9700:19198
+workLoopSync @ chunk-PJEEZAML.js?v=d46b9700:19137
+renderRootSync @ chunk-PJEEZAML.js?v=d46b9700:19116
+recoverFromConcurrentError @ chunk-PJEEZAML.js?v=d46b9700:18736
+performConcurrentWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18684
+workLoop @ chunk-PJEEZAML.js?v=d46b9700:197
+flushWork @ chunk-PJEEZAML.js?v=d46b9700:176
+performWorkUntilDeadline @ chunk-PJEEZAML.js?v=d46b9700:384
+Show 15 more frames
+Show less
+chunk-PJEEZAML.js?v=d46b9700:14032 The above error occurred in the <AgentNode> component:
+
+    at AgentNode (http://localhost:5173/src/App.jsx:583:22)
+    at div
+    at div
+    at div
+    at div
+    at ErrorBoundary (http://localhost:5173/src/App.jsx:74:5)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:945:40)
+    at PresenceChild (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:121:24)
+    at AnimatePresence (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:210:26)
+    at div
+    at main
+    at div
+    at div
+    at App (http://localhost:5173/src/App.jsx:2846:43)
+
+React will try to recreate this component tree from scratch using the error boundary you provided, ErrorBoundary.
+logCapturedError @ chunk-PJEEZAML.js?v=d46b9700:14032
+callback @ chunk-PJEEZAML.js?v=d46b9700:14078
+callCallback @ chunk-PJEEZAML.js?v=d46b9700:11248
+commitUpdateQueue @ chunk-PJEEZAML.js?v=d46b9700:11265
+commitLayoutEffectOnFiber @ chunk-PJEEZAML.js?v=d46b9700:17075
+commitLayoutMountEffects_complete @ chunk-PJEEZAML.js?v=d46b9700:17980
+commitLayoutEffects_begin @ chunk-PJEEZAML.js?v=d46b9700:17969
+commitLayoutEffects @ chunk-PJEEZAML.js?v=d46b9700:17920
+commitRootImpl @ chunk-PJEEZAML.js?v=d46b9700:19353
+commitRoot @ chunk-PJEEZAML.js?v=d46b9700:19277
+finishConcurrentRender @ chunk-PJEEZAML.js?v=d46b9700:18760
+performConcurrentWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18718
+workLoop @ chunk-PJEEZAML.js?v=d46b9700:197
+flushWork @ chunk-PJEEZAML.js?v=d46b9700:176
+performWorkUntilDeadline @ chunk-PJEEZAML.js?v=d46b9700:384
+Show 15 more frames
+Show less
+App.jsx:72 [SONAR] Page crashed: ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19753:22)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+    at renderRootSync (chunk-PJEEZAML.js?v=d46b9700:19116:15)
+    at recoverFromConcurrentError (chunk-PJEEZAML.js?v=d46b9700:18736:28)
+    at performConcurrentWorkOnRoot (chunk-PJEEZAML.js?v=d46b9700:18684:30) {componentStack: '\n    at AgentNode (http://localhost:5173/src/App.j…t App (http://localhost:5173/src/App.jsx:2846:43)'}
+componentDidCatch @ App.jsx:72
+callback @ chunk-PJEEZAML.js?v=d46b9700:14084
+callCallback @ chunk-PJEEZAML.js?v=d46b9700:11248
+commitUpdateQueue @ chunk-PJEEZAML.js?v=d46b9700:11265
+commitLayoutEffectOnFiber @ chunk-PJEEZAML.js?v=d46b9700:17075
+commitLayoutMountEffects_complete @ chunk-PJEEZAML.js?v=d46b9700:17980
+commitLayoutEffects_begin @ chunk-PJEEZAML.js?v=d46b9700:17969
+commitLayoutEffects @ chunk-PJEEZAML.js?v=d46b9700:17920
+commitRootImpl @ chunk-PJEEZAML.js?v=d46b9700:19353
+commitRoot @ chunk-PJEEZAML.js?v=d46b9700:19277
+finishConcurrentRender @ chunk-PJEEZAML.js?v=d46b9700:18760
+performConcurrentWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18718
+workLoop @ chunk-PJEEZAML.js?v=d46b9700:197
+flushWork @ chunk-PJEEZAML.js?v=d46b9700:176
+performWorkUntilDeadline @ chunk-PJEEZAML.js?v=d46b9700:384
+Show 14 more frames
+Show less
+App.jsx:544 Uncaught ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=d46b9700:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=d46b9700:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=d46b9700:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19765:15)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+AgentNode @ App.jsx:544
+renderWithHooks @ chunk-PJEEZAML.js?v=d46b9700:11548
+mountIndeterminateComponent @ chunk-PJEEZAML.js?v=d46b9700:14926
+beginWork @ chunk-PJEEZAML.js?v=d46b9700:15914
+callCallback2 @ chunk-PJEEZAML.js?v=d46b9700:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=d46b9700:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=d46b9700:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=d46b9700:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=d46b9700:19198
+workLoopSync @ chunk-PJEEZAML.js?v=d46b9700:19137
+renderRootSync @ chunk-PJEEZAML.js?v=d46b9700:19116
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18874
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+(anonymous) @ chunk-PJEEZAML.js?v=d46b9700:18627
+Show 13 more frames
+Show less
+App.jsx:544 Uncaught ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=d46b9700:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=d46b9700:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=d46b9700:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19765:15)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+AgentNode @ App.jsx:544
+renderWithHooks @ chunk-PJEEZAML.js?v=d46b9700:11548
+mountIndeterminateComponent @ chunk-PJEEZAML.js?v=d46b9700:14926
+beginWork @ chunk-PJEEZAML.js?v=d46b9700:15914
+callCallback2 @ chunk-PJEEZAML.js?v=d46b9700:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=d46b9700:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=d46b9700:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=d46b9700:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=d46b9700:19198
+workLoopSync @ chunk-PJEEZAML.js?v=d46b9700:19137
+renderRootSync @ chunk-PJEEZAML.js?v=d46b9700:19116
+recoverFromConcurrentError @ chunk-PJEEZAML.js?v=d46b9700:18736
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18879
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+(anonymous) @ chunk-PJEEZAML.js?v=d46b9700:18627
+Show 14 more frames
+Show less
+chunk-PJEEZAML.js?v=d46b9700:14032 The above error occurred in the <AgentNode> component:
+
+    at AgentNode (http://localhost:5173/src/App.jsx:583:22)
+    at div
+    at div
+    at div
+    at div
+    at ErrorBoundary (http://localhost:5173/src/App.jsx:74:5)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:945:40)
+    at PresenceChild (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:121:24)
+    at AnimatePresence (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:210:26)
+    at div
+    at main
+    at div
+    at div
+    at App (http://localhost:5173/src/App.jsx:2846:43)
+
+React will try to recreate this component tree from scratch using the error boundary you provided, ErrorBoundary.
+logCapturedError @ chunk-PJEEZAML.js?v=d46b9700:14032
+callback @ chunk-PJEEZAML.js?v=d46b9700:14078
+callCallback @ chunk-PJEEZAML.js?v=d46b9700:11248
+commitUpdateQueue @ chunk-PJEEZAML.js?v=d46b9700:11265
+commitLayoutEffectOnFiber @ chunk-PJEEZAML.js?v=d46b9700:17075
+commitLayoutMountEffects_complete @ chunk-PJEEZAML.js?v=d46b9700:17980
+commitLayoutEffects_begin @ chunk-PJEEZAML.js?v=d46b9700:17969
+commitLayoutEffects @ chunk-PJEEZAML.js?v=d46b9700:17920
+commitRootImpl @ chunk-PJEEZAML.js?v=d46b9700:19353
+commitRoot @ chunk-PJEEZAML.js?v=d46b9700:19277
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18895
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+(anonymous) @ chunk-PJEEZAML.js?v=d46b9700:18627
+Show 13 more frames
+Show less
+App.jsx:72 [SONAR] Page crashed: ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19753:22)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+    at renderRootSync (chunk-PJEEZAML.js?v=d46b9700:19116:15)
+    at recoverFromConcurrentError (chunk-PJEEZAML.js?v=d46b9700:18736:28)
+    at performSyncWorkOnRoot (chunk-PJEEZAML.js?v=d46b9700:18879:28) {componentStack: '\n    at AgentNode (http://localhost:5173/src/App.j…t App (http://localhost:5173/src/App.jsx:2846:43)'}
+componentDidCatch @ App.jsx:72
+callback @ chunk-PJEEZAML.js?v=d46b9700:14084
+callCallback @ chunk-PJEEZAML.js?v=d46b9700:11248
+commitUpdateQueue @ chunk-PJEEZAML.js?v=d46b9700:11265
+commitLayoutEffectOnFiber @ chunk-PJEEZAML.js?v=d46b9700:17075
+commitLayoutMountEffects_complete @ chunk-PJEEZAML.js?v=d46b9700:17980
+commitLayoutEffects_begin @ chunk-PJEEZAML.js?v=d46b9700:17969
+commitLayoutEffects @ chunk-PJEEZAML.js?v=d46b9700:17920
+commitRootImpl @ chunk-PJEEZAML.js?v=d46b9700:19353
+commitRoot @ chunk-PJEEZAML.js?v=d46b9700:19277
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18895
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+(anonymous) @ chunk-PJEEZAML.js?v=d46b9700:18627
+Show 12 more frames
+Show less
+App.jsx:544 Uncaught ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=d46b9700:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=d46b9700:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=d46b9700:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19765:15)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+AgentNode @ App.jsx:544
+renderWithHooks @ chunk-PJEEZAML.js?v=d46b9700:11548
+mountIndeterminateComponent @ chunk-PJEEZAML.js?v=d46b9700:14926
+beginWork @ chunk-PJEEZAML.js?v=d46b9700:15914
+callCallback2 @ chunk-PJEEZAML.js?v=d46b9700:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=d46b9700:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=d46b9700:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=d46b9700:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=d46b9700:19198
+workLoopSync @ chunk-PJEEZAML.js?v=d46b9700:19137
+renderRootSync @ chunk-PJEEZAML.js?v=d46b9700:19116
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18874
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+(anonymous) @ chunk-PJEEZAML.js?v=d46b9700:18627
+Show 13 more frames
+Show less
+App.jsx:544 Uncaught ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=d46b9700:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=d46b9700:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=d46b9700:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19765:15)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+AgentNode @ App.jsx:544
+renderWithHooks @ chunk-PJEEZAML.js?v=d46b9700:11548
+mountIndeterminateComponent @ chunk-PJEEZAML.js?v=d46b9700:14926
+beginWork @ chunk-PJEEZAML.js?v=d46b9700:15914
+callCallback2 @ chunk-PJEEZAML.js?v=d46b9700:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=d46b9700:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=d46b9700:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=d46b9700:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=d46b9700:19198
+workLoopSync @ chunk-PJEEZAML.js?v=d46b9700:19137
+renderRootSync @ chunk-PJEEZAML.js?v=d46b9700:19116
+recoverFromConcurrentError @ chunk-PJEEZAML.js?v=d46b9700:18736
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18879
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+(anonymous) @ chunk-PJEEZAML.js?v=d46b9700:18627
+Show 14 more frames
+Show less
+chunk-PJEEZAML.js?v=d46b9700:14032 The above error occurred in the <AgentNode> component:
+
+    at AgentNode (http://localhost:5173/src/App.jsx:583:22)
+    at div
+    at div
+    at div
+    at div
+    at ErrorBoundary (http://localhost:5173/src/App.jsx:74:5)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:945:40)
+    at PresenceChild (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:121:24)
+    at AnimatePresence (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:210:26)
+    at div
+    at main
+    at div
+    at div
+    at App (http://localhost:5173/src/App.jsx:2846:43)
+
+React will try to recreate this component tree from scratch using the error boundary you provided, ErrorBoundary.
+logCapturedError @ chunk-PJEEZAML.js?v=d46b9700:14032
+callback @ chunk-PJEEZAML.js?v=d46b9700:14078
+callCallback @ chunk-PJEEZAML.js?v=d46b9700:11248
+commitUpdateQueue @ chunk-PJEEZAML.js?v=d46b9700:11265
+commitLayoutEffectOnFiber @ chunk-PJEEZAML.js?v=d46b9700:17075
+commitLayoutMountEffects_complete @ chunk-PJEEZAML.js?v=d46b9700:17980
+commitLayoutEffects_begin @ chunk-PJEEZAML.js?v=d46b9700:17969
+commitLayoutEffects @ chunk-PJEEZAML.js?v=d46b9700:17920
+commitRootImpl @ chunk-PJEEZAML.js?v=d46b9700:19353
+commitRoot @ chunk-PJEEZAML.js?v=d46b9700:19277
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18895
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+(anonymous) @ chunk-PJEEZAML.js?v=d46b9700:18627
+Show 13 more frames
+Show less
+App.jsx:72 [SONAR] Page crashed: ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19753:22)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+    at renderRootSync (chunk-PJEEZAML.js?v=d46b9700:19116:15)
+    at recoverFromConcurrentError (chunk-PJEEZAML.js?v=d46b9700:18736:28)
+    at performSyncWorkOnRoot (chunk-PJEEZAML.js?v=d46b9700:18879:28) {componentStack: '\n    at AgentNode (http://localhost:5173/src/App.j…t App (http://localhost:5173/src/App.jsx:2846:43)'}
+componentDidCatch @ App.jsx:72
+callback @ chunk-PJEEZAML.js?v=d46b9700:14084
+callCallback @ chunk-PJEEZAML.js?v=d46b9700:11248
+commitUpdateQueue @ chunk-PJEEZAML.js?v=d46b9700:11265
+commitLayoutEffectOnFiber @ chunk-PJEEZAML.js?v=d46b9700:17075
+commitLayoutMountEffects_complete @ chunk-PJEEZAML.js?v=d46b9700:17980
+commitLayoutEffects_begin @ chunk-PJEEZAML.js?v=d46b9700:17969
+commitLayoutEffects @ chunk-PJEEZAML.js?v=d46b9700:17920
+commitRootImpl @ chunk-PJEEZAML.js?v=d46b9700:19353
+commitRoot @ chunk-PJEEZAML.js?v=d46b9700:19277
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18895
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+(anonymous) @ chunk-PJEEZAML.js?v=d46b9700:18627
+Show 12 more frames
+Show less
+App.jsx:544 Uncaught ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=d46b9700:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=d46b9700:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=d46b9700:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19765:15)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+AgentNode @ App.jsx:544
+renderWithHooks @ chunk-PJEEZAML.js?v=d46b9700:11548
+mountIndeterminateComponent @ chunk-PJEEZAML.js?v=d46b9700:14926
+beginWork @ chunk-PJEEZAML.js?v=d46b9700:15914
+callCallback2 @ chunk-PJEEZAML.js?v=d46b9700:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=d46b9700:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=d46b9700:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=d46b9700:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=d46b9700:19198
+workLoopSync @ chunk-PJEEZAML.js?v=d46b9700:19137
+renderRootSync @ chunk-PJEEZAML.js?v=d46b9700:19116
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18874
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+flushSync @ chunk-PJEEZAML.js?v=d46b9700:18959
+scheduleRefresh @ chunk-PJEEZAML.js?v=d46b9700:20004
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ App.jsx:2189
+(anonymous) @ client:34
+(anonymous) @ client:218
+(anonymous) @ client:193
+queueUpdate @ client:193
+await in queueUpdate
+(anonymous) @ client:642
+handleMessage @ client:640
+(anonymous) @ client:550
+Show 14 more frames
+Show less
+App.jsx:544 Uncaught ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-PJEEZAML.js?v=d46b9700:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-PJEEZAML.js?v=d46b9700:3699:24)
+    at invokeGuardedCallback (chunk-PJEEZAML.js?v=d46b9700:3733:39)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19765:15)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+AgentNode @ App.jsx:544
+renderWithHooks @ chunk-PJEEZAML.js?v=d46b9700:11548
+mountIndeterminateComponent @ chunk-PJEEZAML.js?v=d46b9700:14926
+beginWork @ chunk-PJEEZAML.js?v=d46b9700:15914
+callCallback2 @ chunk-PJEEZAML.js?v=d46b9700:3674
+invokeGuardedCallbackDev @ chunk-PJEEZAML.js?v=d46b9700:3699
+invokeGuardedCallback @ chunk-PJEEZAML.js?v=d46b9700:3733
+beginWork$1 @ chunk-PJEEZAML.js?v=d46b9700:19765
+performUnitOfWork @ chunk-PJEEZAML.js?v=d46b9700:19198
+workLoopSync @ chunk-PJEEZAML.js?v=d46b9700:19137
+renderRootSync @ chunk-PJEEZAML.js?v=d46b9700:19116
+recoverFromConcurrentError @ chunk-PJEEZAML.js?v=d46b9700:18736
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18879
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+flushSync @ chunk-PJEEZAML.js?v=d46b9700:18959
+scheduleRefresh @ chunk-PJEEZAML.js?v=d46b9700:20004
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ App.jsx:2189
+(anonymous) @ client:34
+(anonymous) @ client:218
+(anonymous) @ client:193
+queueUpdate @ client:193
+await in queueUpdate
+(anonymous) @ client:642
+handleMessage @ client:640
+(anonymous) @ client:550
+Show 15 more frames
+Show less
+@react-refresh:228 The above error occurred in the <AgentNode> component:
+
+    at AgentNode (http://localhost:5173/src/App.jsx?t=1776217243319:583:22)
+    at div
+    at div
+    at div
+    at div
+    at ErrorBoundary (http://localhost:5173/src/App.jsx?t=1776217243319:74:5)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:945:40)
+    at PresenceChild (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:121:24)
+    at AnimatePresence (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=d46b9700:210:26)
+    at div
+    at main
+    at div
+    at div
+    at App (http://localhost:5173/src/App.jsx?t=1776217243319:2846:43)
+
+React will try to recreate this component tree from scratch using the error boundary you provided, ErrorBoundary.
+logCapturedError @ chunk-PJEEZAML.js?v=d46b9700:14032
+callback @ chunk-PJEEZAML.js?v=d46b9700:14078
+callCallback @ chunk-PJEEZAML.js?v=d46b9700:11248
+commitUpdateQueue @ chunk-PJEEZAML.js?v=d46b9700:11265
+commitLayoutEffectOnFiber @ chunk-PJEEZAML.js?v=d46b9700:17075
+commitLayoutMountEffects_complete @ chunk-PJEEZAML.js?v=d46b9700:17980
+commitLayoutEffects_begin @ chunk-PJEEZAML.js?v=d46b9700:17969
+commitLayoutEffects @ chunk-PJEEZAML.js?v=d46b9700:17920
+commitRootImpl @ chunk-PJEEZAML.js?v=d46b9700:19353
+commitRoot @ chunk-PJEEZAML.js?v=d46b9700:19277
+performSyncWorkOnRoot @ chunk-PJEEZAML.js?v=d46b9700:18895
+flushSyncCallbacks @ chunk-PJEEZAML.js?v=d46b9700:9119
+flushSync @ chunk-PJEEZAML.js?v=d46b9700:18959
+scheduleRefresh @ chunk-PJEEZAML.js?v=d46b9700:20004
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ App.jsx:2189
+(anonymous) @ client:34
+(anonymous) @ client:218
+(anonymous) @ client:193
+queueUpdate @ client:193
+await in queueUpdate
+(anonymous) @ client:642
+handleMessage @ client:640
+(anonymous) @ client:550
+Show 14 more frames
+Show less
+App.jsx:72 [SONAR] Page crashed: ReferenceError: Phone is not defined
+    at AgentNode (App.jsx:544:16)
+    at renderWithHooks (chunk-PJEEZAML.js?v=d46b9700:11548:26)
+    at mountIndeterminateComponent (chunk-PJEEZAML.js?v=d46b9700:14926:21)
+    at beginWork (chunk-PJEEZAML.js?v=d46b9700:15914:22)
+    at beginWork$1 (chunk-PJEEZAML.js?v=d46b9700:19753:22)
+    at performUnitOfWork (chunk-PJEEZAML.js?v=d46b9700:19198:20)
+    at workLoopSync (chunk-PJEEZAML.js?v=d46b9700:19137:13)
+    at renderRootSync (chunk-PJEEZAML.js?v=d46b9700:19116:15)
+    at recoverFromConcurrentError (chunk-PJEEZAML.js?v=d46b9700:18736:28)
+    at performSyncWorkOnRoot (chunk-PJEEZAML.js?v=d46b9700:18879:28) {componentStack: '\n    at AgentNode (http://localhost:5173/src/App.j…calhost:5173/src/App.jsx?t=1776217243319:2846:43)'}

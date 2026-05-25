@@ -1,0 +1,5 @@
+.env
+memory/
+node_modules/
+*.log
+agents/

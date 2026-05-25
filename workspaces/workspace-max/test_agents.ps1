@@ -1,0 +1,1 @@
+Invoke-WebRequest -Uri "http://127.0.0.1:7878/api/agents" -Method Get -UseBasicParsing | Select-Object -ExpandProperty Content

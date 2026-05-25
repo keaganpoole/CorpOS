@@ -1,0 +1,170 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Send, User, Bot, ShieldCheck } from 'lucide-react';
+
+const MOCK_CONVERSATION = [
+  { id: 1, sender: 'bot', text: "Welcome to the secure channel. All messages here use the refined Masked Reveal protocol.", time: "10:02 AM" },
+  { id: 2, sender: 'user', text: "It looks incredibly smooth. How does the staggered avatar effect work?", time: "10:03 AM" },
+  { id: 3, sender: 'bot', text: "The bubble initiates the clip-path expansion first. Then, the avatar follows with a vertical translation and a slight scale-up.", time: "10:03 AM" },
+  { id: 4, sender: 'user', text: "The 'going up' motion adds a lot of weight and intentionality to the UI.", time: "10:04 AM" },
+  { id: 5, sender: 'bot', text: "Exactly. It creates a secondary motion path that makes the interface feel alive without being distracting.", time: "10:04 AM" },
+];
+
+const App = () => {
+  const [visibleMessages, setVisibleMessages] = useState([]);
+
+  const startSequence = useCallback(() => {
+    setVisibleMessages([]);
+    MOCK_CONVERSATION.forEach((msg, index) => {
+      setTimeout(() => {
+        setVisibleMessages(prev => [...prev, msg]);
+      }, index * 900); 
+    });
+  }, []);
+
+  useEffect(() => {
+    startSequence();
+  }, [startSequence]);
+
+  return (
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4 md:p-8 font-sans selection:bg-indigo-500/30">
+      <style>{`
+        /* 1. The Bubble Reveal (Horizontal Clip + Fade) */
+        @keyframes revealIn {
+          from { 
+            opacity: 0; 
+            clip-path: inset(0 100% 0 0); 
+            transform: translateX(-10px);
+          }
+          to { 
+            opacity: 1; 
+            clip-path: inset(0 0 0 0); 
+            transform: translateX(0);
+          }
+        }
+
+        /* 2. The Avatar Upward Float (Vertical + Scale) */
+        @keyframes avatarUp {
+          from { 
+            opacity: 0; 
+            transform: translateY(12px) scale(0.85); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0) scale(1); 
+          }
+        }
+
+        .animate-reveal { 
+          animation: revealIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+        }
+
+        .animate-avatar { 
+          animation: avatarUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; 
+        }
+
+        .glass-panel {
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(24px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+      `}</style>
+
+      <div className="max-w-2xl w-full h-[780px] glass-panel rounded-[3rem] overflow-hidden flex flex-col relative border border-white/5">
+        {/* Header */}
+        <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.01]">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <div className="font-semibold text-lg tracking-tight">System Core</div>
+              <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-bold uppercase tracking-[0.2em]">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                Live Transmission
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Messages Container */}
+        <div className="flex-1 overflow-y-auto p-8 space-y-10 flex flex-col no-scrollbar">
+          {visibleMessages.map((msg) => (
+            <div 
+              key={msg.id}
+              className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`flex gap-4 max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                
+                {/* Avatar: Animates slightly after and goes UP */}
+                <div className="flex-shrink-0 mt-1 opacity-0 animate-avatar [animation-delay:350ms]">
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border transition-colors duration-500 ${
+                    msg.sender === 'bot' 
+                      ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 shadow-lg shadow-indigo-500/5' 
+                      : 'bg-white/5 border-white/10 text-neutral-400'
+                  }`}>
+                    {msg.sender === 'bot' ? <Bot size={20} /> : <User size={20} />}
+                  </div>
+                </div>
+
+                {/* Message Bubble: Initiates reveal immediately */}
+                <div className="flex flex-col">
+                  <div 
+                    className={`
+                      p-5 px-6 rounded-[1.5rem] text-[15px] leading-relaxed opacity-0 animate-reveal
+                      ${msg.sender === 'user' 
+                        ? 'bg-white text-black font-medium rounded-tr-none' 
+                        : 'bg-white/[0.04] text-neutral-200 border border-white/5 rounded-tl-none'
+                      }
+                    `}
+                  >
+                    {msg.text}
+                  </div>
+                  <span className={`text-[10px] text-neutral-600 mt-2 font-bold uppercase tracking-widest ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
+                    {msg.time}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {/* Incoming Signal */}
+          {visibleMessages.length < MOCK_CONVERSATION.length && (
+            <div className="flex gap-2 items-center px-2 opacity-20">
+              <div className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <div className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <div className="w-1 h-1 bg-white rounded-full animate-bounce" />
+            </div>
+          )}
+        </div>
+
+        {/* Input Footer */}
+        <div className="p-8 bg-neutral-900/40 border-t border-white/5">
+          <div className="relative">
+            <input 
+              type="text" 
+              placeholder="Encrypted input disabled..." 
+              className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-6 pr-14 text-sm focus:outline-none placeholder:text-neutral-700 cursor-not-allowed"
+              readOnly
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 bg-indigo-600/50 text-white/50 rounded-xl">
+              <Send size={18} />
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Replay Control */}
+      <button 
+        onClick={startSequence}
+        className="fixed bottom-10 right-10 w-14 h-14 glass-panel rounded-2xl flex items-center justify-center text-neutral-500 hover:text-white hover:border-indigo-500/50 transition-all duration-300 group"
+      >
+        <Bot size={22} className="group-hover:scale-110 transition-transform" />
+      </button>
+    </div>
+  );
+};
+
+export default App;

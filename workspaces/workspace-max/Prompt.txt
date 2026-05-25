@@ -1,0 +1,171 @@
+import React, { useState } from 'react';
+import { RefreshCw, Zap, Database, Layers, Workflow, Cpu } from 'lucide-react';
+
+const Node = ({ icon: Icon, gradient, shadowColor, title, description, delay }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <div 
+      className="flex flex-col items-center group transition-all duration-700 ease-out"
+      style={{ 
+        animation: `fadeInUp 0.8s ease-out ${delay}s both`,
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* The Main Node Body */}
+      <div className="relative w-32 h-32 md:w-44 md:h-44 flex items-center justify-center cursor-pointer">
+        
+        {/* Outer Ring / Aura - Reduced intensity and scale */}
+        <div 
+          className={`absolute inset-0 rounded-full transition-all duration-1000 blur-2xl opacity-5 group-hover:opacity-20 group-hover:scale-90 ${gradient}`}
+        />
+
+        {/* The Outer Boundary Stroke - Concentric design */}
+        <div className="absolute inset-0 rounded-full border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-inner" />
+
+        {/* The Primary Gradient Sphere */}
+        <div 
+          className={`absolute inset-3 rounded-full shadow-2xl transition-all duration-500 overflow-hidden ${gradient} ${isHovered ? 'scale-105' : 'scale-100'}`}
+          style={{
+            boxShadow: isHovered 
+              ? `0 20px 40px -10px ${shadowColor}66, inset 0 4px 20px rgba(255,255,255,0.25)` 
+              : `0 15px 35px -5px ${shadowColor}44, inset 0 2px 12px rgba(255,255,255,0.15)`
+          }}
+        >
+          {/* Internal Specular Highlight (The "Glass" Look) */}
+          <div className="absolute top-[-30%] left-[-20%] w-[140%] h-[140%] bg-gradient-to-br from-white/40 via-transparent to-transparent pointer-events-none" />
+          
+          {/* Subtle Internal Pattern */}
+          <div className="absolute inset-0 opacity-20 mix-blend-overlay">
+            <svg width="100%" height="100%">
+              <pattern id="grid" width="12" height="12" patternUnits="userSpaceOnUse">
+                <circle cx="1" cy="1" r="0.6" fill="white" />
+              </pattern>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
+          </div>
+
+          {/* Deep Core Shadow for dimension */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,rgba(0,0,0,0.4)_100%)]" />
+        </div>
+
+        {/* Icon Container with Glassmorphism */}
+        <div className="relative z-10 flex items-center justify-center w-16 h-16 md:w-24 md:h-24 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 shadow-2xl group-hover:rotate-[360deg] transition-transform duration-1000 ease-in-out">
+          <Icon 
+            size={40} 
+            className="text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]" 
+            strokeWidth={1.5}
+          />
+        </div>
+
+        {/* Pulse Effect for Activity */}
+        <div className="absolute -bottom-1 right-10 md:right-12 w-5 h-5 bg-emerald-400 rounded-full border-4 border-[#0a0a0c] shadow-[0_0_15px_rgba(52,211,153,0.6)] animate-pulse z-20" />
+      </div>
+
+      {/* Typography Section */}
+      <div className="mt-8 text-center max-w-[220px]">
+        <h3 className="text-xl md:text-2xl font-bold tracking-tight text-white transition-colors duration-300">
+          {title}
+        </h3>
+        <p className="mt-2 text-sm font-medium text-slate-400 leading-relaxed opacity-80 group-hover:opacity-100 transition-opacity">
+          {description}
+        </p>
+      </div>
+
+      {/* Connecting Line Indicator */}
+      <div className="mt-6 w-px h-16 bg-gradient-to-b from-white/20 to-transparent opacity-30 group-hover:h-20 transition-all duration-500" />
+    </div>
+  );
+};
+
+export default function App() {
+  const nodes = [
+    {
+      title: "Record Updated",
+      description: "Trigger flows when records change in real-time.",
+      icon: RefreshCw,
+      gradient: "bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500",
+      shadowColor: "#8b5cf6",
+    },
+    {
+      title: "Trigger Event",
+      description: "Configure custom event-based automation hooks.",
+      icon: Zap,
+      gradient: "bg-gradient-to-tr from-orange-600 via-amber-500 to-yellow-400",
+      shadowColor: "#f59e0b",
+    },
+    {
+      title: "Data Sync",
+      description: "Seamlessly unify data across diverse platforms.",
+      icon: Database,
+      gradient: "bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-500",
+      shadowColor: "#10b981",
+    },
+    {
+      title: "Logic Flow",
+      description: "Implement complex branching and conditional logic.",
+      icon: Layers,
+      gradient: "bg-gradient-to-tr from-blue-700 via-blue-500 to-indigo-500",
+      shadowColor: "#3b82f6",
+    },
+    {
+      title: "Process Hub",
+      description: "Centralize your operational workflow management.",
+      icon: Workflow,
+      gradient: "bg-gradient-to-tr from-rose-600 via-red-500 to-orange-500",
+      shadowColor: "#e11d48",
+    },
+    {
+      title: "AI Analysis",
+      description: "Enhance decision making with neural processing.",
+      icon: Cpu,
+      gradient: "bg-gradient-to-tr from-slate-700 via-slate-800 to-black",
+      shadowColor: "#64748b",
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0c] py-24 px-12 overflow-x-hidden">
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(40px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        body {
+          background-color: #0a0a0c;
+        }
+      `}</style>
+      
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-24 text-center">
+          <div className="inline-block px-4 py-1.5 mb-6 text-xs font-semibold tracking-widest text-indigo-400 uppercase bg-indigo-400/10 border border-indigo-400/20 rounded-full">
+            Elite Workflow UI
+          </div>
+          <h1 className="text-5xl font-black text-white sm:text-6xl tracking-tight">
+            The <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">Next-Gen</span> Core
+          </h1>
+          <p className="mt-6 text-xl text-slate-400 font-medium max-w-2xl mx-auto leading-relaxed">
+            Sophisticated node architecture designed for premium automation platforms.
+          </p>
+        </header>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-24 gap-x-12 items-start justify-items-center">
+          {nodes.map((node, index) => (
+            <Node 
+              key={index} 
+              {...node} 
+              delay={index * 0.12}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

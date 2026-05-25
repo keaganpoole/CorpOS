@@ -1,0 +1,16 @@
+/* src/dashboard-v2/dashboard.css */
+body {
+    background-color: #121212;
+    color: white;
+    overflow: hidden;
+}
+
+.dashboard-layout {
+    display: flex;
+    height: 100vh;
+}
+
+.canvas {
+    flex-grow: 1;
+    position: relative;
+}

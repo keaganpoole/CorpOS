@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+stripe
+supabase
+python-dotenv
+python-jose[cryptography]
+apscheduler
+pydantic[email]
+openai
+requests

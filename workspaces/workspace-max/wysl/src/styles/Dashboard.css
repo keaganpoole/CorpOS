@@ -1,0 +1,87 @@
+/* src/styles/Dashboard.css */
+
+.dashboard-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: #121212; /* Solid black background for the dashboard */
+  color: #e5e7eb;
+}
+
+.dashboard-main-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  transition: margin-left 0.3s ease;
+}
+
+.dashboard-main-content.expanded {
+  margin-left: 220px; /* Same as expanded NavPanel width */
+}
+
+/* Removed desktop-bg as dashboard-layout now has solid background */
+
+.dashboard-view-content {
+  flex-grow: 1;
+  height: 100%;
+  position: relative;
+  display: flex;
+  overflow-y: auto; /* Allow content to scroll */
+}
+
+.mobile-nav-menu {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0; /* Slightly less padding for a thinner look */
+  background-color: transparent; /* Ensure menu background is transparent */
+  position: relative; /* Changed from fixed */
+  margin-top: 20px; /* Position it lower */
+  z-index: 50; /* Ensure it's above other content */
+}
+
+.button-container {
+  display: flex;
+  background-color: #ffffff; /* White background */
+  width: 280px; /* Slightly wider for 4 icons */
+  height: 48px; /* Taller for better tap target */
+  align-items: center;
+  justify-content: space-around;
+  border-radius: 12px; /* Slightly more rounded */
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 8px 24px; /* Softer shadow */
+  border: 1px solid rgba(0, 0, 0, 0.05); /* Subtle border */
+}
+
+.button {
+  outline: 0 !important;
+  border: 0 !important;
+  width: 44px; /* Slightly larger tap area */
+  height: 44px; /* Slightly larger tap area */
+  border-radius: 50%;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #121212; /* Black icons by default */
+  transition: all ease-in-out 0.3s;
+  cursor: pointer;
+  position: relative; /* For gradient overlay */
+}
+
+.button:hover {
+  transform: translateY(-2px); /* Subtle hover effect */
+}
+
+.button.active .icon {
+  /* New approach for gradient fill on FontAwesome SVG icons */
+  background-color: #7b8afe; /* Fallback solid color */
+  mask-image: linear-gradient(to right, #7b8afe, #534eef); /* Gradient mask */
+  -webkit-mask-image: linear-gradient(to right, var(--color1), var(--color2));
+  color: transparent; /* Hide original icon color */
+}
+
+.icon {
+  font-size: 18px; /* Smaller, more modern icon size */
+  transition: transform 0.3s ease, color 0.3s ease; /* Smooth transitions */
+}
