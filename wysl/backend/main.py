@@ -90,7 +90,6 @@ from models import (
     AdminSetting, RepLoginRequest, MoneyTablePlan, MoneyTableRep, RepResponse, RepUpdate,
     PasswordCreate, PasswordUpdate, PasswordResponse, PrizeCreate, PrizeUpdate, PrizeResponse, TierResponse, HelpdeskMessage, OAuthAccountCreate, OAuthAccountResponse
 )
-from phone_helper import router as phone_helper_router
 from dependencies import get_current_user, get_current_rep
 from scenario_engine import ScenarioEngine
 
@@ -100,8 +99,6 @@ from scenario_engine import ScenarioEngine
 app = FastAPI(title="WYSL API")
 # scheduler = AsyncIOScheduler()
 PAYMENT_TEST_MODE = TEST_MODE
-
-app.include_router(phone_helper_router, prefix="/api", tags=["Phone Helper"])
 
 CONTROL_STATE = {
     "runtime_mode": "running",
