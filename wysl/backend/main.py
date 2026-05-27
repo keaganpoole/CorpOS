@@ -2573,6 +2573,47 @@ def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id
         logging.warning("Failed to match hired receptionist for call log: %s", exc)
     return None
 
+
+def extract_agent_data_updates(payload: Optional[dict]) -> dict:
+    payload = payload if isinstance(payload, dict) else {}
+    dynamic_variables = payload.get("dynamic_variables") if isinstance(payload.get("dynamic_variables"), dict) else {}
+    agent_data = payload.get("agent_data") if isinstance(payload.get("agent_data"), dict) else {}
+    updates = {**dynamic_variables, **agent_data, **payload}
+    return updates
+
+
+def build_agent_update_map(key: Optional[str], value):
+    normalized_key = str(key or "").strip()
+    if not normalized_key:
+        return {}
+
+    updates = {normalized_key: value}
+    cursor = nested_root = {}
+    parts = [part.strip() for part in normalized_key.split(".") if part.strip()]
+    if not parts:
+        return updates
+
+    for part in parts[:-1]:
+        next_cursor = cursor.get(part)
+        if not isinstance(next_cursor, dict):
+            next_cursor = {}
+            cursor[part] = next_cursor
+        cursor = next_cursor
+    cursor[parts[-1]] = value
+
+    updates.update(nested_root)
+    return updates
+
+
+def deep_merge_dicts(base: Optional[dict], updates: Optional[dict]) -> dict:
+    merged = dict(base or {})
+    for key, value in (updates or {}).items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge_dicts(merged.get(key), value)
+        else:
+            merged[key] = value
+    return merged
+
 def extract_call_log_from_elevenlabs_payload(payload: dict):
     webhook_type, event_timestamp, data = get_elevenlabs_event_data(payload)
     metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
@@ -2868,20 +2909,60 @@ async def trigger_specific_scenario(scenario_id: str, payload: dict):
 async def resume_scenario_execution(payload: dict):
     if not scenario_engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
-    execution_id = payload.get("execution_id")
+    execution_id = first_present(payload, "execution_id", "flow_execution_id", "id")
     if not execution_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="execution_id required")
-    resume_payload = {
-        "agent": payload.get("agent_data") or payload.get("agent") or {},
-        "call": {
-            "call_sid": payload.get("call_sid"),
-            "call_outcome": payload.get("call_outcome"),
-        },
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="execution_id or flow_execution_id required")
+    agent_payload = payload.get("agent_data") or payload.get("agent") or {}
+    call_payload = {
+        "call_sid": payload.get("call_sid"),
+        "call_outcome": payload.get("call_outcome"),
     }
-    result = await scenario_engine.resume_execution(execution_id, resume_payload)
+    existing_execution = await scenario_engine.get_execution(str(execution_id))
+    if not existing_execution:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Execution {execution_id} not found")
+
+    current_context = existing_execution.get("flow_context")
+    if isinstance(current_context, str):
+        try:
+            current_context = json.loads(current_context)
+        except Exception:
+            current_context = {}
+    current_context = current_context if isinstance(current_context, dict) else {}
+    if isinstance(agent_payload, dict):
+        current_context["agent"] = deep_merge_dicts(current_context.get("agent"), agent_payload)
+    current_context.update({k: v for k, v in call_payload.items() if v is not None})
+    supabase.table("flow_executions").update({
+        "flow_context": current_context,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", str(execution_id)).execute()
+
+    execution_status = str(existing_execution.get("status") or "").lower()
+    if execution_status != "paused":
+        return {
+            "ok": True,
+            "mode": "execution_context_update",
+            "execution_id": str(execution_id),
+            "status": execution_status or None,
+        }
+
+    resume_payload = {
+        "agent": current_context.get("agent") or {},
+        "call": call_payload,
+    }
+    result = await scenario_engine.resume_execution(str(execution_id), resume_payload)
     if result.get("success"):
         return {"ok": True, **result}
-    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result.get("error") or "Resume failed")
+    detail = result.get("error") or "Resume failed"
+    if "not found" in str(detail).lower():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+    if "not paused" in str(detail).lower():
+        return {
+            "ok": True,
+            "mode": "execution_context_update",
+            "execution_id": str(execution_id),
+            "status": execution_status or None,
+        }
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail)
 
 @app.get("/api/scenarios/executions", tags=["Scenarios"])
 async def list_scenario_executions(limit: int = 20):
@@ -3026,6 +3107,146 @@ async def route_call_compat(request: Request):
 @app.post("/api/tools/report-intent-checkpoint", tags=["Server Tools"])
 async def report_intent_checkpoint(request: IntentCheckpointRequest):
     return emit_intent_checkpoint(request)
+
+
+@app.post("/api/tools/set-agent-data", tags=["Server Tools"])
+async def set_agent_data(request: Request):
+    payload = await parse_request_payload(request)
+    updates_payload = extract_agent_data_updates(payload)
+    flow_execution_id = first_present(
+        updates_payload,
+        "flow_execution_id",
+        "metadata.flow_execution_id",
+        "dynamic_variables.flow_execution_id",
+        "conversation_initiation_client_data.dynamic_variables.flow_execution_id",
+    )
+    update_key = first_present(updates_payload, "key", "name", "variable", "field")
+    update_value = deep_get(updates_payload, "value")
+
+    if flow_execution_id and update_key is not None:
+        agent_updates = build_agent_update_map(update_key, update_value)
+        execution_rows = (
+            supabase.table("flow_executions")
+            .select("id,status,flow_context")
+            .eq("id", str(flow_execution_id))
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        if not execution_rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Execution {flow_execution_id} not found",
+            )
+
+        execution = execution_rows[0]
+        flow_context = execution.get("flow_context")
+        if isinstance(flow_context, str):
+            try:
+                flow_context = json.loads(flow_context)
+            except Exception:
+                flow_context = {}
+        flow_context = flow_context if isinstance(flow_context, dict) else {}
+        merged_agent = deep_merge_dicts(flow_context.get("agent"), agent_updates)
+        flow_context["agent"] = merged_agent
+
+        supabase.table("flow_executions").update({
+            "flow_context": flow_context,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", str(flow_execution_id)).execute()
+
+        if str(execution.get("status") or "").lower() == "paused":
+            if not scenario_engine:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Scenario engine unavailable",
+                )
+            result = await scenario_engine.resume_execution(
+                str(flow_execution_id),
+                {
+                    "agent": merged_agent,
+                },
+            )
+            if not result.get("success"):
+                detail = result.get("error") or "Failed to resume scenario execution"
+                status_code = status.HTTP_404_NOT_FOUND if "not found" in str(detail).lower() else status.HTTP_409_CONFLICT
+                raise HTTPException(status_code=status_code, detail=detail)
+
+        return {
+            "ok": True,
+            "mode": "scenario_resume" if str(execution.get("status") or "").lower() == "paused" else "execution_context_update",
+            "flow_execution_id": str(flow_execution_id),
+            "key": str(update_key),
+            "value": update_value,
+        }
+
+    conversation_id = first_present(
+        updates_payload,
+        "conversation_id",
+        "system__conversation_id",
+        "system_conversation_id",
+    )
+    if not conversation_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either conversation_id or flow_execution_id with key and value is required",
+        )
+
+    receptionist_id = first_present(
+        updates_payload,
+        "hired_receptionist_id",
+        "receptionist_id",
+        "agent_id",
+    )
+    receptionist = load_receptionist_by_id(receptionist_id) if receptionist_id else None
+    if not receptionist:
+        receptionist = lookup_hired_receptionist(
+            hired_receptionist_id=first_present(updates_payload, "hired_receptionist_id", "receptionist_id"),
+            elevenlabs_agent_id=first_present(updates_payload, "elevenlabs_agent_id", "agent_id"),
+        )
+    user_id = first_present(updates_payload, "user_id") or (receptionist or {}).get("user_id")
+    business_id = first_present(updates_payload, "business_id") or (receptionist or {}).get("business_id")
+    receptionist_name = first_present(
+        updates_payload,
+        "receptionist_name",
+        "agent_name",
+        "receptionist",
+    ) or (receptionist or {}).get("full_name")
+    person_id = first_present(updates_payload, "person_id", "record_id", "customer_id")
+
+    update_fields = {
+        "conversation_id": str(conversation_id),
+        "hired_receptionist_id": int_or_none((receptionist or {}).get("id") or receptionist_id),
+        "receptionist_name": str(receptionist_name) if receptionist_name else None,
+        "user_id": str(user_id) if user_id else None,
+        "business_id": int_or_none(business_id),
+        "person_id": int_or_none(person_id),
+        "raw_payload": payload,
+    }
+    update_fields = {key: value for key, value in update_fields.items() if value is not None}
+
+    existing = (
+        supabase.table("call_logs")
+        .select("id,raw_payload")
+        .eq("conversation_id", str(conversation_id))
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+
+    if existing:
+        merged_payload = existing[0].get("raw_payload") if isinstance(existing[0].get("raw_payload"), dict) else {}
+        merged_payload = {**merged_payload, "agent_data": updates_payload}
+        update_fields["raw_payload"] = merged_payload
+        response = supabase.table("call_logs").update(update_fields).eq("id", existing[0]["id"]).execute()
+        saved = response.data[0] if getattr(response, "data", None) else update_fields
+    else:
+        response = supabase.table("call_logs").insert(update_fields).execute()
+        saved = response.data[0] if getattr(response, "data", None) else update_fields
+
+    return {"ok": True, "call_log": saved}
 
 @app.api_route("/api/tools/{tool_name}", methods=["GET", "POST"], tags=["Server Tools"])
 async def legacy_server_tool(tool_name: str, request: Request):

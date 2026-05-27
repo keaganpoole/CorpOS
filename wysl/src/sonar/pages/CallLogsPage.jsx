@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import {
   AlertCircle,
   AudioLines,
+  ArrowDownLeft,
+  ArrowUpRight,
   Check,
   CheckCircle2,
   Clock,
@@ -120,6 +122,23 @@ function sentimentFromCall(call) {
   return 'Neutral';
 }
 
+function directionFromCall(call) {
+  const agentName = normalized(call.agent_name || call.raw?.agent_name);
+  if (agentName.includes('outbound')) return 'outbound';
+  if (agentName.includes('inbound')) return 'inbound';
+
+  const raw = normalized(
+    call.direction
+    || call.raw?.direction
+    || call.raw?.conversation_metadata?.phone_call?.direction
+    || call.raw?.conversation_initiation_data?.dynamic_variables?.direction
+    || call.raw?.conversation_initiation_data?.dynamic_variables?.call_direction
+  );
+  if (raw.includes('out')) return 'outbound';
+  if (raw.includes('in')) return 'inbound';
+  return 'unknown';
+}
+
 function transcriptOffset(seconds) {
   if (seconds === null || seconds === undefined || seconds === '') return '';
   const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -161,7 +180,6 @@ function normalizeTranscript(turns, fallbackText) {
 }
 
 function normalizeCall(row) {
-  const status = titleize(row.status || row.call_successful || 'Unknown', 'Unknown');
   const purpose = titleize(row.outcome || row.call_successful || 'General');
   const receptionistName = row.receptionist_name || row.agent_name || 'Receptionist';
   const avatarName = normalized(receptionistName);
@@ -171,8 +189,9 @@ function normalizeCall(row) {
     phone: row.caller_phone || row.from_number || 'Unknown number',
     summary: row.summary || row.notes || 'No summary captured yet.',
     purpose,
-    status,
+    status: titleize(row.status || row.call_successful || 'Unknown', 'Unknown'),
     sentiment: sentimentFromCall(row),
+    direction: directionFromCall(row),
     duration: row.duration_seconds || 0,
     time: row.started_at || row.event_timestamp || row.created_at,
     receptionist: receptionistName,
@@ -212,13 +231,32 @@ function SentimentIcon({ sentiment, compact = false }) {
   );
 }
 
-function StatusBadge({ status }) {
-  const config = STATUS_STYLES[normalized(status)] || STATUS_STYLES.completed;
-  const Icon = config.icon;
+function DirectionIcon({ direction, compact = false, withLabel = false }) {
+  const normalizedDirection = normalized(direction);
+  const isOutbound = normalizedDirection === 'outbound';
+  const isInbound = normalizedDirection === 'inbound';
+  const Icon = isOutbound ? ArrowUpRight : ArrowDownLeft;
+  const label = isOutbound ? 'Outbound' : isInbound ? 'Inbound' : 'Unknown';
+  const className = isOutbound
+    ? 'text-cyan-200'
+    : isInbound
+      ? 'text-zinc-200'
+      : 'text-zinc-400';
+
+  if (!withLabel) {
+    return (
+      <span className={cn('inline-flex items-center justify-center shrink-0 align-middle', className)}>
+        <Icon size={compact ? 15 : 18} />
+      </span>
+    );
+  }
+
   return (
-    <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold', config.className)}>
-      <Icon size={11} />
-      {status}
+    <span className="inline-flex items-center gap-2 align-middle">
+      <span className={cn('inline-flex items-center justify-center shrink-0', className)}>
+        <Icon size={15} />
+      </span>
+      <span className="text-[12px] font-medium text-zinc-400">{label}</span>
     </span>
   );
 }
@@ -325,7 +363,7 @@ function CallCard({ call, selected, checked, onClick, onToggleSelect, onDelete }
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="truncate text-[15px] font-bold text-white">{call.name}</h3>
-            <StatusBadge status={call.status} />
+            <DirectionIcon direction={call.direction} compact />
           </div>
           <div className="mt-1 flex items-center gap-1.5 text-[12px] text-zinc-500">
             <Phone size={12} />
@@ -554,7 +592,6 @@ export default function CallLogsPage() {
         if (!cancelled) loadCallLogs();
       }, 350);
     };
-
     loadCallLogs({ initial: true });
     const channel = supabase
       .channel('call-logs-page-realtime')
@@ -716,7 +753,13 @@ export default function CallLogsPage() {
                   call={call}
                   selected={selectedCall?.id === call.id}
                   checked={selectedForDelete.includes(call.id)}
-                  onClick={() => setSelectedId(call.id)}
+                  onClick={() => {
+                    if (selectedForDelete.length > 0) {
+                      toggleSelectCall(call.id);
+                      return;
+                    }
+                    setSelectedId(call.id);
+                  }}
                   onToggleSelect={toggleSelectCall}
                   onDelete={(callId) => openDeleteModal([callId])}
                 />
@@ -735,31 +778,40 @@ export default function CallLogsPage() {
           {selectedCall ? (
             <>
           <div className="shrink-0 p-5 sm:p-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-[24px] font-black leading-none text-white">{selectedCall.name}</h3>
-                  <StatusBadge status={selectedCall.status} />
-                  <span className="rounded-full bg-white/[0.045] px-2 py-1 text-[11px] text-zinc-300">{selectedCall.purpose}</span>
-                  <SentimentIcon sentiment={selectedCall.sentiment} compact />
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-[24px] font-black leading-none text-white">{selectedCall.name}</h3>
+                    <DirectionIcon direction={selectedCall.direction} withLabel />
+                    <span className="inline-flex items-center gap-1.5">
+                      <SentimentIcon sentiment={selectedCall.sentiment} compact />
+                      <span className="rounded-full bg-white/[0.045] px-2 py-1 text-[11px] text-zinc-300">{selectedCall.purpose}</span>
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[12px] text-zinc-500">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Phone size={13} />
+                      {selectedCall.phone}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock size={13} />
+                      {formatCallTime(selectedCall.time)}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Timer size={13} />
+                      {formatDuration(selectedCall.duration)}
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-[12px] text-zinc-500">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Phone size={13} />
-                    {selectedCall.phone}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock size={13} />
-                    {formatCallTime(selectedCall.time)}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Timer size={13} />
-                    {formatDuration(selectedCall.duration)}
-                  </span>
+                <div className="w-full lg:w-[340px]">
+                  <AudioStrip call={selectedCall} />
                 </div>
               </div>
-              <div className="w-full lg:w-[340px]">
-                <AudioStrip call={selectedCall} />
+              <div className="w-full">
+                <p className="w-full text-[13px] leading-6 text-zinc-400">
+                  {selectedCall.summary}
+                </p>
               </div>
             </div>
           </div>
