@@ -236,8 +236,8 @@ const LeadDetailPanel = ({ lead, onSave, onDelete, onClose, isNew = false }) => 
             <div className="flex items-baseline gap-2"><span className="text-2xl font-mono font-bold text-white tabular-nums">{currentLead.missed_call_count ?? '—'}</span></div>
           </div>
           <div className="bg-white/[0.03] border border-white/[0.05] p-4 rounded-2xl">
-            <div className="text-[8px] text-zinc-600 uppercase font-black tracking-widest mb-2">Last Outcome</div>
-            <div className="text-[14px] font-bold text-white tracking-tight">{normalizeOptionValue(currentLead.last_outcome) || '—'}</div>
+            <div className="text-[8px] text-zinc-600 uppercase font-black tracking-widest mb-2">Last Call Status</div>
+            <div className="text-[14px] font-bold text-white tracking-tight">{normalizeOptionValue(currentLead.last_call_status) || '—'}</div>
           </div>
         </div>
 

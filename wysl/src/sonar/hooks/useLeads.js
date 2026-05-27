@@ -12,11 +12,7 @@ const SINGLE_SELECT_FIELDS = new Set([
   'source',
   'preferred_contact_method',
   'last_call_status',
-  'last_outcome',
-  'last_sms_status',
-  'last_email_status',
   'payment_status',
-  'call_route',
 ]);
 
 const TRIMMED_TEXT_FIELDS = new Set([
@@ -31,9 +27,10 @@ const TRIMMED_TEXT_FIELDS = new Set([
   'preferred_language',
   'best_time_to_contact',
   'lead_source_detail',
-  'last_intent',
-  'assigned_staff',
-  'invoice_id',
+  'notes',
+  'special_instructions',
+  'stripe_customer_id',
+  'stripe_payment_method_id',
 ]);
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
@@ -93,7 +90,7 @@ export function useLeads() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
-  const [sortBy, setSortBy] = useState('created_at');
+  const [sortBy, setSortBy] = useState('updated_at');
   const [sortDir, setSortDir] = useState('desc');
   const abortRef = useRef(false);
 
@@ -208,13 +205,18 @@ export function useLeads() {
         row.source,
         row.lead_source_detail,
         Array.isArray(row.tags) ? row.tags.join(' ') : row.tags,
-        row.last_intent,
-        row.last_outcome,
-        row.assigned_staff,
+        row.updated_at,
+        row.last_inbound_call_at,
+        row.last_outbound_call_at,
+        row.last_call_status,
+        row.missed_call_count,
+        row.callback_due_at,
         row.payment_status,
-        row.invoice_id,
+        row.balance_due,
         row.notes,
         row.special_instructions,
+        row.stripe_customer_id,
+        row.stripe_payment_method_id,
       ].filter(Boolean).join(' ').toLowerCase();
       if (!searchable.includes(q)) return false;
     }

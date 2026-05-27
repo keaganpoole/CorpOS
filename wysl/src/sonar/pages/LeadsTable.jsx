@@ -6,7 +6,7 @@ import {
   Users, MapPin, Map, Shield, DollarSign, Target, Navigation,
 } from 'lucide-react';
 import {
-  LEAD_FIELDS, STATUS_OPTIONS, SOURCE_OPTIONS, CONTACT_METHOD_OPTIONS, TAG_OPTIONS, OUTCOME_OPTIONS,
+  TABLE_COLUMNS, STATUS_OPTIONS, SOURCE_OPTIONS, CONTACT_METHOD_OPTIONS, TAG_OPTIONS,
   CALL_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS, formatTimestamp, formatCurrency,
   getStatusColor, normalizeOptionValue, getFieldDef,
 } from '../lib/leadSchema';
@@ -22,7 +22,7 @@ const ICONS = {
   map: Map, shield: Shield, 'dollar-sign': DollarSign, target: Target, navigation: Navigation,
 };
 
-const InlineText = ({ value, onSave, placeholder = '—', className = '' }) => {
+const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || '');
   const ref = useRef(null);
@@ -61,7 +61,7 @@ const InlineCurrency = ({ value, onSave }) => {
     </div>
   ) : (
     <span onClick={(e) => { e.stopPropagation(); setEditing(true); }} className="cursor-pointer hover:text-white transition-colors tabular-nums">
-      {value == null || value === '' ? '—' : `$${Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+      {value == null || value === '' ? '' : `$${Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
     </span>
   );
 };
@@ -83,7 +83,7 @@ const InlineNumber = ({ value, onSave, min = 0, max = 999 }) => {
       onClick={(e) => e.stopPropagation()} className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-[70px] text-center" />
   ) : (
     <span onClick={(e) => { e.stopPropagation(); setDraft(value ?? ''); setEditing(true); }} className="cursor-pointer hover:text-white transition-colors">
-      {value == null || value === '' ? '—' : value}
+      {value == null || value === '' ? '' : value}
     </span>
   );
 };
@@ -122,6 +122,7 @@ const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = 
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const current = normalizeOptionValue(value);
+  const currentKey = typeof current === 'string' ? current.toLowerCase() : '';
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -150,9 +151,9 @@ const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = 
   return (
     <div className="relative" ref={ref}>
       <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className={`w-full inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${currentStyle.bg} ${currentStyle.text} ${currentStyle.border}`}>
+        className={`w-full min-h-[26px] inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${currentStyle.bg} ${currentStyle.text} ${currentStyle.border}`}>
         <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: currentStyle.dot }} />
-        <span className="whitespace-nowrap">{current || '—'}</span>
+        <span className="whitespace-nowrap">{current || <span className="invisible">&nbsp;</span>}</span>
       </button>
       <AnimatePresence>
         {open && (
@@ -161,7 +162,8 @@ const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = 
             onClick={(e) => e.stopPropagation()}>
             {options.map((opt, idx) => {
               const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
-              const isActive = val.toLowerCase() === current.toLowerCase();
+              const valueKey = typeof val === 'string' ? val.toLowerCase() : '';
+              const isActive = valueKey !== '' && valueKey === currentKey;
               return (
                 <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }}
                   onClick={() => { setOpen(false); if (!isActive) onSave(val); }}
@@ -182,7 +184,7 @@ const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = 
 const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  const selected = Array.isArray(value) ? value.map(normalizeOptionValue) : [];
+  const selected = Array.isArray(value) ? value.map(normalizeOptionValue).filter((item) => typeof item === 'string' && item.length > 0) : [];
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -191,6 +193,8 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   }, [open]);
   const toggle = (val) => {
     const n = normalizeOptionValue(val);
+    const normalizedKey = typeof n === 'string' ? n.toLowerCase() : '';
+    if (!normalizedKey) return;
     const next = selected.some((s) => s.toLowerCase() === n.toLowerCase())
       ? selected.filter((s) => s.toLowerCase() !== n.toLowerCase())
       : [...selected, n];
@@ -199,8 +203,8 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   const color = (val) => optionColors[normalizeOptionValue(val)] || optionColors[val] || '#71717a';
   return (
     <div className="relative" ref={ref}>
-      <div onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="w-full cursor-pointer flex items-center justify-start gap-1 flex-wrap">
-        {selected.length === 0 ? <span className="text-zinc-700 text-[12px]">—</span> : selected.slice(0, 2).map((tag) => (
+      <div onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="w-full min-h-[26px] cursor-pointer flex items-center justify-start gap-1 flex-wrap">
+        {selected.length === 0 ? <span className="invisible text-[12px]">&nbsp;</span> : selected.slice(0, 2).map((tag) => (
           <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-bold border whitespace-nowrap bg-white/[0.04] text-zinc-300 border-white/[0.06]">
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(tag) }} />{tag}
           </span>
@@ -214,7 +218,8 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
             onClick={(e) => e.stopPropagation()}>
             {options.map((opt, idx) => {
               const val = normalizeOptionValue(opt);
-              const active = selected.some((s) => s.toLowerCase() === val.toLowerCase());
+              const valueKey = typeof val === 'string' ? val.toLowerCase() : '';
+              const active = valueKey !== '' && selected.some((s) => s.toLowerCase() === valueKey);
               return (
                 <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }}
                   onClick={() => toggle(val)}
@@ -294,38 +299,34 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {} }) => 
           {!lead.first_name && !lead.last_name && <span className="text-[12px] text-zinc-700 italic">Untitled Person</span>}
         </div>
       );
-    case 'phone': return <InlineText value={lead.phone} onSave={(v) => autoSave(lead.id, 'phone', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="—" />;
-    case 'email': return <InlineText value={lead.email} onSave={(v) => autoSave(lead.id, 'email', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="—" />;
+    case 'phone': return <InlineText value={lead.phone} onSave={(v) => autoSave(lead.id, 'phone', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
+    case 'email': return <InlineText value={lead.email} onSave={(v) => autoSave(lead.id, 'email', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
     case 'status': return <InlineSelect value={lead.status} options={STATUS_OPTIONS} type="status" onSave={(v) => autoSave(lead.id, 'status', v)} optionColors={fieldConfig.status?.optionColors || {}} />;
     case 'source': return <InlineSelect value={lead.source} options={SOURCE_OPTIONS} onSave={(v) => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
     case 'preferred_contact_method': return <InlineSelect value={lead.preferred_contact_method} options={CONTACT_METHOD_OPTIONS} onSave={(v) => autoSave(lead.id, 'preferred_contact_method', v)} />;
     case 'last_call_status': return <InlineSelect value={lead.last_call_status} options={CALL_STATUS_OPTIONS} onSave={(v) => autoSave(lead.id, 'last_call_status', v)} />;
-    case 'last_intent': return <InlineText value={lead.last_intent} onSave={(v) => autoSave(lead.id, 'last_intent', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="—" />;
-    case 'last_outcome': return <InlineSelect value={lead.last_outcome} options={OUTCOME_OPTIONS} onSave={(v) => autoSave(lead.id, 'last_outcome', v)} />;
     case 'callback_due_at': return <InlineDate value={lead.callback_due_at} onSave={(v) => autoSave(lead.id, 'callback_due_at', v)} />;
-    case 'assigned_staff': return <InlineText value={lead.assigned_staff} onSave={(v) => autoSave(lead.id, 'assigned_staff', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="â€”" />;
     case 'payment_status': return <InlineSelect value={lead.payment_status} options={PAYMENT_STATUS_OPTIONS} onSave={(v) => autoSave(lead.id, 'payment_status', v)} />;
     case 'balance_due': return <InlineCurrency value={lead.balance_due} onSave={(v) => autoSave(lead.id, 'balance_due', v)} />;
     case 'tags': return <InlineMultiSelect value={lead.tags} options={TAG_OPTIONS} onSave={(v) => autoSave(lead.id, 'tags', v)} optionColors={fieldConfig.tags?.optionColors || {}} />;
-    case 'created_at': return <span className="text-[12px] text-zinc-500">{formatTimestamp(lead.created_at)}</span>;
     default: {
       const field = getFieldDef(colId);
       if (!field) return null;
       const value = lead[colId];
       if (field.type === 'boolean') return <InlineBoolean value={!!value} onSave={(v) => autoSave(lead.id, colId, v)} />;
       if (field.type === 'currency') return field.editable ? <InlineCurrency value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{formatCurrency(value)}</span>;
-      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{value ?? 'â€”'}</span>;
+      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{value ?? ''}</span>;
       if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-500">{formatTimestamp(value)}</span>;
       if (field.type === 'select') return <InlineSelect value={value} options={field.options || []} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
       if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={field.options || []} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-      return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="text-[12px] text-zinc-400 truncate block" placeholder="â€”" />;
+      return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
     }
   }
 };
 
 const DEFAULT_COLUMNS = [
   { id: 'avatar', label: '', width: '36px', sortKey: null },
-  ...LEAD_FIELDS.map((field) => ({
+  ...TABLE_COLUMNS.map((field) => ({
     id: field.key,
     label: field.label,
     width: field.tableWidth || {
@@ -418,8 +419,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
 
       <div className="flex-1 px-6 pb-6 min-h-0">
         <div className="relative group/table h-full flex flex-col">
-          <div className="absolute inset-0 bg-indigo-500/[0.02] blur-3xl opacity-0 group-hover/table:opacity-100 transition-opacity pointer-events-none rounded-[2rem]" />
-          <div className="relative bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/[0.06] rounded-[1.5rem] flex flex-col h-full overflow-hidden shadow-2xl">
+          <div className="relative bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/[0.06] rounded-[1.5rem] flex flex-col h-full overflow-hidden">
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="flex-1 overflow-auto custom-scrollbar">
                 <div className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm">

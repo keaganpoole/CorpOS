@@ -61,11 +61,12 @@ import ScenariosPage from './pages/Scenarios/Scenarios';
 import SettingsPage from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
+import CallLogsPage from './pages/CallLogsPage';
 import { useAuth } from '../contexts/AuthContext';
 
 const DASHBOARD_ROUTE_STORAGE_KEY = 'sonar-dashboard-route';
 const DEFAULT_DASHBOARD_ROUTE = 'live-monitoring';
-const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'pipeline', 'settings'];
+const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'settings'];
 
 function getInitialDashboardRoute() {
   if (typeof window === 'undefined') return DEFAULT_DASHBOARD_ROUTE;
@@ -1942,6 +1943,7 @@ const SonarDashboard = () => {
     { id: 'receptionists', icon: <Users size={18} />, label: 'Receptionists' },
     { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
     { id: 'calendar', icon: <Calendar size={18} />, label: 'Calendar' },
+    { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
     { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'People' },
     { id: 'settings', icon: <Settings size={18} />, label: 'Settings' },
   ];
@@ -2123,6 +2125,8 @@ const SonarDashboard = () => {
         return <SettingsPage />;
       case 'calendar':
         return <CalendarPage />;
+      case 'call-logs':
+        return <CallLogsPage />;
       case 'pipeline':
         return <LeadsPage />;
       default:
