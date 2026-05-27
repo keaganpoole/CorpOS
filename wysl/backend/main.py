@@ -2442,7 +2442,7 @@ def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id
         if hired_receptionist_id:
             response = (
                 supabase.table("hired_receptionists")
-                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id")
+                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id,avatar")
                 .eq("id", str(hired_receptionist_id))
                 .limit(1)
                 .execute()
@@ -2453,7 +2453,7 @@ def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id
         if elevenlabs_agent_id:
             response = (
                 supabase.table("hired_receptionists")
-                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id")
+                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id,avatar")
                 .eq("elevenlabs_voice_id", str(elevenlabs_agent_id))
                 .limit(1)
                 .execute()
@@ -2464,7 +2464,7 @@ def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id
         if phone_number:
             response = (
                 supabase.table("hired_receptionists")
-                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id")
+                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id,avatar")
                 .eq("phone_number", str(phone_number))
                 .limit(1)
                 .execute()
@@ -2491,7 +2491,13 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
         "conversation_initiation_client_data.dynamic_variables.system__conversation_id",
     )
     elevenlabs_agent_id = first_present(data, "agent_id", "assistant_id", "metadata.agent_id")
-    hired_receptionist_id = first_present(data, "hired_receptionist_id", "metadata.hired_receptionist_id", "conversation_initiation_client_data.dynamic_variables.hired_receptionist_id")
+    hired_receptionist_id = first_present(
+        data,
+        "hired_receptionist_id",
+        "metadata.hired_receptionist_id",
+        "conversation_initiation_client_data.dynamic_variables.hired_receptionist_id",
+        "conversation_initiation_client_data.dynamic_variables.receptionist_id",
+    )
     scenario_id = first_present(data, "scenario_id", "metadata.scenario_id", "conversation_initiation_client_data.dynamic_variables.scenario_id")
 
     from_number = first_present(
@@ -2623,11 +2629,22 @@ def emit_intent_checkpoint(request: IntentCheckpointRequest):
         "trigger_key": "intent_checkpoint",
         "payload": payload,
         "created_at": checkpoint_ts.isoformat(),
+        "user_id": str(request.user_id) if request.user_id else None,
+        "receptionist_id": int_or_none(request.receptionist_id),
+        "scenario_id": str(request.scenario_id),
+        "intent_key": normalized_intent_key,
+        "phase": request.phase,
+        "timestamp": checkpoint_ts.isoformat(),
+        "conversation_id": payload["conversation_id"],
+        "direction": payload["direction"],
+        "sid": str(request.call_id) if request.call_id else None,
+        "execution_id": payload["execution_id"],
+        "session_id": payload["session_id"],
     }
 
     logging.info("Intent checkpoint fired: %s", json.dumps(event_record, default=str))
     try:
-        response = supabase.table("scenario_events").insert(event_record).execute()
+        response = supabase.table("checkpoints").insert(event_record).execute()
     except Exception as exc:
         logging.error("Failed to persist intent checkpoint: %s", exc, exc_info=True)
         raise HTTPException(
@@ -3686,6 +3703,20 @@ async def list_call_logs(limit: int = 50, current_user: dict = Depends(get_curre
     rows = response.data or []
     for row in rows:
         row["audio_url"] = storage_signed_url(row.get("audio_storage_path"))
+        row["receptionist_avatar"] = None
+        if row.get("hired_receptionist_id"):
+            try:
+                receptionist_response = (
+                    supabase.table("hired_receptionists")
+                    .select("avatar")
+                    .eq("id", str(row["hired_receptionist_id"]))
+                    .limit(1)
+                    .execute()
+                )
+                if receptionist_response.data:
+                    row["receptionist_avatar"] = receptionist_response.data[0].get("avatar")
+            except Exception as exc:
+                logging.warning("Failed to load receptionist avatar for call log %s: %s", row.get("id"), exc)
     return rows
 
 @app.get("/api/sonar/call-logs/stats", tags=["Sonar Calls"])

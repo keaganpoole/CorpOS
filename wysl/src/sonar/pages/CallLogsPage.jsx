@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   AlertCircle,
@@ -8,16 +8,19 @@ import {
   Frown,
   Meh,
   Phone,
+  Play,
+  Pause,
   Search,
   SlidersHorizontal,
   Smile,
   Timer,
   XCircle,
 } from 'lucide-react';
-import receptionistAvatar from '../../assets/a1.png';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const AVATAR_BASE = 'https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges';
 const STATUS_OPTIONS = ['All statuses'];
 const CATEGORY_OPTIONS = ['All categories'];
 const SENTIMENT_OPTIONS = ['All sentiment', 'Positive', 'Neutral', 'Negative'];
@@ -71,7 +74,7 @@ const SENTIMENT_STYLES = {
 const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 function formatDuration(seconds) {
-  const safeSeconds = Number(seconds || 0);
+  const safeSeconds = Math.max(0, Math.floor(Number(seconds || 0)));
   const minutes = Math.floor(safeSeconds / 60);
   const remaining = safeSeconds % 60;
   return `${minutes}:${String(remaining).padStart(2, '0')}`;
@@ -156,6 +159,8 @@ function normalizeTranscript(turns, fallbackText) {
 function normalizeCall(row) {
   const status = titleize(row.status || row.call_successful || 'Unknown', 'Unknown');
   const purpose = titleize(row.outcome || row.call_successful || 'General');
+  const receptionistName = row.receptionist_name || row.agent_name || 'Receptionist';
+  const avatarName = normalized(receptionistName);
   return {
     id: row.id,
     name: row.caller_name || 'Unknown Caller',
@@ -166,7 +171,8 @@ function normalizeCall(row) {
     sentiment: sentimentFromCall(row),
     duration: row.duration_seconds || 0,
     time: row.started_at || row.event_timestamp || row.created_at,
-    receptionist: row.receptionist_name || row.agent_name || 'Receptionist',
+    receptionist: receptionistName,
+    receptionistAvatar: row.receptionist_avatar || (avatarName && avatarName !== 'receptionist' ? `${AVATAR_BASE}/${avatarName}.jpg` : ''),
     audioUrl: row.audio_url || '',
     transcript: normalizeTranscript(row.transcript_jsonb, row.transcript_text),
     raw: row,
@@ -266,8 +272,14 @@ function CallCard({ call, selected, onClick }) {
   );
 }
 
-function TranscriptBubble({ entry }) {
+function TranscriptBubble({ entry, receptionistAvatar }) {
   const isReceptionist = entry.speaker === 'receptionist';
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [receptionistAvatar]);
+
   return (
     <div className={cn('flex items-end gap-3', isReceptionist ? 'justify-end' : 'justify-start')}>
       {!isReceptionist && (
@@ -288,12 +300,18 @@ function TranscriptBubble({ entry }) {
         </div>
         <p className={cn('mt-1 text-[10px] text-zinc-700', isReceptionist ? 'text-right' : 'text-left')}>{entry.offset}</p>
       </div>
-      {isReceptionist && (
+      {isReceptionist && receptionistAvatar && !avatarFailed && (
         <img
           src={receptionistAvatar}
           alt=""
           className="mb-1 h-8 w-8 shrink-0 rounded-full object-cover"
+          onError={() => setAvatarFailed(true)}
         />
+      )}
+      {isReceptionist && (!receptionistAvatar || avatarFailed) && (
+        <div className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-[11px] font-bold text-cyan-100">
+          R
+        </div>
       )}
     </div>
   );
@@ -301,22 +319,94 @@ function TranscriptBubble({ entry }) {
 
 function AudioStrip({ call }) {
   const hasAudio = Boolean(call.audioUrl);
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(call.duration || 0);
+
+  useEffect(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(call.duration || 0);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [call.id, call.duration]);
+
+  const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
+  const progressPercent = `${Math.round(progress * 100)}%`;
+  const togglePlayback = async () => {
+    if (!hasAudio || !audioRef.current) return;
+    try {
+      if (audioRef.current.paused) {
+        await audioRef.current.play();
+      } else {
+        audioRef.current.pause();
+      }
+    } catch (err) {
+      console.error('[CallLogs] Audio playback failed:', err);
+    }
+  };
 
   return (
-    <div className="flex min-h-[52px] items-center gap-3 rounded-2xl bg-white/[0.035] px-4 py-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-zinc-300">
-        <AudioLines size={17} />
-      </div>
+    <div className="rounded-xl bg-white/[0.035] px-3 py-3">
       {hasAudio ? (
-        <audio className="h-9 w-full" controls src={call.audioUrl}>
-          <track kind="captions" />
-        </audio>
-      ) : (
-        <div className="min-w-0 flex-1">
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-            <div className="h-full w-1/3 rounded-full bg-zinc-600" />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={togglePlayback}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.09] text-zinc-100 transition hover:bg-white/[0.14] active:scale-95"
+            aria-label={isPlaying ? 'Pause call recording' : 'Play call recording'}
+          >
+            {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={(event) => {
+                  if (!audioRef.current || !duration) return;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const nextProgress = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+                  audioRef.current.currentTime = nextProgress * duration;
+                  setCurrentTime(audioRef.current.currentTime);
+                }}
+                className="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/[0.08]"
+                aria-label="Seek call recording"
+              >
+                <span className="absolute inset-y-0 left-0 rounded-full bg-zinc-200 transition-[width]" style={{ width: progressPercent }} />
+              </button>
+              <div className="w-[76px] text-right text-[11px] font-medium tabular-nums text-zinc-500">
+                {formatDuration(currentTime)} / {formatDuration(duration)}
+              </div>
+            </div>
           </div>
-          <p className="mt-2 text-[11px] font-medium text-zinc-600">Recording unavailable</p>
+          <audio
+            ref={audioRef}
+            src={call.audioUrl}
+            preload="metadata"
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            onEnded={() => {
+              setIsPlaying(false);
+              setCurrentTime(0);
+            }}
+            onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || call.duration || 0)}
+            onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime || 0)}
+          >
+            <track kind="captions" />
+          </audio>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-zinc-600">
+            <AudioLines size={14} />
+          </div>
+          <div className="h-1.5 min-w-0 flex-1 rounded-full bg-white/[0.06]" />
+          <div className="w-[76px] text-right text-[11px] font-medium tabular-nums text-zinc-700">
+            {formatDuration(call.duration || 0)}
+          </div>
         </div>
       )}
     </div>
@@ -333,9 +423,11 @@ export default function CallLogsPage() {
   const [statusFilter, setStatusFilter] = useState(STATUS_OPTIONS[0]);
   const [sentimentFilter, setSentimentFilter] = useState(SENTIMENT_OPTIONS[0]);
   const [selectedId, setSelectedId] = useState(null);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    let refreshTimer = null;
 
     async function loadCallLogs() {
       if (!session?.access_token) {
@@ -344,7 +436,7 @@ export default function CallLogsPage() {
         return;
       }
 
-      setLoading(true);
+      setLoading(!hasLoadedRef.current);
       setError('');
       try {
         const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs?limit=100`, {
@@ -364,13 +456,28 @@ export default function CallLogsPage() {
           setCalls([]);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          hasLoadedRef.current = true;
+          setLoading(false);
+        }
       }
     }
 
+    const scheduleRefresh = () => {
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(loadCallLogs, 350);
+    };
+
     loadCallLogs();
+    const channel = supabase
+      .channel('call-logs-page-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs' }, scheduleRefresh)
+      .subscribe();
+
     return () => {
       cancelled = true;
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
     };
   }, [session?.access_token]);
 
@@ -508,7 +615,7 @@ export default function CallLogsPage() {
             >
               {selectedCall.transcript.length > 0 ? (
                 selectedCall.transcript.map((entry, index) => (
-                  <TranscriptBubble key={`${selectedCall.id}-${index}`} entry={entry} />
+                  <TranscriptBubble key={`${selectedCall.id}-${index}`} entry={entry} receptionistAvatar={selectedCall.receptionistAvatar} />
                 ))
               ) : (
                 <div className="rounded-2xl bg-white/[0.03] p-8 text-center">
