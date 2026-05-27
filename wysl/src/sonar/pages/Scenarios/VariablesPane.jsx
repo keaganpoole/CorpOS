@@ -156,7 +156,8 @@ const getAvailableTables = (triggerKey) => {
     if (!availableKeys) {
       tables = [...TABLE_DEFS];
     } else {
-      tables = TABLE_DEFS.filter(t => availableKeys.includes(t.key));
+      const visibleKeys = new Set([...availableKeys, 'services']);
+      tables = TABLE_DEFS.filter(t => visibleKeys.has(t.key));
     }
   }
 
@@ -419,7 +420,7 @@ export const TABLE_LABELS = {
   business: 'Business',
 };
 
-const AGENT_SOURCE_TABLES = new Set(['people', 'appointments', 'services']);
+const AGENT_SOURCE_TABLES = new Set(['people', 'appointments']);
 
 const getAgentFieldsForTable = (tableKey) => {
   if (!AGENT_SOURCE_TABLES.has(tableKey)) return [];
@@ -1406,4 +1407,3 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 };
 
 export default VariablesPane;
-

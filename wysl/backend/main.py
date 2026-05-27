@@ -2052,6 +2052,104 @@ def build_phone_match_values(value) -> list[str]:
         values.add(f"+{digits[1:]}")
     return [item for item in values if item]
 
+
+def format_person_display_name(person: Optional[dict]) -> Optional[str]:
+    if not person:
+        return None
+    first_name = str(person.get("first_name") or "").strip()
+    last_name = str(person.get("last_name") or "").strip()
+    full_name = " ".join(part for part in [first_name, last_name] if part).strip()
+    if full_name:
+        return full_name
+    fallback = str(person.get("name") or person.get("full_name") or "").strip()
+    return fallback or None
+
+
+def lookup_person_record(
+    *,
+    person_id: Optional[str] = None,
+    phone_number: Optional[str] = None,
+    business_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+):
+    try:
+        if person_id:
+            query = supabase.table("people").select("id,first_name,last_name,phone,business_id,user_id").eq("id", str(person_id))
+            if business_id:
+                query = query.eq("business_id", str(business_id))
+            elif user_id:
+                query = query.eq("user_id", str(user_id))
+            response = query.limit(1).execute()
+            if response.data:
+                return response.data[0]
+
+        match_values = set(build_phone_match_values(phone_number))
+        if not match_values:
+            return None
+
+        query = supabase.table("people").select("id,first_name,last_name,phone,business_id,user_id")
+        if business_id:
+            query = query.eq("business_id", str(business_id))
+        elif user_id:
+            query = query.eq("user_id", str(user_id))
+        rows = query.limit(500).execute().data or []
+        for row in rows:
+            if set(build_phone_match_values(row.get("phone"))) & match_values:
+                return row
+    except Exception as exc:
+        logging.warning("Failed to match person for call log: %s", exc)
+    return None
+
+
+def enrich_call_log_with_person(
+    call_log: dict,
+    *,
+    payload_data: Optional[dict] = None,
+    business_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+):
+    payload_data = payload_data or {}
+    direction = str(
+        first_present(
+            payload_data,
+            "direction",
+            "metadata.direction",
+            "metadata.phone_call.direction",
+            "conversation_initiation_client_data.dynamic_variables.direction",
+            "conversation_initiation_client_data.dynamic_variables.call_direction",
+        )
+        or ""
+    ).strip().lower()
+    explicit_person_id = first_present(
+        payload_data,
+        "person_id",
+        "metadata.person_id",
+        "conversation_initiation_client_data.dynamic_variables.person_id",
+        "conversation_initiation_client_data.dynamic_variables.record_id",
+    ) or call_log.get("person_id")
+    lookup_phone = (
+        call_log.get("to_number")
+        if direction == "outgoing"
+        else call_log.get("from_number")
+    ) or call_log.get("caller_phone")
+
+    person = lookup_person_record(
+        person_id=explicit_person_id,
+        phone_number=lookup_phone,
+        business_id=business_id or call_log.get("business_id"),
+        user_id=user_id or call_log.get("user_id"),
+    )
+    if person:
+        call_log["person_id"] = person.get("id")
+        person_name = format_person_display_name(person)
+        if person_name:
+            call_log["caller_name"] = person_name
+        person_phone = normalize_phone_number(person.get("phone"))
+        call_log["caller_phone"] = person_phone or normalize_phone_number(lookup_phone)
+    elif not call_log.get("caller_phone"):
+        call_log["caller_phone"] = normalize_phone_number(lookup_phone)
+    return call_log
+
 def safe_json_loads(value):
     if isinstance(value, (dict, list)):
         return value
@@ -2508,8 +2606,10 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
         "customer.phone_number",
         "metadata.phone_call.caller_phone_number",
         "metadata.phone_call.from_number",
+        "metadata.phone_call.external_number",
         "conversation_initiation_client_data.dynamic_variables.caller_number",
         "conversation_initiation_client_data.dynamic_variables.from_number",
+        "conversation_initiation_client_data.dynamic_variables.system__caller_id",
     ) or first_present(telephony_body, "From", "Caller", "from_number")
     to_number = first_present(
         data,
@@ -2520,12 +2620,14 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
         "metadata.phone_call.to_number",
         "conversation_initiation_client_data.dynamic_variables.twilio_to_number",
         "conversation_initiation_client_data.dynamic_variables.to_number",
+        "conversation_initiation_client_data.dynamic_variables.system__called_number",
     ) or first_present(telephony_body, "To", "Called", "to_number")
     caller_name = first_present(
         data,
         "caller_name",
         "customer.name",
         "metadata.caller_name",
+        "analysis.data_collection_results.caller_name.value",
         "conversation_initiation_client_data.dynamic_variables.caller_name",
         "conversation_initiation_client_data.dynamic_variables.user_name",
     )
@@ -3211,6 +3313,16 @@ async def elevenlabs_post_call_webhook(
         "to_number": call_log.get("to_number"),
         "forwarded_from": first_present(event_data, "forwarded_from", "metadata.forwarded_from", "conversation_initiation_client_data.dynamic_variables.forwarded_from"),
     })
+    if business_context.get("user_id") and not call_log.get("user_id"):
+        call_log["user_id"] = business_context["user_id"]
+    if business_context.get("business") and not call_log.get("business_id"):
+        call_log["business_id"] = business_context["business"].get("id")
+    enrich_call_log_with_person(
+        call_log,
+        payload_data=event_data,
+        business_id=(business_context.get("business") or {}).get("id"),
+        user_id=business_context.get("user_id"),
+    )
     verification_called_number = call_log.get("to_number")
     if not verification_called_number and str(call_log.get("direction") or "").lower() == "inbound":
         verification_called_number = ((business_context.get("business") or {}).get("twilio_number"))
@@ -3702,6 +3814,12 @@ async def list_call_logs(limit: int = 50, current_user: dict = Depends(get_curre
     response = query.execute()
     rows = response.data or []
     for row in rows:
+        enrich_call_log_with_person(
+            row,
+            payload_data=row.get("raw_payload") if isinstance(row.get("raw_payload"), dict) else {},
+            business_id=row.get("business_id"),
+            user_id=str(current_user.id),
+        )
         row["audio_url"] = storage_signed_url(row.get("audio_storage_path"))
         row["receptionist_avatar"] = None
         if row.get("hired_receptionist_id"):
