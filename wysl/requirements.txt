@@ -17,3 +17,4 @@ sqlmodel
 asyncpg
 sqlalchemy[asyncio]
 jose
+elevenlabs

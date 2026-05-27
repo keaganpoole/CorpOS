@@ -8,3 +8,4 @@ apscheduler
 pydantic[email]
 openai
 requests
+elevenlabs

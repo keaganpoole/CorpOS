@@ -7,6 +7,8 @@ import json
 import time
 import asyncio
 import requests
+import base64
+import binascii
 from uuid import UUID, uuid4
 from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, timezone, timedelta
@@ -92,6 +94,11 @@ from models import (
 )
 from dependencies import get_current_user, get_current_rep
 from scenario_engine import ScenarioEngine
+
+try:
+    from elevenlabs.client import ElevenLabs
+except Exception:
+    ElevenLabs = None
 
 # --------------------------------------------------------------------------
 # App Initialization
@@ -2309,6 +2316,10 @@ def parse_optional_datetime(value):
             return None
     return None
 
+def epoch_to_iso(value):
+    parsed = parse_optional_datetime(value)
+    return parsed.isoformat() if parsed else None
+
 def stringify_transcript(value):
     if value is None:
         return None
@@ -2337,6 +2348,94 @@ def stringify_transcript(value):
         except Exception:
             return str(value)
     return str(value)
+
+def sanitize_storage_segment(value: Optional[str], fallback: str = "unknown") -> str:
+    raw = str(value or fallback).strip() or fallback
+    return "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in raw)[:120] or fallback
+
+def int_or_none(value):
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+def uuid_or_none(value):
+    if value is None or value == "":
+        return None
+    try:
+        return str(UUID(str(value)))
+    except (TypeError, ValueError):
+        return None
+
+def get_elevenlabs_event_data(payload: dict) -> tuple[str, Optional[str], dict]:
+    webhook_type = str(payload.get("type") or "post_call_transcription").strip()
+    event_timestamp = epoch_to_iso(payload.get("event_timestamp"))
+    data = payload.get("data")
+    if isinstance(data, dict):
+        return webhook_type, event_timestamp, data
+    return webhook_type, event_timestamp, payload
+
+def extract_transcript_turns(value):
+    if not isinstance(value, list):
+        return []
+    turns = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        text = item.get("message") or item.get("text") or item.get("content")
+        text = str(text or "").strip()
+        if not text:
+            continue
+        turns.append({
+            "role": item.get("role") or item.get("speaker") or "speaker",
+            "message": text,
+            "time_in_call_secs": item.get("time_in_call_secs"),
+            "tool_calls": item.get("tool_calls"),
+            "tool_results": item.get("tool_results"),
+            "feedback": item.get("feedback"),
+            "conversation_turn_metrics": item.get("conversation_turn_metrics"),
+        })
+    return turns
+
+def extract_dynamic_variables(data: dict) -> dict:
+    candidate = deep_get(data, "conversation_initiation_client_data.dynamic_variables")
+    return candidate if isinstance(candidate, dict) else {}
+
+def storage_signed_url(path: Optional[str], expires_in: int = 3600) -> Optional[str]:
+    if not path:
+        return None
+    try:
+        response = supabase_admin.storage.from_("call_recordings").create_signed_url(path, expires_in)
+        if isinstance(response, dict):
+            return response.get("signedURL") or response.get("signed_url") or response.get("signedUrl")
+    except Exception as exc:
+        logging.warning("Failed to create signed call recording URL for %s: %s", path, exc)
+    return None
+
+def upload_call_recording(conversation_id: str, audio_base64: str, *, agent_id: Optional[str] = None) -> Optional[str]:
+    if not conversation_id or not audio_base64:
+        return None
+    try:
+        audio_bytes = base64.b64decode(audio_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        logging.warning("Invalid ElevenLabs full_audio payload for conversation_id=%s: %s", conversation_id, exc)
+        return None
+
+    safe_agent_id = sanitize_storage_segment(agent_id, "agent")
+    safe_conversation_id = sanitize_storage_segment(conversation_id, uuid4().hex)
+    storage_path = f"elevenlabs/{safe_agent_id}/{safe_conversation_id}.mp3"
+    try:
+        supabase_admin.storage.from_("call_recordings").upload(
+            storage_path,
+            audio_bytes,
+            file_options={"content-type": "audio/mpeg", "upsert": "true"},
+        )
+        return storage_path
+    except Exception as exc:
+        logging.error("Failed to upload call recording to Supabase Storage: %s", exc, exc_info=True)
+        return None
 
 def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id=None, phone_number=None):
     try:
@@ -2377,66 +2476,72 @@ def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id
     return None
 
 def extract_call_log_from_elevenlabs_payload(payload: dict):
-    call_id = first_present(payload, "call_id", "call.id", "conversation_id", "conversation.id")
-    conversation_id = first_present(payload, "conversation_id", "conversation.id", "metadata.conversation_id")
-    elevenlabs_agent_id = first_present(payload, "agent_id", "agent.id", "assistant_id", "metadata.agent_id")
-    hired_receptionist_id = first_present(payload, "hired_receptionist_id", "metadata.hired_receptionist_id")
-    scenario_id = first_present(payload, "scenario_id", "metadata.scenario_id", "dynamic_variables.scenario_id")
-    direction_value = first_present(
-        payload,
-        "direction",
-        "call.direction",
-        "metadata.direction",
-        "dynamic_variables.direction",
-        "conversation_initiation_client_data.dynamic_variables.direction",
+    webhook_type, event_timestamp, data = get_elevenlabs_event_data(payload)
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    analysis = data.get("analysis") if isinstance(data.get("analysis"), dict) else {}
+    initiation_data = data.get("conversation_initiation_client_data") if isinstance(data.get("conversation_initiation_client_data"), dict) else {}
+    dynamic_variables = extract_dynamic_variables(data)
+    telephony_metadata = data.get("metadata") if webhook_type == "call_initiation_failure" and isinstance(data.get("metadata"), dict) else None
+    telephony_body = telephony_metadata.get("body") if isinstance(telephony_metadata, dict) and isinstance(telephony_metadata.get("body"), dict) else {}
+
+    conversation_id = first_present(
+        data,
+        "conversation_id",
+        "metadata.conversation_id",
+        "conversation_initiation_client_data.dynamic_variables.system__conversation_id",
     )
-    forwarded_from = first_present(
-        payload,
-        "forwarded_from",
-        "forwardedFrom",
-        "ForwardedFrom",
-        "metadata.forwarded_from",
-        "dynamic_variables.forwarded_from",
-    )
+    elevenlabs_agent_id = first_present(data, "agent_id", "assistant_id", "metadata.agent_id")
+    hired_receptionist_id = first_present(data, "hired_receptionist_id", "metadata.hired_receptionist_id", "conversation_initiation_client_data.dynamic_variables.hired_receptionist_id")
+    scenario_id = first_present(data, "scenario_id", "metadata.scenario_id", "conversation_initiation_client_data.dynamic_variables.scenario_id")
+
     from_number = first_present(
-        payload,
+        data,
         "from_number",
+        "caller_phone",
         "caller.phone_number",
         "customer.phone_number",
-        "metadata.from_number",
-        "dynamic_variables.caller_number",
+        "metadata.phone_call.caller_phone_number",
+        "metadata.phone_call.from_number",
         "conversation_initiation_client_data.dynamic_variables.caller_number",
-    )
+        "conversation_initiation_client_data.dynamic_variables.from_number",
+    ) or first_present(telephony_body, "From", "Caller", "from_number")
     to_number = first_present(
-        payload,
+        data,
         "to_number",
         "agent_phone_number",
         "phone_number",
-        "metadata.to_number",
-        "metadata.twilio_to_number",
-        "dynamic_variables.twilio_to_number",
+        "metadata.phone_call.agent_number",
+        "metadata.phone_call.to_number",
         "conversation_initiation_client_data.dynamic_variables.twilio_to_number",
+        "conversation_initiation_client_data.dynamic_variables.to_number",
+    ) or first_present(telephony_body, "To", "Called", "to_number")
+    caller_name = first_present(
+        data,
+        "caller_name",
+        "customer.name",
+        "metadata.caller_name",
+        "conversation_initiation_client_data.dynamic_variables.caller_name",
+        "conversation_initiation_client_data.dynamic_variables.user_name",
     )
-    started_at = parse_optional_datetime(first_present(payload, "started_at", "call.started_at", "start_time", "metadata.started_at"))
-    ended_at = parse_optional_datetime(first_present(payload, "ended_at", "call.ended_at", "end_time", "metadata.ended_at"))
 
-    duration_seconds = first_present(
-        payload,
-        "duration_seconds",
-        "call_duration_secs",
-        "duration",
-        "metadata.duration_seconds",
+    started_at = parse_optional_datetime(
+        first_present(data, "started_at", "start_time", "metadata.started_at", "metadata.start_time_unix_secs")
     )
+    duration_seconds = first_present(data, "duration_seconds", "metadata.call_duration_secs", "metadata.duration_seconds", "duration")
     try:
         duration_seconds = int(float(duration_seconds)) if duration_seconds is not None else None
     except (TypeError, ValueError):
         duration_seconds = None
+    ended_at = parse_optional_datetime(first_present(data, "ended_at", "end_time", "metadata.ended_at"))
+    if not ended_at and started_at and duration_seconds is not None:
+        ended_at = started_at + timedelta(seconds=duration_seconds)
 
-    status_value = first_present(payload, "status", "call_status", "analysis.status")
-    outcome_value = first_present(payload, "outcome", "analysis.outcome", "call_outcome", "metadata.outcome")
-    summary_value = first_present(payload, "summary", "analysis.summary", "conversation_summary", "metadata.summary")
-    transcript_value = first_present(payload, "transcript", "conversation.transcript", "analysis.transcript")
-    sentiment_value = first_present(payload, "sentiment", "analysis.sentiment", "analysis.call_sentiment")
+    transcript_value = data.get("transcript")
+    transcript_turns = extract_transcript_turns(transcript_value)
+    summary_value = first_present(data, "summary", "analysis.transcript_summary", "analysis.summary", "conversation_summary")
+    call_successful = first_present(data, "analysis.call_successful", "call_successful")
+    outcome_value = first_present(data, "outcome", "analysis.outcome", "call_outcome", "conversation_initiation_client_data.dynamic_variables.outcome")
+    provider_call_sid = first_present(data, "provider_call_sid", "metadata.call_sid", "metadata.phone_call.call_sid") or first_present(telephony_body, "CallSid", "call_sid")
 
     receptionist = lookup_hired_receptionist(
         hired_receptionist_id=hired_receptionist_id,
@@ -2444,32 +2549,43 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
         phone_number=to_number,
     )
 
-    normalized_direction = str(direction_value or "").strip().lower() or None
-    normalized_to_number = normalize_phone_number(to_number)
-    normalized_from_number = normalize_phone_number(from_number)
-    normalized_forwarded_from = normalize_phone_number(forwarded_from)
-
     return {
         "source": "elevenlabs",
-        "external_call_id": str(call_id) if call_id else None,
+        "webhook_type": webhook_type,
+        "event_timestamp": event_timestamp,
         "conversation_id": str(conversation_id) if conversation_id else None,
         "elevenlabs_agent_id": str(elevenlabs_agent_id) if elevenlabs_agent_id else None,
-        "hired_receptionist_id": receptionist.get("id") if receptionist else (str(hired_receptionist_id) if hired_receptionist_id else None),
-        "user_id": receptionist.get("user_id") if receptionist else None,
-        "receptionist_name": receptionist.get("full_name") if receptionist else None,
-        "scenario_id": str(scenario_id) if scenario_id else None,
-        "direction": normalized_direction,
-        "from_number": normalized_from_number,
-        "to_number": normalized_to_number or (normalize_phone_number(receptionist.get("phone_number")) if receptionist else None),
-        "forwarded_from": normalized_forwarded_from,
+        "agent_name": str(data.get("agent_name")) if data.get("agent_name") else None,
+        "hired_receptionist_id": receptionist.get("id") if receptionist else int_or_none(hired_receptionist_id),
+        "user_id": receptionist.get("user_id") if receptionist else (str(dynamic_variables.get("user_id")) if dynamic_variables.get("user_id") else None),
+        "business_id": int_or_none(dynamic_variables.get("business_id")),
+        "receptionist_name": receptionist.get("full_name") if receptionist else (str(data.get("agent_name")) if data.get("agent_name") else None),
+        "scenario_id": uuid_or_none(scenario_id),
+        "caller_phone": normalize_phone_number(from_number),
+        "caller_name": str(caller_name) if caller_name else None,
+        "from_number": normalize_phone_number(from_number),
+        "to_number": normalize_phone_number(to_number) or (normalize_phone_number(receptionist.get("phone_number")) if receptionist else None),
         "started_at": started_at.isoformat() if started_at else None,
         "ended_at": ended_at.isoformat() if ended_at else None,
         "duration_seconds": duration_seconds,
-        "status": str(status_value) if status_value else None,
+        "status": str(data.get("status")) if data.get("status") else ("failed" if webhook_type == "call_initiation_failure" else None),
         "outcome": str(outcome_value) if outcome_value else None,
         "summary": str(summary_value) if summary_value else None,
         "transcript_text": stringify_transcript(transcript_value),
-        "sentiment": str(sentiment_value) if sentiment_value else None,
+        "transcript_jsonb": transcript_turns or None,
+        "branch_id": str(data.get("branch_id")) if data.get("branch_id") else None,
+        "version_id": str(data.get("version_id")) if data.get("version_id") else None,
+        "environment": str(data.get("environment")) if data.get("environment") else None,
+        "has_audio": data.get("has_audio"),
+        "has_user_audio": data.get("has_user_audio"),
+        "has_response_audio": data.get("has_response_audio"),
+        "call_successful": str(call_successful) if call_successful else None,
+        "analysis_results": analysis or None,
+        "conversation_metadata": metadata or None,
+        "conversation_initiation_data": initiation_data or None,
+        "telephony_metadata": telephony_metadata,
+        "provider_call_sid": str(provider_call_sid) if provider_call_sid else None,
+        "failure_reason": str(data.get("failure_reason")) if data.get("failure_reason") else None,
         "raw_payload": payload,
     }
 
@@ -2983,28 +3099,100 @@ async def elevenlabs_post_call_webhook(
     x_webhook_secret: Optional[str] = Header(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
+    raw_body = await request.body()
     if elevenlabs_webhook_secret:
-        bearer_secret = None
-        if authorization and authorization.lower().startswith("bearer "):
-            bearer_secret = authorization.split(" ", 1)[1].strip()
-        presented_secret = x_webhook_secret or bearer_secret
-        if presented_secret != elevenlabs_webhook_secret:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook secret")
-
-    try:
-        payload = await request.json()
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
+        hmac_signature = request.headers.get("elevenlabs-signature")
+        if hmac_signature:
+            if ElevenLabs is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="ElevenLabs SDK is required for HMAC webhook verification.",
+                )
+            try:
+                elevenlabs_client = ElevenLabs(api_key=elevenlabs_api_key or "")
+                payload = elevenlabs_client.webhooks.construct_event(
+                    rawBody=raw_body.decode("utf-8"),
+                    sig_header=hmac_signature,
+                    secret=elevenlabs_webhook_secret,
+                )
+            except Exception as exc:
+                logging.warning("Invalid ElevenLabs webhook HMAC signature: %s", exc)
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature") from exc
+        else:
+            bearer_secret = None
+            if authorization and authorization.lower().startswith("bearer "):
+                bearer_secret = authorization.split(" ", 1)[1].strip()
+            presented_secret = x_webhook_secret or bearer_secret
+            if presented_secret != elevenlabs_webhook_secret:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook secret")
+            try:
+                payload = json.loads(raw_body.decode("utf-8"))
+            except Exception as exc:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
+    else:
+        try:
+            payload = json.loads(raw_body.decode("utf-8"))
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
 
     if not isinstance(payload, dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook payload must be a JSON object")
+
+    webhook_type, event_timestamp, event_data = get_elevenlabs_event_data(payload)
+    conversation_id = first_present(
+        event_data,
+        "conversation_id",
+        "conversation_initiation_client_data.dynamic_variables.system__conversation_id",
+    )
+
+    if webhook_type == "post_call_audio":
+        audio_storage_path = upload_call_recording(
+            str(conversation_id) if conversation_id else "",
+            str(event_data.get("full_audio") or ""),
+            agent_id=event_data.get("agent_id"),
+        )
+        updates = {
+            "webhook_type": webhook_type,
+            "event_timestamp": event_timestamp,
+            "elevenlabs_agent_id": str(event_data.get("agent_id")) if event_data.get("agent_id") else None,
+            "conversation_id": str(conversation_id) if conversation_id else None,
+            "has_audio": True if audio_storage_path else None,
+            "audio_storage_path": audio_storage_path,
+            "raw_payload": payload,
+        }
+        updates = {key: value for key, value in updates.items() if value is not None}
+        try:
+            existing = []
+            if conversation_id:
+                existing = (
+                    supabase.table("call_logs")
+                    .select("id")
+                    .eq("conversation_id", str(conversation_id))
+                    .limit(1)
+                    .execute()
+                    .data
+                    or []
+                )
+            if existing:
+                response = supabase.table("call_logs").update(updates).eq("id", existing[0]["id"]).execute()
+                saved = response.data[0] if getattr(response, "data", None) else updates
+            else:
+                response = supabase.table("call_logs").insert(updates).execute()
+                saved = response.data[0] if getattr(response, "data", None) else updates
+        except Exception as exc:
+            logging.error("Failed to persist ElevenLabs audio webhook: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to persist call audio",
+            ) from exc
+        return {"ok": True, "type": webhook_type, "call_log": saved}
 
     call_log = extract_call_log_from_elevenlabs_payload(payload)
     logging.info("ElevenLabs post-call webhook received: %s", json.dumps(call_log, default=str))
     business_context = resolve_business_context({
         "user_id": call_log.get("user_id"),
         "to_number": call_log.get("to_number"),
-        "forwarded_from": call_log.get("forwarded_from"),
+        "forwarded_from": first_present(event_data, "forwarded_from", "metadata.forwarded_from", "conversation_initiation_client_data.dynamic_variables.forwarded_from"),
     })
     verification_called_number = call_log.get("to_number")
     if not verification_called_number and str(call_log.get("direction") or "").lower() == "inbound":
@@ -3020,7 +3208,23 @@ async def elevenlabs_post_call_webhook(
     )
 
     try:
-        response = supabase.table("call_logs").insert(call_log).execute()
+        existing = []
+        if call_log.get("conversation_id"):
+            existing = (
+                supabase.table("call_logs")
+                .select("id,audio_storage_path")
+                .eq("conversation_id", call_log["conversation_id"])
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+        if existing:
+            if existing[0].get("audio_storage_path") and not call_log.get("audio_storage_path"):
+                call_log["audio_storage_path"] = existing[0]["audio_storage_path"]
+            response = supabase.table("call_logs").update(call_log).eq("id", existing[0]["id"]).execute()
+        else:
+            response = supabase.table("call_logs").insert(call_log).execute()
     except Exception as exc:
         logging.error("Failed to persist call log: %s", exc, exc_info=True)
         raise HTTPException(
@@ -3031,15 +3235,16 @@ async def elevenlabs_post_call_webhook(
     saved = response.data[0] if getattr(response, "data", None) else call_log
 
     flow_execution_id = first_present(
-        payload,
+        event_data,
         "flow_execution_id",
         "metadata.flow_execution_id",
         "dynamic_variables.flow_execution_id",
+        "conversation_initiation_client_data.dynamic_variables.flow_execution_id",
     )
     agent_data = (
-        deep_get(payload, "agent_data")
-        or deep_get(payload, "analysis.data_collection_results")
-        or deep_get(payload, "analysis.extracted_variables")
+        deep_get(event_data, "agent_data")
+        or deep_get(event_data, "analysis.data_collection_results")
+        or deep_get(event_data, "analysis.extracted_variables")
         or {}
     )
     if flow_execution_id and scenario_engine:
@@ -3478,7 +3683,10 @@ async def list_call_logs(limit: int = 50, current_user: dict = Depends(get_curre
         .limit(safe_limit)
     )
     response = query.execute()
-    return response.data or []
+    rows = response.data or []
+    for row in rows:
+        row["audio_url"] = storage_signed_url(row.get("audio_storage_path"))
+    return rows
 
 @app.get("/api/sonar/call-logs/stats", tags=["Sonar Calls"])
 async def get_call_log_stats(current_user: dict = Depends(get_current_user)):

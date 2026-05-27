@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   AlertCircle,
@@ -15,9 +15,11 @@ import {
   XCircle,
 } from 'lucide-react';
 import receptionistAvatar from '../../assets/a1.png';
+import { useAuth } from '../../contexts/AuthContext';
 
-const STATUS_OPTIONS = ['All statuses', 'Completed', 'Failed', 'Missed', 'Escalated'];
-const CATEGORY_OPTIONS = ['All categories', 'Booking', 'Billing', 'Support', 'Reschedule', 'General'];
+const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const STATUS_OPTIONS = ['All statuses'];
+const CATEGORY_OPTIONS = ['All categories'];
 const SENTIMENT_OPTIONS = ['All sentiment', 'Positive', 'Neutral', 'Negative'];
 
 const STATUS_STYLES = {
@@ -25,7 +27,19 @@ const STATUS_STYLES = {
     icon: CheckCircle2,
     className: 'bg-emerald-400/8 text-emerald-300',
   },
+  done: {
+    icon: CheckCircle2,
+    className: 'bg-emerald-400/8 text-emerald-300',
+  },
+  success: {
+    icon: CheckCircle2,
+    className: 'bg-emerald-400/8 text-emerald-300',
+  },
   failed: {
+    icon: XCircle,
+    className: 'bg-rose-400/8 text-rose-300',
+  },
+  failure: {
     icon: XCircle,
     className: 'bg-rose-400/8 text-rose-300',
   },
@@ -54,100 +68,6 @@ const SENTIMENT_STYLES = {
   },
 };
 
-const mockCallLogs = [
-  {
-    id: 'call-001',
-    name: 'Mara Ellis',
-    phone: '(617) 555-0188',
-    summary: 'Booked a new patient cleaning and confirmed insurance details before ending the call.',
-    purpose: 'Booking',
-    status: 'Completed',
-    sentiment: 'Positive',
-    duration: 312,
-    time: '2026-05-26T15:42:00-04:00',
-    receptionist: 'Breezy',
-    audioUrl: '',
-    transcript: [
-      { speaker: 'customer', text: 'Hi, I wanted to see if you have any appointments open this week for a cleaning.', offset: '0:04' },
-      { speaker: 'receptionist', text: 'Absolutely. I can help with that. Are you a new or returning patient?', offset: '0:10' },
-      { speaker: 'customer', text: 'New patient. I just moved nearby and found you online.', offset: '0:18' },
-      { speaker: 'receptionist', text: 'Welcome to the area. I have Thursday at 10:30 AM or Friday at 2:00 PM. Which works better?', offset: '0:28' },
-      { speaker: 'customer', text: 'Thursday morning would be perfect.', offset: '0:37' },
-      { speaker: 'receptionist', text: 'You are set for Thursday at 10:30 AM. I also noted that you will bring your insurance card and ID.', offset: '0:48' },
-    ],
-  },
-  {
-    id: 'call-002',
-    name: 'Caleb Brooks',
-    phone: '(312) 555-0142',
-    summary: 'Asked about an invoice balance and requested a callback from billing about duplicate charges.',
-    purpose: 'Billing',
-    status: 'Escalated',
-    sentiment: 'Neutral',
-    duration: 188,
-    time: '2026-05-26T14:18:00-04:00',
-    receptionist: 'Breezy',
-    audioUrl: '',
-    transcript: [
-      { speaker: 'customer', text: 'I got two invoices that look almost identical. I need someone to check if I was charged twice.', offset: '0:03' },
-      { speaker: 'receptionist', text: 'I can take the details and have billing review it. What is the invoice number on the first one?', offset: '0:13' },
-      { speaker: 'customer', text: 'It is INV-2048. The second one ends in 2050.', offset: '0:25' },
-      { speaker: 'receptionist', text: 'I have both noted. I will mark this for billing follow-up today and include your callback number.', offset: '0:38' },
-    ],
-  },
-  {
-    id: 'call-003',
-    name: 'Priya Narang',
-    phone: '(415) 555-0194',
-    summary: 'Rescheduled a consultation after a conflict and confirmed the updated calendar invite.',
-    purpose: 'Reschedule',
-    status: 'Completed',
-    sentiment: 'Positive',
-    duration: 224,
-    time: '2026-05-26T12:07:00-04:00',
-    receptionist: 'Breezy',
-    audioUrl: '',
-    transcript: [
-      { speaker: 'customer', text: 'I have an appointment tomorrow afternoon, but a meeting came up. Can I move it?', offset: '0:05' },
-      { speaker: 'receptionist', text: 'Yes. I see your consultation at 3:30 PM. The next openings are Friday at 11:00 AM or Monday at 9:15 AM.', offset: '0:16' },
-      { speaker: 'customer', text: 'Friday at 11 works.', offset: '0:31' },
-      { speaker: 'receptionist', text: 'Done. Your consultation is now Friday at 11:00 AM, and the calendar invite has been updated.', offset: '0:40' },
-    ],
-  },
-  {
-    id: 'call-004',
-    name: 'Andre Wallace',
-    phone: '(718) 555-0166',
-    summary: 'Caller reported an urgent service issue, but the call dropped before full triage was completed.',
-    purpose: 'Support',
-    status: 'Failed',
-    sentiment: 'Negative',
-    duration: 76,
-    time: '2026-05-26T10:29:00-04:00',
-    receptionist: 'Breezy',
-    audioUrl: '',
-    transcript: [
-      { speaker: 'customer', text: 'I need help right away. The system stopped working again and nobody has called me back.', offset: '0:02' },
-      { speaker: 'receptionist', text: 'I am sorry that happened. I can prioritize this. Can you tell me what changed before it stopped working?', offset: '0:14' },
-      { speaker: 'customer', text: 'It started after the technician left yesterday. Now the panel is blank.', offset: '0:27' },
-    ],
-  },
-  {
-    id: 'call-005',
-    name: 'Unknown Caller',
-    phone: '(904) 555-0131',
-    summary: 'Missed call after two rings with no voicemail left.',
-    purpose: 'General',
-    status: 'Missed',
-    sentiment: 'Neutral',
-    duration: 22,
-    time: '2026-05-25T17:54:00-04:00',
-    receptionist: 'Breezy',
-    audioUrl: '',
-    transcript: [],
-  },
-];
-
 const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 function formatDuration(seconds) {
@@ -170,6 +90,87 @@ function formatCallTime(value) {
 
 function normalized(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function titleize(value, fallback = 'General') {
+  const raw = String(value || '').trim();
+  if (!raw) return fallback;
+  return raw
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function sentimentFromCall(call) {
+  const success = normalized(call.call_successful);
+  const status = normalized(call.status);
+  if (['success', 'successful', 'completed', 'done'].includes(success) || ['completed', 'done', 'success'].includes(status)) {
+    return 'Positive';
+  }
+  if (['failure', 'failed', 'unsuccessful'].includes(success) || ['failed', 'error'].includes(status)) {
+    return 'Negative';
+  }
+  return 'Neutral';
+}
+
+function transcriptOffset(seconds) {
+  if (seconds === null || seconds === undefined || seconds === '') return '';
+  const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, '0')}`;
+}
+
+function transcriptFromText(text) {
+  if (!text) return [];
+  return String(text)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [speaker, ...rest] = line.split(':');
+      const hasSpeaker = rest.length > 0;
+      const speakerValue = hasSpeaker ? speaker : 'caller';
+      return {
+        speaker: normalized(speakerValue).includes('agent') || normalized(speakerValue).includes('receptionist') ? 'receptionist' : 'customer',
+        text: hasSpeaker ? rest.join(':').trim() : line,
+        offset: '',
+      };
+    });
+}
+
+function normalizeTranscript(turns, fallbackText) {
+  if (!Array.isArray(turns) || turns.length === 0) return transcriptFromText(fallbackText);
+  return turns
+    .map((turn) => {
+      const role = normalized(turn.role || turn.speaker);
+      const text = String(turn.message || turn.text || turn.content || '').trim();
+      if (!text) return null;
+      return {
+        speaker: role === 'agent' || role === 'assistant' || role === 'receptionist' ? 'receptionist' : 'customer',
+        text,
+        offset: transcriptOffset(turn.time_in_call_secs),
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeCall(row) {
+  const status = titleize(row.status || row.call_successful || 'Unknown', 'Unknown');
+  const purpose = titleize(row.outcome || row.call_successful || 'General');
+  return {
+    id: row.id,
+    name: row.caller_name || 'Unknown Caller',
+    phone: row.caller_phone || row.from_number || 'Unknown number',
+    summary: row.summary || row.notes || 'No summary captured yet.',
+    purpose,
+    status,
+    sentiment: sentimentFromCall(row),
+    duration: row.duration_seconds || 0,
+    time: row.started_at || row.event_timestamp || row.created_at,
+    receptionist: row.receptionist_name || row.agent_name || 'Receptionist',
+    audioUrl: row.audio_url || '',
+    transcript: normalizeTranscript(row.transcript_jsonb, row.transcript_text),
+    raw: row,
+  };
 }
 
 function FilterSelect({ value, onChange, options, label }) {
@@ -218,12 +219,20 @@ function CallCard({ call, selected, onClick }) {
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full rounded-2xl px-4 py-4 text-left transition duration-200',
+        'relative w-full rounded-2xl px-4 py-4 text-left transition duration-200',
         selected
-          ? 'bg-white/[0.055]'
+          ? 'bg-transparent'
           : 'bg-transparent hover:bg-white/[0.025]'
       )}
     >
+      {selected && (
+        <motion.span
+          layoutId="call-log-active-rail"
+          className="absolute bottom-3 left-0 top-3 w-px rounded-full bg-white/90"
+          transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.7 }}
+          aria-hidden="true"
+        />
+      )}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -235,13 +244,15 @@ function CallCard({ call, selected, onClick }) {
             <span>{call.phone}</span>
           </div>
         </div>
-        <SentimentIcon sentiment={call.sentiment} compact />
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-white/[0.045] px-2 py-1 text-[11px] text-zinc-300">{call.purpose}</span>
+          <SentimentIcon sentiment={call.sentiment} compact />
+        </div>
       </div>
 
       <p className="mt-4 line-clamp-2 text-[13px] leading-5 text-zinc-400">{call.summary}</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
-        <span className="rounded-full bg-white/[0.045] px-2 py-1 text-zinc-300">{call.purpose}</span>
         <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.03] px-2 py-1">
           <Timer size={11} />
           {formatDuration(call.duration)}
@@ -313,15 +324,67 @@ function AudioStrip({ call }) {
 }
 
 export default function CallLogsPage() {
+  const { session } = useAuth();
+  const [calls, setCalls] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(CATEGORY_OPTIONS[0]);
   const [statusFilter, setStatusFilter] = useState(STATUS_OPTIONS[0]);
   const [sentimentFilter, setSentimentFilter] = useState(SENTIMENT_OPTIONS[0]);
-  const [selectedId, setSelectedId] = useState(mockCallLogs[0]?.id);
+  const [selectedId, setSelectedId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCallLogs() {
+      if (!session?.access_token) {
+        setCalls([]);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs?limit=100`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        if (!response.ok) throw new Error(`Call logs request failed (${response.status})`);
+        const data = await response.json();
+        if (cancelled) return;
+        const normalizedCalls = Array.isArray(data) ? data.map(normalizeCall) : [];
+        setCalls(normalizedCalls);
+        setSelectedId((current) => current || normalizedCalls[0]?.id || null);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || 'Failed to load call logs.');
+          setCalls([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadCallLogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.access_token]);
+
+  const categoryOptions = useMemo(() => (
+    [CATEGORY_OPTIONS[0], ...Array.from(new Set(calls.map((call) => call.purpose).filter(Boolean))).sort()]
+  ), [calls]);
+
+  const statusOptions = useMemo(() => (
+    [STATUS_OPTIONS[0], ...Array.from(new Set(calls.map((call) => call.status).filter(Boolean))).sort()]
+  ), [calls]);
 
   const filteredCalls = useMemo(() => {
     const query = normalized(searchQuery);
-    return mockCallLogs.filter((call) => {
+    return calls.filter((call) => {
       const matchesSearch = !query || [call.name, call.phone, call.summary, call.purpose, call.status]
         .some((value) => normalized(value).includes(query));
       const matchesCategory = categoryFilter === CATEGORY_OPTIONS[0] || call.purpose === categoryFilter;
@@ -329,9 +392,9 @@ export default function CallLogsPage() {
       const matchesSentiment = sentimentFilter === SENTIMENT_OPTIONS[0] || call.sentiment === sentimentFilter;
       return matchesSearch && matchesCategory && matchesStatus && matchesSentiment;
     });
-  }, [categoryFilter, searchQuery, sentimentFilter, statusFilter]);
+  }, [calls, categoryFilter, searchQuery, sentimentFilter, statusFilter]);
 
-  const selectedCall = filteredCalls.find((call) => call.id === selectedId) || filteredCalls[0] || mockCallLogs[0];
+  const selectedCall = filteredCalls.find((call) => call.id === selectedId) || filteredCalls[0] || null;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#020202] text-zinc-100">
@@ -343,7 +406,7 @@ export default function CallLogsPage() {
             </div>
             <div>
               <h2 className="text-[28px] font-black leading-none text-white">Call Logs</h2>
-              <p className="mt-1 text-[12px] font-medium text-zinc-600">{mockCallLogs.length} recent calls</p>
+              <p className="mt-1 text-[12px] font-medium text-zinc-600">{loading ? 'Loading calls' : `${calls.length} recent calls`}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 rounded-full bg-white/[0.03] px-3 py-2 text-[12px] font-medium text-zinc-500">
@@ -367,14 +430,24 @@ export default function CallLogsPage() {
               />
             </label>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-              <FilterSelect label="Category" value={categoryFilter} onChange={setCategoryFilter} options={CATEGORY_OPTIONS} />
-              <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+              <FilterSelect label="Category" value={categoryFilter} onChange={setCategoryFilter} options={categoryOptions} />
+              <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
               <FilterSelect label="Sentiment" value={sentimentFilter} onChange={setSentimentFilter} options={SENTIMENT_OPTIONS} />
             </div>
           </div>
 
           <div className="custom-scrollbar min-h-[320px] flex-1 overflow-y-auto px-3 py-2">
-            {filteredCalls.map((call) => (
+            {loading && (
+              <div className="p-6 text-center">
+                <p className="text-[13px] font-semibold text-zinc-300">Loading call logs</p>
+              </div>
+            )}
+            {!loading && error && (
+              <div className="p-6 text-center">
+                <p className="text-[13px] font-semibold text-rose-300">{error}</p>
+              </div>
+            )}
+            {!loading && !error && filteredCalls.map((call) => (
               <div key={call.id} className="border-b border-white/[0.04] last:border-b-0">
                 <CallCard
                   call={call}
@@ -383,22 +456,25 @@ export default function CallLogsPage() {
                 />
               </div>
             ))}
-            {filteredCalls.length === 0 && (
+            {!loading && !error && filteredCalls.length === 0 && (
               <div className="p-6 text-center">
                 <p className="text-[13px] font-semibold text-zinc-300">No calls found</p>
-                <p className="mt-2 text-[12px] text-zinc-600">Adjust the filters or search another caller.</p>
+                <p className="mt-2 text-[12px] text-zinc-600">{calls.length ? 'Adjust the filters or search another caller.' : 'New ElevenLabs post-call webhooks will appear here.'}</p>
               </div>
             )}
           </div>
         </aside>
 
         <section className="flex min-h-0 flex-col">
+          {selectedCall ? (
+            <>
           <div className="shrink-0 p-5 sm:p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-[24px] font-black leading-none text-white">{selectedCall.name}</h3>
                   <StatusBadge status={selectedCall.status} />
+                  <span className="rounded-full bg-white/[0.045] px-2 py-1 text-[11px] text-zinc-300">{selectedCall.purpose}</span>
                   <SentimentIcon sentiment={selectedCall.sentiment} compact />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-[12px] text-zinc-500">
@@ -442,6 +518,15 @@ export default function CallLogsPage() {
               )}
             </motion.div>
           </div>
+            </>
+          ) : (
+            <div className="flex flex-1 items-center justify-center p-8 text-center">
+              <div>
+                <p className="text-[14px] font-semibold text-zinc-300">No conversation selected</p>
+                <p className="mt-2 text-[12px] text-zinc-600">Completed calls will show their transcript here.</p>
+              </div>
+            </div>
+          )}
         </section>
       </div>
     </div>

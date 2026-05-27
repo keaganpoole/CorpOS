@@ -5,13 +5,16 @@ CREATE TABLE IF NOT EXISTS public.call_logs (
 
 ALTER TABLE public.call_logs
   ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'elevenlabs',
-  ADD COLUMN IF NOT EXISTS external_call_id text NULL,
+  ADD COLUMN IF NOT EXISTS caller_phone text NULL,
+  ADD COLUMN IF NOT EXISTS caller_name text NULL,
+  ADD COLUMN IF NOT EXISTS person_id bigint NULL,
+  ADD COLUMN IF NOT EXISTS business_id bigint NULL,
   ADD COLUMN IF NOT EXISTS conversation_id text NULL,
   ADD COLUMN IF NOT EXISTS elevenlabs_agent_id text NULL,
   ADD COLUMN IF NOT EXISTS hired_receptionist_id bigint NULL,
   ADD COLUMN IF NOT EXISTS user_id uuid NULL,
   ADD COLUMN IF NOT EXISTS receptionist_name text NULL,
-  ADD COLUMN IF NOT EXISTS scenario_id text NULL,
+  ADD COLUMN IF NOT EXISTS scenario_id uuid NULL,
   ADD COLUMN IF NOT EXISTS from_number text NULL,
   ADD COLUMN IF NOT EXISTS to_number text NULL,
   ADD COLUMN IF NOT EXISTS started_at timestamptz NULL,
@@ -19,10 +22,35 @@ ALTER TABLE public.call_logs
   ADD COLUMN IF NOT EXISTS duration_seconds integer NULL,
   ADD COLUMN IF NOT EXISTS status text NULL,
   ADD COLUMN IF NOT EXISTS outcome text NULL,
+  ADD COLUMN IF NOT EXISTS appointment_id uuid NULL,
+  ADD COLUMN IF NOT EXISTS notes text NULL,
   ADD COLUMN IF NOT EXISTS summary text NULL,
   ADD COLUMN IF NOT EXISTS transcript_text text NULL,
-  ADD COLUMN IF NOT EXISTS sentiment text NULL,
+  ADD COLUMN IF NOT EXISTS transcript_jsonb jsonb NULL,
+  ADD COLUMN IF NOT EXISTS webhook_type text NULL,
+  ADD COLUMN IF NOT EXISTS event_timestamp timestamptz NULL,
+  ADD COLUMN IF NOT EXISTS agent_name text NULL,
+  ADD COLUMN IF NOT EXISTS branch_id text NULL,
+  ADD COLUMN IF NOT EXISTS version_id text NULL,
+  ADD COLUMN IF NOT EXISTS environment text NULL,
+  ADD COLUMN IF NOT EXISTS has_audio boolean NULL,
+  ADD COLUMN IF NOT EXISTS has_user_audio boolean NULL,
+  ADD COLUMN IF NOT EXISTS has_response_audio boolean NULL,
+  ADD COLUMN IF NOT EXISTS call_successful text NULL,
+  ADD COLUMN IF NOT EXISTS analysis_results jsonb NULL,
+  ADD COLUMN IF NOT EXISTS conversation_metadata jsonb NULL,
+  ADD COLUMN IF NOT EXISTS conversation_initiation_data jsonb NULL,
+  ADD COLUMN IF NOT EXISTS telephony_metadata jsonb NULL,
+  ADD COLUMN IF NOT EXISTS provider_call_sid text NULL,
+  ADD COLUMN IF NOT EXISTS audio_storage_path text NULL,
+  ADD COLUMN IF NOT EXISTS failure_reason text NULL,
   ADD COLUMN IF NOT EXISTS raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE public.call_logs
+  DROP COLUMN IF EXISTS external_call_id,
+  DROP COLUMN IF EXISTS raw_transcript,
+  DROP COLUMN IF EXISTS receptionist_id,
+  DROP COLUMN IF EXISTS sentiment;
 
 DO $$
 BEGIN
@@ -64,5 +92,5 @@ CREATE INDEX IF NOT EXISTS idx_call_logs_hired_receptionist_id_created_at
 CREATE INDEX IF NOT EXISTS idx_call_logs_conversation_id
   ON public.call_logs (conversation_id);
 
-CREATE INDEX IF NOT EXISTS idx_call_logs_external_call_id
-  ON public.call_logs (external_call_id);
+CREATE INDEX IF NOT EXISTS idx_call_logs_business_id_created_at
+  ON public.call_logs (business_id, created_at DESC);
