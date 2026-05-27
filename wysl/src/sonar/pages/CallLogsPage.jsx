@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   AlertCircle,
   AudioLines,
+  Check,
   CheckCircle2,
   Clock,
   Frown,
@@ -11,9 +12,12 @@ import {
   Play,
   Pause,
   Search,
+  Square,
   SlidersHorizontal,
   Smile,
   Timer,
+  Trash2,
+  X,
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -219,13 +223,69 @@ function StatusBadge({ status }) {
   );
 }
 
-function CallCard({ call, selected, onClick }) {
+function SelectionToggle({ checked, visible, onClick, label }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-label={label}
       className={cn(
-        'relative w-full rounded-2xl px-4 py-4 text-left transition duration-200',
+        'flex h-6 w-6 items-center justify-center rounded-full bg-[#090909]/88 text-zinc-400 transition duration-200',
+        checked ? 'opacity-100 text-white' : visible ? 'opacity-100 hover:text-zinc-100' : 'pointer-events-none opacity-0'
+      )}
+    >
+      {checked ? <Check size={13} /> : <Square size={12} />}
+    </button>
+  );
+}
+
+function DeleteConfirmModal({ count, onCancel, onConfirm, deleting }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm" onClick={onCancel}>
+      <div className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#080808] p-6 shadow-[0_30px_120px_rgba(0,0,0,0.45)]" onClick={(event) => event.stopPropagation()}>
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05] text-zinc-100">
+          <Trash2 size={18} />
+        </div>
+        <h3 className="mt-5 text-[22px] font-black text-white">Delete conversation{count > 1 ? 's' : ''}</h3>
+        <p className="mt-2 text-[13px] leading-6 text-zinc-400">
+          {count > 1 ? `Delete ${count} selected conversations?` : 'Delete this conversation?'} This cannot be undone.
+        </p>
+        <div className="mt-6 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-11 rounded-xl bg-white/[0.045] px-4 text-[13px] font-semibold text-zinc-300 transition hover:bg-white/[0.07]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={deleting}
+            className="h-11 rounded-xl bg-white px-4 text-[13px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {deleting ? 'Deleting...' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CallCard({ call, selected, checked, onClick, onToggleSelect, onDelete }) {
+  return (
+    <div
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className={cn(
+        'group relative w-full rounded-2xl py-4 pl-11 pr-11 text-left transition duration-200',
         selected
           ? 'bg-transparent'
           : 'bg-transparent hover:bg-white/[0.025]'
@@ -239,6 +299,28 @@ function CallCard({ call, selected, onClick }) {
           aria-hidden="true"
         />
       )}
+      <button
+        type="button"
+        aria-label="Delete conversation"
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete(call.id);
+        }}
+        className="absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[#090909]/88 text-zinc-400 opacity-0 transition duration-200 hover:text-zinc-100 group-hover:opacity-100"
+      >
+        <X size={13} />
+      </button>
+      <div className={cn('absolute left-3 top-3 z-10 transition duration-200', checked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}>
+        <SelectionToggle
+          checked={checked}
+          visible
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleSelect(call.id);
+          }}
+          label={checked ? 'Deselect conversation' : 'Select conversation'}
+        />
+      </div>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -268,7 +350,7 @@ function CallCard({ call, selected, onClick }) {
           {formatCallTime(call.time)}
         </span>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -423,52 +505,57 @@ export default function CallLogsPage() {
   const [statusFilter, setStatusFilter] = useState(STATUS_OPTIONS[0]);
   const [sentimentFilter, setSentimentFilter] = useState(SENTIMENT_OPTIONS[0]);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedForDelete, setSelectedForDelete] = useState([]);
+  const [deleteTargetIds, setDeleteTargetIds] = useState([]);
+  const [deleting, setDeleting] = useState(false);
   const hasLoadedRef = useRef(false);
+
+  async function loadCallLogs({ initial = false } = {}) {
+    if (!session?.access_token) {
+      setCalls([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(initial && !hasLoadedRef.current);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs?limit=100`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      if (!response.ok) throw new Error(`Call logs request failed (${response.status})`);
+      const data = await response.json();
+      const normalizedCalls = Array.isArray(data) ? data.map(normalizeCall) : [];
+      setCalls(normalizedCalls);
+      setSelectedId((current) => (
+        normalizedCalls.some((call) => call.id === current)
+          ? current
+          : normalizedCalls[0]?.id || null
+      ));
+      setSelectedForDelete((current) => current.filter((id) => normalizedCalls.some((call) => call.id === id)));
+    } catch (err) {
+      setError(err.message || 'Failed to load call logs.');
+      setCalls([]);
+    } finally {
+      hasLoadedRef.current = true;
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
     let refreshTimer = null;
 
-    async function loadCallLogs() {
-      if (!session?.access_token) {
-        setCalls([]);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(!hasLoadedRef.current);
-      setError('');
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs?limit=100`, {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-        if (!response.ok) throw new Error(`Call logs request failed (${response.status})`);
-        const data = await response.json();
-        if (cancelled) return;
-        const normalizedCalls = Array.isArray(data) ? data.map(normalizeCall) : [];
-        setCalls(normalizedCalls);
-        setSelectedId((current) => current || normalizedCalls[0]?.id || null);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err.message || 'Failed to load call logs.');
-          setCalls([]);
-        }
-      } finally {
-        if (!cancelled) {
-          hasLoadedRef.current = true;
-          setLoading(false);
-        }
-      }
-    }
-
     const scheduleRefresh = () => {
       if (refreshTimer) window.clearTimeout(refreshTimer);
-      refreshTimer = window.setTimeout(loadCallLogs, 350);
+      refreshTimer = window.setTimeout(() => {
+        if (!cancelled) loadCallLogs();
+      }, 350);
     };
 
-    loadCallLogs();
+    loadCallLogs({ initial: true });
     const channel = supabase
       .channel('call-logs-page-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs' }, scheduleRefresh)
@@ -480,6 +567,61 @@ export default function CallLogsPage() {
       supabase.removeChannel(channel);
     };
   }, [session?.access_token]);
+
+  const toggleSelectCall = (callId) => {
+    setSelectedForDelete((current) => (
+      current.includes(callId)
+        ? current.filter((id) => id !== callId)
+        : [...current, callId]
+    ));
+  };
+
+  const openDeleteModal = (ids) => {
+    const normalizedIds = ids.filter(Boolean);
+    if (!normalizedIds.length) return;
+    setDeleteTargetIds(normalizedIds);
+  };
+
+  const closeDeleteModal = () => {
+    if (deleting) return;
+    setDeleteTargetIds([]);
+  };
+
+  const handleDeleteCalls = async () => {
+    if (!deleteTargetIds.length || !session?.access_token) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs/delete`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids: deleteTargetIds }),
+      });
+      if (!response.ok) throw new Error(`Delete request failed (${response.status})`);
+      const data = await response.json();
+      const deletedIds = Array.isArray(data.deleted_ids) ? data.deleted_ids : deleteTargetIds;
+      let nextSelectedId = null;
+      setCalls((current) => {
+        const remaining = current.filter((call) => !deletedIds.includes(call.id));
+        nextSelectedId = remaining[0]?.id || null;
+        return remaining;
+      });
+      setSelectedForDelete((current) => current.filter((id) => !deletedIds.includes(id)));
+      setSelectedId((current) => (
+        deletedIds.includes(current)
+          ? nextSelectedId
+          : current
+      ));
+      setDeleteTargetIds([]);
+      loadCallLogs();
+    } catch (err) {
+      setError(err.message || 'Failed to delete call logs.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const categoryOptions = useMemo(() => (
     [CATEGORY_OPTIONS[0], ...Array.from(new Set(calls.map((call) => call.purpose).filter(Boolean))).sort()]
@@ -502,6 +644,7 @@ export default function CallLogsPage() {
   }, [calls, categoryFilter, searchQuery, sentimentFilter, statusFilter]);
 
   const selectedCall = filteredCalls.find((call) => call.id === selectedId) || filteredCalls[0] || null;
+  const selectedDeleteCount = selectedForDelete.length;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#020202] text-zinc-100">
@@ -541,6 +684,19 @@ export default function CallLogsPage() {
               <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
               <FilterSelect label="Sentiment" value={sentimentFilter} onChange={setSentimentFilter} options={SENTIMENT_OPTIONS} />
             </div>
+            {selectedDeleteCount > 0 && (
+              <div className="flex items-center justify-between rounded-xl bg-white/[0.035] px-3 py-2">
+                <span className="text-[12px] font-medium text-zinc-400">{selectedDeleteCount} selected</span>
+                <button
+                  type="button"
+                  onClick={() => openDeleteModal(selectedForDelete)}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg bg-white px-3 text-[12px] font-semibold text-black transition hover:bg-zinc-200"
+                >
+                  <Trash2 size={13} />
+                  Delete
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="custom-scrollbar min-h-[320px] flex-1 overflow-y-auto px-3 py-2">
@@ -559,7 +715,10 @@ export default function CallLogsPage() {
                 <CallCard
                   call={call}
                   selected={selectedCall?.id === call.id}
+                  checked={selectedForDelete.includes(call.id)}
                   onClick={() => setSelectedId(call.id)}
+                  onToggleSelect={toggleSelectCall}
+                  onDelete={(callId) => openDeleteModal([callId])}
                 />
               </div>
             ))}
@@ -636,6 +795,14 @@ export default function CallLogsPage() {
           )}
         </section>
       </div>
+      {deleteTargetIds.length > 0 && (
+        <DeleteConfirmModal
+          count={deleteTargetIds.length}
+          onCancel={closeDeleteModal}
+          onConfirm={handleDeleteCalls}
+          deleting={deleting}
+        />
+      )}
     </div>
   );
 }

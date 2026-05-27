@@ -3837,6 +3837,31 @@ async def list_call_logs(limit: int = 50, current_user: dict = Depends(get_curre
                 logging.warning("Failed to load receptionist avatar for call log %s: %s", row.get("id"), exc)
     return rows
 
+
+@app.post("/api/sonar/call-logs/delete", tags=["Sonar Calls"])
+async def delete_call_logs(payload: dict, current_user: dict = Depends(get_current_user)):
+    ids = payload.get("ids") if isinstance(payload, dict) else None
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ids array is required")
+
+    normalized_ids = [str(item).strip() for item in ids if str(item).strip()]
+    if not normalized_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid call log ids provided")
+
+    existing = (
+        supabase.table("call_logs")
+        .select("id")
+        .eq("user_id", str(current_user.id))
+        .in_("id", normalized_ids)
+        .execute()
+    )
+    matched_ids = [str(row.get("id")) for row in (existing.data or []) if row.get("id")]
+    if not matched_ids:
+        return {"ok": True, "deleted_ids": [], "deleted_count": 0}
+
+    supabase.table("call_logs").delete().eq("user_id", str(current_user.id)).in_("id", matched_ids).execute()
+    return {"ok": True, "deleted_ids": matched_ids, "deleted_count": len(matched_ids)}
+
 @app.get("/api/sonar/call-logs/stats", tags=["Sonar Calls"])
 async def get_call_log_stats(current_user: dict = Depends(get_current_user)):
     response = (
