@@ -2193,28 +2193,72 @@ def load_receptionist_by_id(receptionist_id: Optional[str]):
     except Exception:
         return None
 
-def find_inbound_receptionist_for_business(business_id: Optional[str]):
-    if not business_id:
+def get_receptionist_display_name(receptionist: Optional[dict]) -> Optional[str]:
+    if not receptionist:
         return None
-    try:
-        response = (
-            supabase
-            .table("hired_receptionists")
-            .select("*")
-            .eq("business_id", str(business_id))
-            .execute()
+    full_name = str(receptionist.get("full_name") or "").strip()
+    if full_name:
+        return full_name
+    first_name = str(receptionist.get("first_name") or "").strip()
+    return first_name or None
+
+def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: Optional[str] = None):
+    business_id_value = int_or_none(business_id)
+    user_id_value = str(user_id).strip() if user_id else None
+    if not business_id_value and not user_id_value:
+        logging.info(
+            "Inbound receptionist lookup skipped: missing business_id and user_id. business_id=%s user_id=%s",
+            business_id,
+            user_id,
         )
-    except Exception:
+        return None
+
+    rows_by_id = {}
+    try:
+        if business_id_value:
+            response = (
+                supabase
+                .table("hired_receptionists")
+                .select("*")
+                .eq("business_id", business_id_value)
+                .execute()
+            )
+            for row in response.data or []:
+                rows_by_id[str(row.get("id"))] = row
+
+        if user_id_value:
+            response = (
+                supabase
+                .table("hired_receptionists")
+                .select("*")
+                .eq("user_id", user_id_value)
+                .execute()
+            )
+            for row in response.data or []:
+                rows_by_id[str(row.get("id"))] = row
+    except Exception as exc:
+        logging.warning(
+            "Inbound receptionist lookup failed: business_id=%s user_id=%s error=%s",
+            business_id_value,
+            user_id_value,
+            exc,
+        )
         return None
 
     candidates = []
-    for row in response.data or []:
+    for row in rows_by_id.values():
         call_types = str(row.get("call_types") or "").strip().lower()
         if call_types not in {"inbound", "both"}:
             continue
         candidates.append(row)
 
     if not candidates:
+        logging.info(
+            "Inbound receptionist lookup found no inbound-capable candidates: business_id=%s user_id=%s rows=%s",
+            business_id_value,
+            user_id_value,
+            len(rows_by_id),
+        )
         return None
 
     def sort_key(row: dict):
@@ -2224,7 +2268,17 @@ def find_inbound_receptionist_for_business(business_id: Optional[str]):
         hired_at = str(row.get("hired_at") or "")
         return (is_active, is_online, hired_at)
 
-    return sorted(candidates, key=sort_key, reverse=True)[0]
+    selected = sorted(candidates, key=sort_key, reverse=True)[0]
+    logging.info(
+        "Inbound receptionist resolved: business_id=%s user_id=%s receptionist_id=%s receptionist_name=%s call_types=%s candidates=%s",
+        business_id_value,
+        user_id_value,
+        selected.get("id"),
+        get_receptionist_display_name(selected),
+        selected.get("call_types"),
+        len(candidates),
+    )
+    return selected
 
 def find_business_by_forwarded_number(forwarded_number: Optional[str]):
     match_values = set(build_phone_match_values(forwarded_number))
@@ -3084,7 +3138,10 @@ async def twilio_inbound_webhook(request: Request):
         "forwarded_from": first_present(payload, "ForwardedFrom", "forwarded_from"),
     })
     business = context.get("business")
-    receptionist = find_inbound_receptionist_for_business(business.get("id")) if business else None
+    receptionist = find_inbound_receptionist_for_business(
+        business.get("id") if business else None,
+        context.get("user_id") or (business or {}).get("user_id"),
+    )
     maybe_auto_verify_business_forwarding(business, called_number=to_number)
 
     event_payload = {
@@ -3100,7 +3157,7 @@ async def twilio_inbound_webhook(request: Request):
         "business_id": business.get("id") if business else None,
         "business_name": business.get("name") if business else None,
         "receptionist_id": receptionist.get("id") if receptionist else None,
-        "receptionist_name": receptionist.get("full_name") if receptionist else None,
+        "receptionist_name": get_receptionist_display_name(receptionist),
     }
     emit_scenario_trigger("incoming_call", event_payload)
 
@@ -3115,7 +3172,7 @@ async def twilio_inbound_webhook(request: Request):
                 "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
                 "business_name": business.get("name") if business else None,
                 "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
-                "receptionist_name": receptionist.get("full_name") if receptionist else None,
+                "receptionist_name": get_receptionist_display_name(receptionist),
                 "twilio_to_number": to_number,
                 "twilio_call_sid": first_present(payload, "CallSid"),
             }
@@ -3158,7 +3215,10 @@ async def route_call_compat(request: Request):
     business = context.get("business")
     receptionist = (
         context.get("receptionist")
-        or find_inbound_receptionist_for_business((business or {}).get("id"))
+        or find_inbound_receptionist_for_business(
+            (business or {}).get("id"),
+            context.get("user_id") or (business or {}).get("user_id"),
+        )
     )
     maybe_auto_verify_business_forwarding(
         business,
@@ -3171,7 +3231,7 @@ async def route_call_compat(request: Request):
         "business_id": business.get("id") if business else None,
         "business_name": business.get("name") if business else None,
         "receptionist_id": receptionist.get("id") if receptionist else None,
-        "receptionist_name": receptionist.get("full_name") if receptionist else None,
+        "receptionist_name": get_receptionist_display_name(receptionist),
         "forwarding_target_number": get_business_forwarding_target_number(business),
     }
 
@@ -3184,21 +3244,28 @@ async def route_call_compat(request: Request):
         payload=event_payload,
     )
 
+    dynamic_variables = {
+        "caller_number": call_payload.get("from_number"),
+        "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
+        "business_name": business.get("name") if business else None,
+        "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
+        "receptionist_name": get_receptionist_display_name(receptionist),
+        "twilio_to_number": call_payload.get("to_number"),
+        "twilio_call_sid": call_payload.get("call_id"),
+    }
+    dynamic_variables = {key: value for key, value in dynamic_variables.items() if value is not None}
+    logging.info(
+        "ElevenLabs call route dynamic variables response: %s",
+        json.dumps(dynamic_variables, default=str),
+    )
+
     return {
         "ok": True,
         "message": "FastAPI call route compatibility endpoint handled the request.",
         "route": event_payload,
         "event": event.get("event"),
         "type": "conversation_initiation_client_data",
-        "dynamic_variables": {
-            "caller_number": call_payload.get("from_number"),
-            "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
-            "business_name": business.get("name") if business else None,
-            "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
-            "receptionist_name": receptionist.get("full_name") if receptionist else None,
-            "twilio_to_number": call_payload.get("to_number"),
-            "twilio_call_sid": call_payload.get("call_id"),
-        },
+        "dynamic_variables": dynamic_variables,
     }
 
 @app.post("/api/tools/report-intent-checkpoint", tags=["Server Tools"])
