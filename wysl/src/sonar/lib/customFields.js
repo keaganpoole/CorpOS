@@ -1,5 +1,4 @@
-const CUSTOM_FIELDS_KEY = 'SONAR_people_custom_fields';
-const CUSTOM_FIELD_VALUES_KEY = 'SONAR_people_custom_field_values';
+import { supabase } from './supabase';
 
 export const CUSTOM_FIELD_PREFIX = 'custom_';
 
@@ -16,70 +15,131 @@ const titleCase = (value) => String(value || '')
   .trim()
   .replace(/\b\w/g, (char) => char.toUpperCase());
 
-const safeParse = (value, fallback) => {
-  try {
-    return value ? JSON.parse(value) : fallback;
-  } catch {
-    return fallback;
-  }
-};
-
-export const loadCustomFields = () => {
-  const fields = safeParse(localStorage.getItem(CUSTOM_FIELDS_KEY), []);
-  return Array.isArray(fields) ? fields : [];
-};
-
-export const saveCustomFields = (fields) => {
-  localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(fields));
-};
-
-export const loadCustomFieldValues = () => {
-  const values = safeParse(localStorage.getItem(CUSTOM_FIELD_VALUES_KEY), {});
-  return values && typeof values === 'object' && !Array.isArray(values) ? values : {};
-};
-
-export const saveCustomFieldValues = (values) => {
-  localStorage.setItem(CUSTOM_FIELD_VALUES_KEY, JSON.stringify(values));
-};
-
 export const isCustomFieldKey = (key) => typeof key === 'string' && key.startsWith(CUSTOM_FIELD_PREFIX);
 
-export const createCustomField = (type, existingFields = []) => {
-  const countForType = existingFields.filter((field) => field.type === type).length + 1;
-  const createdAt = Date.now();
-  return {
-    key: `${CUSTOM_FIELD_PREFIX}${type}_${createdAt}`,
-    label: `${titleCase(type)} Field ${countForType}`,
-    type,
+export const getCurrentBusinessId = async () => {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error('User not found');
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .single();
+
+  if (error) throw error;
+  if (!data?.id) throw new Error('Business not found');
+  return data.id;
+};
+
+export const fetchCustomFields = async (businessId) => {
+  const { data, error } = await supabase
+    .from('people_schema')
+    .select('*')
+    .eq('business_id', businessId)
+    .eq('is_active', true)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  return (data || []).map((field) => ({
+    key: field.field_key,
+    label: field.label,
+    type: field.field_type,
     table: true,
     editable: true,
-    tableWidth: {
+    tableWidth: field.config?.tableWidth || {
       boolean: '110px',
       text: '180px',
       number: '120px',
       date: '150px',
-    }[type] || '160px',
-    createdAt,
+    }[field.field_type] || '160px',
+    position: field.position ?? 0,
+    config: field.config || {},
+    id: field.id,
+    createdAt: field.created_at,
+  }));
+};
+
+export const createCustomField = async (type, existingFields = [], businessId) => {
+  const countForType = existingFields.filter((field) => field.type === type).length + 1;
+  const fieldKey = `${CUSTOM_FIELD_PREFIX}${type}_${Date.now()}`;
+  const label = `${titleCase(type)} Field ${countForType}`;
+  const position = existingFields.length;
+  const tableWidth = {
+    boolean: '110px',
+    text: '180px',
+    number: '120px',
+    date: '150px',
+  }[type] || '160px';
+
+  const { data, error } = await supabase
+    .from('people_schema')
+    .insert({
+      business_id: businessId,
+      field_key: fieldKey,
+      label,
+      field_type: type,
+      position,
+      is_active: true,
+      config: { tableWidth },
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    key: data.field_key,
+    label: data.label,
+    type: data.field_type,
+    table: true,
+    editable: true,
+    tableWidth,
+    position: data.position ?? position,
+    config: data.config || {},
+    id: data.id,
+    createdAt: data.created_at,
   };
 };
 
-export const getCustomValue = (values, leadId, fieldKey) => values?.[leadId]?.[fieldKey];
+export const updateCustomField = async (fieldKey, businessId, updates = {}) => {
+  const dbUpdates = {};
+  if (updates.label != null) dbUpdates.label = updates.label;
+  if (updates.position != null) dbUpdates.position = updates.position;
+  if (updates.config != null) dbUpdates.config = updates.config;
+  if (updates.is_active != null) dbUpdates.is_active = updates.is_active;
 
-export const setCustomValue = (values, leadId, fieldKey, value) => {
-  const next = { ...values };
-  const rowValues = { ...(next[leadId] || {}) };
+  const { data, error } = await supabase
+    .from('people_schema')
+    .update(dbUpdates)
+    .eq('business_id', businessId)
+    .eq('field_key', fieldKey)
+    .select()
+    .single();
 
+  if (error) throw error;
+  return data;
+};
+
+export const updateCustomFieldPositions = async (businessId, orderedFieldKeys = []) => {
+  await Promise.all(
+    orderedFieldKeys.map((fieldKey, index) => updateCustomField(fieldKey, businessId, { position: index }))
+  );
+};
+
+export const getCustomValue = (rowCustomFields, fieldKey) => rowCustomFields?.[fieldKey];
+
+export const setCustomFieldValue = (rowCustomFields, fieldKey, value) => {
+  const next = { ...(rowCustomFields || {}) };
   if (value == null || value === '') {
-    delete rowValues[fieldKey];
+    delete next[fieldKey];
   } else {
-    rowValues[fieldKey] = value;
+    next[fieldKey] = value;
   }
-
-  if (Object.keys(rowValues).length === 0) {
-    delete next[leadId];
-  } else {
-    next[leadId] = rowValues;
-  }
-
   return next;
 };

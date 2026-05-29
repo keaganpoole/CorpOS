@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2,
   User, Phone, Mail, Flag, Compass, Clock, Tag, Search as SearchIcon, FileText, Activity,
-  Users, MapPin, Map, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays,
+  Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays,
   ToggleLeft,
 } from 'lucide-react';
 import {
@@ -15,8 +15,8 @@ import {
   loadFieldConfig, saveFieldConfig, loadColorbarRules, saveColorbarRules, evaluateColorbar,
 } from '../lib/fieldConfig';
 import {
-  CUSTOM_FIELD_TYPES, createCustomField, getCustomValue, isCustomFieldKey,
-  loadCustomFields, loadCustomFieldValues, saveCustomFields, saveCustomFieldValues, setCustomValue,
+  CUSTOM_FIELD_TYPES, createCustomField, fetchCustomFields, getCurrentBusinessId, getCustomValue,
+  isCustomFieldKey, setCustomFieldValue, updateCustomField, updateCustomFieldPositions,
 } from '../lib/customFields';
 import FieldSettingsModal from './FieldSettingsModal';
 import ColorbarConfigModal from './ColorbarConfigModal';
@@ -24,7 +24,7 @@ import ColorbarConfigModal from './ColorbarConfigModal';
 const ICONS = {
   user: User, phone: Phone, mail: Mail, flag: Flag, compass: Compass, clock: Clock, tag: Tag,
   search: SearchIcon, 'file-text': FileText, activity: Activity, users: Users, 'map-pin': MapPin,
-  map: Map, shield: Shield, 'dollar-sign': DollarSign, target: Target, navigation: Navigation,
+  map: MapIcon, shield: Shield, 'dollar-sign': DollarSign, target: Target, navigation: Navigation,
 };
 
 const FIELD_TYPE_ICONS = {
@@ -302,14 +302,15 @@ const DraggableHeader = ({ col, index, sortBy, sortDir, onSort, onDragStart, onD
   );
 };
 
-const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], customFieldValues = {} }) => {
+const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, customFields = [] }) => {
   const customField = customFields.find((field) => field.key === colId);
   if (customField) {
-    const value = getCustomValue(customFieldValues, lead.id, colId);
-    if (customField.type === 'boolean') return <InlineBoolean value={!!value} onSave={(v) => autoSave(lead.id, colId, v)} />;
-    if (customField.type === 'number') return <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} />;
-    if (customField.type === 'date') return <InlineDateOnly value={value} onSave={(v) => autoSave(lead.id, colId, v)} />;
-    return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
+    const value = getCustomValue(lead.custom_fields, colId);
+    const saveCustom = (nextValue) => autoSave(lead.id, 'custom_fields', setCustomFieldValue(lead.custom_fields, colId, nextValue));
+    if (customField.type === 'boolean') return <InlineBoolean value={!!value} onSave={saveCustom} />;
+    if (customField.type === 'number') return <InlineNumber value={value} onSave={saveCustom} />;
+    if (customField.type === 'date') return <InlineDateOnly value={value} onSave={saveCustom} />;
+    return <InlineText value={value} onSave={saveCustom} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
   }
 
   switch (colId) {
@@ -405,9 +406,9 @@ const buildColumns = (customFields = []) => [
 
 const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearchChange, statusFilter, onStatusFilterChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateNew, totalCount, onUpdateLead }) => {
   const [density] = useState(4);
-  const [customFields, setCustomFields] = useState(() => loadCustomFields());
-  const [customFieldValues, setCustomFieldValues] = useState(() => loadCustomFieldValues());
-  const [columns, setColumns] = useState(() => buildColumns(loadCustomFields()));
+  const [businessId, setBusinessId] = useState(null);
+  const [customFields, setCustomFields] = useState([]);
+  const [columns, setColumns] = useState(() => buildColumns());
   const [fieldConfig, setFieldConfig] = useState(() => loadFieldConfig());
   const [colorbarRules, setColorbarRules] = useState(() => loadColorbarRules());
   const [settingsField, setSettingsField] = useState(null);
@@ -420,6 +421,37 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
 
   const column_options = CUSTOM_FIELD_TYPES;
 
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const nextBusinessId = await getCurrentBusinessId();
+        const nextCustomFields = await fetchCustomFields(nextBusinessId);
+        if (!active) return;
+        setBusinessId(nextBusinessId);
+        setCustomFields(nextCustomFields);
+        setColumns((prev) => {
+          const built = buildColumns(nextCustomFields);
+          const prevOrder = prev.map((col) => col.id);
+          const byId = new Map(built.map((col) => [col.id, col]));
+          const next = [];
+          prevOrder.forEach((id) => {
+            if (byId.has(id)) {
+              next.push(byId.get(id));
+              byId.delete(id);
+            }
+          });
+          byId.forEach((col) => next.push(col));
+          return next;
+        });
+      } catch (err) {
+        console.error('[LeadsTable] Failed to load custom fields:', err.message);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, []);
+
   const handleFieldSave = (key, config) => {
     const next = { ...fieldConfig, [key]: { ...fieldConfig[key], ...config } };
     setFieldConfig(next);
@@ -429,31 +461,25 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
         field.key === key ? { ...field, label: config.name || field.label } : field
       ));
       setCustomFields(nextFields);
-      saveCustomFields(nextFields);
       setColumns((prev) => prev.map((col) => (
         col.id === key ? { ...col, label: config.name || col.label } : col
       )));
+      if (businessId) {
+        updateCustomField(key, businessId, { label: config.name || key }).catch((err) => {
+          console.error('[LeadsTable] Failed to save custom field settings:', err.message);
+        });
+      }
     }
     setSettingsField(null);
   };
   const handleColorbarRulesChange = (rules) => { setColorbarRules(rules); saveColorbarRules(rules); };
-  const autoSave = useCallback((leadId, field, value) => {
-    if (isCustomFieldKey(field)) {
-      setCustomFieldValues((prev) => {
-        const next = setCustomValue(prev, leadId, field, value);
-        saveCustomFieldValues(next);
-        return next;
-      });
-      return;
-    }
-    onUpdateLead(leadId, { [field]: value });
-  }, [onUpdateLead]);
+  const autoSave = useCallback((leadId, field, value) => onUpdateLead(leadId, { [field]: value }), [onUpdateLead]);
 
-  const handleCreateColumn = (type) => {
-    const nextField = createCustomField(type, customFields);
+  const handleCreateColumn = async (type) => {
+    if (!businessId) return;
+    const nextField = await createCustomField(type, customFields, businessId);
     const nextFields = [...customFields, nextField];
     setCustomFields(nextFields);
-    saveCustomFields(nextFields);
     setColumns((prev) => [
       ...prev,
       {
@@ -524,6 +550,16 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       const next = [...prev];
       const [moved] = next.splice(dragIndex, 1);
       next.splice(dropIndex, 0, moved);
+      if (businessId) {
+        const orderedCustomKeys = next.filter((col) => col.custom).map((col) => col.id);
+        updateCustomFieldPositions(businessId, orderedCustomKeys).catch((err) => {
+          console.error('[LeadsTable] Failed to persist custom field positions:', err.message);
+        });
+        setCustomFields((fields) => fields.map((field) => ({
+          ...field,
+          position: orderedCustomKeys.indexOf(field.key),
+        })));
+      }
       return next;
     });
     setDragIndex(null); setDragOverIndex(null);
@@ -618,7 +654,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                       })()}
                       {columns.map((col) => (
                         <div key={col.id} style={{ width: col.width, minWidth: col.width }} className={col.id === 'avatar' ? 'shrink-0' : 'shrink-0 pl-4'}>
-                          <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} customFieldValues={customFieldValues} />
+                          <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} />
                         </div>
                       ))}
                     </motion.div>

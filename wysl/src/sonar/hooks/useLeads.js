@@ -163,6 +163,14 @@ export function useLeads() {
 
   const updateLead = async (id, updates) => {
     const payload = normalizePayload(updates, { isCreate: false });
+    let previousRow = null;
+    setError(null);
+    setLeads((prev) => prev.map((row) => {
+      if (row.id !== id) return row;
+      previousRow = row;
+      return { ...row, ...payload };
+    }));
+
     const { data, error: err } = await supabase
       .from('people')
       .update(payload)
@@ -170,7 +178,13 @@ export function useLeads() {
       .select()
       .single();
 
-    if (err) throw err;
+    if (err) {
+      if (previousRow) {
+        setLeads((prev) => prev.map((row) => (row.id === id ? previousRow : row)));
+      }
+      throw err;
+    }
+
     setLeads((prev) => prev.map((row) => (row.id === id ? data : row)));
     return data;
   };
