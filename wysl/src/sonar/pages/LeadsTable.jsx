@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2,
   User, Phone, Mail, Flag, Compass, Clock, Tag, Search as SearchIcon, FileText, Activity,
-  Users, MapPin, Map, Shield, DollarSign, Target, Navigation,
+  Users, MapPin, Map, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays,
+  ToggleLeft,
 } from 'lucide-react';
 import {
   TABLE_COLUMNS, STATUS_OPTIONS, SOURCE_OPTIONS, CONTACT_METHOD_OPTIONS, TAG_OPTIONS,
@@ -13,6 +14,10 @@ import {
 import {
   loadFieldConfig, saveFieldConfig, loadColorbarRules, saveColorbarRules, evaluateColorbar,
 } from '../lib/fieldConfig';
+import {
+  CUSTOM_FIELD_TYPES, createCustomField, getCustomValue, isCustomFieldKey,
+  loadCustomFields, loadCustomFieldValues, saveCustomFields, saveCustomFieldValues, setCustomValue,
+} from '../lib/customFields';
 import FieldSettingsModal from './FieldSettingsModal';
 import ColorbarConfigModal from './ColorbarConfigModal';
 
@@ -20,6 +25,13 @@ const ICONS = {
   user: User, phone: Phone, mail: Mail, flag: Flag, compass: Compass, clock: Clock, tag: Tag,
   search: SearchIcon, 'file-text': FileText, activity: Activity, users: Users, 'map-pin': MapPin,
   map: Map, shield: Shield, 'dollar-sign': DollarSign, target: Target, navigation: Navigation,
+};
+
+const FIELD_TYPE_ICONS = {
+  boolean: ToggleLeft,
+  text: Type,
+  number: Hash,
+  date: CalendarDays,
 };
 
 const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
@@ -36,8 +48,12 @@ const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
       className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-full min-w-[60px]" />
   ) : (
     <span onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-      className={`cursor-pointer hover:text-white transition-colors ${className}`}>
-      {value || <span className="text-zinc-700 italic">{placeholder}</span>}
+      className={`inline-flex min-w-[60px] cursor-pointer hover:text-white transition-colors ${className}`}>
+      {value || (
+        placeholder
+          ? <span className="text-zinc-700 italic">{placeholder}</span>
+          : <span className="invisible">edit</span>
+      )}
     </span>
   );
 };
@@ -103,6 +119,27 @@ const InlineDate = ({ value, onSave }) => {
     <span onClick={(e) => { e.stopPropagation(); setDraft(toLocal(value)); setEditing(true); }}
       className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-500">
       {formatTimestamp(value)}
+    </span>
+  );
+};
+
+const InlineDateOnly = ({ value, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const ref = useRef(null);
+  useEffect(() => { if (editing) ref.current?.showPicker?.(); }, [editing]);
+  const save = () => { setEditing(false); onSave(draft || null); };
+  const formatted = value
+    ? new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+  return editing ? (
+    <input ref={ref} type="date" value={draft} onChange={(e) => setDraft(e.target.value)}
+      onBlur={save} onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }} onClick={(e) => e.stopPropagation()}
+      className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none [color-scheme:dark]" />
+  ) : (
+    <span onClick={(e) => { e.stopPropagation(); setDraft(value || ''); setEditing(true); }}
+      className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-500">
+      {formatted || <span className="text-zinc-700 italic">Set date</span>}
     </span>
   );
 };
@@ -265,7 +302,16 @@ const DraggableHeader = ({ col, index, sortBy, sortDir, onSort, onDragStart, onD
   );
 };
 
-const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {} }) => {
+const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], customFieldValues = {} }) => {
+  const customField = customFields.find((field) => field.key === colId);
+  if (customField) {
+    const value = getCustomValue(customFieldValues, lead.id, colId);
+    if (customField.type === 'boolean') return <InlineBoolean value={!!value} onSave={(v) => autoSave(lead.id, colId, v)} />;
+    if (customField.type === 'number') return <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} />;
+    if (customField.type === 'date') return <InlineDateOnly value={value} onSave={(v) => autoSave(lead.id, colId, v)} />;
+    return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
+  }
+
   switch (colId) {
     case 'avatar': {
       const statusColor = getStatusColor(lead.status);
@@ -324,7 +370,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {} }) => 
   }
 };
 
-const DEFAULT_COLUMNS = [
+const buildColumns = (customFields = []) => [
   { id: 'avatar', label: '', width: '36px', sortKey: null },
   ...TABLE_COLUMNS.map((field) => ({
     id: field.key,
@@ -343,26 +389,121 @@ const DEFAULT_COLUMNS = [
     }[field.type] || '160px',
     sortKey: field.key,
   })),
+  ...customFields.map((field) => ({
+    id: field.key,
+    label: field.label,
+    width: field.tableWidth || {
+      boolean: '110px',
+      text: '180px',
+      number: '120px',
+      date: '150px',
+    }[field.type] || '160px',
+    sortKey: null,
+    custom: true,
+  })),
 ];
 
 const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearchChange, statusFilter, onStatusFilterChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateNew, totalCount, onUpdateLead }) => {
   const [density] = useState(4);
-  const [columns, setColumns] = useState(DEFAULT_COLUMNS);
+  const [customFields, setCustomFields] = useState(() => loadCustomFields());
+  const [customFieldValues, setCustomFieldValues] = useState(() => loadCustomFieldValues());
+  const [columns, setColumns] = useState(() => buildColumns(loadCustomFields()));
   const [fieldConfig, setFieldConfig] = useState(() => loadFieldConfig());
   const [colorbarRules, setColorbarRules] = useState(() => loadColorbarRules());
   const [settingsField, setSettingsField] = useState(null);
   const [showColorbarStudio, setShowColorbarStudio] = useState(false);
+  const [showColumnOptions, setShowColumnOptions] = useState(false);
+  const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, left: 0 });
+  const columnOptionsButtonRef = useRef(null);
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+
+  const column_options = CUSTOM_FIELD_TYPES;
 
   const handleFieldSave = (key, config) => {
     const next = { ...fieldConfig, [key]: { ...fieldConfig[key], ...config } };
     setFieldConfig(next);
     saveFieldConfig(next);
+    if (isCustomFieldKey(key)) {
+      const nextFields = customFields.map((field) => (
+        field.key === key ? { ...field, label: config.name || field.label } : field
+      ));
+      setCustomFields(nextFields);
+      saveCustomFields(nextFields);
+      setColumns((prev) => prev.map((col) => (
+        col.id === key ? { ...col, label: config.name || col.label } : col
+      )));
+    }
     setSettingsField(null);
   };
   const handleColorbarRulesChange = (rules) => { setColorbarRules(rules); saveColorbarRules(rules); };
-  const autoSave = useCallback((leadId, field, value) => onUpdateLead(leadId, { [field]: value }), [onUpdateLead]);
+  const autoSave = useCallback((leadId, field, value) => {
+    if (isCustomFieldKey(field)) {
+      setCustomFieldValues((prev) => {
+        const next = setCustomValue(prev, leadId, field, value);
+        saveCustomFieldValues(next);
+        return next;
+      });
+      return;
+    }
+    onUpdateLead(leadId, { [field]: value });
+  }, [onUpdateLead]);
+
+  const handleCreateColumn = (type) => {
+    const nextField = createCustomField(type, customFields);
+    const nextFields = [...customFields, nextField];
+    setCustomFields(nextFields);
+    saveCustomFields(nextFields);
+    setColumns((prev) => [
+      ...prev,
+      {
+        id: nextField.key,
+        label: nextField.label,
+        width: nextField.tableWidth,
+        sortKey: null,
+        custom: true,
+      },
+    ]);
+    setFieldConfig((prev) => {
+      const icon = { boolean: 'shield', text: 'file-text', number: 'activity', date: 'clock' }[type] || 'tag';
+      const next = { ...prev, [nextField.key]: { name: nextField.label, icon } };
+      saveFieldConfig(next);
+      return next;
+    });
+    setShowColumnOptions(false);
+    setSettingsField(nextField.key);
+  };
+
+  const updateColumnOptionsPosition = useCallback(() => {
+    const rect = columnOptionsButtonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const menuWidth = 168;
+    const left = Math.min(rect.left, window.innerWidth - menuWidth - 12);
+    setColumnOptionsPosition({ top: rect.bottom + 8, left: Math.max(12, left) });
+  }, []);
+
+  const toggleColumnOptions = () => {
+    updateColumnOptionsPosition();
+    setShowColumnOptions((open) => !open);
+  };
+
+  useEffect(() => {
+    if (!showColumnOptions) return undefined;
+    updateColumnOptionsPosition();
+    const close = (event) => {
+      if (columnOptionsButtonRef.current?.contains(event.target)) return;
+      if (event.target.closest?.('[data-column-options-menu="true"]')) return;
+      setShowColumnOptions(false);
+    };
+    window.addEventListener('resize', updateColumnOptionsPosition);
+    window.addEventListener('scroll', updateColumnOptionsPosition, true);
+    document.addEventListener('mousedown', close);
+    return () => {
+      window.removeEventListener('resize', updateColumnOptionsPosition);
+      window.removeEventListener('scroll', updateColumnOptionsPosition, true);
+      document.removeEventListener('mousedown', close);
+    };
+  }, [showColumnOptions, updateColumnOptionsPosition]);
 
   const dc = {
     row: ['py-0', 'py-0.5', 'py-1', 'py-1.5', 'py-2', 'py-2.5', 'py-3', 'py-3.5', 'py-4'][density],
@@ -429,6 +570,18 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                         <DraggableHeader col={col} index={index} sortBy={sortBy} sortDir={sortDir} onSort={onSort} onDragStart={handleDragStart} onDragOver={handleDragOver} onDrop={handleDrop} onDragEnd={() => setDragIndex(null)} isDragging={dragIndex === index} dragOverIndex={dragOverIndex} fieldConfig={fieldConfig} onFieldSettings={setSettingsField} />
                       </div>
                     ))}
+                    <div className="shrink-0 pl-1">
+                      <button
+                        ref={columnOptionsButtonRef}
+                        type="button"
+                        onClick={toggleColumnOptions}
+                        className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-cyan-500/25 hover:bg-cyan-500/10 transition-all flex items-center justify-center"
+                        aria-label="Add column"
+                      >
+                        <Plus size={13} />
+                      </button>
+                    </div>
+                    {showColumnOptions && <div className="w-[190px] shrink-0" />}
                   </div>
                 </div>
 
@@ -465,7 +618,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                       })()}
                       {columns.map((col) => (
                         <div key={col.id} style={{ width: col.width, minWidth: col.width }} className={col.id === 'avatar' ? 'shrink-0' : 'shrink-0 pl-4'}>
-                          <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} />
+                          <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} customFieldValues={customFieldValues} />
                         </div>
                       ))}
                     </motion.div>
@@ -478,8 +631,38 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       </div>
 
       <AnimatePresence>
+        {showColumnOptions && (
+          <motion.div
+            data-column-options-menu="true"
+            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+            style={{ top: columnOptionsPosition.top, left: columnOptionsPosition.left }}
+            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d0d0d]/95 shadow-[0_18px_48px_rgba(0,0,0,0.82)] backdrop-blur-xl"
+          >
+            <div className="py-1">
+              {column_options.map((option, idx) => {
+                const IconComp = FIELD_TYPE_ICONS[option.type] || Tag;
+                return (
+                  <motion.button
+                    key={option.type}
+                    type="button"
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.025 }}
+                    onClick={() => handleCreateColumn(option.type)}
+                    className="w-full px-3 py-2 text-left transition-all hover:bg-white/[0.04] flex items-center gap-2.5 group/fieldtype"
+                  >
+                    <IconComp size={13} className="text-zinc-600 group-hover/fieldtype:text-cyan-300 transition-colors" />
+                    <span className="text-[11px] font-bold text-zinc-400 group-hover/fieldtype:text-white transition-colors">{option.label}</span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
         {settingsField && (
-          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onClose={() => setSettingsField(null)} />
+          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onClose={() => setSettingsField(null)} />
         )}
         {showColorbarStudio && (
           <ColorbarConfigModal onClose={() => setShowColorbarStudio(false)} onRulesChange={handleColorbarRulesChange} />

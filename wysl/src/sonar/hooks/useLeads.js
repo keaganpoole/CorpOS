@@ -75,7 +75,7 @@ const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
     next.missed_call_count = Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
   }
 
-  if (!next.status) {
+  if (isCreate && !next.status) {
     next.status = DEFAULT_STATUS;
   }
 
@@ -169,6 +169,7 @@ export function useLeads() {
       .eq('id', id)
       .select()
       .single();
+
     if (err) throw err;
     setLeads((prev) => prev.map((row) => (row.id === id ? data : row)));
     return data;
