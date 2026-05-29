@@ -4247,6 +4247,23 @@ async def delete_call_logs(payload: dict, current_user: dict = Depends(get_curre
     supabase.table("call_logs").delete().eq("user_id", str(current_user.id)).in_("id", matched_ids).execute()
     return {"ok": True, "deleted_ids": matched_ids, "deleted_count": len(matched_ids)}
 
+@app.patch("/api/sonar/call-logs/{call_log_id}/favorite", tags=["Sonar Calls"])
+async def update_call_log_favorite(call_log_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
+    if not isinstance(payload, dict) or "is_favorited" not in payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="is_favorited is required")
+
+    is_favorited = bool(payload.get("is_favorited"))
+    response = (
+        supabase.table("call_logs")
+        .update({"is_favorited": is_favorited})
+        .eq("user_id", str(current_user.id))
+        .eq("id", str(call_log_id))
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call log not found")
+    return {"ok": True, "call_log": response.data[0]}
+
 @app.get("/api/sonar/call-logs/stats", tags=["Sonar Calls"])
 async def get_call_log_stats(current_user: dict = Depends(get_current_user)):
     response = (

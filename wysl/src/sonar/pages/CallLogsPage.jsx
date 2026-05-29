@@ -14,6 +14,7 @@ import {
   Play,
   Pause,
   Search,
+  Star,
   Square,
   SlidersHorizontal,
   Smile,
@@ -196,6 +197,7 @@ function normalizeCall(row) {
     time: row.started_at || row.event_timestamp || row.created_at,
     receptionist: receptionistName,
     receptionistAvatar: row.receptionist_avatar || (avatarName && avatarName !== 'receptionist' ? `${AVATAR_BASE}/${avatarName}.jpg` : ''),
+    isFavorited: Boolean(row.is_favorited),
     audioUrl: row.audio_url || '',
     transcript: normalizeTranscript(row.transcript_jsonb, row.transcript_text),
     raw: row,
@@ -310,7 +312,37 @@ function DeleteConfirmModal({ count, onCancel, onConfirm, deleting }) {
   );
 }
 
-function CallCard({ call, selected, checked, onClick, onToggleSelect, onDelete }) {
+function CallLogsLoader() {
+  return (
+    <div className="px-4 py-6">
+      <div className="flex items-center gap-3 text-zinc-500">
+        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center text-cyan-300/80">
+          <motion.div
+            animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.96, 1.04, 0.96] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <AudioLines size={15} />
+          </motion.div>
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="text-[13px] font-semibold text-zinc-400">Loading call logs</p>
+          <div className="flex items-center gap-1">
+            {[0, 1, 2].map((index) => (
+              <motion.span
+                key={index}
+                className="h-1 w-1 rounded-full bg-cyan-300/60"
+                animate={{ opacity: [0.25, 0.85, 0.25] }}
+                transition={{ duration: 1, repeat: Infinity, delay: index * 0.16, ease: 'easeInOut' }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CallCard({ call, selected, checked, onClick, onToggleSelect, onToggleFavorite, onDelete }) {
   return (
     <div
       onClick={onClick}
@@ -347,6 +379,39 @@ function CallCard({ call, selected, checked, onClick, onToggleSelect, onDelete }
         className="absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[#090909]/88 text-zinc-400 opacity-0 transition duration-200 hover:text-zinc-100 group-hover:opacity-100"
       >
         <X size={13} />
+      </button>
+      <button
+        type="button"
+        aria-label={call.isFavorited ? 'Remove favorite' : 'Favorite conversation'}
+        aria-pressed={call.isFavorited}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleFavorite(call.id);
+        }}
+        className={cn(
+          'absolute right-3 top-10 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[#090909]/88 transition duration-200',
+          call.isFavorited
+            ? 'text-amber-300 opacity-100'
+            : 'text-zinc-500 opacity-0 hover:text-amber-200 group-hover:opacity-100'
+        )}
+      >
+        {call.isFavorited && (
+          <motion.span
+            key={`${call.id}-favorite-glow`}
+            className="absolute inset-0 rounded-full bg-amber-300/15"
+            initial={{ scale: 0.65, opacity: 0 }}
+            animate={{ scale: 1.7, opacity: [0, 0.9, 0] }}
+            transition={{ duration: 0.55, ease: 'easeOut' }}
+            aria-hidden="true"
+          />
+        )}
+        <motion.span
+          animate={call.isFavorited ? { scale: [1, 1.28, 1], rotate: [0, -10, 0] } : { scale: 1, rotate: 0 }}
+          transition={{ duration: 0.32, ease: 'easeOut' }}
+          className="relative z-10 inline-flex"
+        >
+          <Star size={13} fill={call.isFavorited ? 'currentColor' : 'none'} />
+        </motion.span>
       </button>
       <div className={cn('absolute left-3 top-3 z-10 transition duration-200', checked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}>
         <SelectionToggle
@@ -392,22 +457,25 @@ function CallCard({ call, selected, checked, onClick, onToggleSelect, onDelete }
   );
 }
 
-function TranscriptBubble({ entry, receptionistAvatar }) {
+function TranscriptBubble({ entry, receptionistAvatar, receptionistName, customerName }) {
   const isReceptionist = entry.speaker === 'receptionist';
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const speakerName = isReceptionist ? receptionistName : customerName;
+  const fallbackInitial = isReceptionist ? 'R' : 'C';
+  const initial = String(speakerName || fallbackInitial).trim().charAt(0).toUpperCase() || fallbackInitial;
 
   useEffect(() => {
     setAvatarFailed(false);
   }, [receptionistAvatar]);
 
   return (
-    <div className={cn('flex items-end gap-3', isReceptionist ? 'justify-end' : 'justify-start')}>
+    <div className={cn('flex items-center gap-3', isReceptionist ? 'justify-end' : 'justify-start')}>
       {!isReceptionist && (
-        <div className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-[11px] font-bold text-zinc-300">
-          C
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-[11px] font-bold text-zinc-300">
+          {initial}
         </div>
       )}
-      <div className={cn('max-w-[74%]', isReceptionist ? 'items-end' : 'items-start')}>
+      <div className={cn('flex max-w-[74%] flex-col', isReceptionist ? 'items-end' : 'items-start')}>
         <div
           className={cn(
             'rounded-2xl px-4 py-3 text-[13px] leading-6 shadow-[0_12px_30px_rgba(0,0,0,0.18)]',
@@ -418,19 +486,27 @@ function TranscriptBubble({ entry, receptionistAvatar }) {
         >
           {entry.text}
         </div>
-        <p className={cn('mt-1 text-[10px] text-zinc-700', isReceptionist ? 'text-right' : 'text-left')}>{entry.offset}</p>
+        <div className={cn('mt-1 flex max-w-full items-center gap-1.5 text-[10px]', isReceptionist ? 'justify-end text-right' : 'justify-start text-left')}>
+          <span className="truncate font-semibold text-zinc-500">{speakerName || (isReceptionist ? 'Receptionist' : 'Caller')}</span>
+          {entry.offset && (
+            <>
+              <span className="text-zinc-800">•</span>
+              <span className="shrink-0 text-zinc-700">{entry.offset}</span>
+            </>
+          )}
+        </div>
       </div>
       {isReceptionist && receptionistAvatar && !avatarFailed && (
         <img
           src={receptionistAvatar}
           alt=""
-          className="mb-1 h-8 w-8 shrink-0 rounded-full object-cover"
+          className="h-8 w-8 shrink-0 rounded-full object-cover"
           onError={() => setAvatarFailed(true)}
         />
       )}
       {isReceptionist && (!receptionistAvatar || avatarFailed) && (
-        <div className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-[11px] font-bold text-cyan-100">
-          R
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-[11px] font-bold text-cyan-100">
+          {initial}
         </div>
       )}
     </div>
@@ -660,6 +736,34 @@ export default function CallLogsPage() {
     }
   };
 
+  const handleToggleFavorite = async (callId) => {
+    if (!session?.access_token) return;
+    const target = calls.find((call) => call.id === callId);
+    if (!target) return;
+
+    const nextValue = !target.isFavorited;
+    setCalls((current) => current.map((call) => (
+      call.id === callId ? { ...call, isFavorited: nextValue } : call
+    )));
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs/${callId}/favorite`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_favorited: nextValue }),
+      });
+      if (!response.ok) throw new Error(`Favorite request failed (${response.status})`);
+    } catch (err) {
+      setCalls((current) => current.map((call) => (
+        call.id === callId ? { ...call, isFavorited: target.isFavorited } : call
+      )));
+      setError(err.message || 'Failed to update favorite.');
+    }
+  };
+
   const categoryOptions = useMemo(() => (
     [CATEGORY_OPTIONS[0], ...Array.from(new Set(calls.map((call) => call.purpose).filter(Boolean))).sort()]
   ), [calls]);
@@ -677,6 +781,9 @@ export default function CallLogsPage() {
       const matchesStatus = statusFilter === STATUS_OPTIONS[0] || call.status === statusFilter;
       const matchesSentiment = sentimentFilter === SENTIMENT_OPTIONS[0] || call.sentiment === sentimentFilter;
       return matchesSearch && matchesCategory && matchesStatus && matchesSentiment;
+    }).sort((a, b) => {
+      if (a.isFavorited !== b.isFavorited) return a.isFavorited ? -1 : 1;
+      return new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime();
     });
   }, [calls, categoryFilter, searchQuery, sentimentFilter, statusFilter]);
 
@@ -738,9 +845,7 @@ export default function CallLogsPage() {
 
           <div className="custom-scrollbar min-h-[320px] flex-1 overflow-y-auto px-3 py-2">
             {loading && (
-              <div className="p-6 text-center">
-                <p className="text-[13px] font-semibold text-zinc-300">Loading call logs</p>
-              </div>
+              <CallLogsLoader />
             )}
             {!loading && error && (
               <div className="p-6 text-center">
@@ -761,6 +866,7 @@ export default function CallLogsPage() {
                     setSelectedId(call.id);
                   }}
                   onToggleSelect={toggleSelectCall}
+                  onToggleFavorite={handleToggleFavorite}
                   onDelete={(callId) => openDeleteModal([callId])}
                 />
               </div>
@@ -826,7 +932,13 @@ export default function CallLogsPage() {
             >
               {selectedCall.transcript.length > 0 ? (
                 selectedCall.transcript.map((entry, index) => (
-                  <TranscriptBubble key={`${selectedCall.id}-${index}`} entry={entry} receptionistAvatar={selectedCall.receptionistAvatar} />
+                  <TranscriptBubble
+                    key={`${selectedCall.id}-${index}`}
+                    entry={entry}
+                    receptionistAvatar={selectedCall.receptionistAvatar}
+                    receptionistName={selectedCall.receptionist}
+                    customerName={selectedCall.name}
+                  />
                 ))
               ) : (
                 <div className="rounded-2xl bg-white/[0.03] p-8 text-center">
