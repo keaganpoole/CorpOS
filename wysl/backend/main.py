@@ -2193,6 +2193,39 @@ def load_receptionist_by_id(receptionist_id: Optional[str]):
     except Exception:
         return None
 
+def find_inbound_receptionist_for_business(business_id: Optional[str]):
+    if not business_id:
+        return None
+    try:
+        response = (
+            supabase
+            .table("hired_receptionists")
+            .select("*")
+            .eq("business_id", str(business_id))
+            .execute()
+        )
+    except Exception:
+        return None
+
+    candidates = []
+    for row in response.data or []:
+        call_types = str(row.get("call_types") or "").strip().lower()
+        if call_types not in {"inbound", "both"}:
+            continue
+        candidates.append(row)
+
+    if not candidates:
+        return None
+
+    def sort_key(row: dict):
+        is_active = bool(row.get("is_active", True))
+        status_value = str(row.get("status") or "").strip().lower()
+        is_online = status_value not in {"offline", "disabled", "inactive"}
+        hired_at = str(row.get("hired_at") or "")
+        return (is_active, is_online, hired_at)
+
+    return sorted(candidates, key=sort_key, reverse=True)[0]
+
 def find_business_by_forwarded_number(forwarded_number: Optional[str]):
     match_values = set(build_phone_match_values(forwarded_number))
     if not match_values:
@@ -2244,8 +2277,22 @@ def find_business_by_called_number(called_number: Optional[str]):
 def resolve_business_context(payload: Optional[dict] = None):
     payload = payload or {}
 
-    business_id = first_present(payload, "business_id", "businessId", "metadata.business_id")
-    user_id = first_present(payload, "user_id", "userId", "metadata.user_id")
+    business_id = first_present(
+        payload,
+        "business_id",
+        "businessId",
+        "metadata.business_id",
+        "dynamic_variables.business_id",
+        "conversation_initiation_client_data.dynamic_variables.business_id",
+    )
+    user_id = first_present(
+        payload,
+        "user_id",
+        "userId",
+        "metadata.user_id",
+        "dynamic_variables.user_id",
+        "conversation_initiation_client_data.dynamic_variables.user_id",
+    )
     receptionist_id = first_present(
         payload,
         "receptionist_id",
@@ -2253,8 +2300,22 @@ def resolve_business_context(payload: Optional[dict] = None):
         "hired_receptionist_id",
         "metadata.receptionist_id",
         "metadata.hired_receptionist_id",
+        "dynamic_variables.receptionist_id",
+        "dynamic_variables.hired_receptionist_id",
+        "conversation_initiation_client_data.dynamic_variables.receptionist_id",
+        "conversation_initiation_client_data.dynamic_variables.hired_receptionist_id",
     )
-    receptionist_phone = first_present(payload, "receptionist_phone", "phone_number", "agent_phone_number", "to_number")
+    receptionist_phone = first_present(
+        payload,
+        "receptionist_phone",
+        "phone_number",
+        "agent_phone_number",
+        "to_number",
+        "To",
+        "Called",
+        "metadata.to_number",
+        "conversation_initiation_client_data.dynamic_variables.phone_number",
+    )
     forwarded_from = first_present(
         payload,
         "forwarded_from",
@@ -2262,14 +2323,23 @@ def resolve_business_context(payload: Optional[dict] = None):
         "ForwardedFrom",
         "metadata.forwarded_from",
         "source_number",
+        "conversation_initiation_client_data.dynamic_variables.forwarded_from",
     )
     called_number = first_present(
         payload,
         "to_number",
         "To",
+        "Called",
+        "called",
+        "called_number",
         "agent_phone_number",
         "phone_number",
+        "PhoneNumber",
         "metadata.to_number",
+        "dynamic_variables.to_number",
+        "dynamic_variables.called_number",
+        "conversation_initiation_client_data.dynamic_variables.to_number",
+        "conversation_initiation_client_data.dynamic_variables.called_number",
     )
 
     receptionist = load_receptionist_by_id(receptionist_id)
@@ -2357,14 +2427,14 @@ def build_call_route_payload(payload: dict, request: Request):
 
     call_payload = {
         "trigger_key": str(trigger_key).strip().lower().replace(" ", "_"),
-        "call_id": first_present(payload, "call_id", "CallSid", "callSid", "conversation_id"),
+        "call_id": first_present(payload, "call_id", "call_sid", "CallSid", "callSid", "conversation_id"),
         "conversation_id": first_present(payload, "conversation_id", "ConversationSid"),
-        "from_number": normalize_phone_number(first_present(payload, "from_number", "From", "caller_phone", "caller")),
-        "to_number": normalize_phone_number(first_present(payload, "to_number", "To", "agent_phone_number", "phone_number")),
+        "from_number": normalize_phone_number(first_present(payload, "from_number", "From", "caller_phone", "caller", "caller_id")),
+        "to_number": normalize_phone_number(first_present(payload, "to_number", "To", "agent_phone_number", "phone_number", "called_number", "Called")),
         "forwarded_from": normalize_phone_number(forwarded_from),
         "call_status": first_present(payload, "call_status", "CallStatus", "status"),
         "direction": first_present(payload, "direction", "Direction"),
-        "provider": first_present(payload, "provider", "source") or "unknown",
+        "provider": first_present(payload, "provider", "source") or ("elevenlabs" if first_present(payload, "agent_id") else "unknown"),
         "received_at": datetime.now(timezone.utc).isoformat(),
         "path": request.url.path,
         "raw_payload": payload,
@@ -3014,6 +3084,7 @@ async def twilio_inbound_webhook(request: Request):
         "forwarded_from": first_present(payload, "ForwardedFrom", "forwarded_from"),
     })
     business = context.get("business")
+    receptionist = find_inbound_receptionist_for_business(business.get("id")) if business else None
     maybe_auto_verify_business_forwarding(business, called_number=to_number)
 
     event_payload = {
@@ -3028,6 +3099,8 @@ async def twilio_inbound_webhook(request: Request):
         "user_id": context.get("user_id"),
         "business_id": business.get("id") if business else None,
         "business_name": business.get("name") if business else None,
+        "receptionist_id": receptionist.get("id") if receptionist else None,
+        "receptionist_name": receptionist.get("full_name") if receptionist else None,
     }
     emit_scenario_trigger("incoming_call", event_payload)
 
@@ -3041,6 +3114,8 @@ async def twilio_inbound_webhook(request: Request):
                 "caller_number": from_number,
                 "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
                 "business_name": business.get("name") if business else None,
+                "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
+                "receptionist_name": receptionist.get("full_name") if receptionist else None,
                 "twilio_to_number": to_number,
                 "twilio_call_sid": first_present(payload, "CallSid"),
             }
@@ -3051,6 +3126,11 @@ async def twilio_inbound_webhook(request: Request):
         for key, value in register_payload["conversation_initiation_client_data"]["dynamic_variables"].items()
         if value is not None
     }
+
+    logging.info(
+        "ElevenLabs inbound register-call payload: %s",
+        json.dumps(register_payload, default=str),
+    )
 
     response = requests.post(
         "https://api.elevenlabs.io/v1/convai/twilio/register-call",
@@ -3075,17 +3155,24 @@ async def route_call_compat(request: Request):
     payload = await parse_request_payload(request)
     call_payload = build_call_route_payload(payload, request)
     context = resolve_business_context(call_payload)
+    business = context.get("business")
+    receptionist = (
+        context.get("receptionist")
+        or find_inbound_receptionist_for_business((business or {}).get("id"))
+    )
     maybe_auto_verify_business_forwarding(
-        context.get("business"),
+        business,
         called_number=call_payload.get("to_number"),
     )
 
     event_payload = {
         **call_payload,
         "user_id": context.get("user_id"),
-        "business_id": context.get("business", {}).get("id") if context.get("business") else None,
-        "business_name": context.get("business", {}).get("name") if context.get("business") else None,
-        "forwarding_target_number": get_business_forwarding_target_number(context.get("business")),
+        "business_id": business.get("id") if business else None,
+        "business_name": business.get("name") if business else None,
+        "receptionist_id": receptionist.get("id") if receptionist else None,
+        "receptionist_name": receptionist.get("full_name") if receptionist else None,
+        "forwarding_target_number": get_business_forwarding_target_number(business),
     }
 
     event = emit_scenario_trigger(call_payload["trigger_key"], event_payload)
@@ -3102,6 +3189,16 @@ async def route_call_compat(request: Request):
         "message": "FastAPI call route compatibility endpoint handled the request.",
         "route": event_payload,
         "event": event.get("event"),
+        "type": "conversation_initiation_client_data",
+        "dynamic_variables": {
+            "caller_number": call_payload.get("from_number"),
+            "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
+            "business_name": business.get("name") if business else None,
+            "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
+            "receptionist_name": receptionist.get("full_name") if receptionist else None,
+            "twilio_to_number": call_payload.get("to_number"),
+            "twilio_call_sid": call_payload.get("call_id"),
+        },
     }
 
 @app.post("/api/tools/report-intent-checkpoint", tags=["Server Tools"])
@@ -3305,7 +3402,7 @@ async def legacy_server_tool(tool_name: str, request: Request):
         data = query.order("category").order("sort_order").execute().data or []
         return {"ok": True, "services": data, "count": len(data)}
 
-    if normalized_tool == "get-business-info":
+    if normalized_tool in {"get-business-info", "inbound-get-business-info"}:
         if not business:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
         return {
