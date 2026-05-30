@@ -4,6 +4,7 @@ import logging
 import os
 import stripe
 import json
+import re
 import time
 import asyncio
 import requests
@@ -2074,7 +2075,7 @@ def lookup_person_record(
 ):
     try:
         if person_id:
-            query = supabase.table("people").select("id,first_name,last_name,phone,business_id,user_id").eq("id", str(person_id))
+            query = supabase.table("people").select("id,first_name,last_name,phone,business_id,user_id,custom_fields").eq("id", str(person_id))
             if business_id:
                 query = query.eq("business_id", str(business_id))
             elif user_id:
@@ -2087,7 +2088,7 @@ def lookup_person_record(
         if not match_values:
             return None
 
-        query = supabase.table("people").select("id,first_name,last_name,phone,business_id,user_id")
+        query = supabase.table("people").select("id,first_name,last_name,phone,business_id,user_id,custom_fields")
         if business_id:
             query = query.eq("business_id", str(business_id))
         elif user_id:
@@ -2099,6 +2100,46 @@ def lookup_person_record(
     except Exception as exc:
         logging.warning("Failed to match person for call log: %s", exc)
     return None
+
+
+def custom_dynamic_variable_name(label: Optional[str]) -> Optional[str]:
+    if not label:
+        return None
+    key = re.sub(r"[^a-z0-9]+", "_", str(label).strip().lower()).strip("_")
+    return key or None
+
+
+def load_people_schema_labels(business_id: Optional[str]) -> dict:
+    if not business_id:
+        return {}
+    try:
+        rows = (
+            supabase.table("people_schema")
+            .select("field_key,label")
+            .eq("business_id", str(business_id))
+            .eq("is_active", True)
+            .execute()
+            .data
+            or []
+        )
+        return {row.get("field_key"): row.get("label") for row in rows if row.get("field_key")}
+    except Exception as exc:
+        logging.warning("Failed to load people schema labels: %s", exc)
+        return {}
+
+
+def add_person_custom_dynamic_variables(dynamic_variables: dict, person: Optional[dict], business_id: Optional[str]):
+    if not person or not isinstance(person.get("custom_fields"), dict):
+        return dynamic_variables
+    labels = load_people_schema_labels(business_id or person.get("business_id"))
+    for field_key, value in person.get("custom_fields", {}).items():
+        if value is None:
+            continue
+        dynamic_variables[field_key] = value
+        label_key = custom_dynamic_variable_name(labels.get(field_key))
+        if label_key and label_key not in dynamic_variables:
+            dynamic_variables[label_key] = value
+    return dynamic_variables
 
 
 def enrich_call_log_with_person(
@@ -3178,6 +3219,20 @@ async def twilio_inbound_webhook(request: Request):
             }
         },
     }
+    matched_person = lookup_person_record(
+        phone_number=from_number,
+        business_id=str(business.get("id")) if business and business.get("id") is not None else None,
+        user_id=context.get("user_id") or (business or {}).get("user_id"),
+    )
+    if matched_person:
+        dynamic_variables = register_payload["conversation_initiation_client_data"]["dynamic_variables"]
+        dynamic_variables["person_id"] = str(matched_person.get("id")) if matched_person.get("id") is not None else None
+        dynamic_variables["customer_name"] = format_person_display_name(matched_person)
+        add_person_custom_dynamic_variables(
+            dynamic_variables,
+            matched_person,
+            str(business.get("id")) if business and business.get("id") is not None else None,
+        )
     register_payload["conversation_initiation_client_data"]["dynamic_variables"] = {
         key: value
         for key, value in register_payload["conversation_initiation_client_data"]["dynamic_variables"].items()
@@ -3253,6 +3308,19 @@ async def route_call_compat(request: Request):
         "twilio_to_number": call_payload.get("to_number"),
         "twilio_call_sid": call_payload.get("call_id"),
     }
+    matched_person = lookup_person_record(
+        phone_number=call_payload.get("from_number"),
+        business_id=str(business.get("id")) if business and business.get("id") is not None else None,
+        user_id=context.get("user_id") or (business or {}).get("user_id"),
+    )
+    if matched_person:
+        dynamic_variables["person_id"] = str(matched_person.get("id")) if matched_person.get("id") is not None else None
+        dynamic_variables["customer_name"] = format_person_display_name(matched_person)
+        add_person_custom_dynamic_variables(
+            dynamic_variables,
+            matched_person,
+            str(business.get("id")) if business and business.get("id") is not None else None,
+        )
     dynamic_variables = {key: value for key, value in dynamic_variables.items() if value is not None}
     logging.info(
         "ElevenLabs call route dynamic variables response: %s",

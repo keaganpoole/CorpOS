@@ -35,9 +35,10 @@ import {
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
-import VariablesPane, { getVariableRef, parseVariables, renderVarChipsHTML, TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
+import VariablesPane, { getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields, TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
 import { supabase } from '../../lib/supabase';
 import { LEAD_FIELDS } from '../../lib/leadSchema';
+import { fetchCustomFields, getCurrentBusinessId, isCustomFieldKey } from '../../lib/customFields';
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
 import { getSmartActions, getSmartActionByKey } from './smartActions';
 
@@ -167,6 +168,30 @@ const RECORD_TABLE_FIELDS = {
     { key: 'language_model', label: 'Language Model' },
     { key: 'voice', label: 'Voice' },
   ],
+};
+
+const toRecordCustomField = (field) => ({
+  key: field.key,
+  label: field.label,
+  type: field.type || 'text',
+  custom: true,
+});
+
+const coerceCustomFieldValue = (value, type) => {
+  if (value == null || value === '') return value;
+  if (typeof value === 'string' && value.includes('{{')) return value;
+  if (type === 'boolean') {
+    if (typeof value === 'boolean') return value;
+    const normalized = String(value).trim().toLowerCase();
+    if (['true', 'yes', '1', 'on'].includes(normalized)) return true;
+    if (['false', 'no', '0', 'off'].includes(normalized)) return false;
+    return value;
+  }
+  if (type === 'number') {
+    const numberValue = Number(value);
+    return Number.isNaN(numberValue) ? value : numberValue;
+  }
+  return value;
 };
 
 const AUTOMATION_HIERARCHY = {
@@ -524,6 +549,7 @@ export default function ScenariosPage() {
   const [varsPane, setVarsPane] = useState({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
   const [hoveredTableColor, setHoveredTableColor] = useState('');
   const [actionConfig, setActionConfig] = useState(null);
+  const [peopleCustomFields, setPeopleCustomFields] = useState([]);
   const [contextMenu, setContextMenu] = useState(null); // { x, y, nodeId }
   const [edgeRules, setEdgeRules] = useState([
     { id: 1, variable: '', operator: 'equals', value: '', logic: 'and' },
@@ -602,6 +628,29 @@ export default function ScenariosPage() {
     };
     
     fetchScenarios();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPeopleCustomFields = async () => {
+      try {
+        const businessId = await getCurrentBusinessId();
+        const fields = await fetchCustomFields(businessId);
+        if (cancelled) return;
+        setPeopleCustomFields(fields);
+        setPeopleCustomVariableFields(fields);
+      } catch (error) {
+        console.warn('[Scenarios] Could not load custom people fields:', error?.message || error);
+        if (!cancelled) {
+          setPeopleCustomFields([]);
+          setPeopleCustomVariableFields([]);
+        }
+      }
+    };
+
+    loadPeopleCustomFields();
+    return () => { cancelled = true; };
   }, []);
 
   const builderRef = useRef(null);
@@ -1762,6 +1811,48 @@ export default function ScenariosPage() {
   };
 
   // ─── Resolve Variable References (reads from resultsMap for live data) ──
+  const peopleCustomFieldMap = useMemo(
+    () => new globalThis.Map(peopleCustomFields.map((field) => [field.key, field])),
+    [peopleCustomFields]
+  );
+
+  const getRecordFieldsForTable = useCallback((tableName) => {
+    const baseFields = RECORD_TABLE_FIELDS[tableName] || [];
+    if (tableName !== 'People' || peopleCustomFields.length === 0) return baseFields;
+
+    const baseKeys = new Set(baseFields.map((field) => field.key));
+    const customFields = peopleCustomFields
+      .filter((field) => !baseKeys.has(field.key))
+      .map(toRecordCustomField);
+
+    return [...baseFields, ...customFields];
+  }, [peopleCustomFields]);
+
+  const readRuntimePath = (source, path) => {
+    let current = source;
+
+    for (const key of path) {
+      if (current == null) return undefined;
+      if (Array.isArray(current)) {
+        if (key === 'records') continue;
+        const index = Number(key);
+        if (Number.isInteger(index)) {
+          current = current[index];
+          continue;
+        }
+        current = current[0];
+        if (current == null) return undefined;
+      }
+      if (isCustomFieldKey(key) && current.custom_fields && Object.prototype.hasOwnProperty.call(current.custom_fields, key)) {
+        current = current.custom_fields[key];
+      } else {
+        current = current[key];
+      }
+    }
+
+    return current;
+  };
+
   const resolveVariableRefs = (value, resultsMap) => {
     if (typeof value !== 'string' || !value.includes('{{')) return value;
     return value.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
@@ -1780,11 +1871,7 @@ export default function ScenariosPage() {
         }
       }
       if (!outputData) { console.log(`[Resolve] ❌ No outputData for ${nodeId}`); return match; }
-      let current = outputData;
-      for (const key of fieldPath) {
-        if (current == null) { console.log(`[Resolve] ❌ Null at ${ref}`); return match; }
-        current = current[key];
-      }
+      const current = readRuntimePath(outputData, fieldPath);
       if (current == null) { console.log(`[Resolve] ❌ Final value is null for ${ref}`); return match; }
       console.log(`[Resolve] ✅ ${ref} → ${String(current).slice(0, 80)}`);
       return String(current);
@@ -1806,15 +1893,7 @@ export default function ScenariosPage() {
         const outputData = resultsMap[candidate];
         if (!outputData) continue;
 
-        let current = outputData;
-        if (Array.isArray(current)) {
-          current = current[0];
-        }
-
-        for (const key of fieldPath) {
-          if (current == null) break;
-          current = current[key];
-        }
+        const current = readRuntimePath(outputData, fieldPath);
 
         if (current != null) {
           return String(current);
@@ -2055,6 +2134,29 @@ export default function ScenariosPage() {
           }
           console.log(`[Scenario Run]   ├ Resolved update data:`, JSON.stringify(updateData));
           console.log(`[Scenario Run]   ├ ${actionKey === 'update_record' ? 'PATCH' : 'POST'} /api/sonar/${tableKey} | data:`, JSON.stringify(updateData));
+          if (tableKey === 'people') {
+            const customUpdates = {};
+            Object.keys(updateData).forEach((columnKey) => {
+              if (!isCustomFieldKey(columnKey)) return;
+              const customField = peopleCustomFieldMap.get(columnKey);
+              customUpdates[columnKey] = coerceCustomFieldValue(updateData[columnKey], customField?.type);
+              delete updateData[columnKey];
+            });
+
+            if (Object.keys(customUpdates).length > 0) {
+              let existingCustomFields = {};
+              if (actionKey === 'update_record' && resolvedRecordId) {
+                const { data } = await supabase
+                  .from('people')
+                  .select('custom_fields')
+                  .eq('id', resolvedRecordId)
+                  .single();
+                existingCustomFields = data?.custom_fields || {};
+              }
+              updateData.custom_fields = { ...existingCustomFields, ...customUpdates };
+            }
+          }
+
           if (actionKey === 'update_record' && resolvedRecordId) {
             // Update existing record via Supabase
             const { data, error } = await supabase.from(tableKey).update(updateData).eq('id', resolvedRecordId).select().single();
@@ -2930,19 +3032,45 @@ export default function ScenariosPage() {
                         {/* Field inputs — shown for create and update actions */}
                         {(actionConfig._key === 'update_record' || actionConfig._key === 'create_new_record') && (
                         <div className="sb-record-fields-grid">
-                          {RECORD_TABLE_FIELDS[actionConfig.target_table].map((field) => {
+                          {getRecordFieldsForTable(actionConfig.target_table).map((field) => {
                             const fieldKey = `field_${field.key}`;
                             const val = actionConfig[fieldKey] || '';
+                            const isBooleanCustomField = field.custom && field.type === 'boolean';
                             return (
                               <div key={field.key} className="sb-record-field">
                                 <label className="sb-record-label">{field.label}</label>
+                                {isBooleanCustomField && (
+                                  <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                                    {['true', 'false'].map((option) => (
+                                      <button
+                                        key={option}
+                                        type="button"
+                                        onClick={() => setActionConfig(prev => ({ ...prev, [fieldKey]: option }))}
+                                        style={{
+                                          border: `1px solid ${val === option ? 'rgba(50,240,217,0.45)' : 'rgba(255,255,255,0.08)'}`,
+                                          background: val === option ? 'rgba(50,240,217,0.12)' : 'rgba(255,255,255,0.03)',
+                                          color: val === option ? '#32f0d9' : 'rgba(255,255,255,0.62)',
+                                          borderRadius: 999,
+                                          padding: '4px 9px',
+                                          fontSize: 10,
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          textTransform: 'capitalize',
+                                        }}
+                                      >
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                                 <div style={{ position: 'relative' }}>
                                   <input
                                     className="sb-input-field"
                                     type="text"
                                     value={val}
                                     onChange={e => setActionConfig(prev => ({ ...prev, [fieldKey]: e.target.value }))}
-                                    onFocus={() => setVarsPane({ visible: true, fieldKey, fieldLabel: field.label, fieldType: 'text' })}
+                                    onFocus={() => setVarsPane({ visible: true, fieldKey, fieldLabel: field.label, fieldType: field.type || 'text' })}
+                                    placeholder={isBooleanCustomField ? 'true, false, or variable' : undefined}
                                     style={{
                                       ...(val.includes('{{') ? { color: 'transparent' } : {}),
                                       ...(varsPane.visible && hoveredTableColor && fieldKey === varsPane.fieldKey ? {

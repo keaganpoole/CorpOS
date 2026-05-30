@@ -68,7 +68,10 @@ def deep_get(data: Any, dotted_key: str):
         if value is None:
             return None
         if isinstance(value, dict):
-            value = value.get(part)
+            if part.startswith("custom_") and isinstance(value.get("custom_fields"), dict):
+                value = value["custom_fields"].get(part)
+            else:
+                value = value.get(part)
         else:
             return None
     return value
@@ -135,6 +138,9 @@ class ScenarioActionExecutor:
         def replacer(match):
             key = match.group(1).strip()
             resolved = deep_get(context, key)
+            parts = key.split(".")
+            if resolved is None and len(parts) >= 3 and parts[0] in {"rec", "agent", "receptionist"}:
+                resolved = deep_get(context, ".".join(parts[1:]))
             if resolved is None and isinstance(context.get("agent"), dict):
                 resolved = context["agent"].get(key)
             return str(resolved) if resolved is not None else match.group(0)
@@ -150,6 +156,73 @@ class ScenarioActionExecutor:
         if not cleaned:
             return None
         return int(round(float(cleaned) * 100))
+
+    def _get_people_custom_schema(self, context: dict) -> dict:
+        business = context.get("business") or {}
+        business_id = business.get("id") or context.get("business_id")
+        if not business_id:
+            return {}
+        try:
+            response = (
+                self.supabase.table("people_schema")
+                .select("field_key, field_type, label")
+                .eq("business_id", str(business_id))
+                .eq("is_active", True)
+                .execute()
+            )
+            return {
+                row.get("field_key"): row
+                for row in (response.data or [])
+                if row.get("field_key")
+            }
+        except Exception as exc:
+            logging.warning("[ActionExecutor] Could not load people custom schema: %s", exc)
+            return {}
+
+    def _get_people_custom_field_types(self, context: dict) -> dict:
+        return {
+            field_key: row.get("field_type")
+            for field_key, row in self._get_people_custom_schema(context).items()
+        }
+
+    def _coerce_custom_field_value(self, value: Any, field_type: Optional[str]):
+        if value in (None, ""):
+            return value
+        if field_type == "boolean":
+            if isinstance(value, bool):
+                return value
+            normalized = str(value).strip().lower()
+            if normalized in {"true", "yes", "1", "on"}:
+                return True
+            if normalized in {"false", "no", "0", "off"}:
+                return False
+        if field_type == "number":
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return value
+        return value
+
+    def _custom_dynamic_variable_name(self, label: Optional[str]) -> Optional[str]:
+        if not label:
+            return None
+        key = re.sub(r"[^a-z0-9]+", "_", str(label).strip().lower()).strip("_")
+        return key or None
+
+    def _add_person_custom_dynamic_variables(self, dynamic_vars: dict, context: dict):
+        person = context.get("person") or context.get("customer") or {}
+        custom_fields = person.get("custom_fields") if isinstance(person, dict) else None
+        if not isinstance(custom_fields, dict):
+            return dynamic_vars
+        schema = self._get_people_custom_schema(context)
+        for field_key, value in custom_fields.items():
+            if value is None:
+                continue
+            dynamic_vars[field_key] = value
+            label_key = self._custom_dynamic_variable_name((schema.get(field_key) or {}).get("label"))
+            if label_key and label_key not in dynamic_vars:
+                dynamic_vars[label_key] = value
+        return dynamic_vars
 
     def _find_elevenlabs_phone_number_id_for_business(self, context: dict) -> str:
         business = context.get("business") or {}
@@ -282,13 +355,28 @@ class ScenarioActionExecutor:
                 return {"success": False, "error": "No record ID specified"}
 
             updates = {}
+            custom_updates = {}
+            custom_field_types = self._get_people_custom_field_types(context) if table == "people" else {}
             for key, value in config.items():
                 if key.startswith("_") or key in {"target_table", "table", "record_id", "record_lookup_value"}:
                     continue
                 if value in (None, ""):
                     continue
                 column_key = key[6:] if key.startswith("field_") else key
-                updates[column_key] = self._resolve_variables(value, context)
+                resolved_value = self._resolve_variables(value, context)
+                if table == "people" and column_key.startswith("custom_"):
+                    custom_updates[column_key] = self._coerce_custom_field_value(resolved_value, custom_field_types.get(column_key))
+                else:
+                    updates[column_key] = resolved_value
+            if custom_updates:
+                existing_custom_fields = {}
+                try:
+                    existing = self.supabase.table("people").select("custom_fields").eq("id", str(record_id)).execute()
+                    if existing.data:
+                        existing_custom_fields = existing.data[0].get("custom_fields") or {}
+                except Exception as exc:
+                    logging.warning("[ActionExecutor] Could not load existing custom_fields for people:%s: %s", record_id, exc)
+                updates["custom_fields"] = {**existing_custom_fields, **custom_updates}
             updates["updated_at"] = datetime.now(timezone.utc).isoformat()
 
             response = self.supabase.table(table).update(updates).eq("id", str(record_id)).execute()
@@ -303,13 +391,21 @@ class ScenarioActionExecutor:
             config = node.get("actionConfig") or {}
             table = str(config.get("target_table") or config.get("table") or "people").lower().replace(" ", "_")
             row = {}
+            custom_updates = {}
+            custom_field_types = self._get_people_custom_field_types(context) if table == "people" else {}
             for key, value in config.items():
                 if key.startswith("_") or key in {"target_table", "table", "record_id"}:
                     continue
                 if value in (None, ""):
                     continue
                 column_key = key[6:] if key.startswith("field_") else key
-                row[column_key] = self._resolve_variables(value, context)
+                resolved_value = self._resolve_variables(value, context)
+                if table == "people" and column_key.startswith("custom_"):
+                    custom_updates[column_key] = self._coerce_custom_field_value(resolved_value, custom_field_types.get(column_key))
+                else:
+                    row[column_key] = resolved_value
+            if custom_updates:
+                row["custom_fields"] = custom_updates
             now = datetime.now(timezone.utc).isoformat()
             row.setdefault("created_at", now)
             row.setdefault("updated_at", now)
@@ -406,8 +502,9 @@ class ScenarioActionExecutor:
                 "direction": "outgoing",
                 "flow_execution_id": context.get("_executionId") or "",
                 "scenario_id": (context.get("_scenario") or {}).get("id") or "",
-                "mission": config.get("main_content") or "",
+                "mission": self._resolve_variables(config.get("main_content") or "", context),
             }
+            self._add_person_custom_dynamic_variables(dynamic_vars, context)
             logging.info("[ActionExecutor] outbound call dynamic variables: %s", json.dumps({
                 "user_id": dynamic_vars["user_id"],
                 "receptionist_name": dynamic_vars["receptionist_name"],

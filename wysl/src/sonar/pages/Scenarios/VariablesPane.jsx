@@ -4,6 +4,7 @@ import {
   User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, CreditCard, Search, Layers
 } from 'lucide-react';
 import { getOutputVariables } from '../../../sonar/lib/fieldContexts';
+import { fetchCustomFields, getCurrentBusinessId, getCustomValue, isCustomFieldKey } from '../../lib/customFields';
 import { getSmartActionByKey, getSmartActions } from './smartActions';
 
 const SMART_ACTION_MAP = {};
@@ -65,6 +66,51 @@ const SEARCH_FIELDS = {
   services: ['name', 'description', 'category'],
   hired_receptionists: ['full_name', 'stereotype', 'phone_number'],
   businesses: ['name', 'email', 'phone', 'address', 'city', 'state'],
+};
+
+let peopleCustomVariableFields = [];
+
+const toScenarioCustomField = (field) => ({
+  key: field.key,
+  label: field.label,
+  type: field.type,
+  custom: true,
+});
+
+export const setPeopleCustomVariableFields = (fields = []) => {
+  peopleCustomVariableFields = fields.map(toScenarioCustomField);
+};
+
+export const getPeopleCustomVariableFields = () => peopleCustomVariableFields;
+
+const withCustomFields = (table) => {
+  if (!table || table.key !== 'people' || peopleCustomVariableFields.length === 0) return table;
+  const baseKeys = new Set(table.fields.map((field) => field.key));
+  const customFields = peopleCustomVariableFields.filter((field) => !baseKeys.has(field.key));
+  return { ...table, fields: [...table.fields, ...customFields] };
+};
+
+const getTableFields = (tableKey) => {
+  const table = TABLE_DEFS.find((item) => item.key === tableKey);
+  return withCustomFields(table)?.fields || [];
+};
+
+const getRecordFieldValue = (record, fieldKey) => {
+  if (!record) return undefined;
+  if (isCustomFieldKey(fieldKey)) return getCustomValue(record.custom_fields, fieldKey);
+  return record[fieldKey];
+};
+
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const getFieldDisplayLabel = (tableKey, fieldKey) => {
+  const field = getTableFields(tableKey).find((item) => item.key === fieldKey);
+  return field?.label || fieldKey;
 };
 
 // ─── Trigger → Runtime Table Availability ──────────────────────────────────
@@ -168,7 +214,7 @@ const getAvailableTables = (triggerKey) => {
     return aKey - bKey;
   });
 
-  return tables;
+  return tables.map(withCustomFields);
 };
 
 const TABLE_DEFS = [
@@ -424,7 +470,7 @@ const AGENT_SOURCE_TABLES = new Set(['people', 'appointments']);
 
 const getAgentFieldsForTable = (tableKey) => {
   if (!AGENT_SOURCE_TABLES.has(tableKey)) return [];
-  return TABLE_DEFS.find((table) => table.key === tableKey)?.fields || [];
+  return getTableFields(tableKey);
 };
 
 const getFocusedTableKeyForNode = (node) => {
@@ -461,7 +507,9 @@ export const renderVarChipsHTML = (value) => {
     if (parts.length === 3 && (parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist')) {
       const tableKey = normalizeParsedTableKey(parts[1]);
       const color = TABLE_COLORS[tableKey] || '#a78bfa';
-      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">rec.${parts[1]}.${parts[2]}</span>`;
+      const tableLabel = TABLE_LABELS[parts[1]] || TABLE_LABELS[tableKey] || parts[1];
+      const fieldLabel = getFieldDisplayLabel(tableKey, parts[2]);
+      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">rec.${escapeHtml(tableLabel)}.${escapeHtml(fieldLabel)}</span>`;
     }
     if (parts.length !== 2) return match;
     if (parts[0] === 'agent' || parts[0] === 'receptionist') {
@@ -471,7 +519,8 @@ export const renderVarChipsHTML = (value) => {
     const tableKey = normalizeParsedTableKey(parts[0]);
     const color = TABLE_COLORS[tableKey] || '#a78bfa';
     const tableLabel = TABLE_LABELS[parts[0]] || TABLE_LABELS[tableKey] || parts[0];
-    return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${tableLabel}.${parts[1]}</span>`;
+    const fieldLabel = getFieldDisplayLabel(tableKey, parts[1]);
+    return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${escapeHtml(tableLabel)}.${escapeHtml(fieldLabel)}</span>`;
   });
   return result;
 };
@@ -667,7 +716,17 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
                 records.map((record, idx) => {
                   const key = `${node.nodeId}-${idx}`;
                   const isExpanded = isMany ? (expandedRecords[key] === true) : (expandedRecords[key] !== false);
-                  const entries = Object.entries(record).filter(([k]) => k !== '_id' && k !== '__proto__');
+                  const baseEntries = Object.entries(record)
+                    .filter(([k]) => k !== '_id' && k !== '__proto__' && k !== 'custom_fields')
+                    .map(([entryKey, entryValue]) => ({ key: entryKey, label: entryKey, value: entryValue }));
+                  const customEntries = String(node.table || '').toLowerCase() === 'people'
+                    ? peopleCustomVariableFields.map((field) => ({
+                        key: field.key,
+                        label: field.label,
+                        value: getCustomValue(record.custom_fields, field.key),
+                      }))
+                    : [];
+                  const entries = [...baseEntries, ...customEntries];
                   return (
                     <div key={idx} className="sb-search-record-bundle">
                       <div
@@ -684,7 +743,7 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
                       </div>
                       {isExpanded && (
                         <div className="sb-vars-fields" style={{ paddingLeft: 18 }}>
-                          {entries.map(([fieldKey, fieldValue]) => {
+                          {entries.map(({ key: fieldKey, label, value: fieldValue }) => {
                             const varRef = getVariableRef(node.nodeId, `records.${idx}.${fieldKey}`);
                             const displayVal = fieldValue == null ? '—' : (typeof fieldValue === 'object' ? JSON.stringify(fieldValue) : String(fieldValue));
                             return (
@@ -692,10 +751,10 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
                                 key={fieldKey}
                                 type="button"
                                 className="sb-vars-field"
-                                onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, fieldKey, color); }}
+                                onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, label, color); }}
                                 title={`Insert {{${node.nodeId}.records.${idx}.${fieldKey}}}`}
                               >
-                                <span className="sb-vars-field-name" style={{ color }}>{fieldKey}</span>
+                                <span className="sb-vars-field-name" style={{ color }}>{label}</span>
                                 <span className="sb-vars-field-value">{displayVal.length > 40 ? displayVal.slice(0, 40) + '…' : displayVal}</span>
                               </button>
                             );
@@ -846,6 +905,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   const [editingTables, setEditingTables] = useState({});
   const [activeSources, setActiveSources] = useState({});
   const [activeReceptionist, setActiveReceptionist] = useState(null);
+  const [customFieldsReady, setCustomFieldsReady] = useState(false);
   const searchTimers = useRef({});
   const searchInputRefs = useRef({});
   const seenSourceLabelsRef = useRef(new Set());
@@ -854,7 +914,27 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   const focusedTableKey = getFocusedTableKeyForNode(currentNode);
 
   useEffect(() => {
-    if (!visible) return;
+    let cancelled = false;
+
+    const loadCustomFields = async () => {
+      try {
+        const businessId = await getCurrentBusinessId();
+        const fields = await fetchCustomFields(businessId);
+        if (!cancelled) setPeopleCustomVariableFields(fields);
+      } catch (error) {
+        console.warn('[VariablesPane] Could not load custom people fields:', error?.message || error);
+        if (!cancelled) setPeopleCustomVariableFields([]);
+      } finally {
+        if (!cancelled) setCustomFieldsReady(true);
+      }
+    };
+
+    loadCustomFields();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!visible || !customFieldsReady) return;
     // Determine trigger key for filtering available tables
     const triggerKey = findTriggerKeyForNode(currentNodeId, nodes, edges);
     const available = getAvailableTables(triggerKey);
@@ -873,7 +953,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       setExpanded(exp);
     };
     fetchAll();
-  }, [visible, currentNodeId, nodes, edges]);
+  }, [visible, currentNodeId, nodes, edges, customFieldsReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -939,7 +1019,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   }, [visible]);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !customFieldsReady) return;
     const currentTriggerKey = findTriggerKeyForNode(currentNodeId, nodes, edges);
     const tables = getAvailableTables(currentTriggerKey).slice().reverse();
     const hasCallNodeBeforeLocal = (() => {
@@ -970,7 +1050,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       const activeSource = activeSources[sourceStateKey(table.key)] || (hasAgentData ? 'agent' : 'trigger');
       seenSourceLabelsRef.current.add(`${sourceStateKey(table.key)}::${activeSource}`);
     });
-  }, [visible, currentNodeId, nodes, edges, activeSources]);
+  }, [visible, currentNodeId, nodes, edges, activeSources, customFieldsReady]);
 
   useEffect(() => {
     const panel = paneRef.current;
@@ -1074,7 +1154,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       for (let i = 0; i < tableRecords.length; i++) {
         const record = tableRecords[i];
         for (const field of searchFields) {
-          const val = record[field];
+          const val = getRecordFieldValue(record, field);
           if (val != null && String(val).toLowerCase().includes(lowerQuery)) {
             matchIndex = i;
             found = true;
@@ -1113,7 +1193,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     let count = 0;
     for (const record of tableRecords) {
       for (const field of searchFields) {
-        const val = record[field];
+        const val = getRecordFieldValue(record, field);
         if (val != null && String(val).toLowerCase().includes(lowerQuery)) { count++; break; }
       }
     }
@@ -1131,7 +1211,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     for (let i = 0; i < tableRecords.length; i++) {
       const record = tableRecords[i];
       for (const field of searchFields) {
-        const val = record[field];
+        const val = getRecordFieldValue(record, field);
         if (val != null && String(val).toLowerCase().includes(lowerQuery)) {
           indices.push(i);
           break;
@@ -1158,7 +1238,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     const lowerQuery = query.toLowerCase();
     const matched = new Set();
     for (const field of searchFields) {
-      const val = record[field];
+      const val = getRecordFieldValue(record, field);
       if (val != null && String(val).toLowerCase().includes(lowerQuery)) {
         matched.add(field);
       }
@@ -1376,7 +1456,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                     </>
                   ) : currentRecord ? (
                     table.fields.map((field) => {
-                      const sampleValue = currentRecord[field.key];
+                      const sampleValue = getRecordFieldValue(currentRecord, field.key);
                       const varRef = getVariableRef(table.key, field.key);
                       const hasValue = sampleValue !== null && sampleValue !== undefined;
                       const isMatched = matchedFields.has(field.key);
