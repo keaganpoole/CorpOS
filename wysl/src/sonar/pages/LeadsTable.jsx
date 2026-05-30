@@ -12,7 +12,8 @@ import {
   getStatusColor, normalizeOptionValue, getFieldDef,
 } from '../lib/leadSchema';
 import {
-  loadFieldConfig, saveFieldConfig, loadColorbarRules, saveColorbarRules, evaluateColorbar,
+  DEFAULT_FIELD_CONFIG, fetchBusinessFieldConfig, loadFieldConfig, migrateLegacyFieldConfig,
+  saveFieldConfig, loadColorbarRules, saveColorbarRules, evaluateColorbar,
 } from '../lib/fieldConfig';
 import {
   CUSTOM_FIELD_TYPES, createCustomField, fetchCustomFields, getCurrentBusinessId, getCustomValue,
@@ -276,6 +277,12 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   );
 };
 
+const configuredOptions = (fieldConfig, fieldKey, fallbackOptions = []) => (
+  Array.isArray(fieldConfig[fieldKey]?.options) && fieldConfig[fieldKey].options.length > 0
+    ? fieldConfig[fieldKey].options
+    : fallbackOptions
+);
+
 const DraggableHeader = ({ col, index, sortBy, sortDir, onSort, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, dragOverIndex, fieldConfig = {}, onFieldSettings }) => {
   const displayName = fieldConfig[col.id]?.name || col.label;
   const iconName = fieldConfig[col.id]?.icon;
@@ -348,12 +355,12 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       );
     case 'phone': return <InlineText value={lead.phone} onSave={(v) => autoSave(lead.id, 'phone', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
     case 'email': return <InlineText value={lead.email} onSave={(v) => autoSave(lead.id, 'email', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
-    case 'status': return <InlineSelect value={lead.status} options={STATUS_OPTIONS} type="status" onSave={(v) => autoSave(lead.id, 'status', v)} optionColors={fieldConfig.status?.optionColors || {}} />;
-    case 'source': return <InlineSelect value={lead.source} options={SOURCE_OPTIONS} onSave={(v) => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
-    case 'preferred_contact_method': return <InlineSelect value={lead.preferred_contact_method} options={CONTACT_METHOD_OPTIONS} onSave={(v) => autoSave(lead.id, 'preferred_contact_method', v)} />;
-    case 'last_call_status': return <InlineSelect value={lead.last_call_status} options={CALL_STATUS_OPTIONS} onSave={(v) => autoSave(lead.id, 'last_call_status', v)} />;
+    case 'status': return <InlineSelect value={lead.status} options={configuredOptions(fieldConfig, 'status', STATUS_OPTIONS)} type="status" onSave={(v) => autoSave(lead.id, 'status', v)} optionColors={fieldConfig.status?.optionColors || {}} />;
+    case 'source': return <InlineSelect value={lead.source} options={configuredOptions(fieldConfig, 'source', SOURCE_OPTIONS)} onSave={(v) => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
+    case 'preferred_contact_method': return <InlineSelect value={lead.preferred_contact_method} options={configuredOptions(fieldConfig, 'preferred_contact_method', CONTACT_METHOD_OPTIONS)} onSave={(v) => autoSave(lead.id, 'preferred_contact_method', v)} optionColors={fieldConfig.preferred_contact_method?.optionColors || {}} />;
+    case 'last_call_status': return <InlineSelect value={lead.last_call_status} options={configuredOptions(fieldConfig, 'last_call_status', CALL_STATUS_OPTIONS)} onSave={(v) => autoSave(lead.id, 'last_call_status', v)} optionColors={fieldConfig.last_call_status?.optionColors || {}} />;
     case 'callback_due_at': return <InlineDate value={lead.callback_due_at} onSave={(v) => autoSave(lead.id, 'callback_due_at', v)} />;
-    case 'payment_status': return <InlineSelect value={lead.payment_status} options={PAYMENT_STATUS_OPTIONS} onSave={(v) => autoSave(lead.id, 'payment_status', v)} />;
+    case 'payment_status': return <InlineSelect value={lead.payment_status} options={configuredOptions(fieldConfig, 'payment_status', PAYMENT_STATUS_OPTIONS)} onSave={(v) => autoSave(lead.id, 'payment_status', v)} optionColors={fieldConfig.payment_status?.optionColors || {}} />;
     case 'balance_due': return <InlineCurrency value={lead.balance_due} onSave={(v) => autoSave(lead.id, 'balance_due', v)} />;
     case 'tags': return <InlineMultiSelect value={lead.tags} options={TAG_OPTIONS} onSave={(v) => autoSave(lead.id, 'tags', v)} optionColors={fieldConfig.tags?.optionColors || {}} />;
     default: {
@@ -364,16 +371,16 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       if (field.type === 'currency') return field.editable ? <InlineCurrency value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{formatCurrency(value)}</span>;
       if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{value ?? ''}</span>;
       if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-500">{formatTimestamp(value)}</span>;
-      if (field.type === 'select') return <InlineSelect value={value} options={field.options || []} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-      if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={field.options || []} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
+      if (field.type === 'select') return <InlineSelect value={value} options={configuredOptions(fieldConfig, colId, field.options || [])} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
+      if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={configuredOptions(fieldConfig, colId, field.options || [])} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
       return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
     }
   }
 };
 
-const buildColumns = (customFields = []) => [
+const buildColumns = (customFields = [], fieldConfig = {}) => [
   { id: 'avatar', label: '', width: '36px', sortKey: null },
-  ...TABLE_COLUMNS.map((field) => ({
+  ...TABLE_COLUMNS.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({
     id: field.key,
     label: field.label,
     width: field.tableWidth || {
@@ -390,7 +397,7 @@ const buildColumns = (customFields = []) => [
     }[field.type] || '160px',
     sortKey: field.key,
   })),
-  ...customFields.map((field) => ({
+  ...customFields.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({
     id: field.key,
     label: field.label,
     width: field.tableWidth || {
@@ -408,14 +415,15 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
   const [density] = useState(4);
   const [businessId, setBusinessId] = useState(null);
   const [customFields, setCustomFields] = useState([]);
-  const [columns, setColumns] = useState(() => buildColumns());
   const [fieldConfig, setFieldConfig] = useState(() => loadFieldConfig());
+  const [columns, setColumns] = useState(() => buildColumns([], DEFAULT_FIELD_CONFIG));
   const [colorbarRules, setColorbarRules] = useState(() => loadColorbarRules());
   const [settingsField, setSettingsField] = useState(null);
   const [showColorbarStudio, setShowColorbarStudio] = useState(false);
   const [showColumnOptions, setShowColumnOptions] = useState(false);
   const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, left: 0 });
   const columnOptionsButtonRef = useRef(null);
+  const tableScrollRef = useRef(null);
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
@@ -426,36 +434,53 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
     const load = async () => {
       try {
         const nextBusinessId = await getCurrentBusinessId();
-        const nextCustomFields = await fetchCustomFields(nextBusinessId);
+        const [{ rawConfig }, nextCustomFields] = await Promise.all([
+          fetchBusinessFieldConfig(nextBusinessId),
+          fetchCustomFields(nextBusinessId),
+        ]);
+        const nextFieldConfig = await migrateLegacyFieldConfig(nextBusinessId, rawConfig);
         if (!active) return;
         setBusinessId(nextBusinessId);
+        setFieldConfig(nextFieldConfig);
         setCustomFields(nextCustomFields);
-        setColumns((prev) => {
-          const built = buildColumns(nextCustomFields);
-          const prevOrder = prev.map((col) => col.id);
-          const byId = new Map(built.map((col) => [col.id, col]));
-          const next = [];
-          prevOrder.forEach((id) => {
-            if (byId.has(id)) {
-              next.push(byId.get(id));
-              byId.delete(id);
-            }
-          });
-          byId.forEach((col) => next.push(col));
-          return next;
-        });
       } catch (err) {
-        console.error('[LeadsTable] Failed to load custom fields:', err.message);
+        console.error('[LeadsTable] Failed to load table schema:', err.message);
       }
     };
     load();
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    setColumns((prev) => {
+      const built = buildColumns(customFields, fieldConfig);
+      const prevOrder = prev.map((col) => col.id);
+      const byId = new Map(built.map((col) => [col.id, col]));
+      const next = [];
+      prevOrder.forEach((id) => {
+        if (byId.has(id)) {
+          next.push(byId.get(id));
+          byId.delete(id);
+        }
+      });
+      byId.forEach((col) => next.push(col));
+      return next;
+    });
+  }, [customFields, fieldConfig]);
+
+  const persistFieldConfig = async (next) => {
+    setFieldConfig(next);
+    if (!businessId) return;
+    try {
+      await saveFieldConfig(businessId, next);
+    } catch (err) {
+      console.error('[LeadsTable] Failed to save field config:', err.message);
+    }
+  };
+
   const handleFieldSave = (key, config) => {
     const next = { ...fieldConfig, [key]: { ...fieldConfig[key], ...config } };
-    setFieldConfig(next);
-    saveFieldConfig(next);
+    persistFieldConfig(next);
     if (isCustomFieldKey(key)) {
       const nextFields = customFields.map((field) => (
         field.key === key ? { ...field, label: config.name || field.label } : field
@@ -470,6 +495,26 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
         });
       }
     }
+    setSettingsField(null);
+  };
+
+  const handleFieldHide = (key) => {
+    const next = {
+      ...fieldConfig,
+      [key]: { ...fieldConfig[key], hidden: true },
+    };
+    persistFieldConfig(next);
+    setColumns((prev) => prev.filter((col) => col.id !== key));
+
+    if (isCustomFieldKey(key)) {
+      setCustomFields((prev) => prev.filter((field) => field.key !== key));
+      if (businessId) {
+        updateCustomField(key, businessId, { is_active: false }).catch((err) => {
+          console.error('[LeadsTable] Failed to hide custom field:', err.message);
+        });
+      }
+    }
+
     setSettingsField(null);
   };
   const handleColorbarRulesChange = (rules) => { setColorbarRules(rules); saveColorbarRules(rules); };
@@ -493,11 +538,22 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
     setFieldConfig((prev) => {
       const icon = { boolean: 'shield', text: 'file-text', number: 'activity', date: 'clock' }[type] || 'tag';
       const next = { ...prev, [nextField.key]: { name: nextField.label, icon } };
-      saveFieldConfig(next);
+      if (businessId) {
+        saveFieldConfig(businessId, next).catch((err) => {
+          console.error('[LeadsTable] Failed to save new field config:', err.message);
+        });
+      }
       return next;
     });
     setShowColumnOptions(false);
     setSettingsField(nextField.key);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const scroller = tableScrollRef.current;
+        if (!scroller) return;
+        scroller.scrollTo({ left: scroller.scrollWidth, behavior: 'smooth' });
+      });
+    });
   };
 
   const updateColumnOptionsPosition = useCallback(() => {
@@ -598,7 +654,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
         <div className="relative group/table h-full flex flex-col">
           <div className="relative bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/[0.06] rounded-[1.5rem] flex flex-col h-full overflow-hidden">
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-auto custom-scrollbar">
+              <div ref={tableScrollRef} className="flex-1 overflow-auto custom-scrollbar">
                 <div className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm">
                   <div className="flex items-center gap-3 px-5 py-2 min-w-max group">
                     {columns.map((col, index) => (
@@ -698,7 +754,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
           </motion.div>
         )}
         {settingsField && (
-          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onClose={() => setSettingsField(null)} />
+          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={handleFieldHide} onClose={() => setSettingsField(null)} />
         )}
         {showColorbarStudio && (
           <ColorbarConfigModal onClose={() => setShowColorbarStudio(false)} onRulesChange={handleColorbarRulesChange} />

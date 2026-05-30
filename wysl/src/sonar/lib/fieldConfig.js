@@ -11,11 +11,14 @@ import {
   PAYMENT_STATUS_OPTIONS,
   CALL_ROUTE_OPTIONS,
 } from './leadSchema';
+import { supabase } from './supabase';
+import { getCurrentBusinessId } from './customFields';
 
 const STORAGE_KEY = 'SONAR_field_config';
 const COLORBAR_KEY = 'SONAR_colorbar_rules';
+const PEOPLE_FIELD_CONFIG_COLUMN = 'people_field_config';
 
-const DEFAULT_CONFIG = {
+export const DEFAULT_FIELD_CONFIG = {
   first_name: { name: 'First Name', icon: 'user' },
   last_name: { name: 'Last Name', icon: 'user' },
   phone: { name: 'Phone', icon: 'phone' },
@@ -131,16 +134,77 @@ export const COLORBAR_PRESETS = [
   { name: 'Midnight', gradient: ['#6366f1', '#ec4899'], animation: 'sweep' },
 ];
 
-export const loadFieldConfig = () => {
+const loadLegacyFieldConfig = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return { ...DEFAULT_CONFIG, ...JSON.parse(stored) };
+    if (stored) return { ...DEFAULT_FIELD_CONFIG, ...JSON.parse(stored) };
   } catch {}
-  return { ...DEFAULT_CONFIG };
+  return { ...DEFAULT_FIELD_CONFIG };
 };
 
-export const saveFieldConfig = (config) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+export const loadFieldConfig = () => ({ ...DEFAULT_FIELD_CONFIG });
+
+export const fetchBusinessFieldConfig = async (businessId) => {
+  const resolvedBusinessId = businessId || await getCurrentBusinessId();
+  const { data, error } = await supabase
+    .from('businesses')
+    .select(`id, ${PEOPLE_FIELD_CONFIG_COLUMN}`)
+    .eq('id', resolvedBusinessId)
+    .single();
+
+  if (error) {
+    const message = String(error.message || '');
+    if (message.includes(PEOPLE_FIELD_CONFIG_COLUMN)) {
+      return {
+        businessId: resolvedBusinessId,
+        config: { ...DEFAULT_FIELD_CONFIG },
+        rawConfig: {},
+      };
+    }
+    throw error;
+  }
+
+  return {
+    businessId: data.id,
+    config: { ...DEFAULT_FIELD_CONFIG, ...(data?.[PEOPLE_FIELD_CONFIG_COLUMN] || {}) },
+    rawConfig: data?.[PEOPLE_FIELD_CONFIG_COLUMN] || {},
+  };
+};
+
+export const saveFieldConfig = async (businessId, config) => {
+  const resolvedBusinessId = businessId || await getCurrentBusinessId();
+  const payload = { [PEOPLE_FIELD_CONFIG_COLUMN]: config };
+  const { error } = await supabase
+    .from('businesses')
+    .update(payload)
+    .eq('id', resolvedBusinessId);
+
+  if (error) {
+    const message = String(error.message || '');
+    if (message.includes(PEOPLE_FIELD_CONFIG_COLUMN)) return config;
+    throw error;
+  }
+  return config;
+};
+
+export const migrateLegacyFieldConfig = async (businessId, rawRemoteConfig) => {
+  const hasRemoteConfig = rawRemoteConfig && Object.keys(rawRemoteConfig).length > 0;
+  if (hasRemoteConfig) return { ...DEFAULT_FIELD_CONFIG, ...rawRemoteConfig };
+
+  const legacyConfig = loadLegacyFieldConfig();
+  const hasLegacyOverrides = Object.keys(legacyConfig).some((key) => {
+    const defaults = DEFAULT_FIELD_CONFIG[key] || {};
+    const current = legacyConfig[key] || {};
+    return JSON.stringify(defaults) !== JSON.stringify(current);
+  });
+
+  if (!hasLegacyOverrides) return { ...DEFAULT_FIELD_CONFIG };
+
+  await saveFieldConfig(businessId, legacyConfig);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {}
+  return legacyConfig;
 };
 
 export const loadColorbarRules = () => {

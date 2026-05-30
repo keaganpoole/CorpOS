@@ -125,10 +125,10 @@ export const LEAD_FIELDS = [
   // Contact
   { key: 'phone', label: 'Phone', type: 'phone', required: false, table: true, tableWidth: '150px', section: 'contact', editable: true },
   { key: 'email', label: 'Email', type: 'email', required: false, table: true, tableWidth: '210px', section: 'contact', editable: true },
-  { key: 'street_address', label: 'Street Address', type: 'text', required: false, table: true, tableWidth: '220px', section: 'contact', editable: true },
-  { key: 'city', label: 'City', type: 'text', required: false, table: true, tableWidth: '130px', section: 'contact', editable: true },
-  { key: 'state', label: 'State', type: 'text', required: false, table: true, tableWidth: '90px', section: 'contact', editable: true },
-  { key: 'zip_code', label: 'Zip Code', type: 'text', required: false, table: true, tableWidth: '110px', section: 'contact', editable: true },
+  { key: 'street_address', label: 'Street Address', type: 'text', required: false, table: false, tableWidth: '220px', section: 'contact', editable: true },
+  { key: 'city', label: 'City', type: 'text', required: false, table: false, tableWidth: '130px', section: 'contact', editable: true },
+  { key: 'state', label: 'State', type: 'text', required: false, table: false, tableWidth: '90px', section: 'contact', editable: true },
+  { key: 'zip_code', label: 'Zip Code', type: 'text', required: false, table: false, tableWidth: '110px', section: 'contact', editable: true },
 
   // Preferences
   {
@@ -137,19 +137,19 @@ export const LEAD_FIELDS = [
     type: 'select',
     options: CONTACT_METHOD_OPTIONS,
     required: false,
-    table: true,
+    table: false,
     tableWidth: '140px',
     section: 'preferences',
     editable: true,
   },
-  { key: 'preferred_language', label: 'Preferred Language', type: 'text', required: false, table: true, tableWidth: '150px', section: 'preferences', editable: true },
-  { key: 'best_time_to_contact', label: 'Best Time To Contact', type: 'text', required: false, table: true, tableWidth: '170px', section: 'preferences', editable: true },
+  { key: 'preferred_language', label: 'Preferred Language', type: 'text', required: false, table: false, tableWidth: '150px', section: 'preferences', editable: true },
+  { key: 'best_time_to_contact', label: 'Best Time To Contact', type: 'text', required: false, table: false, tableWidth: '170px', section: 'preferences', editable: true },
 
   // Consent
-  { key: 'consent_sms', label: 'Consent SMS', type: 'boolean', required: false, table: true, section: 'consent', editable: true },
-  { key: 'consent_call', label: 'Consent Call', type: 'boolean', required: false, table: true, section: 'consent', editable: true },
-  { key: 'do_not_call', label: 'Do Not Call', type: 'boolean', required: false, table: true, section: 'consent', editable: true },
-  { key: 'do_not_text', label: 'Do Not Text', type: 'boolean', required: false, table: true, section: 'consent', editable: true },
+  { key: 'consent_sms', label: 'Consent SMS', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
+  { key: 'consent_call', label: 'Consent Call', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
+  { key: 'do_not_call', label: 'Do Not Call', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
+  { key: 'do_not_text', label: 'Do Not Text', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
 
   // CRM
   {
@@ -174,7 +174,7 @@ export const LEAD_FIELDS = [
     section: 'crm',
     editable: true,
   },
-  { key: 'lead_source_detail', label: 'Source Detail', type: 'text', required: false, table: true, tableWidth: '190px', section: 'crm', editable: true },
+  { key: 'lead_source_detail', label: 'Source Detail', type: 'text', required: false, table: false, tableWidth: '190px', section: 'crm', editable: true },
   {
     key: 'tags',
     label: 'Tags',
@@ -187,35 +187,35 @@ export const LEAD_FIELDS = [
     editable: true,
   },
   { key: 'created_at', label: 'Created', type: 'timestamp', required: false, table: false, tableWidth: '120px', section: 'crm', editable: false },
-  { key: 'updated_at', label: 'Updated', type: 'timestamp', required: false, table: true, tableWidth: '150px', section: 'crm', editable: false },
+  { key: 'updated_at', label: 'Updated', type: 'timestamp', required: false, table: false, tableWidth: '150px', section: 'crm', editable: false },
 
   // Activity
-  { key: 'last_inbound_call_at', label: 'Last Inbound Call', type: 'timestamp', required: false, table: true, tableWidth: '160px', section: 'activity', editable: false },
-  { key: 'last_outbound_call_at', label: 'Last Outbound Call', type: 'timestamp', required: false, table: true, tableWidth: '170px', section: 'activity', editable: false },
+  { key: 'last_inbound_call_at', label: 'Last Inbound Call', type: 'timestamp', required: false, table: false, tableWidth: '160px', section: 'activity', editable: false },
+  { key: 'last_outbound_call_at', label: 'Last Outbound Call', type: 'timestamp', required: false, table: false, tableWidth: '170px', section: 'activity', editable: false },
   {
     key: 'last_call_status',
     label: 'Last Call Status',
     type: 'select',
     options: CALL_STATUS_OPTIONS,
     required: false,
-    table: true,
+    table: false,
     tableWidth: '140px',
     section: 'activity',
     editable: true,
   },
-  { key: 'last_intent', label: 'Last Intent', type: 'text', required: false, table: true, tableWidth: '180px', section: 'activity', editable: true },
+  { key: 'last_intent', label: 'Last Intent', type: 'text', required: false, table: false, tableWidth: '180px', section: 'activity', editable: true },
   {
     key: 'last_outcome',
     label: 'Last Outcome',
     type: 'select',
     options: OUTCOME_OPTIONS,
     required: false,
-    table: true,
+    table: false,
     tableWidth: '160px',
     section: 'activity',
     editable: true,
   },
-  { key: 'missed_call_count', label: 'Missed Call Count', type: 'number', min: 0, max: 999, required: false, table: true, tableWidth: '140px', section: 'activity', editable: true },
+  { key: 'missed_call_count', label: 'Missed Call Count', type: 'number', min: 0, max: 999, required: false, table: false, tableWidth: '140px', section: 'activity', editable: true },
   { key: 'last_inbound_sms_at', label: 'Last Inbound SMS', type: 'timestamp', required: false, table: false, section: 'activity', editable: false },
   { key: 'last_outbound_sms_at', label: 'Last Outbound SMS', type: 'timestamp', required: false, table: false, section: 'activity', editable: false },
   {
@@ -242,10 +242,10 @@ export const LEAD_FIELDS = [
   },
 
   // Routing
-  { key: 'callback_needed', label: 'Callback Needed', type: 'boolean', required: false, table: true, section: 'routing', editable: true },
-  { key: 'callback_due_at', label: 'Callback Due At', type: 'timestamp', required: false, table: true, tableWidth: '150px', section: 'routing', editable: true },
-  { key: 'handoff_required', label: 'Handoff Required', type: 'boolean', required: false, table: true, section: 'routing', editable: true },
-  { key: 'assigned_staff', label: 'Assigned Staff', type: 'text', required: false, table: true, tableWidth: '160px', section: 'routing', editable: true },
+  { key: 'callback_needed', label: 'Callback Needed', type: 'boolean', required: false, table: false, section: 'routing', editable: true },
+  { key: 'callback_due_at', label: 'Callback Due At', type: 'timestamp', required: false, table: false, tableWidth: '150px', section: 'routing', editable: true },
+  { key: 'handoff_required', label: 'Handoff Required', type: 'boolean', required: false, table: false, section: 'routing', editable: true },
+  { key: 'assigned_staff', label: 'Assigned Staff', type: 'text', required: false, table: false, tableWidth: '160px', section: 'routing', editable: true },
   {
     key: 'call_route',
     label: 'Call Route',
@@ -264,12 +264,12 @@ export const LEAD_FIELDS = [
     type: 'select',
     options: PAYMENT_STATUS_OPTIONS,
     required: false,
-    table: true,
+    table: false,
     tableWidth: '140px',
     section: 'financial',
     editable: true,
   },
-  { key: 'balance_due', label: 'Balance Due', type: 'currency', required: false, table: true, tableWidth: '120px', section: 'financial', editable: true },
+  { key: 'balance_due', label: 'Balance Due', type: 'currency', required: false, table: false, tableWidth: '120px', section: 'financial', editable: true },
   { key: 'invoice_id', label: 'Invoice ID', type: 'text', required: false, table: false, section: 'financial', editable: true },
 
   // Payment record fields (from payments table — used in condition builders)
@@ -299,9 +299,9 @@ export const LEAD_FIELDS = [
 
   // Notes
   { key: 'notes', label: 'Notes', type: 'textarea', required: false, table: true, tableWidth: '280px', section: 'notes', editable: true, appendOnly: true, description: 'Append only - never replace existing notes' },
-  { key: 'special_instructions', label: 'Special Instructions', type: 'textarea', required: false, table: true, tableWidth: '280px', section: 'notes', editable: true },
-  { key: 'stripe_customer_id', label: 'Stripe Customer ID', type: 'text', required: false, table: true, tableWidth: '190px', section: 'financial', editable: true },
-  { key: 'stripe_payment_method_id', label: 'Stripe Payment Method ID', type: 'text', required: false, table: true, tableWidth: '220px', section: 'financial', editable: true },
+  { key: 'special_instructions', label: 'Special Instructions', type: 'textarea', required: false, table: false, tableWidth: '280px', section: 'notes', editable: true },
+  { key: 'stripe_customer_id', label: 'Stripe Customer ID', type: 'text', required: false, table: false, tableWidth: '190px', section: 'financial', editable: true },
+  { key: 'stripe_payment_method_id', label: 'Stripe Payment Method ID', type: 'text', required: false, table: false, tableWidth: '220px', section: 'financial', editable: true },
 ];
 
 export const DETAIL_SECTIONS = [

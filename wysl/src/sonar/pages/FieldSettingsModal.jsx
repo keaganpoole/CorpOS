@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Palette, Type, Sparkles, Check, RotateCcw,
+  X, Palette, Type, Sparkles, Check, RotateCcw, Trash2,
   Building2, User, Briefcase, Factory, Flag, Compass, Target,
   DollarSign, TrendingUp, Mail, Phone, Globe, MapPin, Map,
   Calendar, Clock, MessageSquare, Search, FileText, Gauge,
@@ -32,10 +32,33 @@ const OPTION_COLORS = [
   '#71717a', '#a1a1aa', '#d4d4d8',
 ];
 
-const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onClose }) => {
+const getOptionValue = (option) => {
+  if (option && typeof option === 'object') return option.value || option.label || '';
+  return option;
+};
+
+const normalizeOptions = (options = []) => options
+  .map((option) => getOptionValue(option))
+  .map((option) => typeof option === 'string' ? option.trim() : '')
+  .filter(Boolean);
+
+const buildOptionNames = (savedOptions = [], fallbackOptions = []) => {
+  const fallback = normalizeOptions(fallbackOptions);
+  const saved = Array.isArray(savedOptions) ? savedOptions.map((option) => {
+    const value = getOptionValue(option);
+    return typeof value === 'string' ? value.trim() : '';
+  }) : [];
+
+  const length = Math.max(fallback.length, saved.length);
+  return Array.from({ length }, (_, index) => saved[index] || fallback[index] || '')
+    .filter(Boolean);
+};
+
+const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, onClose }) => {
   const [name, setName] = useState(fieldConfig?.name || fieldKey);
   const [icon, setIcon] = useState(fieldConfig?.icon || 'tag');
   const [optionColors, setOptionColors] = useState(fieldConfig?.optionColors || {});
+  const [options, setOptions] = useState(() => buildOptionNames(fieldConfig?.options, fieldMeta?.options));
   const [activeTab, setActiveTab] = useState('name');
   const [saved, setSaved] = useState(false);
 
@@ -46,6 +69,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onClose 
       name,
       icon,
       optionColors,
+      ...(hasOptions ? { options: options.map((option) => option.trim()).filter(Boolean) } : {}),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -55,11 +79,12 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onClose 
     setName(fieldKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
     setIcon('tag');
     setOptionColors({});
+    setOptions(buildOptionNames([], fieldMeta?.options));
   };
 
   const tabs = [
     { key: 'name', label: 'Name & Icon', icon: <Type size={12} /> },
-    ...(hasOptions ? [{ key: 'colors', label: 'Colors', icon: <Palette size={12} /> }] : []),
+    ...(hasOptions ? [{ key: 'options', label: 'Options', icon: <Palette size={12} /> }] : []),
   ];
 
   return (
@@ -82,12 +107,22 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onClose 
             </div>
             <div>
               <h3 className="text-[13px] font-bold text-white">Edit Field</h3>
-              <p className="text-[9px] text-zinc-600 uppercase tracking-widest font-bold">{fieldKey}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/5 transition-all">
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-2">
+            {onHide && (
+              <button
+                onClick={() => onHide(fieldKey)}
+                title="Hide column"
+                className="p-1 text-rose-500/70 hover:text-rose-400 transition-colors"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/5 transition-all">
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -162,19 +197,33 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onClose 
             </>
           )}
 
-          {activeTab === 'colors' && hasOptions && (
+          {activeTab === 'options' && hasOptions && (
             <div>
-              <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-3 block">Option Colors</label>
+              <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-3 block">Dropdown Options</label>
               <div className="space-y-3">
-                {fieldMeta.options.map(opt => {
-                  const currentColor = optionColors[opt] || '#71717a';
+                {options.map((optionValue, optionIndex) => {
+                  const originalOption = (fieldMeta.options || []).find((opt) => getOptionValue(opt) === optionValue);
+                  const currentColor = optionColors[optionValue] || originalOption?.color || '#71717a';
                   return (
-                    <div key={opt} className="flex items-center gap-3 bg-white/[0.02] border border-white/[0.04] rounded-xl px-4 py-3">
+                    <div key={`${optionIndex}-${optionValue}`} className="flex items-center gap-3 bg-white/[0.02] border border-white/[0.04] rounded-xl px-3 py-3">
                       <div className="w-3 h-3 rounded-full shrink-0 shadow-lg" style={{ backgroundColor: currentColor, boxShadow: `0 0 8px ${currentColor}40` }} />
-                      <span className="text-[12px] text-zinc-300 font-medium flex-1">{opt}</span>
-                      <div className="flex gap-1">
+                      <input
+                        value={optionValue}
+                        onChange={(event) => {
+                          const nextValue = event.target.value;
+                          setOptions((prev) => prev.map((option, index) => index === optionIndex ? nextValue : option));
+                          setOptionColors((prev) => {
+                            if (!prev[optionValue] || optionValue === nextValue) return prev;
+                            const { [optionValue]: oldColor, ...rest } = prev;
+                            return { ...rest, [nextValue]: oldColor };
+                          });
+                        }}
+                        className="min-w-0 flex-1 rounded-lg border border-white/[0.06] bg-black/30 px-2.5 py-1.5 text-[12px] text-zinc-200 font-semibold placeholder:text-zinc-700 focus:outline-none focus:border-cyan-500/30 focus:text-white"
+                        placeholder="Option name"
+                      />
+                      <div className="flex shrink-0 gap-1">
                         {OPTION_COLORS.map(c => (
-                          <button key={c} onClick={() => setOptionColors(prev => ({ ...prev, [opt]: c }))}
+                          <button key={c} onClick={() => setOptionColors(prev => ({ ...prev, [optionValue]: c }))}
                             className={`w-5 h-5 rounded-full transition-all hover:scale-110 ${currentColor === c ? 'ring-2 ring-white ring-offset-1 ring-offset-[#0d0d0f]' : ''}`}
                             style={{ backgroundColor: c }} />
                         ))}
