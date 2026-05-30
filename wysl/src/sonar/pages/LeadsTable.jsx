@@ -277,12 +277,6 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   );
 };
 
-const configuredOptions = (fieldConfig, fieldKey, fallbackOptions = []) => (
-  Array.isArray(fieldConfig[fieldKey]?.options) && fieldConfig[fieldKey].options.length > 0
-    ? fieldConfig[fieldKey].options
-    : fallbackOptions
-);
-
 const DraggableHeader = ({ col, index, sortBy, sortDir, onSort, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, dragOverIndex, fieldConfig = {}, onFieldSettings }) => {
   const displayName = fieldConfig[col.id]?.name || col.label;
   const iconName = fieldConfig[col.id]?.icon;
@@ -355,12 +349,12 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       );
     case 'phone': return <InlineText value={lead.phone} onSave={(v) => autoSave(lead.id, 'phone', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
     case 'email': return <InlineText value={lead.email} onSave={(v) => autoSave(lead.id, 'email', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
-    case 'status': return <InlineSelect value={lead.status} options={configuredOptions(fieldConfig, 'status', STATUS_OPTIONS)} type="status" onSave={(v) => autoSave(lead.id, 'status', v)} optionColors={fieldConfig.status?.optionColors || {}} />;
-    case 'source': return <InlineSelect value={lead.source} options={configuredOptions(fieldConfig, 'source', SOURCE_OPTIONS)} onSave={(v) => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
-    case 'preferred_contact_method': return <InlineSelect value={lead.preferred_contact_method} options={configuredOptions(fieldConfig, 'preferred_contact_method', CONTACT_METHOD_OPTIONS)} onSave={(v) => autoSave(lead.id, 'preferred_contact_method', v)} optionColors={fieldConfig.preferred_contact_method?.optionColors || {}} />;
-    case 'last_call_status': return <InlineSelect value={lead.last_call_status} options={configuredOptions(fieldConfig, 'last_call_status', CALL_STATUS_OPTIONS)} onSave={(v) => autoSave(lead.id, 'last_call_status', v)} optionColors={fieldConfig.last_call_status?.optionColors || {}} />;
+    case 'status': return <InlineSelect value={lead.status} options={STATUS_OPTIONS} type="status" onSave={(v) => autoSave(lead.id, 'status', v)} optionColors={fieldConfig.status?.optionColors || {}} />;
+    case 'source': return <InlineSelect value={lead.source} options={SOURCE_OPTIONS} onSave={(v) => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
+    case 'preferred_contact_method': return <InlineSelect value={lead.preferred_contact_method} options={CONTACT_METHOD_OPTIONS} onSave={(v) => autoSave(lead.id, 'preferred_contact_method', v)} />;
+    case 'last_call_status': return <InlineSelect value={lead.last_call_status} options={CALL_STATUS_OPTIONS} onSave={(v) => autoSave(lead.id, 'last_call_status', v)} />;
     case 'callback_due_at': return <InlineDate value={lead.callback_due_at} onSave={(v) => autoSave(lead.id, 'callback_due_at', v)} />;
-    case 'payment_status': return <InlineSelect value={lead.payment_status} options={configuredOptions(fieldConfig, 'payment_status', PAYMENT_STATUS_OPTIONS)} onSave={(v) => autoSave(lead.id, 'payment_status', v)} optionColors={fieldConfig.payment_status?.optionColors || {}} />;
+    case 'payment_status': return <InlineSelect value={lead.payment_status} options={PAYMENT_STATUS_OPTIONS} onSave={(v) => autoSave(lead.id, 'payment_status', v)} />;
     case 'balance_due': return <InlineCurrency value={lead.balance_due} onSave={(v) => autoSave(lead.id, 'balance_due', v)} />;
     case 'tags': return <InlineMultiSelect value={lead.tags} options={TAG_OPTIONS} onSave={(v) => autoSave(lead.id, 'tags', v)} optionColors={fieldConfig.tags?.optionColors || {}} />;
     default: {
@@ -371,8 +365,8 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       if (field.type === 'currency') return field.editable ? <InlineCurrency value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{formatCurrency(value)}</span>;
       if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{value ?? ''}</span>;
       if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-500">{formatTimestamp(value)}</span>;
-      if (field.type === 'select') return <InlineSelect value={value} options={configuredOptions(fieldConfig, colId, field.options || [])} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-      if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={configuredOptions(fieldConfig, colId, field.options || [])} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
+      if (field.type === 'select') return <InlineSelect value={value} options={field.options || []} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
+      if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={field.options || []} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
       return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
     }
   }
