@@ -150,7 +150,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.92, y: 16 }}
         transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-        className="w-[480px] rounded-2xl border border-white/[0.06] bg-[#0d0d0f] shadow-[0_40px_80px_rgba(0,0,0,0.9)] overflow-visible"
+        className="flex h-[640px] w-[480px] flex-col rounded-2xl border border-white/[0.06] bg-[#0d0d0f] shadow-[0_40px_80px_rgba(0,0,0,0.9)] overflow-visible"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-white/[0.04] px-6 pt-5 pb-3">
@@ -197,7 +197,8 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
           ))}
         </div>
 
-        <div className="space-y-5 p-6">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          <div className="space-y-5">
           {activeTab === 'name' && (
             <>
               <div>
@@ -399,6 +400,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
               </div>
             </div>
           )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 border-t border-white/[0.04] px-6 py-4">
