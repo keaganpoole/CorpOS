@@ -49,7 +49,7 @@ const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
       className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-full min-w-[60px]" />
   ) : (
     <span onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-      className={`inline-flex min-w-[60px] cursor-pointer hover:text-white transition-colors ${className}`}>
+      className={`inline-flex w-full min-w-[60px] cursor-pointer hover:text-white transition-colors ${className}`}>
       {value || (
         placeholder
           ? <span className="text-zinc-700 italic">{placeholder}</span>
@@ -77,7 +77,7 @@ const InlineCurrency = ({ value, onSave }) => {
         className="bg-white/[0.06] border border-cyan-500/30 rounded-lg pl-6 pr-2 py-1 text-[12px] text-white focus:outline-none w-[110px]" />
     </div>
   ) : (
-    <span onClick={(e) => { e.stopPropagation(); setEditing(true); }} className="cursor-pointer hover:text-white transition-colors tabular-nums">
+    <span onClick={(e) => { e.stopPropagation(); setEditing(true); }} className="block w-full cursor-pointer hover:text-white transition-colors tabular-nums">
       {value == null || value === '' ? '' : `$${Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
     </span>
   );
@@ -99,7 +99,7 @@ const InlineNumber = ({ value, onSave, min = 0, max = 999 }) => {
       onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
       onClick={(e) => e.stopPropagation()} className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-[70px] text-center" />
   ) : (
-    <span onClick={(e) => { e.stopPropagation(); setDraft(value ?? ''); setEditing(true); }} className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400">
+    <span onClick={(e) => { e.stopPropagation(); setDraft(value ?? ''); setEditing(true); }} className="block w-full cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400">
       {value == null || value === '' ? '' : value}
     </span>
   );
@@ -120,10 +120,10 @@ const InlineDate = ({ value, onSave }) => {
   const toLocal = (iso) => iso ? new Date(iso).toISOString().slice(0, 16) : '';
   const save = () => { setEditing(false); onSave(draft ? new Date(draft).toISOString() : null); };
   return (
-    <div className="relative inline-flex">
+    <div className="relative block w-full">
       <span
         onClick={(e) => { e.stopPropagation(); setDraft(toLocal(value)); setEditing(true); }}
-        className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400"
+        className="block w-full cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400"
       >
         {formatTimestamp(value)}
       </span>
@@ -162,10 +162,10 @@ const InlineDateOnly = ({ value, onSave }) => {
     ? new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
   return (
-    <div className="relative inline-flex">
+    <div className="relative block w-full">
       <span
         onClick={(e) => { e.stopPropagation(); setDraft(value || ''); setEditing(true); }}
-        className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400"
+        className="block w-full cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400"
       >
         {formatted || <span className="text-zinc-700 italic">Set date</span>}
       </span>
