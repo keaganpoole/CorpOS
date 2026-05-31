@@ -66,15 +66,35 @@ const NumberInput = ({ value, onChange, field, error }) => (
   </div>
 );
 
-const BooleanInput = ({ value, onChange, field }) => (
-  <button type="button" onClick={() => onChange(field.key, !value)}
-    className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border transition-all ${value ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-300' : 'bg-white/[0.02] border-white/[0.06] text-zinc-500'}`}>
-    <span className="text-[12px] font-medium">{field.label}</span>
-    <span className={`w-9 h-5 rounded-full relative transition-colors ${value ? 'bg-cyan-500/30' : 'bg-zinc-800'}`}>
-      <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${value ? 'left-4 bg-cyan-400' : 'left-0.5 bg-zinc-600'}`} />
-    </span>
-  </button>
-);
+const BooleanInput = ({ value, onChange, field }) => {
+  const current = value === true ? 'yes' : value === false ? 'no' : 'blank';
+  const nextValue = value == null ? true : value === true ? false : null;
+  const state = current === 'yes'
+    ? { label: 'Yes', className: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-300', dot: '#22d3ee' }
+    : current === 'no'
+      ? { label: 'No', className: 'bg-amber-500/10 border-amber-500/20 text-amber-300', dot: '#f59e0b' }
+      : { label: '', className: 'bg-transparent border-transparent text-transparent shadow-none', dot: 'transparent' };
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(field.key, nextValue)}
+      className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border transition-all ${state.className}`}
+      title="Click to cycle Blank / Yes / No"
+    >
+      {current !== 'blank' ? (
+        <>
+          <span className="text-[12px] font-medium">{field.label}</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: state.dot }} />
+            <span className="text-[11px] font-bold">{state.label}</span>
+          </span>
+        </>
+      ) : (
+        <span className="invisible">.</span>
+      )}
+    </button>
+  );
+};
 
 const SelectInput = ({ value, onChange, field }) => {
   const options = (field.options || []).map((opt) => typeof opt === 'string' ? opt : opt.value);
@@ -152,7 +172,7 @@ const FieldEditor = ({ field, value, onChange, errors }) => {
     case 'multi_select': return <MultiSelectInput value={value} onChange={onChange} field={field} />;
     case 'textarea': return <TextareaInput value={value} onChange={onChange} field={field} error={error} appendMode={field.appendOnly} />;
     case 'timestamp': return <div className="px-3 py-2.5 bg-black/20 border border-white/[0.03] rounded-xl text-[12px] text-zinc-500">{formatTimestampFull(value)}</div>;
-    case 'boolean': return <BooleanInput value={!!value} onChange={onChange} field={field} />;
+    case 'boolean': return <BooleanInput value={value} onChange={onChange} field={field} />;
     default: return <TextInput value={value} onChange={onChange} field={field} error={error} />;
   }
 };

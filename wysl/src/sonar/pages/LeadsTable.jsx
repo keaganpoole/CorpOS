@@ -99,7 +99,7 @@ const InlineNumber = ({ value, onSave, min = 0, max = 999 }) => {
       onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
       onClick={(e) => e.stopPropagation()} className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-[70px] text-center" />
   ) : (
-    <span onClick={(e) => { e.stopPropagation(); setDraft(value ?? ''); setEditing(true); }} className="cursor-pointer hover:text-white transition-colors">
+    <span onClick={(e) => { e.stopPropagation(); setDraft(value ?? ''); setEditing(true); }} className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400">
       {value == null || value === '' ? '' : value}
     </span>
   );
@@ -109,18 +109,39 @@ const InlineDate = ({ value, onSave }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const ref = useRef(null);
-  useEffect(() => { if (editing) ref.current?.showPicker?.(); }, [editing]);
+  useEffect(() => {
+    if (!editing) return undefined;
+    const frame = requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.showPicker?.();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editing]);
   const toLocal = (iso) => iso ? new Date(iso).toISOString().slice(0, 16) : '';
   const save = () => { setEditing(false); onSave(draft ? new Date(draft).toISOString() : null); };
-  return editing ? (
-    <input ref={ref} type="datetime-local" value={draft} onChange={(e) => setDraft(e.target.value)}
-      onBlur={save} onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }} onClick={(e) => e.stopPropagation()}
-      className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none [color-scheme:dark]" />
-  ) : (
-    <span onClick={(e) => { e.stopPropagation(); setDraft(toLocal(value)); setEditing(true); }}
-      className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-500">
-      {formatTimestamp(value)}
-    </span>
+  return (
+    <div className="relative inline-flex">
+      <span
+        onClick={(e) => { e.stopPropagation(); setDraft(toLocal(value)); setEditing(true); }}
+        className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400"
+      >
+        {formatTimestamp(value)}
+      </span>
+      {editing && (
+        <input
+          ref={ref}
+          type="datetime-local"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute left-0 top-full mt-1 h-px w-px opacity-0 pointer-events-none focus:outline-none [color-scheme:dark]"
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+      )}
+    </div>
   );
 };
 
@@ -128,33 +149,74 @@ const InlineDateOnly = ({ value, onSave }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const ref = useRef(null);
-  useEffect(() => { if (editing) ref.current?.showPicker?.(); }, [editing]);
+  useEffect(() => {
+    if (!editing) return undefined;
+    const frame = requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.showPicker?.();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editing]);
   const save = () => { setEditing(false); onSave(draft || null); };
   const formatted = value
     ? new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
-  return editing ? (
-    <input ref={ref} type="date" value={draft} onChange={(e) => setDraft(e.target.value)}
-      onBlur={save} onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }} onClick={(e) => e.stopPropagation()}
-      className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none [color-scheme:dark]" />
-  ) : (
-    <span onClick={(e) => { e.stopPropagation(); setDraft(value || ''); setEditing(true); }}
-      className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-500">
-      {formatted || <span className="text-zinc-700 italic">Set date</span>}
-    </span>
+  return (
+    <div className="relative inline-flex">
+      <span
+        onClick={(e) => { e.stopPropagation(); setDraft(value || ''); setEditing(true); }}
+        className="cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400"
+      >
+        {formatted || <span className="text-zinc-700 italic">Set date</span>}
+      </span>
+      {editing && (
+        <input
+          ref={ref}
+          autoFocus
+          type="date"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute left-0 top-full mt-1 h-px w-px opacity-0 pointer-events-none focus:outline-none [color-scheme:dark]"
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+      )}
+    </div>
   );
 };
 
-const InlineBoolean = ({ value, onSave }) => (
-  <button
-    type="button"
-    onClick={(e) => { e.stopPropagation(); onSave(!value); }}
-    className={`w-full inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${value ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/[0.02] text-zinc-500 border-white/[0.06] hover:border-white/15 hover:text-zinc-300'}`}
-  >
-    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: value ? '#10b981' : '#71717a' }} />
-    {value ? 'Yes' : 'No'}
-  </button>
-);
+const InlineBoolean = ({ value, onSave }) => {
+  const current = value === true ? 'yes' : value === false ? 'no' : 'blank';
+  const nextValue = value == null ? true : value === true ? false : null;
+  const state = current === 'yes'
+    ? { label: 'Yes', dot: '#10b981', className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
+    : current === 'no'
+      ? { label: 'No', dot: '#f59e0b', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' }
+      : { label: '', dot: 'transparent', className: 'bg-transparent text-transparent border-transparent shadow-none' };
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onSave(nextValue);
+      }}
+      className={`w-full inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${state.className}`}
+      title="Click to cycle Blank / Yes / No"
+    >
+      {current !== 'blank' ? (
+        <>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: state.dot }} />
+          {state.label}
+        </>
+      ) : (
+        <span className="invisible">.</span>
+      )}
+    </button>
+  );
+};
 
 const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = {} }) => {
   const [open, setOpen] = useState(false);
@@ -308,7 +370,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
   if (customField) {
     const value = getCustomValue(lead.custom_fields, colId);
     const saveCustom = (nextValue) => autoSave(lead.id, 'custom_fields', setCustomFieldValue(lead.custom_fields, colId, nextValue));
-    if (customField.type === 'boolean') return <InlineBoolean value={!!value} onSave={saveCustom} />;
+    if (customField.type === 'boolean') return <InlineBoolean value={value} onSave={saveCustom} />;
     if (customField.type === 'number') return <InlineNumber value={value} onSave={saveCustom} />;
     if (customField.type === 'date') return <InlineDateOnly value={value} onSave={saveCustom} />;
     return <InlineText value={value} onSave={saveCustom} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
@@ -361,7 +423,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       const field = getFieldDef(colId);
       if (!field) return null;
       const value = lead[colId];
-      if (field.type === 'boolean') return <InlineBoolean value={!!value} onSave={(v) => autoSave(lead.id, colId, v)} />;
+      if (field.type === 'boolean') return <InlineBoolean value={value} onSave={(v) => autoSave(lead.id, colId, v)} />;
       if (field.type === 'currency') return field.editable ? <InlineCurrency value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{formatCurrency(value)}</span>;
       if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{value ?? ''}</span>;
       if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-500">{formatTimestamp(value)}</span>;

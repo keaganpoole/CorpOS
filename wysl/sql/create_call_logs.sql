@@ -95,3 +95,12 @@ CREATE INDEX IF NOT EXISTS idx_call_logs_conversation_id
 
 CREATE INDEX IF NOT EXISTS idx_call_logs_business_id_created_at
   ON public.call_logs (business_id, created_at DESC);
+
+ALTER TABLE public.call_logs REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.call_logs;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;

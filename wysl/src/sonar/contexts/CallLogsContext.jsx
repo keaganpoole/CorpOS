@@ -55,8 +55,16 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
   };
 
   useEffect(() => {
+    if (!session?.access_token) {
+      setCalls([]);
+      setLoading(false);
+      hasLoadedRef.current = false;
+      return undefined;
+    }
+
     let cancelled = false;
     let refreshTimer = null;
+    const userId = session.user?.id || 'current-user';
 
     const scheduleRefresh = () => {
       if (refreshTimer) window.clearTimeout(refreshTimer);
@@ -67,9 +75,15 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
 
     loadCallLogs({ initial: true });
     const channel = supabase
-      .channel('call-logs-dashboard-cache')
+      .channel(`call-logs-dashboard-cache-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs' }, scheduleRefresh)
-      .subscribe();
+      .subscribe((status, error) => {
+        if (error) {
+          console.warn('[CallLogs] realtime subscription error:', error);
+          return;
+        }
+        console.info('[CallLogs] realtime status:', status);
+      });
 
     return () => {
       cancelled = true;
