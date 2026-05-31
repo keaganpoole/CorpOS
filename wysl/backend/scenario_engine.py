@@ -97,7 +97,8 @@ def deep_get(data: Any, dotted_key: str):
             return None
         if isinstance(value, dict):
             if part.startswith("custom_") and isinstance(value.get("custom_fields"), dict):
-                value = value["custom_fields"].get(part)
+                custom_value = value["custom_fields"].get(part)
+                value = custom_value if custom_value is not None else value.get(part)
             else:
                 value = value.get(part)
         else:
@@ -263,6 +264,8 @@ class ScenarioActionExecutor:
             custom_field = schema.get(field_key) or {}
             if custom_field.get("label"):
                 return str(custom_field["label"])
+            if str(field_key).startswith("custom_"):
+                return ""
         base_label = ((BASE_TABLE_LABELS.get(table_key) or {}).get(field_key))
         if base_label:
             return base_label
@@ -302,6 +305,25 @@ class ScenarioActionExecutor:
             "accepted_return_keys": return_keys,
         }
 
+    def _is_valid_agent_requirement(self, table_key: str, field_key: str, context: dict) -> bool:
+        table_key = self._normalize_table_key(table_key)
+        if table_key == "people" and str(field_key).startswith("custom_"):
+            schema = self._get_people_custom_schema(context)
+            if field_key not in schema:
+                logging.warning(
+                    "[ActionExecutor] Skipping inactive or missing custom field requirement: %s.%s",
+                    table_key,
+                    field_key,
+                )
+                return False
+        return True
+
+    def _is_agent_safe_label(self, label: Optional[str]) -> bool:
+        if not label:
+            return False
+        normalized = str(label).strip().lower()
+        return not re.match(r"^custom\s+(text|boolean|number|date)\s+\d+", normalized)
+
     def _infer_required_agent_fields(self, scenario: Optional[dict], call_node_id: str, context: dict):
         if not scenario or not call_node_id:
             return []
@@ -326,8 +348,18 @@ class ScenarioActionExecutor:
                     token = (table_key, field_key)
                     if token in seen:
                         continue
+                    if not self._is_valid_agent_requirement(table_key, field_key, context):
+                        continue
                     seen.add(token)
                     label = self._format_field_label(table_key, field_key, context)
+                    if not self._is_agent_safe_label(label):
+                        logging.warning(
+                            "[ActionExecutor] Skipping unsafe agent-facing field label for requirement: %s.%s label=%s",
+                            table_key,
+                            field_key,
+                            label,
+                        )
+                        continue
                     requirements.append(self._build_requirement_key_metadata(table_key, field_key, label, context))
         return requirements
 
@@ -385,6 +417,14 @@ class ScenarioActionExecutor:
                 current_value = context.get(context_key)
                 if not isinstance(current_value, dict):
                     current_value = {}
+                if table_key == "people" and str(field_key).startswith("custom_"):
+                    custom_fields = current_value.get("custom_fields")
+                    if not isinstance(custom_fields, dict):
+                        custom_fields = {}
+                    custom_fields[field_key] = value
+                    current_value["custom_fields"] = custom_fields
+                    context[context_key] = current_value
+                    continue
                 nested = current_value
                 parts = [part for part in str(field_key).split(".") if part]
                 for part in parts[:-1]:
@@ -494,7 +534,6 @@ class ScenarioActionExecutor:
         for field_key, value in custom_fields.items():
             if value is None:
                 continue
-            dynamic_vars[field_key] = value
             label_key = self._custom_dynamic_variable_name((schema.get(field_key) or {}).get("label"))
             if label_key and label_key not in dynamic_vars:
                 dynamic_vars[label_key] = value
@@ -640,6 +679,15 @@ class ScenarioActionExecutor:
                     continue
                 column_key = key[6:] if key.startswith("field_") else key
                 resolved_value = self._resolve_variables(value, context)
+                if isinstance(resolved_value, str) and re.search(r"\{\{[^}]+\}\}", resolved_value):
+                    logging.warning(
+                        "[ActionExecutor] Skipping unresolved record update value table=%s record_id=%s field=%s value=%s",
+                        table,
+                        record_id,
+                        column_key,
+                        resolved_value,
+                    )
+                    continue
                 if table == "people" and column_key.startswith("custom_"):
                     custom_updates[column_key] = self._coerce_custom_field_value(resolved_value, custom_field_types.get(column_key))
                 else:
@@ -803,6 +851,13 @@ class ScenarioActionExecutor:
                 "flow_execution_id": dynamic_vars["flow_execution_id"],
                 "agent_phone_number_id": phone_number_id,
                 "to_number": normalize_phone_number(to_number),
+                "required_fields": [
+                    {
+                        "label": field.get("label"),
+                        "return_key": field.get("preferred_return_key"),
+                    }
+                    for field in required_agent_fields
+                ],
             }))
 
             response = requests.post(

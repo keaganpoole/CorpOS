@@ -3392,6 +3392,13 @@ async def set_agent_data(request: Request):
 
     if flow_execution_id and update_key is not None:
         agent_updates = build_agent_update_map(update_key, update_value)
+        logging.info(
+            "[set_agent_data] flow_execution_id=%s key=%s value=%s merged_updates=%s",
+            str(flow_execution_id),
+            str(update_key),
+            json.dumps(update_value, default=str),
+            json.dumps(agent_updates, default=str),
+        )
         execution_rows = (
             supabase.table("flow_executions")
             .select("id,status,flow_context")
