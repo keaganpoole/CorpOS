@@ -7,6 +7,8 @@ export const CUSTOM_FIELD_TYPES = [
   { type: 'text', label: 'Text', icon: 'type' },
   { type: 'number', label: 'Number', icon: 'hash' },
   { type: 'date', label: 'Date', icon: 'calendar' },
+  { type: 'select', label: 'Single Select', icon: 'tag' },
+  { type: 'multi_select', label: 'Multi Select', icon: 'layers' },
 ];
 
 const titleCase = (value) => String(value || '')
@@ -51,6 +53,7 @@ export const fetchCustomFields = async (businessId) => {
     label: field.label,
     description: field.config?.description || '',
     type: field.field_type,
+    options: Array.isArray(field.config?.options) ? field.config.options : [],
     table: true,
     editable: true,
     tableWidth: field.config?.tableWidth || {
@@ -58,6 +61,8 @@ export const fetchCustomFields = async (businessId) => {
       text: '180px',
       number: '120px',
       date: '150px',
+      select: '140px',
+      multi_select: '220px',
     }[field.field_type] || '160px',
     position: field.position ?? 0,
     config: field.config || {},
@@ -76,6 +81,8 @@ export const createCustomField = async (type, existingFields = [], businessId) =
     text: '180px',
     number: '120px',
     date: '150px',
+    select: '140px',
+    multi_select: '220px',
   }[type] || '160px';
 
   const { data, error } = await supabase
@@ -87,7 +94,7 @@ export const createCustomField = async (type, existingFields = [], businessId) =
       field_type: type,
       position,
       is_active: true,
-      config: { tableWidth, description: '' },
+      config: { tableWidth, description: '', options: [] },
     })
     .select()
     .single();
@@ -99,6 +106,7 @@ export const createCustomField = async (type, existingFields = [], businessId) =
     label: data.label,
     description: data.config?.description || '',
     type: data.field_type,
+    options: Array.isArray(data.config?.options) ? data.config.options : [],
     table: true,
     editable: true,
     tableWidth,
@@ -162,6 +170,70 @@ export const deleteCustomField = async (fieldKey, businessId) => {
         .update({ custom_fields: nextCustomFields })
         .eq('id', row.id);
     });
+
+  if (updates.length) {
+    const results = await Promise.all(updates);
+    const failed = results.find(({ error }) => error);
+    if (failed?.error) throw failed.error;
+  }
+};
+
+export const syncCustomFieldOptionValues = async (fieldKey, businessId, previousOptions = [], nextOptions = [], fieldType) => {
+  if (!fieldKey || !businessId) throw new Error('fieldKey and businessId are required');
+  if (!['select', 'multi_select'].includes(fieldType)) return;
+
+  const renameMap = new Map();
+  previousOptions.forEach((previousOption, index) => {
+    const nextOption = nextOptions[index];
+    if (previousOption && nextOption && previousOption !== nextOption) {
+      renameMap.set(previousOption, nextOption);
+    }
+  });
+
+  const allowedOptions = new Set(nextOptions.filter(Boolean));
+
+  const { data: peopleRows, error: peopleError } = await supabase
+    .from('people')
+    .select('id,custom_fields')
+    .eq('business_id', businessId);
+
+  if (peopleError) throw peopleError;
+
+  const updates = (peopleRows || []).flatMap((row) => {
+    const currentValue = row?.custom_fields?.[fieldKey];
+    if (currentValue == null) return [];
+
+    let nextValue = currentValue;
+
+    if (fieldType === 'select') {
+      nextValue = renameMap.get(currentValue) || currentValue;
+      if (!allowedOptions.has(nextValue)) nextValue = null;
+    }
+
+    if (fieldType === 'multi_select') {
+      const currentArray = Array.isArray(currentValue) ? currentValue : [];
+      const remapped = currentArray
+        .map((item) => renameMap.get(item) || item)
+        .filter((item) => allowedOptions.has(item));
+      nextValue = remapped.length ? remapped : null;
+    }
+
+    if (JSON.stringify(nextValue) === JSON.stringify(currentValue)) return [];
+
+    const nextCustomFields = { ...(row.custom_fields || {}) };
+    if (nextValue == null || (Array.isArray(nextValue) && nextValue.length === 0)) {
+      delete nextCustomFields[fieldKey];
+    } else {
+      nextCustomFields[fieldKey] = nextValue;
+    }
+
+    return [
+      supabase
+        .from('people')
+        .update({ custom_fields: nextCustomFields })
+        .eq('id', row.id),
+    ];
+  });
 
   if (updates.length) {
     const results = await Promise.all(updates);

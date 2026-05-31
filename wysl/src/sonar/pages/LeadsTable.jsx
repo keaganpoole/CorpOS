@@ -17,7 +17,7 @@ import {
 } from '../lib/fieldConfig';
 import {
   CUSTOM_FIELD_TYPES, createCustomField, fetchCustomFields, getCurrentBusinessId, getCustomValue,
-  isCustomFieldKey, setCustomFieldValue, updateCustomField, updateCustomFieldPositions, deleteCustomField,
+  isCustomFieldKey, setCustomFieldValue, updateCustomField, updateCustomFieldPositions, deleteCustomField, syncCustomFieldOptionValues,
 } from '../lib/customFields';
 import FieldSettingsModal from './FieldSettingsModal';
 import ColorbarConfigModal from './ColorbarConfigModal';
@@ -242,6 +242,9 @@ const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = 
   };
   const styleFor = (val) => {
     const normal = normalizeOptionValue(val);
+    if (normal == null || normal === '') {
+      return { bg: 'bg-transparent', text: 'text-transparent', border: 'border-transparent', dot: 'transparent' };
+    }
     if (optionColors[normal]) return { bg: 'bg-white/[0.04]', text: 'text-white', border: 'border-white/[0.08]', dot: optionColors[normal] };
     if (optionColors[val]) return { bg: 'bg-white/[0.04]', text: 'text-white', border: 'border-white/[0.08]', dot: optionColors[val] };
     const color = type === 'status' ? getStatusColor(normal) : 'blue';
@@ -252,20 +255,33 @@ const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = 
     <div className="relative" ref={ref}>
       <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className={`w-full min-h-[26px] inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${currentStyle.bg} ${currentStyle.text} ${currentStyle.border}`}>
-        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: currentStyle.dot }} />
-        <span className="whitespace-nowrap">{current || <span className="invisible">&nbsp;</span>}</span>
+        {current ? (
+          <>
+            <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: currentStyle.dot }} />
+            <span className="whitespace-nowrap">{current}</span>
+          </>
+        ) : (
+          <span className="invisible">.</span>
+        )}
       </button>
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.96 }}
             className="absolute top-full left-0 mt-1.5 z-50 bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden min-w-[170px] py-1"
             onClick={(e) => e.stopPropagation()}>
+            <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
+              onClick={() => { setOpen(false); onSave(null); }}
+              className={`w-full text-left px-3 py-2 text-[11px] font-bold flex items-center gap-2 hover:bg-white/[0.06] ${current == null || current === '' ? 'text-white' : 'text-zinc-400'}`}>
+              <div className="w-2 h-2 rounded-full bg-zinc-700" />
+              <span className="invisible">.</span>
+              {(current == null || current === '') && <Check size={11} className="text-cyan-400 ml-auto" />}
+            </motion.button>
             {options.map((opt, idx) => {
               const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
               const valueKey = typeof val === 'string' ? val.toLowerCase() : '';
               const isActive = valueKey !== '' && valueKey === currentKey;
               return (
-                <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }}
+                <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: (idx + 1) * 0.02 }}
                   onClick={() => { setOpen(false); if (!isActive) onSave(val); }}
                   className={`w-full text-left px-3 py-2 text-[11px] font-bold flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
@@ -283,6 +299,7 @@ const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = 
 
 const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   const [open, setOpen] = useState(false);
+  const [hovering, setHovering] = useState(false);
   const ref = useRef(null);
   const selected = Array.isArray(value) ? value.map(normalizeOptionValue).filter((item) => typeof item === 'string' && item.length > 0) : [];
   useEffect(() => {
@@ -302,7 +319,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   };
   const color = (val) => optionColors[normalizeOptionValue(val)] || optionColors[val] || '#71717a';
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={ref} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
       <div onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="w-full min-h-[26px] cursor-pointer flex items-center justify-start gap-1 flex-wrap">
         {selected.length === 0 ? <span className="invisible text-[12px]">&nbsp;</span> : selected.slice(0, 2).map((tag) => (
           <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-bold border whitespace-nowrap bg-white/[0.04] text-zinc-300 border-white/[0.06]">
@@ -311,6 +328,26 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
         ))}
         {selected.length > 2 && <span className="text-[9px] text-zinc-600 font-bold">+{selected.length - 2}</span>}
       </div>
+      <AnimatePresence>
+        {!open && hovering && selected.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.98 }}
+            transition={{ duration: 0.12 }}
+            className="absolute left-0 top-full mt-1.5 z-40 min-w-[180px] max-w-[260px] rounded-xl border border-white/[0.08] bg-[#111] px-2 py-2 shadow-[0_12px_36px_rgba(0,0,0,0.72)]"
+          >
+            <div className="flex flex-wrap gap-1.5">
+              {selected.map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-bold border whitespace-nowrap bg-white/[0.04] text-zinc-300 border-white/[0.06]">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(tag) }} />
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.96 }}
@@ -373,6 +410,8 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
     if (customField.type === 'boolean') return <InlineBoolean value={value} onSave={saveCustom} />;
     if (customField.type === 'number') return <InlineNumber value={value} onSave={saveCustom} />;
     if (customField.type === 'date') return <InlineDateOnly value={value} onSave={saveCustom} />;
+    if (customField.type === 'select') return <InlineSelect value={value} options={customField.options || []} onSave={saveCustom} optionColors={fieldConfig[colId]?.optionColors || {}} />;
+    if (customField.type === 'multi_select') return <InlineMultiSelect value={value} options={customField.options || []} onSave={saveCustom} optionColors={fieldConfig[colId]?.optionColors || {}} />;
     return <InlineText value={value} onSave={saveCustom} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
   }
 
@@ -475,6 +514,8 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
       text: '180px',
       number: '120px',
       date: '150px',
+      select: '140px',
+      multi_select: '220px',
     }[field.type] || '160px',
     sortKey: null,
     custom: true,
@@ -556,7 +597,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
     persistFieldConfig(next);
     if (isCustomFieldKey(key)) {
       const nextFields = customFields.map((field) => (
-        field.key === key ? { ...field, label: config.name || field.label, description: config.description ?? field.description ?? '' } : field
+        field.key === key ? { ...field, label: config.name || field.label, description: config.description ?? field.description ?? '', options: config.options ?? field.options ?? [] } : field
       ));
       setCustomFields(nextFields);
       setColumns((prev) => prev.map((col) => (
@@ -564,14 +605,18 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       )));
       if (businessId) {
         const fieldMeta = customFields.find((field) => field.key === key);
+        const previousOptions = Array.isArray(fieldMeta?.options) ? fieldMeta.options : [];
+        const nextOptions = Array.isArray(config.options) ? config.options : previousOptions;
         updateCustomField(key, businessId, {
           label: config.name || key,
           config: {
             ...(fieldMeta?.config || {}),
             tableWidth: fieldMeta?.tableWidth,
             description: config.description ?? fieldMeta?.description ?? '',
+            options: config.options ?? fieldMeta?.options ?? [],
           },
-        }).catch((err) => {
+        }).then(() => syncCustomFieldOptionValues(key, businessId, previousOptions, nextOptions, fieldMeta?.type))
+        .catch((err) => {
           console.error('[LeadsTable] Failed to save custom field settings:', err.message);
         });
       }
@@ -620,7 +665,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       },
     ]);
     setFieldConfig((prev) => {
-      const icon = { boolean: 'shield', text: 'file-text', number: 'activity', date: 'clock' }[type] || 'tag';
+      const icon = { boolean: 'shield', text: 'file-text', number: 'activity', date: 'clock', select: 'tag', multi_select: 'layers' }[type] || 'tag';
       const next = { ...prev, [nextField.key]: { name: nextField.label, icon } };
       if (businessId) {
         saveFieldConfig(businessId, next).catch((err) => {

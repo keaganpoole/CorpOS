@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Palette, Type, Sparkles, Check, RotateCcw, Trash2,
@@ -10,6 +10,7 @@ import {
   BarChart3, PieChart, Activity, Wifi, Anchor, Aperture,
 } from 'lucide-react';
 import { AVAILABLE_ICONS } from '../lib/fieldConfig';
+import { normalizeOptionValue } from '../lib/leadSchema';
 
 const ICON_MAP = {
   building: Building2, user: User, briefcase: Briefcase, factory: Factory,
@@ -42,25 +43,49 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
   const [icon, setIcon] = useState(fieldConfig?.icon || 'tag');
   const [description, setDescription] = useState(fieldMeta?.description || fieldConfig?.description || '');
   const [optionColors, setOptionColors] = useState(fieldConfig?.optionColors || {});
+  const [optionText, setOptionText] = useState('');
   const [activeTab, setActiveTab] = useState('name');
   const [saved, setSaved] = useState(false);
   const isCustomField = typeof fieldKey === 'string' && fieldKey.startsWith('custom_');
+  const isCustomOptionsField = isCustomField && (fieldMeta?.type === 'select' || fieldMeta?.type === 'multi_select');
+  const normalizedOptions = useMemo(() => (
+    Array.isArray(fieldMeta?.options)
+      ? fieldMeta.options.map((opt) => getOptionValue(opt)).filter(Boolean)
+      : []
+  ), [fieldMeta?.options]);
+  const normalizedOptionsText = useMemo(() => normalizedOptions.join('\n'), [normalizedOptions]);
 
-  const hasOptions = fieldMeta?.options?.length > 0;
+  const hasOptions = normalizedOptions.length > 0 || isCustomOptionsField;
 
   useEffect(() => {
     setName(fieldConfig?.name || fieldKey);
     setIcon(fieldConfig?.icon || 'tag');
     setDescription(fieldMeta?.description || fieldConfig?.description || '');
     setOptionColors(fieldConfig?.optionColors || {});
-  }, [fieldKey, fieldConfig, fieldMeta]);
+    setOptionText(normalizedOptionsText);
+  }, [fieldKey, normalizedOptionsText]);
 
   const handleSave = () => {
+    const normalizedCustomOptions = isCustomOptionsField
+      ? optionText
+        .split('\n')
+        .map((line) => normalizeOptionValue(line.trim()))
+        .filter(Boolean)
+      : [];
+    const normalizedCustomOptionColors = isCustomOptionsField
+      ? Object.fromEntries(
+        Object.entries(optionColors || {}).map(([key, color]) => [normalizeOptionValue(key), color]),
+      )
+      : optionColors;
+
     onSave({
       name,
       icon,
       description,
-      optionColors,
+      optionColors: normalizedCustomOptionColors,
+      ...(isCustomOptionsField ? {
+        options: normalizedCustomOptions,
+      } : {}),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -71,10 +96,12 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
     setIcon('tag');
     setDescription('');
     setOptionColors({});
+    setOptionText(normalizedOptionsText);
   };
 
   const tabs = [
     { key: 'name', label: 'Name & Icon', icon: <Type size={12} /> },
+    ...(isCustomOptionsField ? [{ key: 'options', label: 'Options', icon: <Layers size={12} /> }] : []),
     ...(hasOptions ? [{ key: 'colors', label: 'Colors', icon: <Palette size={12} /> }] : []),
   ];
 
@@ -202,11 +229,25 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
             </>
           )}
 
+          {activeTab === 'options' && isCustomOptionsField && (
+            <div>
+              <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Options</label>
+              <textarea
+                value={optionText}
+                onChange={e => setOptionText(e.target.value)}
+                rows={8}
+                className="w-full bg-black/40 border border-white/[0.06] rounded-xl px-4 py-3 text-[13px] text-white leading-relaxed focus:outline-none focus:border-indigo-500/30 transition-colors resize-none"
+                placeholder={`One option per line\nExample A\nExample B\nExample C`}
+              />
+              <p className="text-[8px] text-zinc-700 mt-1.5">One option per line. These values are used in the table editor.</p>
+            </div>
+          )}
+
           {activeTab === 'colors' && hasOptions && (
             <div>
               <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-3 block">Option Colors</label>
               <div className="space-y-3">
-                {fieldMeta.options.map(opt => {
+                {(isCustomOptionsField ? optionText.split('\n').map((line) => line.trim()).filter(Boolean) : normalizedOptions).map(opt => {
                   const optionValue = getOptionValue(opt);
                   const currentColor = optionColors[optionValue] || opt?.color || '#71717a';
                   return (
