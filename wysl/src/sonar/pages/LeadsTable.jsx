@@ -463,7 +463,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
 
 const DraggableHeader = ({
   col, index, sortBy, sortDir, onSort, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, dragOverIndex,
-  fieldConfig = {}, onFieldSettings, headerRef, onZonePointerDown, onZoneHover, onZoneLeave, showZoneRail, isZoneCandidate,
+  fieldConfig = {}, onFieldSettings, headerRef, isZoneCandidate,
 }) => {
   const displayName = fieldConfig[col.id]?.name || col.label;
   const iconName = fieldConfig[col.id]?.icon;
@@ -472,23 +472,8 @@ const DraggableHeader = ({
   return (
     <div ref={headerRef} draggable={col.id !== 'avatar'} onDragStart={(e) => col.id !== 'avatar' && onDragStart(e, index)} onDragOver={(e) => onDragOver(e, index)}
       onDrop={(e) => onDrop(e, index)} onDragEnd={onDragEnd}
-      onMouseEnter={() => zoneEligible && onZoneHover(col.id)}
-      onMouseLeave={() => zoneEligible && onZoneLeave(col.id)}
       style={{ width: col.width, minWidth: col.width }}
       className={`shrink-0 flex items-center gap-1 transition-all duration-200 cursor-grab active:cursor-grabbing relative group/header ${isDragging ? 'opacity-30' : ''} ${dragOverIndex === index && !isDragging ? 'translate-x-1' : ''} ${isZoneCandidate ? 'text-white' : ''}`}>
-      {zoneEligible && (
-        <>
-          <button
-            type="button"
-            onPointerDown={(event) => onZonePointerDown(event, index)}
-            className={`absolute inset-x-0 top-0 h-4 z-20 transition-opacity ${showZoneRail ? 'opacity-100' : 'opacity-0 group-hover/header:opacity-100'}`}
-            aria-label={`Create zone from ${displayName}`}
-          >
-            <span className={`absolute left-1 right-1 top-0 h-px rounded-full transition-all duration-200 ${isZoneCandidate ? 'bg-cyan-300/90 shadow-[0_0_14px_rgba(125,211,252,0.5)]' : 'bg-white/18 shadow-[0_0_10px_rgba(255,255,255,0.1)] group-hover/header:bg-cyan-300/50 group-hover/header:shadow-[0_0_12px_rgba(125,211,252,0.25)]'}`} />
-          </button>
-          <div className={`pointer-events-none absolute inset-x-1 top-0 bottom-1 rounded-xl transition-all duration-200 ${isZoneCandidate ? 'bg-[linear-gradient(180deg,rgba(125,211,252,0.12),rgba(125,211,252,0.03)_45%,transparent_100%)]' : 'bg-transparent'}`} />
-        </>
-      )}
       <div className="w-0 overflow-hidden group-hover/header:w-3 transition-all duration-200 shrink-0 flex items-center">
         <GripVertical size={10} className="text-zinc-800 group-hover/header:text-zinc-500 transition-colors shrink-0" />
       </div>
@@ -1103,14 +1088,26 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
               <div ref={tableScrollRef} className="flex-1 overflow-auto custom-scrollbar">
                 <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
                   <div ref={headerRowRef} className="relative min-w-max">
-                    <div className="pointer-events-none absolute inset-x-0 top-0 h-6">
+                    <div className="absolute inset-x-0 top-0 h-6">
+                      {headerMetrics.filter((metric) => metric.eligible).map((metric) => (
+                        <button
+                          key={`zone-hit-${metric.id}`}
+                          type="button"
+                          onPointerDown={(event) => handleZonePointerDown(event, metric.index)}
+                          onMouseEnter={() => setHoveredZoneColumnId(metric.id)}
+                          onMouseLeave={() => setHoveredZoneColumnId((current) => (current === metric.id ? null : current))}
+                          className="absolute top-[1px] h-4 z-20"
+                          style={{ left: metric.left + 4, width: Math.max(metric.width - 8, 0) }}
+                          aria-label={`Create zone from ${fieldConfig[metric.id]?.name || columns[metric.index]?.label || metric.id}`}
+                        />
+                      ))}
                       {draftSpan?.metrics.map((metric) => (
                         <motion.div
                           key={`draft-glow-${metric.id}`}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="absolute top-0 bottom-1 rounded-b-xl"
+                          className="pointer-events-none absolute top-0 bottom-1 rounded-b-xl"
                           style={{
                             left: metric.left + 2,
                             width: Math.max(metric.width - 4, 0),
@@ -1131,8 +1128,14 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                           aria-label="Edit zone color"
                         >
                           <span
-                            className="absolute inset-x-0 rounded-full blur-[4px] opacity-35"
-                            style={{ top: zone.top - Math.max(zone.top - 6, 0) - 1, height: 4, backgroundColor: zone.color }}
+                            className="absolute blur-[9px] opacity-26"
+                            style={{
+                              left: '2%',
+                              width: '96%',
+                              top: zone.top - Math.max(zone.top - 6, 0) + 1,
+                              height: 8,
+                              background: `radial-gradient(ellipse at center top, ${zone.color}14 0%, ${zone.color}10 34%, ${zone.color}00 78%), linear-gradient(90deg, transparent 0%, ${zone.color}14 10%, ${zone.color}30 50%, ${zone.color}14 90%, transparent 100%)`,
+                            }}
                           />
                           <span
                             className="absolute inset-x-0 h-px rounded-full"
@@ -1149,10 +1152,18 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                           initial={{ opacity: 0, scaleX: 0.98 }}
                           animate={{ opacity: 1, scaleX: 1 }}
                           exit={{ opacity: 0 }}
-                          className="absolute h-4"
+                          className="pointer-events-none absolute h-4"
                           style={{ left: draftSpan.left, width: draftSpan.width, top: 0 }}
                         >
-                          <span className="absolute inset-x-0 top-[2px] h-[4px] rounded-full bg-cyan-300/20 blur-[4px]" />
+                          <span
+                            className="absolute h-[8px] blur-[9px]"
+                            style={{
+                              left: '2%',
+                              top: '3px',
+                              width: '96%',
+                              background: 'radial-gradient(ellipse at center top, rgba(125,211,252,0.12) 0%, rgba(125,211,252,0.09) 34%, rgba(125,211,252,0) 78%), linear-gradient(90deg, transparent 0%, rgba(125,211,252,0.1) 10%, rgba(125,211,252,0.22) 50%, rgba(125,211,252,0.1) 90%, transparent 100%)',
+                            }}
+                          />
                           <span className="absolute inset-x-0 top-[3px] h-px rounded-full bg-cyan-200 shadow-[0_0_16px_rgba(125,211,252,0.55)]" />
                         </motion.div>
                       )}
@@ -1189,10 +1200,6 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                               if (node) headerRefs.current[col.id] = node;
                               else delete headerRefs.current[col.id];
                             }}
-                            onZonePointerDown={handleZonePointerDown}
-                            onZoneHover={setHoveredZoneColumnId}
-                            onZoneLeave={(id) => setHoveredZoneColumnId((current) => (current === id ? null : current))}
-                            showZoneRail={hoveredZoneColumnId === col.id || zoneCandidateRange?.has(col.id)}
                             isZoneCandidate={zoneCandidateRange?.has(col.id)}
                           />
                         </div>
