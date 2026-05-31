@@ -47,15 +47,24 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
   const [activeTab, setActiveTab] = useState('name');
   const [saved, setSaved] = useState(false);
   const isCustomField = typeof fieldKey === 'string' && fieldKey.startsWith('custom_');
-  const isCustomOptionsField = isCustomField && (fieldMeta?.type === 'select' || fieldMeta?.type === 'multi_select');
+  const isOptionsField = fieldMeta?.type === 'select' || fieldMeta?.type === 'multi_select';
   const normalizedOptions = useMemo(() => (
-    Array.isArray(fieldMeta?.options)
-      ? fieldMeta.options.map((opt) => getOptionValue(opt)).filter(Boolean)
+    Array.isArray(fieldConfig?.options)
+      ? fieldConfig.options.map((opt) => getOptionValue(opt)).filter(Boolean)
+      : Array.isArray(fieldMeta?.options)
+        ? fieldMeta.options.map((opt) => getOptionValue(opt)).filter(Boolean)
+        : []
+  ), [fieldConfig?.options, fieldMeta?.options]);
+  const normalizedOptionColors = useMemo(() => (
+    isOptionsField
+      ? Object.fromEntries(
+        Object.entries(optionColors || {}).map(([key, color]) => [normalizeOptionValue(key), color]),
+      )
       : []
-  ), [fieldMeta?.options]);
+  ), [isOptionsField, optionColors]);
   const normalizedOptionsText = useMemo(() => normalizedOptions.join('\n'), [normalizedOptions]);
 
-  const hasOptions = normalizedOptions.length > 0 || isCustomOptionsField;
+  const hasOptions = normalizedOptions.length > 0 || isOptionsField;
 
   useEffect(() => {
     setName(fieldConfig?.name || fieldKey);
@@ -66,25 +75,20 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
   }, [fieldKey, normalizedOptionsText]);
 
   const handleSave = () => {
-    const normalizedCustomOptions = isCustomOptionsField
+    const nextOptions = isOptionsField
       ? optionText
         .split('\n')
         .map((line) => normalizeOptionValue(line.trim()))
         .filter(Boolean)
       : [];
-    const normalizedCustomOptionColors = isCustomOptionsField
-      ? Object.fromEntries(
-        Object.entries(optionColors || {}).map(([key, color]) => [normalizeOptionValue(key), color]),
-      )
-      : optionColors;
 
     onSave({
       name,
       icon,
       description,
-      optionColors: normalizedCustomOptionColors,
-      ...(isCustomOptionsField ? {
-        options: normalizedCustomOptions,
+      optionColors: isOptionsField ? normalizedOptionColors : optionColors,
+      ...(isOptionsField ? {
+        options: nextOptions,
       } : {}),
     });
     setSaved(true);
@@ -101,7 +105,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
 
   const tabs = [
     { key: 'name', label: 'Name & Icon', icon: <Type size={12} /> },
-    ...(isCustomOptionsField ? [{ key: 'options', label: 'Options', icon: <Layers size={12} /> }] : []),
+    ...(isOptionsField ? [{ key: 'options', label: 'Options', icon: <Layers size={12} /> }] : []),
     ...(hasOptions ? [{ key: 'colors', label: 'Colors', icon: <Palette size={12} /> }] : []),
   ];
 
@@ -229,7 +233,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
             </>
           )}
 
-          {activeTab === 'options' && isCustomOptionsField && (
+          {activeTab === 'options' && isOptionsField && (
             <div>
               <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Options</label>
               <textarea
@@ -247,7 +251,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
             <div>
               <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-3 block">Option Colors</label>
               <div className="space-y-3">
-                {(isCustomOptionsField ? optionText.split('\n').map((line) => line.trim()).filter(Boolean) : normalizedOptions).map(opt => {
+                {(isOptionsField ? optionText.split('\n').map((line) => normalizeOptionValue(line.trim())).filter(Boolean) : normalizedOptions).map(opt => {
                   const optionValue = getOptionValue(opt);
                   const currentColor = optionColors[optionValue] || opt?.color || '#71717a';
                   return (
