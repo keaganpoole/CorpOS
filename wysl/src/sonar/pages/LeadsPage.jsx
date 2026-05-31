@@ -9,7 +9,6 @@ const PeoplePage = () => {
     leads, allLeads, loading, error,
     selectedId, setSelectedId, selectedLead,
     searchQuery, setSearchQuery,
-    statusFilter, setStatusFilter,
     sourceFilter, setSourceFilter,
     sortBy, sortDir, handleSort,
     createLead, updateLead, deleteLead, refresh,
@@ -78,7 +77,6 @@ const PeoplePage = () => {
         leads={leads} loading={loading} selectedId={selectedId}
         onSelect={(id) => { setSelectedId(id); setCreating(false); }}
         searchQuery={searchQuery} onSearchChange={setSearchQuery}
-        statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
         sourceFilter={sourceFilter} onSourceFilterChange={setSourceFilter}
         sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
         onCreateNew={handleCreateNew} totalCount={allLeads.length}

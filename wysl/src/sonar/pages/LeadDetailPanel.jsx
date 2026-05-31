@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   DETAIL_SECTIONS, getSectionFields, formatTimestampFull, formatCurrency,
-  normalizeOptionValue, STATUS_OPTIONS, SOURCE_OPTIONS,
+  normalizeOptionValue,
 } from '../lib/leadSchema';
 
 const TextInput = ({ value, onChange, field, error }) => (
@@ -243,7 +243,6 @@ const LeadDetailPanel = ({ lead, onSave, onDelete, onClose, isNew = false }) => 
               <h3 className="text-2xl font-bold text-white mb-0.5 tracking-tight">{displayName}</h3>
               <p className="text-[13px] text-zinc-400">{currentLead.phone || currentLead.email || 'No contact details yet'}</p>
               <div className="mt-2 flex gap-2 flex-wrap">
-                {currentLead.status && <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">{normalizeOptionValue(currentLead.status)}</span>}
                 {currentLead.source && <span className="px-2 py-0.5 rounded-lg text-[9px] font-bold text-zinc-500 border border-white/10 bg-white/5 uppercase">{normalizeOptionValue(currentLead.source)}</span>}
               </div>
             </div>

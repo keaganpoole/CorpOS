@@ -60,7 +60,7 @@ const getReceptionistBannerUrl = (bannerId) => (
 );
 
 const SEARCH_FIELDS = {
-  people: ['first_name', 'last_name', 'email', 'notes'],
+  people: ['first_name', 'last_name', 'email'],
   payments: ['description', 'status', 'payment_method'],
   appointments: ['client_name', 'notes', 'status', 'date'],
   services: ['name', 'description', 'category'],
@@ -243,11 +243,8 @@ const TABLE_DEFS = [
       { key: 'consent_call', label: 'Consent Call', type: 'boolean' },
       { key: 'do_not_call', label: 'Do Not Call', type: 'boolean' },
       { key: 'do_not_text', label: 'Do Not Text', type: 'boolean' },
-      { key: 'status', label: 'Status', type: 'text' },
       { key: 'source', label: 'Source', type: 'text' },
       { key: 'lead_source_detail', label: 'Source Detail', type: 'text' },
-      { key: 'tags', label: 'Tags', type: 'text' },
-      { key: 'notes', label: 'Notes', type: 'text' },
       { key: 'special_instructions', label: 'Special Instructions', type: 'text' },
       { key: 'last_call_status', label: 'Last Call Status', type: 'text' },
       { key: 'last_intent', label: 'Last Intent', type: 'text' },

@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   X, Palette, Type, Sparkles, Check, RotateCcw, Trash2,
   Building2, User, Briefcase, Factory, Flag, Compass, Target,
   DollarSign, TrendingUp, Mail, Phone, Globe, MapPin, Map,
   Calendar, Clock, MessageSquare, Search, FileText, Gauge,
-  Star, Heart, Zap, Shield, Award, Bookmark, Tag, Layers,
-  Database, Cpu, Settings, Wrench, Package, Truck, Users, ChevronDown,
+  Star, Heart, Zap, Shield, Award, Bookmark, Tag, Layers, Plus,
+  Database, Cpu, Settings, Wrench, Package, Truck, Users, ChevronDown, GripVertical,
   BarChart3, PieChart, Activity, Wifi, Anchor, Aperture,
 } from 'lucide-react';
 import { AVAILABLE_ICONS } from '../lib/fieldConfig';
@@ -47,12 +50,203 @@ const getOptionValue = (option) => {
   return option;
 };
 
+const buildOptionDrafts = (options, colors = {}) => (
+  (options || []).map((option, index) => {
+    const value = getOptionValue(option);
+    return {
+      id: `${value || 'option'}-${index}`,
+      name: value,
+      color: colors[value] || option?.color || '#71717a',
+    };
+  })
+);
+
+const SortableOptionRow = ({
+  optionId,
+  isOptionsField,
+  currentColor,
+  optionValue,
+  opt,
+  isPopoverOpen,
+  activeColorOption,
+  setActiveColorOption,
+  setOptionDrafts,
+  setOptionColors,
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: optionId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.75 : 1,
+    zIndex: isDragging ? 20 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-color-popover-root="true"
+      className={`relative flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 transition-colors ${
+        isDragging
+          ? 'border-cyan-400/40 bg-white/[0.06] shadow-[0_12px_24px_rgba(0,0,0,0.25)]'
+          : 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.035]'
+      }`}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        {isOptionsField && (
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className={`shrink-0 cursor-grab rounded-md p-1 transition-colors active:cursor-grabbing ${
+              isDragging ? 'text-zinc-300' : 'text-zinc-600 hover:text-zinc-300'
+            }`}
+            title="Drag to reorder"
+          >
+            <GripVertical size={12} />
+          </button>
+        )}
+        <div className="min-w-0">
+          {isOptionsField ? (
+            <input
+              type="text"
+              value={opt.name}
+              onChange={(e) => {
+                const nextName = e.target.value;
+                setOptionDrafts((prev) => prev.map((draft) => (
+                  draft.id === optionId ? { ...draft, name: nextName } : draft
+                )));
+              }}
+              className="w-[220px] max-w-full rounded-md border border-transparent bg-transparent px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white transition-colors placeholder:text-zinc-600 focus:border-white/[0.08] focus:bg-black/30 focus:outline-none"
+              placeholder="Option name"
+              style={{
+                backgroundColor: hexToRgba(currentColor, 0.12),
+                color: currentColor,
+                borderColor: hexToRgba(currentColor, 0.22),
+              }}
+            />
+          ) : (
+            <div
+              className="inline-flex max-w-full items-center rounded-md px-2.5 py-1 text-[11px] font-semibold tracking-wide"
+              style={{
+                backgroundColor: hexToRgba(currentColor, 0.12),
+                color: currentColor,
+                border: `1px solid ${hexToRgba(currentColor, 0.22)}`,
+              }}
+            >
+              <span className="truncate">{optionValue}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveColorOption((prev) => (prev === optionId ? '' : optionId))}
+          className={`shrink-0 rounded-lg border px-2 py-1.5 transition-all ${
+            isPopoverOpen
+              ? 'border-white/[0.14] bg-white/[0.08]'
+              : 'border-white/[0.06] bg-black/35 hover:border-white/[0.12] hover:bg-white/[0.05]'
+          }`}
+        >
+          <span className="flex items-center gap-2">
+            <span
+              className="h-3.5 w-3.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.45)]"
+              style={{
+                backgroundColor: currentColor,
+                boxShadow: `0 0 10px ${currentColor}35`,
+              }}
+            />
+            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.08em] text-zinc-500">
+              {currentColor}
+            </span>
+            <ChevronDown
+              size={11}
+              className={`text-zinc-600 transition-transform ${isPopoverOpen ? 'rotate-180 text-zinc-300' : ''}`}
+            />
+          </span>
+        </button>
+        {isOptionsField && (
+          <button
+            type="button"
+            onClick={() => {
+              setOptionDrafts((prev) => prev.filter((draft) => draft.id !== optionId));
+              setActiveColorOption((prev) => (prev === optionId ? '' : prev));
+            }}
+            className="rounded-md p-1 text-zinc-600 transition-colors hover:text-rose-400"
+            title="Remove option"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {isPopoverOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -4 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
+            className="absolute right-0 top-full z-30 mt-2 w-[220px] origin-top-right rounded-xl border border-white/[0.08] bg-[#121215] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.85)]"
+          >
+            <div className="mb-2.5 flex items-center justify-between border-b border-white/[0.04] pb-2">
+              <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400">Select Color</span>
+              <span
+                className="text-[9px] font-mono font-bold uppercase"
+                style={{ color: currentColor }}
+              >
+                {currentColor}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-6 gap-1.5">
+              {OPTION_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => {
+                    if (isOptionsField) {
+                      setOptionDrafts((prev) => prev.map((draft) => (
+                        draft.id === optionId ? { ...draft, color } : draft
+                      )));
+                    } else {
+                      setOptionColors((prev) => ({ ...prev, [optionValue]: color }));
+                    }
+                    setActiveColorOption('');
+                  }}
+                  className="group relative flex h-6 w-6 items-center justify-center rounded-full transition-transform active:scale-90"
+                  style={{ backgroundColor: color }}
+                  title={color}
+                >
+                  {currentColor === color ? (
+                    <span className="h-2 w-2 rounded-full bg-white shadow-sm" />
+                  ) : (
+                    <span className="h-0 w-0 rounded-full bg-white/40 transition-all duration-150 group-hover:h-1.5 group-hover:w-1.5" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.03] pt-2">
+              <span className="text-[8px] font-medium text-zinc-600">Standard Palette</span>
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: currentColor }} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, onClose }) => {
   const [name, setName] = useState(fieldConfig?.name || fieldKey);
   const [icon, setIcon] = useState(fieldConfig?.icon || 'tag');
   const [description, setDescription] = useState(fieldMeta?.description || fieldConfig?.description || '');
   const [optionColors, setOptionColors] = useState(fieldConfig?.optionColors || {});
-  const [optionText, setOptionText] = useState('');
+  const [optionDrafts, setOptionDrafts] = useState([]);
   const [activeColorOption, setActiveColorOption] = useState('');
   const [activeTab, setActiveTab] = useState('name');
   const [saved, setSaved] = useState(false);
@@ -65,15 +259,6 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
         ? fieldMeta.options.map((opt) => getOptionValue(opt)).filter(Boolean)
         : []
   ), [fieldConfig?.options, fieldMeta?.options]);
-  const normalizedOptionColors = useMemo(() => (
-    isOptionsField
-      ? Object.fromEntries(
-        Object.entries(optionColors || {}).map(([key, color]) => [normalizeOptionValue(key), color]),
-      )
-      : []
-  ), [isOptionsField, optionColors]);
-  const normalizedOptionsText = useMemo(() => normalizedOptions.join('\n'), [normalizedOptions]);
-
   const hasOptions = normalizedOptions.length > 0 || isOptionsField;
 
   useEffect(() => {
@@ -81,9 +266,9 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
     setIcon(fieldConfig?.icon || 'tag');
     setDescription(fieldMeta?.description || fieldConfig?.description || '');
     setOptionColors(fieldConfig?.optionColors || {});
-    setOptionText(normalizedOptionsText);
+    setOptionDrafts(buildOptionDrafts(normalizedOptions, fieldConfig?.optionColors || {}));
     setActiveColorOption('');
-  }, [fieldKey, normalizedOptionsText]);
+  }, [fieldKey, normalizedOptions, fieldConfig?.optionColors, fieldMeta?.description, fieldConfig?.description, fieldConfig?.icon]);
 
   useEffect(() => {
     if (!activeColorOption) return undefined;
@@ -99,17 +284,23 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
 
   const handleSave = () => {
     const nextOptions = isOptionsField
-      ? optionText
-        .split('\n')
-        .map((line) => normalizeOptionValue(line.trim()))
+      ? optionDrafts
+        .map((draft) => normalizeOptionValue(draft.name.trim()))
         .filter(Boolean)
       : [];
+    const nextOptionColors = isOptionsField
+      ? Object.fromEntries(
+        optionDrafts
+          .map((draft) => [normalizeOptionValue(draft.name.trim()), draft.color])
+          .filter(([value]) => Boolean(value)),
+      )
+      : optionColors;
 
     onSave({
       name,
       icon,
       description,
-      optionColors: isOptionsField ? normalizedOptionColors : optionColors,
+      optionColors: nextOptionColors,
       ...(isOptionsField ? {
         options: nextOptions,
       } : {}),
@@ -123,18 +314,22 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
     setIcon('tag');
     setDescription('');
     setOptionColors({});
-    setOptionText(normalizedOptionsText);
+    setOptionDrafts(buildOptionDrafts(normalizedOptions));
     setActiveColorOption('');
   };
 
   const tabs = [
     { key: 'name', label: 'Name & Icon', icon: <Type size={12} /> },
-    ...(isOptionsField ? [{ key: 'options', label: 'Options', icon: <Layers size={12} /> }] : []),
     ...(hasOptions ? [{ key: 'colors', label: 'Colors', icon: <Palette size={12} /> }] : []),
   ];
 
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
+  );
+
   const colorOptions = isOptionsField
-    ? optionText.split('\n').map((line) => normalizeOptionValue(line.trim())).filter(Boolean)
+    ? optionDrafts
     : normalizedOptions;
 
   return (
@@ -277,127 +472,83 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
             </>
           )}
 
-          {activeTab === 'options' && isOptionsField && (
-            <div>
-              <label className="mb-2 block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">Options</label>
-              <textarea
-                value={optionText}
-                onChange={(e) => setOptionText(e.target.value)}
-                rows={8}
-                className="w-full resize-none rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-indigo-500/30 focus:outline-none"
-                placeholder={`One option per line\nExample A\nExample B\nExample C`}
-              />
-              <p className="mt-1.5 text-[8px] text-zinc-700">One option per line. These values are used in the table editor.</p>
-            </div>
-          )}
-
           {activeTab === 'colors' && hasOptions && (
             <div>
-              <label className="mb-3 block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">Option Colors</label>
-              <div className="space-y-2.5">
-                {colorOptions.map((opt) => {
-                  const optionValue = getOptionValue(opt);
-                  const currentColor = optionColors[optionValue] || opt?.color || '#71717a';
-                  const isPopoverOpen = activeColorOption === optionValue;
-
-                  return (
-                    <div
-                      key={optionValue}
-                      data-color-popover-root="true"
-                      className="relative flex items-center justify-between gap-3 rounded-xl border border-white/[0.04] bg-white/[0.02] px-3.5 py-2.5 transition-colors hover:bg-white/[0.035]"
-                    >
-                      <div className="min-w-0">
-                        <div
-                          className="inline-flex max-w-full items-center rounded-md px-2.5 py-1 text-[11px] font-semibold tracking-wide"
-                          style={{
-                            backgroundColor: hexToRgba(currentColor, 0.12),
-                            color: currentColor,
-                            border: `1px solid ${hexToRgba(currentColor, 0.22)}`,
-                          }}
-                        >
-                          <span className="truncate">{optionValue}</span>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveColorOption((prev) => (prev === optionValue ? '' : optionValue))}
-                        className={`shrink-0 rounded-lg border px-2 py-1.5 transition-all ${
-                          isPopoverOpen
-                            ? 'border-white/[0.14] bg-white/[0.08]'
-                            : 'border-white/[0.06] bg-black/35 hover:border-white/[0.12] hover:bg-white/[0.05]'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="h-3.5 w-3.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.45)]"
-                            style={{
-                              backgroundColor: currentColor,
-                              boxShadow: `0 0 10px ${currentColor}35`,
-                            }}
-                          />
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-[0.08em] text-zinc-500">
-                            {currentColor}
-                          </span>
-                          <ChevronDown
-                            size={11}
-                            className={`text-zinc-600 transition-transform ${isPopoverOpen ? 'rotate-180 text-zinc-300' : ''}`}
-                          />
-                        </span>
-                      </button>
-
-                      <AnimatePresence>
-                        {isPopoverOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.96, y: -4 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.96, y: -4 }}
-                            transition={{ duration: 0.12, ease: 'easeOut' }}
-                            className="absolute right-0 top-full z-30 mt-2 w-[220px] origin-top-right rounded-xl border border-white/[0.08] bg-[#121215] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.85)]"
-                          >
-                            <div className="mb-2.5 flex items-center justify-between border-b border-white/[0.04] pb-2">
-                              <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400">Select Color</span>
-                              <span
-                                className="text-[9px] font-mono font-bold uppercase"
-                                style={{ color: currentColor }}
-                              >
-                                {currentColor}
-                              </span>
-                            </div>
-
-                            <div className="grid grid-cols-6 gap-1.5">
-                              {OPTION_COLORS.map((color) => (
-                                <button
-                                  key={color}
-                                  type="button"
-                                  onClick={() => {
-                                    setOptionColors((prev) => ({ ...prev, [optionValue]: color }));
-                                    setActiveColorOption('');
-                                  }}
-                                  className="group relative flex h-6 w-6 items-center justify-center rounded-full transition-transform active:scale-90"
-                                  style={{ backgroundColor: color }}
-                                  title={color}
-                                >
-                                  {currentColor === color ? (
-                                    <span className="h-2 w-2 rounded-full bg-white shadow-sm" />
-                                  ) : (
-                                    <span className="h-0 w-0 rounded-full bg-white/40 transition-all duration-150 group-hover:h-1.5 group-hover:w-1.5" />
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-
-                            <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.03] pt-2">
-                              <span className="text-[8px] font-medium text-zinc-600">Standard Palette</span>
-                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: currentColor }} />
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  );
-                })}
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">
+                  {isOptionsField ? 'Options' : 'Option Colors'}
+                </label>
+                {isOptionsField && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextId = `option-${Date.now()}`;
+                      setOptionDrafts((prev) => [...prev, { id: nextId, name: '', color: '#71717a' }]);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400 transition-all hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white"
+                  >
+                    <Plus size={11} /> Add
+                  </button>
+                )}
               </div>
+              {isOptionsField ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={({ active, over }) => {
+                    if (!active?.id || !over?.id || active.id === over.id) return;
+                    setOptionDrafts((prev) => {
+                      const oldIndex = prev.findIndex((draft) => draft.id === active.id);
+                      const newIndex = prev.findIndex((draft) => draft.id === over.id);
+                      return oldIndex === -1 || newIndex === -1 ? prev : arrayMove(prev, oldIndex, newIndex);
+                    });
+                  }}
+                >
+                  <SortableContext items={colorOptions.map((opt) => opt.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2.5">
+                      {colorOptions.map((opt) => (
+                        <SortableOptionRow
+                          key={opt.id}
+                          optionId={opt.id}
+                          isOptionsField
+                          currentColor={opt.color}
+                          optionValue={opt.name}
+                          opt={opt}
+                          isPopoverOpen={activeColorOption === opt.id}
+                          activeColorOption={activeColorOption}
+                          setActiveColorOption={setActiveColorOption}
+                          setOptionDrafts={setOptionDrafts}
+                          setOptionColors={setOptionColors}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="space-y-2.5">
+                  {colorOptions.map((opt) => {
+                    const optionValue = getOptionValue(opt);
+                    const currentColor = optionColors[optionValue] || opt?.color || '#71717a';
+                    const optionId = optionValue;
+
+                    return (
+                      <SortableOptionRow
+                        key={optionId}
+                        optionId={optionId}
+                        isOptionsField={false}
+                        currentColor={currentColor}
+                        optionValue={optionValue}
+                        opt={opt}
+                        isPopoverOpen={activeColorOption === optionId}
+                        activeColorOption={activeColorOption}
+                        setActiveColorOption={setActiveColorOption}
+                        setOptionDrafts={setOptionDrafts}
+                        setOptionColors={setOptionColors}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
           </div>

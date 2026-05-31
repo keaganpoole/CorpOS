@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2,
@@ -7,9 +8,9 @@ import {
   ToggleLeft,
 } from 'lucide-react';
 import {
-  TABLE_COLUMNS, STATUS_OPTIONS, SOURCE_OPTIONS, CONTACT_METHOD_OPTIONS, TAG_OPTIONS,
+  TABLE_COLUMNS, SOURCE_OPTIONS, CONTACT_METHOD_OPTIONS,
   CALL_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS, formatTimestamp, formatCurrency,
-  getStatusColor, normalizeOptionValue, getFieldDef,
+  normalizeOptionValue, getFieldDef,
 } from '../lib/leadSchema';
 import {
   DEFAULT_FIELD_CONFIG, fetchBusinessFieldConfig, loadFieldConfig, migrateLegacyFieldConfig,
@@ -33,6 +34,90 @@ const FIELD_TYPE_ICONS = {
   text: Type,
   number: Hash,
   date: CalendarDays,
+};
+
+const ZONE_META_KEY = '__zones';
+const ZONE_SWATCHES = ['#22d3ee', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#f59e0b', '#10b981', '#14b8a6'];
+
+const isZoneEligibleColumn = (col) => Boolean(col?.label) && col.id !== 'select' && col.id !== 'avatar';
+
+const getSavedZones = (config) => {
+  if (!Array.isArray(config?.[ZONE_META_KEY])) return [];
+  return config[ZONE_META_KEY]
+    .filter((zone) => zone && typeof zone.startColumnId === 'string' && typeof zone.endColumnId === 'string')
+    .map((zone) => ({
+      id: zone.id || `zone_${zone.startColumnId}_${zone.endColumnId}`,
+      startColumnId: zone.startColumnId,
+      endColumnId: zone.endColumnId,
+      color: typeof zone.color === 'string' ? zone.color : ZONE_SWATCHES[1],
+    }));
+};
+
+const assignZoneLanes = (zones) => {
+  const laneEnds = [];
+  return zones
+    .slice()
+    .sort((a, b) => (a.startIndex - b.startIndex) || (a.endIndex - b.endIndex))
+    .map((zone) => {
+      let lane = laneEnds.findIndex((endIndex) => zone.startIndex > endIndex);
+      if (lane === -1) {
+        lane = laneEnds.length;
+        laneEnds.push(zone.endIndex);
+      } else {
+        laneEnds[lane] = zone.endIndex;
+      }
+      return { ...zone, lane, top: 3 + (lane * 7) };
+    });
+};
+
+const ZoneColorPalette = ({ position, activeColor, onSelect, onDelete, onClose }) => {
+  if (!position) return null;
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0, y: 6, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 6, scale: 0.96 }}
+      transition={{ duration: 0.16, ease: 'easeOut' }}
+      className="fixed z-[260] rounded-2xl border border-white/[0.08] bg-[#0b0b0d]/98 p-2 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+      style={{ left: position.left, top: position.top, transform: 'translate(-50%, -100%)' }}
+      data-zone-palette="true"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div className="flex items-center gap-1.5">
+        <span className="h-5 w-5 shrink-0 opacity-0" aria-hidden="true" />
+        {ZONE_SWATCHES.map((color) => {
+          const isActive = color === activeColor;
+          return (
+            <button
+              key={color}
+              type="button"
+              onClick={() => {
+                onSelect(color);
+                onClose();
+              }}
+              className={`relative h-5 w-5 rounded-full border transition-all ${isActive ? 'border-white/70 scale-105' : 'border-white/10 hover:border-white/30 hover:scale-105'}`}
+              style={{ backgroundColor: color, boxShadow: isActive ? `0 0 0 1px ${color}, 0 0 18px ${color}55` : `0 0 12px ${color}22` }}
+              aria-label={`Select zone color ${color}`}
+            >
+              {isActive && <span className="absolute inset-[4px] rounded-full border border-white/80" />}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => {
+            onDelete();
+            onClose();
+          }}
+          className="flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-zinc-500 transition-all hover:border-rose-400/40 hover:bg-rose-500/[0.08] hover:text-rose-400"
+          aria-label="Delete zone"
+        >
+          <Trash2 size={11} />
+        </button>
+      </div>
+    </motion.div>,
+    document.body,
+  );
 };
 
 const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
@@ -218,7 +303,7 @@ const InlineBoolean = ({ value, onSave }) => {
   );
 };
 
-const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = {} }) => {
+const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = {} }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const current = normalizeOptionValue(value);
@@ -247,7 +332,7 @@ const InlineSelect = ({ value, options, onSave, type = 'status', optionColors = 
     }
     if (optionColors[normal]) return { bg: 'bg-white/[0.04]', text: 'text-white', border: 'border-white/[0.08]', dot: optionColors[normal] };
     if (optionColors[val]) return { bg: 'bg-white/[0.04]', text: 'text-white', border: 'border-white/[0.08]', dot: optionColors[val] };
-    const color = type === 'status' ? getStatusColor(normal) : 'blue';
+    const color = 'blue';
     return palettes[color] || palettes.zinc;
   };
   const currentStyle = styleFor(current);
@@ -376,15 +461,34 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   );
 };
 
-const DraggableHeader = ({ col, index, sortBy, sortDir, onSort, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, dragOverIndex, fieldConfig = {}, onFieldSettings }) => {
+const DraggableHeader = ({
+  col, index, sortBy, sortDir, onSort, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, dragOverIndex,
+  fieldConfig = {}, onFieldSettings, headerRef, onZonePointerDown, onZoneHover, onZoneLeave, showZoneRail, isZoneCandidate,
+}) => {
   const displayName = fieldConfig[col.id]?.name || col.label;
   const iconName = fieldConfig[col.id]?.icon;
   const IconComp = iconName ? ICONS[iconName] : null;
+  const zoneEligible = isZoneEligibleColumn(col);
   return (
-    <div draggable={col.id !== 'avatar'} onDragStart={(e) => col.id !== 'avatar' && onDragStart(e, index)} onDragOver={(e) => onDragOver(e, index)}
+    <div ref={headerRef} draggable={col.id !== 'avatar'} onDragStart={(e) => col.id !== 'avatar' && onDragStart(e, index)} onDragOver={(e) => onDragOver(e, index)}
       onDrop={(e) => onDrop(e, index)} onDragEnd={onDragEnd}
+      onMouseEnter={() => zoneEligible && onZoneHover(col.id)}
+      onMouseLeave={() => zoneEligible && onZoneLeave(col.id)}
       style={{ width: col.width, minWidth: col.width }}
-      className={`shrink-0 flex items-center gap-1 transition-all duration-200 cursor-grab active:cursor-grabbing relative group/header ${isDragging ? 'opacity-30' : ''} ${dragOverIndex === index && !isDragging ? 'translate-x-1' : ''}`}>
+      className={`shrink-0 flex items-center gap-1 transition-all duration-200 cursor-grab active:cursor-grabbing relative group/header ${isDragging ? 'opacity-30' : ''} ${dragOverIndex === index && !isDragging ? 'translate-x-1' : ''} ${isZoneCandidate ? 'text-white' : ''}`}>
+      {zoneEligible && (
+        <>
+          <button
+            type="button"
+            onPointerDown={(event) => onZonePointerDown(event, index)}
+            className={`absolute inset-x-0 top-0 h-4 z-20 transition-opacity ${showZoneRail ? 'opacity-100' : 'opacity-0 group-hover/header:opacity-100'}`}
+            aria-label={`Create zone from ${displayName}`}
+          >
+            <span className={`absolute left-1 right-1 top-0 h-px rounded-full transition-all duration-200 ${isZoneCandidate ? 'bg-cyan-300/90 shadow-[0_0_14px_rgba(125,211,252,0.5)]' : 'bg-white/18 shadow-[0_0_10px_rgba(255,255,255,0.1)] group-hover/header:bg-cyan-300/50 group-hover/header:shadow-[0_0_12px_rgba(125,211,252,0.25)]'}`} />
+          </button>
+          <div className={`pointer-events-none absolute inset-x-1 top-0 bottom-1 rounded-xl transition-all duration-200 ${isZoneCandidate ? 'bg-[linear-gradient(180deg,rgba(125,211,252,0.12),rgba(125,211,252,0.03)_45%,transparent_100%)]' : 'bg-transparent'}`} />
+        </>
+      )}
       <div className="w-0 overflow-hidden group-hover/header:w-3 transition-all duration-200 shrink-0 flex items-center">
         <GripVertical size={10} className="text-zinc-800 group-hover/header:text-zinc-500 transition-colors shrink-0" />
       </div>
@@ -464,14 +568,12 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       );
     case 'phone': return <InlineText value={lead.phone} onSave={(v) => autoSave(lead.id, 'phone', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
     case 'email': return <InlineText value={lead.email} onSave={(v) => autoSave(lead.id, 'email', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
-    case 'status': return <InlineSelect value={lead.status} options={getConfiguredOptions('status', STATUS_OPTIONS)} type="status" onSave={(v) => autoSave(lead.id, 'status', v)} optionColors={fieldConfig.status?.optionColors || {}} />;
     case 'source': return <InlineSelect value={lead.source} options={getConfiguredOptions('source', SOURCE_OPTIONS)} onSave={(v) => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
     case 'preferred_contact_method': return <InlineSelect value={lead.preferred_contact_method} options={getConfiguredOptions('preferred_contact_method', CONTACT_METHOD_OPTIONS)} onSave={(v) => autoSave(lead.id, 'preferred_contact_method', v)} optionColors={fieldConfig.preferred_contact_method?.optionColors || {}} />;
     case 'last_call_status': return <InlineSelect value={lead.last_call_status} options={getConfiguredOptions('last_call_status', CALL_STATUS_OPTIONS)} onSave={(v) => autoSave(lead.id, 'last_call_status', v)} optionColors={fieldConfig.last_call_status?.optionColors || {}} />;
     case 'callback_due_at': return <InlineDate value={lead.callback_due_at} onSave={(v) => autoSave(lead.id, 'callback_due_at', v)} />;
     case 'payment_status': return <InlineSelect value={lead.payment_status} options={getConfiguredOptions('payment_status', PAYMENT_STATUS_OPTIONS)} onSave={(v) => autoSave(lead.id, 'payment_status', v)} optionColors={fieldConfig.payment_status?.optionColors || {}} />;
     case 'balance_due': return <InlineCurrency value={lead.balance_due} onSave={(v) => autoSave(lead.id, 'balance_due', v)} />;
-    case 'tags': return <InlineMultiSelect value={lead.tags} options={getConfiguredOptions('tags', TAG_OPTIONS)} onSave={(v) => autoSave(lead.id, 'tags', v)} optionColors={fieldConfig.tags?.optionColors || {}} />;
     default: {
       const field = getFieldDef(colId);
       if (!field) return null;
@@ -523,7 +625,7 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
   })),
 ];
 
-const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearchChange, statusFilter, onStatusFilterChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateNew, onCreateInline, onDeleteMany, totalCount, onUpdateLead }) => {
+const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateNew, onCreateInline, onDeleteMany, totalCount, onUpdateLead }) => {
   const [density] = useState(2);
   const [businessId, setBusinessId] = useState(null);
   const [customFields, setCustomFields] = useState([]);
@@ -536,13 +638,21 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
   const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, left: 0 });
   const columnOptionsButtonRef = useRef(null);
   const tableScrollRef = useRef(null);
+  const headerStickyRef = useRef(null);
+  const headerRowRef = useRef(null);
+  const headerRefs = useRef({});
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [contextMenu, setContextMenu] = useState(null);
+  const [hoveredZoneColumnId, setHoveredZoneColumnId] = useState(null);
+  const [zoneDraft, setZoneDraft] = useState(null);
+  const [zonePaletteId, setZonePaletteId] = useState(null);
+  const [headerMetrics, setHeaderMetrics] = useState([]);
 
   const column_options = CUSTOM_FIELD_TYPES;
   const anySelected = selectedIds.length > 0;
+  const zones = useMemo(() => getSavedZones(fieldConfig), [fieldConfig]);
 
   useEffect(() => {
     let active = true;
@@ -582,6 +692,42 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       return next;
     });
   }, [customFields, fieldConfig]);
+
+  const measureHeaderMetrics = useCallback(() => {
+    if (!headerRowRef.current) return;
+    const nextMetrics = columns
+      .map((col, index) => {
+        const el = headerRefs.current[col.id];
+        if (!el) return null;
+        return {
+          id: col.id,
+          index,
+          left: el.offsetLeft,
+          right: el.offsetLeft + el.offsetWidth,
+          width: el.offsetWidth,
+          center: el.offsetLeft + (el.offsetWidth / 2),
+          eligible: isZoneEligibleColumn(col),
+        };
+      })
+      .filter(Boolean);
+    setHeaderMetrics(nextMetrics);
+  }, [columns]);
+
+  useEffect(() => {
+    measureHeaderMetrics();
+  }, [measureHeaderMetrics]);
+
+  useEffect(() => {
+    window.addEventListener('resize', measureHeaderMetrics);
+    return () => window.removeEventListener('resize', measureHeaderMetrics);
+  }, [measureHeaderMetrics]);
+
+  useEffect(() => {
+    if (!headerRowRef.current || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => measureHeaderMetrics());
+    observer.observe(headerRowRef.current);
+    return () => observer.disconnect();
+  }, [measureHeaderMetrics]);
 
   const persistFieldConfig = async (next) => {
     setFieldConfig(next);
@@ -727,6 +873,34 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
     setSelectedIds((prev) => prev.filter((id) => leads.some((lead) => lead.id === id)));
   }, [leads]);
 
+  useEffect(() => {
+    if (!zonePaletteId) return undefined;
+    const close = (event) => {
+      if (event.target.closest?.('[data-zone-palette="true"]')) return;
+      setZonePaletteId(null);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setZonePaletteId(null);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [zonePaletteId]);
+
+  useEffect(() => {
+    if (zoneDraft || !zonePaletteId) return undefined;
+    const update = () => measureHeaderMetrics();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [measureHeaderMetrics, zoneDraft, zonePaletteId]);
+
   const dc = {
     row: ['py-0', 'py-0.5', 'py-1', 'py-1.5', 'py-2', 'py-2.5', 'py-3', 'py-3.5', 'py-4'][density],
     avatar: ['w-6', 'w-6', 'w-7', 'w-7', 'w-8', 'w-8', 'w-9', 'w-9', 'w-10'][density] + ' ' + ['w-6', 'w-6', 'w-7', 'w-7', 'w-8', 'w-8', 'w-9', 'w-9', 'w-10'][density].replace('w', 'h') + ' rounded-xl',
@@ -761,6 +935,59 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
     setDragIndex(null); setDragOverIndex(null);
   };
 
+  const persistZones = useCallback((nextZones) => {
+    persistFieldConfig({ ...fieldConfig, [ZONE_META_KEY]: nextZones });
+  }, [fieldConfig]);
+
+  const findClosestZoneMetric = useCallback((clientX) => {
+    if (!headerRowRef.current || headerMetrics.length === 0) return null;
+    const rowRect = headerRowRef.current.getBoundingClientRect();
+    const relativeX = clientX - rowRect.left;
+    const eligibleMetrics = headerMetrics.filter((metric) => metric.eligible);
+    if (!eligibleMetrics.length) return null;
+    const containing = eligibleMetrics.find((metric) => relativeX >= metric.left && relativeX <= metric.right);
+    if (containing) return containing;
+    return eligibleMetrics.reduce((closest, metric) => (
+      Math.abs(metric.center - relativeX) < Math.abs(closest.center - relativeX) ? metric : closest
+    ), eligibleMetrics[0]);
+  }, [headerMetrics]);
+
+  const handleZonePointerDown = useCallback((event, startIndex) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startMetric = headerMetrics.find((metric) => metric.index === startIndex && metric.eligible);
+    if (!startMetric) return;
+    setZonePaletteId(null);
+    setZoneDraft({ startIndex, currentIndex: startIndex });
+    const handlePointerMove = (moveEvent) => {
+      const nextMetric = findClosestZoneMetric(moveEvent.clientX);
+      if (!nextMetric) return;
+      setZoneDraft((prev) => (prev ? { ...prev, currentIndex: nextMetric.index } : prev));
+    };
+    const handlePointerUp = (upEvent) => {
+      const endMetric = findClosestZoneMetric(upEvent.clientX);
+      setZoneDraft(null);
+      if (endMetric && startIndex !== endMetric.index) {
+        const startCol = columns[startIndex];
+        const endCol = columns[endMetric.index];
+        if (isZoneEligibleColumn(startCol) && isZoneEligibleColumn(endCol)) {
+          const nextZone = {
+            id: `zone_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            startColumnId: startCol.id,
+            endColumnId: endCol.id,
+            color: ZONE_SWATCHES[1],
+          };
+          persistZones([...zones, nextZone]);
+          setZonePaletteId(nextZone.id);
+        }
+      }
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }, [columns, findClosestZoneMetric, headerMetrics, persistZones, zones]);
+
   const toggleSelectedId = (id) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((current) => current !== id) : [...prev, id]));
   };
@@ -780,6 +1007,65 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
     setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
     setContextMenu(null);
   };
+
+  const zoneLayouts = useMemo(() => {
+    const metricsById = new Map(headerMetrics.map((metric) => [metric.id, metric]));
+    const prepared = zones
+      .map((zone) => {
+        const startMetric = metricsById.get(zone.startColumnId);
+        const endMetric = metricsById.get(zone.endColumnId);
+        if (!startMetric || !endMetric || !startMetric.eligible || !endMetric.eligible) return null;
+        const startIndex = Math.min(startMetric.index, endMetric.index);
+        const endIndex = Math.max(startMetric.index, endMetric.index);
+        const left = Math.min(startMetric.left, endMetric.left);
+        const right = Math.max(startMetric.right, endMetric.right);
+        return {
+          ...zone,
+          startIndex,
+          endIndex,
+          left,
+          right,
+          width: right - left,
+          center: left + ((right - left) / 2),
+        };
+      })
+      .filter(Boolean);
+    return assignZoneLanes(prepared);
+  }, [headerMetrics, zones]);
+
+  const draftSpan = useMemo(() => {
+    if (!zoneDraft) return null;
+    const startIndex = Math.min(zoneDraft.startIndex, zoneDraft.currentIndex);
+    const endIndex = Math.max(zoneDraft.startIndex, zoneDraft.currentIndex);
+    const metrics = headerMetrics.filter((metric) => metric.eligible && metric.index >= startIndex && metric.index <= endIndex);
+    if (!metrics.length) return null;
+    const left = metrics[0].left;
+    const right = metrics[metrics.length - 1].right;
+    return {
+      startIndex,
+      endIndex,
+      metrics,
+      left,
+      right,
+      width: right - left,
+      center: left + ((right - left) / 2),
+      top: 3,
+    };
+  }, [headerMetrics, zoneDraft]);
+
+  const hoveredZoneMetric = useMemo(() => (
+    hoveredZoneColumnId ? headerMetrics.find((metric) => metric.id === hoveredZoneColumnId && metric.eligible) || null : null
+  ), [headerMetrics, hoveredZoneColumnId]);
+
+  const zonePalette = useMemo(() => zoneLayouts.find((zone) => zone.id === zonePaletteId) || null, [zoneLayouts, zonePaletteId]);
+  const zonePalettePosition = zonePalette && headerRowRef.current && headerStickyRef.current
+    ? {
+        left: headerRowRef.current.getBoundingClientRect().left + zonePalette.center,
+        top: headerStickyRef.current.getBoundingClientRect().top + zonePalette.top - 8,
+      }
+    : null;
+
+  const zoneCandidateRange = draftSpan ? new Set(draftSpan.metrics.map((metric) => metric.id)) : null;
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full">
@@ -815,25 +1101,115 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
           <div className="relative bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/[0.06] rounded-[1.5rem] flex flex-col h-full overflow-hidden">
             <div className="flex-1 flex flex-col overflow-hidden">
               <div ref={tableScrollRef} className="flex-1 overflow-auto custom-scrollbar">
-                <div className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm">
-                  <div className="flex items-center gap-3 px-5 py-2 min-w-max group">
-                    {columns.map((col, index) => (
-                      <div key={col.id} className="shrink-0">
-                        <DraggableHeader col={col} index={index} sortBy={sortBy} sortDir={sortDir} onSort={onSort} onDragStart={handleDragStart} onDragOver={handleDragOver} onDrop={handleDrop} onDragEnd={() => setDragIndex(null)} isDragging={dragIndex === index} dragOverIndex={dragOverIndex} fieldConfig={fieldConfig} onFieldSettings={setSettingsField} />
-                      </div>
-                    ))}
-                    <div className="shrink-0 pl-1">
-                      <button
-                        ref={columnOptionsButtonRef}
-                        type="button"
-                        onClick={toggleColumnOptions}
-                        className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-cyan-500/25 hover:bg-cyan-500/10 transition-all flex items-center justify-center"
-                        aria-label="Add column"
-                      >
-                        <Plus size={13} />
-                      </button>
+                <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
+                  <div ref={headerRowRef} className="relative min-w-max">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-6">
+                      {draftSpan?.metrics.map((metric) => (
+                        <motion.div
+                          key={`draft-glow-${metric.id}`}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute top-0 bottom-1 rounded-b-xl"
+                          style={{
+                            left: metric.left + 2,
+                            width: Math.max(metric.width - 4, 0),
+                            background: 'linear-gradient(180deg, rgba(125,211,252,0.14), rgba(125,211,252,0.04) 55%, transparent 100%)',
+                          }}
+                        />
+                      ))}
+                      {zoneLayouts.map((zone) => (
+                        <button
+                          key={zone.id}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setZonePaletteId(zone.id);
+                          }}
+                          className="absolute z-10 h-4 rounded-full pointer-events-auto"
+                          style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 6, 0) }}
+                          aria-label="Edit zone color"
+                        >
+                          <span
+                            className="absolute inset-x-0 rounded-full blur-[4px] opacity-35"
+                            style={{ top: zone.top - Math.max(zone.top - 6, 0) - 1, height: 4, backgroundColor: zone.color }}
+                          />
+                          <span
+                            className="absolute inset-x-0 h-px rounded-full"
+                            style={{
+                              top: zone.top - Math.max(zone.top - 6, 0),
+                              background: `linear-gradient(90deg, ${zone.color}AA 0%, ${zone.color} 12%, ${zone.color} 88%, ${zone.color}AA 100%)`,
+                              boxShadow: zonePaletteId === zone.id ? `0 0 0 1px ${zone.color}44, 0 0 18px ${zone.color}55` : `0 0 12px ${zone.color}35`,
+                            }}
+                          />
+                        </button>
+                      ))}
+                      {draftSpan && (
+                        <motion.div
+                          initial={{ opacity: 0, scaleX: 0.98 }}
+                          animate={{ opacity: 1, scaleX: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute h-4"
+                          style={{ left: draftSpan.left, width: draftSpan.width, top: 0 }}
+                        >
+                          <span className="absolute inset-x-0 top-[2px] h-[4px] rounded-full bg-cyan-300/20 blur-[4px]" />
+                          <span className="absolute inset-x-0 top-[3px] h-px rounded-full bg-cyan-200 shadow-[0_0_16px_rgba(125,211,252,0.55)]" />
+                        </motion.div>
+                      )}
+                      {!zoneDraft && hoveredZoneMetric && (
+                        <motion.div
+                          initial={{ opacity: 0, scaleX: 0.94 }}
+                          animate={{ opacity: 1, scaleX: 1 }}
+                          exit={{ opacity: 0, scaleX: 0.94 }}
+                          className="absolute h-4"
+                          style={{ left: hoveredZoneMetric.left, width: hoveredZoneMetric.width, top: 0 }}
+                        >
+                          <span className="absolute inset-x-1 top-[3px] h-px rounded-full bg-white/20 shadow-[0_0_10px_rgba(255,255,255,0.08)]" />
+                        </motion.div>
+                      )}
                     </div>
-                    {showColumnOptions && <div className="w-[190px] shrink-0" />}
+                    <div className="flex items-center gap-3 px-5 py-2 group" style={{ paddingTop: '15px' }}>
+                      {columns.map((col, index) => (
+                        <div key={col.id} className="shrink-0">
+                          <DraggableHeader
+                            col={col}
+                            index={index}
+                            sortBy={sortBy}
+                            sortDir={sortDir}
+                            onSort={onSort}
+                            onDragStart={handleDragStart}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            onDragEnd={() => setDragIndex(null)}
+                            isDragging={dragIndex === index}
+                            dragOverIndex={dragOverIndex}
+                            fieldConfig={fieldConfig}
+                            onFieldSettings={setSettingsField}
+                            headerRef={(node) => {
+                              if (node) headerRefs.current[col.id] = node;
+                              else delete headerRefs.current[col.id];
+                            }}
+                            onZonePointerDown={handleZonePointerDown}
+                            onZoneHover={setHoveredZoneColumnId}
+                            onZoneLeave={(id) => setHoveredZoneColumnId((current) => (current === id ? null : current))}
+                            showZoneRail={hoveredZoneColumnId === col.id || zoneCandidateRange?.has(col.id)}
+                            isZoneCandidate={zoneCandidateRange?.has(col.id)}
+                          />
+                        </div>
+                      ))}
+                      <div className="shrink-0 pl-1">
+                        <button
+                          ref={columnOptionsButtonRef}
+                          type="button"
+                          onClick={toggleColumnOptions}
+                          className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-cyan-500/25 hover:bg-cyan-500/10 transition-all flex items-center justify-center"
+                          aria-label="Add column"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                      {showColumnOptions && <div className="w-[190px] shrink-0" />}
+                    </div>
                   </div>
                 </div>
 
@@ -910,6 +1286,19 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       </div>
 
       <AnimatePresence>
+        {zonePalette && (
+          <ZoneColorPalette
+            position={zonePalettePosition}
+            activeColor={zonePalette.color}
+            onSelect={(color) => {
+              persistZones(zones.map((zone) => (zone.id === zonePalette.id ? { ...zone, color } : zone)));
+            }}
+            onDelete={() => {
+              persistZones(zones.filter((zone) => zone.id !== zonePalette.id));
+            }}
+            onClose={() => setZonePaletteId(null)}
+          />
+        )}
         {contextMenu && (
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: -4 }}

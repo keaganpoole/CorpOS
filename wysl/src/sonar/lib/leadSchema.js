@@ -153,17 +153,6 @@ export const LEAD_FIELDS = [
 
   // CRM
   {
-    key: 'status',
-    label: 'Status',
-    type: 'select',
-    options: STATUS_OPTIONS,
-    required: false,
-    table: true,
-    tableWidth: '140px',
-    section: 'crm',
-    editable: true,
-  },
-  {
     key: 'source',
     label: 'Source',
     type: 'select',
@@ -175,17 +164,6 @@ export const LEAD_FIELDS = [
     editable: true,
   },
   { key: 'lead_source_detail', label: 'Source Detail', type: 'text', required: false, table: false, tableWidth: '190px', section: 'crm', editable: true },
-  {
-    key: 'tags',
-    label: 'Tags',
-    type: 'multi_select',
-    options: TAG_OPTIONS,
-    required: false,
-    table: true,
-    tableWidth: '220px',
-    section: 'crm',
-    editable: true,
-  },
   { key: 'created_at', label: 'Created', type: 'timestamp', required: false, table: false, tableWidth: '120px', section: 'crm', editable: false },
   { key: 'updated_at', label: 'Updated', type: 'timestamp', required: false, table: false, tableWidth: '150px', section: 'crm', editable: false },
 
@@ -298,7 +276,6 @@ export const LEAD_FIELDS = [
   { key: 'payment_created_at', label: 'Payment Date', type: 'timestamp', required: false, table: false, section: 'financial', editable: false },
 
   // Notes
-  { key: 'notes', label: 'Notes', type: 'textarea', required: false, table: true, tableWidth: '280px', section: 'notes', editable: true, appendOnly: true, description: 'Append only - never replace existing notes' },
   { key: 'special_instructions', label: 'Special Instructions', type: 'textarea', required: false, table: false, tableWidth: '280px', section: 'notes', editable: true },
   { key: 'stripe_customer_id', label: 'Stripe Customer ID', type: 'text', required: false, table: false, tableWidth: '190px', section: 'financial', editable: true },
   { key: 'stripe_payment_method_id', label: 'Stripe Payment Method ID', type: 'text', required: false, table: false, tableWidth: '220px', section: 'financial', editable: true },

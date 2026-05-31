@@ -194,9 +194,7 @@ const RECORD_TABLE_FIELDS = {
     { key: 'state', label: 'State' },
     { key: 'zip_code', label: 'Zip Code' },
     { key: 'preferred_contact_method', label: 'Preferred Contact Method' },
-    { key: 'status', label: 'Status' },
     { key: 'source', label: 'Source' },
-    { key: 'notes', label: 'Notes' },
   ],
   Appointments: [
     { key: 'client_name', label: 'Client Name' },
@@ -529,29 +527,6 @@ const AUTOMATION_HIERARCHY = {
         { key: 'subject', label: 'Subject', type: 'text' },
         { key: 'body', label: 'Body', type: 'textarea' },
       ]}],
-    },
-    {
-      key: 'tags',
-      option: 'Tags',
-      description: 'Manage record tags',
-      accent: '#38bdf8',
-      icon: OPTION_ICONS.tags,
-      sub_options: [
-        { key: 'add_tag', name: 'Add Tag', description: 'Attach tag to record', configFields: [
-          { key: 'person_id', label: 'Record', type: 'person_id' },
-          { key: 'tag_name', label: 'Tag Name', type: 'text' },
-        ]},
-        { key: 'search_tags', name: 'Search Tags', description: 'Find existing tags', configFields: [
-          { key: 'search_value', label: 'Search', type: 'text', placeholder: 'Tag to search for' },
-        ]},
-        { key: 'update_tag', name: 'Update Tag', description: 'Update an existing tag', configFields: [
-          { key: 'old_tag', label: 'Current Tag Name', type: 'text', placeholder: 'Tag to rename' },
-          { key: 'new_tag', label: 'New Tag Name', type: 'text', placeholder: 'New name' },
-        ]},
-        { key: 'delete_tag', name: 'Delete Tag', description: 'Remove a tag permanently', configFields: [
-          { key: 'tag_name', label: 'Tag Name', type: 'text', placeholder: 'Tag to remove' },
-        ]},
-      ],
     },
   ],
   UTILITIES: [

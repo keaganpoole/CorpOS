@@ -2,13 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   normalizeOptionValue,
-  normalizeMultiSelectValue,
   titleCase,
-  DEFAULT_STATUS,
 } from '../lib/leadSchema';
 
 const SINGLE_SELECT_FIELDS = new Set([
-  'status',
   'source',
   'preferred_contact_method',
   'last_call_status',
@@ -27,7 +24,6 @@ const TRIMMED_TEXT_FIELDS = new Set([
   'preferred_language',
   'best_time_to_contact',
   'lead_source_detail',
-  'notes',
   'special_instructions',
   'stripe_customer_id',
   'stripe_payment_method_id',
@@ -45,10 +41,6 @@ const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
     if (field in next && typeof next[field] === 'string') {
       next[field] = normalizeOptionValue(next[field]);
     }
-  }
-
-  if ('tags' in next) {
-    next.tags = normalizeMultiSelectValue(next.tags);
   }
 
   for (const field of TRIMMED_TEXT_FIELDS) {
@@ -75,10 +67,6 @@ const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
     next.missed_call_count = Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
   }
 
-  if (isCreate && !next.status) {
-    next.status = DEFAULT_STATUS;
-  }
-
   return next;
 };
 
@@ -88,7 +76,6 @@ export function useLeads() {
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [sortBy, setSortBy] = useState('updated_at');
   const [sortDir, setSortDir] = useState('desc');
@@ -216,7 +203,6 @@ export function useLeads() {
   };
 
   const filteredLeads = leads.filter((row) => {
-    if (statusFilter !== 'All' && titleCase(row.status).toLowerCase() !== statusFilter.toLowerCase()) return false;
     if (sourceFilter !== 'All' && titleCase(row.source).toLowerCase() !== sourceFilter.toLowerCase()) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -232,10 +218,8 @@ export function useLeads() {
         row.preferred_contact_method,
         row.preferred_language,
         row.best_time_to_contact,
-        row.status,
         row.source,
         row.lead_source_detail,
-        Array.isArray(row.tags) ? row.tags.join(' ') : row.tags,
         row.updated_at,
         row.last_inbound_call_at,
         row.last_outbound_call_at,
@@ -244,7 +228,6 @@ export function useLeads() {
         row.callback_due_at,
         row.payment_status,
         row.balance_due,
-        row.notes,
         row.special_instructions,
         row.stripe_customer_id,
         row.stripe_payment_method_id,
@@ -275,8 +258,6 @@ export function useLeads() {
     selectedLead,
     searchQuery,
     setSearchQuery,
-    statusFilter,
-    setStatusFilter,
     sourceFilter,
     setSourceFilter,
     sortBy,

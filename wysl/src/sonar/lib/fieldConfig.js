@@ -34,21 +34,6 @@ export const DEFAULT_FIELD_CONFIG = {
   consent_call: { name: 'Consent Call', icon: 'shield' },
   do_not_call: { name: 'Do Not Call', icon: 'shield' },
   do_not_text: { name: 'Do Not Text', icon: 'shield' },
-  status: {
-    name: 'Status',
-    icon: 'flag',
-    optionColors: {
-      New: '#3b82f6',
-      Contacted: '#f59e0b',
-      Active: '#06b6d4',
-      'Callback Needed': '#f97316',
-      Booked: '#10b981',
-      Transferred: '#d946ef',
-      Closed: '#10b981',
-      'Do Not Contact': '#f43f5e',
-      Inactive: '#71717a',
-    },
-  },
   source: {
     name: 'Source',
     icon: 'compass',
@@ -63,7 +48,6 @@ export const DEFAULT_FIELD_CONFIG = {
     },
   },
   lead_source_detail: { name: 'Source Detail', icon: 'search' },
-  tags: { name: 'Tags', icon: 'tag' },
   created_at: { name: 'Created', icon: 'calendar' },
   updated_at: { name: 'Updated', icon: 'clock' },
   last_inbound_call_at: { name: 'Last Inbound Call', icon: 'phone' },
@@ -107,7 +91,6 @@ export const DEFAULT_FIELD_CONFIG = {
   },
   balance_due: { name: 'Balance Due', icon: 'dollar-sign' },
   invoice_id: { name: 'Invoice ID', icon: 'file-text' },
-  notes: { name: 'Notes', icon: 'file-text' },
   special_instructions: { name: 'Special Instructions', icon: 'file-text' },
 };
 
@@ -267,9 +250,7 @@ export const OPERATORS = {
 };
 
 export const CONDITIONAL_FIELDS = [
-  { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS.map((opt) => opt.value) },
   { key: 'source', label: 'Source', type: 'select', options: SOURCE_OPTIONS.map((opt) => opt.value) },
-  { key: 'tags', label: 'Tags', type: 'multi_select', options: ['VIP', 'Callback', 'Spanish', 'Urgent', 'Billing', 'New', 'Follow Up', 'Existing Customer', 'Do Not Disturb'] },
   { key: 'last_intent', label: 'Last Intent', type: 'text' },
   { key: 'last_outcome', label: 'Last Outcome', type: 'select', options: OUTCOME_OPTIONS.map((opt) => opt.value) },
   { key: 'last_call_status', label: 'Last Call Status', type: 'select', options: CALL_STATUS_OPTIONS.map((opt) => opt.value) },
