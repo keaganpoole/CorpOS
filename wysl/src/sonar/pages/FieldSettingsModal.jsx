@@ -40,16 +40,26 @@ const getOptionValue = (option) => {
 const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, onClose }) => {
   const [name, setName] = useState(fieldConfig?.name || fieldKey);
   const [icon, setIcon] = useState(fieldConfig?.icon || 'tag');
+  const [description, setDescription] = useState(fieldMeta?.description || fieldConfig?.description || '');
   const [optionColors, setOptionColors] = useState(fieldConfig?.optionColors || {});
   const [activeTab, setActiveTab] = useState('name');
   const [saved, setSaved] = useState(false);
+  const isCustomField = typeof fieldKey === 'string' && fieldKey.startsWith('custom_');
 
   const hasOptions = fieldMeta?.options?.length > 0;
+
+  useEffect(() => {
+    setName(fieldConfig?.name || fieldKey);
+    setIcon(fieldConfig?.icon || 'tag');
+    setDescription(fieldMeta?.description || fieldConfig?.description || '');
+    setOptionColors(fieldConfig?.optionColors || {});
+  }, [fieldKey, fieldConfig, fieldMeta]);
 
   const handleSave = () => {
     onSave({
       name,
       icon,
+      description,
       optionColors,
     });
     setSaved(true);
@@ -59,6 +69,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
   const handleReset = () => {
     setName(fieldKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
     setIcon('tag');
+    setDescription('');
     setOptionColors({});
   };
 
@@ -134,6 +145,20 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
                 </div>
                 <p className="text-[8px] text-zinc-700 mt-1.5">Display only — Supabase column key stays: <code className="text-zinc-500">{fieldKey}</code></p>
               </div>
+
+              {isCustomField && (
+                <div>
+                  <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Description</label>
+                  <textarea
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    rows={3}
+                    className="w-full bg-black/40 border border-white/[0.06] rounded-xl px-4 py-3 text-[13px] text-white leading-relaxed focus:outline-none focus:border-indigo-500/30 transition-colors resize-none"
+                    placeholder="Give your receptionist more context into what this is for."
+                  />
+                  <p className="text-[8px] text-zinc-700 mt-1.5">Used in AI collection instructions and custom-field metadata.</p>
+                </div>
+              )}
 
               {/* Icon Picker */}
               <div>

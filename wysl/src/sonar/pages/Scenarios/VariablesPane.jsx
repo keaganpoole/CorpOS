@@ -73,6 +73,7 @@ let peopleCustomVariableFields = [];
 const toScenarioCustomField = (field) => ({
   key: field.key,
   label: field.label,
+  description: field.description,
   type: field.type,
   custom: true,
 });
@@ -90,7 +91,7 @@ const withCustomFields = (table) => {
   return { ...table, fields: [...table.fields, ...customFields] };
 };
 
-const getTableFields = (tableKey) => {
+export const getTableFields = (tableKey) => {
   const table = TABLE_DEFS.find((item) => item.key === tableKey);
   return withCustomFields(table)?.fields || [];
 };
@@ -108,7 +109,7 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
-const getFieldDisplayLabel = (tableKey, fieldKey) => {
+export const getFieldDisplayLabel = (tableKey, fieldKey) => {
   const field = getTableFields(tableKey).find((item) => item.key === fieldKey);
   return field?.label || fieldKey;
 };
@@ -468,7 +469,7 @@ export const TABLE_LABELS = {
 
 const AGENT_SOURCE_TABLES = new Set(['people', 'appointments']);
 
-const getAgentFieldsForTable = (tableKey) => {
+export const getAgentFieldsForTable = (tableKey) => {
   if (!AGENT_SOURCE_TABLES.has(tableKey)) return [];
   return getTableFields(tableKey);
 };
@@ -534,9 +535,9 @@ export const parseVariables = (value) => {
     const [full, ref] = match;
     const parts = ref.split('.');
     if (parts.length === 2) {
-      matches.push({ full, table: normalizeParsedTableKey(parts[0]), field: parts[1] });
+      matches.push({ full, source: null, table: normalizeParsedTableKey(parts[0]), field: parts[1] });
     } else if (parts.length >= 3 && (parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist')) {
-      matches.push({ full, table: normalizeParsedTableKey(parts[1]), field: parts.slice(2).join('.') });
+      matches.push({ full, source: parts[0], table: normalizeParsedTableKey(parts[1]), field: parts.slice(2).join('.') });
     }
   }
   return matches;

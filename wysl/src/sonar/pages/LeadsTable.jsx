@@ -17,7 +17,7 @@ import {
 } from '../lib/fieldConfig';
 import {
   CUSTOM_FIELD_TYPES, createCustomField, fetchCustomFields, getCurrentBusinessId, getCustomValue,
-  isCustomFieldKey, setCustomFieldValue, updateCustomField, updateCustomFieldPositions,
+  isCustomFieldKey, setCustomFieldValue, updateCustomField, updateCustomFieldPositions, deleteCustomField,
 } from '../lib/customFields';
 import FieldSettingsModal from './FieldSettingsModal';
 import ColorbarConfigModal from './ColorbarConfigModal';
@@ -477,14 +477,22 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
     persistFieldConfig(next);
     if (isCustomFieldKey(key)) {
       const nextFields = customFields.map((field) => (
-        field.key === key ? { ...field, label: config.name || field.label } : field
+        field.key === key ? { ...field, label: config.name || field.label, description: config.description ?? field.description ?? '' } : field
       ));
       setCustomFields(nextFields);
       setColumns((prev) => prev.map((col) => (
         col.id === key ? { ...col, label: config.name || col.label } : col
       )));
       if (businessId) {
-        updateCustomField(key, businessId, { label: config.name || key }).catch((err) => {
+        const fieldMeta = customFields.find((field) => field.key === key);
+        updateCustomField(key, businessId, {
+          label: config.name || key,
+          config: {
+            ...(fieldMeta?.config || {}),
+            tableWidth: fieldMeta?.tableWidth,
+            description: config.description ?? fieldMeta?.description ?? '',
+          },
+        }).catch((err) => {
           console.error('[LeadsTable] Failed to save custom field settings:', err.message);
         });
       }
@@ -497,16 +505,19 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       ...fieldConfig,
       [key]: { ...fieldConfig[key], hidden: true },
     };
-    persistFieldConfig(next);
-    setColumns((prev) => prev.filter((col) => col.id !== key));
-
     if (isCustomFieldKey(key)) {
+      const { [key]: _, ...remainingFieldConfig } = next;
+      persistFieldConfig(remainingFieldConfig);
+      setColumns((prev) => prev.filter((col) => col.id !== key));
       setCustomFields((prev) => prev.filter((field) => field.key !== key));
       if (businessId) {
-        updateCustomField(key, businessId, { is_active: false }).catch((err) => {
-          console.error('[LeadsTable] Failed to hide custom field:', err.message);
+        deleteCustomField(key, businessId).catch((err) => {
+          console.error('[LeadsTable] Failed to delete custom field:', err.message);
         });
       }
+    } else {
+      persistFieldConfig(next);
+      setColumns((prev) => prev.filter((col) => col.id !== key));
     }
 
     setSettingsField(null);

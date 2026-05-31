@@ -7,6 +7,32 @@ from typing import Any, Callable, Optional
 
 import requests
 
+BASE_TABLE_LABELS = {
+    "people": {
+        "first_name": "First Name",
+        "last_name": "Last Name",
+        "email": "Email",
+        "phone": "Phone",
+        "notes": "Notes",
+    },
+    "appointments": {
+        "client_name": "Client Name",
+        "date": "Date",
+        "time": "Time",
+        "duration": "Duration",
+        "status": "Status",
+        "assigned_receptionist": "Assigned Receptionist",
+        "notes": "Appointment Notes",
+    },
+}
+
+TABLE_CONTEXT_ALIASES = {
+    "people": ("people", "person"),
+    "appointments": ("appointments", "appointment"),
+}
+
+AGENT_REF_PREFIXES = {"rec", "agent", "receptionist"}
+
 
 def normalize_phone_number(phone_value: Optional[str]) -> Optional[str]:
     if phone_value is None:
@@ -58,6 +84,8 @@ TABLE_REF_ALIASES = {
     "receptionist": "hired_receptionists",
     "business": "businesses",
 }
+
+TABLE_REF_REVERSE_ALIASES = {value: key for key, value in TABLE_REF_ALIASES.items()}
 
 
 def deep_get(data: Any, dotted_key: str):
@@ -125,6 +153,16 @@ def evaluate_conditions(rules: list[dict], context: dict) -> bool:
     return result
 
 
+def deep_merge_dicts(base: Optional[dict], updates: Optional[dict]) -> dict:
+    merged = dict(base or {})
+    for key, value in (updates or {}).items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge_dicts(merged.get(key), value)
+        else:
+            merged[key] = value
+    return merged
+
+
 class ScenarioActionExecutor:
     def __init__(self, supabase, callbacks: dict[str, Callable], base_url: str):
         self.supabase = supabase
@@ -147,6 +185,244 @@ class ScenarioActionExecutor:
 
         return re.sub(r"\{\{([^}]+)\}\}", replacer, value)
 
+    def _normalize_table_key(self, table_key: Optional[str]) -> str:
+        normalized = str(table_key or "").strip().lower()
+        return TABLE_REF_ALIASES.get(normalized, normalized)
+
+    def _preferred_table_ref(self, table_key: Optional[str]) -> str:
+        normalized = self._normalize_table_key(table_key)
+        return TABLE_REF_REVERSE_ALIASES.get(normalized, normalized)
+
+    def _iter_string_values(self, value: Any):
+        if isinstance(value, str):
+            yield value
+            return
+        if isinstance(value, dict):
+            for nested in value.values():
+                yield from self._iter_string_values(nested)
+            return
+        if isinstance(value, list):
+            for nested in value:
+                yield from self._iter_string_values(nested)
+
+    def _extract_agent_refs_from_string(self, value: str):
+        refs = []
+        if not isinstance(value, str) or not value:
+            return refs
+
+        seen = set()
+        template_regex = re.compile(r"\{\{([^}]+)\}\}")
+        plain_regex = re.compile(r"\b(rec|agent|receptionist)\.([a-z0-9_]+)\.([a-z0-9_.]+)\b", re.IGNORECASE)
+
+        for match in template_regex.finditer(value):
+            ref = match.group(1).strip()
+            parts = [part.strip() for part in ref.split(".") if part.strip()]
+            if len(parts) >= 3 and parts[0].lower() in AGENT_REF_PREFIXES:
+                table_key = self._normalize_table_key(parts[1])
+                field_key = ".".join(parts[2:])
+                token = (table_key, field_key)
+                if token not in seen:
+                    refs.append({"table": table_key, "field": field_key})
+                    seen.add(token)
+
+        for match in plain_regex.finditer(value):
+            table_key = self._normalize_table_key(match.group(2))
+            field_key = match.group(3)
+            token = (table_key, field_key)
+            if token not in seen:
+                refs.append({"table": table_key, "field": field_key})
+                seen.add(token)
+        return refs
+
+    def _get_node_descendants(self, scenario: dict, start_node_id: str):
+        edges = scenario.get("edges_data")
+        if isinstance(edges, str):
+            edges = json.loads(edges)
+        edges = edges or []
+
+        descendants = []
+        visited = {start_node_id}
+        queue = [start_node_id]
+        while queue:
+            current = queue.pop(0)
+            for edge in edges:
+                if edge.get("from") != current:
+                    continue
+                target = edge.get("to")
+                if not target or target in visited:
+                    continue
+                visited.add(target)
+                descendants.append(target)
+                queue.append(target)
+        return descendants
+
+    def _format_field_label(self, table_key: str, field_key: str, context: dict) -> str:
+        table_key = self._normalize_table_key(table_key)
+        if table_key == "people":
+            schema = self._get_people_custom_schema(context)
+            custom_field = schema.get(field_key) or {}
+            if custom_field.get("label"):
+                return str(custom_field["label"])
+        base_label = ((BASE_TABLE_LABELS.get(table_key) or {}).get(field_key))
+        if base_label:
+            return base_label
+        return field_key.replace("_", " ").replace(".", " ").title()
+
+    def _format_field_description(self, table_key: str, field_key: str, context: dict) -> str:
+        table_key = self._normalize_table_key(table_key)
+        if table_key == "people":
+            schema = self._get_people_custom_schema(context)
+            config = (schema.get(field_key) or {}).get("config") or {}
+            description = config.get("description")
+            if description:
+                return str(description)
+        return ""
+
+    def _build_requirement_key_metadata(self, table_key: str, field_key: str, label: str, context: dict) -> dict:
+        table_key = self._normalize_table_key(table_key)
+        ref_table = self._preferred_table_ref(table_key)
+        schema = self._get_people_custom_schema(context) if table_key == "people" else {}
+        schema_label = (schema.get(field_key) or {}).get("label")
+        label_key = self._custom_dynamic_variable_name(schema_label or label)
+
+        return_keys = []
+        for candidate in [label_key, field_key]:
+            if candidate and candidate not in return_keys:
+                return_keys.append(candidate)
+
+        return {
+            "table": table_key,
+            "table_ref": ref_table,
+            "field": field_key,
+            "path": f"{table_key}.{field_key}",
+            "ref_path": f"{ref_table}.{field_key}",
+            "label": label,
+            "description": self._format_field_description(table_key, field_key, context),
+            "preferred_return_key": return_keys[0] if return_keys else field_key,
+            "accepted_return_keys": return_keys,
+        }
+
+    def _infer_required_agent_fields(self, scenario: Optional[dict], call_node_id: str, context: dict):
+        if not scenario or not call_node_id:
+            return []
+
+        nodes = scenario.get("nodes_data")
+        if isinstance(nodes, str):
+            nodes = json.loads(nodes)
+        node_map = {
+            node.get("id"): node
+            for node in (nodes or [])
+            if isinstance(node, dict) and node.get("id")
+        }
+
+        requirements = []
+        seen = set()
+        for node_id in self._get_node_descendants(scenario, call_node_id):
+            node = node_map.get(node_id) or {}
+            for text_value in self._iter_string_values(node):
+                for ref in self._extract_agent_refs_from_string(text_value):
+                    table_key = ref["table"]
+                    field_key = ref["field"]
+                    token = (table_key, field_key)
+                    if token in seen:
+                        continue
+                    seen.add(token)
+                    label = self._format_field_label(table_key, field_key, context)
+                    requirements.append(self._build_requirement_key_metadata(table_key, field_key, label, context))
+        return requirements
+
+    def _flatten_agent_payload(self, value: Any):
+        if not isinstance(value, dict):
+            return value
+        if "value" in value:
+            candidate = value.get("value")
+            if isinstance(candidate, dict):
+                return self._flatten_agent_payload(candidate)
+            if candidate not in (None, ""):
+                return candidate
+        flattened = {}
+        for key, nested in value.items():
+            flattened[key] = self._flatten_agent_payload(nested)
+        return flattened
+
+    def _resolve_agent_requirement_value(self, agent_data: dict, requirement: dict):
+        table_key = self._normalize_table_key(requirement.get("table"))
+        field_key = requirement.get("field")
+        path = requirement.get("path")
+        accepted_return_keys = requirement.get("accepted_return_keys") or []
+        candidates = [
+            deep_get(agent_data, path),
+            deep_get(agent_data, f"{table_key}.{field_key}"),
+            deep_get(agent_data, f"{path}.value"),
+            deep_get(agent_data, f"{field_key}.value"),
+            deep_get(agent_data, field_key),
+            agent_data.get(path) if isinstance(agent_data, dict) else None,
+            agent_data.get(field_key) if isinstance(agent_data, dict) else None,
+        ]
+        for return_key in accepted_return_keys:
+            candidates.extend([
+                deep_get(agent_data, return_key),
+                deep_get(agent_data, f"{return_key}.value"),
+                agent_data.get(return_key) if isinstance(agent_data, dict) else None,
+            ])
+        for candidate in candidates:
+            if candidate not in (None, ""):
+                return candidate
+        return None
+
+    def _project_agent_requirements_into_context(self, context: dict, agent_data: dict, requirements: list[dict]):
+        if not isinstance(agent_data, dict):
+            return
+        for requirement in requirements:
+            table_key = self._normalize_table_key(requirement.get("table"))
+            field_key = requirement.get("field")
+            if not table_key or not field_key:
+                continue
+            value = self._resolve_agent_requirement_value(agent_data, requirement)
+            if value in (None, ""):
+                continue
+            for context_key in TABLE_CONTEXT_ALIASES.get(table_key, (table_key,)):
+                current_value = context.get(context_key)
+                if not isinstance(current_value, dict):
+                    current_value = {}
+                nested = current_value
+                parts = [part for part in str(field_key).split(".") if part]
+                for part in parts[:-1]:
+                    next_cursor = nested.get(part)
+                    if not isinstance(next_cursor, dict):
+                        next_cursor = {}
+                        nested[part] = next_cursor
+                    nested = next_cursor
+                nested[parts[-1]] = value
+                context[context_key] = current_value
+
+    def _build_agent_collection_state(self, context: dict, requirements: list[dict], paused_node_id: Optional[str] = None):
+        agent_data = context.get("agent") if isinstance(context.get("agent"), dict) else {}
+        required_fields = []
+        collected_fields = []
+        missing_fields = []
+        for requirement in requirements:
+            value = self._resolve_agent_requirement_value(agent_data, requirement)
+            entry = {**requirement, "value": value}
+            required_fields.append({
+                k: requirement.get(k)
+                for k in ("table", "table_ref", "field", "path", "ref_path", "label", "description", "preferred_return_key", "accepted_return_keys")
+            })
+            if value in (None, ""):
+                missing_fields.append({
+                    k: entry.get(k)
+                    for k in ("table", "table_ref", "field", "path", "ref_path", "label", "description", "preferred_return_key", "accepted_return_keys")
+                })
+            else:
+                collected_fields.append(entry)
+        return {
+            "paused_node_id": paused_node_id,
+            "is_complete": len(missing_fields) == 0,
+            "required_fields": required_fields,
+            "collected_fields": collected_fields,
+            "missing_fields": missing_fields,
+        }
+
     def _parse_money_to_cents(self, value: Any):
         if value in (None, ""):
             return None
@@ -165,7 +441,7 @@ class ScenarioActionExecutor:
         try:
             response = (
                 self.supabase.table("people_schema")
-                .select("field_key, field_type, label")
+                .select("field_key, field_type, label, config")
                 .eq("business_id", str(business_id))
                 .eq("is_active", True)
                 .execute()
@@ -493,6 +769,9 @@ class ScenarioActionExecutor:
                 )
                 return {"success": False, "error": "No outbound business phone number is configured"}
 
+            required_agent_fields = self._infer_required_agent_fields(context.get("_scenario"), node.get("id"), context)
+            mission_text = self._resolve_variables(config.get("main_content") or "", context)
+
             dynamic_vars = {
                 "user_id": str((context.get("business") or {}).get("user_id") or context.get("user_id") or ""),
                 "company_name": (context.get("business") or {}).get("name") or "",
@@ -502,9 +781,19 @@ class ScenarioActionExecutor:
                 "direction": "outgoing",
                 "flow_execution_id": context.get("_executionId") or "",
                 "scenario_id": (context.get("_scenario") or {}).get("id") or "",
-                "mission": self._resolve_variables(config.get("main_content") or "", context),
+                "mission": mission_text,
             }
             self._add_person_custom_dynamic_variables(dynamic_vars, context)
+            if required_agent_fields:
+                dynamic_vars["required_fields"] = json.dumps([
+                    {
+                        "label": field["label"],
+                        "description": field.get("description") or "",
+                        "return_key": field["preferred_return_key"],
+                        "current_value": self._resolve_agent_requirement_value(dynamic_vars, field),
+                    }
+                    for field in required_agent_fields
+                ])
             logging.info("[ActionExecutor] outbound call dynamic variables: %s", json.dumps({
                 "user_id": dynamic_vars["user_id"],
                 "receptionist_name": dynamic_vars["receptionist_name"],
@@ -543,6 +832,8 @@ class ScenarioActionExecutor:
                     "call_id": result.get("conversation_id") or result.get("call_id"),
                     "to": to_number,
                     "initiated_at": datetime.now(timezone.utc).isoformat(),
+                    "required_agent_fields": required_agent_fields,
+                    "agent_collection": self._build_agent_collection_state(context, required_agent_fields, node.get("id")),
                 },
             }
         except Exception as exc:
@@ -689,8 +980,16 @@ class ScenarioFlowExecutor:
             context = context or {}
 
             resume_data = resume_data or {}
+            requirements = (pause_data or {}).get("required_agent_fields") or []
             if isinstance(resume_data.get("agent"), dict):
-                context["agent"] = {**(context.get("agent") or {}), **resume_data["agent"]}
+                flattened_agent = self.action_executor._flatten_agent_payload(resume_data["agent"])
+                context["agent"] = deep_merge_dicts(context.get("agent"), flattened_agent)
+                self.action_executor._project_agent_requirements_into_context(context, context["agent"], requirements)
+                context["agent_collection"] = self.action_executor._build_agent_collection_state(
+                    context,
+                    requirements,
+                    (pause_data or {}).get("paused_node_id"),
+                )
             context.update({k: v for k, v in resume_data.items() if k != "agent"})
 
             self.supabase.table("flow_executions").update({

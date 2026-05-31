@@ -25,6 +25,7 @@ ALTER TABLE public.call_logs
   ADD COLUMN IF NOT EXISTS appointment_id uuid NULL,
   ADD COLUMN IF NOT EXISTS notes text NULL,
   ADD COLUMN IF NOT EXISTS summary text NULL,
+  ADD COLUMN IF NOT EXISTS call_report jsonb NULL,
   ADD COLUMN IF NOT EXISTS transcript_text text NULL,
   ADD COLUMN IF NOT EXISTS transcript_jsonb jsonb NULL,
   ADD COLUMN IF NOT EXISTS webhook_type text NULL,

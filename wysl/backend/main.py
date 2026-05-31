@@ -2770,6 +2770,41 @@ def build_agent_update_map(key: Optional[str], value):
     return updates
 
 
+def build_call_report(flow_context: Optional[dict]) -> Optional[dict]:
+    if not isinstance(flow_context, dict):
+        return None
+    agent_collection = flow_context.get("agent_collection")
+    if not isinstance(agent_collection, dict):
+        return None
+
+    required_entries = agent_collection.get("required_fields") or []
+    collected_entries = agent_collection.get("collected_fields") or []
+    missing_entries = agent_collection.get("missing_fields") or []
+
+    def summarize(entries, include_value: bool = False):
+        summary = []
+        if not isinstance(entries, list):
+            return summary
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            item = {
+                "label": entry.get("label") or entry.get("preferred_return_key") or entry.get("field"),
+                "return_key": entry.get("preferred_return_key") or entry.get("field"),
+            }
+            if include_value:
+                item["value"] = entry.get("value")
+            summary.append(item)
+        return summary
+
+    return {
+        "required_fields": summarize(required_entries, include_value=False),
+        "fetched_fields": summarize(collected_entries, include_value=True),
+        "missing_fields": summarize(missing_entries, include_value=False),
+        "is_complete": bool(agent_collection.get("is_complete")),
+    }
+
+
 def deep_merge_dicts(base: Optional[dict], updates: Optional[dict]) -> dict:
     merged = dict(base or {})
     for key, value in (updates or {}).items():
@@ -3388,26 +3423,9 @@ async def set_agent_data(request: Request):
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", str(flow_execution_id)).execute()
 
-        if str(execution.get("status") or "").lower() == "paused":
-            if not scenario_engine:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Scenario engine unavailable",
-                )
-            result = await scenario_engine.resume_execution(
-                str(flow_execution_id),
-                {
-                    "agent": merged_agent,
-                },
-            )
-            if not result.get("success"):
-                detail = result.get("error") or "Failed to resume scenario execution"
-                status_code = status.HTTP_404_NOT_FOUND if "not found" in str(detail).lower() else status.HTTP_409_CONFLICT
-                raise HTTPException(status_code=status_code, detail=detail)
-
         return {
             "ok": True,
-            "mode": "scenario_resume" if str(execution.get("status") or "").lower() == "paused" else "execution_context_update",
+            "mode": "execution_context_update",
             "flow_execution_id": str(flow_execution_id),
             "key": str(update_key),
             "value": update_value,
@@ -3831,7 +3849,7 @@ async def elevenlabs_post_call_webhook(
     )
     if flow_execution_id and scenario_engine:
         try:
-            await scenario_engine.resume_execution(
+            resume_result = await scenario_engine.resume_execution(
                 str(flow_execution_id),
                 {
                     "agent": agent_data if isinstance(agent_data, dict) else {},
@@ -3841,6 +3859,23 @@ async def elevenlabs_post_call_webhook(
                     },
                 },
             )
+            call_report = build_call_report(resume_result.get("context"))
+            if call_report and saved.get("id"):
+                try:
+                    update_response = (
+                        supabase.table("call_logs")
+                        .update({
+                            "call_report": call_report,
+                        })
+                        .eq("id", saved["id"])
+                        .execute()
+                    )
+                    if getattr(update_response, "data", None):
+                        saved = update_response.data[0]
+                    else:
+                        saved["call_report"] = call_report
+                except Exception as exc:
+                    logging.error("Failed to persist call report for call log %s: %s", saved.get("id"), exc, exc_info=True)
         except Exception as exc:
             logging.error("Failed to resume scenario execution %s: %s", flow_execution_id, exc, exc_info=True)
 

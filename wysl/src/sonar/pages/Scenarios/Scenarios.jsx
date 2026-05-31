@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
-import VariablesPane, { getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields, TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
+import VariablesPane, { getFieldDisplayLabel, getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields, TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
 import { supabase } from '../../lib/supabase';
 import { LEAD_FIELDS } from '../../lib/leadSchema';
 import { fetchCustomFields, getCurrentBusinessId, isCustomFieldKey } from '../../lib/customFields';
@@ -76,6 +76,92 @@ const getTableRefCandidates = (tableKey) => {
   const normalized = normalizeTableRefKey(tableKey);
   const reverseAlias = TABLE_REF_REVERSE_ALIASES[tableKey];
   return [...new Set([tableKey, normalized, reverseAlias].filter(Boolean))];
+};
+
+const RECEPTIONIST_REF_PREFIXES = new Set(['rec', 'agent', 'receptionist']);
+const TABLE_ALIAS_TO_CANONICAL = {
+  person: 'people',
+  appointment: 'appointments',
+  payment: 'payments',
+  invoice: 'invoices',
+  service: 'services',
+  receptionist: 'hired_receptionists',
+  business: 'businesses',
+};
+
+const normalizeScenarioTableKey = (tableKey) => TABLE_ALIAS_TO_CANONICAL[tableKey] || tableKey;
+
+const getDescendantNodeIds = (startNodeId, edges) => {
+  const descendants = [];
+  const queue = [startNodeId];
+  const visited = new Set([startNodeId]);
+  while (queue.length > 0) {
+    const current = queue.shift();
+    edges.forEach((edge) => {
+      if (edge.from !== current || !edge.to || visited.has(edge.to)) return;
+      visited.add(edge.to);
+      descendants.push(edge.to);
+      queue.push(edge.to);
+    });
+  }
+  return descendants;
+};
+
+const extractReceptionistRefsFromString = (value) => {
+  if (!value || typeof value !== 'string') return [];
+  const parsed = parseVariables(value).filter((item) => RECEPTIONIST_REF_PREFIXES.has(item.source));
+  const plainMatches = [];
+  const regex = /\b(rec|agent|receptionist)\.([a-z0-9_]+)\.([a-z0-9_.]+)\b/gi;
+  let match;
+  while ((match = regex.exec(value)) !== null) {
+    plainMatches.push({
+      source: match[1].toLowerCase(),
+      table: normalizeScenarioTableKey(match[2].toLowerCase()),
+      field: match[3],
+    });
+  }
+  return [...parsed, ...plainMatches];
+};
+
+const iterateStringValues = (value, visitor) => {
+  if (typeof value === 'string') {
+    visitor(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => iterateStringValues(item, visitor));
+    return;
+  }
+  if (value && typeof value === 'object') {
+    Object.values(value).forEach((item) => iterateStringValues(item, visitor));
+  }
+};
+
+const inferReceptionistRequirements = (callNodeId, nodes, edges) => {
+  if (!callNodeId) return [];
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const requirements = [];
+  const seen = new Set();
+
+  getDescendantNodeIds(callNodeId, edges).forEach((nodeId) => {
+    const node = nodeMap.get(nodeId);
+    if (!node) return;
+    iterateStringValues(node, (textValue) => {
+      extractReceptionistRefsFromString(textValue).forEach((ref) => {
+        const token = `${ref.table}.${ref.field}`;
+        if (seen.has(token)) return;
+        seen.add(token);
+        requirements.push({
+          table: ref.table,
+          field: ref.field,
+          path: token,
+          label: getFieldDisplayLabel(ref.table, ref.field),
+        });
+      });
+    });
+  });
+
+  return requirements;
 };
 
 const OPTION_ICONS = {
@@ -870,6 +956,10 @@ export default function ScenariosPage() {
 
   // Get the action key from the current action config
   const currentActionKey = actionConfig?._key || null;
+  const inferredReceptionistRequirements = useMemo(() => {
+    if (currentActionKey !== 'call_customer') return [];
+    return inferReceptionistRequirements(selectedNodeId, nodes, edges);
+  }, [currentActionKey, selectedNodeId, nodes, edges]);
 
   // Handle smart action insertion — inserts delimited token into raw value,
   // overlay renders the display text as a styled chip
@@ -2989,6 +3079,62 @@ export default function ScenariosPage() {
                           </div>
                         );
                       })}
+                      {currentActionKey === 'call_customer' && (
+                        <div
+                          className="sb-action-config-field"
+                          style={{
+                            border: '1px solid rgba(56,189,248,0.16)',
+                            background: 'rgba(56,189,248,0.06)',
+                            borderRadius: 14,
+                            padding: '12px 14px',
+                          }}
+                        >
+                          <div
+                            className="sb-action-field-label"
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+                          >
+                            <span>Receptionist Must Collect</span>
+                            <span style={{ fontSize: 10, color: 'rgba(228,228,231,0.6)', fontWeight: 600 }}>
+                              inferred from downstream `rec.*`
+                            </span>
+                          </div>
+                          {inferredReceptionistRequirements.length > 0 ? (
+                            <>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                                {inferredReceptionistRequirements.map((requirement) => (
+                                  <span
+                                    key={requirement.path}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                      borderRadius: 999,
+                                      padding: '5px 10px',
+                                      background: 'rgba(56,189,248,0.14)',
+                                      border: '1px solid rgba(56,189,248,0.2)',
+                                      color: '#d9f4ff',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    <span>{requirement.label}</span>
+                                    <span style={{ color: 'rgba(217,244,255,0.55)', fontWeight: 500 }}>
+                                      {TABLE_LABELS[requirement.table] || requirement.table}
+                                    </span>
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(228,228,231,0.64)', lineHeight: 1.5 }}>
+                                The outbound prompt will automatically tell the receptionist these fields are mandatory before the call ends.
+                              </div>
+                            </>
+                          ) : (
+                            <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(228,228,231,0.64)', lineHeight: 1.5 }}>
+                              No downstream receptionist variables were detected. This call will follow only the prompt unless a later node uses {'{{rec.people.field}}'} or {'{{rec.appointments.field}}'}.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Table-specific fields — dynamic based on selected table */}

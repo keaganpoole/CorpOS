@@ -49,6 +49,7 @@ export const fetchCustomFields = async (businessId) => {
   return (data || []).map((field) => ({
     key: field.field_key,
     label: field.label,
+    description: field.config?.description || '',
     type: field.field_type,
     table: true,
     editable: true,
@@ -86,7 +87,7 @@ export const createCustomField = async (type, existingFields = [], businessId) =
       field_type: type,
       position,
       is_active: true,
-      config: { tableWidth },
+      config: { tableWidth, description: '' },
     })
     .select()
     .single();
@@ -96,6 +97,7 @@ export const createCustomField = async (type, existingFields = [], businessId) =
   return {
     key: data.field_key,
     label: data.label,
+    description: data.config?.description || '',
     type: data.field_type,
     table: true,
     editable: true,
@@ -130,6 +132,42 @@ export const updateCustomFieldPositions = async (businessId, orderedFieldKeys = 
   await Promise.all(
     orderedFieldKeys.map((fieldKey, index) => updateCustomField(fieldKey, businessId, { position: index }))
   );
+};
+
+export const deleteCustomField = async (fieldKey, businessId) => {
+  if (!fieldKey || !businessId) throw new Error('fieldKey and businessId are required');
+
+  const { error: schemaError } = await supabase
+    .from('people_schema')
+    .delete()
+    .eq('business_id', businessId)
+    .eq('field_key', fieldKey);
+
+  if (schemaError) throw schemaError;
+
+  const { data: peopleRows, error: peopleError } = await supabase
+    .from('people')
+    .select('id,custom_fields')
+    .eq('business_id', businessId);
+
+  if (peopleError) throw peopleError;
+
+  const updates = (peopleRows || [])
+    .filter((row) => row?.custom_fields && Object.prototype.hasOwnProperty.call(row.custom_fields, fieldKey))
+    .map((row) => {
+      const nextCustomFields = { ...(row.custom_fields || {}) };
+      delete nextCustomFields[fieldKey];
+      return supabase
+        .from('people')
+        .update({ custom_fields: nextCustomFields })
+        .eq('id', row.id);
+    });
+
+  if (updates.length) {
+    const results = await Promise.all(updates);
+    const failed = results.find(({ error }) => error);
+    if (failed?.error) throw failed.error;
+  }
 };
 
 export const getCustomValue = (rowCustomFields, fieldKey) => rowCustomFields?.[fieldKey];
