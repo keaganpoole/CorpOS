@@ -24,7 +24,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { useAudioPlayer } from '../contexts/AudioPlayerContext';
+import { useCallLogs } from '../contexts/CallLogsContext';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const AVATAR_BASE = 'https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges';
@@ -180,7 +181,7 @@ function normalizeTranscript(turns, fallbackText) {
     .filter(Boolean);
 }
 
-function normalizeCall(row) {
+export function normalizeCall(row) {
   const purpose = titleize(row.outcome || row.call_successful || 'General');
   const receptionistName = row.receptionist_name || row.agent_name || 'Receptionist';
   const avatarName = normalized(receptionistName);
@@ -515,34 +516,24 @@ function TranscriptBubble({ entry, receptionistAvatar, receptionistName, custome
 
 function AudioStrip({ call }) {
   const hasAudio = Boolean(call.audioUrl);
-  const audioRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(call.duration || 0);
-
-  useEffect(() => {
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(call.duration || 0);
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-  }, [call.id, call.duration]);
+  const audioPlayer = useAudioPlayer();
+  const track = {
+    id: call.id,
+    src: call.audioUrl,
+    title: call.name || 'Call recording',
+    subtitle: `${call.phone} - ${formatCallTime(call.time)}`,
+    duration: call.duration || 0,
+  };
+  const isActiveTrack = audioPlayer.track?.id === call.id && audioPlayer.track?.src === call.audioUrl;
+  const isPlaying = isActiveTrack && audioPlayer.isPlaying;
+  const currentTime = isActiveTrack ? audioPlayer.currentTime : 0;
+  const duration = isActiveTrack ? (audioPlayer.duration || call.duration || 0) : (call.duration || 0);
 
   const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
   const progressPercent = `${Math.round(progress * 100)}%`;
   const togglePlayback = async () => {
-    if (!hasAudio || !audioRef.current) return;
-    try {
-      if (audioRef.current.paused) {
-        await audioRef.current.play();
-      } else {
-        audioRef.current.pause();
-      }
-    } catch (err) {
-      console.error('[CallLogs] Audio playback failed:', err);
-    }
+    if (!hasAudio) return;
+    await audioPlayer.toggleTrack(track);
   };
 
   return (
@@ -562,11 +553,14 @@ function AudioStrip({ call }) {
               <button
                 type="button"
                 onClick={(event) => {
-                  if (!audioRef.current || !duration) return;
+                  if (!duration) return;
                   const rect = event.currentTarget.getBoundingClientRect();
                   const nextProgress = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-                  audioRef.current.currentTime = nextProgress * duration;
-                  setCurrentTime(audioRef.current.currentTime);
+                  if (!isActiveTrack) {
+                    audioPlayer.playTrack(track).then(() => audioPlayer.seek(nextProgress * duration));
+                    return;
+                  }
+                  audioPlayer.seek(nextProgress * duration);
                 }}
                 className="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/[0.08]"
                 aria-label="Seek call recording"
@@ -578,21 +572,6 @@ function AudioStrip({ call }) {
               </div>
             </div>
           </div>
-          <audio
-            ref={audioRef}
-            src={call.audioUrl}
-            preload="metadata"
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onEnded={() => {
-              setIsPlaying(false);
-              setCurrentTime(0);
-            }}
-            onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || call.duration || 0)}
-            onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime || 0)}
-          >
-            <track kind="captions" />
-          </audio>
         </div>
       ) : (
         <div className="flex items-center gap-3">
@@ -611,75 +590,24 @@ function AudioStrip({ call }) {
 
 export default function CallLogsPage() {
   const { session } = useAuth();
-  const [calls, setCalls] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const {
+    calls,
+    setCalls,
+    loading,
+    error,
+    setError,
+    selectedId,
+    setSelectedId,
+    selectedForDelete,
+    setSelectedForDelete,
+    loadCallLogs,
+  } = useCallLogs();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(CATEGORY_OPTIONS[0]);
   const [statusFilter, setStatusFilter] = useState(STATUS_OPTIONS[0]);
   const [sentimentFilter, setSentimentFilter] = useState(SENTIMENT_OPTIONS[0]);
-  const [selectedId, setSelectedId] = useState(null);
-  const [selectedForDelete, setSelectedForDelete] = useState([]);
   const [deleteTargetIds, setDeleteTargetIds] = useState([]);
   const [deleting, setDeleting] = useState(false);
-  const hasLoadedRef = useRef(false);
-
-  async function loadCallLogs({ initial = false } = {}) {
-    if (!session?.access_token) {
-      setCalls([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(initial && !hasLoadedRef.current);
-    setError('');
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs?limit=100`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      if (!response.ok) throw new Error(`Call logs request failed (${response.status})`);
-      const data = await response.json();
-      const normalizedCalls = Array.isArray(data) ? data.map(normalizeCall) : [];
-      setCalls(normalizedCalls);
-      setSelectedId((current) => (
-        normalizedCalls.some((call) => call.id === current)
-          ? current
-          : normalizedCalls[0]?.id || null
-      ));
-      setSelectedForDelete((current) => current.filter((id) => normalizedCalls.some((call) => call.id === id)));
-    } catch (err) {
-      setError(err.message || 'Failed to load call logs.');
-      setCalls([]);
-    } finally {
-      hasLoadedRef.current = true;
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    let refreshTimer = null;
-
-    const scheduleRefresh = () => {
-      if (refreshTimer) window.clearTimeout(refreshTimer);
-      refreshTimer = window.setTimeout(() => {
-        if (!cancelled) loadCallLogs();
-      }, 350);
-    };
-    loadCallLogs({ initial: true });
-    const channel = supabase
-      .channel('call-logs-page-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs' }, scheduleRefresh)
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      if (refreshTimer) window.clearTimeout(refreshTimer);
-      supabase.removeChannel(channel);
-    };
-  }, [session?.access_token]);
 
   const toggleSelectCall = (callId) => {
     setSelectedForDelete((current) => (

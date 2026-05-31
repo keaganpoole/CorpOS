@@ -1231,8 +1231,7 @@ class ScenarioEngine:
 
     async def handle_event(self, event_type: str, payload: Optional[dict] = None):
         payload = payload or {}
-        if not self.scenarios:
-            await self.load_scenarios()
+        await self.load_scenarios()
 
         runs = []
         for scenario in self.scenarios:

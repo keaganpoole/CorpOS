@@ -61,7 +61,9 @@ import ScenariosPage from './pages/Scenarios/Scenarios';
 import SettingsPage from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
-import CallLogsPage from './pages/CallLogsPage';
+import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
+import { AudioPlayerProvider, PersistentAudioPlayer } from './contexts/AudioPlayerContext';
+import { CallLogsProvider } from './contexts/CallLogsContext';
 import { useAuth } from '../contexts/AuthContext';
 
 const DASHBOARD_ROUTE_STORAGE_KEY = 'sonar-dashboard-route';
@@ -2138,6 +2140,8 @@ const SonarDashboard = () => {
   const displayZone = controlState?.zone || 1;
 
   return (
+    <AudioPlayerProvider>
+    <CallLogsProvider normalizeCall={normalizeCall}>
     <div className="flex flex-col h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -2339,7 +2343,10 @@ const SonarDashboard = () => {
           )}
         </aside>
       </div>
+      <PersistentAudioPlayer />
     </div>
+    </CallLogsProvider>
+    </AudioPlayerProvider>
   );
 };
 

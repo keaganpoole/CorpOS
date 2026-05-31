@@ -42,6 +42,8 @@ import { fetchCustomFields, getCurrentBusinessId, isCustomFieldKey } from '../..
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
 import { getSmartActions, getSmartActionByKey } from './smartActions';
 
+const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+
 const TABLE_REF_ALIASES = {
   person: 'people',
   payment: 'payments',
@@ -716,28 +718,32 @@ export default function ScenariosPage() {
     fetchScenarios();
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadPeopleCustomFields = async () => {
-      try {
-        const businessId = await getCurrentBusinessId();
-        const fields = await fetchCustomFields(businessId);
-        if (cancelled) return;
-        setPeopleCustomFields(fields);
-        setPeopleCustomVariableFields(fields);
-      } catch (error) {
-        console.warn('[Scenarios] Could not load custom people fields:', error?.message || error);
-        if (!cancelled) {
-          setPeopleCustomFields([]);
-          setPeopleCustomVariableFields([]);
-        }
-      }
-    };
-
-    loadPeopleCustomFields();
-    return () => { cancelled = true; };
+  const refreshPeopleCustomFields = useCallback(async () => {
+    try {
+      const businessId = await getCurrentBusinessId();
+      const fields = await fetchCustomFields(businessId);
+      setPeopleCustomFields(fields);
+      setPeopleCustomVariableFields(fields);
+    } catch (error) {
+      console.warn('[Scenarios] Could not load custom people fields:', error?.message || error);
+      setPeopleCustomFields([]);
+      setPeopleCustomVariableFields([]);
+    }
   }, []);
+
+  useEffect(() => {
+    refreshPeopleCustomFields();
+  }, [refreshPeopleCustomFields]);
+
+  useEffect(() => {
+    const handleFocus = () => refreshPeopleCustomFields();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [refreshPeopleCustomFields]);
+
+  useEffect(() => {
+    if (varsPane.visible) refreshPeopleCustomFields();
+  }, [varsPane.visible, refreshPeopleCustomFields]);
 
   const builderRef = useRef(null);
   const canvasRef = useRef(null);
@@ -1809,6 +1815,17 @@ export default function ScenariosPage() {
     const resolvedDescription = scenarioDescription
       ? scenarioDescription.charAt(0).toUpperCase() + scenarioDescription.slice(1)
       : '';
+    const activeCustomFieldKeys = new Set(peopleCustomFields.map((field) => field.key));
+    const sanitizeActionConfig = (config) => {
+      if (!config) return null;
+      return Object.fromEntries(Object.entries(config).filter(([key]) => {
+        if (key === '_fields') return false;
+        if (key.startsWith('field_custom_')) {
+          return activeCustomFieldKeys.has(key.replace(/^field_/, ''));
+        }
+        return true;
+      }));
+    };
     const scenarioData = {
       user_id: userId,
       created_by: currentScenario?.created_by || userId,
@@ -1827,7 +1844,7 @@ export default function ScenariosPage() {
         appointmentConfig: n.appointmentConfig || null,
         scheduleConfig: n.scheduleConfig || null,
         triggerFilter: n.triggerFilter || null,
-        actionConfig: n.actionConfig ? Object.fromEntries(Object.entries(n.actionConfig).filter(([k]) => k !== '_fields')) : null,
+        actionConfig: sanitizeActionConfig(n.actionConfig),
         subOptionKey: n.subOptionKey || null,
         categoryKey: n.categoryKey || null,
         categoryType: n.categoryType || null,
@@ -1884,6 +1901,12 @@ export default function ScenariosPage() {
     
     if (updatedScenarios) {
       setScenarios(updatedScenarios);
+    }
+
+    try {
+      await fetch(`${API_BASE_URL}/api/scenarios/reload`, { method: 'POST' });
+    } catch (reloadError) {
+      console.warn('[Scenarios] Scenario saved, but backend reload failed:', reloadError?.message || reloadError);
     }
     
     // Close modal and switch back to list view
