@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2,
   User, Phone, Mail, Flag, Compass, Clock, Tag, Search as SearchIcon, FileText, Activity,
-  Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays,
+  Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays, ArrowUpRight, Trash2,
   ToggleLeft,
 } from 'lucide-react';
 import {
@@ -167,7 +167,7 @@ const InlineDateOnly = ({ value, onSave }) => {
         onClick={(e) => { e.stopPropagation(); setDraft(value || ''); setEditing(true); }}
         className="block w-full cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400"
       >
-        {formatted || <span className="text-zinc-700 italic">Set date</span>}
+        {formatted || <span className="invisible">.</span>}
       </span>
       {editing && (
         <input
@@ -365,7 +365,7 @@ const DraggableHeader = ({ col, index, sortBy, sortDir, onSort, onDragStart, onD
   );
 };
 
-const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, customFields = [] }) => {
+const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], selection = null }) => {
   const customField = customFields.find((field) => field.key === colId);
   if (customField) {
     const value = getCustomValue(lead.custom_fields, colId);
@@ -377,25 +377,38 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
   }
 
   switch (colId) {
-    case 'avatar': {
-      const statusColor = getStatusColor(lead.status);
-      const initial = `${lead.first_name || ''}${lead.last_name || ''}`.trim().charAt(0).toUpperCase() || '?';
-      const avatarStyle = {
-        emerald: { gradient: 'from-emerald-500/20 to-emerald-500/5', text: 'text-emerald-400', dot: '#10b981' },
-        cyan: { gradient: 'from-cyan-500/20 to-cyan-500/5', text: 'text-cyan-400', dot: '#06b6d4' },
-        blue: { gradient: 'from-blue-500/20 to-blue-500/5', text: 'text-blue-400', dot: '#3b82f6' },
-        amber: { gradient: 'from-amber-500/20 to-amber-500/5', text: 'text-amber-400', dot: '#f59e0b' },
-        orange: { gradient: 'from-orange-500/20 to-orange-500/5', text: 'text-orange-400', dot: '#f97316' },
-        fuchsia: { gradient: 'from-fuchsia-500/20 to-fuchsia-500/5', text: 'text-fuchsia-400', dot: '#d946ef' },
-        rose: { gradient: 'from-rose-500/20 to-rose-500/5', text: 'text-rose-400', dot: '#f43f5e' },
-        zinc: { gradient: 'from-zinc-500/20 to-zinc-500/5', text: 'text-zinc-400', dot: '#71717a' },
-      }[statusColor] || { gradient: 'from-zinc-500/20 to-zinc-500/5', text: 'text-zinc-400', dot: '#71717a' };
+    case 'select': {
+      const anySelected = selection?.anySelected;
+      const isSelected = selection?.isSelected;
       return (
-        <div className="relative shrink-0 cursor-pointer group/avatar" onClick={() => onSelect(lead.id)}>
-          <div className={`${dc.avatar} bg-gradient-to-br ${avatarStyle.gradient} border border-white/[0.05] flex items-center justify-center font-black ${dc.avatarText} transition-all group-hover/avatar:scale-110`}>
-            <span className={`relative z-10 ${avatarStyle.text}`}>{initial}</span>
-          </div>
-          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0a0a0a]" style={{ backgroundColor: avatarStyle.dot }} />
+        <div className="relative shrink-0 h-8 w-5 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              selection?.toggle?.(lead.id);
+            }}
+            className={`h-3.5 w-3.5 rounded-[4px] border transition-all ${isSelected ? 'border-cyan-400/60 bg-cyan-400/15 opacity-100' : 'border-white/20 bg-black/40 opacity-0 group-hover:opacity-100'} ${anySelected ? 'opacity-100' : ''}`}
+            aria-label="Select record"
+          >
+            {isSelected && <Check size={9} className="text-cyan-300 m-auto" />}
+          </button>
+        </div>
+      );
+    }
+    case 'avatar': {
+      return (
+        <div className="relative shrink-0 h-8 w-6 flex items-center justify-center">
+          {!selection?.anySelected && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSelect(lead.id); }}
+              className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-zinc-600 hover:text-white"
+              aria-label="Expand record"
+            >
+              <ArrowUpRight size={15.5} />
+            </button>
+          )}
         </div>
       );
     }
@@ -435,7 +448,8 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
 };
 
 const buildColumns = (customFields = [], fieldConfig = {}) => [
-  { id: 'avatar', label: '', width: '36px', sortKey: null },
+  { id: 'select', label: '', width: '20px', sortKey: null },
+  { id: 'avatar', label: '', width: '24px', sortKey: null },
   ...TABLE_COLUMNS.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({
     id: field.key,
     label: field.label,
@@ -467,8 +481,8 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
   })),
 ];
 
-const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearchChange, statusFilter, onStatusFilterChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateNew, totalCount, onUpdateLead }) => {
-  const [density] = useState(4);
+const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearchChange, statusFilter, onStatusFilterChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateNew, onCreateInline, onDeleteMany, totalCount, onUpdateLead }) => {
+  const [density] = useState(2);
   const [businessId, setBusinessId] = useState(null);
   const [customFields, setCustomFields] = useState([]);
   const [fieldConfig, setFieldConfig] = useState(() => loadFieldConfig());
@@ -482,8 +496,11 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
   const tableScrollRef = useRef(null);
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [contextMenu, setContextMenu] = useState(null);
 
   const column_options = CUSTOM_FIELD_TYPES;
+  const anySelected = selectedIds.length > 0;
 
   useEffect(() => {
     let active = true;
@@ -654,6 +671,16 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
     };
   }, [showColumnOptions, updateColumnOptionsPosition]);
 
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
+
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => leads.some((lead) => lead.id === id)));
+  }, [leads]);
+
   const dc = {
     row: ['py-0', 'py-0.5', 'py-1', 'py-1.5', 'py-2', 'py-2.5', 'py-3', 'py-3.5', 'py-4'][density],
     avatar: ['w-6', 'w-6', 'w-7', 'w-7', 'w-8', 'w-8', 'w-9', 'w-9', 'w-10'][density] + ' ' + ['w-6', 'w-6', 'w-7', 'w-7', 'w-8', 'w-8', 'w-9', 'w-9', 'w-10'][density].replace('w', 'h') + ' rounded-xl',
@@ -686,6 +713,26 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       return next;
     });
     setDragIndex(null); setDragOverIndex(null);
+  };
+
+  const toggleSelectedId = (id) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((current) => current !== id) : [...prev, id]));
+  };
+
+  const handleContextMenu = (event, leadId) => {
+    event.preventDefault();
+    setContextMenu({
+      leadId,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const handleDeleteRecords = async (ids) => {
+    if (!ids.length) return;
+    await onDeleteMany(ids);
+    setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+    setContextMenu(null);
   };
 
   return (
@@ -756,32 +803,59 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                       <p className="text-[13px] text-zinc-500 font-bold">No people found</p>
                       <p className="text-[10px] text-zinc-700">Adjust filters or create a new person</p>
                     </div>
-                  ) : leads.map((lead, idx) => (
-                    <motion.div key={lead.id} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.012, 0.35) }} className={`group px-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${selectedId === lead.id ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'}`}>
-                      {(() => {
-                        const matchedRule = evaluateColorbar(lead, colorbarRules);
-                        if (!matchedRule) return null;
-                        const colors = matchedRule.colors || ['#6366f1'];
-                        const animation = matchedRule.animation || 'none';
-                        const gradId = `cb-${lead.id}`;
-                        return (
-                          <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-full overflow-hidden pointer-events-none" style={{ top: '25%', bottom: '25%' }}>
-                            <svg width="3" height="100%" className="block">
-                              <defs>
-                                {colors.length > 1 && <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">{colors.map((c, i) => <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={c} />)}</linearGradient>}
-                              </defs>
-                              <rect width="3" height="100%" rx="1.5" fill={colors.length > 1 ? `url(#${gradId})` : colors[0]}>{animation === 'pulse' && <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />}</rect>
-                            </svg>
-                          </div>
-                        );
-                      })()}
-                      {columns.map((col) => (
-                        <div key={col.id} style={{ width: col.width, minWidth: col.width }} className={col.id === 'avatar' ? 'shrink-0' : 'shrink-0 pl-4'}>
-                          <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} />
-                        </div>
+                  ) : (
+                    <>
+                      {leads.map((lead, idx) => (
+                    <motion.div key={lead.id} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.012, 0.35) }} onContextMenu={(event) => handleContextMenu(event, lead.id)} className={`group px-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${selectedId === lead.id ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'} ${selectedIds.includes(lead.id) ? 'bg-cyan-500/[0.04]' : ''}`}>
+                          {(() => {
+                            const matchedRule = evaluateColorbar(lead, colorbarRules);
+                            if (!matchedRule) return null;
+                            const colors = matchedRule.colors || ['#6366f1'];
+                            const animation = matchedRule.animation || 'none';
+                            const gradId = `cb-${lead.id}`;
+                            return (
+                              <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-full overflow-hidden pointer-events-none" style={{ top: '25%', bottom: '25%' }}>
+                                <svg width="3" height="100%" className="block">
+                                  <defs>
+                                    {colors.length > 1 && <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">{colors.map((c, i) => <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={c} />)}</linearGradient>}
+                                  </defs>
+                                  <rect width="3" height="100%" rx="1.5" fill={colors.length > 1 ? `url(#${gradId})` : colors[0]}>{animation === 'pulse' && <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />}</rect>
+                                </svg>
+                              </div>
+                            );
+                          })()}
+                          {columns.map((col) => (
+                            <div key={col.id} style={{ width: col.width, minWidth: col.width }} className={col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'}>
+                              <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(lead.id), toggle: toggleSelectedId }} />
+                            </div>
+                          ))}
+                        </motion.div>
                       ))}
-                    </motion.div>
-                  ))}
+                      <button
+                        type="button"
+                        onClick={onCreateInline}
+                        className={`w-full px-5 ${dc.row} flex items-center gap-3 min-w-max text-left transition-all duration-150 hover:bg-white/[0.02]`}
+                      >
+                        {columns.map((col, index) => (
+                          <div
+                            key={col.id}
+                            style={{ width: col.width, minWidth: col.width }}
+                            className={`${col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'} ${index <= 1 ? 'flex items-center text-zinc-700' : ''}`}
+                          >
+                            {index === 0 ? (
+                              <div className="w-8 h-8 flex items-center justify-center text-zinc-700">
+                                <Plus size={19} strokeWidth={1.0} />
+                              </div>
+                            ) : index === 1 ? (
+                              <span className="text-transparent select-none">.</span>
+                            ) : (
+                              <span className="text-transparent select-none">.</span>
+                            )}
+                          </div>
+                        ))}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -790,6 +864,36 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       </div>
 
       <AnimatePresence>
+        {contextMenu && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -4 }}
+            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#111]/95"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                onSelect(contextMenu.leadId);
+                setContextMenu(null);
+              }}
+              className="w-full px-3 py-2 text-left text-[11px] font-bold text-zinc-300 hover:bg-white/[0.05] flex items-center gap-2"
+            >
+              <ArrowUpRight size={11} className="text-zinc-500" />
+              Expand record
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDeleteRecords(anySelected ? selectedIds : [contextMenu.leadId])}
+              className="w-full px-3 py-2 text-left text-[11px] font-bold text-rose-400 hover:bg-rose-500/[0.08] flex items-center gap-2"
+            >
+              <Trash2 size={11} className="text-rose-400" />
+              Delete record{(anySelected ? selectedIds : [contextMenu.leadId]).length > 1 ? 's' : ''}
+            </button>
+          </motion.div>
+        )}
         {showColumnOptions && (
           <motion.div
             data-column-options-menu="true"

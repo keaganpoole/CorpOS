@@ -93,6 +93,7 @@ export function useLeads() {
   const [sortBy, setSortBy] = useState('updated_at');
   const [sortDir, setSortDir] = useState('desc');
   const abortRef = useRef(false);
+  const pendingInsertPlacementRef = useRef(new Map());
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -135,7 +136,15 @@ export function useLeads() {
       .channel('people-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'people' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setLeads((prev) => [payload.new, ...prev]);
+          setLeads((prev) => {
+            const withoutExisting = prev.filter((row) => row.id !== payload.new.id);
+            const placement = pendingInsertPlacementRef.current.get(payload.new.id);
+            if (placement === 'end') {
+              pendingInsertPlacementRef.current.delete(payload.new.id);
+              return [...withoutExisting, payload.new];
+            }
+            return [payload.new, ...withoutExisting];
+          });
           notifyBackend('INSERT', payload.new, null);
         } else if (payload.eventType === 'UPDATE') {
           setLeads((prev) => prev.map((row) => (row.id === payload.new.id ? payload.new : row)));
@@ -150,7 +159,7 @@ export function useLeads() {
     return () => { supabase.removeChannel(channel); };
   }, [notifyBackend]);
 
-  const createLead = async (leadData) => {
+  const createLead = async (leadData, options = {}) => {
     const payload = normalizePayload(leadData, { isCreate: true });
     const { data, error: err } = await supabase
       .from('people')
@@ -158,6 +167,13 @@ export function useLeads() {
       .select()
       .single();
     if (err) throw err;
+    if (options.placement === 'end') {
+      pendingInsertPlacementRef.current.set(data.id, 'end');
+      setLeads((prev) => {
+        const withoutExisting = prev.filter((row) => row.id !== data.id);
+        return [...withoutExisting, data];
+      });
+    }
     return data;
   };
 

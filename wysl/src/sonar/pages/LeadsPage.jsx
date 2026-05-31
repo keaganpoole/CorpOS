@@ -19,6 +19,15 @@ const PeoplePage = () => {
 
   const handleCreateNew = () => { setCreating(true); setSelectedId(null); };
 
+  const handleInlineCreate = async () => {
+    try {
+      await createLead({}, { placement: 'end' });
+      setCreating(false);
+    } catch (err) {
+      console.error('[PeoplePage] Inline create failed:', err.message);
+    }
+  };
+
   const handleSaveNew = async (data) => {
     const result = await createLead(data);
     setCreating(false);
@@ -46,6 +55,11 @@ const PeoplePage = () => {
   }, [updateLead]);
 
   const handleDelete = async () => { if (!selectedId) return; await deleteLead(selectedId); setSelectedId(null); };
+  const handleDeleteMany = async (ids) => {
+    for (const id of ids) {
+      await deleteLead(id);
+    }
+  };
   const handleClosePanel = () => { setSelectedId(null); setCreating(false); };
 
   return (
@@ -68,6 +82,8 @@ const PeoplePage = () => {
         sourceFilter={sourceFilter} onSourceFilterChange={setSourceFilter}
         sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
         onCreateNew={handleCreateNew} totalCount={allLeads.length}
+        onCreateInline={handleInlineCreate}
+        onDeleteMany={handleDeleteMany}
         onUpdateLead={handleInlineUpdate}
       />
 
