@@ -453,22 +453,6 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
                 </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">Preview</label>
-                <div className="flex items-center gap-3 rounded-xl border border-white/[0.04] bg-black/40 px-4 py-3">
-                  {(() => {
-                    const IconComp = ICON_MAP[icon] || Tag;
-                    return (
-                      <>
-                        <div className="rounded-lg border border-indigo-500/15 bg-indigo-500/10 p-2">
-                          <IconComp size={14} className="text-indigo-400" />
-                        </div>
-                        <span className="text-[13px] font-bold text-white">{name || 'Untitled'}</span>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
             </>
           )}
 

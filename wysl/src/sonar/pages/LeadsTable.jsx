@@ -70,52 +70,59 @@ const assignZoneLanes = (zones) => {
     });
 };
 
-const ZoneColorPalette = ({ position, activeColor, onSelect, onDelete, onClose }) => {
+const ZoneColorPalette = ({ position, activeColor, onPreviewColor, onClearPreview, onSelect, onDelete, onClose }) => {
   if (!position) return null;
   return createPortal(
-    <motion.div
-      initial={{ opacity: 0, y: 6, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 6, scale: 0.96 }}
-      transition={{ duration: 0.16, ease: 'easeOut' }}
-      className="fixed z-[260] rounded-2xl border border-white/[0.08] bg-[#0b0b0d]/98 p-2 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-      style={{ left: position.left, top: position.top, transform: 'translate(-50%, -100%)' }}
+    <div
+      className="fixed z-[260]"
+      style={{ left: position.left, top: position.top - 52, transform: 'translateX(-50%)' }}
       data-zone-palette="true"
       onClick={(event) => event.stopPropagation()}
     >
-      <div className="flex items-center gap-1.5">
-        <span className="h-5 w-5 shrink-0 opacity-0" aria-hidden="true" />
-        {ZONE_SWATCHES.map((color) => {
-          const isActive = color === activeColor;
-          return (
-            <button
-              key={color}
-              type="button"
-              onClick={() => {
-                onSelect(color);
-                onClose();
-              }}
-              className={`relative h-5 w-5 rounded-full border transition-all ${isActive ? 'border-white/70 scale-105' : 'border-white/10 hover:border-white/30 hover:scale-105'}`}
-              style={{ backgroundColor: color, boxShadow: isActive ? `0 0 0 1px ${color}, 0 0 18px ${color}55` : `0 0 12px ${color}22` }}
-              aria-label={`Select zone color ${color}`}
-            >
-              {isActive && <span className="absolute inset-[4px] rounded-full border border-white/80" />}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={() => {
-            onDelete();
-            onClose();
-          }}
-          className="flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-zinc-500 transition-all hover:border-rose-400/40 hover:bg-rose-500/[0.08] hover:text-rose-400"
-          aria-label="Delete zone"
-        >
-          <Trash2 size={11} />
-        </button>
-      </div>
-    </motion.div>,
+      <motion.div
+        initial={{ opacity: 0, y: 6, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 6, scale: 0.96 }}
+        transition={{ duration: 0.16, ease: 'easeOut' }}
+        className="rounded-2xl border border-white/[0.08] bg-[#0b0b0d]/98 p-2 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="h-5 w-5 shrink-0 opacity-0" aria-hidden="true" />
+          {ZONE_SWATCHES.map((color) => {
+            const isActive = color === activeColor;
+            return (
+              <button
+                key={color}
+                type="button"
+                onMouseEnter={() => onPreviewColor(color)}
+                onMouseLeave={onClearPreview}
+                onClick={() => {
+                  onSelect(color);
+                  onClose();
+                }}
+                className={`relative h-5 w-5 rounded-full border transition-all ${isActive ? 'border-white/70 scale-105' : 'border-white/10 hover:border-white/30 hover:scale-105'}`}
+                style={{ backgroundColor: color, boxShadow: isActive ? `0 0 0 1px ${color}, 0 0 18px ${color}55` : `0 0 12px ${color}22` }}
+                aria-label={`Select zone color ${color}`}
+              >
+                {isActive && <span className="absolute inset-[4px] rounded-full border border-white/80" />}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => {
+              onDelete();
+              onClose();
+            }}
+            onMouseEnter={onClearPreview}
+            className="flex h-5 w-5 items-center justify-center text-zinc-500 transition-all hover:text-rose-400"
+            aria-label="Delete zone"
+          >
+            <Trash2 size={11} />
+          </button>
+        </div>
+      </motion.div>
+    </div>,
     document.body,
   );
 };
@@ -633,6 +640,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
   const [hoveredZoneColumnId, setHoveredZoneColumnId] = useState(null);
   const [zoneDraft, setZoneDraft] = useState(null);
   const [zonePaletteId, setZonePaletteId] = useState(null);
+  const [zonePreviewColor, setZonePreviewColor] = useState(null);
   const [headerMetrics, setHeaderMetrics] = useState([]);
 
   const column_options = CUSTOM_FIELD_TYPES;
@@ -876,6 +884,12 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
   }, [zonePaletteId]);
 
   useEffect(() => {
+    if (zonePaletteId) return undefined;
+    setZonePreviewColor(null);
+    return undefined;
+  }, [zonePaletteId]);
+
+  useEffect(() => {
     if (zoneDraft || !zonePaletteId) return undefined;
     const update = () => measureHeaderMetrics();
     window.addEventListener('scroll', update, true);
@@ -956,6 +970,34 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
         const startCol = columns[startIndex];
         const endCol = columns[endMetric.index];
         if (isZoneEligibleColumn(startCol) && isZoneEligibleColumn(endCol)) {
+          const proposedStartIndex = Math.min(startIndex, endMetric.index);
+          const proposedEndIndex = Math.max(startIndex, endMetric.index);
+          const metricsById = new Map(headerMetrics.map((metric) => [metric.id, metric]));
+          const existingZoneRanges = zones
+            .map((zone) => {
+              const start = metricsById.get(zone.startColumnId);
+              const end = metricsById.get(zone.endColumnId);
+              if (!start || !end) return null;
+              return {
+                startIndex: Math.min(start.index, end.index),
+                endIndex: Math.max(start.index, end.index),
+              };
+            })
+            .filter(Boolean);
+          const wouldExceedOverlapLimit = Array.from(
+            { length: proposedEndIndex - proposedStartIndex + 1 },
+            (_, offset) => proposedStartIndex + offset,
+          ).some((columnIndex) => {
+            const overlappingCount = existingZoneRanges.filter((zone) => (
+              zone.startIndex <= columnIndex && zone.endIndex >= columnIndex
+            )).length;
+            return overlappingCount >= 2;
+          });
+          if (wouldExceedOverlapLimit) {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+            return;
+          }
           const nextZone = {
             id: `zone_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
             startColumnId: startCol.id,
@@ -1006,6 +1048,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
         const right = Math.max(startMetric.right, endMetric.right);
         return {
           ...zone,
+          displayColor: zonePaletteId === zone.id && zonePreviewColor ? zonePreviewColor : zone.color,
           startIndex,
           endIndex,
           left,
@@ -1016,7 +1059,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
       })
       .filter(Boolean);
     return assignZoneLanes(prepared);
-  }, [headerMetrics, zones]);
+  }, [headerMetrics, zonePaletteId, zonePreviewColor, zones]);
 
   const draftSpan = useMemo(() => {
     if (!zoneDraft) return null;
@@ -1046,7 +1089,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
   const zonePalettePosition = zonePalette && headerRowRef.current && headerStickyRef.current
     ? {
         left: headerRowRef.current.getBoundingClientRect().left + zonePalette.center,
-        top: headerStickyRef.current.getBoundingClientRect().top + zonePalette.top - 8,
+        top: headerStickyRef.current.getBoundingClientRect().top,
       }
     : null;
 
@@ -1123,8 +1166,8 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                             event.stopPropagation();
                             setZonePaletteId(zone.id);
                           }}
-                          className="absolute z-10 h-4 rounded-full pointer-events-auto"
-                          style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 6, 0) }}
+                          className="absolute z-10 rounded-full pointer-events-auto"
+                          style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 8, 0), height: 16 }}
                           aria-label="Edit zone color"
                         >
                           <span
@@ -1134,15 +1177,15 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                               width: '96%',
                               top: zone.top - Math.max(zone.top - 6, 0) + 1,
                               height: 8,
-                              background: `radial-gradient(ellipse at center top, ${zone.color}14 0%, ${zone.color}10 34%, ${zone.color}00 78%), linear-gradient(90deg, transparent 0%, ${zone.color}14 10%, ${zone.color}30 50%, ${zone.color}14 90%, transparent 100%)`,
+                              background: `radial-gradient(ellipse at center top, ${zone.displayColor}14 0%, ${zone.displayColor}10 34%, ${zone.displayColor}00 78%), linear-gradient(90deg, transparent 0%, ${zone.displayColor}14 10%, ${zone.displayColor}30 50%, ${zone.displayColor}14 90%, transparent 100%)`,
                             }}
                           />
                           <span
                             className="absolute inset-x-0 h-px rounded-full"
                             style={{
                               top: zone.top - Math.max(zone.top - 6, 0),
-                              background: `linear-gradient(90deg, ${zone.color}AA 0%, ${zone.color} 12%, ${zone.color} 88%, ${zone.color}AA 100%)`,
-                              boxShadow: zonePaletteId === zone.id ? `0 0 0 1px ${zone.color}44, 0 0 18px ${zone.color}55` : `0 0 12px ${zone.color}35`,
+                              background: `linear-gradient(90deg, ${zone.displayColor}AA 0%, ${zone.displayColor} 12%, ${zone.displayColor} 88%, ${zone.displayColor}AA 100%)`,
+                              boxShadow: zonePaletteId === zone.id ? `0 0 0 1px ${zone.displayColor}44, 0 0 18px ${zone.displayColor}55` : `0 0 12px ${zone.displayColor}35`,
                             }}
                           />
                         </button>
@@ -1296,11 +1339,15 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
         {zonePalette && (
           <ZoneColorPalette
             position={zonePalettePosition}
-            activeColor={zonePalette.color}
+            activeColor={zonePreviewColor || zonePalette.color}
+            onPreviewColor={setZonePreviewColor}
+            onClearPreview={() => setZonePreviewColor(null)}
             onSelect={(color) => {
+              setZonePreviewColor(null);
               persistZones(zones.map((zone) => (zone.id === zonePalette.id ? { ...zone, color } : zone)));
             }}
             onDelete={() => {
+              setZonePreviewColor(null);
               persistZones(zones.filter((zone) => zone.id !== zonePalette.id));
             }}
             onClose={() => setZonePaletteId(null)}
