@@ -81,6 +81,7 @@ const getTableRefCandidates = (tableKey) => {
 };
 
 const RECEPTIONIST_REF_PREFIXES = new Set(['rec', 'agent', 'receptionist']);
+const VARIABLE_TOKEN_REGEX = /\{\{[^}]+\}\}/;
 const TABLE_ALIAS_TO_CANONICAL = {
   person: 'people',
   appointment: 'appointments',
@@ -614,6 +615,8 @@ export default function ScenariosPage() {
   const [actionConfig, setActionConfig] = useState(null);
   const [peopleCustomFields, setPeopleCustomFields] = useState([]);
   const [contextMenu, setContextMenu] = useState(null); // { x, y, nodeId }
+  const [runNodeModal, setRunNodeModal] = useState(null);
+  const runNodeTargetRef = useRef(null);
   const [edgeRules, setEdgeRules] = useState([
     { id: 1, variable: '', operator: 'equals', value: '', logic: 'and' },
   ]);
@@ -793,6 +796,10 @@ export default function ScenariosPage() {
     // If node has saved config, let openSelectionPanel restore it — preserve config stages
     if (hasSavedConfig) {
       setPanelStage(prev => {
+        if (prev === 'runNode') {
+          if (runNodeTargetRef.current === selectedNodeId) return prev;
+          return node?.actionConfig?._key ? 'actionConfig' : 'options';
+        }
         if (['actionConfig'].includes(prev)) {
           // Only preserve actionConfig if the new node actually has one
           if (node?.actionConfig?._key) return prev;
@@ -893,7 +900,7 @@ export default function ScenariosPage() {
       : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
-  const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter'].includes(panelStage);
+  const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'runNode'].includes(panelStage);
   const appointmentDateInputMode = appointmentConfig.date_input_mode || 'picker';
   const appointmentTimeInputMode = appointmentConfig.time_input_mode || 'picker';
   const scheduleDateInputMode = scheduleConfig.date_input_mode || 'picker';
@@ -1992,6 +1999,27 @@ export default function ScenariosPage() {
     });
   };
 
+  const hasUnresolvedVariableToken = (value) => (
+    typeof value === 'string' && VARIABLE_TOKEN_REGEX.test(value)
+  );
+
+  const resolveRunFieldValue = (configValue, resultsMap, manualValueProvided, manualValue) => {
+    if (manualValueProvided) return manualValue;
+    return resolveVariableRefs(resolveTableVariableRefs(configValue, resultsMap), resultsMap);
+  };
+
+  const getUnresolvedRunFields = (node, resultsMap) => {
+    const config = node?.actionConfig;
+    const fields = Array.isArray(config?._fields) ? config._fields : [];
+
+    return fields
+      .filter((field) => hasUnresolvedVariableToken(config?.[field.key]))
+      .filter((field) => {
+        const resolvedValue = resolveRunFieldValue(config[field.key], resultsMap, false, undefined);
+        return hasUnresolvedVariableToken(resolvedValue);
+      });
+  };
+
   const buildFlowResultsMap = (targetNodeId) => {
     if (!targetNodeId || !nodes?.length) return {};
 
@@ -2043,6 +2071,142 @@ export default function ScenariosPage() {
     }
 
     return resultsMap;
+  };
+
+  const executeRunnableNode = async (nodeId, manualValues = {}) => {
+    const node = nodeMap[nodeId];
+    if (!node?.actionConfig) return;
+
+    const config = node.actionConfig;
+    const actionKey = config._key;
+    const flowResultsMap = buildFlowResultsMap(nodeId);
+    const hasManualValue = (fieldKey) => Object.prototype.hasOwnProperty.call(manualValues, fieldKey);
+    const getValue = (fieldKey) => resolveRunFieldValue(
+      config[fieldKey],
+      flowResultsMap,
+      hasManualValue(fieldKey),
+      manualValues[fieldKey]
+    );
+
+    if (actionKey === 'search_records') {
+      const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+      const limit = config.search_limit || 10;
+      let query = supabase.from(tableKey).select('*').limit(limit);
+      const searchUserId = getValue('search_user_id');
+      if (searchUserId) query = query.eq('user_id', searchUserId);
+      const { data, error } = await query;
+      if (error) throw new Error(error.message || 'Search failed');
+      setNodes(prev => prev.map(n => n.id === nodeId
+        ? { ...n, searchResults: data || [], outputData: data || [] }
+        : n
+      ));
+      return;
+    }
+
+    if (actionKey === 'create_payment') {
+      const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
+      const resp = await fetch('/api/sonar/create-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amountCents,
+          currency: getValue('currency') || 'usd',
+          payment_method_type: getValue('payment_method') || 'card',
+          description: getValue('description') || '',
+          person_id: getValue('person_id') || null,
+          appointment_id: getValue('appointment_id') || null,
+        }),
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create payment failed');
+      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+      return;
+    }
+
+    if (actionKey === 'create_payment_profile') {
+      const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
+      const resp = await fetch('/api/sonar/create-payment-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amountCents,
+          currency: getValue('currency') || 'usd',
+          description: getValue('description') || '',
+          person_id: getValue('person_id') || null,
+          customer_name: getValue('customer_name') || '',
+          customer_email: getValue('customer_email') || '',
+          customer_phone: getValue('customer_phone') || '',
+        }),
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create payment profile failed');
+      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+      return;
+    }
+
+    if (actionKey === 'create_invoice') {
+      const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
+      const resp = await fetch('/api/sonar/create-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amountCents,
+          currency: getValue('currency') || 'usd',
+          description: getValue('description') || '',
+          person_id: getValue('person_id') || null,
+          customer_name: getValue('customer_name') || '',
+          customer_email: getValue('customer_email') || '',
+          customer_phone: getValue('customer_phone') || '',
+          appointment_id: getValue('appointment_id') || null,
+          service_id: getValue('service_id') || null,
+          due_days: getValue('due_days') || 7,
+        }),
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create invoice failed');
+      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+      return;
+    }
+
+    if (actionKey === 'send_invoice') {
+      const resp = await fetch('/api/sonar/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoice_id: getValue('invoice_id') || null,
+        }),
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Send invoice failed');
+      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+    }
+  };
+
+  const handleRunNodeRequest = async (nodeId) => {
+    const node = nodeMap[nodeId];
+    if (!node?.actionConfig) return;
+
+    const unresolvedFields = getUnresolvedRunFields(node, buildFlowResultsMap(nodeId));
+    if (unresolvedFields.length > 0) {
+      runNodeTargetRef.current = nodeId;
+      setRunNodeModal({
+        nodeId,
+        nodeLabel: node.label || 'Run Node',
+        actionKey: node.actionConfig._key,
+        fields: unresolvedFields,
+        values: Object.fromEntries(unresolvedFields.map((field) => [field.key, ''])),
+        isSubmitting: false,
+        error: '',
+      });
+      setSelectedNodeId(nodeId);
+      setIsPanelVisible(true);
+      setActionConfig(node.actionConfig ? { ...node.actionConfig } : null);
+      setPanelCategory(node.categoryType === 'TRIGGERS' ? 'TRIGGERS' : 'ACTIONS');
+      setPanelStage('runNode');
+      return;
+    }
+
+    await executeRunnableNode(nodeId);
   };
 
   // ─── Run Entire Scenario ─────────────────────────────────────────────
@@ -2695,6 +2859,8 @@ export default function ScenariosPage() {
                     type="button"
                     className="sb-panel-close"
                     onClick={() => {
+                      runNodeTargetRef.current = null;
+                      setRunNodeModal(null);
                       setSelectedNodeId(null);
                       setIsPanelVisible(false);
                       setPanelIntent(false);
@@ -2741,7 +2907,7 @@ export default function ScenariosPage() {
                   <p className="sb-panel-subheader">Select an action for {activeOption.option}</p>
                 </>
               )}
-              {!['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter'].includes(panelStage) && (
+              {!['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'runNode'].includes(panelStage) && (
                 <>
                   <div className="sb-panel-search">
                     <Search className="sb-panel-search-icon" size={16} />
@@ -2770,7 +2936,7 @@ export default function ScenariosPage() {
                 </>
               )}
               {/* Action banner — persists across all config stages */}
-              {['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter'].includes(panelStage) && selectedNode && (
+              {['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'runNode'].includes(panelStage) && selectedNode && (
                 <div
                   className="sb-active-banner sleek-cyber"
                   style={{ borderLeft: `4px solid ${selectedNode.accent || categoryMeta.accent}` }}
@@ -2786,7 +2952,15 @@ export default function ScenariosPage() {
                       <button
                         type="button"
                         className="sb-cyber-back"
-                        onClick={() => { setPanelStage('options'); }}
+                        onClick={() => {
+                          runNodeTargetRef.current = null;
+                          if (panelStage === 'runNode') {
+                            setRunNodeModal(null);
+                            setPanelStage(selectedNode?.actionConfig?._key ? 'actionConfig' : 'options');
+                            return;
+                          }
+                          setPanelStage('options');
+                        }}
                       >
                         <ChevronLeft size={14} /> Back
                       </button>
@@ -2859,6 +3033,106 @@ export default function ScenariosPage() {
                           This trigger fires when the current time is {triggerFilter.hours || 0} hour{(triggerFilter.hours || 0) === 1 ? '' : 's'} {triggerFilter.minutes || 0} minute{(triggerFilter.minutes || 0) === 1 ? '' : 's'} before the appointment starts.
                         </div>
                       </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {panelStage === 'runNode' && runNodeModal ? (
+                  <div className="sb-action-config-form">
+                    <div className="sb-action-config-header">
+                      <div>
+                        <h4 className="sb-action-config-title">Run Node</h4>
+                        <div className="sb-run-node-panel-subtitle">{runNodeModal.nodeLabel}</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="sb-action-config-close"
+                        onClick={() => {
+                          runNodeTargetRef.current = null;
+                          setRunNodeModal(null);
+                          setPanelStage(selectedNode?.actionConfig?._key ? 'actionConfig' : 'options');
+                        }}
+                        disabled={runNodeModal.isSubmitting}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="sb-run-node-panel-copy">
+                      Enter values for the fields that still depend on scenario variables before this node can run.
+                    </div>
+                    <div className="sb-action-config-fields">
+                      {runNodeModal.fields.map((field) => {
+                        const value = runNodeModal.values[field.key] || '';
+                        return (
+                          <div key={field.key} className="sb-action-config-field">
+                            <label className="sb-action-field-label">{field.label}</label>
+                            {field.type === 'select' ? (
+                              <select
+                                className="sb-input-field sb-select-field"
+                                value={value}
+                                onChange={(e) => setRunNodeModal((prev) => ({ ...prev, values: { ...prev.values, [field.key]: e.target.value } }))}
+                              >
+                                <option value="">Select...</option>
+                                {(field.options || []).map((opt) => {
+                                  const optionValue = typeof opt === 'string' ? opt : opt?.value;
+                                  const optionLabel = typeof opt === 'string' ? opt : (opt?.label || opt?.value);
+                                  return <option key={optionValue} value={optionValue}>{optionLabel}</option>;
+                                })}
+                              </select>
+                            ) : field.type === 'textarea' || field.type === 'prompt_textarea' || field.type === 'first_message_textarea' ? (
+                              <textarea
+                                className="sb-input-field sb-run-node-panel-textarea"
+                                value={value}
+                                rows={field.type === 'prompt_textarea' ? 4 : 3}
+                                onChange={(e) => setRunNodeModal((prev) => ({ ...prev, values: { ...prev.values, [field.key]: e.target.value } }))}
+                              />
+                            ) : (
+                              <input
+                                className="sb-input-field"
+                                type={field.type === 'number' ? 'number' : 'text'}
+                                value={value}
+                                onChange={(e) => setRunNodeModal((prev) => ({ ...prev, values: { ...prev.values, [field.key]: e.target.value } }))}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {runNodeModal.error && (
+                      <div className="sb-run-node-panel-error">{runNodeModal.error}</div>
+                    )}
+                    <div className="sb-run-node-panel-actions">
+                      <button
+                        type="button"
+                        className="sb-schedule-cancel-btn"
+                        onClick={() => {
+                          runNodeTargetRef.current = null;
+                          setRunNodeModal(null);
+                          setPanelStage(selectedNode?.actionConfig?._key ? 'actionConfig' : 'options');
+                        }}
+                        disabled={runNodeModal.isSubmitting}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="sb-action-config-save sb-run-node-panel-run"
+                        disabled={runNodeModal.isSubmitting}
+                        onClick={async () => {
+                          const { nodeId, values } = runNodeModal;
+                          setRunNodeModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
+                          try {
+                            await executeRunnableNode(nodeId, values);
+                            runNodeTargetRef.current = null;
+                            setRunNodeModal(null);
+                            setPanelStage(selectedNode?.actionConfig?._key ? 'actionConfig' : 'options');
+                          } catch (err) {
+                            setRunNodeModal((prev) => ({ ...prev, isSubmitting: false, error: err.message || 'Run failed' }));
+                          }
+                        }}
+                      >
+                        {runNodeModal.isSubmitting ? 'Running…' : 'Run'}
+                      </button>
                     </div>
                   </div>
                 ) : null}
@@ -4233,145 +4507,13 @@ export default function ScenariosPage() {
             }}
             onClick={async (e) => {
               e.stopPropagation();
-              const node = nodeMap[contextMenu.nodeId];
-              if (!node?.actionConfig) return;
-              const config = node.actionConfig;
-              const actionKey = config._key;
-
-              if (actionKey === 'search_records') {
-                const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
-                const limit = config.search_limit || 10;
-                try {
-                  let query = supabase.from(tableKey).select('*').limit(limit);
-                  if (config.search_user_id) {
-                    query = query.eq('user_id', config.search_user_id);
-                  }
-                  const { data, error } = await query;
-                  if (!error) {
-                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
-                      ? { ...n, searchResults: data || [], outputData: data || [] }
-                      : n
-                    ));
-                  } else {
-                    console.error('[Run Node] Error:', error.message);
-                  }
-                } catch (err) {
-                  console.error('[Run Node] Request failed:', err.message);
-                }
-              } else if (actionKey === 'create_payment') {
-                try {
-                  const flowResultsMap = buildFlowResultsMap(contextMenu.nodeId);
-                  const amountCents = Math.round(Number(config.amount || 0) * 100);
-                  const resp = await fetch('/api/sonar/create-payment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      amount: amountCents,
-                      currency: 'usd',
-                      payment_method_type: config.payment_method || 'card',
-                      description: resolveVariableRefs(resolveTableVariableRefs(config.description, flowResultsMap), flowResultsMap) || config.description || '',
-                      person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, flowResultsMap), flowResultsMap) || config.person_id || null,
-                      appointment_id: resolveVariableRefs(resolveTableVariableRefs(config.appointment_id, flowResultsMap), flowResultsMap) || config.appointment_id || null,
-                    }),
-                  });
-                  const result = await resp.json();
-                  if (result.error) {
-                    console.error('[Create Payment] Error:', result.error);
-                  } else {
-                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
-                      ? { ...n, outputData: result }
-                      : n
-                    ));
-                  }
-                } catch (err) {
-                  console.error('[Create Payment] Request failed:', err.message);
-                }
-              } else if (actionKey === 'create_payment_profile') {
-                try {
-                  const flowResultsMap = buildFlowResultsMap(contextMenu.nodeId);
-                  const amountCents = Math.round(Number(config.amount || 0) * 100);
-                  const resp = await fetch('/api/sonar/create-payment-profile', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      amount: amountCents,
-                      currency: config.currency || 'usd',
-                      description: resolveVariableRefs(resolveTableVariableRefs(config.description, flowResultsMap), flowResultsMap) || config.description || '',
-                      person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, flowResultsMap), flowResultsMap) || config.person_id || null,
-                      customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, flowResultsMap), flowResultsMap) || config.customer_name || '',
-                      customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, flowResultsMap), flowResultsMap) || config.customer_email || '',
-                      customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, flowResultsMap), flowResultsMap) || config.customer_phone || '',
-                    }),
-                  });
-                  const result = await resp.json();
-                  if (result.error) {
-                    console.error('[Create Payment Profile] Error:', result.error);
-                  } else {
-                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
-                      ? { ...n, outputData: result }
-                      : n
-                    ));
-                  }
-                } catch (err) {
-                  console.error('[Create Payment Profile] Request failed:', err.message);
-                }
-              } else if (actionKey === 'create_invoice') {
-                try {
-                  const flowResultsMap = buildFlowResultsMap(contextMenu.nodeId);
-                  const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, flowResultsMap), flowResultsMap) || config.amount || 0) * 100);
-                  const resp = await fetch('/api/sonar/create-invoice', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      amount: amountCents,
-                      currency: config.currency || 'usd',
-                      description: resolveVariableRefs(resolveTableVariableRefs(config.description, flowResultsMap), flowResultsMap) || config.description || '',
-                      person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, flowResultsMap), flowResultsMap) || config.person_id || null,
-                      customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, flowResultsMap), flowResultsMap) || config.customer_name || '',
-                      customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, flowResultsMap), flowResultsMap) || config.customer_email || '',
-                      customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, flowResultsMap), flowResultsMap) || config.customer_phone || '',
-                      appointment_id: resolveVariableRefs(resolveTableVariableRefs(config.appointment_id, flowResultsMap), flowResultsMap) || config.appointment_id || null,
-                      service_id: resolveVariableRefs(resolveTableVariableRefs(config.service_id, flowResultsMap), flowResultsMap) || config.service_id || null,
-                      due_days: resolveVariableRefs(resolveTableVariableRefs(config.due_days, flowResultsMap), flowResultsMap) || config.due_days || 7,
-                    }),
-                  });
-                  const result = await resp.json();
-                  if (result.error) {
-                    console.error('[Create Invoice] Error:', result.error);
-                  } else {
-                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
-                      ? { ...n, outputData: result }
-                      : n
-                    ));
-                  }
-                } catch (err) {
-                  console.error('[Create Invoice] Request failed:', err.message);
-                }
-              } else if (actionKey === 'send_invoice') {
-                try {
-                  const flowResultsMap = buildFlowResultsMap(contextMenu.nodeId);
-                  const resp = await fetch('/api/sonar/send-invoice', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      invoice_id: resolveVariableRefs(resolveTableVariableRefs(config.invoice_id, flowResultsMap), flowResultsMap) || config.invoice_id || null,
-                    }),
-                  });
-                  const result = await resp.json();
-                  if (result.error) {
-                    console.error('[Send Invoice] Error:', result.error);
-                  } else {
-                    setNodes(prev => prev.map(n => n.id === contextMenu.nodeId
-                      ? { ...n, outputData: result }
-                      : n
-                    ));
-                  }
-                } catch (err) {
-                  console.error('[Send Invoice] Request failed:', err.message);
-                }
-              }
-
+              const { nodeId } = contextMenu;
               setContextMenu(null);
+              try {
+                await handleRunNodeRequest(nodeId);
+              } catch (err) {
+                console.error('[Run Node] Request failed:', err.message);
+              }
             }}
           >
             <div style={{ fontSize: 11, fontWeight: 600, color: '#38bdf8', padding: '6px 12px', cursor: 'pointer' }}>

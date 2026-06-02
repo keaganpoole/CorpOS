@@ -16,6 +16,12 @@ import { supabase } from '../lib/supabase';
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+const appointmentFieldClass =
+  'w-full rounded-2xl border border-neutral-800 bg-neutral-900 px-5 py-4 text-base text-neutral-100 placeholder:text-neutral-600 focus:outline-none focus:border-neutral-700 transition-all [color-scheme:dark]';
+
+const appointmentSmallFieldClass =
+  'w-full rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-neutral-100 placeholder:text-neutral-600 focus:outline-none focus:border-neutral-700 transition-all [color-scheme:dark]';
+
 const STATUS_CONFIG = {
   confirmed: { color: '#34d399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.2)', glow: 'rgba(52,211,153,0.4)', label: 'Confirmed' },
   pending:   { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)', glow: 'rgba(251,191,36,0.4)', label: 'Pending' },
@@ -136,7 +142,7 @@ export default function CalendarPage() {
     if (!addForm.name.trim() || !addForm.date || !addForm.time) { setAddError('Name, date, and time are required'); return; }
     setAdding(true); setAddError('');
     const { error } = await supabase.from('appointments').insert({
-      lead_id: null,
+      person_id: null,
       client_name: addForm.name.trim(),
       date: addForm.date,
       time: addForm.time,
@@ -401,76 +407,72 @@ export default function CalendarPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-2xl"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/78 backdrop-blur-xl px-4 py-8"
             onClick={() => setAddModalOpen(false)}
           >
-            {/* Ambient glow */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden">
-              <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-cyan-500/[0.03] blur-[120px] rounded-full" />
-              <div className="absolute bottom-1/3 left-1/3 w-[300px] h-[300px] bg-indigo-500/[0.02] blur-[100px] rounded-full" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.02]"
-                style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-            </div>
-
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="relative w-[460px] max-h-[85vh] bg-zinc-950 border border-white/[0.07] rounded-3xl flex flex-col overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.9)]"
+              className="relative flex w-full max-w-[560px] max-h-[88vh] flex-col overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/92 shadow-[0_28px_90px_rgba(0,0,0,0.5)] backdrop-blur-xl"
               onClick={e => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="shrink-0 px-7 py-5 border-b border-white/[0.05] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500/20 to-indigo-500/20 border border-white/[0.08] flex items-center justify-center">
-                    <Plus size={16} className="text-cyan-400" />
+              <div className="shrink-0 border-b border-white/[0.04] px-6 pb-4 pt-6 sm:px-7">
+                <div className="flex items-start justify-between gap-5">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-normal text-orange-300">Appointments</p>
+                    <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">New appointment</h2>
+                    <p className="mt-3 max-w-md text-sm leading-6 text-zinc-500">Add the booking details without leaving the calendar.</p>
                   </div>
-                  <div>
-                    <h2 className="text-[14px] font-black text-white tracking-tight uppercase">New Appointment</h2>
-                    <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] mt-0.5">Schedule a booking</p>
-                  </div>
+                  <button
+                    onClick={() => setAddModalOpen(false)}
+                    className="shrink-0 rounded-full border border-white/[0.08] px-3 py-2 text-xs font-normal text-zinc-500 transition hover:border-white/[0.16] hover:text-white"
+                  >
+                    Close
+                  </button>
                 </div>
-                <button onClick={() => setAddModalOpen(false)}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-600 hover:text-white hover:bg-white/[0.06] transition-all bg-transparent border-none cursor-pointer">
-                  <X size={14} />
-                </button>
               </div>
 
-              {/* Form */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar px-7 py-6 space-y-5">
-                {/* Client Name */}
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Client Name</label>
-                  <input ref={addInputRef} type="text" value={addForm.name}
+              <div className="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar sm:px-7">
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium tracking-tight text-neutral-200">Client name</div>
+                    </div>
+                    <input ref={addInputRef} type="text" value={addForm.name}
                     onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
                     placeholder="Customer name"
-                    className="w-full bg-black/60 border border-white/[0.06] rounded-xl px-4 py-3 text-[13px] text-zinc-100 font-semibold placeholder:text-zinc-800 focus:outline-none focus:border-cyan-500/30 focus:shadow-[0_0_20px_rgba(34,211,238,0.06)] transition-all" />
-                </div>
+                    className={appointmentFieldClass} />
+                  </div>
 
-                {/* Date + Time */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Date</label>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium tracking-tight text-neutral-200">Date</div>
+                      </div>
                     <input type="date" value={addForm.date}
                       onChange={e => setAddForm(f => ({ ...f, date: e.target.value }))}
-                      className="w-full bg-black/60 border border-white/[0.06] rounded-xl px-3 py-3 text-[12px] text-zinc-300 font-medium focus:outline-none focus:border-cyan-500/30 transition-all [color-scheme:dark]" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Time</label>
+                      className={appointmentSmallFieldClass} />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium tracking-tight text-neutral-200">Time</div>
+                      </div>
                     <input type="time" value={addForm.time}
                       onChange={e => setAddForm(f => ({ ...f, time: e.target.value }))}
-                      className="w-full bg-black/60 border border-white/[0.06] rounded-xl px-3 py-3 text-[12px] text-zinc-300 font-medium focus:outline-none focus:border-cyan-500/30 transition-all [color-scheme:dark]" />
+                      className={appointmentSmallFieldClass} />
+                    </div>
                   </div>
-                </div>
 
-                {/* Duration + Status */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Duration</label>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium tracking-tight text-neutral-200">Duration</div>
+                      </div>
                     <select value={addForm.duration}
                       onChange={e => setAddForm(f => ({ ...f, duration: Number(e.target.value) }))}
-                      className="w-full bg-black/60 border border-white/[0.06] rounded-xl px-3 py-3 text-[12px] text-zinc-300 font-medium focus:outline-none focus:border-cyan-500/30 transition-all appearance-none cursor-pointer">
+                      className={`${appointmentSmallFieldClass} appearance-none cursor-pointer`}>
                       <option value={15}>15 min</option>
                       <option value={30}>30 min</option>
                       <option value={45}>45 min</option>
@@ -478,55 +480,67 @@ export default function CalendarPage() {
                       <option value={90}>1.5 hours</option>
                       <option value={120}>2 hours</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Status</label>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium tracking-tight text-neutral-200">Status</div>
+                      </div>
                     <select value={addForm.status}
                       onChange={e => setAddForm(f => ({ ...f, status: e.target.value }))}
-                      className="w-full bg-black/60 border border-white/[0.06] rounded-xl px-3 py-3 text-[12px] text-zinc-300 font-medium focus:outline-none focus:border-cyan-500/30 transition-all appearance-none cursor-pointer">
+                      className={`${appointmentSmallFieldClass} appearance-none cursor-pointer`}>
                       <option value="pending">Pending</option>
                       <option value="confirmed">Confirmed</option>
                       <option value="completed">Completed</option>
                       <option value="missed">Missed</option>
                     </select>
+                    </div>
                   </div>
-                </div>
 
-                {/* Receptionist */}
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Receptionist</label>
-                  <input type="text" value={addForm.receptionist}
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium tracking-tight text-neutral-200">Receptionist</div>
+                    </div>
+                    <input type="text" value={addForm.receptionist}
                     onChange={e => setAddForm(f => ({ ...f, receptionist: e.target.value }))}
                     placeholder="Who booked it"
-                    className="w-full bg-black/60 border border-white/[0.06] rounded-xl px-4 py-3 text-[12px] text-zinc-300 font-medium placeholder:text-zinc-800 focus:outline-none focus:border-cyan-500/30 transition-all" />
-                </div>
+                    className={appointmentFieldClass} />
+                  </div>
 
-                {/* Notes */}
-                <div>
-                  <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Notes</label>
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium tracking-tight text-neutral-200">Notes</div>
+                    </div>
                   <textarea value={addForm.notes}
                     onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))}
                     placeholder="Optional notes..."
-                    rows={2}
-                    className="w-full bg-black/60 border border-white/[0.06] rounded-xl px-4 py-3 text-[12px] text-zinc-300 font-medium placeholder:text-zinc-800 focus:outline-none focus:border-cyan-500/30 transition-all resize-none" />
-                </div>
-
-                {/* Error */}
-                {addError && (
-                  <div className="px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
-                    <AlertCircle size={14} className="text-rose-400 shrink-0" />
-                    <span className="text-[11px] text-rose-400 font-medium">{addError}</span>
+                    rows={4}
+                    className="min-h-[140px] w-full resize-none rounded-[22px] border border-neutral-800 bg-neutral-900 px-4 py-4 text-sm leading-6 text-neutral-100 outline-none transition placeholder:text-neutral-600 focus:border-neutral-700" />
                   </div>
-                )}
+
+                  {addError && (
+                    <div className="flex items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/8 px-4 py-3">
+                      <AlertCircle size={14} className="shrink-0 text-rose-400" />
+                      <span className="text-sm text-rose-300">{addError}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Footer */}
-              <div className="shrink-0 px-7 py-5 border-t border-white/[0.04]">
-                <button onClick={handleAddAppointment}
-                  disabled={adding || !addForm.name.trim()}
-                  className="w-full py-3.5 bg-white text-black rounded-xl text-[13px] font-black uppercase tracking-wider hover:bg-cyan-400 transition-all active:scale-[0.98] disabled:opacity-20 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(255,255,255,0.08)]">
-                  {adding ? 'Scheduling...' : 'Schedule Appointment'}
-                </button>
+              <div className="shrink-0 border-t border-white/[0.04] px-6 py-5 sm:px-7">
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAddModalOpen(false)}
+                    className="rounded-full border border-white/[0.08] px-4 py-2.5 text-sm font-normal text-zinc-500 transition hover:border-white/[0.16] hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button onClick={handleAddAppointment}
+                    disabled={adding || !addForm.name.trim()}
+                    className="rounded-full bg-neutral-100 px-5 py-2.5 text-sm font-medium text-neutral-950 transition-all hover:bg-white active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_12px_rgba(255,255,255,0.12)]">
+                    {adding ? 'Scheduling...' : 'Schedule appointment'}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

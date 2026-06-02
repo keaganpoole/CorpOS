@@ -349,12 +349,68 @@ const OUTPUT_VARIABLE_MAP = {
   ],
 };
 
+const STRIPE_RESPONSE_ACTION_KEYS = new Set([
+  'create_payment',
+  'create_payment_profile',
+  'create_invoice',
+  'send_invoice',
+]);
+
+const humanizeVariableKey = (key) => String(key || '')
+  .replace(/[_-]+/g, ' ')
+  .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const inferVariableType = (key, value) => {
+  if (typeof value === 'boolean') return 'boolean';
+  if (typeof value === 'number') {
+    if (/(created|updated|due)_?at?$|_at$|date$/i.test(String(key || ''))) return 'timestamp';
+    return 'number';
+  }
+  if (Array.isArray(value) || (value && typeof value === 'object')) return 'text';
+
+  const normalizedKey = String(key || '').toLowerCase();
+  if (normalizedKey.includes('email')) return 'email';
+  if (normalizedKey.includes('url') || normalizedKey.includes('pdf')) return 'url';
+  if (normalizedKey.includes('phone')) return 'phone';
+  if (normalizedKey === 'created' || normalizedKey === 'due_date' || normalizedKey.endsWith('_at')) return 'timestamp';
+  return 'text';
+};
+
+const buildStripeResponseVariables = (node, fallbackVars) => {
+  const outputData = node?.outputData;
+  if (!outputData || Array.isArray(outputData) || typeof outputData !== 'object') return fallbackVars;
+
+  const fallbackByKey = new Map(fallbackVars.map((item) => [item.key, item]));
+  return Object.keys(outputData)
+    .filter((key) => key && key !== '__proto__')
+    .map((key) => {
+      const fallback = fallbackByKey.get(key);
+      const value = outputData[key];
+      return {
+        key,
+        label: fallback?.label || humanizeVariableKey(key),
+        type: fallback?.type || inferVariableType(key, value),
+      };
+    });
+};
+
+export const isStripeResponseNode = (node) => {
+  const key = node?.actionConfig?._key || node?.subOptionKey || '';
+  return STRIPE_RESPONSE_ACTION_KEYS.has(key);
+};
+
 // Get output variables for a node
 export const getOutputVariables = (node) => {
   if (!node) return [];
   
   const key = node.subOptionKey || '';
   const vars = OUTPUT_VARIABLE_MAP[key] || [];
+  if (isStripeResponseNode(node)) {
+    return buildStripeResponseVariables(node, vars);
+  }
   
   // Also check by label for generic types
   if (vars.length === 0 && node.label) {

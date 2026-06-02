@@ -666,21 +666,28 @@ def search_available_twilio_numbers(
         "ExcludeAllAddressRequired": "true",
         "Limit": query_limit,
     }
-    if area_code and str(area_code).isdigit():
-        search_params["AreaCode"] = str(area_code)[:3]
     if contains:
         search_params["Contains"] = str(contains).strip()
+    normalized_near_number = None
     if near_number:
         normalized_near_number = normalize_phone_number(near_number)
         if normalized_near_number:
             search_params["NearNumber"] = normalized_near_number
             search_params["Distance"] = 100
+    if not normalized_near_number and area_code and str(area_code).isdigit():
+        search_params["AreaCode"] = str(area_code)[:3]
     if region:
         search_params["InRegion"] = str(region).strip()[:2].upper()
 
     search_url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/AvailablePhoneNumbers/US/Local.json"
     response = requests.get(search_url, params=search_params, auth=auth, timeout=30)
     if not response.ok:
+        logging.error(
+            "Twilio number search failed status=%s params=%s body=%s",
+            response.status_code,
+            search_params,
+            response.text,
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Twilio number search failed ({response.status_code}).",
@@ -5624,10 +5631,15 @@ async def search_business_forwarding_numbers(
         purchase_limit = get_system_number_purchase_limit()
         purchase_count = get_business_number_purchase_count(business)
 
+        resolved_near_number = near_number or None
+        resolved_area_code = area_code or extract_us_area_code(business.get("phone"))
+        if resolved_near_number:
+            resolved_area_code = None
+
         filters = {
-            "area_code": area_code or extract_us_area_code(business.get("phone")),
+            "area_code": resolved_area_code,
             "contains": contains or None,
-            "near_number": near_number or normalize_phone_number(business.get("phone")),
+            "near_number": resolved_near_number,
             "region": region or None,
             "limit": limit,
         }

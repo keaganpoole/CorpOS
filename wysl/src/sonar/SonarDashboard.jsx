@@ -626,9 +626,10 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
     setTargetNumbersLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.areaCode?.trim()) params.set('area_code', filters.areaCode.trim());
+      const shouldUseNearNumber = Boolean(filters.nearBusiness && defaultNearNumber);
+      if (!shouldUseNearNumber && filters.areaCode?.trim()) params.set('area_code', filters.areaCode.trim());
       if (filters.contains?.trim()) params.set('contains', filters.contains.trim());
-      if (filters.nearBusiness && defaultNearNumber) params.set('near_number', defaultNearNumber);
+      if (shouldUseNearNumber) params.set('near_number', defaultNearNumber);
       params.set('limit', '12');
 
       const data = await requestForwarding(`/businesses/me/forwarding/available-numbers?${params.toString()}`);

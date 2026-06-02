@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, CreditCard, Search, Layers
 } from 'lucide-react';
-import { getOutputVariables } from '../../../sonar/lib/fieldContexts';
+import { getOutputVariables, isStripeResponseNode } from '../../../sonar/lib/fieldContexts';
 import { fetchCustomFields, getCurrentBusinessId, getCustomValue, isCustomFieldKey } from '../../lib/customFields';
 import { getSmartActionByKey, getSmartActions } from './smartActions';
 
@@ -817,7 +817,9 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
       const label = node.label || display.defaultLabel;
       const outputVars = getOutputVariables(node);
       const outputData = node.outputData || null;
-      return { nodeId, label, categoryType: node.categoryType, icon: display.icon, outputVars, outputData };
+      if (outputData == null) return null;
+      const isStripeResponse = isStripeResponseNode(node);
+      return { nodeId, label, categoryType: node.categoryType, icon: display.icon, outputVars, outputData, isStripeResponse };
     }).filter(Boolean);
   };
 
@@ -838,18 +840,19 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
         const color = '#a78bfa';
         const isExpanded = expandedNodes[prev.nodeId] !== false;
         const hasOutput = prev.outputData != null;
+        const sourceName = prev.isStripeResponse ? 'Stripe' : null;
 
         return (
           <div
             key={prev.nodeId}
-            className="sb-vars-table-group"
+            className="sb-vars-table-group sb-vars-table-group--response"
             style={{ '--table-color': color, '--table-bg': 'rgba(167,139,250,0.08)', '--table-border': 'rgba(167,139,250,0.2)' }}
             onMouseEnter={() => onTableHover?.(color)}
             onMouseLeave={() => onTableHover?.('')}
           >
             <button
               type="button"
-              className="sb-vars-table-header"
+              className="sb-vars-table-header sb-vars-table-header--response"
               onClick={() => setExpandedNodes(p => ({ ...p, [prev.nodeId]: !isExpanded }))}
             >
               <span className="sb-vars-table-chevron">
@@ -857,7 +860,12 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
               </span>
               <span className="sb-vars-table-icon" style={{ color }}><NodeIcon size={11} /></span>
               <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{prev.label}</span>
-              {hasOutput && <span className="sb-vars-table-badge">RUN</span>}
+              {sourceName && (
+                <span className="sb-vars-table-source">
+                  <span className="sb-vars-table-source-prefix">via</span>
+                  <span className="sb-vars-table-source-name" style={{ color }}>{sourceName}</span>
+                </span>
+              )}
             </button>
 
             {isExpanded && (
@@ -1297,6 +1305,22 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
             </div>
           </div>
         )}
+
+        <PreviousNodeVars
+          currentNodeId={currentNodeId}
+          nodes={nodes}
+          edges={edges}
+          onInsertVariable={onInsertVariable}
+          onTableHover={onTableHover}
+        />
+
+        <SearchRecordsOutput
+          currentNodeId={currentNodeId}
+          nodes={nodes}
+          edges={edges}
+          onInsertVariable={onInsertVariable}
+          onTableHover={onTableHover}
+        />
 
         {availableTables.map((table) => {
           const tableRecords = records[table.key] || [];
