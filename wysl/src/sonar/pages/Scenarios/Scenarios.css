@@ -1095,8 +1095,8 @@
 /* Panel */
 .sb-selection-panel {
   position: absolute;
-  width: 400px;
-  height: 640px;
+  width: 440px;
+  height: 800px;
   background: var(--sb-bg-panel);
   backdrop-filter: blur(30px) saturate(150%);
   border-radius: 28px;
@@ -1465,6 +1465,7 @@
   color: #fff;
   color-scheme: dark;
   overflow: hidden;
+  min-height: 600px;
 }
 
 .aether-panel-header {
@@ -2232,7 +2233,8 @@
   --sb-pane-rotate-x: 0deg;
   --sb-pane-rotate-y: 6deg;
   position: absolute;
-  width: 264px;
+  width: 270px;
+  height: 800px;
   background: linear-gradient(135deg, rgba(14, 14, 18, 0.98), rgba(20, 20, 26, 0.98));
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-left: 2px solid rgba(255, 255, 255, 0.06);
@@ -2334,6 +2336,7 @@
 }
 
 .sb-vars-scroll {
+  flex: 1;
   overflow-y: auto;
   padding: 6px 0;
   scrollbar-width: thin;

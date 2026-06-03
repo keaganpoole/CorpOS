@@ -1216,8 +1216,8 @@ export default function ScenariosPage() {
       return;
     }
     const rect = nodeEl.getBoundingClientRect();
-    const panelWidth = 400;
-    const panelHeight = 640;
+    const panelWidth = 440;
+    const panelHeight = 800;
     
     let left = rect.right - pageRect.left - rect.width * 0.13;
     if (left + panelWidth > pageRect.width) {
@@ -1238,7 +1238,15 @@ export default function ScenariosPage() {
 
   useLayoutEffect(() => {
     repositionPanel();
-  }, [selectedNodeId, nodes, view.x, view.y, repositionPanel]);
+  }, [
+    selectedNodeId,
+    nodeMap[selectedNodeId]?.x,
+    nodeMap[selectedNodeId]?.y,
+    nodeMap[selectedNodeId]?.configured,
+    view.x,
+    view.y,
+    repositionPanel,
+  ]);
 
   // Measure each node's actual circle center in canvas coordinates (no state mutation)
   const circleCenterRef = useRef({});
@@ -4511,7 +4519,7 @@ export default function ScenariosPage() {
               position: 'absolute',
               top: panelStyle.top,
               left: Math.max(10, (panelStyle.left || 0) - 272 - 8),
-              height: 640,
+              height: 800,
             }}
           />
         )}
@@ -4562,7 +4570,7 @@ export default function ScenariosPage() {
                 position: 'absolute',
                 top: logicPanelDragPos?.top ?? logicPanel.top,
                 left: Math.max(10, (logicPanelDragPos?.left ?? (logicPanel.left || 0)) - 272 - 8),
-                height: 640,
+                height: 800,
               }}
             />
             <AetherEdgeLogic
