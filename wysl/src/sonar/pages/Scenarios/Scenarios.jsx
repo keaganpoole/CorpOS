@@ -1356,13 +1356,14 @@ export default function ScenariosPage() {
         return;
       }
 
-      if (!panRef.current) return;
-      const dx = event.clientX - panRef.current.startX;
-      const dy = event.clientY - panRef.current.startY;
+      const panState = panRef.current;
+      if (!panState) return;
+      const dx = event.clientX - panState.startX;
+      const dy = event.clientY - panState.startY;
       setView((prev) => ({
         ...prev,
-        x: panRef.current.originX + dx,
-        y: panRef.current.originY + dy,
+        x: panState.originX + dx,
+        y: panState.originY + dy,
       }));
     };
 
@@ -1939,16 +1940,27 @@ export default function ScenariosPage() {
   const handleLoadScenario = (scenario) => {
     try {
       // Parse nodes and edges from JSON
-      const nodesData = typeof scenario.nodes_data === 'string' 
+      const parsedNodesData = typeof scenario.nodes_data === 'string' 
         ? JSON.parse(scenario.nodes_data) 
         : scenario.nodes_data;
-      const edgesData = typeof scenario.edges_data === 'string' 
+      const parsedEdgesData = typeof scenario.edges_data === 'string' 
         ? JSON.parse(scenario.edges_data) 
         : scenario.edges_data;
+      const nodesData = parsedNodesData ? parsedNodesData.map((node) => ({ ...node })) : [INITIAL_NODE];
+      const edgesData = parsedEdgesData ? parsedEdgesData.map((edge) => ({ ...edge })) : [];
+
+      const getMaxIdNumber = (items, prefix) => items.reduce((max, item) => {
+        const match = typeof item?.id === 'string' ? item.id.match(new RegExp(`^${prefix}-(\\d+)$`)) : null;
+        if (!match) return max;
+        const value = Number(match[1]);
+        return Number.isFinite(value) ? Math.max(max, value) : max;
+      }, 1);
       
       // Set nodes and edges from scenario data
-      setNodes(nodesData || [INITIAL_NODE]);
-      setEdges(edgesData || []);
+      setNodes(nodesData);
+      setEdges(edgesData);
+      nodeIdCounter.current = getMaxIdNumber(nodesData, 'node');
+      edgeIdCounter.current = getMaxIdNumber(edgesData, 'edge');
 
       // Reconstruct _fields for each node's actionConfig from AUTOMATION_HIERARCHY
       if (nodesData) {
