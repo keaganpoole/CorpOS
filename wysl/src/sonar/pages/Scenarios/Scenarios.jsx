@@ -4718,54 +4718,6 @@ export default function ScenariosPage() {
                   <p className="sb-integrations-lead">
                     Gmail is the first supported provider. We’ll keep the setup explicit so you always know what’s configured, what still needs approval, and what scenarios will be able to do next.
                   </p>
-
-                  <div className="sb-integrations-status-card">
-                    <div className="sb-integrations-status-row">
-                      <span className="sb-integrations-status-label">Current status</span>
-                      <span className={`sb-integrations-status-pill ${selectedIntegration.status === 'connected' ? 'is-active' : ''}`}>
-                        {selectedIntegration.status === 'connected'
-                          ? `${selectedProviderConfig?.name || 'Provider'} connected`
-                          : selectedIntegration.selected
-                            ? `${selectedProviderConfig?.name || 'Provider'} selected`
-                            : 'No provider selected'}
-                      </span>
-                    </div>
-                    <div className="sb-integrations-status-copy">
-                      {selectedIntegration.connectedEmail
-                        ? selectedIntegration.connectedEmail
-                        : 'Connect a provider to send email from scenarios.'}
-                    </div>
-                    {selectedIntegration.connectedEmail && (
-                      <div className="sb-integrations-connected-email">{selectedIntegration.connectedEmail}</div>
-                    )}
-                    {integrationError && (
-                      <div className="sb-integrations-error">{integrationError}</div>
-                    )}
-                    {integrationPopupPending && (
-                      <div className="sb-integrations-inline-note">Waiting for Google to finish connecting…</div>
-                    )}
-                  </div>
-
-                  <div className="sb-integrations-steps">
-                    {integrationSteps.map((stepItem, index) => {
-                      const active = integrationStep === index;
-                      const complete = integrationStep > index || (selectedIntegration.selected && index === 0);
-                      return (
-                        <div
-                          key={stepItem.id}
-                          className={`sb-integrations-step ${active ? 'is-active' : ''} ${complete ? 'is-complete' : ''}`}
-                        >
-                          <div className="sb-integrations-step-index">
-                            {complete ? <Check size={12} /> : index + 1}
-                          </div>
-                          <div className="sb-integrations-step-copy">
-                            <div className="sb-integrations-step-title">{stepItem.title}</div>
-                            <div className="sb-integrations-step-helper">{stepItem.helper}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
               </div>
 
@@ -4787,7 +4739,7 @@ export default function ScenariosPage() {
                   </button>
                 </div>
 
-                {integrationStep === 0 && (
+                {integrationStep === 0 ? (
                   <div className="sb-integrations-provider-grid">
                     {INTEGRATION_PROVIDERS.map((provider) => {
                       const providerState = emailIntegrations[provider.key] || DEFAULT_EMAIL_INTEGRATIONS[provider.key];
@@ -4822,42 +4774,46 @@ export default function ScenariosPage() {
                       );
                     })}
                   </div>
-                )}
-
-                {integrationStep === 1 && (
+                ) : (
                   <div className="sb-integrations-review">
-                    <div className="sb-integrations-note sb-integrations-note--minimal">
-                      <div className="sb-integrations-note-title">{selectedProviderConfig?.name} selected</div>
-                      <div className="sb-integrations-note-copy">
-                        We’ll store Gmail as your chosen provider for scenarios and keep the status visible in the builder, so you’re always in the loop about what’s selected versus fully connected.
+                    <div className="sb-integrations-provider-identity">
+                      <div className="sb-integrations-provider-brand">
+                        <img src={selectedProviderConfig?.icon} alt={selectedProviderConfig?.name} className="sb-integrations-provider-logo" />
+                        <div>
+                          <div className="sb-integrations-provider-name">{selectedProviderConfig?.name}</div>
+                          <div className="sb-integrations-provider-subtitle">{selectedProviderConfig?.subtitle}</div>
+                        </div>
                       </div>
+                      <span className={`sb-integrations-status-pill ${selectedIntegration.status === 'connected' ? 'is-active' : ''}`}>
+                        {selectedIntegration.status === 'connected'
+                          ? 'Connected'
+                          : selectedIntegration.selected
+                            ? 'Selected'
+                            : 'Not connected'}
+                      </span>
                     </div>
-                  </div>
-                )}
 
-                {integrationStep === 2 && (
-                  <div className="sb-integrations-finish">
-                    <div className="sb-integrations-finish-orb" />
-                    <div className="sb-integrations-finish-kicker">Gmail saved</div>
-                    <h3 className="sb-integrations-finish-title">Gmail is selected.</h3>
-                    <p className="sb-integrations-finish-copy">
-                      You’ll see Gmail reflected as the selected scenario email provider from here, and the remaining live mailbox auth step can be layered on without changing the user-facing setup flow.
-                    </p>
-
-                    <div className="sb-integrations-summary">
+                    <div className="sb-integrations-summary sb-integrations-summary--minimal">
                       <div className="sb-integrations-summary-row">
                         <span>Provider</span>
-                        <strong>Gmail</strong>
-                      </div>
-                      <div className="sb-integrations-summary-row">
-                        <span>Workspace email</span>
-                        <strong>{gmailIntegration.connectedEmail || session?.user?.email || 'Will use the connected Google mailbox'}</strong>
+                        <strong>{selectedProviderConfig?.name || 'Gmail'}</strong>
                       </div>
                       <div className="sb-integrations-summary-row">
                         <span>Status</span>
-                        <strong>Selected for scenario email</strong>
+                        <strong>{selectedIntegration.status === 'connected' ? 'Connected for scenario email' : 'Selected for scenario email'}</strong>
+                      </div>
+                      <div className="sb-integrations-summary-row">
+                        <span>Mailbox</span>
+                        <strong>{selectedIntegration.connectedEmail || session?.user?.email || 'Will use the connected Google mailbox'}</strong>
                       </div>
                     </div>
+
+                    {integrationPopupPending && (
+                      <div className="sb-integrations-inline-note">Waiting for Google to finish connecting…</div>
+                    )}
+                    {integrationError && (
+                      <div className="sb-integrations-error">{integrationError}</div>
+                    )}
                   </div>
                 )}
 
@@ -4928,7 +4884,7 @@ export default function ScenariosPage() {
             </div>
           </div>
         )}
-        
+
         {/* Schedule Modal */}
         {showScheduleModal && (
           <div className="sb-schedule-modal-overlay" onClick={() => setShowScheduleModal(false)}>
