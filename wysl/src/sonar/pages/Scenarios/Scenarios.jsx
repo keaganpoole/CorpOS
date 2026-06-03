@@ -3550,21 +3550,14 @@ export default function ScenariosPage() {
                     <div className="sb-run-node-panel-actions">
                       <button
                         type="button"
-                        className="sb-schedule-cancel-btn"
-                        onClick={() => {
-                          runNodeTargetRef.current = null;
-                          setRunNodeModal(null);
-                          setPanelStage(selectedNode?.actionConfig?._key ? 'actionConfig' : 'options');
-                        }}
-                        disabled={runNodeModal.isSubmitting}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
                         className="sb-action-config-save sb-run-node-panel-run"
-                        disabled={runNodeModal.isSubmitting}
                         onClick={async () => {
+                          if (runNodeModal.isSubmitting) {
+                            runNodeTargetRef.current = null;
+                            setRunNodeModal(null);
+                            setPanelStage(selectedNode?.actionConfig?._key ? 'actionConfig' : 'options');
+                            return;
+                          }
                           const { nodeId, values } = runNodeModal;
                           setRunNodeModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
                           try {
@@ -3575,11 +3568,11 @@ export default function ScenariosPage() {
                             setPanelIntent(false);
                             setPanelStage('options');
                           } catch (err) {
-                            setRunNodeModal((prev) => ({ ...prev, isSubmitting: false, error: err.message || 'Run failed' }));
+                            setRunNodeModal((prev) => (prev ? { ...prev, isSubmitting: false, error: err.message || 'Run failed' } : prev));
                           }
                         }}
                       >
-                        {runNodeModal.isSubmitting ? 'Running…' : 'Run'}
+                        {runNodeModal.isSubmitting ? 'Cancel' : 'Run'}
                       </button>
                     </div>
                   </div>
@@ -3817,62 +3810,6 @@ export default function ScenariosPage() {
                           </div>
                         );
                       })}
-                      {currentActionKey === 'call_customer' && (
-                        <div
-                          className="sb-action-config-field"
-                          style={{
-                            border: '1px solid rgba(56,189,248,0.16)',
-                            background: 'rgba(56,189,248,0.06)',
-                            borderRadius: 14,
-                            padding: '12px 14px',
-                          }}
-                        >
-                          <div
-                            className="sb-action-field-label"
-                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
-                          >
-                            <span>Receptionist Must Collect</span>
-                            <span style={{ fontSize: 10, color: 'rgba(228,228,231,0.6)', fontWeight: 600 }}>
-                              inferred from downstream `rec.*`
-                            </span>
-                          </div>
-                          {inferredReceptionistRequirements.length > 0 ? (
-                            <>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                                {inferredReceptionistRequirements.map((requirement) => (
-                                  <span
-                                    key={requirement.path}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 6,
-                                      borderRadius: 999,
-                                      padding: '5px 10px',
-                                      background: 'rgba(56,189,248,0.14)',
-                                      border: '1px solid rgba(56,189,248,0.2)',
-                                      color: '#d9f4ff',
-                                      fontSize: 11,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    <span>{requirement.label}</span>
-                                    <span style={{ color: 'rgba(217,244,255,0.55)', fontWeight: 500 }}>
-                                      {TABLE_LABELS[requirement.table] || requirement.table}
-                                    </span>
-                                  </span>
-                                ))}
-                              </div>
-                              <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(228,228,231,0.64)', lineHeight: 1.5 }}>
-                                The outbound prompt will automatically tell the receptionist these fields are mandatory before the call ends.
-                              </div>
-                            </>
-                          ) : (
-                            <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(228,228,231,0.64)', lineHeight: 1.5 }}>
-                              No downstream receptionist variables were detected. This call will follow only the prompt unless a later node uses {'{{rec.people.field}}'} or {'{{rec.appointments.field}}'}.
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                     )}
 

@@ -1896,7 +1896,7 @@ def _send_gmail_email_for_user(user_id: str, to: str, subject: str, body: str) -
     )
     if not response.ok:
         logging.error("Gmail send failed: %s", response.text)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to send Gmail message.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to send message.")
     return response.json()
 
 class RuntimeModeRequest(BaseModel):

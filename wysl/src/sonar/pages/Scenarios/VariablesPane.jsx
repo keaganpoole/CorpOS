@@ -840,11 +840,7 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
   const prevNodes = getPreviousNodes();
 
   if (prevNodes.length === 0) {
-    return (
-      <div className="sb-vars-empty" style={{ padding: '20px 12px' }}>
-        No previous nodes found
-      </div>
-    );
+    return null;
   }
 
   return (
