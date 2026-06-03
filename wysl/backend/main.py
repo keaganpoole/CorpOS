@@ -56,7 +56,7 @@ from pydantic import BaseModel, Field, EmailStr
 from fastapi import FastAPI, HTTPException, status, Depends, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from gotrue.errors import AuthApiError
 from collections import defaultdict
 from fastapi import BackgroundTasks
@@ -82,6 +82,10 @@ from config import (
     twilio_api_key,
     twilio_api_secret,
     twilio_voice_webhook_url,
+    google_client_id,
+    google_client_secret,
+    google_oauth_redirect_uri,
+    frontend_base_url,
 )
 
  
@@ -91,7 +95,9 @@ from models import (
     PurchaseUpdate, PurchaseResponse, CampaignItemResponse,
     CampaignCreate, CampaignUpdate, CampaignResponse, AIAgentResponse,
     AdminSetting, RepLoginRequest, MoneyTablePlan, MoneyTableRep, RepResponse, RepUpdate,
-    PasswordCreate, PasswordUpdate, PasswordResponse, PrizeCreate, PrizeUpdate, PrizeResponse, TierResponse, HelpdeskMessage, OAuthAccountCreate, OAuthAccountResponse
+    PasswordCreate, PasswordUpdate, PasswordResponse, PrizeCreate, PrizeUpdate, PrizeResponse,
+    TierResponse, HelpdeskMessage, OAuthAccountCreate, OAuthAccountResponse,
+    UserIntegrationUpdate, UserIntegrationResponse,
 )
 from dependencies import get_current_user, get_current_rep
 from scenario_engine import ScenarioEngine
@@ -1541,6 +1547,358 @@ class RepTokenResponse(BaseModel):
 class LoginStatusUpdate(BaseModel):
     is_logged_in: bool
 
+
+SUPPORTED_EMAIL_INTEGRATION_PROVIDERS = {"gmail"}
+GMAIL_SCOPES = [
+    "openid",
+    "email",
+    "profile",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.readonly",
+]
+GMAIL_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GMAIL_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+GMAIL_MESSAGES_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
+
+
+class IntegrationAuthorizeResponse(BaseModel):
+    provider: str
+    authorization_url: str
+
+
+class IntegrationDisconnectResponse(BaseModel):
+    success: bool
+    provider: str
+
+
+class IntegrationEmailSendRequest(BaseModel):
+    to: str
+    subject: str
+    body: str
+
+
+class IntegrationEmailListItem(BaseModel):
+    id: str
+    thread_id: Optional[str] = None
+    subject: Optional[str] = None
+    from_email: Optional[str] = None
+    to_email: Optional[str] = None
+    snippet: Optional[str] = None
+    received_at: Optional[str] = None
+
+
+class IntegrationEmailMessageResponse(IntegrationEmailListItem):
+    body_text: Optional[str] = None
+
+
+class IntegrationEmailSendResponse(BaseModel):
+    id: str
+    thread_id: Optional[str] = None
+    label_ids: List[str] = Field(default_factory=list)
+
+
+def _default_user_integration(provider: str, user_id: str) -> dict:
+    return {
+        "id": str(uuid4()),
+        "user_id": user_id,
+        "provider": provider,
+        "status": "not_connected",
+        "selected": False,
+        "connected_email": None,
+        "scopes": [],
+        "provider_metadata": {},
+        "credentials": {},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _normalize_user_integration_row(row: dict, user_id: str) -> dict:
+    provider = (row or {}).get("provider") or "gmail"
+    base = _default_user_integration(provider, user_id)
+    base.update(row or {})
+    base["scopes"] = base.get("scopes") or []
+    base["provider_metadata"] = base.get("provider_metadata") or {}
+    base["credentials"] = base.get("credentials") or {}
+    base["selected"] = bool(base.get("selected"))
+    base["status"] = base.get("status") or "not_connected"
+    return base
+
+
+def _serialize_public_integration(row: dict, user_id: str) -> dict:
+    safe_row = dict(_normalize_user_integration_row(row, user_id))
+    safe_row.pop("credentials", None)
+    return safe_row
+
+
+def _get_google_redirect_uri(request: Optional[Request] = None) -> str:
+    if google_oauth_redirect_uri:
+        return google_oauth_redirect_uri
+    if request is not None:
+        return str(request.url_for("gmail_integration_callback"))
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="GOOGLE_OAUTH_REDIRECT_URI is not configured.",
+    )
+
+
+def _build_integration_state(user_id: str, provider: str, return_to: Optional[str] = None) -> str:
+    payload = {
+        "sub": user_id,
+        "provider": provider,
+        "return_to": return_to or frontend_base_url or "",
+        "nonce": str(uuid4()),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _decode_integration_state(state_token: str) -> dict:
+    try:
+        payload = jwt.decode(state_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("provider") not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider state.")
+        return payload
+    except JWTError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid integration state.") from exc
+
+
+def _extract_email_header(headers: List[dict], name: str) -> Optional[str]:
+    for header in headers or []:
+        if (header.get("name") or "").lower() == name.lower():
+            return header.get("value")
+    return None
+
+
+def _decode_gmail_parts(parts: List[dict]) -> str:
+    chunks: List[str] = []
+    for part in parts or []:
+        mime_type = part.get("mimeType") or ""
+        body_data = (part.get("body") or {}).get("data")
+        if body_data and mime_type.startswith("text/plain"):
+            try:
+                decoded = base64.urlsafe_b64decode(body_data + "=" * (-len(body_data) % 4)).decode("utf-8", errors="ignore")
+                chunks.append(decoded)
+            except Exception:
+                continue
+        nested = part.get("parts") or []
+        if nested:
+            nested_text = _decode_gmail_parts(nested)
+            if nested_text:
+                chunks.append(nested_text)
+    return "\n".join(chunk for chunk in chunks if chunk).strip()
+
+
+def _parse_gmail_message(message: dict) -> dict:
+    payload = message.get("payload") or {}
+    headers = payload.get("headers") or []
+    internal_ms = message.get("internalDate")
+    received_at = None
+    if internal_ms:
+        try:
+            received_at = datetime.fromtimestamp(int(internal_ms) / 1000, tz=timezone.utc).isoformat()
+        except Exception:
+            received_at = None
+    body_text = ""
+    body_data = (payload.get("body") or {}).get("data")
+    if body_data:
+        try:
+            body_text = base64.urlsafe_b64decode(body_data + "=" * (-len(body_data) % 4)).decode("utf-8", errors="ignore")
+        except Exception:
+            body_text = ""
+    if not body_text:
+        body_text = _decode_gmail_parts(payload.get("parts") or [])
+    return {
+        "id": message.get("id"),
+        "thread_id": message.get("threadId"),
+        "subject": _extract_email_header(headers, "Subject"),
+        "from_email": _extract_email_header(headers, "From"),
+        "to_email": _extract_email_header(headers, "To"),
+        "snippet": message.get("snippet"),
+        "received_at": received_at,
+        "body_text": body_text or None,
+    }
+
+
+def _fetch_integration_row(user_id: str, provider: str) -> Optional[dict]:
+    response = (
+        supabase_admin.table("integrations")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("provider", provider)
+        .limit(1)
+        .execute()
+    )
+    if response.data:
+        return _normalize_user_integration_row(response.data[0], user_id)
+    return None
+
+
+def _upsert_integration_row(user_id: str, provider: str, updates: dict) -> dict:
+    existing_row = _fetch_integration_row(user_id, provider)
+    base_row = _normalize_user_integration_row(existing_row or {"provider": provider}, user_id)
+    merged = {
+        **base_row,
+        **updates,
+        "provider": provider,
+        "user_id": user_id,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if "credentials" not in merged or merged["credentials"] is None:
+        merged["credentials"] = {}
+    if "provider_metadata" not in merged or merged["provider_metadata"] is None:
+        merged["provider_metadata"] = {}
+    if "scopes" not in merged or merged["scopes"] is None:
+        merged["scopes"] = []
+
+    if existing_row:
+        response = (
+            supabase_admin.table("integrations")
+            .update({
+                "status": merged["status"],
+                "selected": merged["selected"],
+                "connected_email": merged["connected_email"],
+                "scopes": merged["scopes"],
+                "provider_metadata": merged["provider_metadata"],
+                "credentials": merged["credentials"],
+                "updated_at": merged["updated_at"],
+            })
+            .eq("id", existing_row["id"])
+            .execute()
+        )
+    else:
+        response = supabase_admin.table("integrations").insert(merged).execute()
+
+    if not response.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save integration.")
+    return _normalize_user_integration_row(response.data[0], user_id)
+
+
+def _exchange_google_code(code: str, redirect_uri: str) -> dict:
+    if not google_client_id or not google_client_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google OAuth is not configured.",
+        )
+    token_response = requests.post(
+        GMAIL_TOKEN_URL,
+        data={
+            "code": code,
+            "client_id": google_client_id,
+            "client_secret": google_client_secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        },
+        timeout=30,
+    )
+    if not token_response.ok:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google token exchange failed.")
+    return token_response.json()
+
+
+def _refresh_google_credentials(credentials: dict) -> dict:
+    refresh_token = (credentials or {}).get("refresh_token")
+    if not refresh_token or not google_client_id or not google_client_secret:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google refresh token is missing.")
+    token_response = requests.post(
+        GMAIL_TOKEN_URL,
+        data={
+            "client_id": google_client_id,
+            "client_secret": google_client_secret,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        },
+        timeout=30,
+    )
+    if not token_response.ok:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google token refresh failed.")
+    refreshed = token_response.json()
+    next_credentials = dict(credentials or {})
+    next_credentials["access_token"] = refreshed.get("access_token")
+    next_credentials["token_type"] = refreshed.get("token_type", "Bearer")
+    expires_in = refreshed.get("expires_in") or 3600
+    next_credentials["expires_at"] = (
+        datetime.now(timezone.utc) + timedelta(seconds=int(expires_in) - 60)
+    ).isoformat()
+    return next_credentials
+
+
+def _get_valid_gmail_integration(user_id: str) -> dict:
+    integration = _fetch_integration_row(user_id, "gmail")
+    if not integration:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gmail is not connected.")
+    credentials = integration.get("credentials") or {}
+    access_token = credentials.get("access_token")
+    expires_at = credentials.get("expires_at")
+    is_expired = True
+    if access_token and expires_at:
+        try:
+            is_expired = datetime.fromisoformat(expires_at) <= datetime.now(timezone.utc)
+        except Exception:
+            is_expired = True
+    if not access_token or is_expired:
+        credentials = _refresh_google_credentials(credentials)
+        integration = _upsert_integration_row(
+            user_id,
+            "gmail",
+            {
+                "credentials": credentials,
+                "status": "connected",
+                "selected": True,
+            },
+        )
+    return integration
+
+
+def _gmail_api_request(user_id: str, method: str, url: str, **kwargs) -> requests.Response:
+    integration = _get_valid_gmail_integration(user_id)
+    credentials = integration.get("credentials") or {}
+    access_token = credentials.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Gmail access token is missing.")
+    headers = kwargs.pop("headers", {})
+    headers["Authorization"] = f"Bearer {access_token}"
+    response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+    if response.status_code == 401:
+        refreshed = _refresh_google_credentials(credentials)
+        integration = _upsert_integration_row(
+            user_id,
+            "gmail",
+            {
+                "credentials": refreshed,
+                "status": "connected",
+                "selected": True,
+            },
+        )
+        headers["Authorization"] = f"Bearer {(integration.get('credentials') or {}).get('access_token')}"
+        response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+    return response
+
+
+def _send_gmail_email_for_user(user_id: str, to: str, subject: str, body: str) -> dict:
+    integration = _get_valid_gmail_integration(user_id)
+    connected_email = integration.get("connected_email")
+    raw_message = (
+        f"From: {connected_email}\r\n"
+        f"To: {to}\r\n"
+        f"Subject: {subject}\r\n"
+        "Content-Type: text/plain; charset=utf-8\r\n\r\n"
+        f"{body}"
+    )
+    encoded_message = base64.urlsafe_b64encode(raw_message.encode("utf-8")).decode("utf-8")
+    response = _gmail_api_request(
+        user_id,
+        "POST",
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        headers={"Content-Type": "application/json"},
+        json={"raw": encoded_message},
+    )
+    if not response.ok:
+        logging.error("Gmail send failed: %s", response.text)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to send Gmail message.")
+    return response.json()
+
 class RuntimeModeRequest(BaseModel):
     mode: str
 
@@ -1668,6 +2026,12 @@ class InvoiceCreateRequest(BaseModel):
 
 class InvoiceSendRequest(BaseModel):
     invoice_id: str
+
+
+class ScenarioSendEmailRequest(BaseModel):
+    to: str
+    subject: str
+    body: str
 
 class PaymentUpdateRequest(BaseModel):
     payment_id: str
@@ -4999,6 +5363,24 @@ async def send_invoice(request: InvoiceSendRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@app.post("/api/sonar/send-email", tags=["Sonar Integrations"])
+async def send_scenario_email(
+    request: ScenarioSendEmailRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    ensure_no_unresolved_templates(request.to, request.subject, request.body)
+    if not request.to or not request.subject:
+        raise HTTPException(status_code=400, detail="Email recipient and subject are required.")
+    result = _send_gmail_email_for_user(str(current_user.id), request.to, request.subject, request.body or "")
+    return {
+        "id": result.get("id"),
+        "thread_id": result.get("threadId"),
+        "label_ids": result.get("labelIds") or [],
+        "status": "sent",
+        "provider": "gmail",
+    }
+
+
 async def scenario_create_payment_callback(payload: dict):
     request = PaymentCreateRequest(**payload)
     return await create_payment(request)
@@ -5019,6 +5401,20 @@ async def scenario_send_invoice_callback(payload: dict):
     return await send_invoice(request)
 
 
+async def scenario_send_email_callback(payload: dict):
+    user_id = str(payload.get("user_id") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario email.")
+    result = _send_gmail_email_for_user(user_id, payload.get("to") or "", payload.get("subject") or "", payload.get("body") or "")
+    return {
+        "id": result.get("id"),
+        "thread_id": result.get("threadId"),
+        "label_ids": result.get("labelIds") or [],
+        "status": "sent",
+        "provider": "gmail",
+    }
+
+
 scenario_engine = ScenarioEngine(
     supabase=supabase,
     callbacks={
@@ -5026,6 +5422,7 @@ scenario_engine = ScenarioEngine(
         "create_payment_profile": scenario_create_payment_profile_callback,
         "create_invoice": scenario_create_invoice_callback,
         "send_invoice": scenario_send_invoice_callback,
+        "send_email": scenario_send_email_callback,
     },
     base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
 )
@@ -5469,6 +5866,306 @@ async def read_current_user(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         logging.error(f"Error in read_current_user for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@app.get("/users/me/integrations", response_model=List[UserIntegrationResponse], tags=["Users"])
+async def list_user_integrations(current_user: dict = Depends(get_current_user)):
+    current_user_id = str(current_user.id)
+    try:
+        rows = (
+            supabase_admin.table("integrations")
+            .select("*")
+            .eq("user_id", current_user_id)
+            .execute()
+            .data
+            or []
+        )
+        by_provider = {row.get("provider"): row for row in rows if row.get("provider")}
+        integrations = [
+            UserIntegrationResponse.model_validate(
+                _serialize_public_integration(
+                    by_provider.get(provider) or _default_user_integration(provider, current_user_id),
+                    current_user_id,
+                )
+            )
+            for provider in sorted(SUPPORTED_EMAIL_INTEGRATION_PROVIDERS)
+        ]
+        return [integration.model_dump() for integration in integrations]
+    except Exception as e:
+        logging.error(f"Failed to list integrations for user {current_user_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load integrations.")
+
+@app.put("/users/me/integrations/{provider}", response_model=UserIntegrationResponse, tags=["Users"])
+async def upsert_user_integration(
+    provider: str,
+    payload: UserIntegrationUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    provider = provider.lower().strip()
+    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
+
+    current_user_id = str(current_user.id)
+    update_data = payload.model_dump(exclude_unset=True)
+
+    try:
+        if "status" in update_data and not update_data["status"]:
+            update_data["status"] = "not_connected"
+        if "provider_metadata" in update_data and update_data["provider_metadata"] is None:
+            update_data["provider_metadata"] = {}
+        if "scopes" in update_data and update_data["scopes"] is None:
+            update_data["scopes"] = []
+        if "selected" in update_data and update_data["selected"] and not update_data.get("status"):
+            update_data["status"] = "selected"
+        saved = _upsert_integration_row(current_user_id, provider, update_data)
+        return UserIntegrationResponse.model_validate(
+            _serialize_public_integration(saved, current_user_id)
+        ).model_dump()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Failed to save {provider} integration for user {current_user_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save integration.")
+
+@app.get("/users/me/integrations/{provider}/authorize", response_model=IntegrationAuthorizeResponse, tags=["Users"])
+async def authorize_user_integration(
+    provider: str,
+    request: Request,
+    return_to: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    provider = provider.lower().strip()
+    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
+    if provider != "gmail":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provider authorization not implemented.")
+    if not google_client_id or not google_client_secret:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Google OAuth is not configured.")
+
+    redirect_uri = _get_google_redirect_uri(request)
+    state_token = _build_integration_state(str(current_user.id), provider, return_to)
+    params = {
+        "client_id": google_client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(GMAIL_SCOPES),
+        "access_type": "offline",
+        "prompt": "consent",
+        "include_granted_scopes": "true",
+        "state": state_token,
+    }
+    authorization_url = requests.Request("GET", GMAIL_AUTH_URL, params=params).prepare().url
+    if not authorization_url:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create authorization URL.")
+    _upsert_integration_row(
+        str(current_user.id),
+        provider,
+        {
+            "selected": True,
+            "status": "selected",
+            "provider_metadata": {
+                "last_authorize_started_at": datetime.now(timezone.utc).isoformat(),
+            },
+        },
+    )
+    return {"provider": provider, "authorization_url": authorization_url}
+
+
+@app.get("/users/me/integrations/gmail/callback", response_class=HTMLResponse, name="gmail_integration_callback", tags=["Users"])
+async def gmail_integration_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+):
+    frontend_target = frontend_base_url or "/"
+    success = False
+    message = "Gmail could not be connected."
+
+    try:
+        if error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+        if not code or not state:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth callback parameters.")
+
+        state_payload = _decode_integration_state(state)
+        user_id = str(state_payload["sub"])
+        frontend_target = state_payload.get("return_to") or frontend_target
+        redirect_uri = _get_google_redirect_uri(request)
+        token_data = _exchange_google_code(code, redirect_uri)
+
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
+        expires_in = int(token_data.get("expires_in") or 3600)
+        scope_string = token_data.get("scope") or ""
+        scopes = [scope for scope in scope_string.split(" ") if scope]
+
+        userinfo_response = requests.get(
+            GMAIL_USERINFO_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        if not userinfo_response.ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to fetch Google account details.")
+        userinfo = userinfo_response.json()
+        connected_email = userinfo.get("email")
+
+        existing_row = _fetch_integration_row(user_id, "gmail") or _default_user_integration("gmail", user_id)
+        existing_credentials = existing_row.get("credentials") or {}
+        credentials = {
+            **existing_credentials,
+            "access_token": access_token,
+            "refresh_token": refresh_token or existing_credentials.get("refresh_token"),
+            "token_type": token_data.get("token_type", "Bearer"),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=expires_in - 60)).isoformat(),
+        }
+
+        _upsert_integration_row(
+            user_id,
+            "gmail",
+            {
+                "selected": True,
+                "status": "connected",
+                "connected_email": connected_email,
+                "scopes": scopes,
+                "provider_metadata": {
+                    "display_name": userinfo.get("name"),
+                    "picture": userinfo.get("picture"),
+                    "connected_at": datetime.now(timezone.utc).isoformat(),
+                    "supports_send": True,
+                    "supports_read": True,
+                },
+                "credentials": credentials,
+            },
+        )
+        success = True
+        message = "Gmail connected."
+    except HTTPException as exc:
+        message = exc.detail
+    except Exception as exc:
+        logging.error(f"Failed Gmail OAuth callback: {exc}", exc_info=True)
+        message = "Gmail could not be connected."
+
+    callback_payload = json.dumps({
+        "type": "sonar.integration.oauth_complete",
+        "provider": "gmail",
+        "success": success,
+        "message": message,
+    })
+    safe_target = json.dumps(frontend_target)
+    html = f"""
+    <!doctype html>
+    <html>
+      <body style="font-family: Inter, sans-serif; background:#09090b; color:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;">
+        <div style="text-align:center;">
+          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{message}</div>
+          <div style="font-size:13px; color:rgba(255,255,255,0.6);">You can close this window.</div>
+        </div>
+        <script>
+          (function() {{
+            const payload = {callback_payload};
+            const targetOrigin = (function() {{
+              try {{
+                return new URL({safe_target}, window.location.origin).origin;
+              }} catch (e) {{
+                return window.location.origin;
+              }}
+            }})();
+            if (window.opener && !window.opener.closed) {{
+              window.opener.postMessage(payload, targetOrigin);
+            }}
+            setTimeout(function() {{ window.close(); }}, 350);
+          }})();
+        </script>
+      </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+@app.post("/users/me/integrations/{provider}/disconnect", response_model=IntegrationDisconnectResponse, tags=["Users"])
+async def disconnect_user_integration(provider: str, current_user: dict = Depends(get_current_user)):
+    provider = provider.lower().strip()
+    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
+    current_user_id = str(current_user.id)
+    _upsert_integration_row(
+        current_user_id,
+        provider,
+        {
+            "status": "disconnected",
+            "selected": False,
+            "connected_email": None,
+            "scopes": [],
+            "provider_metadata": {},
+            "credentials": {},
+        },
+    )
+    return {"success": True, "provider": provider}
+
+
+@app.get("/users/me/integrations/{provider}/messages", response_model=List[IntegrationEmailListItem], tags=["Users"])
+async def list_integration_messages(
+    provider: str,
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user),
+):
+    provider = provider.lower().strip()
+    if provider != "gmail":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message listing is not available for this provider.")
+    limit = max(1, min(limit, 50))
+    response = _gmail_api_request(str(current_user.id), "GET", GMAIL_MESSAGES_URL, params={"maxResults": limit})
+    if not response.ok:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Gmail messages.")
+    message_refs = response.json().get("messages") or []
+    messages = []
+    for ref in message_refs:
+        msg_response = _gmail_api_request(
+            str(current_user.id),
+            "GET",
+            f"{GMAIL_MESSAGES_URL}/{ref.get('id')}",
+            params={"format": "full"},
+        )
+        if not msg_response.ok:
+            continue
+        messages.append(IntegrationEmailListItem.model_validate(_parse_gmail_message(msg_response.json())).model_dump())
+    return messages
+
+
+@app.get("/users/me/integrations/{provider}/messages/{message_id}", response_model=IntegrationEmailMessageResponse, tags=["Users"])
+async def get_integration_message(
+    provider: str,
+    message_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    provider = provider.lower().strip()
+    if provider != "gmail":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message lookup is not available for this provider.")
+    response = _gmail_api_request(
+        str(current_user.id),
+        "GET",
+        f"{GMAIL_MESSAGES_URL}/{message_id}",
+        params={"format": "full"},
+    )
+    if not response.ok:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Gmail message.")
+    return IntegrationEmailMessageResponse.model_validate(_parse_gmail_message(response.json())).model_dump()
+
+
+@app.post("/users/me/integrations/{provider}/send-email", response_model=IntegrationEmailSendResponse, tags=["Users"])
+async def send_integration_email(
+    provider: str,
+    payload: IntegrationEmailSendRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    provider = provider.lower().strip()
+    if provider != "gmail":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email sending is not available for this provider.")
+    result = _send_gmail_email_for_user(str(current_user.id), payload.to, payload.subject, payload.body)
+    return {
+        "id": result.get("id"),
+        "thread_id": result.get("threadId"),
+        "label_ids": result.get("labelIds") or [],
+    }
 
 @app.put("/users/me", tags=["Users"])
 async def update_user_profile(user_update_data: UserUpdate, current_user: dict = Depends(get_current_user)):

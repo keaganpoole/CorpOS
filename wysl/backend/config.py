@@ -70,6 +70,16 @@ elevenlabs_api_key = os.environ.get("ELEVENLABS_API_KEY")
 elevenlabs_agent_id_inbound = os.environ.get("ELEVENLABS_AGENT_ID_INBOUND")
 elevenlabs_agent_id_outbound = os.environ.get("ELEVENLABS_AGENT_ID_OUTBOUND")
 
+# --- Google / Gmail Integration Configuration ---
+google_client_id = os.environ.get("GOOGLE_CLIENT_ID")
+google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+google_oauth_redirect_uri = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI")
+frontend_base_url = (
+    os.environ.get("FRONTEND_BASE_URL")
+    or os.environ.get("VITE_FRONTEND_URL")
+    or os.environ.get("VITE_APP_URL")
+)
+
 try:
     if not url:
         raise ValueError("SUPABASE_URL is required")

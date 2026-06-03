@@ -32,6 +32,7 @@ import {
   Database,
   Hash,
   Code,
+  ShieldCheck,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
@@ -41,8 +42,55 @@ import { LEAD_FIELDS } from '../../lib/leadSchema';
 import { fetchCustomFields, getCurrentBusinessId, isCustomFieldKey } from '../../lib/customFields';
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
 import { getSmartActions, getSmartActionByKey } from './smartActions';
+import googleIcon from '../../../assets/google.png';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_ORIGIN = (() => {
+  try {
+    return new URL(API_BASE_URL, window.location.origin).origin;
+  } catch (error) {
+    return window.location.origin;
+  }
+})();
+const INTEGRATION_PROVIDERS = [
+  {
+    key: 'gmail',
+    name: 'Gmail',
+    subtitle: 'Google Workspace or Gmail',
+    description: 'Use this inbox for scenario email.',
+    icon: googleIcon,
+    available: true,
+  },
+];
+const DEFAULT_EMAIL_INTEGRATIONS = INTEGRATION_PROVIDERS.reduce((acc, provider) => {
+  acc[provider.key] = {
+    provider: provider.key,
+    selected: false,
+    status: 'not_connected',
+    connectedEmail: '',
+    scopes: [],
+    providerMetadata: {},
+    updatedAt: null,
+  };
+  return acc;
+}, {});
+
+const normalizeIntegrationState = (rows = []) => {
+  const next = { ...DEFAULT_EMAIL_INTEGRATIONS };
+  rows.forEach((row) => {
+    const key = row?.provider;
+    if (!key || !next[key]) return;
+    next[key] = {
+      ...next[key],
+      ...row,
+      connectedEmail: row.connected_email || row.connectedEmail || '',
+      providerMetadata: row.provider_metadata || row.providerMetadata || {},
+      scopes: row.scopes || [],
+      updatedAt: row.updated_at || row.updatedAt || null,
+    };
+  });
+  return next;
+};
 
 const TABLE_REF_ALIASES = {
   person: 'people',
@@ -655,10 +703,18 @@ export default function ScenariosPage() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showJsonModal, setShowJsonModal] = useState(false);
+  const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
+  const [integrationStep, setIntegrationStep] = useState(0);
   const [recurringSchedule, setRecurringSchedule] = useState({ frequency: 'once', interval: 1, time: '09:00' });
   const [scenarioNotes, setScenarioNotes] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [runProgress, setRunProgress] = useState('');
+  const [emailIntegrations, setEmailIntegrations] = useState(DEFAULT_EMAIL_INTEGRATIONS);
+  const [integrationLoading, setIntegrationLoading] = useState(false);
+  const [integrationSaving, setIntegrationSaving] = useState(false);
+  const [integrationPopupPending, setIntegrationPopupPending] = useState(false);
+  const [integrationError, setIntegrationError] = useState('');
+  const [selectedIntegrationProvider, setSelectedIntegrationProvider] = useState(INTEGRATION_PROVIDERS[0]?.key || 'gmail');
   
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
@@ -833,6 +889,57 @@ export default function ScenariosPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  const authorizedApiFetch = useCallback(async (path, options = {}) => {
+    if (!session?.access_token) {
+      throw new Error('You need to be logged in to manage integrations.');
+    }
+    const headers = new Headers(options.headers || {});
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+    return fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  }, [session?.access_token]);
+
+  const refreshIntegrations = useCallback(async () => {
+    if (!session?.access_token) {
+      setEmailIntegrations(DEFAULT_EMAIL_INTEGRATIONS);
+      return;
+    }
+    setIntegrationLoading(true);
+    try {
+      const response = await authorizedApiFetch('/users/me/integrations');
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.detail || 'Failed to load integrations.');
+      }
+      setEmailIntegrations(normalizeIntegrationState(result));
+    } catch (error) {
+      console.warn('[Scenarios] Failed to load integrations:', error?.message || error);
+      setIntegrationError(error?.message || 'Failed to load integrations.');
+    } finally {
+      setIntegrationLoading(false);
+    }
+  }, [authorizedApiFetch, session?.access_token]);
+
+  useEffect(() => {
+    refreshIntegrations();
+  }, [refreshIntegrations]);
+
+  useEffect(() => {
+    const handleMessage = async (event) => {
+      if (event.origin !== window.location.origin && event.origin !== API_ORIGIN) return;
+      if (event.data?.type !== 'sonar.integration.oauth_complete') return;
+      setIntegrationPopupPending(false);
+      if (event.data?.success) {
+        setIntegrationError('');
+        await refreshIntegrations();
+        setIntegrationStep(1);
+      } else {
+        setIntegrationError(event.data?.message || 'Integration failed.');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [refreshIntegrations]);
+
   useLayoutEffect(() => {
     if (initialFocusSet) return;
     setView({ x: 0, y: 0, scale: 1 });
@@ -905,6 +1012,57 @@ export default function ScenariosPage() {
   const appointmentTimeInputMode = appointmentConfig.time_input_mode || 'picker';
   const scheduleDateInputMode = scheduleConfig.date_input_mode || 'picker';
   const scheduleTimeInputMode = scheduleConfig.time_input_mode || 'picker';
+  const selectedProviderConfig = INTEGRATION_PROVIDERS.find((provider) => provider.key === selectedIntegrationProvider) || INTEGRATION_PROVIDERS[0];
+  const selectedIntegration = emailIntegrations[selectedIntegrationProvider] || DEFAULT_EMAIL_INTEGRATIONS[selectedIntegrationProvider] || DEFAULT_EMAIL_INTEGRATIONS.gmail;
+  const gmailIntegration = emailIntegrations.gmail || DEFAULT_EMAIL_INTEGRATIONS.gmail;
+  const gmailStatusLabel = gmailIntegration.status === 'connected'
+    ? 'Gmail connected'
+    : gmailIntegration.selected
+      ? 'Gmail selected'
+      : 'No email connected';
+  const integrationSteps = [
+    {
+      id: 'provider',
+      eyebrow: 'Step 1',
+      title: 'Pick your email provider',
+      helper: 'Choose which inbox scenarios should use.',
+    },
+    {
+      id: 'connect',
+      eyebrow: 'Step 2',
+      title: 'Connect your provider',
+      helper: '',
+    },
+  ];
+  const integrationMeta = integrationSteps[integrationStep] || integrationSteps[0];
+
+  useEffect(() => {
+    if (selectedIntegration?.status !== 'connected') return;
+    setIntegrationPopupPending(false);
+    setIntegrationError('');
+    if (showIntegrationsModal) {
+      setIntegrationStep(1);
+    }
+  }, [selectedIntegration?.status, showIntegrationsModal]);
+
+  useEffect(() => {
+    if (!integrationPopupPending || selectedIntegration?.status === 'connected') return;
+
+    let cancelled = false;
+    const intervalId = window.setInterval(async () => {
+      if (cancelled) return;
+      try {
+        await refreshIntegrations();
+      } catch (error) {
+        console.warn('[Scenarios] Integration poll failed:', error?.message || error);
+      }
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [integrationPopupPending, refreshIntegrations, selectedIntegration?.status]);
 
   // Handle variable insertion — inserts {{table.field}} syntax for rendering
   const handleInsertVariable = (varRef, fieldLabel, color) => {
@@ -1680,6 +1838,92 @@ export default function ScenariosPage() {
     setViewMode('list');
   };
 
+  const openIntegrationsModal = () => {
+    setSelectedIntegrationProvider(gmailIntegration.connectedEmail ? 'gmail' : selectedIntegrationProvider);
+    setIntegrationStep(gmailIntegration.selected || gmailIntegration.status === 'connected' ? 1 : 0);
+    setIntegrationError('');
+    setShowIntegrationsModal(true);
+  };
+
+  const selectIntegrationProvider = async (providerKey) => {
+    setSelectedIntegrationProvider(providerKey);
+    setIntegrationError('');
+    setIntegrationSaving(true);
+    try {
+      const response = await authorizedApiFetch(`/users/me/integrations/${providerKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selected: true, status: 'selected' }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.detail || 'Failed to save provider.');
+      }
+      setEmailIntegrations((prev) => normalizeIntegrationState([
+        ...Object.values(prev).map((entry) => ({
+          provider: entry.provider,
+          selected: entry.selected,
+          status: entry.status,
+          connected_email: entry.connectedEmail,
+          scopes: entry.scopes,
+          provider_metadata: entry.providerMetadata,
+          updated_at: entry.updatedAt,
+        })).filter((entry) => entry.provider !== providerKey),
+        result,
+      ]));
+      setIntegrationStep(1);
+    } catch (error) {
+      setIntegrationError(error?.message || 'Failed to save provider.');
+    } finally {
+      setIntegrationSaving(false);
+    }
+  };
+
+  const connectSelectedProvider = async () => {
+    if (!selectedProviderConfig?.key) return;
+    setIntegrationPopupPending(true);
+    setIntegrationError('');
+    try {
+      const response = await authorizedApiFetch(
+        `/users/me/integrations/${selectedProviderConfig.key}/authorize?return_to=${encodeURIComponent(window.location.href)}`,
+      );
+      const result = await response.json();
+      if (!response.ok || !result?.authorization_url) {
+        throw new Error(result?.detail || 'Failed to start integration.');
+      }
+      const popup = window.open(result.authorization_url, 'sonar-integration-auth', 'width=540,height=720');
+      if (!popup) {
+        setIntegrationPopupPending(false);
+        throw new Error('Popup blocked. Allow popups and try again.');
+      }
+    } catch (error) {
+      setIntegrationPopupPending(false);
+      setIntegrationError(error?.message || 'Failed to start integration.');
+    }
+  };
+
+  const disconnectSelectedProvider = async () => {
+    if (!selectedProviderConfig?.key) return;
+    setIntegrationSaving(true);
+    setIntegrationError('');
+    try {
+      const response = await authorizedApiFetch(`/users/me/integrations/${selectedProviderConfig.key}/disconnect`, {
+        method: 'POST',
+      });
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.detail || 'Failed to disconnect integration.');
+      }
+      await refreshIntegrations();
+      setIntegrationStep(0);
+    } catch (error) {
+      setIntegrationError(error?.message || 'Failed to disconnect integration.');
+    } finally {
+      setIntegrationSaving(false);
+      setIntegrationPopupPending(false);
+    }
+  };
+
   const handleLoadScenario = (scenario) => {
     try {
       // Parse nodes and edges from JSON
@@ -2179,6 +2423,26 @@ export default function ScenariosPage() {
       const result = await resp.json();
       if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Send invoice failed');
       setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+      return;
+    }
+
+    if (actionKey === 'send_email') {
+      if (!session?.access_token) throw new Error('You need to be logged in to send email.');
+      const resp = await fetch(`${API_BASE_URL}/api/sonar/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          to: getValue('to') || '',
+          subject: getValue('subject') || '',
+          body: getValue('body') || '',
+        }),
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Send email failed');
+      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
     }
   };
 
@@ -2370,6 +2634,36 @@ export default function ScenariosPage() {
             log(`❌ ${step} ${node.label} — error: ${result.error}`);
             console.error(`[Scenario Run]   └ Error:`, result.error);
           }
+        } else if (actionKey === 'send_email') {
+          if (!session?.access_token) {
+            log(`❌ ${step} ${node.label} — error: login required`);
+            continue;
+          }
+          const config = node.actionConfig;
+          const body = {
+            to: resolveVariableRefs(resolveTableVariableRefs(config.to, resultsMap), resultsMap) || config.to || '',
+            subject: resolveVariableRefs(resolveTableVariableRefs(config.subject, resultsMap), resultsMap) || config.subject || '',
+            body: resolveVariableRefs(resolveTableVariableRefs(config.body, resultsMap), resultsMap) || config.body || '',
+          };
+          console.log(`[Scenario Run]   ├ POST /api/sonar/send-email | to: ${body.to || '(none)'}`);
+          const resp = await fetch(`${API_BASE_URL}/api/sonar/send-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(body),
+          });
+          const result = await resp.json();
+          if (!result.error && !result.detail) {
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
+            resultsMap[node.id] = result;
+            log(`✅ ${step} ${node.label} — email sent`);
+            console.log(`[Scenario Run]   └ Email: ${result.id} | provider: ${result.provider}`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+          }
         } else if (actionKey === 'update_record' || actionKey === 'create_new_record') {
           const config = node.actionConfig;
           const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
@@ -2556,10 +2850,23 @@ export default function ScenariosPage() {
           <h1 className="scenario-list-title">Scenarios</h1>
           <p className="scenario-list-subtitle">Automate your workflows with conditional logic</p>
         </div>
-        <button className="create-scenario-btn" onClick={handleCreateScenario}>
-          <Plus size={18} />
-          Create Scenario
-        </button>
+        <div className="scenario-list-actions">
+          <button
+            type="button"
+            className="sb-integrations-btn sb-integrations-btn--inline"
+            onClick={openIntegrationsModal}
+          >
+            <span className="sb-integrations-btn-copy">
+              <span className="sb-integrations-btn-label">Integrations</span>
+              <span className="sb-integrations-btn-status">{gmailStatusLabel}</span>
+            </span>
+            <ChevronRight size={14} />
+          </button>
+          <button className="create-scenario-btn" onClick={handleCreateScenario}>
+            <Plus size={18} />
+            Create Scenario
+          </button>
+        </div>
       </div>
       
       <div className="scenario-list-content">
@@ -2742,7 +3049,7 @@ export default function ScenariosPage() {
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
                     event.preventDefault();
-                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'create_payment_profile' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice') && node.configured) {
+                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'create_payment_profile' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice' || node.actionConfig?._key === 'send_email') && node.configured) {
                       setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
                     }
                   }}
@@ -4170,24 +4477,35 @@ export default function ScenariosPage() {
         )}
         
         {/* Back button for builder view */}
-        <button 
-          className="back-to-list-btn" 
-          onClick={handleBackToList}
-          style={{ position: 'absolute', top: 16, left: 16, zIndex: 100 }}
-        >
-          <ChevronLeft size={16} />
-          Back to Scenarios
-        </button>
-        
-        {/* Save button for builder view */}
-        <button 
-          className="save-scenario-btn" 
-          onClick={handleSaveScenario}
-          style={{ position: 'absolute', top: 16, right: 16, zIndex: 100 }}
-        >
-          <Check size={16} />
-          {currentScenario ? 'Save' : 'Save Scenario'}
-        </button>
+        <div className="sb-builder-topbar">
+          <div className="sb-builder-topbar-group">
+            <button 
+              className="back-to-list-btn" 
+              onClick={handleBackToList}
+            >
+              <ChevronLeft size={16} />
+              Back to Scenarios
+            </button>
+            <button
+              type="button"
+              className="sb-integrations-btn sb-integrations-btn--inline"
+              onClick={openIntegrationsModal}
+            >
+              <span className="sb-integrations-btn-copy">
+                <span className="sb-integrations-btn-label">Integrations</span>
+                <span className="sb-integrations-btn-status">{gmailStatusLabel}</span>
+              </span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+          <button 
+            className="save-scenario-btn" 
+            onClick={handleSaveScenario}
+          >
+            <Check size={16} />
+            {currentScenario ? 'Save' : 'Save Scenario'}
+          </button>
+        </div>
         
         {/* Bottom Toolbar — shown after intro node is configured */}
         {nodes[0]?.configured && (
@@ -4237,6 +4555,227 @@ export default function ScenariosPage() {
 
           </div>
         </div>
+        )}
+
+        {showIntegrationsModal && (
+          <div className="sb-integrations-overlay" onClick={() => setShowIntegrationsModal(false)}>
+            <div className="sb-integrations-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="sb-integrations-sidebar">
+                <div className="sb-integrations-sidebar-inner">
+                  <div className="sb-integrations-kicker">Email Integrations</div>
+                  <h2 className="sb-integrations-title">Set up email for scenarios.</h2>
+                  <p className="sb-integrations-lead">
+                    Gmail is the first supported provider. We’ll keep the setup explicit so you always know what’s configured, what still needs approval, and what scenarios will be able to do next.
+                  </p>
+
+                  <div className="sb-integrations-status-card">
+                    <div className="sb-integrations-status-row">
+                      <span className="sb-integrations-status-label">Current status</span>
+                      <span className={`sb-integrations-status-pill ${selectedIntegration.status === 'connected' ? 'is-active' : ''}`}>
+                        {selectedIntegration.status === 'connected'
+                          ? `${selectedProviderConfig?.name || 'Provider'} connected`
+                          : selectedIntegration.selected
+                            ? `${selectedProviderConfig?.name || 'Provider'} selected`
+                            : 'No provider selected'}
+                      </span>
+                    </div>
+                    <div className="sb-integrations-status-copy">
+                      {selectedIntegration.connectedEmail
+                        ? selectedIntegration.connectedEmail
+                        : 'Connect a provider to send email from scenarios.'}
+                    </div>
+                    {selectedIntegration.connectedEmail && (
+                      <div className="sb-integrations-connected-email">{selectedIntegration.connectedEmail}</div>
+                    )}
+                    {integrationError && (
+                      <div className="sb-integrations-error">{integrationError}</div>
+                    )}
+                    {integrationPopupPending && (
+                      <div className="sb-integrations-inline-note">Waiting for Google to finish connecting…</div>
+                    )}
+                  </div>
+
+                  <div className="sb-integrations-steps">
+                    {integrationSteps.map((stepItem, index) => {
+                      const active = integrationStep === index;
+                      const complete = integrationStep > index || (selectedIntegration.selected && index === 0);
+                      return (
+                        <div
+                          key={stepItem.id}
+                          className={`sb-integrations-step ${active ? 'is-active' : ''} ${complete ? 'is-complete' : ''}`}
+                        >
+                          <div className="sb-integrations-step-index">
+                            {complete ? <Check size={12} /> : index + 1}
+                          </div>
+                          <div className="sb-integrations-step-copy">
+                            <div className="sb-integrations-step-title">{stepItem.title}</div>
+                            <div className="sb-integrations-step-helper">{stepItem.helper}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="sb-integrations-main">
+                <div className="sb-integrations-main-header">
+                  <div>
+                    <div className="sb-integrations-eyebrow">{integrationMeta.eyebrow}</div>
+                    <h3 className="sb-integrations-panel-title">{integrationMeta.title}</h3>
+                    {integrationMeta.helper ? (
+                      <p className="sb-integrations-panel-helper">{integrationMeta.helper}</p>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="sb-integrations-close"
+                    onClick={() => setShowIntegrationsModal(false)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {integrationStep === 0 && (
+                  <div className="sb-integrations-provider-grid">
+                    {INTEGRATION_PROVIDERS.map((provider) => {
+                      const providerState = emailIntegrations[provider.key] || DEFAULT_EMAIL_INTEGRATIONS[provider.key];
+                      const isSelected = selectedIntegrationProvider === provider.key;
+                      return (
+                        <button
+                          key={provider.key}
+                          type="button"
+                          className={`sb-integrations-provider-card ${isSelected ? 'is-selected' : ''}`}
+                          onClick={() => setSelectedIntegrationProvider(provider.key)}
+                        >
+                          <div className="sb-integrations-provider-top">
+                            <div className="sb-integrations-provider-brand">
+                              <img src={provider.icon} alt={provider.name} className="sb-integrations-provider-logo" />
+                              <div>
+                                <div className="sb-integrations-provider-name">{provider.name}</div>
+                                <div className="sb-integrations-provider-subtitle">{provider.subtitle}</div>
+                              </div>
+                            </div>
+                            {(providerState.selected || providerState.status === 'connected') && (
+                              <span className="sb-integrations-provider-check">
+                                <Check size={12} />
+                              </span>
+                            )}
+                          </div>
+                          <p className="sb-integrations-provider-body">{provider.description}</p>
+                          <div className="sb-integrations-provider-meta">
+                            <span>{providerState.status === 'connected' ? 'Connected' : 'Available now'}</span>
+                            {providerState.connectedEmail && <span>{providerState.connectedEmail}</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {integrationStep === 1 && (
+                  <div className="sb-integrations-review">
+                    <div className="sb-integrations-note sb-integrations-note--minimal">
+                      <div className="sb-integrations-note-title">{selectedProviderConfig?.name} selected</div>
+                      <div className="sb-integrations-note-copy">
+                        We’ll store Gmail as your chosen provider for scenarios and keep the status visible in the builder, so you’re always in the loop about what’s selected versus fully connected.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {integrationStep === 2 && (
+                  <div className="sb-integrations-finish">
+                    <div className="sb-integrations-finish-orb" />
+                    <div className="sb-integrations-finish-kicker">Gmail saved</div>
+                    <h3 className="sb-integrations-finish-title">Gmail is selected.</h3>
+                    <p className="sb-integrations-finish-copy">
+                      You’ll see Gmail reflected as the selected scenario email provider from here, and the remaining live mailbox auth step can be layered on without changing the user-facing setup flow.
+                    </p>
+
+                    <div className="sb-integrations-summary">
+                      <div className="sb-integrations-summary-row">
+                        <span>Provider</span>
+                        <strong>Gmail</strong>
+                      </div>
+                      <div className="sb-integrations-summary-row">
+                        <span>Workspace email</span>
+                        <strong>{gmailIntegration.connectedEmail || session?.user?.email || 'Will use the connected Google mailbox'}</strong>
+                      </div>
+                      <div className="sb-integrations-summary-row">
+                        <span>Status</span>
+                        <strong>Selected for scenario email</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="sb-integrations-actions">
+                  {integrationStep > 0 ? (
+                    <button
+                      type="button"
+                      className="sb-integrations-secondary"
+                      onClick={() => setIntegrationStep((prev) => Math.max(0, prev - 1))}
+                    >
+                      <ChevronLeft size={14} />
+                      Back
+                    </button>
+                  ) : <span />}
+
+                  <div className="sb-integrations-action-group">
+                    <button
+                      type="button"
+                      className="sb-integrations-secondary"
+                      onClick={() => setShowIntegrationsModal(false)}
+                    >
+                      {integrationStep === 1 && selectedIntegration.status === 'connected'
+                        ? 'Close'
+                        : integrationStep === 1
+                          ? 'Done'
+                          : 'Not now'}
+                    </button>
+
+                    {integrationStep === 0 && (
+                      <button
+                        type="button"
+                        className="sb-integrations-primary"
+                        onClick={() => selectIntegrationProvider(selectedIntegrationProvider)}
+                        disabled={integrationSaving || integrationLoading}
+                      >
+                        Continue
+                        <ChevronRight size={15} />
+                      </button>
+                    )}
+
+                    {integrationStep === 1 && (
+                      <>
+                        {selectedIntegration.status === 'connected' ? (
+                          <button
+                            type="button"
+                            className="sb-integrations-secondary"
+                            onClick={disconnectSelectedProvider}
+                            disabled={integrationSaving || integrationPopupPending}
+                          >
+                            Disconnect
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="sb-integrations-primary"
+                            onClick={connectSelectedProvider}
+                            disabled={integrationSaving || integrationPopupPending}
+                          >
+                            Connect
+                            <ChevronRight size={15} />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
         
         {/* Schedule Modal */}

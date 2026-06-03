@@ -106,36 +106,178 @@ def deep_get(data: Any, dotted_key: str):
     return value
 
 
+def normalize_condition_ref(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    if stripped.startswith("{{") and stripped.endswith("}}"):
+        return stripped[2:-2].strip()
+    return stripped
+
+
+def is_empty_value(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    if isinstance(value, (list, dict, tuple, set)):
+        return len(value) == 0
+    return False
+
+
+def coerce_bool(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        if value == 1:
+            return True
+        if value == 0:
+            return False
+        return None
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y"}:
+            return True
+        if normalized in {"false", "0", "no", "n"}:
+            return False
+    return None
+
+
+def coerce_number(value: Any) -> Optional[float]:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip().replace(",", "")
+        if stripped == "":
+            return None
+        try:
+            return float(stripped)
+        except ValueError:
+            return None
+    return None
+
+
+def coerce_datetime(value: Any) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    normalized = stripped.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def normalize_string(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return str(value).strip()
+
+
+def values_equal(actual: Any, expected: Any) -> bool:
+    actual_bool = coerce_bool(actual)
+    expected_bool = coerce_bool(expected)
+    if actual_bool is not None and expected_bool is not None:
+        return actual_bool == expected_bool
+
+    actual_number = coerce_number(actual)
+    expected_number = coerce_number(expected)
+    if actual_number is not None and expected_number is not None:
+        return actual_number == expected_number
+
+    actual_dt = coerce_datetime(actual)
+    expected_dt = coerce_datetime(expected)
+    if actual_dt is not None and expected_dt is not None:
+        return actual_dt == expected_dt
+
+    if isinstance(actual, list):
+        expected_normalized = normalize_string(expected).lower()
+        return any(normalize_string(item).lower() == expected_normalized for item in actual)
+
+    return normalize_string(actual).lower() == normalize_string(expected).lower()
+
+
+def compare_ordered_values(actual: Any, expected: Any) -> Optional[int]:
+    actual_number = coerce_number(actual)
+    expected_number = coerce_number(expected)
+    if actual_number is not None and expected_number is not None:
+        return -1 if actual_number < expected_number else (1 if actual_number > expected_number else 0)
+
+    actual_dt = coerce_datetime(actual)
+    expected_dt = coerce_datetime(expected)
+    if actual_dt is not None and expected_dt is not None:
+        return -1 if actual_dt < expected_dt else (1 if actual_dt > expected_dt else 0)
+
+    actual_string = normalize_string(actual).lower()
+    expected_string = normalize_string(expected).lower()
+    if actual_string == "" or expected_string == "":
+        return None
+    return -1 if actual_string < expected_string else (1 if actual_string > expected_string else 0)
+
+
 def evaluate_rule(rule: dict, context: dict) -> bool:
-    variable = rule.get("variable") or ""
+    variable = normalize_condition_ref(rule.get("variable") or "")
     operator = rule.get("operator") or ""
-    expected = rule.get("value")
+    expected = normalize_condition_ref(rule.get("value"))
     value = deep_get(context, variable)
 
     if operator == "equals":
-        return value == expected
+        return values_equal(value, expected)
     if operator == "not_equals":
-        return value != expected
+        return not values_equal(value, expected)
     if operator == "contains":
-        return isinstance(value, str) and str(expected).lower() in value.lower()
+        if isinstance(value, list):
+            expected_normalized = normalize_string(expected).lower()
+            return any(expected_normalized in normalize_string(item).lower() for item in value)
+        return normalize_string(expected).lower() in normalize_string(value).lower()
     if operator == "not_contains":
-        return not (isinstance(value, str) and str(expected).lower() in value.lower())
+        if isinstance(value, list):
+            expected_normalized = normalize_string(expected).lower()
+            return not any(expected_normalized in normalize_string(item).lower() for item in value)
+        return normalize_string(expected).lower() not in normalize_string(value).lower()
     if operator == "is_empty":
-        return value is None or value == ""
+        return is_empty_value(value)
     if operator == "is_not_empty":
-        return value is not None and value != ""
+        return not is_empty_value(value)
     if operator == "greater_than":
-        return float(value) > float(expected)
+        comparison = compare_ordered_values(value, expected)
+        return comparison is not None and comparison > 0
     if operator == "less_than":
-        return float(value) < float(expected)
+        comparison = compare_ordered_values(value, expected)
+        return comparison is not None and comparison < 0
     if operator == "includes":
-        return isinstance(value, list) and expected in value
+        if isinstance(value, list):
+            expected_normalized = normalize_string(expected).lower()
+            return any(normalize_string(item).lower() == expected_normalized for item in value)
+        if isinstance(value, str):
+            parts = [part.strip() for part in value.split(",") if part.strip()]
+            expected_normalized = normalize_string(expected).lower()
+            return any(part.lower() == expected_normalized for part in parts)
+        return False
     if operator == "does_not_include":
-        return isinstance(value, list) and expected not in value
+        if isinstance(value, list):
+            expected_normalized = normalize_string(expected).lower()
+            return not any(normalize_string(item).lower() == expected_normalized for item in value)
+        if isinstance(value, str):
+            parts = [part.strip() for part in value.split(",") if part.strip()]
+            expected_normalized = normalize_string(expected).lower()
+            return not any(part.lower() == expected_normalized for part in parts)
+        return True
     if operator == "before":
-        return str(value) < str(expected)
+        comparison = compare_ordered_values(value, expected)
+        return comparison is not None and comparison < 0
     if operator == "after":
-        return str(value) > str(expected)
+        comparison = compare_ordered_values(value, expected)
+        return comparison is not None and comparison > 0
 
     logging.warning("[ConditionEvaluator] Unknown operator: %s", operator)
     return False
@@ -616,6 +758,7 @@ class ScenarioActionExecutor:
             "create_payment_profile": self._create_payment_profile,
             "create_invoice": self._create_invoice,
             "send_invoice": self._send_invoice,
+            "send_email": self._send_email,
             "send_to_customer": self._send_sms_placeholder,
             "hang_up": self._hang_up,
         }
@@ -965,6 +1108,23 @@ class ScenarioActionExecutor:
             return {"success": False, "error": "No invoice ID provided for send invoice"}
         result = await callback({"invoice_id": invoice_id})
         return {"success": True, "data": {"action": "send_invoice", **result}}
+
+    async def _send_email(self, node: dict, context: dict):
+        callback = self.callbacks.get("send_email")
+        if not callback:
+            return {"success": False, "error": "Send email callback not configured"}
+        config = node.get("actionConfig") or {}
+        person = context.get("person") or {}
+        payload = {
+            "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
+            "to": self._resolve_variables(config.get("to") or person.get("email") or "", context),
+            "subject": self._resolve_variables(config.get("subject") or "", context),
+            "body": self._resolve_variables(config.get("body") or "", context),
+        }
+        if not payload["to"]:
+            return {"success": False, "error": "No email recipient provided"}
+        result = await callback(payload)
+        return {"success": True, "data": {"action": "send_email", **result}}
 
 
 class ScenarioFlowExecutor:

@@ -109,6 +109,20 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
+const readOutputPath = (source, path) => {
+  if (!path) return source;
+  return String(path)
+    .split('.')
+    .reduce((current, key) => {
+      if (current == null) return undefined;
+      if (Array.isArray(current)) {
+        const index = Number(key);
+        return Number.isInteger(index) ? current[index] : undefined;
+      }
+      return current[key];
+    }, source);
+};
+
 export const getFieldDisplayLabel = (tableKey, fieldKey) => {
   const field = getTableFields(tableKey).find((item) => item.key === fieldKey);
   return field?.label || fieldKey;
@@ -875,7 +889,7 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
                 ) : (
                   prev.outputVars.map((field) => {
                     const varRef = getVariableRef(prev.nodeId, field.key);
-                    const rawValue = hasOutput ? (prev.outputData?.[field.key]) : undefined;
+                    const rawValue = hasOutput ? readOutputPath(prev.outputData, field.key) : undefined;
                     const displayVal = hasOutput ? formatValue(rawValue, field.type) : '';
                     return (
                       <button

@@ -239,6 +239,40 @@ class UserResponse(UserBase):
 
 
 # =============================================================================
+# USER INTEGRATION MODELS
+# =============================================================================
+class UserIntegrationBase(BaseModel):
+    provider: str
+    status: str = "not_connected"
+    selected: bool = False
+    connected_email: Optional[EmailStr] = None
+    scopes: List[str] = Field(default_factory=list)
+    provider_metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+class UserIntegrationUpdate(BaseModel):
+    selected: Optional[bool] = None
+    status: Optional[str] = None
+    connected_email: Optional[EmailStr] = None
+    scopes: Optional[List[str]] = None
+    provider_metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        populate_by_name = True
+
+
+class UserIntegrationResponse(UserIntegrationBase):
+    id: UUID
+    user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+# =============================================================================
 # AI AGENT MODELS
 # =============================================================================
 class AIAgentBase(BaseModel):

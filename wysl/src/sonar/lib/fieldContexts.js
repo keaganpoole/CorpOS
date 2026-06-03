@@ -397,6 +397,87 @@ const buildStripeResponseVariables = (node, fallbackVars) => {
     });
 };
 
+const buildDynamicOutputVariables = (outputData, fallbackVars = []) => {
+  if (outputData == null) return fallbackVars;
+
+  const fallbackByKey = new Map(fallbackVars.map((item) => [item.key, item]));
+  const dynamicVars = [];
+  const visited = new Set();
+
+  const walk = (value, path = []) => {
+    const joinedPath = path.join('.');
+
+    if (value == null) {
+      if (joinedPath) {
+        const fallback = fallbackByKey.get(joinedPath);
+        dynamicVars.push({
+          key: joinedPath,
+          label: fallback?.label || humanizeVariableKey(joinedPath.replace(/\./g, ' ')),
+          type: fallback?.type || 'text',
+        });
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        if (joinedPath) {
+          const fallback = fallbackByKey.get(joinedPath);
+          dynamicVars.push({
+            key: joinedPath,
+            label: fallback?.label || humanizeVariableKey(joinedPath.replace(/\./g, ' ')),
+            type: fallback?.type || 'text',
+          });
+        }
+        return;
+      }
+
+      value.forEach((item, index) => walk(item, [...path, String(index)]));
+      return;
+    }
+
+    if (typeof value === 'object') {
+      const entries = Object.entries(value).filter(([key]) => key && key !== '__proto__');
+      if (entries.length === 0) {
+        if (joinedPath) {
+          const fallback = fallbackByKey.get(joinedPath);
+          dynamicVars.push({
+            key: joinedPath,
+            label: fallback?.label || humanizeVariableKey(joinedPath.replace(/\./g, ' ')),
+            type: fallback?.type || 'text',
+          });
+        }
+        return;
+      }
+
+      entries.forEach(([key, child]) => walk(child, [...path, key]));
+      return;
+    }
+
+    if (!joinedPath || visited.has(joinedPath)) return;
+    visited.add(joinedPath);
+
+    const fallback = fallbackByKey.get(joinedPath);
+    dynamicVars.push({
+      key: joinedPath,
+      label: fallback?.label || humanizeVariableKey(joinedPath.replace(/\./g, ' ')),
+      type: fallback?.type || inferVariableType(path[path.length - 1], value),
+    });
+  };
+
+  walk(outputData);
+
+  if (dynamicVars.length === 0) return fallbackVars;
+
+  fallbackVars.forEach((item) => {
+    if (item?.key && !visited.has(item.key)) {
+      dynamicVars.push(item);
+    }
+  });
+
+  return dynamicVars;
+};
+
 export const isStripeResponseNode = (node) => {
   const key = node?.actionConfig?._key || node?.subOptionKey || '';
   return STRIPE_RESPONSE_ACTION_KEYS.has(key);
@@ -410,6 +491,10 @@ export const getOutputVariables = (node) => {
   const vars = OUTPUT_VARIABLE_MAP[key] || [];
   if (isStripeResponseNode(node)) {
     return buildStripeResponseVariables(node, vars);
+  }
+
+  if (node?.outputData != null) {
+    return buildDynamicOutputVariables(node.outputData, vars);
   }
   
   // Also check by label for generic types
