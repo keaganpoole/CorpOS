@@ -1301,6 +1301,56 @@
   display: block;
 }
 
+.sb-panel-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 4px 6px;
+}
+
+.sb-panel-empty-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fdba74;
+}
+
+.sb-panel-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.sb-panel-empty-copy {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.sb-panel-empty-cta {
+  align-self: flex-start;
+  margin-top: 4px;
+  border: 1px solid rgba(249, 115, 22, 0.22);
+  background: rgba(249, 115, 22, 0.1);
+  color: #fdba74;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-family: var(--sb-font-main);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.sb-panel-empty-cta:hover {
+  background: rgba(249, 115, 22, 0.16);
+  border-color: rgba(249, 115, 22, 0.3);
+  color: #ffedd5;
+}
+
 @keyframes sbCascadeFade {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }

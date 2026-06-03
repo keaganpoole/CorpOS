@@ -1017,6 +1017,7 @@ export default function ScenariosPage() {
   const selectedProviderConfig = INTEGRATION_PROVIDERS.find((provider) => provider.key === selectedIntegrationProvider) || INTEGRATION_PROVIDERS[0];
   const selectedIntegration = emailIntegrations[selectedIntegrationProvider] || DEFAULT_EMAIL_INTEGRATIONS[selectedIntegrationProvider] || DEFAULT_EMAIL_INTEGRATIONS.gmail;
   const gmailIntegration = emailIntegrations.gmail || DEFAULT_EMAIL_INTEGRATIONS.gmail;
+  const hasConnectedEmailIntegration = Object.values(emailIntegrations).some((integration) => integration?.status === 'connected');
   const gmailStatusLabel = gmailIntegration.status === 'connected'
     ? 'Gmail connected'
     : gmailIntegration.selected
@@ -3598,12 +3599,30 @@ export default function ScenariosPage() {
                 {panelStage === 'actionConfig' && actionConfig ? (
                   /* Staged Action Config Form */
                   <div className="sb-action-config-form">
-                    <div className="sb-action-config-header">
-                      <h4 className="sb-action-config-title">Configure Action</h4>
-                      <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); setActionConfig(null); }}>
-                        <X size={14} />
-                      </button>
-                    </div>
+                    {!(actionConfig._key === 'send_email' && !hasConnectedEmailIntegration) && (
+                      <div className="sb-action-config-header">
+                        <h4 className="sb-action-config-title">Configure Action</h4>
+                        <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); setActionConfig(null); }}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
+                    {actionConfig._key === 'send_email' && !hasConnectedEmailIntegration ? (
+                      <div className="sb-panel-empty-state">
+                        <div className="sb-panel-empty-kicker">Email integration required</div>
+                        <div className="sb-panel-empty-title">Connect your email</div>
+                        <p className="sb-panel-empty-copy">
+                          Connect your email to trigger powerful automations and workflows.
+                        </p>
+                        <button
+                          type="button"
+                          className="sb-panel-empty-cta"
+                          onClick={openIntegrationsModal}
+                        >
+                          Connect Email
+                        </button>
+                      </div>
+                    ) : (
                     <div className="sb-action-config-fields">
                       {actionConfig._fields.map((field) => {
                         const rawVal = actionConfig[field.key] || '';
@@ -3866,6 +3885,7 @@ export default function ScenariosPage() {
                         </div>
                       )}
                     </div>
+                    )}
 
                     {/* Table-specific fields — dynamic based on selected table */}
                     {actionConfig.target_table && (
@@ -4499,6 +4519,21 @@ export default function ScenariosPage() {
                       );
                     })
                   )
+                ) : activeOption?.key === 'email' && !hasConnectedEmailIntegration ? (
+                  <div className="sb-panel-empty-state">
+                    <div className="sb-panel-empty-kicker">Email integration required</div>
+                    <div className="sb-panel-empty-title">No email integration is set up yet.</div>
+                    <p className="sb-panel-empty-copy">
+                      Connect Gmail first, then this panel will show the available email actions.
+                    </p>
+                    <button
+                      type="button"
+                      className="sb-panel-empty-cta"
+                      onClick={openIntegrationsModal}
+                    >
+                      Open Integrations
+                    </button>
+                  </div>
                 ) : filteredSubOptions.length === 0 ? (
                   null
                 ) : (
