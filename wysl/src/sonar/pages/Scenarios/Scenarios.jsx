@@ -2970,17 +2970,6 @@ export default function ScenariosPage() {
           <p className="scenario-list-subtitle">Automate your workflows with conditional logic</p>
         </div>
         <div className="scenario-list-actions">
-          <button
-            type="button"
-            className="sb-integrations-btn sb-integrations-btn--inline"
-            onClick={openIntegrationsModal}
-          >
-            <span className="sb-integrations-btn-copy">
-              <span className="sb-integrations-btn-label">Integrations</span>
-              <span className="sb-integrations-btn-status">{gmailStatusLabel}</span>
-            </span>
-            <ChevronRight size={14} />
-          </button>
           <button className="create-scenario-btn" onClick={handleCreateScenario}>
             <Plus size={18} />
             Create Scenario
@@ -3619,7 +3608,7 @@ export default function ScenariosPage() {
                           className="sb-panel-empty-cta"
                           onClick={openIntegrationsModal}
                         >
-                          Connect Email
+                          Connect your Email
                         </button>
                       </div>
                     ) : (
@@ -4522,9 +4511,9 @@ export default function ScenariosPage() {
                 ) : activeOption?.key === 'email' && !hasConnectedEmailIntegration ? (
                   <div className="sb-panel-empty-state">
                     <div className="sb-panel-empty-kicker">Email integration required</div>
-                    <div className="sb-panel-empty-title">No email integration is set up yet.</div>
+                    <div className="sb-panel-empty-title">Connect your email</div>
                     <p className="sb-panel-empty-copy">
-                      Connect Gmail first, then this panel will show the available email actions.
+                      Once Gmail is connected, this panel will show the available email actions.
                     </p>
                     <button
                       type="button"
@@ -4671,17 +4660,6 @@ export default function ScenariosPage() {
             >
               <ChevronLeft size={16} />
               Back to Scenarios
-            </button>
-            <button
-              type="button"
-              className="sb-integrations-btn sb-integrations-btn--inline"
-              onClick={openIntegrationsModal}
-            >
-              <span className="sb-integrations-btn-copy">
-                <span className="sb-integrations-btn-label">Integrations</span>
-                <span className="sb-integrations-btn-status">{gmailStatusLabel}</span>
-              </span>
-              <ChevronRight size={14} />
             </button>
           </div>
           <button 

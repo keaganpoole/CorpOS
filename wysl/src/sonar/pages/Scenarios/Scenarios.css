@@ -1304,40 +1304,50 @@
 .sb-panel-empty-state {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 4px 6px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+  min-height: 0;
+  padding: 28px 18px 18px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .sb-panel-empty-kicker {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #fdba74;
 }
 
 .sb-panel-empty-title {
-  font-size: 16px;
+  max-width: 15ch;
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: -0.03em;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
   color: #fff;
 }
 
 .sb-panel-empty-copy {
   margin: 0;
+  max-width: 34ch;
   font-size: 12px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.58);
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .sb-panel-empty-cta {
-  align-self: flex-start;
-  margin-top: 4px;
-  border: 1px solid rgba(249, 115, 22, 0.22);
-  background: rgba(249, 115, 22, 0.1);
+  align-self: center;
+  margin-top: 8px;
+  border: 1px solid rgba(249, 115, 22, 0.26);
+  background: rgba(249, 115, 22, 0.12);
   color: #fdba74;
   border-radius: 999px;
-  padding: 9px 14px;
+  padding: 10px 16px;
   font-family: var(--sb-font-main);
   font-size: 12px;
   font-weight: 600;
