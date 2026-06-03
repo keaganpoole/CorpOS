@@ -664,7 +664,9 @@ export default function ScenariosPage() {
   const [peopleCustomFields, setPeopleCustomFields] = useState([]);
   const [contextMenu, setContextMenu] = useState(null); // { x, y, nodeId }
   const [runNodeModal, setRunNodeModal] = useState(null);
+  const [nodeRunStates, setNodeRunStates] = useState({});
   const runNodeTargetRef = useRef(null);
+  const nodeRunTimersRef = useRef({});
   const [edgeRules, setEdgeRules] = useState([
     { id: 1, variable: '', operator: 'equals', value: '', logic: 'and' },
   ]);
@@ -1379,6 +1381,7 @@ export default function ScenariosPage() {
   }, [nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
 
   const handleNodePointerDown = (nodeId, event) => {
+    if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
     const node = nodeMap[nodeId];
@@ -2317,12 +2320,47 @@ export default function ScenariosPage() {
     return resultsMap;
   };
 
+  const hasMeaningfulNodeResponse = (value) => {
+    if (value == null) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return true;
+  };
+
+  const setNodeRunState = useCallback((nodeId, status) => {
+    if (nodeRunTimersRef.current[nodeId]) {
+      clearTimeout(nodeRunTimersRef.current[nodeId]);
+      delete nodeRunTimersRef.current[nodeId];
+    }
+    setNodeRunStates((prev) => ({
+      ...prev,
+      [nodeId]: {
+        status,
+        revision: (prev[nodeId]?.revision || 0) + 1,
+      },
+    }));
+
+    if (status === 'empty') {
+      nodeRunTimersRef.current[nodeId] = setTimeout(() => {
+        setNodeRunStates((prev) => {
+          if (!prev[nodeId]) return prev;
+          const next = { ...prev };
+          delete next[nodeId];
+          return next;
+        });
+        delete nodeRunTimersRef.current[nodeId];
+      }, 3200);
+    }
+  }, []);
+
   const executeRunnableNode = async (nodeId, manualValues = {}) => {
     const node = nodeMap[nodeId];
     if (!node?.actionConfig) return;
 
     const config = node.actionConfig;
     const actionKey = config._key;
+    console.log('[Run Node] Starting executeRunnableNode', { nodeId, actionKey, manualValues });
     const flowResultsMap = buildFlowResultsMap(nodeId);
     const hasManualValue = (fieldKey) => Object.prototype.hasOwnProperty.call(manualValues, fieldKey);
     const getValue = (fieldKey) => resolveRunFieldValue(
@@ -2331,124 +2369,205 @@ export default function ScenariosPage() {
       hasManualValue(fieldKey),
       manualValues[fieldKey]
     );
+    const runStartedAt = Date.now();
+    const finishNodeRun = (result) => {
+      const complete = () => setNodeRunState(nodeId, hasMeaningfulNodeResponse(result) ? 'success' : 'empty');
+      const elapsed = Date.now() - runStartedAt;
+      const remaining = Math.max(0, 900 - elapsed);
+      if (remaining > 0) {
+        setTimeout(complete, remaining);
+      } else {
+        complete();
+      }
+      return result;
+    };
 
-    if (actionKey === 'search_records') {
-      const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
-      const limit = config.search_limit || 10;
-      let query = supabase.from(tableKey).select('*').limit(limit);
-      const searchUserId = getValue('search_user_id');
-      if (searchUserId) query = query.eq('user_id', searchUserId);
-      const { data, error } = await query;
-      if (error) throw new Error(error.message || 'Search failed');
-      setNodes(prev => prev.map(n => n.id === nodeId
-        ? { ...n, searchResults: data || [], outputData: data || [] }
-        : n
-      ));
-      return;
-    }
+    setNodeRunState(nodeId, 'running');
 
-    if (actionKey === 'create_payment') {
-      const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-      const resp = await fetch('/api/sonar/create-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: amountCents,
-          currency: getValue('currency') || 'usd',
-          payment_method_type: getValue('payment_method') || 'card',
-          description: getValue('description') || '',
-          person_id: getValue('person_id') || null,
-          appointment_id: getValue('appointment_id') || null,
-        }),
-      });
-      const result = await resp.json();
-      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create payment failed');
-      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
-      return;
-    }
+    try {
+      if (actionKey === 'search_records') {
+        const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+        const limit = config.search_limit || 10;
+        console.log('[Run Node] search_records request', { nodeId, tableKey, limit });
+        let query = supabase.from(tableKey).select('*').limit(limit);
+        const searchUserId = getValue('search_user_id');
+        if (searchUserId) query = query.eq('user_id', searchUserId);
+        const { data, error } = await query;
+        if (error) throw new Error(error.message || 'Search failed');
+        const result = data || [];
+        setNodes(prev => prev.map(n => n.id === nodeId
+          ? { ...n, searchResults: result, outputData: result }
+          : n
+        ));
+        return finishNodeRun(result);
+      }
 
-    if (actionKey === 'create_payment_profile') {
-      const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-      const resp = await fetch('/api/sonar/create-payment-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: amountCents,
-          currency: getValue('currency') || 'usd',
-          description: getValue('description') || '',
-          person_id: getValue('person_id') || null,
-          customer_name: getValue('customer_name') || '',
-          customer_email: getValue('customer_email') || '',
-          customer_phone: getValue('customer_phone') || '',
-        }),
-      });
-      const result = await resp.json();
-      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create payment profile failed');
-      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
-      return;
-    }
+      if (actionKey === 'create_payment') {
+        const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
+        console.log('[Run Node] create_payment request', { nodeId, amountCents });
+        const resp = await fetch('/api/sonar/create-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: amountCents,
+            currency: getValue('currency') || 'usd',
+            payment_method_type: getValue('payment_method') || 'card',
+            description: getValue('description') || '',
+            person_id: getValue('person_id') || null,
+            appointment_id: getValue('appointment_id') || null,
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create payment failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
 
-    if (actionKey === 'create_invoice') {
-      const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-      const resp = await fetch('/api/sonar/create-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: amountCents,
-          currency: getValue('currency') || 'usd',
-          description: getValue('description') || '',
-          person_id: getValue('person_id') || null,
-          customer_name: getValue('customer_name') || '',
-          customer_email: getValue('customer_email') || '',
-          customer_phone: getValue('customer_phone') || '',
-          appointment_id: getValue('appointment_id') || null,
-          service_id: getValue('service_id') || null,
-          due_days: getValue('due_days') || 7,
-        }),
-      });
-      const result = await resp.json();
-      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create invoice failed');
-      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
-      return;
-    }
+      if (actionKey === 'create_payment_profile') {
+        const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
+        console.log('[Run Node] create_payment_profile request', { nodeId, amountCents });
+        const resp = await fetch('/api/sonar/create-payment-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: amountCents,
+            currency: getValue('currency') || 'usd',
+            description: getValue('description') || '',
+            person_id: getValue('person_id') || null,
+            customer_name: getValue('customer_name') || '',
+            customer_email: getValue('customer_email') || '',
+            customer_phone: getValue('customer_phone') || '',
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create payment profile failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
 
-    if (actionKey === 'send_invoice') {
-      const resp = await fetch('/api/sonar/send-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          invoice_id: getValue('invoice_id') || null,
-        }),
-      });
-      const result = await resp.json();
-      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Send invoice failed');
-      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
-      return;
-    }
+      if (actionKey === 'create_invoice') {
+        const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
+        console.log('[Run Node] create_invoice request', { nodeId, amountCents });
+        const resp = await fetch('/api/sonar/create-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: amountCents,
+            currency: getValue('currency') || 'usd',
+            description: getValue('description') || '',
+            person_id: getValue('person_id') || null,
+            customer_name: getValue('customer_name') || '',
+            customer_email: getValue('customer_email') || '',
+            customer_phone: getValue('customer_phone') || '',
+            appointment_id: getValue('appointment_id') || null,
+            service_id: getValue('service_id') || null,
+            due_days: getValue('due_days') || 7,
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create invoice failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
 
-    if (actionKey === 'send_email') {
-      if (!session?.access_token) throw new Error('You need to be logged in to send email.');
-      const resp = await fetch(`${API_BASE_URL}/api/sonar/send-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
+      if (actionKey === 'send_invoice') {
+        console.log('[Run Node] send_invoice request', { nodeId, invoiceId: getValue('invoice_id') || null });
+        const resp = await fetch('/api/sonar/send-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invoice_id: getValue('invoice_id') || null,
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Send invoice failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
+
+      if (actionKey === 'send_email') {
+        if (!session?.access_token) throw new Error('You need to be logged in to send email.');
+        const body = {
           to: getValue('to') || '',
           subject: getValue('subject') || '',
           body: getValue('body') || '',
-        }),
-      });
-      const result = await resp.json();
-      if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Send email failed');
-      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        };
+        console.log('[Run Node] send_email request', { nodeId, body });
+        const resp = await fetch(`${API_BASE_URL}/api/sonar/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(body),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Send email failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
+
+      if (actionKey === 'update_record' || actionKey === 'create_new_record') {
+        const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+        const resolvedRecordId = getValue('record_id') || null;
+        const updateData = {};
+
+        Object.entries(config).forEach(([key, value]) => {
+          if (key.startsWith('_') || key === 'target_table' || key === 'record_id' || key === 'record_lookup_value') return;
+          if (!key.startsWith('field_')) return;
+          const actualKey = key.replace(/^field_/, '');
+          const resolvedValue = resolveRunFieldValue(value, flowResultsMap, hasManualValue(key), manualValues[key]);
+          if (resolvedValue !== '' && resolvedValue !== undefined) {
+            updateData[actualKey] = resolvedValue;
+          }
+        });
+
+        console.log('[Run Node] record request', { nodeId, actionKey, tableKey, resolvedRecordId, updateData });
+
+        let result;
+        if (actionKey === 'update_record' && resolvedRecordId) {
+          const { data, error } = await supabase
+            .from(tableKey)
+            .update(updateData)
+            .eq('id', resolvedRecordId)
+            .select()
+            .single();
+          if (error) throw new Error(error.message || 'Update record failed');
+          result = data;
+        } else if (actionKey === 'create_new_record') {
+          const { data, error } = await supabase
+            .from(tableKey)
+            .insert(updateData)
+            .select()
+            .single();
+          if (error) throw new Error(error.message || 'Create record failed');
+          result = data;
+        } else {
+          throw new Error('Record ID is required to update a record.');
+        }
+
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
+
+      throw new Error(`Run Node is not implemented for "${actionKey}".`);
+    } catch (error) {
+      console.error('[Run Node] executeRunnableNode failed', { nodeId, actionKey, error: error?.message || error });
+      const elapsed = Date.now() - runStartedAt;
+      const remaining = Math.max(0, 900 - elapsed);
+      if (remaining > 0) {
+        setTimeout(() => setNodeRunState(nodeId, 'empty'), remaining);
+      } else {
+        setNodeRunState(nodeId, 'empty');
+      }
+      throw error;
     }
   };
 
   const handleRunNodeRequest = async (nodeId) => {
     const node = nodeMap[nodeId];
     if (!node?.actionConfig) return;
+    setSelectedNodeId(nodeId);
 
     const unresolvedFields = getUnresolvedRunFields(node, buildFlowResultsMap(nodeId));
     if (unresolvedFields.length > 0) {
@@ -2462,8 +2581,7 @@ export default function ScenariosPage() {
         isSubmitting: false,
         error: '',
       });
-      setSelectedNodeId(nodeId);
-      setIsPanelVisible(true);
+      openSelectionPanel(nodeId);
       setActionConfig(node.actionConfig ? { ...node.actionConfig } : null);
       setPanelCategory(node.categoryType === 'TRIGGERS' ? 'TRIGGERS' : 'ACTIONS');
       setPanelStage('runNode');
@@ -3035,6 +3153,8 @@ export default function ScenariosPage() {
               const Icon = node.icon || null;
               const isActive = selectedNodeId === node.id;
               const accent = node.accent || '#e11d48';
+              const hasOutgoingNode = edges.some((edge) => edge.from === node.id);
+              const nodeRunState = nodeRunStates[node.id]?.status || null;
               return (
                 <div
                   key={node.id}
@@ -3050,6 +3170,11 @@ export default function ScenariosPage() {
                   onContextMenu={(event) => {
                     event.preventDefault();
                     if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'create_payment_profile' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice' || node.actionConfig?._key === 'send_email') && node.configured) {
+                      setRunNodeModal(null);
+                      setIsPanelVisible(false);
+                      setPanelIntent(false);
+                      setLogicPanel(null);
+                      setVarsPane((prev) => ({ ...prev, visible: false }));
                       setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
                     }
                   }}
@@ -3067,9 +3192,19 @@ export default function ScenariosPage() {
 
                         {/* The Primary Gradient Sphere */}
                         <div
-                          className={`sb-node-sphere ${isActive ? 'sb-sphere-active' : ''}`}
+                          className={`sb-node-sphere ${isActive ? 'sb-sphere-active' : ''} ${nodeRunState ? `is-${nodeRunState}` : ''}`}
                           style={{ '--node-accent-color': accent }}
                         >
+                          {nodeRunState === 'running' && (
+                            <div className="sb-node-run-overlay" aria-hidden="true">
+                              <span className="sb-node-run-wave w1" />
+                              <span className="sb-node-run-wave w2" />
+                              <span className="sb-node-run-wave w3" />
+                            </div>
+                          )}
+                          {(nodeRunState === 'success' || nodeRunState === 'empty') && (
+                            <div className={`sb-node-run-resolve is-${nodeRunState}`} aria-hidden="true" />
+                          )}
                           <div className="sb-node-specular" />
                           <div className="sb-node-dots">
                             <svg width="100%" height="100%">
@@ -3083,17 +3218,31 @@ export default function ScenariosPage() {
                         </div>
 
                         {/* Icon Container with Glassmorphism */}
-                        <div className="sb-node-icon-glass">
-                          {Icon ? <Icon size={42} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={42} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
+                        <div className={`sb-node-icon-glass ${nodeRunState ? `is-${nodeRunState}` : ''}`}>
+                          <div className={`sb-node-icon-glyph ${nodeRunState === 'success' ? 'is-hidden' : ''}`}>
+                            {Icon ? <Icon size={42} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={42} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
+                          </div>
+                          {nodeRunState === 'success' && (
+                            <div className="sb-node-run-status is-success" aria-hidden="true">
+                              <Check size={42} strokeWidth={2.8} />
+                            </div>
+                          )}
+                          {nodeRunState === 'empty' && (
+                            <div className="sb-node-run-status is-empty" aria-hidden="true">
+                              <span>?</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Pulse Effect for Activity */}
                         <div className="sb-node-pulse-dot" />
 
                         {/* Add button */}
-                        <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
-                          <Plus size={13} />
-                        </button>
+                        {!hasOutgoingNode && (
+                          <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
+                            <Plus size={13} />
+                          </button>
+                        )}
                       </div>
 
                       {/* Label below — typography from concepts.txt */}
@@ -3432,7 +3581,9 @@ export default function ScenariosPage() {
                             await executeRunnableNode(nodeId, values);
                             runNodeTargetRef.current = null;
                             setRunNodeModal(null);
-                            setPanelStage(selectedNode?.actionConfig?._key ? 'actionConfig' : 'options');
+                            setIsPanelVisible(false);
+                            setPanelIntent(false);
+                            setPanelStage('options');
                           } catch (err) {
                             setRunNodeModal((prev) => ({ ...prev, isSubmitting: false, error: err.message || 'Run failed' }));
                           }
@@ -5037,12 +5188,7 @@ export default function ScenariosPage() {
               position: 'fixed',
               top: contextMenu.y,
               left: contextMenu.x,
-              background: 'rgba(18, 18, 22, 0.98)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8,
-              padding: 4,
               zIndex: 201,
-              minWidth: 140,
             }}
             onClick={async (e) => {
               e.stopPropagation();
@@ -5055,8 +5201,9 @@ export default function ScenariosPage() {
               }
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#38bdf8', padding: '6px 12px', cursor: 'pointer' }}>
-              ▶ Run Node
+            <div className="sb-context-menu-action">
+              <Zap size={13} />
+              <span>Run Node</span>
             </div>
           </div>
         </div>
