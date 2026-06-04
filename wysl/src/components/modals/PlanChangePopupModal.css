@@ -1,0 +1,105 @@
+/* src/components/modals/PlanChangePopupModal.css */
+
+.plan-change-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plan-change-modal-content {
+  border-radius: 16px;
+  width: 100%;
+  max-width: 450px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  padding: 32px;
+  text-align: center;
+  background: #141414;
+  border: 1px solid #262626;
+  color: #F5F5F5;
+  position: relative; /* Needed for absolute positioning of close button */
+}
+
+.plan-change-modal-close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  color: #A3A3A3; /* secondary-text-color */
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.plan-change-modal-close-btn:hover {
+  color: #F5F5F5; /* primary-text-color */
+}
+
+.plan-change-modal-content h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.plan-change-modal-content p {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 24px;
+  color: #A3A3A3;
+}
+
+.plan-change-modal-actions {
+  display: flex;
+  flex-direction: column; /* Stack buttons vertically */
+  gap: 12px;
+  justify-content: center;
+  align-items: center; /* Center buttons horizontally */
+}
+
+.plan-change-modal-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%; /* Make buttons take full width of the column */
+  max-width: 200px; /* Limit max width for better aesthetics */
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  border: 1px solid transparent;
+  color: #fff;
+}
+
+.plan-change-modal-btn.got-it-btn,
+.plan-change-modal-btn.upgrade-btn {
+  background: linear-gradient(to right, var(--color1), var(--color2));
+}
+
+.plan-change-modal-btn.got-it-btn:hover,
+.plan-change-modal-btn.upgrade-btn:hover {
+  filter: brightness(1.1);
+}
+
+.plan-change-modal-text-link {
+  font-size: 0.9rem;
+  color: #A3A3A3; /* secondary-text-color */
+  cursor: pointer;
+  transition: color 0.2s ease;
+  margin-top: 10px; /* Add some space above it */
+}
+
+.plan-change-modal-text-link:hover {
+  color: #F5F5F5; /* primary-text-color */
+  text-decoration: underline;
+}
+
+/* Define CSS variables for colors from color.js */
+

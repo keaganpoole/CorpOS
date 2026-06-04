@@ -1,0 +1,176 @@
+/* src/components/modals/SwiperIntroModal.css */
+
+.swiper-intro-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.swiper-intro-modal-content {
+  border-radius: 16px;
+  width: 100%;
+  max-width: 500px; /* Adjusted max-width for a single column */
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  background: #141414;
+  border: 1px solid #262626;
+  color: #F5F5F5;
+  position: relative;
+  padding: 32px;
+  text-align: center;
+}
+
+.swiper-intro-modal-close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  color: #A3A3A3;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  z-index: 10;
+}
+
+.swiper-intro-modal-close-btn:hover {
+  color: #F5F5F5;
+}
+
+.swiper-intro-modal-body h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.swiper-intro-modal-body p {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 24px;
+  color: #A3A3A3;
+}
+
+.swiper-animation-container {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  margin: 30px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; /* Keep content within bounds */
+}
+
+.swiper-animation-hand {
+  position: absolute;
+  font-size: 3rem;
+  color: var(--color1);
+  z-index: 5;
+  filter: drop-shadow(0 0 8px rgba(var(--color1-rgb), 0.5)); /* Modern glow effect */
+}
+
+.swiper-animation-arrows {
+  position: absolute;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 20px;
+  font-size: 2rem;
+  color: #b3b3b3;
+  z-index: 10; /* Ensure arrows are above the hand */
+}
+
+.swiper-arrow-left,
+.swiper-arrow-right {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.dont-remind-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+  color: #A3A3A3;
+  cursor: pointer;
+}
+
+.dont-remind-checkbox input[type="checkbox"] {
+  /* Hide default checkbox */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 20px; /* Slightly larger for better touch target */
+  height: 20px; /* Slightly larger for better touch target */
+  border: 2px solid #6b7280; /* Custom border */
+  border-radius: 4px; /* Slightly rounded corners */
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.dont-remind-checkbox input[type="checkbox"]:checked {
+  background-color: var(--color1); /* Use theme color when checked */
+  border-color: var(--color1);
+}
+
+.dont-remind-checkbox input[type="checkbox"]::before {
+  content: '';
+  display: block;
+  width: 7px; /* Checkmark width */
+  height: 13px; /* Checkmark height */
+  border: solid black; /* Checkmark color */
+  border-width: 0 3px 3px 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg); /* Center and then rotate */
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.dont-remind-checkbox input[type="checkbox"]:checked::before {
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(45deg); /* Keep centered */
+}
+
+.swiper-intro-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.swiper-intro-modal-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  border: 1px solid transparent;
+  color: #fff;
+}
+
+.swiper-intro-modal-btn.got-it-btn {
+  background: linear-gradient(to right, var(--color1), var(--color2));
+}
+
+.swiper-intro-modal-btn.got-it-btn:hover {
+  filter: brightness(1.1);
+}
