@@ -472,7 +472,10 @@ def derive_receptionist_status(
     *,
     preserve_offline: bool = True,
     call_routing: Optional[str] = None,
+    is_active: bool = True,
 ) -> str:
+    if not is_active:
+        return "Offline"
     normalized_current = str(current_status or "").strip().lower()
     if preserve_offline and normalized_current == "offline":
         return "Offline"
@@ -522,7 +525,7 @@ def maybe_auto_verify_business_forwarding(
         agent_lookup = (
             supabase
             .table("hired_receptionists")
-            .select("id,status")
+            .select("id,status,is_active")
             .eq("id", str(agent_id))
             .limit(1)
             .execute()
@@ -532,6 +535,7 @@ def maybe_auto_verify_business_forwarding(
             next_status = derive_receptionist_status(
                 agent_row.get("status"),
                 preserve_offline=False,
+                is_active=bool(agent_row.get("is_active", True)),
             )
             supabase.table("hired_receptionists").update({"status": next_status}).eq("id", str(agent_id)).execute()
 
@@ -3061,11 +3065,11 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
         )
         return None
 
-    candidates = list(rows_by_id.values())
+    candidates = [row for row in rows_by_id.values() if bool(row.get("is_active", True))]
 
     if not candidates:
         logging.info(
-            "Inbound receptionist lookup found no inbound-capable candidates: business_id=%s user_id=%s rows=%s",
+            "Inbound receptionist lookup found no active candidates: business_id=%s user_id=%s rows=%s",
             business_id_value,
             user_id_value,
             len(rows_by_id),
@@ -3073,11 +3077,14 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
         return None
 
     def sort_key(row: dict):
-        is_active = bool(row.get("is_active", True))
-        status_value = str(derive_receptionist_status(row.get("status"), call_routing=call_routing)).strip().lower()
+        status_value = str(derive_receptionist_status(
+            row.get("status"),
+            call_routing=call_routing,
+            is_active=bool(row.get("is_active", True)),
+        )).strip().lower()
         is_online = status_value not in {"offline", "disabled", "inactive"}
         hired_at = str(row.get("hired_at") or "")
-        return (is_active, is_online, hired_at)
+        return (is_online, hired_at)
 
     selected = sorted(candidates, key=sort_key, reverse=True)[0]
     logging.info(
@@ -4074,7 +4081,7 @@ async def route_call_compat(request: Request):
     context = resolve_business_context(call_payload)
     business = context.get("business")
     receptionist = (
-        context.get("receptionist")
+        (context.get("receptionist") if (context.get("receptionist") or {}).get("is_active") else None)
         or find_inbound_receptionist_for_business(
             (business or {}).get("id"),
             context.get("user_id") or (business or {}).get("user_id"),
@@ -4671,7 +4678,11 @@ async def get_sonar_agents():
                 **row,
                 "name": row.get("full_name") or row.get("first_name") or "Receptionist",
                 "role": row.get("stereotype") or "Receptionist",
-                "status": derive_receptionist_status(row.get("status"), call_routing=call_routing),
+                "status": derive_receptionist_status(
+                    row.get("status"),
+                    call_routing=call_routing,
+                    is_active=bool(row.get("is_active", True)),
+                ),
                 "current_activity": row.get("current_activity") or "Idle",
                 "model": row.get("model"),
             })
@@ -4819,9 +4830,38 @@ async def update_agent_model(agent_id: str, payload: AgentModelRequest):
 
 @app.patch("/api/agents/{agent_id}", tags=["Sonar Controller Compat"])
 async def patch_agent(agent_id: str, payload: dict):
-    response = supabase.table('hired_receptionists').update(payload).eq('id', agent_id).execute()
-    push_live_event("Agent updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, **payload})
-    return response.data[0] if response.data else {"id": agent_id, **payload}
+    existing_response = (
+        supabase
+        .table('hired_receptionists')
+        .select('id,user_id,is_active,status')
+        .eq('id', agent_id)
+        .limit(1)
+        .execute()
+    )
+    existing_agent = (existing_response.data or [None])[0]
+    if not existing_agent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    update_payload = dict(payload)
+    next_is_active = update_payload.get('is_active')
+    if next_is_active is not None:
+        next_is_active = bool(next_is_active)
+        update_payload['is_active'] = next_is_active
+        update_payload['status'] = derive_receptionist_status(
+            existing_agent.get('status'),
+            preserve_offline=False,
+            is_active=next_is_active,
+        )
+
+        if next_is_active and existing_agent.get('user_id'):
+            supabase.table('hired_receptionists').update({
+                'is_active': False,
+                'status': 'Offline',
+            }).eq('user_id', existing_agent.get('user_id')).neq('id', agent_id).execute()
+
+    response = supabase.table('hired_receptionists').update(update_payload).eq('id', agent_id).execute()
+    push_live_event("Agent updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, **update_payload})
+    return response.data[0] if response.data else {"id": agent_id, **update_payload}
 
 @app.post("/api/control/runtime", tags=["Sonar Controller Compat"])
 async def set_runtime_mode(payload: RuntimeModeRequest):
@@ -7420,7 +7460,7 @@ async def update_business_forwarding(
             agent_lookup = (
                 supabase
                 .table('hired_receptionists')
-                .select('id,status')
+                .select('id,status,is_active')
                 .eq('id', payload.agent_id)
                 .eq('user_id', current_user_id)
                 .limit(1)
@@ -7431,6 +7471,7 @@ async def update_business_forwarding(
                 next_agent_status = derive_receptionist_status(
                     agent_row.get('status'),
                     preserve_offline=False,
+                    is_active=bool(agent_row.get('is_active', True)),
                 )
                 supabase.table('hired_receptionists').update({
                     'status': next_agent_status,

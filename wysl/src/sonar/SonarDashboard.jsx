@@ -2051,6 +2051,13 @@ const SonarDashboard = () => {
                   onHire={async (receptionist) => {
                     try {
                       const { data: biz } = await supabase.from('businesses').select('phone').eq('user_id', userId).limit(1).single();
+                      const { data: existingActive } = await supabase
+                        .from('hired_receptionists')
+                        .select('id')
+                        .eq('user_id', userId)
+                        .eq('is_active', true)
+                        .limit(1)
+                        .maybeSingle();
                       const { error } = await supabase.from('hired_receptionists').insert({
                         catalog_id: receptionist.id,
                         full_name: receptionist.full_name,
@@ -2062,7 +2069,7 @@ const SonarDashboard = () => {
                         age: receptionist.age,
                         first_name: receptionist.first_name,
                         gender: receptionist.gender || null,
-                        is_active: true,
+                        is_active: !existingActive?.id,
                         user_id: userId,
                         phone_number: biz?.phone || null,
                         elevenlabs_voice_id: receptionist.elevenlabs_voice_id || receptionist.elevenlabs_agent_id || null,

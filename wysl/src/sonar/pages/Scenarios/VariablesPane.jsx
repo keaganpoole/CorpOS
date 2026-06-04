@@ -1009,15 +1009,12 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           .from('hired_receptionists')
           .select('id, full_name, first_name, avatar, status, user_id, catalog_id')
           .eq('user_id', userId)
+          .eq('is_active', true)
           .limit(10);
 
         if (cancelled) return;
 
-        const preferred = (rows || []).sort((a, b) => {
-          const aScore = a.status === 'active' ? 10 : 0;
-          const bScore = b.status === 'active' ? 10 : 0;
-          return bScore - aScore;
-        })[0] || null;
+        const preferred = (rows || [])[0] || null;
 
         if (!preferred) {
           setActiveReceptionist(null);

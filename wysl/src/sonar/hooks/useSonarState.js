@@ -318,18 +318,29 @@ const [reactions, setReactions] = useState([]);
   }, []);
 
   const updateAgentActive = useCallback(async (agentId, isActive) => {
-    let previousAgent = null;
+    let previousAgents = null;
     const nextStatus = isActive ? 'Online' : 'Offline';
 
-    setAgents(prev => prev.map(agent => {
-      if (String(agent.id) !== String(agentId)) return agent;
-      previousAgent = agent;
-      return {
-        ...agent,
-        is_active: isActive,
-        status: nextStatus,
-      };
-    }));
+    setAgents(prev => {
+      previousAgents = prev;
+      return prev.map(agent => {
+        if (String(agent.id) === String(agentId)) {
+          return {
+            ...agent,
+            is_active: isActive,
+            status: nextStatus,
+          };
+        }
+        if (isActive) {
+          return {
+            ...agent,
+            is_active: false,
+            status: 'Offline',
+          };
+        }
+        return agent;
+      });
+    });
 
     const result = await api.patchAgent(agentId, {
       is_active: isActive,
@@ -337,10 +348,8 @@ const [reactions, setReactions] = useState([]);
     });
 
     if (!result) {
-      if (previousAgent) {
-        setAgents(prev => prev.map(agent => (
-          String(agent.id) === String(agentId) ? previousAgent : agent
-        )));
+      if (previousAgents) {
+        setAgents(previousAgents);
       }
       return null;
     }
