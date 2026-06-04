@@ -947,6 +947,16 @@ class ScenarioActionExecutor:
             if not to_number:
                 return {"success": False, "error": "No phone number for call"}
 
+            try:
+                settings_response = self.supabase.table("account_settings").select("call_routing").limit(1).execute()
+                settings_row = (settings_response.data or [None])[0] or {}
+                call_routing = str(settings_row.get("call_routing") or "all").strip().lower()
+            except Exception:
+                call_routing = "all"
+
+            if call_routing not in {"outbound", "all"}:
+                return {"success": False, "error": "Outbound calling is disabled by account call routing"}
+
             elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
             agent_id = os.environ.get("ELEVENLABS_AGENT_ID_OUTBOUND")
             phone_number_id = self._find_elevenlabs_phone_number_id_for_business(context)

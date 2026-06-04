@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabase';
 export function useSonarState() {
   const [tasks, setTasks] = useState([]);
   const [agents, setAgents] = useState([]);
-  const [controlState, setControlState] = useState({ runtime_mode: 'running', stage: 'code_blue', zone: 1 });
+  const [controlState, setControlState] = useState({ runtime_mode: 'running', stage: 'code_blue', zone: 1, calls_filter: 'all' });
   const [session, setSession] = useState(null);
   const [livePulse, setLivePulse] = useState([]);
   const [systemLogs, setSystemLogs] = useState([]);
@@ -20,10 +20,11 @@ const [reactions, setReactions] = useState([]);
   const [summary, setSummary] = useState({ ok: 0, warnings: 0, errors: 0, activeAgents: 0, totalAgents: 0 });
   const [wsStatus, setWsStatus] = useState('disconnected');
   const [isPaused, setIsPaused] = useState(false);
+  const [accountSettingsId, setAccountSettingsId] = useState(null);
 
   // Load initial data via REST
   const loadInitialData = useCallback(async () => {
-    const [agentsData, controlData, sessionData, pulseData, logsData, summaryData, pipelineData, cronData, reactionsData] = await Promise.all([
+    const [agentsData, controlData, sessionData, pulseData, logsData, summaryData, pipelineData, cronData, reactionsData, settingsResponse] = await Promise.all([
       api.getAgents(),
       api.getControlState(),
       api.getSession(),
@@ -33,13 +34,21 @@ const [reactions, setReactions] = useState([]);
       api.getPipeline(),
       api.getCronJobs(),
       api.getReactions(),
+      supabase.from('account_settings').select('id, call_routing').limit(1).maybeSingle(),
     ]);
 
     // Note: tasksData removed - Sonar no longer uses tasks
     if (agentsData) setAgents(agentsData);
     if (controlData) {
-      setControlState(controlData);
+      setControlState(prev => ({ ...prev, ...controlData, calls_filter: prev.calls_filter || 'all' }));
       setIsPaused(controlData.runtime_mode === 'paused');
+    }
+    if (!settingsResponse?.error && settingsResponse?.data) {
+      setAccountSettingsId(settingsResponse.data.id || null);
+      setControlState(prev => ({
+        ...prev,
+        calls_filter: String(settingsResponse.data.call_routing || prev.calls_filter || 'all').toLowerCase(),
+      }));
     }
     if (sessionData) setSession(sessionData);
     if (pulseData) setLivePulse(pulseData);
@@ -56,7 +65,7 @@ const [reactions, setReactions] = useState([]);
       case 'initial_state':
         setTasks(data.tasks || []);
         setAgents(data.agents || []);
-        setControlState(data.control || {});
+        setControlState(prev => ({ ...prev, ...(data.control || {}), calls_filter: prev.calls_filter || 'all' }));
         setSession(data.session);
         setLivePulse(data.recentEvents || []);
         setSystemLogs(data.systemLogs || []);
@@ -136,7 +145,7 @@ const [reactions, setReactions] = useState([]);
       .channel('state-realtime')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'state' }, (payload) => {
         const s = payload.new;
-        setControlState(s);
+        setControlState(prev => ({ ...prev, ...s, calls_filter: prev.calls_filter || 'all' }));
         setIsPaused(s.runtime_mode === 'paused');
       })
       .subscribe();
@@ -157,12 +166,37 @@ const [reactions, setReactions] = useState([]);
       })
       .subscribe();
 
+    const accountSettingsSub = supabase
+      .channel('account-settings-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'account_settings' }, (payload) => {
+        const next = payload.new || payload.record || null;
+        if (!next) return;
+        const normalized = String(next.call_routing || 'all').toLowerCase();
+        setAccountSettingsId(next.id || null);
+        setControlState(prev => ({
+          ...prev,
+          calls_filter: normalized || prev.calls_filter || 'all',
+        }));
+        setAgents(prev => prev.map(agent => {
+          const currentStatus = String(agent.status || '').trim().toLowerCase();
+          if (currentStatus === 'offline') return agent;
+          return {
+            ...agent,
+            status: normalized === 'inbound' || normalized === 'outbound' || normalized === 'all'
+              ? 'Online'
+              : 'Idle',
+          };
+        }));
+      })
+      .subscribe();
+
     return () => {
       removeListener();
       disconnectWebSocket();
       supabase.removeChannel(stateSub);
       supabase.removeChannel(agentsSub);
       supabase.removeChannel(reactionsSub);
+      supabase.removeChannel(accountSettingsSub);
     };
   }, [loadInitialData, handleWsMessage]);
 
@@ -202,6 +236,79 @@ const [reactions, setReactions] = useState([]);
     }
   }, []);
 
+  const setCallsFilter = useCallback(async (callsFilter) => {
+    const normalized = String(callsFilter || 'all').trim().toLowerCase();
+    const previous = controlState.calls_filter || 'all';
+
+    setControlState(prev => ({ ...prev, calls_filter: normalized }));
+    setAgents(prev => prev.map(agent => {
+      const currentStatus = String(agent.status || '').trim().toLowerCase();
+      if (currentStatus === 'offline') return agent;
+      return {
+        ...agent,
+        status: normalized === 'inbound' || normalized === 'outbound' || normalized === 'all'
+          ? 'Online'
+          : 'Idle',
+      };
+    }));
+
+    try {
+      if (accountSettingsId) {
+        const { data, error } = await supabase
+          .from('account_settings')
+          .update({ call_routing: normalized })
+          .eq('id', accountSettingsId)
+          .select('id, call_routing')
+          .single();
+        if (error) throw error;
+        if (data?.id) setAccountSettingsId(data.id);
+      } else {
+        const { data: existingSettings, error: existingError } = await supabase
+          .from('account_settings')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+
+        if (existingError) throw existingError;
+
+        if (existingSettings?.id) {
+          const { data, error } = await supabase
+            .from('account_settings')
+            .update({ call_routing: normalized })
+            .eq('id', existingSettings.id)
+            .select('id, call_routing')
+            .single();
+          if (error) throw error;
+          if (data?.id) setAccountSettingsId(data.id);
+        } else {
+          const { data, error } = await supabase
+            .from('account_settings')
+            .insert({ call_routing: normalized })
+            .select('id, call_routing')
+            .single();
+          if (error) throw error;
+          if (data?.id) setAccountSettingsId(data.id);
+        }
+      }
+    } catch (err) {
+      console.error('[SonarState] Failed to save receptionist call filter:', err.message || err);
+      setControlState(prev => ({ ...prev, calls_filter: previous }));
+      setAgents(prev => prev.map(agent => {
+        const currentStatus = String(agent.status || '').trim().toLowerCase();
+        if (currentStatus === 'offline') return agent;
+        return {
+          ...agent,
+          status: previous === 'inbound' || previous === 'outbound' || previous === 'all'
+            ? 'Online'
+            : 'Idle',
+        };
+      }));
+      return null;
+    }
+
+    return normalized;
+  }, [accountSettingsId, controlState.calls_filter]);
+
   const pingMax = useCallback(async () => {
     if (window.sonar?.control) {
       await window.sonar.control.pingMax();
@@ -210,24 +317,25 @@ const [reactions, setReactions] = useState([]);
     }
   }, []);
 
-  const updateAgentCallTypes = useCallback(async (agentId, nextCallTypes) => {
+  const updateAgentActive = useCallback(async (agentId, isActive) => {
     let previousAgent = null;
+    const nextStatus = isActive ? 'Online' : 'Offline';
 
     setAgents(prev => prev.map(agent => {
       if (String(agent.id) !== String(agentId)) return agent;
       previousAgent = agent;
-      const normalized = String(nextCallTypes || 'none').trim().toLowerCase();
-      const nextStatus = normalized === 'none' || normalized === 'off' || normalized === ''
-        ? 'Idle'
-        : 'Online';
       return {
         ...agent,
-        call_types: nextCallTypes,
+        is_active: isActive,
         status: nextStatus,
       };
     }));
 
-    const result = await api.updateAgentCallTypes(agentId, nextCallTypes);
+    const result = await api.patchAgent(agentId, {
+      is_active: isActive,
+      status: nextStatus,
+    });
+
     if (!result) {
       if (previousAgent) {
         setAgents(prev => prev.map(agent => (
@@ -242,11 +350,12 @@ const [reactions, setReactions] = useState([]);
         ? {
             ...agent,
             ...result,
-            call_types: result.call_types ?? nextCallTypes,
-            status: result.status ?? agent.status,
+            is_active: result.is_active ?? isActive,
+            status: result.status ?? nextStatus,
           }
         : agent
     )));
+
     return result;
   }, []);
 
@@ -264,10 +373,10 @@ const [reactions, setReactions] = useState([]);
     wsStatus,
     isPaused,
     toggleRuntime,
-    setStage,
     setZone,
+    setCallsFilter,
     pingMax,
-    updateAgentCallTypes,
+    updateAgentActive,
     refresh: loadInitialData,
   };
 }

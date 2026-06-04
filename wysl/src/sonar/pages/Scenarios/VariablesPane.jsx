@@ -993,18 +993,29 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           return;
         }
 
+        const { data: settings } = await supabase
+          .from('account_settings')
+          .select('call_routing')
+          .limit(1)
+          .maybeSingle();
+
+        const callRouting = String(settings?.call_routing || 'all').toLowerCase();
+        if (!['outbound', 'all'].includes(callRouting)) {
+          setActiveReceptionist(null);
+          return;
+        }
+
         const { data: rows } = await supabase
           .from('hired_receptionists')
-          .select('id, full_name, first_name, avatar, call_types, status, user_id, catalog_id')
+          .select('id, full_name, first_name, avatar, status, user_id, catalog_id')
           .eq('user_id', userId)
-          .or('call_types.eq.outbound,call_types.eq.both')
           .limit(10);
 
         if (cancelled) return;
 
         const preferred = (rows || []).sort((a, b) => {
-          const aScore = (a.status === 'active' ? 10 : 0) + (a.call_types === 'both' ? 2 : 1);
-          const bScore = (b.status === 'active' ? 10 : 0) + (b.call_types === 'both' ? 2 : 1);
+          const aScore = a.status === 'active' ? 10 : 0;
+          const bScore = b.status === 'active' ? 10 : 0;
           return bScore - aScore;
         })[0] || null;
 

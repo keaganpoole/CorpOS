@@ -440,17 +440,43 @@ def deactivate_other_purchased_numbers(business_id: int, keep_id: Optional[str],
         logging.warning("Failed to deactivate purchased numbers for business %s: %s", business_id, exc)
 
 
+def get_account_call_routing() -> str:
+    try:
+        response = (
+            supabase
+            .table("account_settings")
+            .select("call_routing")
+            .limit(1)
+            .execute()
+        )
+        row = (response.data or [None])[0]
+        normalized = str((row or {}).get("call_routing") or "all").strip().lower()
+        return normalized if normalized in {"inbound", "outbound", "all"} else "all"
+    except Exception as exc:
+        logging.warning("Failed to load account call routing: %s", exc)
+        return "all"
+
+
+def call_routing_allows(direction: str, call_routing: Optional[str] = None) -> bool:
+    normalized_direction = str(direction or "").strip().lower()
+    normalized_routing = str(call_routing or get_account_call_routing()).strip().lower()
+    if normalized_direction == "inbound":
+        return normalized_routing in {"inbound", "all"}
+    if normalized_direction in {"outbound", "outgoing"}:
+        return normalized_routing in {"outbound", "all"}
+    return False
+
+
 def derive_receptionist_status(
-    call_types: Optional[str],
     current_status: Optional[str] = None,
     *,
     preserve_offline: bool = True,
+    call_routing: Optional[str] = None,
 ) -> str:
     normalized_current = str(current_status or "").strip().lower()
     if preserve_offline and normalized_current == "offline":
         return "Offline"
-    normalized_call_types = str(call_types or "none").strip().lower()
-    return "Idle" if normalized_call_types in {"", "none", "off"} else "Online"
+    return "Online" if call_routing_allows("inbound", call_routing) or call_routing_allows("outbound", call_routing) else "Idle"
 
 
 def maybe_auto_verify_business_forwarding(
@@ -496,7 +522,7 @@ def maybe_auto_verify_business_forwarding(
         agent_lookup = (
             supabase
             .table("hired_receptionists")
-            .select("id,call_types,status")
+            .select("id,status")
             .eq("id", str(agent_id))
             .limit(1)
             .execute()
@@ -504,7 +530,6 @@ def maybe_auto_verify_business_forwarding(
         agent_row = (agent_lookup.data or [None])[0]
         if agent_row:
             next_status = derive_receptionist_status(
-                agent_row.get("call_types"),
                 agent_row.get("status"),
                 preserve_offline=False,
             )
@@ -2988,11 +3013,19 @@ def get_receptionist_display_name(receptionist: Optional[dict]) -> Optional[str]
 def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: Optional[str] = None):
     business_id_value = int_or_none(business_id)
     user_id_value = str(user_id).strip() if user_id else None
+    call_routing = get_account_call_routing()
     if not business_id_value and not user_id_value:
         logging.info(
             "Inbound receptionist lookup skipped: missing business_id and user_id. business_id=%s user_id=%s",
             business_id,
             user_id,
+        )
+        return None
+
+    if not call_routing_allows("inbound", call_routing):
+        logging.info(
+            "Inbound receptionist lookup skipped because account call routing does not allow inbound calls. call_routing=%s",
+            call_routing,
         )
         return None
 
@@ -3028,12 +3061,7 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
         )
         return None
 
-    candidates = []
-    for row in rows_by_id.values():
-        call_types = str(row.get("call_types") or "").strip().lower()
-        if call_types not in {"inbound", "both"}:
-            continue
-        candidates.append(row)
+    candidates = list(rows_by_id.values())
 
     if not candidates:
         logging.info(
@@ -3046,19 +3074,19 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
 
     def sort_key(row: dict):
         is_active = bool(row.get("is_active", True))
-        status_value = str(row.get("status") or "").strip().lower()
+        status_value = str(derive_receptionist_status(row.get("status"), call_routing=call_routing)).strip().lower()
         is_online = status_value not in {"offline", "disabled", "inactive"}
         hired_at = str(row.get("hired_at") or "")
         return (is_active, is_online, hired_at)
 
     selected = sorted(candidates, key=sort_key, reverse=True)[0]
     logging.info(
-        "Inbound receptionist resolved: business_id=%s user_id=%s receptionist_id=%s receptionist_name=%s call_types=%s candidates=%s",
+        "Inbound receptionist resolved: business_id=%s user_id=%s receptionist_id=%s receptionist_name=%s call_routing=%s candidates=%s",
         business_id_value,
         user_id_value,
         selected.get("id"),
         get_receptionist_display_name(selected),
-        selected.get("call_types"),
+        call_routing,
         len(candidates),
     )
     return selected
@@ -4636,13 +4664,14 @@ async def elevenlabs_post_call_webhook(
 async def get_sonar_agents():
     try:
         response = supabase.table('hired_receptionists').select('*').execute()
+        call_routing = get_account_call_routing()
         agents = []
         for row in response.data or []:
             agents.append({
                 **row,
                 "name": row.get("full_name") or row.get("first_name") or "Receptionist",
                 "role": row.get("stereotype") or "Receptionist",
-                "status": row.get("status") or "Offline",
+                "status": derive_receptionist_status(row.get("status"), call_routing=call_routing),
                 "current_activity": row.get("current_activity") or "Idle",
                 "model": row.get("model"),
             })
@@ -4771,13 +4800,12 @@ async def clear_pending_restart(restart_id: str):
 async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest):
     existing_response = supabase.table('hired_receptionists').select('id,status').eq('id', agent_id).limit(1).execute()
     existing_agent = (existing_response.data or [{}])[0]
-    next_status = derive_receptionist_status(payload.call_types, existing_agent.get('status'))
+    next_status = derive_receptionist_status(existing_agent.get('status'))
     response = supabase.table('hired_receptionists').update({
-        'call_types': payload.call_types,
         'status': next_status,
     }).eq('id', agent_id).execute()
-    push_live_event("Agent call handling updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "call_types": payload.call_types})
-    return response.data[0] if response.data else {"id": agent_id, "call_types": payload.call_types, "status": next_status}
+    push_live_event("Agent call handling updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "call_routing": get_account_call_routing()})
+    return response.data[0] if response.data else {"id": agent_id, "status": next_status}
 
 @app.post("/api/agents/{agent_id}/model", tags=["Sonar Controller Compat"])
 async def update_agent_model(agent_id: str, payload: AgentModelRequest):
@@ -7392,7 +7420,7 @@ async def update_business_forwarding(
             agent_lookup = (
                 supabase
                 .table('hired_receptionists')
-                .select('id,call_types,status')
+                .select('id,status')
                 .eq('id', payload.agent_id)
                 .eq('user_id', current_user_id)
                 .limit(1)
@@ -7401,7 +7429,6 @@ async def update_business_forwarding(
             agent_row = (agent_lookup.data or [None])[0]
             if agent_row:
                 next_agent_status = derive_receptionist_status(
-                    agent_row.get('call_types'),
                     agent_row.get('status'),
                     preserve_offline=False,
                 )

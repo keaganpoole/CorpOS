@@ -233,7 +233,7 @@ const formatMetricValue = (value) => {
   return numeric.toLocaleString('en-US');
 };
 
-const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, activeForwardingEntry = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onUpdateCallTypes, onTerminate }) => {
+const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, activeForwardingEntry = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onToggleActive, onTerminate }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   const displayModel = pending || agent.model || 'Not set';
@@ -252,6 +252,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
   const outboundCalls = formatMetricValue(agent.outbound_calls_count);
   const failedCalls = formatMetricValue(agent.failed_calls_count);
   const missedCalls = formatMetricValue(agent.missed_calls_count);
+  const toggleIsActive = agent.is_active !== false;
 
   return (
     <motion.div
@@ -284,12 +285,14 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">{statusLabel}</span>
         </div>
 
-        <button
-          onClick={(e) => { e.stopPropagation(); onTerminate && onTerminate(agent); }}
-          className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-xl border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:border-rose-500/40 transition-all opacity-0 group-hover:opacity-100"
-        >
-          <X size={13} />
-        </button>
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); onTerminate && onTerminate(agent); }}
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-xl border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:border-rose-500/40 transition-all opacity-0 group-hover:opacity-100"
+          >
+            <X size={13} />
+          </button>
+        </div>
 
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
           <h3 className="text-xl font-bold text-white tracking-tight leading-none">{agent.name}</h3>
@@ -298,6 +301,38 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
       </div>
 
       <div className="p-5 space-y-3">
+        <div className="flex items-center justify-between px-0.5 py-1">
+          <div className="min-w-0">
+            <p className="text-[8px] font-black uppercase tracking-[0.24em] text-zinc-600">Receptionist</p>
+            <p className={`mt-1 text-[11px] font-bold ${toggleIsActive ? 'text-zinc-200' : 'text-zinc-500'}`}>
+              {toggleIsActive ? 'Active' : 'Inactive'}
+            </p>
+          </div>
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (onToggleActive) {
+                await onToggleActive(agent, !toggleIsActive);
+              }
+            }}
+            className={`relative h-6 w-10 rounded-full border transition-all ${
+              toggleIsActive
+                ? 'border-emerald-400/30 bg-emerald-400/15'
+                : 'border-white/[0.08] bg-black/30'
+            }`}
+            aria-label={toggleIsActive ? 'Disable receptionist' : 'Enable receptionist'}
+            title={toggleIsActive ? 'Disable receptionist' : 'Enable receptionist'}
+          >
+            <div
+              className={`absolute top-[3px] h-4 w-4 rounded-full transition-transform ${
+                toggleIsActive
+                  ? 'translate-x-5 bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.35)]'
+                  : 'translate-x-1 bg-zinc-200'
+              }`}
+            />
+          </button>
+        </div>
+
         <div className="hidden">
         <div className="pt-3 border-t border-white/[0.04]">
           <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Language Model</p>
@@ -415,40 +450,6 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           </button>
         </div>
 
-        <div className="pt-3 border-t border-white/[0.04]">
-          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Call Handling</p>
-          <div className="flex items-center gap-1.5 mb-2">
-            {[
-              { key: 'none', label: 'Off', activeClass: 'bg-zinc-700/10 border-zinc-700/20 text-zinc-600' },
-              { key: 'inbound', label: 'In', activeClass: 'bg-orange-400/10 border-orange-400/20 text-orange-400' },
-              { key: 'outbound', label: 'Out', activeClass: 'bg-orange-400/10 border-orange-400/20 text-orange-400' },
-              { key: 'both', label: 'Both', activeClass: 'bg-orange-400/10 border-orange-400/20 text-orange-400' },
-            ].map(ct => {
-              const isAct = (agent.call_types || 'none') === ct.key;
-              return (
-                <button
-                  key={ct.key}
-                  onClick={async () => {
-                    const newVal = ct.key === (agent.call_types || 'none') ? 'none' : ct.key;
-                    try {
-                      if (onUpdateCallTypes) {
-                        await onUpdateCallTypes(agent.id, newVal);
-                      } else {
-                        await api.updateAgentCallTypes(agent.id, newVal);
-                      }
-                    } catch (err) {
-                      console.error('[CallTypes] Failed:', err.message || err);
-                    }
-                  }}
-                  className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border
-                    ${isAct ? ct.activeClass : 'bg-transparent border-transparent text-zinc-700 hover:text-zinc-500 hover:bg-white/[0.02]'}`}
-                >
-                  {ct.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </motion.div>
   );
@@ -1652,6 +1653,9 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
   const colorMap = {
     'RED': '#ef4444',
     'BLUE': '#3b82f6',
+    'Inbound': '#3b82f6',
+    'Outbound': '#ef4444',
+    'All': '#6366f1',
     '7': '#f87171',
     '6': '#fb923c',
     '5': '#facc15',
@@ -1660,6 +1664,7 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
     '2': '#818cf8',
     '1': '#c084fc',
     'Code': '#6366f1',
+    'Calls': '#6366f1',
     'Zone': '#6366f1',
   };
 
@@ -1696,7 +1701,7 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
       <div className="flex items-center">
         <button
           onClick={() => toggleOpen()}
-          className={`no-drag flex items-center gap-2 px-4 py-2 font-bold transition-colors duration-500 z-10 text-[11px] uppercase tracking-widest ${isOpen ? '' : 'hover:text-zinc-200'}`}
+          className={`no-drag flex items-center gap-2 px-4 py-2 font-bold transition-colors duration-500 z-10 text-[11px] tracking-widest ${isOpen ? '' : 'hover:text-zinc-200'}`}
         >
           {icon}
           <span className="text-white">{trigger}</span>
@@ -1718,7 +1723,7 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
             <button
               key={o}
               onClick={() => handleSelect(o)}
-              className={`no-drag text-[11px] font-black tracking-widest transition-all duration-500 uppercase ${
+              className={`no-drag text-[11px] font-black tracking-widest transition-all duration-500 ${
                 variant === 'elastic' ? '' : 'hover:scale-110'
               }`}
               style={{ color: value === o ? activeColor : undefined }}
@@ -1942,10 +1947,10 @@ const SonarDashboard = () => {
     wsStatus,
     isPaused,
     toggleRuntime,
-    setStage,
     setZone,
+    setCallsFilter,
     pingMax,
-    updateAgentCallTypes,
+    updateAgentActive,
     refresh,
   } = useSonarState();
 
@@ -1956,6 +1961,8 @@ const SonarDashboard = () => {
     }
     return { ...a, _scenario: null, scenario_name: null, scenario_id: null };
   });
+
+  const normalizedCallsFilter = String(controlState?.calls_filter || 'all').toLowerCase();
 
   useEffect(() => {
     if (!pendingModel || !agents) return;
@@ -2031,7 +2038,7 @@ const SonarDashboard = () => {
                     onOpenMarketplace={setMarketplaceAgent}
                     onOpenScenarios={setReceptionistsAgent}
                     onOpenForwarding={setForwardingAgent}
-                    onUpdateCallTypes={updateAgentCallTypes}
+                    onToggleActive={(agent, nextIsActive) => updateAgentActive(agent.id, nextIsActive)}
                     onTerminate={(agent) => setTerminateAgent(agent)}
                   />
                 );
@@ -2055,7 +2062,6 @@ const SonarDashboard = () => {
                         age: receptionist.age,
                         first_name: receptionist.first_name,
                         gender: receptionist.gender || null,
-                        call_types: 'none',
                         is_active: true,
                         user_id: userId,
                         phone_number: biz?.phone || null,
@@ -2176,8 +2182,12 @@ const SonarDashboard = () => {
     }
   };
 
-  const displayStage = controlState?.stage === 'code_red' ? 'Red' : controlState?.stage === 'code_blue' ? 'Blue' : controlState?.stage || 'Blue';
   const displayZone = controlState?.zone || 1;
+  const displayCalls = normalizedCallsFilter === 'inbound'
+    ? 'Inbound'
+    : normalizedCallsFilter === 'outbound'
+      ? 'Outbound'
+      : 'All';
 
   return (
     <AudioPlayerProvider>
@@ -2234,12 +2244,12 @@ const SonarDashboard = () => {
 
           <div className={`relative transition-opacity duration-500 ${zoneOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ width: '120px', textAlign: 'center' }}>
             <GradientBleed
-              trigger="Code"
-              options={['RED', 'BLUE']}
+              trigger="Calls"
+              options={['Inbound', 'Outbound', 'All']}
               variant="elastic"
-              icon={<Cpu size={12} />}
-              value={displayStage === 'Red' ? 'RED' : displayStage === 'Blue' ? 'BLUE' : null}
-              onSelect={(val) => setStage(val === 'RED' ? 'code_red' : 'code_blue')}
+              icon={<Phone size={12} />}
+              value={displayCalls}
+              onSelect={(val) => setCallsFilter(String(val || 'ALL').toLowerCase())}
               onOpenChange={(open) => setCodeOpen(open)}
             />
           </div>

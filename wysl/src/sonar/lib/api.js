@@ -33,7 +33,6 @@ export const api = {
   addReaction: (data) => postJSON('/api/reactions', data),
   getOpenRouterModels: () => fetchJSON('/api/openrouter/models'),
   updateAgentModel: (agentId, model) => postJSON(`/api/agents/${agentId}/model`, { model }),
-  updateAgentCallTypes: (agentId, callTypes) => postJSON(`/api/agents/${agentId}/call-types`, { call_types: callTypes }),
   patchAgent: (agentId, data) => patchJSON(`/api/agents/${agentId}`, data),
   getPendingRestarts: () => fetchJSON('/api/pending-restarts'),
   clearPendingRestart: (id) => deleteJSON(`/api/pending-restarts/${id}`),
