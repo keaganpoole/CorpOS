@@ -43,6 +43,7 @@ import { fetchCustomFields, getCurrentBusinessId, isCustomFieldKey } from '../..
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
 import { getSmartActions, getSmartActionByKey } from './smartActions';
 import googleIcon from '../../../assets/google.png';
+import microsoftIcon from '../../../assets/microsofticon.png';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const API_ORIGIN = (() => {
@@ -59,6 +60,14 @@ const INTEGRATION_PROVIDERS = [
     subtitle: 'Google Workspace or Gmail',
     description: 'Use this inbox for scenario email.',
     icon: googleIcon,
+    available: true,
+  },
+  {
+    key: 'outlook',
+    name: 'Outlook',
+    subtitle: 'Microsoft 365 or Outlook',
+    description: 'Connect your Outlook mailbox.',
+    icon: microsoftIcon,
     available: true,
   },
 ];
@@ -1018,11 +1027,6 @@ export default function ScenariosPage() {
   const selectedIntegration = emailIntegrations[selectedIntegrationProvider] || DEFAULT_EMAIL_INTEGRATIONS[selectedIntegrationProvider] || DEFAULT_EMAIL_INTEGRATIONS.gmail;
   const gmailIntegration = emailIntegrations.gmail || DEFAULT_EMAIL_INTEGRATIONS.gmail;
   const hasConnectedEmailIntegration = Object.values(emailIntegrations).some((integration) => integration?.status === 'connected');
-  const gmailStatusLabel = gmailIntegration.status === 'connected'
-    ? 'Gmail connected'
-    : gmailIntegration.selected
-      ? 'Gmail selected'
-      : 'No email connected';
   const integrationSteps = [
     {
       id: 'provider',
@@ -1852,8 +1856,13 @@ export default function ScenariosPage() {
   };
 
   const openIntegrationsModal = () => {
-    setSelectedIntegrationProvider(gmailIntegration.connectedEmail ? 'gmail' : selectedIntegrationProvider);
-    setIntegrationStep(gmailIntegration.selected || gmailIntegration.status === 'connected' ? 1 : 0);
+    // Find the first connected provider, or fall back to current selection
+    const connectedEntry = Object.entries(emailIntegrations).find(
+      ([, entry]) => entry.status === 'connected'
+    );
+    const primaryKey = connectedEntry?.[0] || selectedIntegrationProvider || INTEGRATION_PROVIDERS[0]?.key;
+    setSelectedIntegrationProvider(primaryKey);
+    setIntegrationStep(connectedEntry ? 1 : 0);
     setIntegrationError('');
     setShowIntegrationsModal(true);
   };
@@ -4686,7 +4695,7 @@ export default function ScenariosPage() {
                   <div className="sb-integrations-kicker">Email Integrations</div>
                   <h2 className="sb-integrations-title">Set up email for scenarios.</h2>
                   <p className="sb-integrations-lead">
-                    Gmail is the first supported provider. We’ll keep the setup explicit so you always know what’s configured, what still needs approval, and what scenarios will be able to do next.
+                    Connect your email provider so scenarios can send and receive messages. Currently supported: Gmail and Outlook (Microsoft 365).
                   </p>
                 </div>
               </div>
@@ -4774,12 +4783,12 @@ export default function ScenariosPage() {
                       </div>
                       <div className="sb-integrations-summary-row">
                         <span>Mailbox</span>
-                        <strong>{selectedIntegration.connectedEmail || session?.user?.email || 'Will use the connected Google mailbox'}</strong>
+                        <strong>{selectedIntegration.connectedEmail || session?.user?.email || `Will use the connected ${selectedProviderConfig?.name || 'email'} mailbox`}</strong>
                       </div>
                     </div>
 
                     {integrationPopupPending && (
-                      <div className="sb-integrations-inline-note">Waiting for Google to finish connecting…</div>
+                      <div className="sb-integrations-inline-note">Waiting for {selectedProviderConfig?.name || 'provider'} to finish connecting…</div>
                     )}
                     {integrationError && (
                       <div className="sb-integrations-error">{integrationError}</div>

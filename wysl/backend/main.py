@@ -85,6 +85,12 @@ from config import (
     google_client_id,
     google_client_secret,
     google_oauth_redirect_uri,
+    outlook_client_id,
+    outlook_client_secret,
+    outlook_authority,
+    outlook_redirect_uri,
+    outlook_scopes,
+    microsoft_graph_base_url,
     frontend_base_url,
 )
 
@@ -1548,7 +1554,7 @@ class LoginStatusUpdate(BaseModel):
     is_logged_in: bool
 
 
-SUPPORTED_EMAIL_INTEGRATION_PROVIDERS = {"gmail"}
+SUPPORTED_EMAIL_INTEGRATION_PROVIDERS = {"gmail", "outlook"}
 GMAIL_SCOPES = [
     "openid",
     "email",
@@ -1560,6 +1566,17 @@ GMAIL_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GMAIL_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 GMAIL_MESSAGES_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
+
+# --- Outlook / Microsoft Graph Constants ---
+OUTLOOK_AUTHORITY = outlook_authority
+OUTLOOK_AUTH_URL = f"{OUTLOOK_AUTHORITY}/oauth2/v2.0/authorize"
+OUTLOOK_TOKEN_URL = f"{OUTLOOK_AUTHORITY}/oauth2/v2.0/token"
+OUTLOOK_REDIRECT_URI = outlook_redirect_uri
+OUTLOOK_SCOPES_LIST = [s.strip() for s in outlook_scopes.split(" ") if s.strip()]
+GRAPH_BASE_URL = microsoft_graph_base_url
+GRAPH_USERINFO_URL = f"{GRAPH_BASE_URL}/me"
+GRAPH_MESSAGES_URL = f"{GRAPH_BASE_URL}/me/messages"
+GRAPH_SEND_MAIL_URL = f"{GRAPH_BASE_URL}/me/sendMail"
 
 
 class IntegrationAuthorizeResponse(BaseModel):
@@ -1632,6 +1649,11 @@ def _serialize_public_integration(row: dict, user_id: str) -> dict:
     return safe_row
 
 
+CALL_COMPLETED_STATUSES = {"completed", "done", "success"}
+CALL_FAILED_STATUSES = {"failed", "error", "canceled"}
+CALL_MISSED_STATUSES = {"missed", "no-answer", "no_answer", "busy"}
+
+
 def _get_google_redirect_uri(request: Optional[Request] = None) -> str:
     if google_oauth_redirect_uri:
         return google_oauth_redirect_uri
@@ -1688,6 +1710,172 @@ def _decode_gmail_parts(parts: List[dict]) -> str:
             if nested_text:
                 chunks.append(nested_text)
     return "\n".join(chunk for chunk in chunks if chunk).strip()
+
+
+def _extract_call_direction(row: dict) -> Optional[str]:
+    raw_payload = row.get("raw_payload") if isinstance(row.get("raw_payload"), dict) else {}
+    conversation_data = row.get("conversation_initiation_data") if isinstance(row.get("conversation_initiation_data"), dict) else {}
+    metadata = row.get("conversation_metadata") if isinstance(row.get("conversation_metadata"), dict) else {}
+    direction = str(
+        first_present(
+            row,
+            "direction",
+        )
+        or first_present(
+            raw_payload,
+            "direction",
+            "metadata.direction",
+            "metadata.phone_call.direction",
+            "conversation_initiation_client_data.dynamic_variables.direction",
+            "conversation_initiation_client_data.dynamic_variables.call_direction",
+        )
+        or first_present(
+            conversation_data,
+            "dynamic_variables.direction",
+            "dynamic_variables.call_direction",
+        )
+        or first_present(
+            metadata,
+            "direction",
+            "phone_call.direction",
+        )
+        or ""
+    ).strip().lower()
+    return direction or None
+
+
+def _classify_call_status(row: dict) -> str:
+    status_value = str(row.get("status") or "").strip().lower()
+    outcome_value = str(row.get("outcome") or "").strip().lower()
+    success_value = str(row.get("call_successful") or "").strip().lower()
+    failure_reason = str(row.get("failure_reason") or "").strip().lower()
+
+    if status_value in CALL_MISSED_STATUSES or outcome_value in CALL_MISSED_STATUSES:
+        return "missed"
+    if status_value in CALL_FAILED_STATUSES or outcome_value in CALL_FAILED_STATUSES or failure_reason:
+        return "failed"
+    if success_value in {"true", "yes"}:
+        return "completed"
+    if status_value in CALL_COMPLETED_STATUSES or outcome_value in CALL_COMPLETED_STATUSES:
+        return "completed"
+    return "other"
+
+
+def _empty_receptionist_metrics() -> dict:
+    return {
+        "total_calls": 0,
+        "inbound_calls_count": 0,
+        "outbound_calls_count": 0,
+        "completed_calls_count": 0,
+        "failed_calls_count": 0,
+        "missed_calls_count": 0,
+        "unknown_direction_calls_count": 0,
+        "total_duration_seconds": 0,
+        "average_call_duration_seconds": 0,
+        "last_call_at": None,
+        "success_rate": 0,
+    }
+
+
+def _accumulate_receptionist_metrics(rows: List[dict]) -> dict:
+    metrics = _empty_receptionist_metrics()
+    durations_with_values = 0
+
+    for row in rows:
+        metrics["total_calls"] += 1
+
+        direction = _extract_call_direction(row)
+        if direction == "inbound":
+            metrics["inbound_calls_count"] += 1
+        elif direction in {"outbound", "outgoing"}:
+            metrics["outbound_calls_count"] += 1
+        else:
+            metrics["unknown_direction_calls_count"] += 1
+
+        classification = _classify_call_status(row)
+        if classification == "completed":
+            metrics["completed_calls_count"] += 1
+        elif classification == "failed":
+            metrics["failed_calls_count"] += 1
+        elif classification == "missed":
+            metrics["missed_calls_count"] += 1
+
+        duration_seconds = row.get("duration_seconds")
+        if duration_seconds is not None:
+            try:
+                metrics["total_duration_seconds"] += int(duration_seconds)
+                durations_with_values += 1
+            except (TypeError, ValueError):
+                pass
+
+        created_at_value = row.get("created_at")
+        if created_at_value and (metrics["last_call_at"] is None or str(created_at_value) > str(metrics["last_call_at"])):
+            metrics["last_call_at"] = created_at_value
+
+    if durations_with_values:
+        metrics["average_call_duration_seconds"] = round(
+            metrics["total_duration_seconds"] / durations_with_values,
+            2,
+        )
+    if metrics["total_calls"]:
+        metrics["success_rate"] = round(
+            (metrics["completed_calls_count"] / metrics["total_calls"]) * 100,
+            2,
+        )
+    return metrics
+
+
+def _fetch_call_log_rows(*, user_id: Optional[str] = None, receptionist_id: Optional[str] = None, limit: int = 5000) -> List[dict]:
+    rows: List[dict] = []
+    page_size = 1000
+    start = 0
+
+    while start < limit:
+        end = min(start + page_size - 1, limit - 1)
+        query = (
+            supabase.table("call_logs")
+            .select(
+                "id,hired_receptionist_id,receptionist_name,duration_seconds,status,outcome,created_at,call_successful,failure_reason,raw_payload,conversation_initiation_data,conversation_metadata"
+            )
+            .order("created_at", desc=True)
+            .range(start, end)
+        )
+        if user_id:
+            query = query.eq("user_id", str(user_id))
+        if receptionist_id:
+            query = query.eq("hired_receptionist_id", int_or_none(receptionist_id))
+
+        page_rows = query.execute().data or []
+        rows.extend(page_rows)
+        if len(page_rows) < page_size:
+            break
+        start += page_size
+
+    return rows
+
+
+def refresh_receptionist_call_metrics(receptionist_id: Optional[str]) -> Optional[dict]:
+    receptionist_id_value = int_or_none(receptionist_id)
+    if receptionist_id_value is None:
+        return None
+
+    rows = _fetch_call_log_rows(receptionist_id=str(receptionist_id_value))
+    metrics = _accumulate_receptionist_metrics(rows)
+    updates = {
+        "total_calls": metrics["total_calls"],
+        "inbound_calls_count": metrics["inbound_calls_count"],
+        "outbound_calls_count": metrics["outbound_calls_count"],
+        "completed_calls_count": metrics["completed_calls_count"],
+        "failed_calls_count": metrics["failed_calls_count"],
+        "missed_calls_count": metrics["missed_calls_count"],
+        "average_call_duration_seconds": metrics["average_call_duration_seconds"],
+        "last_call_at": metrics["last_call_at"],
+    }
+    try:
+        supabase.table("hired_receptionists").update(updates).eq("id", receptionist_id_value).execute()
+    except Exception as exc:
+        logging.warning("Failed to refresh receptionist metrics for %s: %s", receptionist_id_value, exc)
+    return metrics
 
 
 def _parse_gmail_message(message: dict) -> dict:
@@ -1899,6 +2087,188 @@ def _send_gmail_email_for_user(user_id: str, to: str, subject: str, body: str) -
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to send message.")
     return response.json()
 
+
+# =============================================================================
+# Outlook / Microsoft Graph Integration Helpers
+# =============================================================================
+
+
+def _get_outlook_redirect_uri(request: Optional[Request] = None) -> str:
+    if OUTLOOK_REDIRECT_URI:
+        return OUTLOOK_REDIRECT_URI
+    if request is not None:
+        return str(request.url_for("outlook_integration_callback"))
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="OUTLOOK_REDIRECT_URI is not configured.",
+    )
+
+
+def _exchange_outlook_code(code: str, redirect_uri: str) -> dict:
+    if not outlook_client_id or not outlook_client_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Outlook OAuth is not configured.",
+        )
+    token_response = requests.post(
+        OUTLOOK_TOKEN_URL,
+        data={
+            "client_id": outlook_client_id,
+            "client_secret": outlook_client_secret,
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+            "scope": outlook_scopes,
+        },
+        timeout=30,
+    )
+    if not token_response.ok:
+        logging.error("Outlook token exchange failed: %s", token_response.text)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook token exchange failed.")
+    return token_response.json()
+
+
+def _refresh_outlook_credentials(credentials: dict) -> dict:
+    refresh_token = (credentials or {}).get("refresh_token")
+    if not refresh_token or not outlook_client_id or not outlook_client_secret:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook refresh token is missing.")
+    token_response = requests.post(
+        OUTLOOK_TOKEN_URL,
+        data={
+            "client_id": outlook_client_id,
+            "client_secret": outlook_client_secret,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+            "scope": outlook_scopes,
+        },
+        timeout=30,
+    )
+    if not token_response.ok:
+        logging.error("Outlook token refresh failed: %s", token_response.text)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook token refresh failed.")
+    refreshed = token_response.json()
+    next_credentials = dict(credentials or {})
+    next_credentials["access_token"] = refreshed.get("access_token")
+    next_credentials["token_type"] = refreshed.get("token_type", "Bearer")
+    expires_in = refreshed.get("expires_in") or 3600
+    next_credentials["expires_at"] = (
+        datetime.now(timezone.utc) + timedelta(seconds=int(expires_in) - 60)
+    ).isoformat()
+    return next_credentials
+
+
+def _get_valid_outlook_integration(user_id: str) -> dict:
+    integration = _fetch_integration_row(user_id, "outlook")
+    if not integration:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Outlook is not connected.")
+    credentials = integration.get("credentials") or {}
+    access_token = credentials.get("access_token")
+    expires_at = credentials.get("expires_at")
+    is_expired = True
+    if access_token and expires_at:
+        try:
+            is_expired = datetime.fromisoformat(expires_at) <= datetime.now(timezone.utc)
+        except Exception:
+            is_expired = True
+    if not access_token or is_expired:
+        credentials = _refresh_outlook_credentials(credentials)
+        integration = _upsert_integration_row(
+            user_id,
+            "outlook",
+            {
+                "credentials": credentials,
+                "status": "connected",
+                "selected": True,
+            },
+        )
+    return integration
+
+
+def _outlook_api_request(user_id: str, method: str, url: str, **kwargs) -> requests.Response:
+    integration = _get_valid_outlook_integration(user_id)
+    credentials = integration.get("credentials") or {}
+    access_token = credentials.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook access token is missing.")
+    headers = kwargs.pop("headers", {})
+    headers["Authorization"] = f"Bearer {access_token}"
+    response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+    if response.status_code == 401:
+        refreshed = _refresh_outlook_credentials(credentials)
+        integration = _upsert_integration_row(
+            user_id,
+            "outlook",
+            {
+                "credentials": refreshed,
+                "status": "connected",
+                "selected": True,
+            },
+        )
+        headers["Authorization"] = f"Bearer {(integration.get('credentials') or {}).get('access_token')}"
+        response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+    return response
+
+
+def _parse_outlook_message(message: dict) -> dict:
+    return {
+        "id": message.get("id"),
+        "thread_id": message.get("conversationId") or message.get("threadId"),
+        "subject": message.get("subject"),
+        "from_email": (message.get("from") or {}).get("emailAddress", {}).get("address") if message.get("from") else None,
+        "to_email": ", ".join(
+            r.get("emailAddress", {}).get("address", "")
+            for r in (message.get("toRecipients") or [])
+            if r.get("emailAddress", {}).get("address")
+        ) or None,
+        "snippet": message.get("bodyPreview") or message.get("snippet"),
+        "received_at": message.get("receivedDateTime"),
+        "body_text": (message.get("body") or {}).get("content") if (message.get("body") or {}).get("contentType") == "text" else None,
+    }
+
+
+def _send_outlook_email_for_user(user_id: str, to: str, subject: str, body: str) -> dict:
+    integration = _get_valid_outlook_integration(user_id)
+    connected_email = integration.get("connected_email")
+    payload = {
+        "message": {
+            "subject": subject,
+            "body": {
+                "contentType": "Text",
+                "content": body,
+            },
+            "toRecipients": [
+                {"emailAddress": {"address": to}}
+            ],
+        },
+        "saveToSentItems": True,
+    }
+    response = _outlook_api_request(
+        user_id,
+        "POST",
+        GRAPH_SEND_MAIL_URL,
+        headers={"Content-Type": "application/json"},
+        json=payload,
+    )
+    if not response.ok:
+        logging.error("Outlook send failed: %s", response.text)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to send message via Outlook.")
+    return {"id": "sent", "status": "sent", "provider": "outlook"}
+
+
+def _send_email_for_user(user_id: str, to: str, subject: str, body: str, provider: Optional[str] = None) -> dict:
+    """Route email sending through the connected integration provider."""
+    if not provider:
+        integration = _fetch_integration_row(user_id, "outlook")
+        if integration and integration.get("status") == "connected":
+            provider = "outlook"
+        else:
+            provider = "gmail"
+
+    if provider == "outlook":
+        return _send_outlook_email_for_user(user_id, to, subject, body)
+    return _send_gmail_email_for_user(user_id, to, subject, body)
+
+
 class RuntimeModeRequest(BaseModel):
     mode: str
 
@@ -2032,6 +2402,7 @@ class ScenarioSendEmailRequest(BaseModel):
     to: str
     subject: str
     body: str
+    provider: Optional[str] = None
 
 class PaymentUpdateRequest(BaseModel):
     payment_id: str
@@ -4211,6 +4582,8 @@ async def elevenlabs_post_call_webhook(
         ) from exc
 
     saved = response.data[0] if getattr(response, "data", None) else call_log
+    if call_log.get("hired_receptionist_id"):
+        refresh_receptionist_call_metrics(call_log.get("hired_receptionist_id"))
 
     flow_execution_id = first_present(
         event_data,
@@ -4747,48 +5120,41 @@ async def update_call_log_favorite(call_log_id: str, payload: dict, current_user
 
 @app.get("/api/sonar/call-logs/stats", tags=["Sonar Calls"])
 async def get_call_log_stats(current_user: dict = Depends(get_current_user)):
-    response = (
-        supabase.table("call_logs")
-        .select("id,hired_receptionist_id,receptionist_name,duration_seconds,status,outcome,created_at")
-        .eq("user_id", str(current_user.id))
-        .order("created_at", desc=True)
-        .limit(1000)
-        .execute()
-    )
-    rows = response.data or []
-
-    total_calls = len(rows)
-    completed_calls = sum(1 for row in rows if (row.get("status") or "").lower() in {"completed", "done", "success"})
-    failed_calls = sum(1 for row in rows if (row.get("status") or "").lower() in {"failed", "error"})
-    total_duration = sum(int(row.get("duration_seconds") or 0) for row in rows)
+    rows = _fetch_call_log_rows(user_id=str(current_user.id))
+    overall_metrics = _accumulate_receptionist_metrics(rows)
 
     by_receptionist = {}
     for row in rows:
         receptionist_key = row.get("hired_receptionist_id") or row.get("receptionist_name") or "unknown"
-        if receptionist_key not in by_receptionist:
-            by_receptionist[receptionist_key] = {
+        bucket = by_receptionist.setdefault(
+            receptionist_key,
+            {
                 "hired_receptionist_id": row.get("hired_receptionist_id"),
                 "receptionist_name": row.get("receptionist_name"),
-                "total_calls": 0,
-                "completed_calls": 0,
-                "failed_calls": 0,
-                "total_duration_seconds": 0,
+                "rows": [],
+            },
+        )
+        bucket["rows"].append(row)
+
+    receptionist_metrics = []
+    for bucket in by_receptionist.values():
+        metrics = _accumulate_receptionist_metrics(bucket["rows"])
+        receptionist_metrics.append(
+            {
+                "hired_receptionist_id": bucket["hired_receptionist_id"],
+                "receptionist_name": bucket["receptionist_name"],
+                **metrics,
             }
-        bucket = by_receptionist[receptionist_key]
-        bucket["total_calls"] += 1
-        bucket["total_duration_seconds"] += int(row.get("duration_seconds") or 0)
-        status_value = (row.get("status") or "").lower()
-        if status_value in {"completed", "done", "success"}:
-            bucket["completed_calls"] += 1
-        if status_value in {"failed", "error"}:
-            bucket["failed_calls"] += 1
+        )
 
     return {
-        "total_calls": total_calls,
-        "completed_calls": completed_calls,
-        "failed_calls": failed_calls,
-        "average_duration_seconds": round(total_duration / total_calls, 2) if total_calls else 0,
-        "by_receptionist": list(by_receptionist.values()),
+        **overall_metrics,
+        "completed_calls": overall_metrics["completed_calls_count"],
+        "failed_calls": overall_metrics["failed_calls_count"],
+        "missed_calls": overall_metrics["missed_calls_count"],
+        "inbound_calls": overall_metrics["inbound_calls_count"],
+        "outbound_calls": overall_metrics["outbound_calls_count"],
+        "by_receptionist": receptionist_metrics,
     }
 
 # --- Messages Endpoint for Queue ---
@@ -5371,13 +5737,12 @@ async def send_scenario_email(
     ensure_no_unresolved_templates(request.to, request.subject, request.body)
     if not request.to or not request.subject:
         raise HTTPException(status_code=400, detail="Email recipient and subject are required.")
-    result = _send_gmail_email_for_user(str(current_user.id), request.to, request.subject, request.body or "")
+    result = _send_email_for_user(str(current_user.id), request.to, request.subject, request.body or "")
     return {
+        **result,
         "id": result.get("id"),
-        "thread_id": result.get("threadId"),
+        "thread_id": result.get("thread_id") or result.get("threadId"),
         "label_ids": result.get("labelIds") or [],
-        "status": "sent",
-        "provider": "gmail",
     }
 
 
@@ -5405,13 +5770,19 @@ async def scenario_send_email_callback(payload: dict):
     user_id = str(payload.get("user_id") or "")
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID is required for scenario email.")
-    result = _send_gmail_email_for_user(user_id, payload.get("to") or "", payload.get("subject") or "", payload.get("body") or "")
+    provider = payload.get("provider") or None
+    result = _send_email_for_user(
+        user_id,
+        payload.get("to") or "",
+        payload.get("subject") or "",
+        payload.get("body") or "",
+        provider=provider,
+    )
     return {
+        **result,
         "id": result.get("id"),
-        "thread_id": result.get("threadId"),
+        "thread_id": result.get("thread_id") or result.get("threadId"),
         "label_ids": result.get("labelIds") or [],
-        "status": "sent",
-        "provider": "gmail",
     }
 
 
@@ -5936,24 +6307,42 @@ async def authorize_user_integration(
     provider = provider.lower().strip()
     if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
-    if provider != "gmail":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provider authorization not implemented.")
-    if not google_client_id or not google_client_secret:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Google OAuth is not configured.")
 
-    redirect_uri = _get_google_redirect_uri(request)
-    state_token = _build_integration_state(str(current_user.id), provider, return_to)
-    params = {
-        "client_id": google_client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": " ".join(GMAIL_SCOPES),
-        "access_type": "offline",
-        "prompt": "consent",
-        "include_granted_scopes": "true",
-        "state": state_token,
-    }
-    authorization_url = requests.Request("GET", GMAIL_AUTH_URL, params=params).prepare().url
+    if provider == "gmail":
+        if not google_client_id or not google_client_secret:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Google OAuth is not configured.")
+
+        redirect_uri = _get_google_redirect_uri(request)
+        state_token = _build_integration_state(str(current_user.id), provider, return_to)
+        params = {
+            "client_id": google_client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": " ".join(GMAIL_SCOPES),
+            "access_type": "offline",
+            "prompt": "consent",
+            "include_granted_scopes": "true",
+            "state": state_token,
+        }
+        authorization_url = requests.Request("GET", GMAIL_AUTH_URL, params=params).prepare().url
+    elif provider == "outlook":
+        if not outlook_client_id or not outlook_client_secret:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Outlook OAuth is not configured.")
+
+        redirect_uri = _get_outlook_redirect_uri(request)
+        state_token = _build_integration_state(str(current_user.id), provider, return_to)
+        params = {
+            "client_id": outlook_client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "response_mode": "query",
+            "scope": outlook_scopes,
+            "prompt": "consent",
+            "state": state_token,
+        }
+        authorization_url = requests.Request("GET", OUTLOOK_AUTH_URL, params=params).prepare().url
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provider authorization not implemented.")
     if not authorization_url:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create authorization URL.")
     _upsert_integration_row(
@@ -6082,6 +6471,117 @@ async def gmail_integration_callback(
     return HTMLResponse(content=html)
 
 
+@app.get("/users/me/integrations/outlook/callback", response_class=HTMLResponse, name="outlook_integration_callback", tags=["Users"])
+async def outlook_integration_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+):
+    frontend_target = frontend_base_url or "/"
+    success = False
+    message = "Outlook could not be connected."
+
+    try:
+        if error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+        if not code or not state:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth callback parameters.")
+
+        state_payload = _decode_integration_state(state)
+        user_id = str(state_payload["sub"])
+        frontend_target = state_payload.get("return_to") or frontend_target
+        redirect_uri = _get_outlook_redirect_uri(request)
+        token_data = _exchange_outlook_code(code, redirect_uri)
+
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
+        expires_in = int(token_data.get("expires_in") or 3600)
+        scope_string = token_data.get("scope") or ""
+        scopes = [scope for scope in scope_string.split(" ") if scope]
+
+        userinfo_response = requests.get(
+            GRAPH_USERINFO_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        if not userinfo_response.ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to fetch Microsoft account details.")
+        userinfo = userinfo_response.json()
+        connected_email = userinfo.get("mail") or userinfo.get("userPrincipalName") or userinfo.get("email")
+
+        existing_row = _fetch_integration_row(user_id, "outlook") or _default_user_integration("outlook", user_id)
+        existing_credentials = existing_row.get("credentials") or {}
+        credentials = {
+            **existing_credentials,
+            "access_token": access_token,
+            "refresh_token": refresh_token or existing_credentials.get("refresh_token"),
+            "token_type": token_data.get("token_type", "Bearer"),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=expires_in - 60)).isoformat(),
+        }
+
+        _upsert_integration_row(
+            user_id,
+            "outlook",
+            {
+                "selected": True,
+                "status": "connected",
+                "connected_email": connected_email,
+                "scopes": scopes,
+                "provider_metadata": {
+                    "display_name": userinfo.get("displayName"),
+                    "connected_at": datetime.now(timezone.utc).isoformat(),
+                    "supports_send": True,
+                    "supports_read": True,
+                },
+                "credentials": credentials,
+            },
+        )
+        success = True
+        message = "Outlook connected."
+    except HTTPException as exc:
+        message = exc.detail
+    except Exception as exc:
+        logging.error(f"Failed Outlook OAuth callback: {exc}", exc_info=True)
+        message = "Outlook could not be connected."
+
+    callback_payload = json.dumps({
+        "type": "sonar.integration.oauth_complete",
+        "provider": "outlook",
+        "success": success,
+        "message": message,
+    })
+    safe_target = json.dumps(frontend_target)
+    html = f"""
+    <!doctype html>
+    <html>
+      <body style="font-family: Inter, sans-serif; background:#09090b; color:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;">
+        <div style="text-align:center;">
+          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{message}</div>
+          <div style="font-size:13px; color:rgba(255,255,255,0.6);">You can close this window.</div>
+        </div>
+        <script>
+          (function() {{
+            const payload = {callback_payload};
+            const targetOrigin = (function() {{
+              try {{
+                return new URL({safe_target}, window.location.origin).origin;
+              }} catch (e) {{
+                return window.location.origin;
+              }}
+            }})();
+            if (window.opener && !window.opener.closed) {{
+              window.opener.postMessage(payload, targetOrigin);
+            }}
+            setTimeout(function() {{ window.close(); }}, 350);
+          }})();
+        </script>
+      </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
 @app.post("/users/me/integrations/{provider}/disconnect", response_model=IntegrationDisconnectResponse, tags=["Users"])
 async def disconnect_user_integration(provider: str, current_user: dict = Depends(get_current_user)):
     provider = provider.lower().strip()
@@ -6110,24 +6610,33 @@ async def list_integration_messages(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider != "gmail":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message listing is not available for this provider.")
+    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
     limit = max(1, min(limit, 50))
-    response = _gmail_api_request(str(current_user.id), "GET", GMAIL_MESSAGES_URL, params={"maxResults": limit})
-    if not response.ok:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Gmail messages.")
-    message_refs = response.json().get("messages") or []
-    messages = []
-    for ref in message_refs:
-        msg_response = _gmail_api_request(
-            str(current_user.id),
-            "GET",
-            f"{GMAIL_MESSAGES_URL}/{ref.get('id')}",
-            params={"format": "full"},
-        )
-        if not msg_response.ok:
-            continue
-        messages.append(IntegrationEmailListItem.model_validate(_parse_gmail_message(msg_response.json())).model_dump())
+
+    if provider == "outlook":
+        params = {"$top": limit, "$select": "id,conversationId,subject,from,toRecipients,bodyPreview,receivedDateTime,body", "$orderby": "receivedDateTime desc"}
+        response = _outlook_api_request(str(current_user.id), "GET", GRAPH_MESSAGES_URL, params=params)
+        if not response.ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Outlook messages.")
+        values = response.json().get("value") or []
+        messages = [IntegrationEmailListItem.model_validate(_parse_outlook_message(msg)).model_dump() for msg in values]
+    else:
+        response = _gmail_api_request(str(current_user.id), "GET", GMAIL_MESSAGES_URL, params={"maxResults": limit})
+        if not response.ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Gmail messages.")
+        message_refs = response.json().get("messages") or []
+        messages = []
+        for ref in message_refs:
+            msg_response = _gmail_api_request(
+                str(current_user.id),
+                "GET",
+                f"{GMAIL_MESSAGES_URL}/{ref.get('id')}",
+                params={"format": "full"},
+            )
+            if not msg_response.ok:
+                continue
+            messages.append(IntegrationEmailListItem.model_validate(_parse_gmail_message(msg_response.json())).model_dump())
     return messages
 
 
@@ -6138,14 +6647,37 @@ async def get_integration_message(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider != "gmail":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message lookup is not available for this provider.")
-    response = _gmail_api_request(
-        str(current_user.id),
-        "GET",
-        f"{GMAIL_MESSAGES_URL}/{message_id}",
-        params={"format": "full"},
-    )
+    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
+
+    if provider == "outlook":
+        response = _outlook_api_request(
+            str(current_user.id),
+            "GET",
+            f"{GRAPH_MESSAGES_URL}/{message_id}",
+        )
+        if not response.ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Outlook message.")
+        result = response.json()
+        # Fetch full body if truncated
+        if (result.get("body") or {}).get("contentType") != "text":
+            body_response = _outlook_api_request(
+                str(current_user.id),
+                "GET",
+                f"{GRAPH_MESSAGES_URL}/{message_id}?$select=id,body",
+            )
+            if body_response.ok:
+                body_data = body_response.json().get("body") or {}
+                if body_data.get("contentType") == "text":
+                    result["body"] = body_data
+        return IntegrationEmailMessageResponse.model_validate(_parse_outlook_message(result)).model_dump()
+    else:
+        response = _gmail_api_request(
+            str(current_user.id),
+            "GET",
+            f"{GMAIL_MESSAGES_URL}/{message_id}",
+            params={"format": "full"},
+        )
     if not response.ok:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Gmail message.")
     return IntegrationEmailMessageResponse.model_validate(_parse_gmail_message(response.json())).model_dump()
@@ -6158,12 +6690,16 @@ async def send_integration_email(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider != "gmail":
+    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email sending is not available for this provider.")
-    result = _send_gmail_email_for_user(str(current_user.id), payload.to, payload.subject, payload.body)
+
+    if provider == "outlook":
+        result = _send_outlook_email_for_user(str(current_user.id), payload.to, payload.subject, payload.body)
+    else:
+        result = _send_gmail_email_for_user(str(current_user.id), payload.to, payload.subject, payload.body)
     return {
         "id": result.get("id"),
-        "thread_id": result.get("threadId"),
+        "thread_id": result.get("thread_id") or result.get("threadId"),
         "label_ids": result.get("labelIds") or [],
     }
 

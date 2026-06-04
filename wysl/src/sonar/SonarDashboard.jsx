@@ -227,6 +227,12 @@ const formatDisplayPhoneNumber = (value) => {
   return raw.replace(/^\+/, '');
 };
 
+const formatMetricValue = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '0';
+  return numeric.toLocaleString('en-US');
+};
+
 const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, activeForwardingEntry = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onUpdateCallTypes, onTerminate }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
@@ -242,6 +248,10 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
   const forwardingSourceLabel = formatDisplayPhoneNumber(activeForwardingEntry?.source_number || activeForwardingEntry?.source_label || 'Unassigned');
   const forwardingTargetLabel = formatDisplayPhoneNumber(activeForwardingEntry?.target_number || agent.phone_number || 'Unassigned');
   const forwardingActionLabel = activeForwardingEntry?.status === 'verified' ? 'Change' : 'Setup';
+  const inboundCalls = formatMetricValue(agent.inbound_calls_count);
+  const outboundCalls = formatMetricValue(agent.outbound_calls_count);
+  const failedCalls = formatMetricValue(agent.failed_calls_count);
+  const missedCalls = formatMetricValue(agent.missed_calls_count);
 
   return (
     <motion.div
@@ -317,28 +327,32 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         </div>
 
         <div className="pt-3 border-t border-white/[0.04]">
-          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Scenario</p>
-          <button
-            onClick={() => onOpenScenarios && onOpenScenarios(agent)}
-            className="w-full flex items-center justify-between group/scenario cursor-pointer"
-          >
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Target size={11} className="text-indigo-400/60" />
-              {(agent.scenario_name) ? (
-                <span className="text-[11px] font-bold text-zinc-500 truncate group-hover/scenario:text-zinc-400 transition-colors">
-                  {agent.scenario_name}
-                </span>
-              ) : (
-                <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">No Scenario</span>
-              )}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="min-w-0">
+              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Inbound Calls</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[22px] leading-none font-black tracking-tight text-white tabular-nums">{inboundCalls}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover/scenario:opacity-100 transition-opacity">
-              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
-                {(agent.scenario_name) ? 'Change' : 'Assign'}
-              </span>
-              <ChevronRight size={11} className="text-indigo-500/60" />
+            <div className="min-w-0">
+              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Outbound Calls</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[22px] leading-none font-black tracking-tight text-white tabular-nums">{outboundCalls}</span>
+              </div>
             </div>
-          </button>
+            <div className="min-w-0">
+              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Failed Calls</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[22px] leading-none font-black tracking-tight text-white tabular-nums">{failedCalls}</span>
+              </div>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Missed Calls</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[22px] leading-none font-black tracking-tight text-white tabular-nums">{missedCalls}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="pt-3 border-t border-white/[0.04]">
@@ -372,6 +386,31 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
                 {forwardingActionLabel}
               </span>
               <ChevronRight size={11} className="text-orange-400/70" />
+            </div>
+          </button>
+        </div>
+
+        <div className="pt-3 border-t border-white/[0.04]">
+          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Scenario</p>
+          <button
+            onClick={() => onOpenScenarios && onOpenScenarios(agent)}
+            className="w-full flex items-center justify-between group/scenario cursor-pointer"
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Target size={11} className="text-indigo-400/60" />
+              {(agent.scenario_name) ? (
+                <span className="text-[11px] font-bold text-zinc-500 truncate group-hover/scenario:text-zinc-400 transition-colors">
+                  {agent.scenario_name}
+                </span>
+              ) : (
+                <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">No Scenario</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover/scenario:opacity-100 transition-opacity">
+              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
+                {(agent.scenario_name) ? 'Change' : 'Assign'}
+              </span>
+              <ChevronRight size={11} className="text-indigo-500/60" />
             </div>
           </button>
         </div>

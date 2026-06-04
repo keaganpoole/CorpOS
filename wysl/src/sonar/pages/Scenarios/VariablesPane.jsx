@@ -409,6 +409,13 @@ const TABLE_DEFS = [
       { key: 'status', label: 'Status', type: 'text' },
       { key: 'current_activity', label: 'Current Activity', type: 'text' },
       { key: 'total_calls', label: 'Total Calls', type: 'number' },
+      { key: 'inbound_calls_count', label: 'Inbound Calls', type: 'number' },
+      { key: 'outbound_calls_count', label: 'Outbound Calls', type: 'number' },
+      { key: 'completed_calls_count', label: 'Completed Calls', type: 'number' },
+      { key: 'failed_calls_count', label: 'Failed Calls', type: 'number' },
+      { key: 'missed_calls_count', label: 'Missed Calls', type: 'number' },
+      { key: 'average_call_duration_seconds', label: 'Avg Call Duration Seconds', type: 'number' },
+      { key: 'last_call_at', label: 'Last Call At', type: 'timestamp' },
       { key: 'hired_at', label: 'Hired At', type: 'timestamp' },
     ],
     fetch: async () => {

@@ -78,6 +78,21 @@ elevenlabs_agent_id_outbound = os.environ.get("ELEVENLABS_AGENT_ID_OUTBOUND")
 google_client_id = os.environ.get("GOOGLE_CLIENT_ID")
 google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
 google_oauth_redirect_uri = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI")
+
+# --- Outlook / Microsoft Graph Integration Configuration ---
+outlook_client_id = os.environ.get("OUTLOOK_CLIENT_ID")
+outlook_client_secret = os.environ.get("OUTLOOK_CLIENT_SECRET")
+outlook_tenant_id = os.environ.get("OUTLOOK_TENANT_ID") or "common"
+outlook_authority = (
+    os.environ.get("OUTLOOK_AUTHORITY")
+    or f"https://login.microsoftonline.com/{outlook_tenant_id}"
+)
+outlook_redirect_uri = os.environ.get("OUTLOOK_REDIRECT_URI")
+outlook_scopes = os.environ.get(
+    "OUTLOOK_SCOPES",
+    "openid profile email offline_access User.Read Mail.Read Mail.Send",
+)
+microsoft_graph_base_url = os.environ.get("MICROSOFT_GRAPH_BASE_URL") or "https://graph.microsoft.com/v1.0"
 frontend_base_url = (
     os.environ.get("FRONTEND_BASE_URL")
     or os.environ.get("VITE_FRONTEND_URL")
