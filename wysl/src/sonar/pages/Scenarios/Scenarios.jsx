@@ -979,10 +979,10 @@ export default function ScenariosPage() {
   }, [authorizedApiFetch, session?.access_token]);
 
   useEffect(() => {
-    if (showIntegrationsModal && !integrationsLoadedRef.current && !integrationLoading) {
+    if (session?.access_token && !integrationsLoadedRef.current && !integrationLoading) {
       refreshIntegrations();
     }
-  }, [showIntegrationsModal, integrationLoading, refreshIntegrations]);
+  }, [integrationLoading, refreshIntegrations, session?.access_token]);
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -1006,6 +1006,52 @@ export default function ScenariosPage() {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [refreshIntegrations]);
+
+  useEffect(() => {
+    if (!integrationPopupPending) return undefined;
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 8;
+
+    const pollIntegrations = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      try {
+        await refreshIntegrations();
+      } catch {}
+      if (!cancelled && attempts < maxAttempts) {
+        window.setTimeout(pollIntegrations, 1200);
+      }
+    };
+
+    const timerId = window.setTimeout(pollIntegrations, 900);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+    };
+  }, [integrationPopupPending, refreshIntegrations]);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      if (showIntegrationsModal || integrationPopupPending) {
+        refreshIntegrations();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && (showIntegrationsModal || integrationPopupPending)) {
+        refreshIntegrations();
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [integrationPopupPending, refreshIntegrations, showIntegrationsModal]);
 
   useLayoutEffect(() => {
     if (initialFocusSet) return;
