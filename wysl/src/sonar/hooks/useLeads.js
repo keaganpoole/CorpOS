@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { getCurrentBusinessId } from '../lib/customFields';
 import {
   normalizeOptionValue,
   titleCase,
@@ -72,6 +73,7 @@ const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
 
 export function useLeads() {
   const [leads, setLeads] = useState([]);
+  const [justAddedLeadIds, setJustAddedLeadIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -81,6 +83,28 @@ export function useLeads() {
   const [sortDir, setSortDir] = useState('desc');
   const abortRef = useRef(false);
   const pendingInsertPlacementRef = useRef(new Map());
+  const shimmerTimersRef = useRef(new Map());
+
+  const markLeadJustAdded = useCallback((leadId) => {
+    if (!leadId) return;
+    setJustAddedLeadIds((prev) => (prev.includes(leadId) ? prev : [...prev, leadId]));
+    const existing = shimmerTimersRef.current.get(leadId);
+    if (existing) clearTimeout(existing);
+    const timeout = setTimeout(() => {
+      shimmerTimersRef.current.delete(leadId);
+      setJustAddedLeadIds((prev) => prev.filter((id) => id !== leadId));
+    }, 1200);
+    shimmerTimersRef.current.set(leadId, timeout);
+  }, []);
+
+  const getCreateContext = useCallback(async () => {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) throw new Error('User not found');
+
+    const businessId = await getCurrentBusinessId();
+    return { userId: user.id, businessId };
+  }, []);
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -103,7 +127,11 @@ export function useLeads() {
   useEffect(() => {
     abortRef.current = false;
     fetchLeads();
-    return () => { abortRef.current = true; };
+    return () => {
+      abortRef.current = true;
+      shimmerTimersRef.current.forEach((timeout) => clearTimeout(timeout));
+      shimmerTimersRef.current.clear();
+    };
   }, [fetchLeads]);
 
   const notifyBackend = useCallback(async (eventType, record, oldRecord) => {
@@ -132,6 +160,7 @@ export function useLeads() {
             }
             return [payload.new, ...withoutExisting];
           });
+          markLeadJustAdded(payload.new.id);
           notifyBackend('INSERT', payload.new, null);
         } else if (payload.eventType === 'UPDATE') {
           setLeads((prev) => prev.map((row) => (row.id === payload.new.id ? payload.new : row)));
@@ -144,16 +173,22 @@ export function useLeads() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [notifyBackend]);
+  }, [markLeadJustAdded, notifyBackend]);
 
   const createLead = async (leadData, options = {}) => {
-    const payload = normalizePayload(leadData, { isCreate: true });
+    const { userId, businessId } = await getCreateContext();
+    const payload = normalizePayload({
+      ...leadData,
+      user_id: userId,
+      business_id: businessId,
+    }, { isCreate: true });
     const { data, error: err } = await supabase
       .from('people')
       .insert(payload)
       .select()
       .single();
     if (err) throw err;
+    markLeadJustAdded(data.id);
     if (options.placement === 'end') {
       pendingInsertPlacementRef.current.set(data.id, 'end');
       setLeads((prev) => {
@@ -251,6 +286,7 @@ export function useLeads() {
   return {
     leads: filteredLeads,
     allLeads: leads,
+    justAddedLeadIds,
     loading,
     error,
     selectedId,

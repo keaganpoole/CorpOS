@@ -617,7 +617,7 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
   })),
 ];
 
-const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateNew, onCreateInline, onDeleteMany, totalCount, onUpdateLead }) => {
+const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateNew, onCreateInline, onDeleteMany, totalCount, onUpdateLead }) => {
   const [density] = useState(2);
   const [businessId, setBusinessId] = useState(null);
   const [customFields, setCustomFields] = useState([]);
@@ -1270,15 +1270,42 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                       <p className="text-[11px] text-zinc-600 font-medium">Loading people...</p>
                     </div>
                   ) : leads.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center gap-3 pt-20">
-                      <Building2 size={32} className="text-zinc-800" />
-                      <p className="text-[13px] text-zinc-500 font-bold">No people found</p>
-                      <p className="text-[10px] text-zinc-700">Adjust filters or create a new person</p>
+                    <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
+                      <div className="mx-auto flex w-full max-w-[420px] flex-col items-center justify-center px-14 py-16 text-center">
+                        <button
+                          type="button"
+                          onClick={onCreateInline}
+                          className="group flex h-20 w-20 items-center justify-center rounded-[24px] border border-white/[0.08] bg-white/[0.02] text-white shadow-[0_0_30px_rgba(255,255,255,0.08)] transition-transform duration-300 hover:scale-105"
+                        >
+                          <Plus size={40} strokeWidth={1.6} />
+                        </button>
+                        <div className="mt-5">
+                          <p className="text-3xl font-semibold tracking-tight text-neutral-50">Create your first record</p>
+                          <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">Add your first person to start building out your database.</p>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <>
-                      {leads.map((lead, idx) => (
-                    <motion.div key={lead.id} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.012, 0.35) }} onContextMenu={(event) => handleContextMenu(event, lead.id)} className={`group px-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${selectedId === lead.id ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'} ${selectedIds.includes(lead.id) ? 'bg-cyan-500/[0.04]' : ''}`}>
+                      {leads.map((lead, idx) => {
+                    const isJustAdded = justAddedLeadIds.includes(lead.id);
+                    return (
+                    <motion.div key={lead.id} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.012, 0.35) }} onContextMenu={(event) => handleContextMenu(event, lead.id)} className={`group px-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative overflow-hidden ${selectedId === lead.id ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'} ${selectedIds.includes(lead.id) ? 'bg-cyan-500/[0.04]' : ''}`}>
+                          {isJustAdded && (
+                            <motion.div
+                              initial={{ opacity: 0, backgroundPosition: '-140% 0%' }}
+                              animate={{ opacity: [0, 0.6, 0], backgroundPosition: ['-140% 0%', '140% 0%'] }}
+                              transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
+                              className="pointer-events-none absolute inset-0 z-10"
+                              style={{
+                                backgroundImage: 'linear-gradient(102deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 32%, rgba(255,255,255,0.028) 44%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.028) 56%, rgba(255,255,255,0) 68%, rgba(255,255,255,0) 100%)',
+                                backgroundRepeat: 'no-repeat',
+                                backgroundSize: '42% 100%',
+                                filter: 'blur(10px)',
+                                mixBlendMode: 'screen',
+                              }}
+                            />
+                          )}
                           {(() => {
                             const matchedRule = evaluateColorbar(lead, colorbarRules);
                             if (!matchedRule) return null;
@@ -1302,7 +1329,7 @@ const LeadsTable = ({ leads, loading, selectedId, onSelect, searchQuery, onSearc
                             </div>
                           ))}
                         </motion.div>
-                      ))}
+                      )})}
                       <button
                         type="button"
                         onClick={onCreateInline}

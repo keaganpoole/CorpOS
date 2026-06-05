@@ -7,6 +7,7 @@ import LeadDetailPanel from './LeadDetailPanel';
 const PeoplePage = () => {
   const {
     leads, allLeads, loading, error,
+    justAddedLeadIds,
     selectedId, setSelectedId, selectedLead,
     searchQuery, setSearchQuery,
     sourceFilter, setSourceFilter,
@@ -75,6 +76,7 @@ const PeoplePage = () => {
       {/* Table */}
       <LeadsTable
         leads={leads} loading={loading} selectedId={selectedId}
+        justAddedLeadIds={justAddedLeadIds}
         onSelect={(id) => { setSelectedId(id); setCreating(false); }}
         searchQuery={searchQuery} onSearchChange={setSearchQuery}
         sourceFilter={sourceFilter} onSourceFilterChange={setSourceFilter}
