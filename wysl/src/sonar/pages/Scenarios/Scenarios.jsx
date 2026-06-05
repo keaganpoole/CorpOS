@@ -797,6 +797,12 @@ export default function ScenariosPage() {
     loadScenarios();
   }, [loadScenarios]);
 
+  useEffect(() => {
+    if (scenarios.length === 0 && !currentScenario) {
+      setViewMode('builder');
+    }
+  }, [currentScenario, scenarios.length]);
+
   const refreshPeopleCustomFields = useCallback(async () => {
     try {
       const businessId = await getCurrentBusinessId();
