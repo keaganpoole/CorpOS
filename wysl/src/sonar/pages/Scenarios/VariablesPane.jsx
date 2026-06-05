@@ -420,7 +420,14 @@ const TABLE_DEFS = [
     ],
     fetch: async () => {
       try {
-        const { data } = await supabase.from('hired_receptionists').select('*').limit(20);
+        const { data: authData } = await supabase.auth.getUser();
+        const userId = authData?.user?.id;
+        if (!userId) return [];
+        const { data } = await supabase
+          .from('hired_receptionists')
+          .select('*')
+          .eq('user_id', userId)
+          .limit(20);
         return data || [];
       } catch { return []; }
     },

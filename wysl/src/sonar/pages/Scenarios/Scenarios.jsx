@@ -754,37 +754,48 @@ export default function ScenariosPage() {
   const [nodesOpacity, setNodesOpacity] = useState(1);
   const [quantumOrbits, setQuantumOrbits] = useState({}); // { [nodeId]: [ring configs] }
 
-  // Fetch scenarios from Supabase on mount
-  useEffect(() => {
-    const fetchScenarios = async () => {
-      try {
-        const { data, error } = await supabase
+  const applyScenarioOwnershipFilter = useCallback((query) => {
+    if (!userId) return query;
+    return query.or(`user_id.eq.${userId},created_by.eq.${userId}`);
+  }, [userId]);
+
+  const loadScenarios = useCallback(async () => {
+    if (!userId) {
+      setScenarios([]);
+      return [];
+    }
+
+    try {
+      const { data, error } = await applyScenarioOwnershipFilter(
+        supabase
           .from('scenarios')
           .select('*')
-          .order('updated_at', { ascending: false });
-        
-        if (error) {
-          // Handle case where table doesn't exist yet
-          if (error.code === 'PGRST205') {
-            console.log('[Scenarios] Table not found. Run SQL in Supabase to create scenarios table.');
-            setScenarios([]);
-          } else {
-            console.error('[Scenarios] Error fetching scenarios:', error);
-          }
-          return;
+      )
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        if (error.code === 'PGRST205') {
+          console.log('[Scenarios] Table not found. Run SQL in Supabase to create scenarios table.');
+          setScenarios([]);
+          return [];
         }
-        
-        if (data) {
-          setScenarios(data);
-          console.log('[Scenarios] Loaded', data.length, 'scenarios');
-        }
-      } catch (err) {
-        console.error('[Scenarios] Exception fetching scenarios:', err);
+        throw error;
       }
-    };
-    
-    fetchScenarios();
-  }, []);
+
+      const rows = data || [];
+      setScenarios(rows);
+      console.log('[Scenarios] Loaded', rows.length, 'scenarios');
+      return rows;
+    } catch (err) {
+      console.error('[Scenarios] Error fetching scenarios:', err);
+      return [];
+    }
+  }, [applyScenarioOwnershipFilter, userId]);
+
+  // Fetch scenarios from Supabase on mount
+  useEffect(() => {
+    loadScenarios();
+  }, [loadScenarios]);
 
   const refreshPeopleCustomFields = useCallback(async () => {
     try {
@@ -1025,8 +1036,10 @@ export default function ScenariosPage() {
     const newActive = !scenarioIsActive;
     setScenarioIsActive(newActive);
     // Persist to Supabase if editing existing scenario
-    if (currentScenario?.id) {
-      await supabase.from('scenarios').update({ is_active: newActive }).eq('id', currentScenario.id);
+    if (currentScenario?.id && userId) {
+      await applyScenarioOwnershipFilter(
+        supabase.from('scenarios').update({ is_active: newActive }).eq('id', currentScenario.id)
+      );
     }
   };
 
@@ -2174,11 +2187,13 @@ export default function ScenariosPage() {
     
     if (currentScenario) {
       // Update existing scenario
-      const { data, error } = await supabase
+      const { data, error } = await applyScenarioOwnershipFilter(
+        supabase
         .from('scenarios')
         .update(scenarioData)
         .eq('id', currentScenario.id)
         .select()
+      )
         .single();
       
       result = { data, error };
@@ -2203,14 +2218,7 @@ export default function ScenariosPage() {
     console.log('[Scenarios] Scenario saved:', data);
     
     // Refresh the scenarios list
-    const { data: updatedScenarios } = await supabase
-      .from('scenarios')
-      .select('*')
-      .order('updated_at', { ascending: false });
-    
-    if (updatedScenarios) {
-      setScenarios(updatedScenarios);
-    }
+    await loadScenarios();
 
     try {
       await fetch(`${API_BASE_URL}/api/scenarios/reload`, { method: 'POST' });
@@ -2995,14 +3003,7 @@ export default function ScenariosPage() {
     console.log('[Scenarios] Deleted scenario:', scenario.name);
     
     // Refresh the scenarios list
-    const { data: updatedScenarios } = await supabase
-      .from('scenarios')
-      .select('*')
-      .order('updated_at', { ascending: false });
-    
-    if (updatedScenarios) {
-      setScenarios(updatedScenarios);
-    }
+    await loadScenarios();
     
     // If we deleted the currently loaded scenario, go back to list
     if (currentScenario?.id === scenario.id) {
@@ -3017,10 +3018,12 @@ export default function ScenariosPage() {
   const handleToggleScenarioStatus = async (scenario) => {
     const newStatus = scenario.status === 'active' ? 'disabled' : 'active';
     
-    const { error } = await supabase
-      .from('scenarios')
-      .update({ status: newStatus })
-      .eq('id', scenario.id);
+    const { error } = await applyScenarioOwnershipFilter(
+      supabase
+        .from('scenarios')
+        .update({ status: newStatus })
+        .eq('id', scenario.id)
+    );
     
     if (error) {
       console.error('[Scenarios] Error updating scenario status:', error);
@@ -3030,14 +3033,7 @@ export default function ScenariosPage() {
     console.log('[Scenarios] Updated scenario status:', scenario.name, '->', newStatus);
     
     // Refresh the scenarios list
-    const { data: updatedScenarios } = await supabase
-      .from('scenarios')
-      .select('*')
-      .order('updated_at', { ascending: false });
-    
-    if (updatedScenarios) {
-      setScenarios(updatedScenarios);
-    }
+    await loadScenarios();
   };
 
   // List View Component

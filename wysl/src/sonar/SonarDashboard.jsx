@@ -1911,13 +1911,18 @@ const SonarDashboard = () => {
 
   const loadAgentScenarios = async () => {
     try {
-      const resp = await fetch('https://grpgmhhtmfiwukncucaq.supabase.co/rest/v1/scenarios?select=*', {
-        headers: {
-          'apikey': 'sb_publishable_9y38ODRiD3SOXvMianpUUA_SfDw_y3Z',
-          'Authorization': 'Bearer sb_publishable_9y38ODRiD3SOXvMianpUUA_SfDw_y3Z',
-        },
-      });
-      const data = await resp.json();
+      if (!userId) {
+        setAgentScenarios({});
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('scenarios')
+        .select('*')
+        .or(`user_id.eq.${userId},created_by.eq.${userId}`);
+
+      if (error) throw error;
+
       const map = {};
       if (Array.isArray(data)) {
         data.forEach(s => {
@@ -1932,7 +1937,7 @@ const SonarDashboard = () => {
 
   useEffect(() => {
     if (currentRoute === 'receptionists') loadAgentScenarios();
-  }, [currentRoute]);
+  }, [currentRoute, userId]);
 
   const {
     tasks,

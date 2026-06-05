@@ -6,10 +6,21 @@
 const API_BASE = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const WS_URL = window.sonar?.wsUrl || import.meta.env.VITE_WS_URL || null;
 
+async function buildAuthHeaders(extraHeaders = {}) {
+  const { supabase } = await import('./supabase');
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  return {
+    ...extraHeaders,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // ─── REST Helpers ───────────────────────────────────────────
 async function fetchJSON(endpoint) {
   try {
-    const res = await fetch(`${API_BASE}${endpoint}`);
+    const headers = await buildAuthHeaders();
+    const res = await fetch(`${API_BASE}${endpoint}`, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -46,9 +57,10 @@ export const api = {
 
 async function postJSON(endpoint, body) {
   try {
+    const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -61,9 +73,10 @@ async function postJSON(endpoint, body) {
 
 async function patchJSON(endpoint, body) {
   try {
+    const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -76,8 +89,10 @@ async function patchJSON(endpoint, body) {
 
 async function deleteJSON(endpoint) {
   try {
+    const headers = await buildAuthHeaders();
     const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'DELETE',
+      headers,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();

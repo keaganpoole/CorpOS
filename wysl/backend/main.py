@@ -460,6 +460,26 @@ def get_account_call_routing() -> str:
         return "all"
 
 
+def get_account_call_routing_for_user(user_id: Optional[str]) -> str:
+    if not user_id:
+        return get_account_call_routing()
+    try:
+        response = (
+            supabase
+            .table("account_settings")
+            .select("call_routing")
+            .eq("user_id", str(user_id))
+            .limit(1)
+            .execute()
+        )
+        row = (response.data or [None])[0]
+        normalized = str((row or {}).get("call_routing") or "all").strip().lower()
+        return normalized if normalized in {"inbound", "outbound", "all"} else "all"
+    except Exception as exc:
+        logging.warning("Failed to load account call routing for user %s: %s", user_id, exc)
+        return "all"
+
+
 def call_routing_allows(direction: str, call_routing: Optional[str] = None) -> bool:
     normalized_direction = str(direction or "").strip().lower()
     normalized_routing = str(call_routing or get_account_call_routing()).strip().lower()
@@ -4770,10 +4790,18 @@ async def elevenlabs_post_call_webhook(
     return {"ok": True, "call_log": saved}
 
 @app.get("/api/agents", tags=["Sonar Controller Compat"])
-async def get_sonar_agents():
+async def get_sonar_agents(current_user: dict = Depends(get_current_user)):
     try:
-        response = supabase.table('hired_receptionists').select('*').execute()
-        call_routing = get_account_call_routing()
+        current_user_id = str(current_user.id)
+        response = (
+            supabase
+            .table('hired_receptionists')
+            .select('*')
+            .eq('user_id', current_user_id)
+            .order('hired_at', desc=True)
+            .execute()
+        )
+        call_routing = get_account_call_routing_for_user(current_user_id)
         agents = []
         for row in response.data or []:
             agents.append({
@@ -4794,9 +4822,17 @@ async def get_sonar_agents():
         return []
 
 @app.get("/api/system/summary", tags=["Sonar Controller Compat"])
-async def get_sonar_system_summary():
+async def get_sonar_system_summary(current_user: dict = Depends(get_current_user)):
     try:
-        agents = supabase.table('hired_receptionists').select('id,is_active').execute().data or []
+        agents = (
+            supabase
+            .table('hired_receptionists')
+            .select('id,is_active')
+            .eq('user_id', str(current_user.id))
+            .execute()
+            .data
+            or []
+        )
         active_agents = len([agent for agent in agents if agent.get('is_active', True)])
         total_agents = len(agents)
         return {

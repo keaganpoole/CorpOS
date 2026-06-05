@@ -192,6 +192,66 @@ const defaultSettings = {
   intro_message_prompt: 'Hey, this is {{receptionist_name}} at {{company_name}}. What can I do for you?',
 };
 
+const normalizeNullishStrings = (value) => {
+  if (Array.isArray(value)) {
+    return value.map(normalizeNullishStrings);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [key, normalizeNullishStrings(nestedValue)])
+    );
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim().toLowerCase();
+    if (trimmed === 'null' || trimmed === 'undefined') {
+      return null;
+    }
+  }
+  return value;
+};
+
+const normalizeServicePayload = (service) => {
+  const normalized = {
+    ...service,
+    name: String(service?.name || '').trim(),
+    description: service?.description || '',
+    category: String(service?.category || '').trim() || 'General',
+    unit: service?.unit || '',
+    price_type: service?.price_type || 'fixed',
+    is_active: service?.is_active !== false,
+  };
+
+  const normalizeNumeric = (value) => {
+    if (value === '' || value === null || value === undefined) return null;
+    const num = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  normalized.price_min = normalizeNumeric(service?.price_min);
+  normalized.price_max = normalizeNumeric(service?.price_max);
+
+  if (normalized.price_type === 'free' || normalized.price_type === 'quote') {
+    normalized.price_min = null;
+    normalized.price_max = null;
+    normalized.unit = '';
+  } else if (normalized.price_type !== 'range') {
+    normalized.price_max = null;
+  }
+
+  return normalized;
+};
+
+const createServiceFormState = (service) => ({
+  name: service?.name || '',
+  description: service?.description || '',
+  price_type: service?.price_type || 'fixed',
+  price_min: service?.price_min ?? '',
+  price_max: service?.price_max ?? '',
+  unit: service?.unit ?? '',
+  category: service?.category ?? '',
+  is_active: service?.is_active !== false,
+});
+
 // ─── Section Card ───────────────────────────────────────────────────────────
 const Section = ({ title, icon: Icon, color, children, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
@@ -273,15 +333,34 @@ const NumberInput = ({ value, onChange, min, max, step = 1 }) => (
 );
 
 const Toggle = ({ value, onChange, color = 'indigo' }) => {
-  const activeColor = color === 'indigo' ? 'bg-indigo-500' : 'bg-cyan-500';
-  const glowColor = color === 'indigo' ? 'shadow-[0_0_12px_rgba(99,102,241,0.4)]' : 'shadow-[0_0_12px_rgba(34,211,238,0.4)]';
+  const activeStyles = {
+    indigo: {
+      bg: 'bg-indigo-500',
+      glow: 'shadow-[0_0_12px_rgba(99,102,241,0.4)]',
+    },
+    cyan: {
+      bg: 'bg-cyan-500',
+      glow: 'shadow-[0_0_12px_rgba(34,211,238,0.4)]',
+    },
+    amber: {
+      bg: 'bg-amber-500',
+      glow: 'shadow-[0_0_12px_rgba(245,158,11,0.35)]',
+    },
+  };
+  const activeColor = activeStyles[color]?.bg || activeStyles.indigo.bg;
+  const glowColor = activeStyles[color]?.glow || activeStyles.indigo.glow;
 
   return (
     <button
+      type="button"
       onClick={() => onChange(!value)}
       className={`relative w-11 h-6 rounded-full transition-all ${value ? activeColor + ' ' + glowColor : 'bg-zinc-800 border border-white/[0.06]'}`}
+      aria-pressed={value}
     >
-      <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${value ? 'translate-x-5' : ''}`} />
+      <div
+        className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+        style={{ transform: value ? 'translateX(20px)' : 'translateX(0px)' }}
+      />
     </button>
   );
 };
@@ -329,10 +408,7 @@ const DayHoursRow = ({ day, settings, onChange }) => {
 
 // ─── Service Form (outside ServicesManager to preserve state) ─────────────
 const ServiceForm = ({ initial, onSave, onCancel }) => {
-  const [form, setForm] = useState(initial || {
-    name: '', description: '', price_type: 'fixed',
-    price_min: '', price_max: '', unit: '', category: '', is_active: true,
-  });
+  const [form, setForm] = useState(createServiceFormState(initial));
 
   return (
     <div className="border border-amber-500/15 rounded-2xl bg-amber-500/[0.03] p-5 space-y-4">
@@ -407,7 +483,7 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
 };
 
 // ─── Services Manager ──────────────────────────────────────────────────────
-const ServicesManager = () => {
+const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked }) => {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -421,9 +497,22 @@ const ServicesManager = () => {
   const loadServices = async () => {
     setLoading(true);
     try {
+      let resolvedBusinessId = businessId;
+      if (!resolvedBusinessId) {
+        const business = await ensureBusinessRecord({ createIfMissing: false });
+        resolvedBusinessId = business?.id || null;
+        if (business?.id) onBusinessLinked?.(business.id);
+      }
+
+      if (!resolvedBusinessId) {
+        setServices([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('services')
         .select('*')
+        .eq('business_id', resolvedBusinessId)
         .order('category', { ascending: true })
         .order('sort_order', { ascending: true });
       if (error) throw error;
@@ -437,8 +526,24 @@ const ServicesManager = () => {
 
   const addService = async (svc) => {
     const id = crypto.randomUUID();
-    const newSvc = { ...svc, id, sort_order: services.length };
     try {
+      const business = await ensureBusinessRecord({ createIfMissing: true });
+      const resolvedBusinessId = business?.id || businessId || null;
+      if (!resolvedBusinessId) throw new Error('Save business info before adding services.');
+      onBusinessLinked?.(resolvedBusinessId);
+
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData?.user?.id;
+      if (!userId) throw new Error('User not found');
+
+      const newSvc = {
+        ...normalizeServicePayload(svc),
+        id,
+        user_id: userId,
+        sort_order: services.length,
+        business_id: resolvedBusinessId,
+      };
       const { error } = await supabase.from('services').insert(newSvc);
       if (error) throw error;
       setServices(prev => [...prev, { ...newSvc, id }]);
@@ -450,9 +555,19 @@ const ServicesManager = () => {
 
   const updateService = async (id, updates) => {
     try {
-      const { error } = await supabase.from('services').update(updates).eq('id', id);
+      let resolvedBusinessId = businessId;
+      if (!resolvedBusinessId) {
+        const business = await ensureBusinessRecord({ createIfMissing: false });
+        resolvedBusinessId = business?.id || null;
+      }
+      const existingService = services.find((service) => service.id === id);
+      if (!existingService) throw new Error('Service not found.');
+      const normalizedUpdates = normalizeServicePayload({ ...existingService, ...updates });
+      let query = supabase.from('services').update(normalizedUpdates).eq('id', id);
+      if (resolvedBusinessId) query = query.eq('business_id', resolvedBusinessId);
+      const { error } = await query;
       if (error) throw error;
-      setServices(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+      setServices(prev => prev.map(s => s.id === id ? { ...s, ...normalizedUpdates } : s));
     } catch (err) {
       console.error('[ServicesManager] Failed to update:', err);
     }
@@ -460,7 +575,14 @@ const ServicesManager = () => {
 
   const deleteService = async (id) => {
     try {
-      const { error } = await supabase.from('services').delete().eq('id', id);
+      let resolvedBusinessId = businessId;
+      if (!resolvedBusinessId) {
+        const business = await ensureBusinessRecord({ createIfMissing: false });
+        resolvedBusinessId = business?.id || null;
+      }
+      let query = supabase.from('services').delete().eq('id', id);
+      if (resolvedBusinessId) query = query.eq('business_id', resolvedBusinessId);
+      const { error } = await query;
       if (error) throw error;
       setServices(prev => prev.filter(s => s.id !== id));
       setEditingId(null);
@@ -563,16 +685,13 @@ const ServicesManager = () => {
                         onClick={() => setEditingId(svc.id)}
                       >
                         {/* Active toggle */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleActive(svc.id); }}
-                          className={`shrink-0 w-9 h-5 rounded-full transition-all flex items-center
-                            ${svc.is_active
-                              ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
-                              : 'bg-zinc-800 border border-white/[0.06]'
-                            }`}
-                        >
-                          <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform shadow-sm ${svc.is_active ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-                        </button>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Toggle
+                            value={svc.is_active}
+                            onChange={() => toggleActive(svc.id)}
+                            color="amber"
+                          />
+                        </div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
@@ -898,15 +1017,102 @@ const SettingsPage = () => {
     loadSettings();
   }, []);
 
+  const syncBusinessId = (businessId) => {
+    if (!businessId) return;
+    setSettings(prev => ({ ...prev, _business_id: businessId }));
+  };
+
+  const ensureBusinessRecord = async ({ createIfMissing = true } = {}) => {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    const userId = authData?.user?.id;
+    if (!userId) throw new Error('User not found');
+
+    const businessPayload = {
+      name: settings.business_name || '',
+      phone: settings.business_phone || '',
+      email: settings.business_email || '',
+      address: settings.business_street || '',
+      city: settings.business_city || '',
+      state: settings.business_state || '',
+      zip: settings.business_zip || '',
+      business_hours: typeof settings.business_hours === 'object' ? JSON.stringify(settings.business_hours) : settings.business_hours,
+      about_us: settings.knowledge_base?.about || '',
+      policies: settings.knowledge_base?.policies || '',
+      faq: settings.knowledge_base?.faq || '',
+      user_id: userId,
+    };
+
+    const normalizedBusinessId =
+      settings._business_id === null || settings._business_id === undefined || settings._business_id === ''
+        ? null
+        : Number(settings._business_id);
+
+    if (normalizedBusinessId !== null && Number.isNaN(normalizedBusinessId)) {
+      throw new Error(`Invalid business id: ${settings._business_id}`);
+    }
+
+    if (normalizedBusinessId !== null) {
+      const { data, error } = await supabase
+        .from('businesses')
+        .update(businessPayload)
+        .eq('id', normalizedBusinessId)
+        .eq('user_id', userId)
+        .select('id')
+        .single();
+      if (error) throw error;
+      syncBusinessId(data?.id ?? normalizedBusinessId);
+      return data || { id: normalizedBusinessId };
+    }
+
+    const { data: existingBusiness, error: existingBusinessError } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    if (existingBusinessError && existingBusinessError.code !== 'PGRST116') throw existingBusinessError;
+
+    if (existingBusiness?.id) {
+      const { data, error } = await supabase
+        .from('businesses')
+        .update(businessPayload)
+        .eq('id', existingBusiness.id)
+        .eq('user_id', userId)
+        .select('id')
+        .single();
+      if (error) throw error;
+      syncBusinessId(data?.id ?? existingBusiness.id);
+      return data || existingBusiness;
+    }
+
+    if (!createIfMissing) return null;
+
+    const { data, error } = await supabase
+      .from('businesses')
+      .insert(businessPayload)
+      .select('id')
+      .single();
+    if (error) throw error;
+    syncBusinessId(data?.id ?? null);
+    return data || null;
+  };
+
   const loadSettings = async () => {
     setLoading(true);
     try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData?.user?.id;
+      if (!userId) throw new Error('User not found');
+
       // Load business info from businesses table
       const { data: bizData, error: bizErr } = await supabase
         .from('businesses')
         .select('id, name, phone, email, address, city, state, zip, business_hours, about_us, policies, faq')
+        .eq('user_id', userId)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (bizErr && bizErr.code !== 'PGRST116') throw bizErr;
 
@@ -914,8 +1120,9 @@ const SettingsPage = () => {
       const { data: settingsData, error: settingsErr } = await supabase
         .from('account_settings')
         .select('*')
+        .eq('user_id', userId)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (settingsErr && settingsErr.code !== 'PGRST116') throw settingsErr;
 
@@ -964,41 +1171,69 @@ const SettingsPage = () => {
     setSaving(true);
     setError(null);
     try {
-      // Save business info + knowledge base to businesses table
-      const kb = settings.knowledge_base || {};
-      const { error: bizErr } = await supabase
-        .from('businesses')
-        .update({
-          name: settings.business_name,
-          phone: settings.business_phone,
-          email: settings.business_email,
-          address: settings.business_street,
-          city: settings.business_city,
-          state: settings.business_state,
-          zip: settings.business_zip,
-          business_hours: typeof settings.business_hours === 'object' ? JSON.stringify(settings.business_hours) : settings.business_hours,
-          about_us: kb.about || '',
-          policies: kb.policies || '',
-          faq: kb.faq || '',
-        })
-        .eq('id', settings._business_id);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData?.user?.id;
+      if (!userId) throw new Error('User not found');
 
-      if (bizErr) throw bizErr;
+      const business = await ensureBusinessRecord({ createIfMissing: true });
+      const normalizedBusinessId = business?.id ?? null;
 
       // Save app config to account_settings (excluding business fields and services)
       const { business_name, business_phone, business_email, business_street, business_city, business_state, business_zip, business_hours, business_timezone, _business_id, services, knowledge_base, id: _id, created_at, updated_at, ...appConfig } = settings;
+      const normalizedAppConfig = normalizeNullishStrings(appConfig);
+      const scopedAppConfig = {
+        ...normalizedAppConfig,
+        user_id: userId,
+        business_id: normalizedBusinessId,
+      };
 
-      // Upsert — use insert if no existing record, update otherwise
-      let settingsErr;
+      let savedSettings = null;
       if (_id) {
-        const { error } = await supabase.from('account_settings').update(appConfig).eq('id', _id);
-        settingsErr = error;
+        const { data, error } = await supabase
+          .from('account_settings')
+          .update(scopedAppConfig)
+          .eq('id', _id)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+        if (error) throw error;
+        savedSettings = data;
       } else {
-        const { error } = await supabase.from('account_settings').insert(appConfig);
-        settingsErr = error;
+        const { data: existingSettings, error: existingSettingsError } = await supabase
+          .from('account_settings')
+          .select('id')
+          .eq('user_id', userId)
+          .limit(1)
+          .maybeSingle();
+        if (existingSettingsError && existingSettingsError.code !== 'PGRST116') throw existingSettingsError;
+
+        if (existingSettings?.id) {
+          const { data, error } = await supabase
+            .from('account_settings')
+            .update(scopedAppConfig)
+            .eq('id', existingSettings.id)
+            .eq('user_id', userId)
+            .select('*')
+            .single();
+          if (error) throw error;
+          savedSettings = data;
+        } else {
+          const { data, error } = await supabase
+            .from('account_settings')
+            .insert(scopedAppConfig)
+            .select('*')
+            .single();
+          if (error) throw error;
+          savedSettings = data;
+        }
       }
 
-      if (settingsErr) throw settingsErr;
+      setSettings(prev => ({
+        ...prev,
+        _business_id: normalizedBusinessId,
+        id: savedSettings?.id || prev.id,
+      }));
 
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2000);
@@ -1193,7 +1428,11 @@ const SettingsPage = () => {
               </p>
             </div>
 
-            <ServicesManager />
+            <ServicesManager
+              businessId={settings._business_id}
+              ensureBusinessRecord={ensureBusinessRecord}
+              onBusinessLinked={syncBusinessId}
+            />
           </Section>
 
           {/* ── Knowledge Base ──────────────────────────────────────────── */}
