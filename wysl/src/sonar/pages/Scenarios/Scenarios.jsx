@@ -1584,6 +1584,7 @@ export default function ScenariosPage() {
 
   const handleDeleteNode = useCallback(() => {
     if (!selectedNodeId) return;
+    if (selectedNodeId === INITIAL_NODE.id) return;
     setNodes((prev) => prev.filter((node) => node.id !== selectedNodeId));
     setEdges((prev) =>
       prev.filter((edge) => edge.from !== selectedNodeId && edge.to !== selectedNodeId)
@@ -3097,13 +3098,6 @@ export default function ScenariosPage() {
           <p className="scenario-list-subtitle">Automate your workflows with conditional logic</p>
         </div>
         <div className="scenario-list-actions">
-          <button className="sb-integrations-btn sb-integrations-btn--inline" onClick={() => openIntegrationsModal()}>
-            <ShieldCheck size={16} />
-            <span className="sb-integrations-btn-copy">
-              <span className="sb-integrations-btn-label">Integrations</span>
-              <span className="sb-integrations-btn-status">{connectedIntegrationCount} connected</span>
-            </span>
-          </button>
           <button className="create-scenario-btn" onClick={handleCreateScenario}>
             <Plus size={18} />
             Create Scenario
@@ -3432,7 +3426,13 @@ export default function ScenariosPage() {
                   )}
                 </div>
                 <div className="sb-panel-header-controls">
-                  <button type="button" className="sb-panel-delete" onClick={handleDeleteNode}>
+                  <button
+                    type="button"
+                    className="sb-panel-delete"
+                    onClick={handleDeleteNode}
+                    disabled={selectedNodeId === INITIAL_NODE.id}
+                    style={selectedNodeId === INITIAL_NODE.id ? { opacity: 0.35, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
+                  >
                     <Trash2 size={16} />
                   </button>
                   <button
@@ -4761,13 +4761,6 @@ export default function ScenariosPage() {
             >
               <ChevronLeft size={16} />
               Back to Scenarios
-            </button>
-            <button className="sb-integrations-btn sb-integrations-btn--inline" onClick={() => openIntegrationsModal()}>
-              <ShieldCheck size={15} />
-              <span className="sb-integrations-btn-copy">
-                <span className="sb-integrations-btn-label">Integrations</span>
-                <span className="sb-integrations-btn-status">{connectedIntegrationCount} connected</span>
-              </span>
             </button>
           </div>
           <button 

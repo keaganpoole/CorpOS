@@ -1133,21 +1133,20 @@
 }
 
 .sb-panel-delete {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  padding: 0;
   border: none;
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
   color: #ff5c5c;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.2s ease, opacity 0.2s ease;
 }
 
 .sb-panel-delete:hover {
-  background: rgba(255, 92, 92, 0.22);
+  background: transparent;
+  color: #ff7b7b;
 }
 
 .sb-panel-label {
