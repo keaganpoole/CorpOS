@@ -63,6 +63,7 @@ from fastapi import BackgroundTasks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from jose import JWTError, jwt
+from postgrest.exceptions import APIError
 from config import (
     supabase,
     supabase_admin,
@@ -72,6 +73,8 @@ from config import (
     TEST_MODE,
     STRIPE_LIVE_SECRET_KEY,
     STRIPE_TEST_SECRET_KEY,
+    stripe_connect_client_id,
+    stripe_connect_redirect_uri,
     elevenlabs_webhook_secret,
     elevenlabs_api_key,
     elevenlabs_agent_id_inbound,
@@ -1584,6 +1587,7 @@ class LoginStatusUpdate(BaseModel):
 
 
 SUPPORTED_EMAIL_INTEGRATION_PROVIDERS = {"gmail", "outlook"}
+SUPPORTED_INTEGRATION_PROVIDERS = {*SUPPORTED_EMAIL_INTEGRATION_PROVIDERS, "stripe"}
 GMAIL_SCOPES = [
     "openid",
     "email",
@@ -1606,6 +1610,8 @@ GRAPH_BASE_URL = microsoft_graph_base_url
 GRAPH_USERINFO_URL = f"{GRAPH_BASE_URL}/me"
 GRAPH_MESSAGES_URL = f"{GRAPH_BASE_URL}/me/messages"
 GRAPH_SEND_MAIL_URL = f"{GRAPH_BASE_URL}/me/sendMail"
+STRIPE_CONNECT_AUTH_URL = "https://connect.stripe.com/oauth/authorize"
+STRIPE_CONNECT_SCOPE = "read_write"
 
 
 class IntegrationAuthorizeResponse(BaseModel):
@@ -1694,6 +1700,17 @@ def _get_google_redirect_uri(request: Optional[Request] = None) -> str:
     )
 
 
+def _get_stripe_redirect_uri(request: Optional[Request] = None) -> str:
+    if stripe_connect_redirect_uri:
+        return stripe_connect_redirect_uri
+    if request is not None:
+        return str(request.url_for("stripe_integration_callback"))
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="STRIPE_CONNECT_REDIRECT_URI is not configured.",
+    )
+
+
 def _build_integration_state(user_id: str, provider: str, return_to: Optional[str] = None) -> str:
     payload = {
         "sub": user_id,
@@ -1708,7 +1725,7 @@ def _build_integration_state(user_id: str, provider: str, return_to: Optional[st
 def _decode_integration_state(state_token: str) -> dict:
     try:
         payload = jwt.decode(state_token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("provider") not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+        if payload.get("provider") not in SUPPORTED_INTEGRATION_PROVIDERS:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider state.")
         return payload
     except JWTError as exc:
@@ -1969,27 +1986,112 @@ def _upsert_integration_row(user_id: str, provider: str, updates: dict) -> dict:
     if "scopes" not in merged or merged["scopes"] is None:
         merged["scopes"] = []
 
-    if existing_row:
-        response = (
-            supabase_admin.table("integrations")
-            .update({
-                "status": merged["status"],
-                "selected": merged["selected"],
-                "connected_email": merged["connected_email"],
-                "scopes": merged["scopes"],
-                "provider_metadata": merged["provider_metadata"],
-                "credentials": merged["credentials"],
-                "updated_at": merged["updated_at"],
-            })
-            .eq("id", existing_row["id"])
-            .execute()
-        )
-    else:
-        response = supabase_admin.table("integrations").insert(merged).execute()
+    try:
+        if existing_row:
+            response = (
+                supabase_admin.table("integrations")
+                .update({
+                    "status": merged["status"],
+                    "selected": merged["selected"],
+                    "connected_email": merged["connected_email"],
+                    "scopes": merged["scopes"],
+                    "provider_metadata": merged["provider_metadata"],
+                    "credentials": merged["credentials"],
+                    "updated_at": merged["updated_at"],
+                })
+                .eq("id", existing_row["id"])
+                .execute()
+            )
+        else:
+            response = supabase_admin.table("integrations").insert(merged).execute()
+    except APIError as exc:
+        raw_error = getattr(exc, "args", [None])[0]
+        if isinstance(raw_error, dict):
+            error_message = str(raw_error.get("message") or exc)
+        else:
+            error_message = str(raw_error or exc)
+        if "integrations_provider_check" in error_message and provider == "stripe":
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database migration missing: run `sql/add_stripe_integration_provider.sql` in Supabase before using Stripe integrations.",
+            ) from exc
+        raise
 
     if not response.data:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save integration.")
     return _normalize_user_integration_row(response.data[0], user_id)
+
+
+def _stripe_platform_api_key(livemode: Optional[bool] = None) -> str:
+    use_live_key = (not PAYMENT_TEST_MODE) if livemode is None else livemode
+    api_key = STRIPE_LIVE_SECRET_KEY if use_live_key else STRIPE_TEST_SECRET_KEY
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Stripe Connect {get_payment_mode_label()} platform key is not configured.",
+        )
+    return api_key
+
+
+def _stripe_object_to_dict(value) -> dict:
+    if hasattr(value, "to_dict_recursive"):
+        return value.to_dict_recursive()
+    return dict(value or {})
+
+
+def _exchange_stripe_code(code: str) -> dict:
+    if not stripe_connect_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe Connect is not configured.",
+        )
+    try:
+        token = stripe.OAuth.token(
+            api_key=_stripe_platform_api_key(),
+            grant_type="authorization_code",
+            code=code,
+        )
+        return _stripe_object_to_dict(token)
+    except Exception as exc:
+        logging.error("Stripe OAuth token exchange failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Stripe account authorization failed.",
+        ) from exc
+
+
+def _get_connected_stripe_request_options(user_id: str) -> dict:
+    integration = _fetch_integration_row(user_id, "stripe")
+    credentials = (integration or {}).get("credentials") or {}
+    provider_metadata = (integration or {}).get("provider_metadata") or {}
+    stripe_user_id = credentials.get("stripe_user_id") or provider_metadata.get("account_id")
+    livemode = credentials.get("livemode")
+    if livemode is None:
+        livemode = provider_metadata.get("livemode")
+    if not integration or integration.get("status") != "connected" or not stripe_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Stripe is not connected. Connect Stripe in Integrations before running payment actions.",
+        )
+    return {
+        "api_key": _stripe_platform_api_key(bool(livemode)),
+        "stripe_account": stripe_user_id,
+    }
+
+
+def _deauthorize_stripe_integration(integration: Optional[dict]) -> None:
+    credentials = (integration or {}).get("credentials") or {}
+    stripe_user_id = credentials.get("stripe_user_id") or (integration or {}).get("provider_metadata", {}).get("account_id")
+    if not stripe_user_id or not stripe_connect_client_id:
+        return
+    try:
+        stripe.OAuth.deauthorize(
+            api_key=_stripe_platform_api_key(credentials.get("livemode")),
+            client_id=stripe_connect_client_id,
+            stripe_user_id=stripe_user_id,
+        )
+    except Exception as exc:
+        logging.warning("Stripe deauthorization failed for %s: %s", stripe_user_id, exc)
 
 
 def _exchange_google_code(code: str, redirect_uri: str) -> dict:
@@ -5574,16 +5676,22 @@ async def set_sonar_payment_test_mode(request: PaymentTestModeRequest):
     }
 
 @app.post("/api/sonar/create-payment", tags=["Sonar Payments"])
-async def create_payment(request: PaymentCreateRequest):
+async def create_payment(
+    request: PaymentCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _create_payment_for_user(request, str(current_user.id))
+
+
+async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
     description = request.description or ""
     payment_method_type = (request.payment_method_type or "card").lower()
     payment_method = "us_bank_account" if payment_method_type == "ach" else payment_method_type
     ensure_no_unresolved_templates(request.person_id, request.appointment_id, description)
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
 
     stripe_payment_intent = None
-    stripe_error = None
     try:
-        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
         if payment_method_type != "link":
             payment_intent_payload = {
                 "amount": request.amount,
@@ -5594,13 +5702,14 @@ async def create_payment(request: PaymentCreateRequest):
                 "metadata": {
                     "person_id": request.person_id or "",
                     "appointment_id": request.appointment_id or "",
+                    "user_id": user_id,
                     "source": "wysl_scenarios",
                 },
             }
-            stripe_payment_intent = stripe.PaymentIntent.create(**payment_intent_payload)
+            stripe_payment_intent = stripe.PaymentIntent.create(**stripe_request_options, **payment_intent_payload)
     except Exception as exc:
-        stripe_error = str(exc)
-        logging.warning("Stripe payment intent creation failed, falling back to local payment row: %s", exc)
+        logging.error("Stripe payment intent creation failed for user %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe payment creation failed: {exc}") from exc
 
     payment_row = build_payment_row(
         amount=request.amount,
@@ -5610,7 +5719,7 @@ async def create_payment(request: PaymentCreateRequest):
         status=(stripe_payment_intent.status if stripe_payment_intent else "created"),
         stripe_payment_intent_id=(stripe_payment_intent.id if stripe_payment_intent else None),
         receipt_url=None,
-        error_message=stripe_error,
+        error_message=None,
     )
     saved_payment = insert_payment_record(payment_row)
     emit_payment_trigger("invoice_created", {
@@ -5641,12 +5750,19 @@ async def create_payment(request: PaymentCreateRequest):
     return response_payload
 
 @app.post("/api/sonar/create-payment-profile", tags=["Sonar Payments"])
-async def create_payment_profile(request: PaymentProfileCreateRequest):
+async def create_payment_profile(
+    request: PaymentProfileCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _create_payment_profile_for_user(request, str(current_user.id))
+
+
+async def _create_payment_profile_for_user(request: PaymentProfileCreateRequest, user_id: str):
     description = request.description or ""
     payment_mode_base_url = get_payment_frontend_base_url()
     ensure_no_unresolved_templates(request.person_id, request.customer_name, request.customer_email, request.customer_phone, description)
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
     try:
-        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
         customer_payload = {}
         if request.customer_email:
             customer_payload["email"] = request.customer_email
@@ -5656,14 +5772,17 @@ async def create_payment_profile(request: PaymentProfileCreateRequest):
             customer_payload["phone"] = request.customer_phone
 
         customer = stripe.Customer.create(
+            **stripe_request_options,
             **customer_payload,
             metadata={
                 "person_id": request.person_id or "",
+                "user_id": user_id,
                 "source": "wysl_scenarios",
             },
         )
 
         checkout_session = stripe.checkout.Session.create(
+            **stripe_request_options,
             mode="payment",
             customer=customer.id,
             line_items=[{
@@ -5681,6 +5800,7 @@ async def create_payment_profile(request: PaymentProfileCreateRequest):
             cancel_url=f"{payment_mode_base_url}/dashboard?payment=cancelled",
             metadata={
                 "person_id": request.person_id or "",
+                "user_id": user_id,
                 "source": "wysl_scenarios",
             },
         )
@@ -5723,7 +5843,14 @@ async def create_payment_profile(request: PaymentProfileCreateRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
 @app.post("/api/sonar/create-invoice", tags=["Sonar Payments"])
-async def create_invoice(request: InvoiceCreateRequest):
+async def create_invoice(
+    request: InvoiceCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _create_invoice_for_user(request, str(current_user.id))
+
+
+async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
     description = request.description or ""
     ensure_no_unresolved_templates(
         request.person_id,
@@ -5734,9 +5861,8 @@ async def create_invoice(request: InvoiceCreateRequest):
         request.customer_phone,
         description,
     )
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
     try:
-        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
-
         customer_payload = {}
         if request.customer_email:
             customer_payload["email"] = request.customer_email
@@ -5752,11 +5878,13 @@ async def create_invoice(request: InvoiceCreateRequest):
         )
 
         customer = stripe.Customer.create(
+            **stripe_request_options,
             **customer_payload,
-            metadata=invoice_metadata,
+            metadata={**invoice_metadata, "user_id": user_id},
         )
 
         stripe.InvoiceItem.create(
+            **stripe_request_options,
             customer=customer.id,
             amount=request.amount,
             currency=request.currency,
@@ -5765,6 +5893,7 @@ async def create_invoice(request: InvoiceCreateRequest):
         )
 
         invoice = stripe.Invoice.create(
+            **stripe_request_options,
             customer=customer.id,
             collection_method="send_invoice",
             days_until_due=max(int(request.due_days or 7), 1),
@@ -5779,18 +5908,24 @@ async def create_invoice(request: InvoiceCreateRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
 @app.post("/api/sonar/send-invoice", tags=["Sonar Payments"])
-async def send_invoice(request: InvoiceSendRequest):
+async def send_invoice(
+    request: InvoiceSendRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _send_invoice_for_user(request, str(current_user.id))
+
+
+async def _send_invoice_for_user(request: InvoiceSendRequest, user_id: str):
     ensure_no_unresolved_templates(request.invoice_id)
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
     try:
-        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
-
-        invoice = stripe.Invoice.retrieve(request.invoice_id)
+        invoice = stripe.Invoice.retrieve(request.invoice_id, **stripe_request_options)
         if invoice.get("status") == "draft":
-            invoice = stripe.Invoice.finalize_invoice(request.invoice_id)
+            invoice = stripe.Invoice.finalize_invoice(request.invoice_id, **stripe_request_options)
 
-        sent_invoice = stripe.Invoice.send_invoice(request.invoice_id)
+        stripe.Invoice.send_invoice(request.invoice_id, **stripe_request_options)
 
-        fresh_invoice = stripe.Invoice.retrieve(request.invoice_id)
+        fresh_invoice = stripe.Invoice.retrieve(request.invoice_id, **stripe_request_options)
         return serialize_stripe_invoice(fresh_invoice)
     except Exception as exc:
         logging.error("Error sending invoice: %s", exc, exc_info=True)
@@ -5815,23 +5950,35 @@ async def send_scenario_email(
 
 
 async def scenario_create_payment_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
     request = PaymentCreateRequest(**payload)
-    return await create_payment(request)
+    return await _create_payment_for_user(request, user_id)
 
 
 async def scenario_create_payment_profile_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
     request = PaymentProfileCreateRequest(**payload)
-    return await create_payment_profile(request)
+    return await _create_payment_profile_for_user(request, user_id)
 
 
 async def scenario_create_invoice_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
     request = InvoiceCreateRequest(**payload)
-    return await create_invoice(request)
+    return await _create_invoice_for_user(request, user_id)
 
 
 async def scenario_send_invoice_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
     request = InvoiceSendRequest(**payload)
-    return await send_invoice(request)
+    return await _send_invoice_for_user(request, user_id)
 
 
 async def scenario_send_email_callback(payload: dict):
@@ -6326,7 +6473,7 @@ async def list_user_integrations(current_user: dict = Depends(get_current_user))
                     current_user_id,
                 )
             )
-            for provider in sorted(SUPPORTED_EMAIL_INTEGRATION_PROVIDERS)
+            for provider in sorted(SUPPORTED_INTEGRATION_PROVIDERS)
         ]
         return [integration.model_dump() for integration in integrations]
     except Exception as e:
@@ -6340,7 +6487,7 @@ async def upsert_user_integration(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+    if provider not in SUPPORTED_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
 
     current_user_id = str(current_user.id)
@@ -6373,7 +6520,7 @@ async def authorize_user_integration(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+    if provider not in SUPPORTED_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
 
     if provider == "gmail":
@@ -6409,6 +6556,21 @@ async def authorize_user_integration(
             "state": state_token,
         }
         authorization_url = requests.Request("GET", OUTLOOK_AUTH_URL, params=params).prepare().url
+    elif provider == "stripe":
+        if not stripe_connect_client_id:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe Connect is not configured.")
+        _stripe_platform_api_key()
+
+        redirect_uri = _get_stripe_redirect_uri(request)
+        state_token = _build_integration_state(str(current_user.id), provider, return_to)
+        params = {
+            "client_id": stripe_connect_client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": STRIPE_CONNECT_SCOPE,
+            "state": state_token,
+        }
+        authorization_url = requests.Request("GET", STRIPE_CONNECT_AUTH_URL, params=params).prepare().url
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provider authorization not implemented.")
     if not authorization_url:
@@ -6650,12 +6812,122 @@ async def outlook_integration_callback(
     return HTMLResponse(content=html)
 
 
+@app.get("/users/me/integrations/stripe/callback", response_class=HTMLResponse, name="stripe_integration_callback", tags=["Users"])
+async def stripe_integration_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None,
+):
+    frontend_target = frontend_base_url or "/"
+    success = False
+    message = "Stripe could not be connected."
+
+    try:
+        if error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_description or error)
+        if not code or not state:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth callback parameters.")
+
+        state_payload = _decode_integration_state(state)
+        user_id = str(state_payload["sub"])
+        frontend_target = state_payload.get("return_to") or frontend_target
+        token_data = _exchange_stripe_code(code)
+        stripe_user_id = token_data.get("stripe_user_id")
+        if not stripe_user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stripe did not return a connected account ID.")
+
+        livemode = bool(token_data.get("livemode"))
+        account = _stripe_object_to_dict(
+            stripe.Account.retrieve(
+                stripe_user_id,
+                api_key=_stripe_platform_api_key(livemode),
+            )
+        )
+        business_profile = account.get("business_profile") or {}
+        settings = account.get("settings") or {}
+        dashboard = settings.get("dashboard") or {}
+        connected_email = account.get("email")
+        display_name = business_profile.get("name") or dashboard.get("display_name") or stripe_user_id
+
+        _upsert_integration_row(
+            user_id,
+            "stripe",
+            {
+                "selected": True,
+                "status": "connected",
+                "connected_email": connected_email,
+                "scopes": [token_data.get("scope") or STRIPE_CONNECT_SCOPE],
+                "provider_metadata": {
+                    "account_id": stripe_user_id,
+                    "display_name": display_name,
+                    "business_url": business_profile.get("url"),
+                    "charges_enabled": bool(account.get("charges_enabled")),
+                    "payouts_enabled": bool(account.get("payouts_enabled")),
+                    "details_submitted": bool(account.get("details_submitted")),
+                    "livemode": livemode,
+                    "connected_at": datetime.now(timezone.utc).isoformat(),
+                },
+                "credentials": {
+                    "stripe_user_id": stripe_user_id,
+                    "livemode": livemode,
+                },
+            },
+        )
+        success = True
+        message = "Stripe connected."
+    except HTTPException as exc:
+        message = exc.detail
+    except Exception as exc:
+        logging.error("Failed Stripe OAuth callback: %s", exc, exc_info=True)
+        message = "Stripe could not be connected."
+
+    callback_payload = json.dumps({
+        "type": "sonar.integration.oauth_complete",
+        "provider": "stripe",
+        "success": success,
+        "message": message,
+    })
+    safe_target = json.dumps(frontend_target)
+    html = f"""
+    <!doctype html>
+    <html>
+      <body style="font-family: Inter, sans-serif; background:#09090b; color:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;">
+        <div style="text-align:center;">
+          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{message}</div>
+          <div style="font-size:13px; color:rgba(255,255,255,0.6);">You can close this window.</div>
+        </div>
+        <script>
+          (function() {{
+            const payload = {callback_payload};
+            const targetOrigin = (function() {{
+              try {{
+                return new URL({safe_target}, window.location.origin).origin;
+              }} catch (e) {{
+                return window.location.origin;
+              }}
+            }})();
+            if (window.opener && !window.opener.closed) {{
+              window.opener.postMessage(payload, targetOrigin);
+            }}
+            setTimeout(function() {{ window.close(); }}, 350);
+          }})();
+        </script>
+      </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
 @app.post("/users/me/integrations/{provider}/disconnect", response_model=IntegrationDisconnectResponse, tags=["Users"])
 async def disconnect_user_integration(provider: str, current_user: dict = Depends(get_current_user)):
     provider = provider.lower().strip()
-    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+    if provider not in SUPPORTED_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
     current_user_id = str(current_user.id)
+    if provider == "stripe":
+        _deauthorize_stripe_integration(_fetch_integration_row(current_user_id, provider))
     _upsert_integration_row(
         current_user_id,
         provider,

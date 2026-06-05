@@ -23,9 +23,11 @@ UPDATE2 = False
 load_project_env()
 
 # --- Stripe Configuration ---
-STRIPE_LIVE_SECRET_KEY = os.environ.get("STRIPE_API_SECRET_KEY")
-STRIPE_TEST_SECRET_KEY = os.environ.get("STRIPE_SECRET_TEST_KEY")
+STRIPE_LIVE_SECRET_KEY = os.environ.get("STRIPE_API_SECRET_KEY") or os.environ.get("STRIPE_SECRET_KEY")
+STRIPE_TEST_SECRET_KEY = os.environ.get("STRIPE_SECRET_TEST_KEY") or os.environ.get("STRIPE_TEST_SECRET_KEY")
 stripe_webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
+stripe_connect_client_id = os.environ.get("STRIPE_CONNECT_CLIENT_ID")
+stripe_connect_redirect_uri = os.environ.get("STRIPE_CONNECT_REDIRECT_URI")
 
 if TEST_MODE:
     stripe.api_key = STRIPE_TEST_SECRET_KEY

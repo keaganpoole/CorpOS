@@ -45,7 +45,7 @@ begin
   ) then
     alter table public.integrations
       add constraint integrations_provider_check
-      check (provider in ('gmail', 'outlook'));
+      check (provider in ('gmail', 'outlook', 'stripe'));
   end if;
 end $$;
 

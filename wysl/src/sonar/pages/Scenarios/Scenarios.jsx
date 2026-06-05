@@ -44,6 +44,7 @@ import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/
 import { getSmartActions, getSmartActionByKey } from './smartActions';
 import googleIcon from '../../../assets/google.png';
 import microsoftIcon from '../../../assets/microsofticon.png';
+import stripeIcon from '../../../assets/stripe.svg';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const API_ORIGIN = (() => {
@@ -60,6 +61,7 @@ const INTEGRATION_PROVIDERS = [
     subtitle: 'Google Workspace or Gmail',
     description: 'Use this inbox for scenario email.',
     icon: googleIcon,
+    category: 'email',
     available: true,
   },
   {
@@ -68,10 +70,20 @@ const INTEGRATION_PROVIDERS = [
     subtitle: 'Microsoft 365 or Outlook',
     description: 'Connect your Outlook mailbox.',
     icon: microsoftIcon,
+    category: 'email',
+    available: true,
+  },
+  {
+    key: 'stripe',
+    name: 'Stripe',
+    subtitle: 'Payments and billing',
+    description: 'Use your Stripe account for scenario payment actions.',
+    icon: stripeIcon,
+    category: 'payments',
     available: true,
   },
 ];
-const DEFAULT_EMAIL_INTEGRATIONS = INTEGRATION_PROVIDERS.reduce((acc, provider) => {
+const DEFAULT_INTEGRATIONS = INTEGRATION_PROVIDERS.reduce((acc, provider) => {
   acc[provider.key] = {
     provider: provider.key,
     selected: false,
@@ -85,7 +97,7 @@ const DEFAULT_EMAIL_INTEGRATIONS = INTEGRATION_PROVIDERS.reduce((acc, provider) 
 }, {});
 
 const normalizeIntegrationState = (rows = []) => {
-  const next = { ...DEFAULT_EMAIL_INTEGRATIONS };
+  const next = { ...DEFAULT_INTEGRATIONS };
   rows.forEach((row) => {
     const key = row?.provider;
     if (!key || !next[key]) return;
@@ -100,6 +112,16 @@ const normalizeIntegrationState = (rows = []) => {
   });
   return next;
 };
+
+const STRIPE_ACTION_KEYS = new Set([
+  'create_payment',
+  'create_payment_profile',
+  'create_invoice',
+  'send_invoice',
+  'update_payment',
+  'check_payment_status',
+  'issue_refund',
+]);
 
 const TABLE_REF_ALIASES = {
   person: 'people',
@@ -720,12 +742,13 @@ export default function ScenariosPage() {
   const [scenarioNotes, setScenarioNotes] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [runProgress, setRunProgress] = useState('');
-  const [emailIntegrations, setEmailIntegrations] = useState(DEFAULT_EMAIL_INTEGRATIONS);
+  const [integrations, setIntegrations] = useState(DEFAULT_INTEGRATIONS);
   const [integrationLoading, setIntegrationLoading] = useState(false);
   const [integrationSaving, setIntegrationSaving] = useState(false);
   const [integrationPopupPending, setIntegrationPopupPending] = useState(false);
   const [integrationError, setIntegrationError] = useState('');
   const [selectedIntegrationProvider, setSelectedIntegrationProvider] = useState(INTEGRATION_PROVIDERS[0]?.key || 'gmail');
+  const integrationsLoadedRef = useRef(false);
   
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
@@ -906,33 +929,49 @@ export default function ScenariosPage() {
     }
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${session.access_token}`);
-    return fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    return fetch(`${API_BASE_URL}${path}`, { ...options, headers, signal: options.signal });
   }, [session?.access_token]);
 
   const refreshIntegrations = useCallback(async () => {
     if (!session?.access_token) {
-      setEmailIntegrations(DEFAULT_EMAIL_INTEGRATIONS);
+      setIntegrations(DEFAULT_INTEGRATIONS);
+      integrationsLoadedRef.current = false;
       return;
     }
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 8000);
     setIntegrationLoading(true);
     try {
-      const response = await authorizedApiFetch('/users/me/integrations');
+      const response = await authorizedApiFetch('/users/me/integrations', { signal: controller.signal });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result?.detail || 'Failed to load integrations.');
       }
-      setEmailIntegrations(normalizeIntegrationState(result));
+      setIntegrations(normalizeIntegrationState(result));
+      integrationsLoadedRef.current = true;
     } catch (error) {
-      console.warn('[Scenarios] Failed to load integrations:', error?.message || error);
-      setIntegrationError(error?.message || 'Failed to load integrations.');
+      const message = error?.name === 'AbortError'
+        ? 'Loading integrations timed out. You can still continue and try connecting directly.'
+        : (error?.message || 'Failed to load integrations.');
+      console.warn('[Scenarios] Failed to load integrations:', message, error);
+      setIntegrationError(message);
     } finally {
+      window.clearTimeout(timeoutId);
       setIntegrationLoading(false);
     }
   }, [authorizedApiFetch, session?.access_token]);
 
   useEffect(() => {
-    refreshIntegrations();
-  }, [refreshIntegrations]);
+    if (showIntegrationsModal && !integrationsLoadedRef.current && !integrationLoading) {
+      refreshIntegrations();
+    }
+  }, [showIntegrationsModal, integrationLoading, refreshIntegrations]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      integrationsLoadedRef.current = false;
+    }
+  }, [session?.access_token]);
 
   useEffect(() => {
     const handleMessage = async (event) => {
@@ -1024,15 +1063,25 @@ export default function ScenariosPage() {
   const scheduleDateInputMode = scheduleConfig.date_input_mode || 'picker';
   const scheduleTimeInputMode = scheduleConfig.time_input_mode || 'picker';
   const selectedProviderConfig = INTEGRATION_PROVIDERS.find((provider) => provider.key === selectedIntegrationProvider) || INTEGRATION_PROVIDERS[0];
-  const selectedIntegration = emailIntegrations[selectedIntegrationProvider] || DEFAULT_EMAIL_INTEGRATIONS[selectedIntegrationProvider] || DEFAULT_EMAIL_INTEGRATIONS.gmail;
-  const gmailIntegration = emailIntegrations.gmail || DEFAULT_EMAIL_INTEGRATIONS.gmail;
-  const hasConnectedEmailIntegration = Object.values(emailIntegrations).some((integration) => integration?.status === 'connected');
+  const selectedIntegration = integrations[selectedIntegrationProvider] || DEFAULT_INTEGRATIONS[selectedIntegrationProvider] || DEFAULT_INTEGRATIONS.gmail;
+  const hasConnectedEmailIntegration = ['gmail', 'outlook'].some((provider) => integrations[provider]?.status === 'connected');
+  const hasConnectedStripeIntegration = integrations.stripe?.status === 'connected';
+  const connectedIntegrationCount = Object.values(integrations).filter((integration) => integration?.status === 'connected').length;
+  const actionRequiresEmailIntegration = actionConfig?._key === 'send_email';
+  const actionRequiresStripeIntegration = STRIPE_ACTION_KEYS.has(actionConfig?._key);
+  const actionIntegrationMissing = (actionRequiresEmailIntegration && !hasConnectedEmailIntegration)
+    || (actionRequiresStripeIntegration && !hasConnectedStripeIntegration);
+  const selectedIntegrationAccount = selectedIntegration.providerMetadata?.display_name
+    || selectedIntegration.providerMetadata?.account_id
+    || selectedIntegration.connectedEmail
+    || session?.user?.email
+    || `Will use the connected ${selectedProviderConfig?.name || 'provider'} account`;
   const integrationSteps = [
     {
       id: 'provider',
       eyebrow: 'Step 1',
-      title: 'Pick your email provider',
-      helper: 'Choose which inbox scenarios should use.',
+      title: 'Pick an integration',
+      helper: 'Choose which connected service scenarios should use.',
     },
     {
       id: 'connect',
@@ -1855,14 +1904,15 @@ export default function ScenariosPage() {
     setViewMode('list');
   };
 
-  const openIntegrationsModal = () => {
-    // Find the first connected provider, or fall back to current selection
-    const connectedEntry = Object.entries(emailIntegrations).find(
+  const openIntegrationsModal = (preferredProvider = null) => {
+    const requestedProvider = typeof preferredProvider === 'string' ? preferredProvider : null;
+    // Find the requested provider, first connected provider, or current selection.
+    const connectedEntry = Object.entries(integrations).find(
       ([, entry]) => entry.status === 'connected'
     );
-    const primaryKey = connectedEntry?.[0] || selectedIntegrationProvider || INTEGRATION_PROVIDERS[0]?.key;
+    const primaryKey = requestedProvider || connectedEntry?.[0] || selectedIntegrationProvider || INTEGRATION_PROVIDERS[0]?.key;
     setSelectedIntegrationProvider(primaryKey);
-    setIntegrationStep(connectedEntry ? 1 : 0);
+    setIntegrationStep(integrations[primaryKey]?.status === 'connected' ? 1 : 0);
     setIntegrationError('');
     setShowIntegrationsModal(true);
   };
@@ -1881,7 +1931,7 @@ export default function ScenariosPage() {
       if (!response.ok) {
         throw new Error(result?.detail || 'Failed to save provider.');
       }
-      setEmailIntegrations((prev) => normalizeIntegrationState([
+      setIntegrations((prev) => normalizeIntegrationState([
         ...Object.values(prev).map((entry) => ({
           provider: entry.provider,
           selected: entry.selected,
@@ -2435,7 +2485,7 @@ export default function ScenariosPage() {
       if (actionKey === 'create_payment') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
         console.log('[Run Node] create_payment request', { nodeId, amountCents });
-        const resp = await fetch('/api/sonar/create-payment', {
+        const resp = await authorizedApiFetch('/api/sonar/create-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2456,7 +2506,7 @@ export default function ScenariosPage() {
       if (actionKey === 'create_payment_profile') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
         console.log('[Run Node] create_payment_profile request', { nodeId, amountCents });
-        const resp = await fetch('/api/sonar/create-payment-profile', {
+        const resp = await authorizedApiFetch('/api/sonar/create-payment-profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2478,7 +2528,7 @@ export default function ScenariosPage() {
       if (actionKey === 'create_invoice') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
         console.log('[Run Node] create_invoice request', { nodeId, amountCents });
-        const resp = await fetch('/api/sonar/create-invoice', {
+        const resp = await authorizedApiFetch('/api/sonar/create-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2502,7 +2552,7 @@ export default function ScenariosPage() {
 
       if (actionKey === 'send_invoice') {
         console.log('[Run Node] send_invoice request', { nodeId, invoiceId: getValue('invoice_id') || null });
-        const resp = await fetch('/api/sonar/send-invoice', {
+        const resp = await authorizedApiFetch('/api/sonar/send-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2694,9 +2744,9 @@ export default function ScenariosPage() {
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
           };
           console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
-          const resp = await fetch('/api/sonar/create-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const resp = await authorizedApiFetch('/api/sonar/create-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
-          if (!result.error) {
+          if (resp.ok && !result.error && !result.detail) {
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
             resultsMap[node.id] = result;
             resultsMap.payment = result;
@@ -2704,8 +2754,8 @@ export default function ScenariosPage() {
             log(`✅ ${step} ${node.label} — status: ${result.status} | intent: ${result.id}`);
             console.log(`[Scenario Run]   └ PaymentIntent: ${result.id} | status: ${result.status}`);
           } else {
-            log(`❌ ${step} ${node.label} — error: ${result.error}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error);
+            log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'create_payment_profile') {
           const config = node.actionConfig;
@@ -2719,9 +2769,9 @@ export default function ScenariosPage() {
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
           };
           console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment-profile | person: ${body.person_id || '(none)'}`);
-          const resp = await fetch('/api/sonar/create-payment-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const resp = await authorizedApiFetch('/api/sonar/create-payment-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
-          if (!result.error) {
+          if (resp.ok && !result.error && !result.detail) {
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
             resultsMap[node.id] = result;
             resultsMap.payment = result;
@@ -2731,8 +2781,8 @@ export default function ScenariosPage() {
             console.log(`[Scenario Run]   ├ SetupIntent: ${result.setup_intent_id}`);
             console.log(`[Scenario Run]   └ Payment URL: ${result.payment_url || result.checkout_error || 'none'}`);
           } else {
-            log(`❌ ${step} ${node.label} — error: ${result.error}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error);
+            log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'create_invoice') {
           const config = node.actionConfig;
@@ -2750,9 +2800,9 @@ export default function ScenariosPage() {
             due_days: resolveVariableRefs(resolveTableVariableRefs(config.due_days, resultsMap), resultsMap) || config.due_days || 7,
           };
           console.log(`[Scenario Run]   ├ POST /api/sonar/create-invoice | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
-          const resp = await fetch('/api/sonar/create-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const resp = await authorizedApiFetch('/api/sonar/create-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
-          if (!result.error) {
+          if (resp.ok && !result.error && !result.detail) {
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
             resultsMap[node.id] = result;
             resultsMap.invoice = result;
@@ -2760,8 +2810,8 @@ export default function ScenariosPage() {
             log(`✅ ${step} ${node.label} — invoice: ${result.invoice_id || result.id} | status: ${result.status || 'draft'}`);
             console.log(`[Scenario Run]   └ Invoice: ${result.invoice_id || result.id} | status: ${result.status || 'draft'}`);
           } else {
-            log(`❌ ${step} ${node.label} — error: ${result.error}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error);
+            log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'send_invoice') {
           const config = node.actionConfig;
@@ -2769,9 +2819,9 @@ export default function ScenariosPage() {
             invoice_id: resolveVariableRefs(resolveTableVariableRefs(config.invoice_id, resultsMap), resultsMap) || config.invoice_id || null,
           };
           console.log(`[Scenario Run]   ├ POST /api/sonar/send-invoice | invoice: ${body.invoice_id || '(none)'}`);
-          const resp = await fetch('/api/sonar/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const resp = await authorizedApiFetch('/api/sonar/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
-          if (!result.error) {
+          if (resp.ok && !result.error && !result.detail) {
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
             resultsMap[node.id] = result;
             resultsMap.invoice = result;
@@ -2779,8 +2829,8 @@ export default function ScenariosPage() {
             log(`✅ ${step} ${node.label} — invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
             console.log(`[Scenario Run]   └ Invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
           } else {
-            log(`❌ ${step} ${node.label} — error: ${result.error}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error);
+            log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'send_email') {
           if (!session?.access_token) {
@@ -2999,6 +3049,13 @@ export default function ScenariosPage() {
           <p className="scenario-list-subtitle">Automate your workflows with conditional logic</p>
         </div>
         <div className="scenario-list-actions">
+          <button className="sb-integrations-btn sb-integrations-btn--inline" onClick={() => openIntegrationsModal()}>
+            <ShieldCheck size={16} />
+            <span className="sb-integrations-btn-copy">
+              <span className="sb-integrations-btn-label">Integrations</span>
+              <span className="sb-integrations-btn-status">{connectedIntegrationCount} connected</span>
+            </span>
+          </button>
           <button className="create-scenario-btn" onClick={handleCreateScenario}>
             <Plus size={18} />
             Create Scenario
@@ -3609,8 +3666,8 @@ export default function ScenariosPage() {
 
                 {panelStage === 'actionConfig' && actionConfig ? (
                   /* Staged Action Config Form */
-                  <div className={`sb-action-config-form${actionConfig._key === 'send_email' && !hasConnectedEmailIntegration ? ' sb-action-config-form--empty' : ''}`}>
-                    {!(actionConfig._key === 'send_email' && !hasConnectedEmailIntegration) && (
+                  <div className={`sb-action-config-form${actionIntegrationMissing ? ' sb-action-config-form--empty' : ''}`}>
+                    {!actionIntegrationMissing && (
                       <div className="sb-action-config-header">
                         <h4 className="sb-action-config-title">Configure Action</h4>
                         <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); setActionConfig(null); }}>
@@ -3618,7 +3675,7 @@ export default function ScenariosPage() {
                         </button>
                       </div>
                     )}
-                    {actionConfig._key === 'send_email' && !hasConnectedEmailIntegration ? (
+                    {actionRequiresEmailIntegration && !hasConnectedEmailIntegration ? (
                       <div className="sb-panel-empty-state">
                         <div className="sb-panel-empty-kicker">Email integration required</div>
                         <div className="sb-panel-empty-title">Connect your email</div>
@@ -3628,9 +3685,24 @@ export default function ScenariosPage() {
                         <button
                           type="button"
                           className="sb-panel-empty-cta"
-                          onClick={openIntegrationsModal}
+                          onClick={() => openIntegrationsModal('gmail')}
                         >
                           Connect your Email
+                        </button>
+                      </div>
+                    ) : actionRequiresStripeIntegration && !hasConnectedStripeIntegration ? (
+                      <div className="sb-panel-empty-state">
+                        <div className="sb-panel-empty-kicker">Stripe integration required</div>
+                        <div className="sb-panel-empty-title">Connect your Stripe account</div>
+                        <p className="sb-panel-empty-copy">
+                          Connect Stripe before configuring or running payment actions.
+                        </p>
+                        <button
+                          type="button"
+                          className="sb-panel-empty-cta"
+                          onClick={() => openIntegrationsModal('stripe')}
+                        >
+                          Connect Stripe
                         </button>
                       </div>
                     ) : (
@@ -4474,6 +4546,21 @@ export default function ScenariosPage() {
                       );
                     })
                   )
+                ) : activeOption?.key === 'payments' && !hasConnectedStripeIntegration ? (
+                  <div className="sb-panel-empty-state">
+                    <div className="sb-panel-empty-kicker">Stripe integration required</div>
+                    <div className="sb-panel-empty-title">Connect your Stripe account</div>
+                    <p className="sb-panel-empty-copy">
+                      Once Stripe is connected, this panel will show the available payment actions.
+                    </p>
+                    <button
+                      type="button"
+                      className="sb-panel-empty-cta"
+                      onClick={() => openIntegrationsModal('stripe')}
+                    >
+                      Open Integrations
+                    </button>
+                  </div>
                 ) : activeOption?.key === 'email' && !hasConnectedEmailIntegration ? (
                   <div className="sb-panel-empty-state">
                     <div className="sb-panel-empty-kicker">Email integration required</div>
@@ -4484,7 +4571,7 @@ export default function ScenariosPage() {
                     <button
                       type="button"
                       className="sb-panel-empty-cta"
-                      onClick={openIntegrationsModal}
+                      onClick={() => openIntegrationsModal('gmail')}
                     >
                       Open Integrations
                     </button>
@@ -4627,6 +4714,13 @@ export default function ScenariosPage() {
               <ChevronLeft size={16} />
               Back to Scenarios
             </button>
+            <button className="sb-integrations-btn sb-integrations-btn--inline" onClick={() => openIntegrationsModal()}>
+              <ShieldCheck size={15} />
+              <span className="sb-integrations-btn-copy">
+                <span className="sb-integrations-btn-label">Integrations</span>
+                <span className="sb-integrations-btn-status">{connectedIntegrationCount} connected</span>
+              </span>
+            </button>
           </div>
           <button 
             className="save-scenario-btn" 
@@ -4692,10 +4786,10 @@ export default function ScenariosPage() {
             <div className="sb-integrations-modal" onClick={(e) => e.stopPropagation()}>
               <div className="sb-integrations-sidebar">
                 <div className="sb-integrations-sidebar-inner">
-                  <div className="sb-integrations-kicker">Email Integrations</div>
-                  <h2 className="sb-integrations-title">Set up email for scenarios.</h2>
+                  <div className="sb-integrations-kicker">Scenario Integrations</div>
+                  <h2 className="sb-integrations-title">Connect the services scenarios use.</h2>
                   <p className="sb-integrations-lead">
-                    Connect your email provider so scenarios can send and receive messages. Currently supported: Gmail and Outlook (Microsoft 365).
+                    Connect email providers for messages and Stripe for payment and billing actions.
                   </p>
                 </div>
               </div>
@@ -4721,7 +4815,7 @@ export default function ScenariosPage() {
                 {integrationStep === 0 ? (
                   <div className="sb-integrations-provider-grid">
                     {INTEGRATION_PROVIDERS.map((provider) => {
-                      const providerState = emailIntegrations[provider.key] || DEFAULT_EMAIL_INTEGRATIONS[provider.key];
+                      const providerState = integrations[provider.key] || DEFAULT_INTEGRATIONS[provider.key];
                       const isSelected = selectedIntegrationProvider === provider.key;
                       return (
                         <button
@@ -4747,7 +4841,9 @@ export default function ScenariosPage() {
                           <p className="sb-integrations-provider-body">{provider.description}</p>
                           <div className="sb-integrations-provider-meta">
                             <span>{providerState.status === 'connected' ? 'Connected' : 'Available now'}</span>
-                            {providerState.connectedEmail && <span>{providerState.connectedEmail}</span>}
+                            {(providerState.providerMetadata?.display_name || providerState.providerMetadata?.account_id || providerState.connectedEmail) && (
+                              <span>{providerState.providerMetadata?.display_name || providerState.providerMetadata?.account_id || providerState.connectedEmail}</span>
+                            )}
                           </div>
                         </button>
                       );
@@ -4779,11 +4875,15 @@ export default function ScenariosPage() {
                       </div>
                       <div className="sb-integrations-summary-row">
                         <span>Status</span>
-                        <strong>{selectedIntegration.status === 'connected' ? 'Connected for scenario email' : 'Selected for scenario email'}</strong>
+                        <strong>
+                          {selectedIntegration.status === 'connected'
+                            ? `Connected for scenario ${selectedProviderConfig?.category || 'actions'}`
+                            : `Selected for scenario ${selectedProviderConfig?.category || 'actions'}`}
+                        </strong>
                       </div>
                       <div className="sb-integrations-summary-row">
-                        <span>Mailbox</span>
-                        <strong>{selectedIntegration.connectedEmail || session?.user?.email || `Will use the connected ${selectedProviderConfig?.name || 'email'} mailbox`}</strong>
+                        <span>{selectedProviderConfig?.category === 'email' ? 'Mailbox' : 'Account'}</span>
+                        <strong>{selectedIntegrationAccount}</strong>
                       </div>
                     </div>
 
@@ -4826,7 +4926,7 @@ export default function ScenariosPage() {
                         type="button"
                         className="sb-integrations-primary"
                         onClick={() => selectIntegrationProvider(selectedIntegrationProvider)}
-                        disabled={integrationSaving || integrationLoading}
+                        disabled={integrationSaving}
                       >
                         Continue
                         <ChevronRight size={15} />

@@ -1060,6 +1060,7 @@ class ScenarioActionExecutor:
             return {"success": False, "error": "Payment callback not configured"}
         config = node.get("actionConfig") or {}
         payload = {
+            "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
             "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)),
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "payment_method_type": self._resolve_variables(config.get("payment_method") or "card", context),
@@ -1076,6 +1077,7 @@ class ScenarioActionExecutor:
         config = node.get("actionConfig") or {}
         person = context.get("person") or {}
         payload = {
+            "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
             "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)) if config.get("amount") else None,
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "description": self._resolve_variables(config.get("description") or "", context),
@@ -1094,6 +1096,7 @@ class ScenarioActionExecutor:
         config = node.get("actionConfig") or {}
         person = context.get("person") or {}
         payload = {
+            "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
             "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)),
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "description": self._resolve_variables(config.get("description") or "", context),
@@ -1116,7 +1119,10 @@ class ScenarioActionExecutor:
         invoice_id = self._resolve_variables(config.get("invoice_id") or "", context) or context.get("invoice", {}).get("invoice_id") or context.get("invoice", {}).get("id")
         if not invoice_id:
             return {"success": False, "error": "No invoice ID provided for send invoice"}
-        result = await callback({"invoice_id": invoice_id})
+        result = await callback({
+            "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
+            "invoice_id": invoice_id,
+        })
         return {"success": True, "data": {"action": "send_invoice", **result}}
 
     async def _send_email(self, node: dict, context: dict):
@@ -1541,6 +1547,8 @@ class ScenarioEngine:
 
         business_id = payload.get("business_id") or context.get("business_id")
         user_id = payload.get("user_id") or context.get("user_id") or scenario.get("user_id") or scenario.get("created_by")
+        if user_id:
+            context.setdefault("user_id", user_id)
         try:
             if business_id:
                 response = self.supabase.table("businesses").select("*").eq("id", business_id).limit(1).execute()
