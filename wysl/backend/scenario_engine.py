@@ -49,6 +49,17 @@ def normalize_phone_number(phone_value: Optional[str]) -> Optional[str]:
     return f"+{digits}"
 
 
+def format_person_display_name(person: Optional[dict]) -> str:
+    if not person:
+        return ""
+    first_name = str(person.get("first_name") or "").strip()
+    last_name = str(person.get("last_name") or "").strip()
+    full_name = " ".join(part for part in [first_name, last_name] if part).strip()
+    if full_name:
+        return full_name
+    return str(person.get("name") or person.get("full_name") or "").strip()
+
+
 TRIGGER_EVENT_MAP = {
     "incoming_call": "incoming_call",
     "call_answered": "call_answered",
@@ -70,8 +81,15 @@ TRIGGER_EVENT_MAP = {
     "invoice_created": "invoice_created",
     "invoice_sent": "invoice_sent",
     "invoice_paid": "invoice_paid",
+    "payment_received": "payment_received",
     "payment_failed": "payment_failed",
-    "payment_succeeded": "payment_succeeded",
+    "refund_issued": "refund_issued",
+    "customer_created": "customer_created",
+    "subscription_created": "subscription_created",
+    "subscription_canceled": "subscription_canceled",
+    "subscription_payment_failed": "subscription_payment_failed",
+    "payment_succeeded": "payment_received",
+    "payment_link_sent": "payment_link_sent",
     "manual_trigger": "manual_trigger",
 }
 
@@ -754,10 +772,15 @@ class ScenarioActionExecutor:
             "cancel_appointment": self._cancel_appointment,
             "call_customer": self._call_customer,
             "transfer_to_phone_number": self._transfer_call,
+            "create_customer": self._create_customer,
+            "update_customer": self._update_customer,
             "create_payment": self._create_payment,
-            "create_payment_profile": self._create_payment_profile,
+            "send_payment_link": self._send_payment_link,
+            "create_payment_profile": self._send_payment_link,
             "create_invoice": self._create_invoice,
             "send_invoice": self._send_invoice,
+            "refund_payment": self._refund_payment,
+            "cancel_subscription": self._cancel_subscription,
             "send_email": self._send_email,
             "send_to_customer": self._send_sms_placeholder,
             "hang_up": self._hang_up,
@@ -1059,6 +1082,7 @@ class ScenarioActionExecutor:
         if not callback:
             return {"success": False, "error": "Payment callback not configured"}
         config = node.get("actionConfig") or {}
+        person = context.get("person") or {}
         payload = {
             "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
             "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)),
@@ -1066,12 +1090,49 @@ class ScenarioActionExecutor:
             "payment_method_type": self._resolve_variables(config.get("payment_method") or "card", context),
             "description": self._resolve_variables(config.get("description") or "", context),
             "person_id": self._resolve_variables(config.get("person_id") or "", context) or context.get("person", {}).get("id") or context.get("person_id"),
+            "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
+            "customer_name": self._resolve_variables(config.get("customer_name") or format_person_display_name(person) or "", context),
+            "customer_email": self._resolve_variables(config.get("customer_email") or person.get("email") or "", context),
+            "customer_phone": self._resolve_variables(config.get("customer_phone") or person.get("phone") or "", context),
         }
         result = await callback(payload)
         return {"success": True, "data": {"action": "create_payment", **result}}
 
-    async def _create_payment_profile(self, node: dict, context: dict):
-        callback = self.callbacks.get("create_payment_profile")
+    async def _create_customer(self, node: dict, context: dict):
+        callback = self.callbacks.get("create_customer")
+        if not callback:
+            return {"success": False, "error": "Customer callback not configured"}
+        config = node.get("actionConfig") or {}
+        person = context.get("person") or {}
+        payload = {
+            "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
+            "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+            "customer_name": self._resolve_variables(config.get("customer_name") or format_person_display_name(person) or "", context),
+            "customer_email": self._resolve_variables(config.get("customer_email") or person.get("email") or "", context),
+            "customer_phone": self._resolve_variables(config.get("customer_phone") or person.get("phone") or "", context),
+        }
+        result = await callback(payload)
+        return {"success": True, "data": {"action": "create_customer", **result}}
+
+    async def _update_customer(self, node: dict, context: dict):
+        callback = self.callbacks.get("update_customer")
+        if not callback:
+            return {"success": False, "error": "Update customer callback not configured"}
+        config = node.get("actionConfig") or {}
+        person = context.get("person") or {}
+        payload = {
+            "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
+            "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
+            "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+            "customer_name": self._resolve_variables(config.get("customer_name") or format_person_display_name(person) or "", context),
+            "customer_email": self._resolve_variables(config.get("customer_email") or person.get("email") or "", context),
+            "customer_phone": self._resolve_variables(config.get("customer_phone") or person.get("phone") or "", context),
+        }
+        result = await callback(payload)
+        return {"success": True, "data": {"action": "update_customer", **result}}
+
+    async def _send_payment_link(self, node: dict, context: dict):
+        callback = self.callbacks.get("send_payment_link") or self.callbacks.get("create_payment_profile")
         if not callback:
             return {"success": False, "error": "Payment profile callback not configured"}
         config = node.get("actionConfig") or {}
@@ -1082,12 +1143,13 @@ class ScenarioActionExecutor:
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "description": self._resolve_variables(config.get("description") or "", context),
             "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+            "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
             "customer_name": self._resolve_variables(config.get("customer_name") or f"{person.get('first_name', '')} {person.get('last_name', '')}".strip(), context),
             "customer_email": self._resolve_variables(config.get("customer_email") or person.get("email") or "", context),
             "customer_phone": self._resolve_variables(config.get("customer_phone") or person.get("phone") or "", context),
         }
         result = await callback(payload)
-        return {"success": True, "data": {"action": "create_payment_profile", **result}}
+        return {"success": True, "data": {"action": "send_payment_link", **result}}
 
     async def _create_invoice(self, node: dict, context: dict):
         callback = self.callbacks.get("create_invoice")
@@ -1101,6 +1163,7 @@ class ScenarioActionExecutor:
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "description": self._resolve_variables(config.get("description") or "", context),
             "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+            "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
             "appointment_id": self._resolve_variables(config.get("appointment_id") or "", context) or context.get("appointment", {}).get("id"),
             "service_id": self._resolve_variables(config.get("service_id") or "", context) or context.get("service", {}).get("id"),
             "customer_name": self._resolve_variables(config.get("customer_name") or f"{person.get('first_name', '')} {person.get('last_name', '')}".strip(), context),
@@ -1124,6 +1187,35 @@ class ScenarioActionExecutor:
             "invoice_id": invoice_id,
         })
         return {"success": True, "data": {"action": "send_invoice", **result}}
+
+    async def _refund_payment(self, node: dict, context: dict):
+        callback = self.callbacks.get("refund_payment")
+        if not callback:
+            return {"success": False, "error": "Refund callback not configured"}
+        config = node.get("actionConfig") or {}
+        payload = {
+            "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
+            "payment_id": self._resolve_variables(config.get("payment_id") or "", context) or context.get("payment", {}).get("id"),
+            "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)) if config.get("amount") else None,
+            "refund_reason": self._resolve_variables(config.get("refund_reason") or "", context),
+        }
+        result = await callback(payload)
+        return {"success": True, "data": {"action": "refund_payment", **result}}
+
+    async def _cancel_subscription(self, node: dict, context: dict):
+        callback = self.callbacks.get("cancel_subscription")
+        if not callback:
+            return {"success": False, "error": "Cancel subscription callback not configured"}
+        config = node.get("actionConfig") or {}
+        person = context.get("person") or {}
+        payload = {
+            "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
+            "subscription_id": self._resolve_variables(config.get("subscription_id") or "", context) or context.get("subscription_id") or context.get("subscription", {}).get("subscription_id"),
+            "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
+            "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+        }
+        result = await callback(payload)
+        return {"success": True, "data": {"action": "cancel_subscription", **result}}
 
     async def _send_email(self, node: dict, context: dict):
         callback = self.callbacks.get("send_email")
@@ -1288,9 +1380,13 @@ class ScenarioFlowExecutor:
                 if action in {"create_invoice", "send_invoice"}:
                     context["invoice"] = data
                     context["invoices"] = data
-                if action in {"create_payment", "create_payment_profile", "update_payment"}:
+                if action in {"create_payment", "send_payment_link", "refund_payment", "create_payment_profile", "update_payment"}:
                     context["payment"] = data
                     context["payments"] = data
+                if action in {"create_customer", "update_customer"}:
+                    context["customer"] = data
+                if action in {"cancel_subscription"}:
+                    context["subscription"] = data
                 table = data.get("table")
                 if table:
                     context[table] = data
@@ -1522,13 +1618,43 @@ class ScenarioEngine:
             except Exception as exc:
                 logging.warning("[ScenarioEngine] Could not fetch person: %s", exc)
 
-        payment_id = payload.get("payment_id") or payload.get("stripe_payment_intent_id")
-        if payment_id:
+        if "person" not in context and payload.get("customer_id"):
+            try:
+                customer_query = self.supabase.table("people").select("*").eq("stripe_customer_id", payload.get("customer_id"))
+                if payload.get("user_id"):
+                    customer_query = customer_query.eq("user_id", payload.get("user_id"))
+                response = customer_query.limit(1).execute()
+                if response.data:
+                    context["person"] = response.data[0]
+                    context["customer"] = response.data[0]
+                    context["people"] = response.data[0]
+                    context["person_id"] = response.data[0].get("id")
+                    context.setdefault("user_id", response.data[0].get("user_id"))
+                    context.setdefault("business_id", response.data[0].get("business_id"))
+            except Exception as exc:
+                logging.warning("[ScenarioEngine] Could not fetch person by stripe_customer_id: %s", exc)
+
+        payment_payload = payload.get("payment")
+        if payment_payload:
+            context["payment"] = payment_payload
+            context["payments"] = payment_payload
+        payment_id = payload.get("payment_id") or payload.get("stripe_payment_intent_id") or payload.get("stripe_session_id")
+        if payment_id and not payment_payload:
             try:
                 response = self.supabase.table("payments").select("*").eq("id", payment_id).limit(1).execute()
                 if response.data:
                     context["payment"] = response.data[0]
                     context["payments"] = response.data[0]
+                elif payload.get("stripe_payment_intent_id"):
+                    response = self.supabase.table("payments").select("*").eq("stripe_payment_intent_id", payload["stripe_payment_intent_id"]).limit(1).execute()
+                    if response.data:
+                        context["payment"] = response.data[0]
+                        context["payments"] = response.data[0]
+                elif payload.get("stripe_session_id"):
+                    response = self.supabase.table("payments").select("*").eq("stripe_session_id", payload["stripe_session_id"]).limit(1).execute()
+                    if response.data:
+                        context["payment"] = response.data[0]
+                        context["payments"] = response.data[0]
             except Exception as exc:
                 logging.warning("[ScenarioEngine] Could not fetch payment: %s", exc)
 
@@ -1544,6 +1670,20 @@ class ScenarioEngine:
                     context["invoices"] = response.data[0]
             except Exception as exc:
                 logging.warning("[ScenarioEngine] Could not fetch invoice: %s", exc)
+
+        customer_payload = payload.get("customer")
+        if customer_payload:
+            context["customer"] = customer_payload
+            context.setdefault("customer_id", customer_payload.get("id") or customer_payload.get("customer_id"))
+        elif payload.get("customer_id"):
+            context.setdefault("customer_id", payload.get("customer_id"))
+
+        subscription_payload = payload.get("subscription")
+        if subscription_payload:
+            context["subscription"] = subscription_payload
+            context.setdefault("subscription_id", subscription_payload.get("id") or subscription_payload.get("subscription_id"))
+        elif payload.get("subscription_id"):
+            context.setdefault("subscription_id", payload.get("subscription_id"))
 
         business_id = payload.get("business_id") or context.get("business_id")
         user_id = payload.get("user_id") or context.get("user_id") or scenario.get("user_id") or scenario.get("created_by")

@@ -114,14 +114,43 @@ const normalizeIntegrationState = (rows = []) => {
 };
 
 const STRIPE_ACTION_KEYS = new Set([
+  'create_customer',
+  'update_customer',
   'create_payment',
-  'create_payment_profile',
+  'send_payment_link',
   'create_invoice',
   'send_invoice',
-  'update_payment',
-  'check_payment_status',
-  'issue_refund',
+  'refund_payment',
+  'cancel_subscription',
 ]);
+
+const LEGACY_ACTION_FIELD_MAP = {
+  create_payment_profile: [
+    { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+    { key: 'amount', label: 'Amount ($)', type: 'text' },
+    { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
+    { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
+    { key: 'customer_name', label: 'Customer Name', type: 'text' },
+    { key: 'customer_email', label: 'Customer Email', type: 'text' },
+    { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
+  ],
+  update_payment: [
+    { key: 'payment_id', label: 'Payment ID', type: 'text' },
+    { key: 'status', label: 'Status', type: 'select', options: ['succeeded', 'failed', 'refunded', 'partial_refund', 'pending'] },
+    { key: 'amount', label: 'Refund Amount ($)', type: 'text' },
+    { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
+    { key: 'notes', label: 'Notes', type: 'prompt_textarea', smartActions: true },
+  ],
+  check_payment_status: [
+    { key: 'search_by', label: 'Look Up By', type: 'select', options: ['Customer Name', 'Payment ID', 'Amount'] },
+    { key: 'search_value', label: 'Search Value', type: 'text' },
+  ],
+  issue_refund: [
+    { key: 'payment_id', label: 'Payment ID', type: 'text' },
+    { key: 'amount', label: 'Refund Amount ($)', type: 'text' },
+    { key: 'refund_reason', label: 'Refund Reason', type: 'prompt_textarea', smartActions: true },
+  ],
+};
 
 const TABLE_REF_ALIASES = {
   person: 'people',
@@ -429,15 +458,20 @@ const AUTOMATION_HIERARCHY = {
     {
       key: 'payments',
       option: 'Payments',
-      description: 'When something happens with a payment',
+      description: 'When something happens with billing, customers, or subscriptions',
       accent: '#32f0d9',
       icon: OPTION_ICONS.payments,
       sub_options: [
-        { key: 'invoice_created', name: 'Invoice Created', description: 'When a new invoice is created' },
-        { key: 'invoice_paid', name: 'Invoice Paid', description: 'When an invoice is paid' },
+        { key: 'payment_received', name: 'Payment Received', description: 'When a payment is successfully collected' },
         { key: 'payment_failed', name: 'Payment Failed', description: 'When a payment cannot process' },
-        { key: 'payment_link_sent', name: 'Payment Link Sent', description: 'When a payment link is sent to the customer' },
-        { key: 'invoice_sent', name: 'Invoice Sent', description: 'When a real invoice is sent to the customer' },
+        { key: 'refund_issued', name: 'Refund Issued', description: 'When a refund is successfully issued' },
+        { key: 'invoice_created', name: 'Invoice Created', description: 'When a new invoice is created' },
+        { key: 'invoice_sent', name: 'Invoice Sent', description: 'When an invoice is sent to the customer' },
+        { key: 'invoice_paid', name: 'Invoice Paid', description: 'When an invoice is paid' },
+        { key: 'customer_created', name: 'Customer Created', description: 'When a Stripe customer is created' },
+        { key: 'subscription_created', name: 'Subscription Created', description: 'When a subscription starts' },
+        { key: 'subscription_canceled', name: 'Subscription Canceled', description: 'When a subscription is canceled' },
+        { key: 'subscription_payment_failed', name: 'Subscription Payment Failed', description: 'When recurring billing fails' },
       ],
     },
     {
@@ -539,12 +573,26 @@ const AUTOMATION_HIERARCHY = {
     {
       key: 'payments',
       option: 'Payments',
-      description: 'Process payments and manage billing',
+      description: 'Manage customers, payments, invoices, and subscriptions',
       accent: '#38bdf8',
       icon: OPTION_ICONS.payments,
       sub_options: [
+        { key: 'create_customer', name: 'Create Customer', description: 'Create a Stripe customer', configFields: [
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'customer_name', label: 'Customer Name', type: 'text' },
+          { key: 'customer_email', label: 'Customer Email', type: 'text' },
+          { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
+        ]},
+        { key: 'update_customer', name: 'Update Customer', description: 'Update an existing Stripe customer', configFields: [
+          { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'customer_name', label: 'Customer Name', type: 'text' },
+          { key: 'customer_email', label: 'Customer Email', type: 'text' },
+          { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
+        ]},
         { key: 'create_payment', name: 'Create Payment', description: 'Process a new payment', configFields: [
           { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
           { key: 'amount', label: 'Amount ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'payment_method', label: 'Payment Method', type: 'select', options: ['card', 'ach', 'link'] },
@@ -553,8 +601,9 @@ const AUTOMATION_HIERARCHY = {
           { key: 'customer_email', label: 'Customer Email', type: 'text' },
           { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
         ]},
-        { key: 'create_payment_profile', name: 'Create Payment Profile', description: 'Set up a Stripe customer and generate a payment link', configFields: [
+        { key: 'send_payment_link', name: 'Send Payment Link', description: 'Generate a hosted payment link for the customer', configFields: [
           { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
           { key: 'amount', label: 'Amount ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
@@ -564,6 +613,7 @@ const AUTOMATION_HIERARCHY = {
         ]},
         { key: 'create_invoice', name: 'Create Invoice', description: 'Create a real Stripe invoice with line items', configFields: [
           { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
           { key: 'amount', label: 'Amount ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
@@ -577,21 +627,15 @@ const AUTOMATION_HIERARCHY = {
         { key: 'send_invoice', name: 'Send Invoice', description: 'Finalize and send an existing invoice', configFields: [
           { key: 'invoice_id', label: 'Invoice ID', type: 'text' },
         ]},
-        { key: 'update_payment', name: 'Update Payment', description: 'Update an existing payment record', configFields: [
-          { key: 'payment_id', label: 'Payment ID', type: 'text' },
-          { key: 'status', label: 'Status', type: 'select', options: ['succeeded', 'failed', 'refunded', 'partial_refund', 'pending'] },
-          { key: 'amount', label: 'Refund Amount ($)', type: 'text' },
-          { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
-          { key: 'notes', label: 'Notes', type: 'prompt_textarea', smartActions: true },
-        ]},
-        { key: 'check_payment_status', name: 'Check Payment Status', description: 'Verify if a payment went through', configFields: [
-          { key: 'search_by', label: 'Look Up By', type: 'select', options: ['Customer Name', 'Payment ID', 'Amount'] },
-          { key: 'search_value', label: 'Search Value', type: 'text' },
-        ]},
-        { key: 'issue_refund', name: 'Issue Refund', description: 'Process a refund for a previous charge', configFields: [
+        { key: 'refund_payment', name: 'Refund Payment', description: 'Refund a previous payment', configFields: [
           { key: 'payment_id', label: 'Payment ID', type: 'text' },
           { key: 'amount', label: 'Refund Amount ($)', type: 'text' },
           { key: 'refund_reason', label: 'Refund Reason', type: 'prompt_textarea', smartActions: true },
+        ]},
+        { key: 'cancel_subscription', name: 'Cancel Subscription', description: 'Cancel an active subscription', configFields: [
+          { key: 'subscription_id', label: 'Subscription ID', type: 'text' },
+          { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
+          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
         ]},
       ],
     },
@@ -2103,6 +2147,9 @@ export default function ScenariosPage() {
                 }
               }
             }
+            if (LEGACY_ACTION_FIELD_MAP[key]) {
+              node.actionConfig._fields = LEGACY_ACTION_FIELD_MAP[key];
+            }
           }
         });
       }
@@ -2447,9 +2494,17 @@ export default function ScenariosPage() {
         }
       }
 
-      if (actionKey === 'create_payment' || actionKey === 'create_payment_profile' || actionKey === 'update_payment') {
+      if (actionKey === 'create_customer' || actionKey === 'update_customer') {
+        resultsMap.customer = node.outputData;
+      }
+
+      if (actionKey === 'create_payment' || actionKey === 'send_payment_link' || actionKey === 'refund_payment' || actionKey === 'create_payment_profile' || actionKey === 'update_payment') {
         resultsMap.payment = node.outputData;
         resultsMap.payments = node.outputData;
+      }
+
+      if (actionKey === 'cancel_subscription') {
+        resultsMap.subscription = node.outputData;
       }
 
       if (actionKey === 'create_invoice' || actionKey === 'send_invoice') {
@@ -2543,6 +2598,43 @@ export default function ScenariosPage() {
         return finishNodeRun(result);
       }
 
+      if (actionKey === 'create_customer') {
+        console.log('[Run Node] create_customer request', { nodeId });
+        const resp = await authorizedApiFetch('/api/sonar/create-customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            person_id: getValue('person_id') || null,
+            customer_name: getValue('customer_name') || '',
+            customer_email: getValue('customer_email') || '',
+            customer_phone: getValue('customer_phone') || '',
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create customer failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
+
+      if (actionKey === 'update_customer') {
+        console.log('[Run Node] update_customer request', { nodeId, customerId: getValue('customer_id') || null });
+        const resp = await authorizedApiFetch('/api/sonar/update-customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: getValue('customer_id') || null,
+            person_id: getValue('person_id') || null,
+            customer_name: getValue('customer_name') || '',
+            customer_email: getValue('customer_email') || '',
+            customer_phone: getValue('customer_phone') || '',
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Update customer failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
+
       if (actionKey === 'create_payment') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
         console.log('[Run Node] create_payment request', { nodeId, amountCents });
@@ -2555,7 +2647,11 @@ export default function ScenariosPage() {
             payment_method_type: getValue('payment_method') || 'card',
             description: getValue('description') || '',
             person_id: getValue('person_id') || null,
+            customer_id: getValue('customer_id') || null,
             appointment_id: getValue('appointment_id') || null,
+            customer_name: getValue('customer_name') || '',
+            customer_email: getValue('customer_email') || '',
+            customer_phone: getValue('customer_phone') || '',
           }),
         });
         const result = await resp.json();
@@ -2564,10 +2660,10 @@ export default function ScenariosPage() {
         return finishNodeRun(result);
       }
 
-      if (actionKey === 'create_payment_profile') {
+      if (actionKey === 'send_payment_link') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-        console.log('[Run Node] create_payment_profile request', { nodeId, amountCents });
-        const resp = await authorizedApiFetch('/api/sonar/create-payment-profile', {
+        console.log('[Run Node] send_payment_link request', { nodeId, amountCents });
+        const resp = await authorizedApiFetch('/api/sonar/send-payment-link', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2575,13 +2671,14 @@ export default function ScenariosPage() {
             currency: getValue('currency') || 'usd',
             description: getValue('description') || '',
             person_id: getValue('person_id') || null,
+            customer_id: getValue('customer_id') || null,
             customer_name: getValue('customer_name') || '',
             customer_email: getValue('customer_email') || '',
             customer_phone: getValue('customer_phone') || '',
           }),
         });
         const result = await resp.json();
-        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create payment profile failed');
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Send payment link failed');
         setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
         return finishNodeRun(result);
       }
@@ -2597,6 +2694,7 @@ export default function ScenariosPage() {
             currency: getValue('currency') || 'usd',
             description: getValue('description') || '',
             person_id: getValue('person_id') || null,
+            customer_id: getValue('customer_id') || null,
             customer_name: getValue('customer_name') || '',
             customer_email: getValue('customer_email') || '',
             customer_phone: getValue('customer_phone') || '',
@@ -2607,6 +2705,41 @@ export default function ScenariosPage() {
         });
         const result = await resp.json();
         if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create invoice failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
+
+      if (actionKey === 'refund_payment') {
+        const amountCents = getValue('amount') ? Math.round(Number(getValue('amount')) * 100) : null;
+        console.log('[Run Node] refund_payment request', { nodeId, paymentId: getValue('payment_id') || null, amountCents });
+        const resp = await authorizedApiFetch('/api/sonar/refund-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payment_id: getValue('payment_id') || null,
+            amount: amountCents,
+            refund_reason: getValue('refund_reason') || '',
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Refund payment failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
+
+      if (actionKey === 'cancel_subscription') {
+        console.log('[Run Node] cancel_subscription request', { nodeId, subscriptionId: getValue('subscription_id') || null });
+        const resp = await authorizedApiFetch('/api/sonar/cancel-subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription_id: getValue('subscription_id') || null,
+            customer_id: getValue('customer_id') || null,
+            person_id: getValue('person_id') || null,
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Cancel subscription failed');
         setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
         return finishNodeRun(result);
       }
@@ -2794,6 +2927,49 @@ export default function ScenariosPage() {
             log(`❌ ${step} ${node.label} — error: ${error.message}`);
             console.error(`[Scenario Run]   └ Error:`, error.message);
           }
+        } else if (actionKey === 'create_customer') {
+          const config = node.actionConfig;
+          const body = {
+            person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
+            customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
+            customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
+            customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
+          };
+          console.log(`[Scenario Run]   ├ POST /api/sonar/create-customer | person: ${body.person_id || '(none)'}`);
+          const resp = await authorizedApiFetch('/api/sonar/create-customer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const result = await resp.json();
+          if (resp.ok && !result.error && !result.detail) {
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
+            resultsMap[node.id] = result;
+            resultsMap.customer = result;
+            log(`✅ ${step} ${node.label} — customer: ${result.customer_id || result.id}`);
+            console.log(`[Scenario Run]   └ Customer: ${result.customer_id || result.id}`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+          }
+        } else if (actionKey === 'update_customer') {
+          const config = node.actionConfig;
+          const body = {
+            customer_id: resolveVariableRefs(resolveTableVariableRefs(config.customer_id, resultsMap), resultsMap) || config.customer_id || null,
+            person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
+            customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
+            customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
+            customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
+          };
+          console.log(`[Scenario Run]   ├ POST /api/sonar/update-customer | customer: ${body.customer_id || '(lookup)'}`);
+          const resp = await authorizedApiFetch('/api/sonar/update-customer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const result = await resp.json();
+          if (resp.ok && !result.error && !result.detail) {
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
+            resultsMap[node.id] = result;
+            resultsMap.customer = result;
+            log(`✅ ${step} ${node.label} — customer: ${result.customer_id || result.id}`);
+            console.log(`[Scenario Run]   └ Customer: ${result.customer_id || result.id}`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+          }
         } else if (actionKey === 'create_payment') {
           const config = node.actionConfig;
           const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
@@ -2803,6 +2979,10 @@ export default function ScenariosPage() {
             payment_method_type: config.payment_method || 'card',
             description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
+            customer_id: resolveVariableRefs(resolveTableVariableRefs(config.customer_id, resultsMap), resultsMap) || config.customer_id || null,
+            customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
+            customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
+            customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
           console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
           const resp = await authorizedApiFetch('/api/sonar/create-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -2818,7 +2998,7 @@ export default function ScenariosPage() {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
             console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
-        } else if (actionKey === 'create_payment_profile') {
+        } else if (actionKey === 'send_payment_link') {
           const config = node.actionConfig;
           const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
           const body = {
@@ -2826,11 +3006,13 @@ export default function ScenariosPage() {
             currency: config.currency || 'usd',
             description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
+            customer_id: resolveVariableRefs(resolveTableVariableRefs(config.customer_id, resultsMap), resultsMap) || config.customer_id || null,
             customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
+            customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment-profile | person: ${body.person_id || '(none)'}`);
-          const resp = await authorizedApiFetch('/api/sonar/create-payment-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          console.log(`[Scenario Run]   ├ POST /api/sonar/send-payment-link | person: ${body.person_id || '(none)'}`);
+          const resp = await authorizedApiFetch('/api/sonar/send-payment-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
@@ -2853,6 +3035,7 @@ export default function ScenariosPage() {
             currency: config.currency || 'usd',
             description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
+            customer_id: resolveVariableRefs(resolveTableVariableRefs(config.customer_id, resultsMap), resultsMap) || config.customer_id || null,
             customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
             customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
@@ -2889,6 +3072,49 @@ export default function ScenariosPage() {
             resultsMap.invoices = result;
             log(`✅ ${step} ${node.label} — invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
             console.log(`[Scenario Run]   └ Invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+          }
+        } else if (actionKey === 'refund_payment') {
+          const config = node.actionConfig;
+          const amountValue = resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || null;
+          const amountCents = amountValue ? Math.round(Number(amountValue) * 100) : null;
+          const body = {
+            payment_id: resolveVariableRefs(resolveTableVariableRefs(config.payment_id, resultsMap), resultsMap) || config.payment_id || null,
+            amount: amountCents,
+            refund_reason: resolveVariableRefs(resolveTableVariableRefs(config.refund_reason, resultsMap), resultsMap) || config.refund_reason || '',
+          };
+          console.log(`[Scenario Run]   ├ POST /api/sonar/refund-payment | payment: ${body.payment_id || '(none)'}`);
+          const resp = await authorizedApiFetch('/api/sonar/refund-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const result = await resp.json();
+          if (resp.ok && !result.error && !result.detail) {
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
+            resultsMap[node.id] = result;
+            resultsMap.payment = result;
+            resultsMap.payments = result;
+            log(`✅ ${step} ${node.label} — refund: ${result.refund_id || result.id || 'created'}`);
+            console.log(`[Scenario Run]   └ Refund: ${result.refund_id || result.id || 'created'}`);
+          } else {
+            log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
+            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+          }
+        } else if (actionKey === 'cancel_subscription') {
+          const config = node.actionConfig;
+          const body = {
+            subscription_id: resolveVariableRefs(resolveTableVariableRefs(config.subscription_id, resultsMap), resultsMap) || config.subscription_id || null,
+            customer_id: resolveVariableRefs(resolveTableVariableRefs(config.customer_id, resultsMap), resultsMap) || config.customer_id || null,
+            person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
+          };
+          console.log(`[Scenario Run]   ├ POST /api/sonar/cancel-subscription | subscription: ${body.subscription_id || '(lookup)'}`);
+          const resp = await authorizedApiFetch('/api/sonar/cancel-subscription', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const result = await resp.json();
+          if (resp.ok && !result.error && !result.detail) {
+            setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
+            resultsMap[node.id] = result;
+            resultsMap.subscription = result;
+            log(`✅ ${step} ${node.label} — subscription: ${result.subscription_id || result.id}`);
+            console.log(`[Scenario Run]   └ Subscription: ${result.subscription_id || result.id}`);
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
             console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
@@ -3287,7 +3513,7 @@ export default function ScenariosPage() {
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
                     event.preventDefault();
-                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'create_payment_profile' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice' || node.actionConfig?._key === 'send_email') && node.configured) {
+                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_customer' || node.actionConfig?._key === 'update_customer' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'send_payment_link' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice' || node.actionConfig?._key === 'refund_payment' || node.actionConfig?._key === 'cancel_subscription' || node.actionConfig?._key === 'send_email') && node.configured) {
                       setRunNodeModal(null);
                       setIsPanelVisible(false);
                       setPanelIntent(false);
@@ -4684,10 +4910,6 @@ export default function ScenariosPage() {
           <>
             <VariablesPane
               visible={true}
-              currentNodeId={(() => {
-                const edge = edges.find(e => e.id === logicPanel.edgeId);
-                return edge?.from || currentNodeId;
-              })()}
               targetFieldKey={activeConditionField?.ruleId || ''}
               fieldLabel="Condition"
               onInsertVariable={(varRef, label, color) => {

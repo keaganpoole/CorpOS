@@ -256,6 +256,20 @@ const OUTPUT_VARIABLE_MAP = {
     { key: 'customer_name', label: 'Customer Name', type: 'text' },
     { key: 'minutes_until', label: 'Minutes Until', type: 'number' },
   ],
+  create_customer: [
+    { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
+    { key: 'name', label: 'Customer Name', type: 'text' },
+    { key: 'email', label: 'Customer Email', type: 'email' },
+    { key: 'phone', label: 'Customer Phone', type: 'phone' },
+    { key: 'metadata', label: 'Metadata', type: 'text' },
+  ],
+  update_customer: [
+    { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
+    { key: 'name', label: 'Customer Name', type: 'text' },
+    { key: 'email', label: 'Customer Email', type: 'email' },
+    { key: 'phone', label: 'Customer Phone', type: 'phone' },
+    { key: 'metadata', label: 'Metadata', type: 'text' },
+  ],
   create_payment: [
     { key: 'id', label: 'Payment Intent ID', type: 'text' },
     { key: 'object', label: 'Object', type: 'text' },
@@ -272,16 +286,10 @@ const OUTPUT_VARIABLE_MAP = {
     { key: 'latest_charge', label: 'Latest Charge ID', type: 'text' },
     { key: 'metadata', label: 'Metadata', type: 'text' },
   ],
-  update_payment: [
-    { key: 'id', label: 'Payment Intent ID', type: 'text' },
-    { key: 'status', label: 'Status', type: 'text' },
-    { key: 'amount', label: 'Amount', type: 'number' },
-  ],
-  create_payment_profile: [
+  send_payment_link: [
     { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
-    { key: 'setup_intent_id', label: 'Setup Intent ID', type: 'text' },
-    { key: 'client_secret', label: 'Client Secret', type: 'text' },
     { key: 'payment_url', label: 'Payment URL', type: 'url' },
+    { key: 'payment_id', label: 'Payment ID', type: 'text' },
     { key: 'amount', label: 'Amount', type: 'number' },
     { key: 'currency', label: 'Currency', type: 'text' },
     { key: 'status', label: 'Status', type: 'text' },
@@ -311,6 +319,26 @@ const OUTPUT_VARIABLE_MAP = {
     { key: 'invoice_pdf', label: 'Invoice PDF', type: 'url' },
     { key: 'metadata', label: 'Metadata', type: 'text' },
   ],
+  refund_payment: [
+    { key: 'refund_id', label: 'Refund ID', type: 'text' },
+    { key: 'payment_id', label: 'Payment ID', type: 'text' },
+    { key: 'status', label: 'Status', type: 'text' },
+    { key: 'amount', label: 'Amount', type: 'currency' },
+    { key: 'currency', label: 'Currency', type: 'text' },
+  ],
+  cancel_subscription: [
+    { key: 'subscription_id', label: 'Subscription ID', type: 'text' },
+    { key: 'customer_id', label: 'Customer ID', type: 'text' },
+    { key: 'status', label: 'Status', type: 'text' },
+    { key: 'canceled_at', label: 'Canceled At', type: 'timestamp' },
+  ],
+  payment_received: [
+    { key: 'payment_id', label: 'Payment ID', type: 'text' },
+    { key: 'customer_id', label: 'Customer ID', type: 'text' },
+    { key: 'amount', label: 'Amount', type: 'currency' },
+    { key: 'currency', label: 'Currency', type: 'text' },
+    { key: 'status', label: 'Status', type: 'text' },
+  ],
   invoice_created: [
     { key: 'invoice_id', label: 'Invoice ID', type: 'text' },
     { key: 'customer_id', label: 'Customer ID', type: 'text' },
@@ -331,12 +359,17 @@ const OUTPUT_VARIABLE_MAP = {
     { key: 'status', label: 'Status', type: 'text' },
     { key: 'error_message', label: 'Error Message', type: 'text' },
   ],
-  payment_link_sent: [
+  refund_issued: [
+    { key: 'refund_id', label: 'Refund ID', type: 'text' },
     { key: 'payment_id', label: 'Payment ID', type: 'text' },
-    { key: 'payment_url', label: 'Payment URL', type: 'url' },
-    { key: 'customer_id', label: 'Customer ID', type: 'text' },
-    { key: 'stripe_session_id', label: 'Stripe Session ID', type: 'text' },
     { key: 'amount', label: 'Amount', type: 'currency' },
+    { key: 'status', label: 'Status', type: 'text' },
+  ],
+  customer_created: [
+    { key: 'customer_id', label: 'Customer ID', type: 'text' },
+    { key: 'customer_name', label: 'Customer Name', type: 'text' },
+    { key: 'customer_email', label: 'Customer Email', type: 'email' },
+    { key: 'customer_phone', label: 'Customer Phone', type: 'phone' },
     { key: 'status', label: 'Status', type: 'text' },
   ],
   invoice_sent: [
@@ -347,13 +380,35 @@ const OUTPUT_VARIABLE_MAP = {
     { key: 'amount_due', label: 'Amount Due', type: 'currency' },
     { key: 'status', label: 'Status', type: 'text' },
   ],
+  subscription_created: [
+    { key: 'subscription_id', label: 'Subscription ID', type: 'text' },
+    { key: 'customer_id', label: 'Customer ID', type: 'text' },
+    { key: 'status', label: 'Status', type: 'text' },
+  ],
+  subscription_canceled: [
+    { key: 'subscription_id', label: 'Subscription ID', type: 'text' },
+    { key: 'customer_id', label: 'Customer ID', type: 'text' },
+    { key: 'status', label: 'Status', type: 'text' },
+    { key: 'canceled_at', label: 'Canceled At', type: 'timestamp' },
+  ],
+  subscription_payment_failed: [
+    { key: 'subscription_id', label: 'Subscription ID', type: 'text' },
+    { key: 'customer_id', label: 'Customer ID', type: 'text' },
+    { key: 'invoice_id', label: 'Invoice ID', type: 'text' },
+    { key: 'failure_reason', label: 'Failure Reason', type: 'text' },
+    { key: 'status', label: 'Status', type: 'text' },
+  ],
 };
 
 const STRIPE_RESPONSE_ACTION_KEYS = new Set([
+  'create_customer',
+  'update_customer',
   'create_payment',
-  'create_payment_profile',
+  'send_payment_link',
   'create_invoice',
   'send_invoice',
+  'refund_payment',
+  'cancel_subscription',
 ]);
 
 const humanizeVariableKey = (key) => String(key || '')

@@ -2469,7 +2469,10 @@ class PaymentCreateRequest(BaseModel):
     description: Optional[str] = None
     person_id: Optional[str] = None
     appointment_id: Optional[str] = None
+    customer_id: Optional[str] = None
     customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
 
 class OnboardingRequest(BaseModel):
     business_name: str
@@ -2524,11 +2527,25 @@ class ScenarioTriggerRequest(BaseModel):
     payload: Optional[dict] = None
     created_at: Optional[datetime] = None
 
-class PaymentProfileCreateRequest(BaseModel):
+class CustomerCreateRequest(BaseModel):
+    person_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+class CustomerUpdateRequest(BaseModel):
+    customer_id: Optional[str] = None
+    person_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+class PaymentLinkCreateRequest(BaseModel):
     amount: int
     currency: str = "usd"
     description: Optional[str] = None
     person_id: Optional[str] = None
+    customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
@@ -2538,6 +2555,7 @@ class InvoiceCreateRequest(BaseModel):
     currency: str = "usd"
     description: Optional[str] = None
     person_id: Optional[str] = None
+    customer_id: Optional[str] = None
     appointment_id: Optional[str] = None
     service_id: Optional[str] = None
     customer_name: Optional[str] = None
@@ -2547,6 +2565,16 @@ class InvoiceCreateRequest(BaseModel):
 
 class InvoiceSendRequest(BaseModel):
     invoice_id: str
+
+class RefundPaymentRequest(BaseModel):
+    payment_id: str
+    amount: Optional[int] = None
+    refund_reason: Optional[str] = None
+
+class CancelSubscriptionRequest(BaseModel):
+    subscription_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    person_id: Optional[str] = None
 
 
 class ScenarioSendEmailRequest(BaseModel):
@@ -2589,10 +2617,19 @@ INTENT_KEY_ALIASES = {
     "update_record": "record_updated",
     "intent_payment_received": "payment_received",
     "intent_invoice_sent": "invoice_sent",
+    "intent_refund_issued": "refund_issued",
+    "intent_customer_created": "customer_created",
+    "intent_subscription_created": "subscription_created",
+    "intent_subscription_canceled": "subscription_canceled",
+    "intent_subscription_payment_failed": "subscription_payment_failed",
+    "create_customer": "customer_created",
+    "update_customer": "customer_created",
     "create_payment": "payment_received",
-    "update_payment": "payment_received",
+    "send_payment_link": "invoice_sent",
     "create_invoice": "invoice_sent",
     "send_invoice": "invoice_sent",
+    "refund_payment": "refund_issued",
+    "cancel_subscription": "subscription_canceled",
     "intent_neutral_entered": "neutral",
     "neutral_entered": "neutral",
     "send_to_phone_number": "send_sms",
@@ -2617,15 +2654,21 @@ SUPPORTED_INTENT_KEYS = {
     "cancel_appointment",
     "record_created",
     "record_updated",
+    "customer_created",
     "payment_received",
+    "refund_issued",
     "invoice_sent",
+    "subscription_created",
+    "subscription_canceled",
+    "subscription_payment_failed",
+    "create_customer",
+    "update_customer",
     "create_payment",
-    "create_payment_profile",
+    "send_payment_link",
     "create_invoice",
     "send_invoice",
-    "update_payment",
-    "check_payment_status",
-    "issue_refund",
+    "refund_payment",
+    "cancel_subscription",
     "send_email",
     "add_tag",
     "search_tags",
@@ -2853,6 +2896,21 @@ def build_invoice_metadata(*, person_id: Optional[str] = None, appointment_id: O
         metadata["service_id"] = str(service_id)
     return metadata
 
+def serialize_stripe_customer(customer):
+    if not customer:
+        return {}
+    return {
+        "id": customer.get("id"),
+        "customer_id": customer.get("id"),
+        "object": customer.get("object"),
+        "name": customer.get("name"),
+        "email": customer.get("email"),
+        "phone": customer.get("phone"),
+        "metadata": customer.get("metadata"),
+        "created": customer.get("created"),
+        "status": "created",
+    }
+
 def serialize_stripe_invoice(invoice):
     if not invoice:
         return {}
@@ -2873,6 +2931,166 @@ def serialize_stripe_invoice(invoice):
         "created": invoice.get("created"),
         "metadata": invoice.get("metadata"),
     }
+
+def serialize_stripe_subscription(subscription):
+    if not subscription:
+        return {}
+    return {
+        "id": subscription.get("id"),
+        "subscription_id": subscription.get("id"),
+        "object": subscription.get("object"),
+        "customer_id": subscription.get("customer"),
+        "status": subscription.get("status"),
+        "cancel_at_period_end": subscription.get("cancel_at_period_end"),
+        "canceled_at": subscription.get("canceled_at"),
+        "current_period_end": subscription.get("current_period_end"),
+        "metadata": subscription.get("metadata"),
+        "created": subscription.get("created"),
+    }
+
+def serialize_stripe_refund(refund):
+    if not refund:
+        return {}
+    return {
+        "id": refund.get("id"),
+        "refund_id": refund.get("id"),
+        "object": refund.get("object"),
+        "payment_intent": refund.get("payment_intent"),
+        "charge": refund.get("charge"),
+        "amount": refund.get("amount"),
+        "currency": refund.get("currency"),
+        "reason": refund.get("reason"),
+        "status": refund.get("status"),
+        "created": refund.get("created"),
+        "metadata": refund.get("metadata"),
+    }
+
+def load_person_by_id_for_user(user_id: str, person_id: Optional[str]) -> Optional[dict]:
+    if not user_id or not person_id:
+        return None
+    try:
+        response = (
+            supabase.table("people")
+            .select("*")
+            .eq("id", str(person_id))
+            .eq("user_id", str(user_id))
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+    except Exception as exc:
+        logging.warning("Failed to load person %s for user %s: %s", person_id, user_id, exc)
+        return None
+
+def persist_person_stripe_customer_id(user_id: str, person_id: Optional[str], customer_id: Optional[str]) -> None:
+    if not user_id or not person_id or not customer_id:
+        return
+    try:
+        supabase.table("people").update({
+            "stripe_customer_id": customer_id,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", str(person_id)).eq("user_id", str(user_id)).execute()
+    except Exception as exc:
+        logging.debug("Could not persist stripe_customer_id for person %s: %s", person_id, exc)
+
+def resolve_connected_account_user_id(stripe_account_id: Optional[str]) -> Optional[str]:
+    if not stripe_account_id:
+        return None
+    try:
+        rows = supabase.table("integrations").select("user_id,provider_metadata,credentials").eq("provider", "stripe").execute().data or []
+        for row in rows:
+            provider_metadata = row.get("provider_metadata") or {}
+            credentials = row.get("credentials") or {}
+            account_id = provider_metadata.get("account_id") or credentials.get("stripe_user_id")
+            if str(account_id or "").strip() == str(stripe_account_id).strip():
+                return row.get("user_id")
+    except Exception as exc:
+        logging.warning("Failed to resolve connected Stripe account %s: %s", stripe_account_id, exc)
+    return None
+
+def build_scenario_customer_metadata(*, user_id: str, person_id: Optional[str] = None, appointment_id: Optional[str] = None, service_id: Optional[str] = None) -> dict:
+    metadata = build_invoice_metadata(person_id=person_id, appointment_id=appointment_id, service_id=service_id)
+    metadata["user_id"] = str(user_id)
+    return metadata
+
+def create_or_update_stripe_customer_for_user(
+    *,
+    user_id: str,
+    customer_id: Optional[str] = None,
+    person_id: Optional[str] = None,
+    customer_name: Optional[str] = None,
+    customer_email: Optional[str] = None,
+    customer_phone: Optional[str] = None,
+    create_if_missing: bool = True,
+    appointment_id: Optional[str] = None,
+    service_id: Optional[str] = None,
+):
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
+    person = load_person_by_id_for_user(user_id, person_id)
+    resolved_customer_id = (
+        str(customer_id).strip()
+        if customer_id
+        else str(person.get("stripe_customer_id") or "").strip() if person else ""
+    ) or None
+
+    resolved_name = customer_name or (format_person_display_name(person) if person else None)
+    resolved_email = customer_email or (person.get("email") if person else None)
+    resolved_phone = customer_phone or (person.get("phone") if person else None)
+    metadata = build_scenario_customer_metadata(
+        user_id=user_id,
+        person_id=person_id or (str(person.get("id")) if person and person.get("id") is not None else None),
+        appointment_id=appointment_id,
+        service_id=service_id,
+    )
+
+    if resolved_customer_id:
+        try:
+            customer = _stripe_object_to_dict(stripe.Customer.retrieve(resolved_customer_id, **stripe_request_options))
+            updates = {}
+            if resolved_name and resolved_name != customer.get("name"):
+                updates["name"] = resolved_name
+            if resolved_email and resolved_email != customer.get("email"):
+                updates["email"] = resolved_email
+            if resolved_phone and resolved_phone != customer.get("phone"):
+                updates["phone"] = resolved_phone
+            merged_metadata = {**(customer.get("metadata") or {}), **metadata}
+            if merged_metadata != (customer.get("metadata") or {}):
+                updates["metadata"] = merged_metadata
+            if updates:
+                customer = _stripe_object_to_dict(
+                    stripe.Customer.modify(resolved_customer_id, **stripe_request_options, **updates)
+                )
+            persist_person_stripe_customer_id(user_id, person_id, customer.get("id"))
+            return customer, person
+        except Exception as exc:
+            if not create_if_missing:
+                raise HTTPException(status_code=404, detail=f"Stripe customer not found: {resolved_customer_id}") from exc
+            logging.warning("Existing Stripe customer lookup failed for %s, creating a new one: %s", resolved_customer_id, exc)
+
+    if not create_if_missing:
+        raise HTTPException(status_code=400, detail="No Stripe customer could be resolved.")
+
+    create_payload = {
+        "metadata": metadata,
+    }
+    if resolved_name:
+        create_payload["name"] = resolved_name
+    if resolved_email:
+        create_payload["email"] = resolved_email
+    if resolved_phone:
+        create_payload["phone"] = resolved_phone
+    customer = _stripe_object_to_dict(stripe.Customer.create(**stripe_request_options, **create_payload))
+    persist_person_stripe_customer_id(user_id, person_id, customer.get("id"))
+    return customer, person
+
+
+def resolve_scenario_user_id_from_stripe_event(event: dict, metadata: Optional[dict] = None) -> Optional[str]:
+    metadata = metadata or {}
+    return (
+        str(metadata.get("user_id")).strip()
+        if metadata.get("user_id")
+        else resolve_connected_account_user_id(event.get("account"))
+    ) or None
 
 def emit_payment_trigger(trigger_key: str, payload: dict):
     trigger_payload = {
@@ -5719,30 +5937,90 @@ async def create_payment(
     return await _create_payment_for_user(request, str(current_user.id))
 
 
+@app.post("/api/sonar/create-customer", tags=["Sonar Payments"])
+async def create_customer(
+    request: CustomerCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _create_customer_for_user(request, str(current_user.id))
+
+
+async def _create_customer_for_user(request: CustomerCreateRequest, user_id: str):
+    ensure_no_unresolved_templates(request.person_id, request.customer_name, request.customer_email, request.customer_phone)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=True,
+    )
+    return serialize_stripe_customer(customer)
+
+
+@app.post("/api/sonar/update-customer", tags=["Sonar Payments"])
+async def update_customer(
+    request: CustomerUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _update_customer_for_user(request, str(current_user.id))
+
+
+async def _update_customer_for_user(request: CustomerUpdateRequest, user_id: str):
+    ensure_no_unresolved_templates(request.customer_id, request.person_id, request.customer_name, request.customer_email, request.customer_phone)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=False,
+    )
+    return serialize_stripe_customer(customer)
+
+
 async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
     description = request.description or ""
     payment_method_type = (request.payment_method_type or "card").lower()
     payment_method = "us_bank_account" if payment_method_type == "ach" else payment_method_type
-    ensure_no_unresolved_templates(request.person_id, request.appointment_id, description)
+    ensure_no_unresolved_templates(
+        request.person_id,
+        request.appointment_id,
+        request.customer_id,
+        request.customer_name,
+        request.customer_email,
+        request.customer_phone,
+        description,
+    )
     stripe_request_options = _get_connected_stripe_request_options(user_id)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=True,
+        appointment_id=request.appointment_id,
+    )
 
     stripe_payment_intent = None
     try:
-        if payment_method_type != "link":
-            payment_intent_payload = {
-                "amount": request.amount,
-                "currency": request.currency,
-                "description": description,
-                "payment_method_types": [payment_method],
-                "automatic_payment_methods": {"enabled": False},
-                "metadata": {
-                    "person_id": request.person_id or "",
-                    "appointment_id": request.appointment_id or "",
-                    "user_id": user_id,
-                    "source": "wysl_scenarios",
-                },
-            }
-            stripe_payment_intent = stripe.PaymentIntent.create(**stripe_request_options, **payment_intent_payload)
+        payment_intent_payload = {
+            "amount": request.amount,
+            "currency": request.currency,
+            "description": description,
+            "payment_method_types": [payment_method],
+            "automatic_payment_methods": {"enabled": False},
+            "customer": customer.get("id"),
+            "metadata": build_scenario_customer_metadata(
+                user_id=user_id,
+                person_id=request.person_id,
+                appointment_id=request.appointment_id,
+            ),
+        }
+        stripe_payment_intent = stripe.PaymentIntent.create(**stripe_request_options, **payment_intent_payload)
     except Exception as exc:
         logging.error("Stripe payment intent creation failed for user %s: %s", user_id, exc, exc_info=True)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe payment creation failed: {exc}") from exc
@@ -5758,10 +6036,6 @@ async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
         error_message=None,
     )
     saved_payment = insert_payment_record(payment_row)
-    emit_payment_trigger("invoice_created", {
-        "payment": saved_payment,
-        "stripe_payment_intent_id": stripe_payment_intent.id if stripe_payment_intent else None,
-    })
 
     response_payload = dict(saved_payment)
     if stripe_payment_intent:
@@ -5776,69 +6050,74 @@ async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
             "created": stripe_payment_intent.created,
             "latest_charge": stripe_payment_intent.latest_charge,
             "metadata": stripe_payment_intent.metadata,
+            "customer_id": customer.get("id"),
         })
     else:
         response_payload.update({
             "client_secret": None,
             "id": saved_payment.get("stripe_payment_intent_id") or saved_payment.get("id"),
             "object": "payment_record",
+            "customer_id": customer.get("id"),
         })
     return response_payload
 
-@app.post("/api/sonar/create-payment-profile", tags=["Sonar Payments"])
-async def create_payment_profile(
-    request: PaymentProfileCreateRequest,
+@app.post("/api/sonar/send-payment-link", tags=["Sonar Payments"])
+async def send_payment_link(
+    request: PaymentLinkCreateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _create_payment_profile_for_user(request, str(current_user.id))
+    return await _send_payment_link_for_user(request, str(current_user.id))
 
 
-async def _create_payment_profile_for_user(request: PaymentProfileCreateRequest, user_id: str):
+@app.post("/api/sonar/create-payment-profile", tags=["Sonar Payments"])
+async def create_payment_profile_legacy(
+    request: PaymentLinkCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _send_payment_link_for_user(request, str(current_user.id))
+
+
+async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id: str):
     description = request.description or ""
     payment_mode_base_url = get_payment_frontend_base_url()
-    ensure_no_unresolved_templates(request.person_id, request.customer_name, request.customer_email, request.customer_phone, description)
+    ensure_no_unresolved_templates(
+        request.person_id,
+        request.customer_id,
+        request.customer_name,
+        request.customer_email,
+        request.customer_phone,
+        description,
+    )
     stripe_request_options = _get_connected_stripe_request_options(user_id)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=True,
+    )
     try:
-        customer_payload = {}
-        if request.customer_email:
-            customer_payload["email"] = request.customer_email
-        if request.customer_name:
-            customer_payload["name"] = request.customer_name
-        if request.customer_phone:
-            customer_payload["phone"] = request.customer_phone
-
-        customer = stripe.Customer.create(
-            **stripe_request_options,
-            **customer_payload,
-            metadata={
-                "person_id": request.person_id or "",
-                "user_id": user_id,
-                "source": "wysl_scenarios",
-            },
-        )
 
         checkout_session = stripe.checkout.Session.create(
             **stripe_request_options,
             mode="payment",
-            customer=customer.id,
+            customer=customer.get("id"),
             line_items=[{
                 "price_data": {
                     "currency": request.currency,
                     "product_data": {
-                        **({"name": request.customer_name} if request.customer_name else {"name": "Payment Profile"}),
+                        **({"name": request.customer_name} if request.customer_name else {"name": "Payment Link"}),
                         **({"description": description} if description else {}),
                     },
                     "unit_amount": request.amount,
                 },
-                "quantity": 1,
+                        "quantity": 1,
             }],
             success_url=f"{payment_mode_base_url}/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{payment_mode_base_url}/dashboard?payment=cancelled",
-            metadata={
-                "person_id": request.person_id or "",
-                "user_id": user_id,
-                "source": "wysl_scenarios",
-            },
+            metadata=build_scenario_customer_metadata(user_id=user_id, person_id=request.person_id),
         )
 
         payment_row = build_payment_row(
@@ -5850,20 +6129,9 @@ async def _create_payment_profile_for_user(request: PaymentProfileCreateRequest,
             stripe_session_id=checkout_session.id,
         )
         saved_payment = insert_payment_record(payment_row)
-        emit_payment_trigger("payment_link_sent", {
-            "payment": saved_payment,
-            "payment_id": saved_payment.get("id"),
-            "payment_url": checkout_session.url,
-            "stripe_session_id": checkout_session.id,
-            "customer_id": customer.id,
-            "amount": request.amount,
-            "currency": request.currency,
-        })
 
         return {
-            "customer_id": customer.id,
-            "setup_intent_id": None,
-            "client_secret": None,
+            "customer_id": customer.get("id"),
             "payment_url": checkout_session.url,
             "amount": request.amount,
             "currency": request.currency,
@@ -5875,7 +6143,7 @@ async def _create_payment_profile_for_user(request: PaymentProfileCreateRequest,
             "payment_id": saved_payment.get("id"),
         }
     except Exception as exc:
-        logging.error("Error creating payment profile: %s", exc, exc_info=True)
+        logging.error("Error creating payment link: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 @app.post("/api/sonar/create-invoice", tags=["Sonar Payments"])
@@ -5890,6 +6158,7 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
     description = request.description or ""
     ensure_no_unresolved_templates(
         request.person_id,
+        request.customer_id,
         request.appointment_id,
         request.service_id,
         request.customer_name,
@@ -5898,30 +6167,27 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
         description,
     )
     stripe_request_options = _get_connected_stripe_request_options(user_id)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=True,
+        appointment_id=request.appointment_id,
+        service_id=request.service_id,
+    )
     try:
-        customer_payload = {}
-        if request.customer_email:
-            customer_payload["email"] = request.customer_email
-        if request.customer_name:
-            customer_payload["name"] = request.customer_name
-        if request.customer_phone:
-            customer_payload["phone"] = request.customer_phone
-
         invoice_metadata = build_invoice_metadata(
             person_id=request.person_id,
             appointment_id=request.appointment_id,
             service_id=request.service_id,
         )
 
-        customer = stripe.Customer.create(
-            **stripe_request_options,
-            **customer_payload,
-            metadata={**invoice_metadata, "user_id": user_id},
-        )
-
         stripe.InvoiceItem.create(
             **stripe_request_options,
-            customer=customer.id,
+            customer=customer.get("id"),
             amount=request.amount,
             currency=request.currency,
             description=description or "Invoice",
@@ -5930,15 +6196,16 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
 
         invoice = stripe.Invoice.create(
             **stripe_request_options,
-            customer=customer.id,
+            customer=customer.get("id"),
             collection_method="send_invoice",
             days_until_due=max(int(request.due_days or 7), 1),
             auto_advance=False,
             description=description or None,
             metadata=invoice_metadata,
         )
-
-        return serialize_stripe_invoice(invoice)
+        payload = serialize_stripe_invoice(invoice)
+        payload["customer_id"] = customer.get("id")
+        return payload
     except Exception as exc:
         logging.error("Error creating invoice: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
@@ -5968,6 +6235,129 @@ async def _send_invoice_for_user(request: InvoiceSendRequest, user_id: str):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@app.post("/api/sonar/refund-payment", tags=["Sonar Payments"])
+async def refund_payment(
+    request: RefundPaymentRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _refund_payment_for_user(request, str(current_user.id))
+
+
+async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
+    ensure_no_unresolved_templates(request.payment_id, request.refund_reason)
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
+
+    payment_record = None
+    if request.payment_id:
+        existing = supabase.table("payments").select("*").eq("stripe_payment_intent_id", request.payment_id).limit(1).execute()
+        if existing.data:
+            payment_record = existing.data[0]
+        else:
+            existing = supabase.table("payments").select("*").eq("id", request.payment_id).limit(1).execute()
+            if existing.data:
+                payment_record = existing.data[0]
+
+    payment_intent_id = (
+        (payment_record or {}).get("stripe_payment_intent_id")
+        or request.payment_id
+    )
+    if not payment_intent_id:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    try:
+        refund = _stripe_object_to_dict(
+            stripe.Refund.create(
+                **stripe_request_options,
+                payment_intent=payment_intent_id,
+                **({"amount": request.amount} if request.amount else {}),
+                **({"reason": "requested_by_customer"} if request.refund_reason else {}),
+                metadata={"user_id": user_id, "source": "wysl_scenarios"},
+            )
+        )
+    except Exception as exc:
+        logging.error("Refund creation failed for user %s payment %s: %s", user_id, payment_intent_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe refund failed: {exc}") from exc
+
+    refunded_amount = int(refund.get("amount") or 0)
+    current_amount = int((payment_record or {}).get("amount") or 0)
+    next_status = "partial_refund" if current_amount and refunded_amount < current_amount else "refunded"
+    customer_id = refund.get("customer")
+    if not customer_id and payment_intent_id:
+        try:
+            customer_id = _stripe_object_to_dict(
+                stripe.PaymentIntent.retrieve(payment_intent_id, **stripe_request_options)
+            ).get("customer")
+        except Exception:
+            customer_id = None
+    updated_payment = update_payment_record(
+        "stripe_payment_intent_id",
+        payment_intent_id,
+        {
+            "status": next_status,
+            "refunded_amount": refunded_amount,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    ) or payment_record or {}
+
+    result = {
+        **serialize_stripe_refund(refund),
+        "payment_id": updated_payment.get("id") or request.payment_id,
+        "customer_id": customer_id,
+    }
+    return result
+
+
+@app.post("/api/sonar/cancel-subscription", tags=["Sonar Payments"])
+async def cancel_subscription(
+    request: CancelSubscriptionRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _cancel_subscription_for_user(request, str(current_user.id))
+
+
+async def _cancel_subscription_for_user(request: CancelSubscriptionRequest, user_id: str):
+    ensure_no_unresolved_templates(request.subscription_id, request.customer_id, request.person_id)
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        create_if_missing=False,
+    )
+
+    subscription_id = request.subscription_id
+    if not subscription_id:
+        subscriptions = stripe.Subscription.list(
+            **stripe_request_options,
+            customer=customer.get("id"),
+            status="all",
+            limit=10,
+        )
+        match = next(
+            (
+                item for item in list(subscriptions.get("data") or [])
+                if str(item.get("status") or "").lower() not in {"canceled", "incomplete_expired"}
+            ),
+            None,
+        )
+        subscription_id = match.get("id") if match else None
+
+    if not subscription_id:
+        raise HTTPException(status_code=404, detail="No active subscription found for this customer.")
+
+    try:
+        subscription = _stripe_object_to_dict(
+            stripe.Subscription.cancel(subscription_id, **stripe_request_options)
+        )
+    except Exception as exc:
+        logging.error("Subscription cancel failed for user %s subscription %s: %s", user_id, subscription_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe subscription cancel failed: {exc}") from exc
+
+    result = serialize_stripe_subscription(subscription)
+    result["customer_id"] = subscription.get("customer")
+    return result
+
+
 @app.post("/api/sonar/send-email", tags=["Sonar Integrations"])
 async def send_scenario_email(
     request: ScenarioSendEmailRequest,
@@ -5993,12 +6383,28 @@ async def scenario_create_payment_callback(payload: dict):
     return await _create_payment_for_user(request, user_id)
 
 
-async def scenario_create_payment_profile_callback(payload: dict):
+async def scenario_create_customer_callback(payload: dict):
     user_id = str(payload.pop("user_id", "") or "")
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
-    request = PaymentProfileCreateRequest(**payload)
-    return await _create_payment_profile_for_user(request, user_id)
+    request = CustomerCreateRequest(**payload)
+    return await _create_customer_for_user(request, user_id)
+
+
+async def scenario_update_customer_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
+    request = CustomerUpdateRequest(**payload)
+    return await _update_customer_for_user(request, user_id)
+
+
+async def scenario_send_payment_link_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
+    request = PaymentLinkCreateRequest(**payload)
+    return await _send_payment_link_for_user(request, user_id)
 
 
 async def scenario_create_invoice_callback(payload: dict):
@@ -6015,6 +6421,22 @@ async def scenario_send_invoice_callback(payload: dict):
         raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
     request = InvoiceSendRequest(**payload)
     return await _send_invoice_for_user(request, user_id)
+
+
+async def scenario_refund_payment_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
+    request = RefundPaymentRequest(**payload)
+    return await _refund_payment_for_user(request, user_id)
+
+
+async def scenario_cancel_subscription_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
+    request = CancelSubscriptionRequest(**payload)
+    return await _cancel_subscription_for_user(request, user_id)
 
 
 async def scenario_send_email_callback(payload: dict):
@@ -6040,10 +6462,15 @@ async def scenario_send_email_callback(payload: dict):
 scenario_engine = ScenarioEngine(
     supabase=supabase,
     callbacks={
+        "create_customer": scenario_create_customer_callback,
+        "update_customer": scenario_update_customer_callback,
         "create_payment": scenario_create_payment_callback,
-        "create_payment_profile": scenario_create_payment_profile_callback,
+        "send_payment_link": scenario_send_payment_link_callback,
+        "create_payment_profile": scenario_send_payment_link_callback,
         "create_invoice": scenario_create_invoice_callback,
         "send_invoice": scenario_send_invoice_callback,
+        "refund_payment": scenario_refund_payment_callback,
+        "cancel_subscription": scenario_cancel_subscription_callback,
         "send_email": scenario_send_email_callback,
     },
     base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
@@ -6078,10 +6505,18 @@ async def update_payment(request: PaymentUpdateRequest):
     updated_payment = update_payment_record(match_field, match_value, update_data) or payment_record
 
     if request.status in {"succeeded", "paid"}:
-        emit_payment_trigger("invoice_paid", {
+        emit_payment_trigger("payment_received", {
             "payment": updated_payment,
             "payment_id": request.payment_id,
             "amount": updated_payment.get("amount"),
+            "currency": updated_payment.get("currency"),
+            "status": updated_payment.get("status"),
+        })
+    elif request.status in {"refunded", "partial_refund"}:
+        emit_payment_trigger("refund_issued", {
+            "payment": updated_payment,
+            "payment_id": request.payment_id,
+            "amount": updated_payment.get("refunded_amount") or updated_payment.get("amount"),
             "currency": updated_payment.get("currency"),
             "status": updated_payment.get("status"),
         })
@@ -6104,7 +6539,11 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    if event['type'] == 'checkout.session.completed':
+    event_type = event["type"]
+    connected_account_id = event.get("account")
+    is_connected_account_event = bool(connected_account_id)
+
+    if event_type == 'checkout.session.completed':
         session = event['data']['object']
         if session.get("mode") == "payment":
             payment_status = session.get("payment_status")
@@ -6112,6 +6551,9 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 session_id=session.get("id"),
                 status="paid" if payment_status == "paid" else payment_status or "completed",
             )
+            return {"status": "success"}
+
+        if is_connected_account_event:
             return {"status": "success"}
 
         customer_id = session.get('customer')
@@ -6174,28 +6616,59 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         supabase.table('users').update(update_data).eq('stripe_customer_id', customer_id).execute()
         logging.info(f"Checkout session completed for user with customer ID: {customer_id}. Plan changed: {current_plan} -> {plan_name}")
 
-    elif event['type'] == 'invoice.created':
+    elif event_type == 'invoice.created':
         invoice = event['data']['object']
-        emit_payment_trigger("invoice_created", {
-            "invoice": invoice,
-            "customer_id": invoice.get("customer"),
-            "invoice_id": invoice.get("id"),
-            "amount_due": invoice.get("amount_due"),
-            "currency": invoice.get("currency"),
-            "status": invoice.get("status"),
-        })
-    elif event['type'] == 'invoice.sent':
+        if is_connected_account_event:
+            metadata = invoice.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("invoice_created", {
+                    "invoice": invoice,
+                    "customer_id": invoice.get("customer"),
+                    "invoice_id": invoice.get("id"),
+                    "amount_due": invoice.get("amount_due"),
+                    "currency": invoice.get("currency"),
+                    "status": invoice.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                    "subscription_id": invoice.get("subscription"),
+                })
+    elif event_type == 'invoice.sent':
         invoice = event['data']['object']
-        emit_payment_trigger("invoice_sent", {
-            "invoice": invoice,
-            "customer_id": invoice.get("customer"),
-            "invoice_id": invoice.get("id"),
-            "amount_due": invoice.get("amount_due"),
-            "currency": invoice.get("currency"),
-            "hosted_invoice_url": invoice.get("hosted_invoice_url"),
-        })
-    elif event['type'] == 'invoice.paid':
+        if is_connected_account_event:
+            metadata = invoice.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("invoice_sent", {
+                    "invoice": invoice,
+                    "customer_id": invoice.get("customer"),
+                    "invoice_id": invoice.get("id"),
+                    "amount_due": invoice.get("amount_due"),
+                    "currency": invoice.get("currency"),
+                    "hosted_invoice_url": invoice.get("hosted_invoice_url"),
+                    "status": invoice.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                    "subscription_id": invoice.get("subscription"),
+                })
+    elif event_type == 'invoice.paid':
         invoice = event['data']['object']
+        if is_connected_account_event:
+            metadata = invoice.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("invoice_paid", {
+                    "invoice": invoice,
+                    "customer_id": invoice.get("customer"),
+                    "invoice_id": invoice.get("id"),
+                    "amount_paid": invoice.get("amount_paid"),
+                    "currency": invoice.get("currency"),
+                    "status": invoice.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                    "subscription_id": invoice.get("subscription"),
+                })
+            return {"status": "success"}
         try:
             customer_id = invoice.get('customer')
             amount_paid = invoice.get('amount_paid') # amount_paid is in cents
@@ -6317,8 +6790,25 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             logging.error(f"An unexpected error occurred during invoice.paid event processing for customer {customer_id}: {e}", exc_info=True)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An internal error occurred during invoice.paid processing: {str(e)}")
 
-    elif event['type'] == 'invoice.payment_failed':
+    elif event_type == 'invoice.payment_failed':
         invoice = event['data']['object']
+        if is_connected_account_event:
+            metadata = invoice.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                trigger_key = "subscription_payment_failed" if invoice.get("subscription") else "payment_failed"
+                emit_payment_trigger(trigger_key, {
+                    "invoice": invoice,
+                    "customer_id": invoice.get("customer"),
+                    "invoice_id": invoice.get("id"),
+                    "subscription_id": invoice.get("subscription"),
+                    "failure_reason": invoice.get("last_payment_error", {}).get("message"),
+                    "currency": invoice.get("currency"),
+                    "status": invoice.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                })
+            return {"status": "success"}
         customer_id = invoice.get('customer')
         # next_payment_attempt is a timestamp, convert to datetime for logging
         latest_attempt_date = datetime.fromtimestamp(invoice.get('next_payment_attempt')).isoformat() if invoice.get('next_payment_attempt') else datetime.now(timezone.utc).isoformat()
@@ -6349,21 +6839,28 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 logging.error(f"User not found for stripe_customer_id {customer_id} during payment_failed event.")
         else:
             logging.error(f"Customer ID missing in invoice.payment_failed event.")
-    elif event['type'] == 'payment_intent.succeeded':
+    elif event_type == 'payment_intent.succeeded':
         payment_intent = event['data']['object']
         updated_payment = upsert_payment_from_stripe(
             payment_intent_id=payment_intent.get("id"),
             status="succeeded",
             receipt_url=payment_intent.get("charges", {}).get("data", [{}])[0].get("receipt_url") if payment_intent.get("charges", {}).get("data") else None,
         )
-        emit_payment_trigger("invoice_paid", {
-            "payment_intent": payment_intent,
-            "payment": updated_payment,
-            "amount": payment_intent.get("amount"),
-            "currency": payment_intent.get("currency"),
-            "status": payment_intent.get("status"),
-        })
-    elif event['type'] == 'payment_intent.payment_failed':
+        metadata = payment_intent.get("metadata") or {}
+        user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+        if user_id:
+            emit_payment_trigger("payment_received", {
+                "payment_intent": payment_intent,
+                "payment": updated_payment,
+                "payment_id": (updated_payment or {}).get("id"),
+                "customer_id": payment_intent.get("customer"),
+                "amount": payment_intent.get("amount_received") or payment_intent.get("amount"),
+                "currency": payment_intent.get("currency"),
+                "status": payment_intent.get("status"),
+                "user_id": user_id,
+                "person_id": metadata.get("person_id"),
+            })
+    elif event_type == 'payment_intent.payment_failed':
         payment_intent = event['data']['object']
         last_error = payment_intent.get("last_payment_error", {})
         updated_payment = upsert_payment_from_stripe(
@@ -6371,17 +6868,104 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             status="failed",
             error_message=last_error.get("message"),
         )
-        emit_payment_trigger("payment_failed", {
-            "payment_intent": payment_intent,
-            "payment": updated_payment,
-            "failure_reason": last_error.get("message"),
-            "amount": payment_intent.get("amount"),
-            "currency": payment_intent.get("currency"),
-            "status": payment_intent.get("status"),
-        })
-
-    elif event['type'] == 'customer.subscription.deleted':
+        metadata = payment_intent.get("metadata") or {}
+        user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+        if user_id:
+            emit_payment_trigger("payment_failed", {
+                "payment_intent": payment_intent,
+                "payment": updated_payment,
+                "payment_id": (updated_payment or {}).get("id"),
+                "customer_id": payment_intent.get("customer"),
+                "failure_reason": last_error.get("message"),
+                "amount": payment_intent.get("amount"),
+                "currency": payment_intent.get("currency"),
+                "status": payment_intent.get("status"),
+                "user_id": user_id,
+                "person_id": metadata.get("person_id"),
+            })
+    elif event_type == 'refund.created':
+        refund = event['data']['object']
+        metadata = refund.get("metadata") or {}
+        user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+        payment_intent_id = refund.get("payment_intent")
+        customer_id = refund.get("customer")
+        payment_record = None
+        if payment_intent_id:
+            payment_record = update_payment_record(
+                "stripe_payment_intent_id",
+                payment_intent_id,
+                {
+                    "status": "refunded",
+                    "refunded_amount": refund.get("amount"),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            if not customer_id and user_id:
+                try:
+                    customer_id = _stripe_object_to_dict(
+                        stripe.PaymentIntent.retrieve(payment_intent_id, **_get_connected_stripe_request_options(user_id))
+                    ).get("customer")
+                except Exception:
+                    customer_id = None
+        if user_id:
+            emit_payment_trigger("refund_issued", {
+                "refund": refund,
+                "payment": payment_record,
+                "refund_id": refund.get("id"),
+                "payment_id": (payment_record or {}).get("id"),
+                "customer_id": customer_id,
+                "amount": refund.get("amount"),
+                "currency": refund.get("currency"),
+                "status": refund.get("status"),
+                "user_id": user_id,
+                "person_id": metadata.get("person_id"),
+            })
+    elif event_type == 'customer.created':
+        customer = event['data']['object']
+        if is_connected_account_event:
+            metadata = customer.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("customer_created", {
+                    "customer": customer,
+                    "customer_id": customer.get("id"),
+                    "customer_name": customer.get("name"),
+                    "customer_email": customer.get("email"),
+                    "customer_phone": customer.get("phone"),
+                    "status": "created",
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                })
+    elif event_type == 'customer.subscription.created':
         subscription = event['data']['object']
+        if is_connected_account_event:
+            metadata = subscription.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("subscription_created", {
+                    "subscription": subscription,
+                    "subscription_id": subscription.get("id"),
+                    "customer_id": subscription.get("customer"),
+                    "status": subscription.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                })
+    elif event_type == 'customer.subscription.deleted':
+        subscription = event['data']['object']
+        if is_connected_account_event:
+            metadata = subscription.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("subscription_canceled", {
+                    "subscription": subscription,
+                    "subscription_id": subscription.get("id"),
+                    "customer_id": subscription.get("customer"),
+                    "status": subscription.get("status"),
+                    "canceled_at": subscription.get("ended_at") or subscription.get("canceled_at"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                })
+            return {"status": "success"}
         customer_id = subscription.get('customer')
         subscription_id = subscription.get('id')
         

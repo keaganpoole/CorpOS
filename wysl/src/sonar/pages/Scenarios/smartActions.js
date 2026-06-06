@@ -125,20 +125,45 @@ const SMART_ACTIONS = {
   ],
 
   // ─── Invoice Paid ─────────────────────────────────────
-  invoice_paid: [
+  payment_received: [
     { key: 'confirm_payment', name: 'Confirm Payment', description: 'Verify payment was received', instruction: 'Confirm their payment was received and processed. Thank them for their payment.', appliesTo: ['call_customer', 'call_phone_number'] },
   ],
 
-  // ─── Payment Link Sent ─────────────────────────────────
+  invoice_paid: [
+    { key: 'confirm_payment', name: 'Confirm Payment', description: 'Verify invoice payment was received', instruction: 'Confirm the invoice payment was received and processed. Thank them and close out any billing questions.', appliesTo: ['call_customer', 'call_phone_number'] },
+  ],
+
+  refund_issued: [
+    { key: 'confirm_payment', name: 'Confirm Refund', description: 'Let them know the refund has been issued', instruction: 'Confirm the refund has been issued, explain the amount, and set expectations for when it should appear.', appliesTo: ['call_customer', 'call_phone_number'] },
+  ],
+
+  invoice_sent: [
+    { key: 'confirm_receipt', name: 'Confirm Receipt', description: 'Make sure they got the invoice', instruction: 'Confirm they received the invoice and ask if they have any immediate billing questions.', appliesTo: ['call_customer', 'call_phone_number'] },
+    { key: 'explain_charges', name: 'Explain Charges', description: 'Walk them through the invoice', instruction: 'Walk the customer through the invoice. Explain each line item and answer any billing questions.', appliesTo: ['call_customer', 'call_phone_number'] },
+  ],
+
   payment_link_sent: [
     { key: 'confirm_receipt', name: 'Confirm Receipt', description: 'Make sure they got the payment link', instruction: 'Confirm they received the payment link. Ask if they have any questions about it.', appliesTo: ['call_customer', 'call_phone_number'] },
     { key: 'explain_charges', name: 'Explain Charges', description: 'Walk them through the payment request', instruction: 'Walk the customer through the payment request. Explain each line item and answer any questions.', appliesTo: ['call_customer', 'call_phone_number'] },
   ],
 
-  // Backward compatibility for older saved scenarios
-  invoice_sent: [
-    { key: 'confirm_receipt', name: 'Confirm Receipt', description: 'Make sure they got the payment link', instruction: 'Confirm they received the payment link. Ask if they have any questions about it.', appliesTo: ['call_customer', 'call_phone_number'] },
-    { key: 'explain_charges', name: 'Explain Charges', description: 'Walk them through the payment request', instruction: 'Walk the customer through the payment request. Explain each line item and answer any questions.', appliesTo: ['call_customer', 'call_phone_number'] },
+  customer_created: [
+    { key: 'collect_info', name: 'Verify Customer Info', description: 'Confirm the customer record is accurate', instruction: 'Verify the customer details on file are accurate and ask if anything needs to be corrected or added.', appliesTo: ['call_customer', 'call_phone_number'] },
+  ],
+
+  subscription_created: [
+    { key: 'confirm_receipt', name: 'Welcome Subscriber', description: 'Confirm the subscription is active', instruction: 'Confirm the subscription is active, explain what they now have access to, and answer immediate billing questions.', appliesTo: ['call_customer', 'call_phone_number'] },
+  ],
+
+  subscription_canceled: [
+    { key: 'understand_reason', name: 'Understand Cancellation', description: 'Find out why they canceled', instruction: 'Acknowledge the cancellation and try to understand why. Listen for issues that could still be recovered.', appliesTo: ['call_customer', 'call_phone_number'] },
+    { key: 'retain_customer', name: 'Retain Customer', description: 'Try to save the account', instruction: 'If appropriate, offer alternatives that could retain the customer, such as a different plan, pause, or billing adjustment.', appliesTo: ['call_customer', 'call_phone_number'] },
+  ],
+
+  subscription_payment_failed: [
+    { key: 'investigate_payment', name: 'Investigate Payment', description: 'Find out why recurring billing failed', instruction: 'Investigate why the subscription payment failed. Ask whether the payment method changed or expired and what needs to be updated.', appliesTo: ['call_customer', 'call_phone_number'] },
+    { key: 'confirm_billing', name: 'Confirm Billing Info', description: 'Verify their billing details', instruction: 'Verify the billing details on file and explain what needs to be updated to restore the subscription.', appliesTo: ['call_customer', 'call_phone_number'] },
+    { key: 'save_at_risk', name: 'Save At-Risk Customer', description: 'Keep them from churning over billing', instruction: 'Treat this as a retention moment. Address the billing issue quickly and keep the customer engaged.', appliesTo: ['call_customer', 'call_phone_number'] },
   ],
 
   // ─── Record Created ───────────────────────────────────
