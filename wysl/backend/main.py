@@ -1183,23 +1183,39 @@ def maybe_sync_business_caller_id_verification_from_twilio(business: Optional[di
         return None
     if str(active_entry.get("caller_id_verification_status") or "").lower() == "verified":
         return None
+    last_checked_at_raw = active_entry.get("caller_id_last_checked_at")
+    if last_checked_at_raw:
+        try:
+            last_checked_at = datetime.fromisoformat(str(last_checked_at_raw).replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - last_checked_at < timedelta(minutes=5):
+                return None
+        except Exception:
+            pass
     source_number = normalize_phone_number(active_entry.get("source_number"))
     if not source_number:
         return None
     verified_caller_id = find_twilio_outgoing_caller_id(source_number)
+    now = datetime.now(timezone.utc).isoformat()
     if not verified_caller_id:
+        numbers[active_index] = {
+            **active_entry,
+            "caller_id_last_checked_at": now,
+            "updated_at": now,
+        }
+        config["numbers"] = numbers
+        persist_business_forwarding_config(business["id"], config)
         return None
     phone_number_id = ensure_elevenlabs_outbound_caller_id(
         source_number,
         active_entry.get("source_label") or business.get("name") or "Verified Caller ID",
     )
-    now = datetime.now(timezone.utc).isoformat()
     numbers[active_index] = {
         **active_entry,
         "caller_id_verification_status": "verified",
         "caller_id_phone_number": source_number,
         "caller_id_outgoing_caller_id_sid": verified_caller_id.get("sid"),
         "caller_id_verified_at": active_entry.get("caller_id_verified_at") or now,
+        "caller_id_last_checked_at": now,
         "caller_id_validation_code": None,
         "caller_id_failure_reason": None,
         "caller_id_elevenlabs_phone_number_id": phone_number_id,
@@ -6098,6 +6114,7 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
         customer_phone=request.customer_phone,
         create_if_missing=True,
     )
+    payment_metadata = build_scenario_customer_metadata(user_id=user_id, person_id=request.person_id)
     try:
 
         checkout_session = stripe.checkout.Session.create(
@@ -6115,9 +6132,12 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
                 },
                         "quantity": 1,
             }],
+            payment_intent_data={
+                "metadata": payment_metadata,
+            },
             success_url=f"{payment_mode_base_url}/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{payment_mode_base_url}/dashboard?payment=cancelled",
-            metadata=build_scenario_customer_metadata(user_id=user_id, person_id=request.person_id),
+            metadata=payment_metadata,
         )
 
         payment_row = build_payment_row(
@@ -6125,7 +6145,7 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
             currency=request.currency,
             payment_method="link",
             description=description,
-            status="sent",
+            status="pending",
             stripe_session_id=checkout_session.id,
         )
         saved_payment = insert_payment_record(payment_row)
@@ -6135,7 +6155,7 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
             "payment_url": checkout_session.url,
             "amount": request.amount,
             "currency": request.currency,
-            "status": "sent",
+            "status": "pending",
             "customer_name": request.customer_name,
             "customer_email": request.customer_email,
             "customer_phone": request.customer_phone,
@@ -6547,10 +6567,26 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         session = event['data']['object']
         if session.get("mode") == "payment":
             payment_status = session.get("payment_status")
-            upsert_payment_from_stripe(
+            payment_record = upsert_payment_from_stripe(
                 session_id=session.get("id"),
                 status="paid" if payment_status == "paid" else payment_status or "completed",
             )
+            if is_connected_account_event and payment_status == "paid":
+                metadata = session.get("metadata") or {}
+                user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+                if user_id:
+                    emit_payment_trigger("payment_received", {
+                        "checkout_session": session,
+                        "payment": payment_record,
+                        "payment_id": (payment_record or {}).get("id"),
+                        "stripe_session_id": session.get("id"),
+                        "customer_id": session.get("customer"),
+                        "amount": session.get("amount_total") or session.get("amount_subtotal"),
+                        "currency": session.get("currency"),
+                        "status": payment_status,
+                        "user_id": user_id,
+                        "person_id": metadata.get("person_id"),
+                    })
             return {"status": "success"}
 
         if is_connected_account_event:

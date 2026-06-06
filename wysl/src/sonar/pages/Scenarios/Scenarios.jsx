@@ -4159,7 +4159,9 @@ export default function ScenariosPage() {
                         {/* Field inputs — shown for create and update actions */}
                         {(actionConfig._key === 'update_record' || actionConfig._key === 'create_new_record') && (
                         <div className="sb-record-fields-grid">
-                          {getRecordFieldsForTable(actionConfig.target_table).map((field) => {
+                          {getRecordFieldsForTable(actionConfig.target_table)
+                            .filter((field) => !(actionConfig._key === 'update_record' && field.key === 'id'))
+                            .map((field) => {
                             const fieldKey = `field_${field.key}`;
                             const val = actionConfig[fieldKey] || '';
                             const isBooleanCustomField = field.custom && field.type === 'boolean';
