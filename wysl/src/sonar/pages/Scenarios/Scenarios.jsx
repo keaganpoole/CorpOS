@@ -125,7 +125,7 @@ const STRIPE_ACTION_KEYS = new Set([
 
 const LEGACY_ACTION_FIELD_MAP = {
   create_payment_profile: [
-    { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+    { key: 'person_id', label: 'Person ID', type: 'person_id' },
     { key: 'amount', label: 'Amount ($)', type: 'text' },
     { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
     { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
@@ -424,7 +424,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
           { key: 'first_message', label: 'First Message', type: 'first_message_textarea', smartActions: true, toggleLabel: 'Override First Message' },
           { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text' },
@@ -442,8 +442,8 @@ const AUTOMATION_HIERARCHY = {
           { key: 'recipient', label: 'Recipient Number', type: 'text' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
         ]},
-        { key: 'send_to_customer', name: 'Send To Customer', description: 'Send SMS to an existing customer', configFields: [
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+        { key: 'send_to_customer', name: 'Send SMS to an existing customer', configFields: [
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
         ]},
       ],
@@ -479,12 +479,12 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.appointments,
       sub_options: [
         { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment', configFields: [
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'service_id', label: 'Service ID', type: 'service_id' },
         ] },
         { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment', configFields: [
           { key: 'appointment_id', label: 'Appointment ID', type: 'record_id' },
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'service_id', label: 'Service ID', type: 'service_id' },
           { key: 'status', label: 'Status', type: 'select', options: ['pending', 'confirmed', 'cancelled', 'completed', 'missed'] },
           { key: 'date', label: 'Date', type: 'date' },
@@ -505,20 +505,20 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.payments,
       sub_options: [
         { key: 'create_customer', name: 'Create Customer', description: 'Create a Stripe customer', configFields: [
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'customer_name', label: 'Customer Name', type: 'text' },
           { key: 'customer_email', label: 'Customer Email', type: 'text' },
           { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
         ]},
         { key: 'update_customer', name: 'Update Customer', description: 'Update an existing Stripe customer', configFields: [
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'customer_name', label: 'Customer Name', type: 'text' },
           { key: 'customer_email', label: 'Customer Email', type: 'text' },
           { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
         ]},
         { key: 'create_payment', name: 'Create Payment', description: 'Process a new payment', configFields: [
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
           { key: 'amount', label: 'Amount ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
@@ -529,7 +529,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
         ]},
         { key: 'send_payment_link', name: 'Send Payment Link', description: 'Generate a hosted payment link for the customer', configFields: [
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
           { key: 'amount', label: 'Amount ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
@@ -539,7 +539,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
         ]},
         { key: 'create_invoice', name: 'Create Invoice', description: 'Create a real Stripe invoice with line items', configFields: [
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
           { key: 'amount', label: 'Amount ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
@@ -562,7 +562,7 @@ const AUTOMATION_HIERARCHY = {
         { key: 'cancel_subscription', name: 'Cancel Subscription', description: 'Cancel an active subscription', configFields: [
           { key: 'subscription_id', label: 'Subscription ID', type: 'text' },
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
-          { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
         ]},
       ],
     },
@@ -573,7 +573,7 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.email,
       sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email', configFields: [
-        { key: 'person_id', label: 'Customer ID', type: 'person_id' },
+        { key: 'person_id', label: 'Person ID', type: 'person_id' },
         { key: 'to', label: 'To', type: 'text' },
         { key: 'subject', label: 'Subject', type: 'text' },
         { key: 'body', label: 'Body', type: 'textarea' },
@@ -4244,17 +4244,17 @@ export default function ScenariosPage() {
                       {appointmentConfig.key === 'delete_appointment' && 'Set cancellation criteria.'}
                     </div>
                     <div className="sb-record-fields-grid">
-                      {/* Customer ID — for create and update_appointment (person_id field) */}
+                      {/* Person ID — for create and update_appointment (person_id field) */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
                         <div className="sb-record-field">
-                          <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Customer ID</label>
+                          <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Person ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
                               className="sb-input-field"
                               type="text"
                               value={appointmentConfig.person_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, person_id: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Customer ID', fieldType: 'person_id' })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Person ID', fieldType: 'person_id' })}
                               style={{
                                 ...(appointmentConfig.person_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'person_id' ? {
