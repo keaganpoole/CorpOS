@@ -36,9 +36,8 @@ import {
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
-import VariablesPane, { getFieldDisplayLabel, getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields, TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
+import VariablesPane, { getFieldDisplayLabel, getTableFields, getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields, TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
 import { supabase } from '../../lib/supabase';
-import { LEAD_FIELDS } from '../../lib/leadSchema';
 import { fetchCustomFields, getCurrentBusinessId, isCustomFieldKey } from '../../lib/customFields';
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
 import { getSmartActions, getSmartActionByKey } from './smartActions';
@@ -291,86 +290,14 @@ const OPTION_ICONS = {
   time_schedule: Clock,
 };
 
-// Table field definitions for Update Record
-const RECORD_TABLE_FIELDS = {
-  People: [
-    { key: 'first_name', label: 'First Name' },
-    { key: 'last_name', label: 'Last Name' },
-    { key: 'phone', label: 'Phone' },
-    { key: 'email', label: 'Email' },
-    { key: 'street_address', label: 'Street Address' },
-    { key: 'city', label: 'City' },
-    { key: 'state', label: 'State' },
-    { key: 'zip_code', label: 'Zip Code' },
-    { key: 'preferred_contact_method', label: 'Preferred Contact Method' },
-    { key: 'source', label: 'Source' },
-  ],
-  Appointments: [
-    { key: 'client_name', label: 'Client Name' },
-    { key: 'date', label: 'Date' },
-    { key: 'time', label: 'Time' },
-    { key: 'status', label: 'Status' },
-    { key: 'duration', label: 'Duration' },
-    { key: 'assigned_receptionist', label: 'Assigned Receptionist' },
-    { key: 'notes', label: 'Notes' },
-    { key: 'person_id', label: 'Person ID' },
-    { key: 'service_id', label: 'Service ID' },
-    { key: 'business_id', label: 'Business ID' },
-  ],
-  Services: [
-    { key: 'name', label: 'Name' },
-    { key: 'description', label: 'Description' },
-    { key: 'price_type', label: 'Price Type' },
-    { key: 'price_min', label: 'Price Min' },
-    { key: 'price_max', label: 'Price Max' },
-    { key: 'unit', label: 'Unit' },
-    { key: 'category', label: 'Category' },
-    { key: 'is_active', label: 'Is Active' },
-    { key: 'sort_order', label: 'Sort Order' },
-  ],
-  Payments: [
-    { key: 'person_id', label: 'Person ID' },
-    { key: 'appointment_id', label: 'Appointment ID' },
-    { key: 'amount', label: 'Amount' },
-    { key: 'currency', label: 'Currency' },
-    { key: 'status', label: 'Status' },
-    { key: 'payment_method', label: 'Payment Method' },
-    { key: 'description', label: 'Description' },
-    { key: 'stripe_payment_intent_id', label: 'Stripe Intent ID' },
-  ],
-  Businesses: [
-    { key: 'name', label: 'Name' },
-    { key: 'phone', label: 'Phone' },
-    { key: 'email', label: 'Email' },
-    { key: 'address', label: 'Address' },
-    { key: 'city', label: 'City' },
-    { key: 'state', label: 'State' },
-    { key: 'zip', label: 'Zip' },
-    { key: 'website', label: 'Website' },
-    { key: 'about_us', label: 'About Us' },
-    { key: 'policies', label: 'Policies' },
-    { key: 'faq', label: 'FAQ' },
-    { key: 'business_hours', label: 'Business Hours' },
-  ],
-  'Hired Receptionists': [
-    { key: 'full_name', label: 'Full Name' },
-    { key: 'first_name', label: 'First Name' },
-    { key: 'stereotype', label: 'Role' },
-    { key: 'phone_number', label: 'Phone' },
-    { key: 'call_types', label: 'Call Types' },
-    { key: 'status', label: 'Status' },
-    { key: 'is_active', label: 'Is Active' },
-    { key: 'language_model', label: 'Language Model' },
-    { key: 'voice', label: 'Voice' },
-  ],
+const RECORD_TABLE_KEY_MAP = {
+  People: 'people',
+  Payments: 'payments',
+  Appointments: 'appointments',
+  Services: 'services',
+  'Hired Receptionists': 'hired_receptionists',
+  Businesses: 'businesses',
 };
-
-const toRecordCustomField = (field) => ({
-  key: field.key,
-  label: field.label,
-  type: field.type || 'text',
-  custom: true,
-});
 
 const coerceCustomFieldValue = (value, type) => {
   if (value == null || value === '') return value;
@@ -2347,16 +2274,19 @@ export default function ScenariosPage() {
   );
 
   const getRecordFieldsForTable = useCallback((tableName) => {
-    const baseFields = RECORD_TABLE_FIELDS[tableName] || [];
-    if (tableName !== 'People' || peopleCustomFields.length === 0) return baseFields;
+    const tableKey = RECORD_TABLE_KEY_MAP[tableName];
+    const tableFields = tableKey ? getTableFields(tableKey) : [];
+    if (tableFields.length > 0) {
+      return tableFields.map((field) => ({
+        key: field.key,
+        label: field.label,
+        type: field.type || 'text',
+        custom: Boolean(field.custom),
+      }));
+    }
 
-    const baseKeys = new Set(baseFields.map((field) => field.key));
-    const customFields = peopleCustomFields
-      .filter((field) => !baseKeys.has(field.key))
-      .map(toRecordCustomField);
-
-    return [...baseFields, ...customFields];
-  }, [peopleCustomFields]);
+    return [];
+  }, []);
 
   const readRuntimePath = (source, path) => {
     let current = source;

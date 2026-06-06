@@ -845,12 +845,14 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
     return previousIds.map(nodeId => {
       const node = nodes.find(n => n.id === nodeId);
       if (!node) return null;
+      const isTriggerNode = node.categoryType === 'TRIGGERS' || (!!node.triggerKey && !node.actionConfig);
+      if (isTriggerNode) return null;
       if (node.actionConfig?._key === 'search_records') return null;
       const display = getNodeDisplay(node.categoryType);
       const label = node.label || display.defaultLabel;
       const outputVars = getOutputVariables(node);
       const outputData = node.outputData || null;
-      if (outputData == null) return null;
+      if (outputData == null && outputVars.length === 0) return null;
       const isStripeResponse = isStripeResponseNode(node);
       return { nodeId, label, categoryType: node.categoryType, icon: display.icon, outputVars, outputData, isStripeResponse };
     }).filter(Boolean);
@@ -912,11 +914,10 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
                         type="button"
                         className="sb-vars-field"
                         onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, color); }}
-                        title={displayVal || `{{${prev.nodeId}.${field.key}}}`}
+                        title={displayVal || varRef}
                       >
                         <span className="sb-vars-field-name" style={{ color }}>{field.label}</span>
                         {hasOutput && displayVal && <span className="sb-vars-field-value">{displayVal}</span>}
-                        {!hasOutput && <span className="sb-vars-field-type" style={{ opacity: 0.4 }}>—</span>}
                       </button>
                     );
                   })
