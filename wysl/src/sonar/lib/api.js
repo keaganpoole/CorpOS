@@ -3,7 +3,7 @@
  * Handles REST fetches and WebSocket subscriptions
  */
 
-const API_BASE = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_BASE = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
 const WS_URL = window.sonar?.wsUrl || import.meta.env.VITE_WS_URL || null;
 
 async function buildAuthHeaders(extraHeaders = {}) {
@@ -45,8 +45,10 @@ export const api = {
   getOpenRouterModels: () => fetchJSON('/api/openrouter/models'),
   updateAgentModel: (agentId, model) => postJSON(`/api/agents/${agentId}/model`, { model }),
   patchAgent: (agentId, data) => patchJSON(`/api/agents/${agentId}`, data),
+  deleteAgent: (agentId) => deleteJSON(`/api/agents/${agentId}`),
   getPendingRestarts: () => fetchJSON('/api/pending-restarts'),
   clearPendingRestart: (id) => deleteJSON(`/api/pending-restarts/${id}`),
+  hireReceptionist: (catalogId) => postJSON('/api/sonar/receptionists/hire', { catalog_id: catalogId }),
 
   // Control commands via REST (fallback when IPC unavailable)
   setRuntime: (mode) => postJSON('/api/control/runtime', { mode }),

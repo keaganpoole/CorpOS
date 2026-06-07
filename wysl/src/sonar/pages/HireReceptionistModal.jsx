@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Play, Pause, Mic, Volume2, Zap, Sparkles,
+  X, Play, Pause, Volume2, Sparkles,
   User, ChevronLeft, ChevronRight, Loader2,
   Briefcase,
 } from 'lucide-react';
@@ -13,6 +13,8 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [playingVoice, setPlayingVoice] = useState(null);
+  const [hiringId, setHiringId] = useState(null);
+  const [hireError, setHireError] = useState('');
   const audioRef = useRef(null);
 
   const loadReceptionists = async () => {
@@ -85,9 +87,19 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
     };
   };
 
-  const handleSelect = (receptionist) => {
-    onHire?.(receptionist);
-    onClose?.();
+  const handleSelect = async (receptionist) => {
+    if (hiringId) return;
+    setHiringId(receptionist.id);
+    setHireError('');
+    try {
+      await onHire?.(receptionist);
+      onClose?.();
+    } catch (err) {
+      console.error('[HireReceptionistModal] Failed to hire receptionist:', err);
+      setHireError(err?.message || 'Failed to hire receptionist');
+    } finally {
+      setHiringId(null);
+    }
   };
 
   const active = receptionists[currentIndex];
@@ -266,12 +278,14 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
                         {/* Hire button — only on active card */}
                         {isActive && (
                           <button
+                            disabled={Boolean(hiringId)}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleSelect(person);
                             }}
-                            className="mt-auto w-full h-11 bg-white text-black font-bold rounded-2xl tracking-wide flex items-center justify-center gap-2 hover:bg-white/90 transition-all active:scale-[0.98] shadow-lg shadow-white/5"
+                            className="mt-auto w-full h-11 bg-white text-black font-bold rounded-2xl tracking-wide flex items-center justify-center gap-2 hover:bg-white/90 transition-all active:scale-[0.98] shadow-lg shadow-white/5 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
+                            {hiringId === person.id && <Loader2 size={16} className="animate-spin" />}
                             ✨ Hire {person.first_name || person.full_name || 'Receptionist'}
                           </button>
                         )}
@@ -320,12 +334,10 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
               </div>
             )}
 
-            {/* Helper Instructions */}
-            <div className="mt-8 flex items-center gap-4 text-white/20 text-[10px] font-bold uppercase tracking-[2px]">
-              <span className="flex items-center gap-1"><Mic size={10} /> Voice Sample Available</span>
-              <span className="w-1 h-1 bg-white/20 rounded-full" />
-              <span className="flex items-center gap-1"><Zap size={10} /> Low Latency</span>
-            </div>
+            {hireError && (
+              <p className="text-xs font-semibold text-rose-300">{hireError}</p>
+            )}
+
           </>
         )}
       </motion.div>

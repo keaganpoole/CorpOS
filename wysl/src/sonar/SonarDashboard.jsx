@@ -39,7 +39,6 @@ import {
   Star,
   X,
   Trash2,
-  Target,
   GitBranch,
   Calendar,
   Phone,
@@ -190,9 +189,9 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={`bg-[#0A0A0A] border ${borderClass} rounded-2xl w-[320px] flex flex-col hover:border-white/10 transition-all duration-500 relative group overflow-visible`}
+      className={`shrink-0 bg-[#0A0A0A] border ${borderClass} rounded-[28px] w-[380px] flex flex-col hover:border-white/10 transition-all duration-500 relative group overflow-visible shadow-[0_24px_80px_rgba(0,0,0,0.42)]`}
     >
-      <div className="relative h-[200px] overflow-hidden">
+      <div className="relative h-[280px] overflow-hidden rounded-t-[28px]">
         <img
           src={agent.avatar || `${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
           alt={agent.name}
@@ -232,7 +231,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         </div>
       </div>
 
-      <div className="p-5 space-y-3">
+      <div className="p-6 space-y-3.5">
         <div className="flex items-center justify-between px-0.5 py-1">
           <div className="min-w-0">
             <p className="text-[8px] font-black uppercase tracking-[0.24em] text-zinc-600">Receptionist</p>
@@ -293,30 +292,30 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         </div>
         </div>
 
-        <div className="pt-3 border-t border-white/[0.04]">
-          <div className="grid grid-cols-2 gap-6">
+        <div className="pt-3.5 border-t border-white/[0.04]">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-5">
             <div className="min-w-0">
-              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Inbound Calls</p>
+              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1.5">Inbound Calls</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-[22px] leading-none font-black tracking-tight text-white tabular-nums">{inboundCalls}</span>
+                <span className="text-[20px] leading-none font-black tracking-tight text-white tabular-nums">{inboundCalls}</span>
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Outbound Calls</p>
+              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1.5">Outbound Calls</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-[22px] leading-none font-black tracking-tight text-white tabular-nums">{outboundCalls}</span>
+                <span className="text-[20px] leading-none font-black tracking-tight text-white tabular-nums">{outboundCalls}</span>
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Failed Calls</p>
+              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1.5">Failed Calls</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-[22px] leading-none font-black tracking-tight text-white tabular-nums">{failedCalls}</span>
+                <span className="text-[20px] leading-none font-black tracking-tight text-white tabular-nums">{failedCalls}</span>
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-2">Missed Calls</p>
+              <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1.5">Missed Calls</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-[22px] leading-none font-black tracking-tight text-white tabular-nums">{missedCalls}</span>
+                <span className="text-[20px] leading-none font-black tracking-tight text-white tabular-nums">{missedCalls}</span>
               </div>
             </div>
           </div>
@@ -353,31 +352,6 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
                 {forwardingActionLabel}
               </span>
               <ChevronRight size={11} className="text-orange-400/70" />
-            </div>
-          </button>
-        </div>
-
-        <div className="pt-3 border-t border-white/[0.04]">
-          <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1">Scenario</p>
-          <button
-            onClick={() => onOpenScenarios && onOpenScenarios(agent)}
-            className="w-full flex items-center justify-between group/scenario cursor-pointer"
-          >
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Target size={11} className="text-indigo-400/60" />
-              {(agent.scenario_name) ? (
-                <span className="text-[11px] font-bold text-zinc-500 truncate group-hover/scenario:text-zinc-400 transition-colors">
-                  {agent.scenario_name}
-                </span>
-              ) : (
-                <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest">No Scenario</span>
-              )}
-            </div>
-            <div className="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover/scenario:opacity-100 transition-opacity">
-              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">
-                {(agent.scenario_name) ? 'Change' : 'Assign'}
-              </span>
-              <ChevronRight size={11} className="text-indigo-500/60" />
             </div>
           </button>
         </div>
@@ -1883,6 +1857,7 @@ const SonarDashboard = () => {
     setZone,
     setCallsFilter,
     updateAgentActive,
+    refresh,
   } = useSonarState();
 
   const enrichedAgents = (agents || []).map(a => {
@@ -1952,28 +1927,30 @@ const SonarDashboard = () => {
               </button>
             </div>
 
-            <div className="flex gap-6 justify-start overflow-x-auto px-12 py-8 flex-1 items-center" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333 transparent' }}>
-              {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
-                const reactionsMap = {};
-                for (const r of (reactions || [])) {
-                  reactionsMap[r.agent_name] = r;
-                }
-                return (
-                  <AgentNode
-                    key={agent.id}
-                    agent={agent}
-                    isActive={false}
-                    reactions={reactionsMap[agent.name] || {}}
-                    pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
-                    activeForwardingEntry={activeForwardingEntry}
-                    onOpenMarketplace={setMarketplaceAgent}
-                    onOpenScenarios={setReceptionistsAgent}
-                    onOpenForwarding={setForwardingAgent}
-                    onToggleActive={(agent, nextIsActive) => updateAgentActive(agent.id, nextIsActive)}
-                    onTerminate={(agent) => setTerminateAgent(agent)}
-                  />
-                );
-              })}
+            <div className="flex flex-1 items-center overflow-x-auto px-12 py-8" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333 transparent' }}>
+              <div className="flex min-w-full w-max justify-center gap-8">
+                {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
+                  const reactionsMap = {};
+                  for (const r of (reactions || [])) {
+                    reactionsMap[r.agent_name] = r;
+                  }
+                  return (
+                    <AgentNode
+                      key={agent.id}
+                      agent={agent}
+                      isActive={false}
+                      reactions={reactionsMap[agent.name] || {}}
+                      pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
+                      activeForwardingEntry={activeForwardingEntry}
+                      onOpenMarketplace={setMarketplaceAgent}
+                      onOpenScenarios={setReceptionistsAgent}
+                      onOpenForwarding={setForwardingAgent}
+                      onToggleActive={(agent, nextIsActive) => updateAgentActive(agent.id, nextIsActive)}
+                      onTerminate={(agent) => setTerminateAgent(agent)}
+                    />
+                  );
+                })}
+              </div>
             </div>
             <AnimatePresence>
               {showHireModal && (
@@ -1981,37 +1958,15 @@ const SonarDashboard = () => {
                   onClose={() => setShowHireModal(false)}
                   onHire={async (receptionist) => {
                     try {
-                      const { data: biz } = await supabase.from('businesses').select('phone').eq('user_id', userId).limit(1).single();
-                      const { data: existingActive } = await supabase
-                        .from('hired_receptionists')
-                        .select('id')
-                        .eq('user_id', userId)
-                        .eq('is_active', true)
-                        .limit(1)
-                        .maybeSingle();
-                      const { error } = await supabase.from('hired_receptionists').insert({
-                        catalog_id: receptionist.id,
-                        full_name: receptionist.full_name,
-                        description: receptionist.description,
-                        stereotype: receptionist.stereotype,
-                        avatar: receptionist.avatar,
-                        traits: receptionist.traits,
-                        voice: receptionist.voice,
-                        age: receptionist.age,
-                        first_name: receptionist.first_name,
-                        gender: receptionist.gender || null,
-                        is_active: !existingActive?.id,
-                        user_id: userId,
-                        phone_number: biz?.phone || null,
-                        elevenlabs_voice_id: receptionist.elevenlabs_voice_id || receptionist.elevenlabs_agent_id || null,
-                      });
-                      if (error) throw error;
+                      const result = await api.hireReceptionist(receptionist.id);
+                      if (!result) throw new Error('Failed to hire receptionist');
+                      await refresh();
+                      await loadAgentScenarios();
+                      return result;
                     } catch (err) {
                       console.error('[Hire] Failed:', err.message);
-                      return;
+                      throw err;
                     }
-                    await refresh();
-                    await loadAgentScenarios();
                   }}
                 />
               )}
@@ -2082,13 +2037,13 @@ const SonarDashboard = () => {
                         <button
                           onClick={async () => {
                             try {
-                              const { error } = await supabase.from('hired_receptionists').delete().eq('id', terminateAgent.id);
-                              if (error) throw error;
+                              const result = await api.deleteAgent(terminateAgent.id);
+                              if (!result?.ok) throw new Error('Failed to delete receptionist');
                               setTerminateAgent(null);
                               await refresh();
                               await loadAgentScenarios();
                             } catch (err) {
-                              console.error('[Terminate] Failed:', err.message);
+                              console.error('[Terminate] Failed:', err);
                             }
                           }}
                           className="px-5 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-black uppercase tracking-wider hover:bg-rose-400 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)] active:scale-95"

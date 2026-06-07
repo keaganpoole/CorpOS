@@ -5256,6 +5256,36 @@ async def patch_agent(agent_id: str, payload: dict):
     push_live_event("Agent updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, **update_payload})
     return response.data[0] if response.data else {"id": agent_id, **update_payload}
 
+@app.delete("/api/agents/{agent_id}", tags=["Sonar Controller Compat"])
+async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_user)):
+    current_user_id = str(current_user.id)
+    existing_response = (
+        supabase
+        .table('hired_receptionists')
+        .select('id,user_id,full_name,first_name')
+        .eq('id', agent_id)
+        .eq('user_id', current_user_id)
+        .limit(1)
+        .execute()
+    )
+    existing_agent = (existing_response.data or [None])[0]
+    if not existing_agent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    supabase.table('hired_receptionists').delete().eq('id', agent_id).eq('user_id', current_user_id).execute()
+    push_live_event(
+        "Agent deleted.",
+        actor="system",
+        severity="info",
+        event_type="agent_deleted",
+        payload={
+            "agent_id": agent_id,
+            "user_id": current_user_id,
+            "name": existing_agent.get('full_name') or existing_agent.get('first_name') or "Receptionist",
+        },
+    )
+    return {"ok": True, "id": agent_id}
+
 @app.post("/api/control/runtime", tags=["Sonar Controller Compat"])
 async def set_runtime_mode(payload: RuntimeModeRequest):
     CONTROL_STATE["runtime_mode"] = payload.mode
@@ -5489,6 +5519,77 @@ async def list_hired_receptionists(current_user: dict = Depends(get_current_user
         .execute()
     )
     return response.data or []
+
+@app.post("/api/sonar/receptionists/hire", tags=["Sonar Receptionists"])
+async def hire_receptionist(payload: dict, current_user: dict = Depends(get_current_user)):
+    catalog_id = payload.get("catalog_id") or payload.get("id")
+    if not catalog_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="catalog_id is required")
+
+    current_user_id = str(current_user.id)
+    try:
+        catalog_response = (
+            supabase.table("receptionist_catalog")
+            .select("*")
+            .eq("id", str(catalog_id))
+            .limit(1)
+            .execute()
+        )
+        catalog_row = (catalog_response.data or [None])[0]
+        if not catalog_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catalog receptionist not found")
+
+        business_response = (
+            supabase.table("businesses")
+            .select("id,phone")
+            .eq("user_id", current_user_id)
+            .limit(1)
+            .execute()
+        )
+        business_row = (business_response.data or [None])[0]
+
+        active_response = (
+            supabase.table("hired_receptionists")
+            .select("id")
+            .eq("user_id", current_user_id)
+            .eq("is_active", True)
+            .limit(1)
+            .execute()
+        )
+        active_row = (active_response.data or [None])[0]
+
+        insert_payload = {
+            "catalog_id": catalog_row.get("id"),
+            "full_name": catalog_row.get("full_name"),
+            "description": catalog_row.get("description"),
+            "stereotype": catalog_row.get("stereotype"),
+            "avatar": catalog_row.get("avatar"),
+            "traits": catalog_row.get("traits"),
+            "voice": catalog_row.get("voice"),
+            "age": catalog_row.get("age"),
+            "first_name": catalog_row.get("first_name"),
+            "gender": catalog_row.get("gender"),
+            "is_active": not bool(active_row and active_row.get("id")),
+            "user_id": current_user_id,
+            "business_id": business_row.get("id") if business_row else None,
+            "phone_number": business_row.get("phone") if business_row else None,
+            "elevenlabs_voice_id": catalog_row.get("elevenlabs_voice_id") or catalog_row.get("elevenlabs_agent_id"),
+        }
+        response = supabase.table("hired_receptionists").insert(insert_payload).execute()
+        created = response.data[0] if response.data else insert_payload
+        push_live_event(
+            "Agent hired.",
+            actor="system",
+            severity="info",
+            event_type="agent_created",
+            payload={"agent_id": created.get("id"), "user_id": current_user_id},
+        )
+        return created
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to hire receptionist %s for user %s: %s", catalog_id, current_user_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to hire receptionist")
 
 @app.get("/api/sonar/receptionists/catalog", tags=["Sonar Receptionists"])
 async def list_receptionist_catalog():

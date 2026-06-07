@@ -607,7 +607,6 @@ const sparklinePoints = (series) => {
 };
 
 function AnalyticsCard({ item, value, index }) {
-  const Icon = item.icon;
   const line = sparklinePoints(item.series);
 
   return (
@@ -624,9 +623,6 @@ function AnalyticsCard({ item, value, index }) {
             <span className="live-stat-value">{formatValue(item, value)}</span>
             <span className="live-stat-delta">{item.delta}</span>
           </div>
-        </div>
-        <div className="live-stat-icon">
-          <Icon size={15} />
         </div>
       </div>
       <div className="live-stat-chart-row">
@@ -2388,7 +2384,7 @@ export default function LiveMonitoringPage() {
           content: "";
           position: absolute;
           inset: 0;
-          background: linear-gradient(180deg, rgba(255,255,255,0.05), transparent 48%);
+          background: linear-gradient(180deg, rgba(255,255,255,0.018), transparent 45%);
           pointer-events: none;
         }
 
@@ -2397,25 +2393,13 @@ export default function LiveMonitoringPage() {
           z-index: 1;
           display: flex;
           align-items: flex-start;
-          justify-content: space-between;
-          gap: 12px;
+          justify-content: flex-start;
+          gap: 0;
         }
 
         .live-stat-copy {
           flex: 1;
           min-width: 0;
-        }
-
-        .live-stat-icon {
-          width: 40px;
-          height: 40px;
-          display: grid;
-          place-items: center;
-          flex: 0 0 auto;
-          border-radius: 14px;
-          color: #b0b0b0;
-          border: 1px solid rgba(255,255,255,0.08);
-          background: rgba(255,255,255,0.04);
         }
 
         .live-stat-label {
