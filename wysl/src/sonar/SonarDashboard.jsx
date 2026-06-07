@@ -1927,8 +1927,8 @@ const SonarDashboard = () => {
               </button>
             </div>
 
-            <div className="flex flex-1 items-center overflow-x-auto px-12 py-8" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333 transparent' }}>
-              <div className="flex min-w-full w-max justify-center gap-8">
+            <div className="flex flex-1 overflow-x-auto overflow-y-hidden px-12 py-8" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333 transparent' }}>
+              <div className="flex min-w-max items-center justify-start gap-8">
                 {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
                   const reactionsMap = {};
                   for (const r of (reactions || [])) {
