@@ -16,7 +16,6 @@ import {
   Search,
   Star,
   Square,
-  SlidersHorizontal,
   Smile,
   Timer,
   Trash2,
@@ -731,15 +730,11 @@ export default function CallLogsPage() {
               <p className="mt-1 text-[12px] font-medium text-zinc-600">{loading ? 'Loading calls' : `${calls.length} recent calls`}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-full bg-white/[0.03] px-3 py-2 text-[12px] font-medium text-zinc-500">
-            <SlidersHorizontal size={14} />
-            <span>{filteredCalls.length} showing</span>
-          </div>
         </div>
       </div>
 
       <div className="grid flex-1 min-h-0 grid-cols-1 xl:grid-cols-[430px_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col border-b border-white/[0.05] xl:border-b-0 xl:border-r xl:border-white/[0.05]">
+        <aside className="relative flex min-h-0 flex-col border-b border-white/[0.05] after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/[0.05] xl:border-b-0 xl:border-r xl:border-white/[0.05]">
           <div className="shrink-0 space-y-3 bg-[#020202]/95 p-4">
             <label className="relative block">
               <span className="sr-only">Search call logs</span>
@@ -808,7 +803,7 @@ export default function CallLogsPage() {
           </div>
         </aside>
 
-        <section className="flex min-h-0 flex-col">
+        <section className="relative flex min-h-0 flex-col after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/[0.05]">
           {selectedCall ? (
             <>
           <div className="shrink-0 p-5 sm:p-6">
@@ -850,31 +845,35 @@ export default function CallLogsPage() {
             </div>
           </div>
 
-          <div className="custom-scrollbar flex-1 overflow-y-auto px-4 py-6 sm:px-7">
-            <motion.div
-              key={selectedCall.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.24 }}
-              className="mx-auto flex max-w-[860px] flex-col gap-4"
-            >
-              {selectedCall.transcript.length > 0 ? (
-                selectedCall.transcript.map((entry, index) => (
-                  <TranscriptBubble
-                    key={`${selectedCall.id}-${index}`}
-                    entry={entry}
-                    receptionistAvatar={selectedCall.receptionistAvatar}
-                    receptionistName={selectedCall.receptionist}
-                    customerName={selectedCall.name}
-                  />
-                ))
-              ) : (
-                <div className="rounded-2xl bg-white/[0.03] p-8 text-center">
-                  <p className="text-[13px] font-semibold text-zinc-300">No transcript captured</p>
-                  <p className="mt-2 text-[12px] text-zinc-600">The caller disconnected before a conversation was recorded.</p>
-                </div>
-              )}
-            </motion.div>
+          <div className="min-h-0 flex-1 px-4 pb-6 sm:px-7">
+            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-white/[0.02]">
+              <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6">
+                <motion.div
+                  key={selectedCall.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.24 }}
+                  className="mx-auto flex max-w-[860px] flex-col gap-4"
+                >
+                  {selectedCall.transcript.length > 0 ? (
+                    selectedCall.transcript.map((entry, index) => (
+                      <TranscriptBubble
+                        key={`${selectedCall.id}-${index}`}
+                        entry={entry}
+                        receptionistAvatar={selectedCall.receptionistAvatar}
+                        receptionistName={selectedCall.receptionist}
+                        customerName={selectedCall.name}
+                      />
+                    ))
+                  ) : (
+                    <div className="rounded-2xl bg-white/[0.03] p-8 text-center">
+                      <p className="text-[13px] font-semibold text-zinc-300">No transcript captured</p>
+                      <p className="mt-2 text-[12px] text-zinc-600">The caller disconnected before a conversation was recorded.</p>
+                    </div>
+                  )}
+                </motion.div>
+              </div>
+            </div>
           </div>
             </>
           ) : (
