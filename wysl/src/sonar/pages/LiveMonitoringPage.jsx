@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import * as d3 from 'd3';
 import { sankey, sankeyJustify } from 'd3-sankey';
 import {
+  CalendarRange,
   CalendarDays,
   CheckCircle2,
   Check,
@@ -38,6 +39,7 @@ const DEFAULT_ANALYTICS_KEYS = ['calls', 'appointments', 'customers', 'revenue']
 const MAX_ANALYTICS_SELECTION = 8;
 const ANALYTICS_SELECTION_STORAGE_KEY = 'live-monitoring.analytics.selection';
 const ANALYTICS_PERIOD_STORAGE_KEY = 'live-monitoring.analytics.period';
+const ANALYTICS_RANGE_STORAGE_KEY = 'live-monitoring.analytics.range';
 
 const analyticsCatalog = [
   { key: 'calls', label: 'Total Calls', icon: Phone },
@@ -353,6 +355,44 @@ const comparisonWindow = (periodKey) => {
   };
 };
 
+const parseDateInputValue = (value, endOfDay = false) => {
+  if (!value) return null;
+  const [year, month, day] = String(value).split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return endOfDay
+    ? new Date(year, month - 1, day, 23, 59, 59, 999)
+    : new Date(year, month - 1, day);
+};
+
+const formatRangeDateLabel = (value) => {
+  const date = parseDateInputValue(value);
+  if (!date) return '';
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const analyticsWindow = (periodKey, range) => {
+  const customStart = parseDateInputValue(range?.start);
+  const customEnd = parseDateInputValue(range?.end, true);
+
+  if (customStart && customEnd && customEnd >= customStart) {
+    const spanMs = Math.max(24 * 60 * 60 * 1000, customEnd.getTime() - customStart.getTime() + 1);
+    return {
+      now: customEnd,
+      currentStart: customStart,
+      currentEnd: customEnd,
+      previousStart: new Date(customStart.getTime() - spanMs),
+      bucketCount: 10,
+      isCustom: true,
+    };
+  }
+
+  return { ...comparisonWindow(periodKey), isCustom: false };
+};
+
 const percentChange = (current, previous) => {
   if (!previous && !current) return '0%';
   if (!previous) return `+${Math.round(current * 100)}%`;
@@ -624,11 +664,30 @@ function getInitialAnalyticsPeriod() {
   return periodByKey[saved] ? saved : 'week';
 }
 
-function AnalyticsControls({ selectedKeys, periodKey, onToggleMetric, onPeriodChange }) {
+function getInitialAnalyticsRange() {
+  if (typeof window === 'undefined') return { start: '', end: '' };
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ANALYTICS_RANGE_STORAGE_KEY) || '{}');
+    return {
+      start: typeof parsed.start === 'string' ? parsed.start : '',
+      end: typeof parsed.end === 'string' ? parsed.end : '',
+    };
+  } catch {
+    return { start: '', end: '' };
+  }
+}
+
+function AnalyticsControls({ selectedKeys, periodKey, dateRange, onDateRangeChange, onToggleMetric, onPeriodChange }) {
   const pickerRef = useRef(null);
   const periodRef = useRef(null);
+  const rangeRef = useRef(null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);
+  const [isRangeOpen, setIsRangeOpen] = useState(false);
+  const rangeTriggerLabel = [
+    dateRange.start ? formatRangeDateLabel(dateRange.start) : '',
+    dateRange.end ? formatRangeDateLabel(dateRange.end) : '',
+  ].filter(Boolean).join(' to ');
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -637,6 +696,9 @@ function AnalyticsControls({ selectedKeys, periodKey, onToggleMetric, onPeriodCh
       }
       if (!periodRef.current?.contains(event.target)) {
         setIsPeriodOpen(false);
+      }
+      if (!rangeRef.current?.contains(event.target)) {
+        setIsRangeOpen(false);
       }
     };
 
@@ -650,30 +712,113 @@ function AnalyticsControls({ selectedKeys, periodKey, onToggleMetric, onPeriodCh
 
   return (
     <section className="live-analytics-controls">
-      <div className="live-period-picker" ref={periodRef}>
-        <button
-          type="button"
-          className="live-period-trigger"
-          aria-expanded={isPeriodOpen}
-          onClick={() => setIsPeriodOpen((value) => !value)}
+      <div className="live-timeline-group">
+        <div
+          className="live-period-picker live-timeline-slot live-timeline-slot-active"
+          ref={periodRef}
         >
-          <span>Comparison</span>
-          <strong>{periodByKey[periodKey]?.label || 'Week-over-Week'}</strong>
-        </button>
-        <div className={`live-period-options ${isPeriodOpen ? 'live-period-options-open' : ''}`} aria-label="Comparison period">
-          {comparisonPeriods.map((period) => (
+          <button
+            type="button"
+            className="live-period-trigger"
+            aria-expanded={isPeriodOpen}
+            onClick={() => setIsPeriodOpen((value) => !value)}
+          >
+            <span>Comparison</span>
+            <strong>{periodByKey[periodKey]?.label || 'Week-over-Week'}</strong>
+          </button>
+          <div className={`live-period-options ${isPeriodOpen ? 'live-period-options-open' : ''}`} aria-label="Comparison period">
+            {comparisonPeriods.map((period) => (
+              <button
+                key={period.key}
+                type="button"
+                className={`live-period-option ${periodKey === period.key ? 'live-period-option-active' : ''}`}
+                onClick={() => {
+                  onPeriodChange(period.key);
+                  setIsPeriodOpen(false);
+                }}
+              >
+                {period.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className={`live-range-picker live-timeline-slot ${isPeriodOpen ? 'live-timeline-slot-faded' : 'live-timeline-slot-active'}`}
+          ref={rangeRef}
+        >
+          <button
+            type="button"
+            className="live-range-trigger"
+            aria-expanded={isRangeOpen}
+            onClick={() => setIsRangeOpen((value) => !value)}
+          >
+            <span>Timeframe</span>
+            <strong>
+              {rangeTriggerLabel ? (
+                rangeTriggerLabel
+              ) : (
+                <span className="live-range-trigger-icon" aria-label="Select timeframe">
+                  <CalendarRange size={14} />
+                </span>
+              )}
+            </strong>
+          </button>
+          <div
+            className={`live-range-options ${isRangeOpen ? 'live-range-options-open' : ''}`}
+            style={{
+              filter: !isRangeOpen ? 'blur(10px)' : 'blur(0px)',
+              transitionProperty: 'all, filter',
+            }}
+          >
+            <label className="live-range-field">
+              <span className="live-range-field-label">From</span>
+              <span className="live-range-field-control">
+                <span className="live-range-field-display">
+                  {dateRange.start ? (
+                    <span>{formatRangeDateLabel(dateRange.start)}</span>
+                  ) : (
+                    <span className="live-range-field-icon" aria-hidden="true">
+                      <CalendarRange size={13} />
+                    </span>
+                  )}
+                </span>
+                <input
+                  type="date"
+                  aria-label="Start date"
+                  value={dateRange.start}
+                  onChange={(event) => onDateRangeChange((current) => ({ ...current, start: event.target.value }))}
+                />
+              </span>
+            </label>
+            <label className="live-range-field">
+              <span className="live-range-field-label">To</span>
+              <span className="live-range-field-control">
+                <span className="live-range-field-display">
+                  {dateRange.end ? (
+                    <span>{formatRangeDateLabel(dateRange.end)}</span>
+                  ) : (
+                    <span className="live-range-field-icon" aria-hidden="true">
+                      <CalendarRange size={13} />
+                    </span>
+                  )}
+                </span>
+                <input
+                  type="date"
+                  aria-label="End date"
+                  value={dateRange.end}
+                  onChange={(event) => onDateRangeChange((current) => ({ ...current, end: event.target.value }))}
+                />
+              </span>
+            </label>
             <button
-              key={period.key}
               type="button"
-              className={`live-period-option ${periodKey === period.key ? 'live-period-option-active' : ''}`}
-              onClick={() => {
-                onPeriodChange(period.key);
-                setIsPeriodOpen(false);
-              }}
+              className="live-range-clear"
+              onClick={() => onDateRangeChange({ start: '', end: '' })}
             >
-              {period.label}
+              Clear
             </button>
-          ))}
+          </div>
         </div>
       </div>
 
@@ -720,7 +865,7 @@ function AnalyticsControls({ selectedKeys, periodKey, onToggleMetric, onPeriodCh
   );
 }
 
-function useLiveAnalytics(periodKey) {
+function useLiveAnalytics(periodKey, dateRange) {
   const [analytics, setAnalytics] = useState(() => analyticsCatalog.map((item) => ({
     ...item,
     value: 0,
@@ -736,11 +881,11 @@ function useLiveAnalytics(periodKey) {
 
     const fetchAnalytics = async () => {
       try {
-        const { now, currentStart, currentEnd, previousStart, bucketCount } = comparisonWindow(periodKey);
+        const { now, currentStart, currentEnd, previousStart, bucketCount } = analyticsWindow(periodKey, dateRange);
         const since = previousStart.toISOString();
         const inCurrentPeriod = (row) => {
           const dt = safeDate(row.created_at || row.started_at);
-          return dt && dt >= currentStart && dt < currentEnd;
+          return dt && dt >= currentStart && dt <= currentEnd;
         };
         const inPreviousPeriod = (row) => {
           const dt = safeDate(row.created_at || row.started_at);
@@ -884,7 +1029,7 @@ function useLiveAnalytics(periodKey) {
       window.clearTimeout(refreshTimer);
       supabase.removeChannel(channel);
     };
-  }, [periodKey]);
+  }, [dateRange, periodKey]);
 
   return analytics;
 }
@@ -1802,7 +1947,8 @@ function RealtimeSankey({ flowState }) {
 export default function LiveMonitoringPage() {
   const [selectedMetricKeys, setSelectedMetricKeys] = useState(getInitialAnalyticsSelection);
   const [periodKey, setPeriodKey] = useState(getInitialAnalyticsPeriod);
-  const analytics = useLiveAnalytics(periodKey);
+  const [dateRange, setDateRange] = useState(getInitialAnalyticsRange);
+  const analytics = useLiveAnalytics(periodKey, dateRange);
   const flowState = useLiveSankeyState();
   const selectedAnalytics = useMemo(() => (
     selectedMetricKeys
@@ -1817,6 +1963,10 @@ export default function LiveMonitoringPage() {
   useEffect(() => {
     window.localStorage.setItem(ANALYTICS_PERIOD_STORAGE_KEY, periodKey);
   }, [periodKey]);
+
+  useEffect(() => {
+    window.localStorage.setItem(ANALYTICS_RANGE_STORAGE_KEY, JSON.stringify(dateRange));
+  }, [dateRange]);
 
   const toggleMetric = (key) => {
     setSelectedMetricKeys((current) => {
@@ -1850,10 +2000,34 @@ export default function LiveMonitoringPage() {
           overflow: visible;
         }
 
+        .live-timeline-group {
+          display: inline-flex;
+          align-items: center;
+          gap: 14px;
+          overflow: visible;
+        }
+
+        .live-timeline-slot {
+          position: relative;
+          transition: opacity 500ms ease;
+        }
+
+        .live-timeline-slot-active {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .live-timeline-slot-faded {
+          opacity: 0;
+          pointer-events: none;
+        }
+
         .live-period-picker {
           display: inline-flex;
           align-items: center;
           gap: 4px;
+          position: relative;
+          z-index: 45;
           overflow: visible;
         }
 
@@ -1883,21 +2057,25 @@ export default function LiveMonitoringPage() {
         }
 
         .live-period-options {
-          display: inline-flex;
+          position: absolute;
+          top: 50%;
+          left: calc(100% + 12px);
+          display: flex;
           align-items: center;
           gap: 10px;
           overflow: hidden;
           max-width: 0;
           opacity: 0;
-          padding-left: 0;
-          transition: max-width 420ms cubic-bezier(0.23,1,0.32,1), opacity 220ms ease, padding-left 220ms ease;
+          transform: translateY(-50%);
+          pointer-events: none;
+          transition: max-width 700ms cubic-bezier(0.23,1,0.32,1), opacity 260ms ease;
           white-space: nowrap;
         }
 
         .live-period-options-open {
           max-width: 720px;
           opacity: 1;
-          padding-left: 4px;
+          pointer-events: auto;
         }
 
         .live-period-option {
@@ -1925,6 +2103,157 @@ export default function LiveMonitoringPage() {
           position: relative;
           z-index: 40;
           overflow: visible;
+        }
+
+        .live-range-picker {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          position: relative;
+          z-index: 35;
+          overflow: visible;
+        }
+
+        .live-range-trigger {
+          min-height: 38px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.03);
+          border-radius: 18px;
+          padding: 0 14px;
+          box-shadow: 0 20px 48px rgba(0,0,0,0.28);
+          font-size: 12px;
+          font-weight: 500;
+          line-height: 1.2;
+          color: #e5e5e5;
+          cursor: pointer;
+          white-space: nowrap;
+          appearance: none;
+        }
+
+        .live-range-trigger strong {
+          color: #8a8a8a;
+          font-size: 12px;
+          font-weight: 500;
+          display: inline-flex;
+          align-items: center;
+        }
+
+        .live-range-trigger-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #8a8a8a;
+          line-height: 0;
+        }
+
+        .live-range-options {
+          position: absolute;
+          top: 50%;
+          left: calc(100% + 12px);
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          overflow: hidden;
+          max-width: 0;
+          opacity: 0;
+          transform: translateY(-50%);
+          pointer-events: none;
+          transition: all 700ms cubic-bezier(0.23,1,0.32,1), filter 700ms cubic-bezier(0.23,1,0.32,1);
+          white-space: nowrap;
+        }
+
+        .live-range-options-open {
+          max-width: 64rem;
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .live-range-field {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          color: #8a8a8a;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          white-space: nowrap;
+        }
+
+        .live-range-field-control {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          min-width: 116px;
+          height: 34px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.03);
+          border-radius: 12px;
+          overflow: hidden;
+        }
+
+        .live-range-field-display {
+          width: 100%;
+          height: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 12px;
+          color: #f5f5f5;
+          font-size: 12px;
+          font-weight: 500;
+          line-height: 1;
+          pointer-events: none;
+        }
+
+        .live-range-field-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #9ca3af;
+          line-height: 0;
+        }
+
+        .live-range-field input {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          border: 0;
+          background: transparent;
+          color: transparent;
+          opacity: 0;
+          padding: 0;
+          cursor: pointer;
+          outline: none;
+          color-scheme: dark;
+        }
+
+        .live-range-field input::-webkit-calendar-picker-indicator {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          cursor: pointer;
+        }
+
+        .live-range-clear {
+          border: 0;
+          background: transparent;
+          color: #8a8a8a;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          cursor: pointer;
+          white-space: nowrap;
+          padding: 0;
+          transition: color 160ms ease;
+        }
+
+        .live-range-clear:hover {
+          color: #f5f5f5;
         }
 
         .live-metric-picker-trigger {
@@ -2346,6 +2675,8 @@ export default function LiveMonitoringPage() {
           <AnalyticsControls
             selectedKeys={selectedMetricKeys}
             periodKey={periodKey}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
             onToggleMetric={toggleMetric}
             onPeriodChange={setPeriodKey}
           />
