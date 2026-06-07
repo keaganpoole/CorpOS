@@ -312,15 +312,37 @@ const InlineBoolean = ({ value, onSave }) => {
 
 const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = {} }) => {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
   const ref = useRef(null);
+  const menuRef = useRef(null);
   const current = normalizeOptionValue(value);
   const currentKey = typeof current === 'string' ? current.toLowerCase() : '';
+  const updateMenuPosition = useCallback(() => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setMenuPosition({
+      left: rect.left,
+      top: rect.bottom + 6,
+      width: Math.max(rect.width, 170),
+    });
+  }, []);
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    updateMenuPosition();
+    const handler = (e) => {
+      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const update = () => updateMenuPosition();
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, updateMenuPosition]);
   const palettes = {
     emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', dot: '#10b981' },
     cyan: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20', dot: '#06b6d4' },
@@ -356,10 +378,20 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
           <span className="invisible">.</span>
         )}
       </button>
+      {createPortal(
       <AnimatePresence>
         {open && (
-          <motion.div initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.96 }}
-            className="absolute top-full left-0 mt-1.5 z-50 bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden min-w-[170px] py-1"
+          <motion.div
+            ref={menuRef}
+            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+            style={{
+              left: menuPosition?.left ?? 0,
+              top: menuPosition?.top ?? 0,
+              width: menuPosition?.width ?? 170,
+            }}
+            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
               onClick={() => { setOpen(false); onSave(null); }}
@@ -384,7 +416,9 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
             })}
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
     </div>
   );
 };
@@ -392,11 +426,37 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
 const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   const [open, setOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
   const ref = useRef(null);
+  const menuRef = useRef(null);
+  const tooltipRef = useRef(null);
   const selected = Array.isArray(value) ? value.map(normalizeOptionValue).filter((item) => typeof item === 'string' && item.length > 0) : [];
+  const updateMenuPosition = useCallback(() => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setMenuPosition({
+      left: rect.left,
+      top: rect.bottom + 6,
+      width: Math.max(rect.width, 190),
+    });
+  }, []);
+  useEffect(() => {
+    if (!open && !hovering) return;
+    updateMenuPosition();
+    const update = () => updateMenuPosition();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, hovering, updateMenuPosition]);
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
@@ -420,14 +480,21 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
         ))}
         {selected.length > 2 && <span className="text-[9px] text-zinc-600 font-bold">+{selected.length - 2}</span>}
       </div>
+      {createPortal(
       <AnimatePresence>
         {!open && hovering && selected.length > 0 && (
           <motion.div
+            ref={tooltipRef}
             initial={{ opacity: 0, y: 4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
             transition={{ duration: 0.12 }}
-            className="absolute left-0 top-full mt-1.5 z-40 min-w-[180px] max-w-[260px] rounded-xl border border-white/[0.08] bg-[#111] px-2 py-2 shadow-[0_12px_36px_rgba(0,0,0,0.72)]"
+            style={{
+              left: menuPosition?.left ?? 0,
+              top: menuPosition?.top ?? 0,
+              width: Math.min(Math.max(menuPosition?.width ?? 190, 190), 260),
+            }}
+            className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#111] px-2 py-2 shadow-[0_12px_36px_rgba(0,0,0,0.72)]"
           >
             <div className="flex flex-wrap gap-1.5">
               {selected.map((tag) => (
@@ -439,31 +506,43 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
+      {createPortal(
       <AnimatePresence>
         {open && (
-          <motion.div initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.96 }}
-            className="absolute top-full left-0 mt-1.5 z-50 bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden min-w-[190px] py-1"
+          <motion.div
+            ref={menuRef}
+            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+            style={{
+              left: menuPosition?.left ?? 0,
+              top: menuPosition?.top ?? 0,
+              width: menuPosition?.width ?? 190,
+            }}
+            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             {options.map((opt, idx) => {
-              const val = normalizeOptionValue(opt);
+              const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
               const valueKey = typeof val === 'string' ? val.toLowerCase() : '';
               const active = valueKey !== '' && selected.some((s) => s.toLowerCase() === valueKey);
               return (
                 <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }}
                   onClick={() => toggle(val)}
-                  className={`w-full text-left px-3 py-2 text-[11px] font-bold flex items-center gap-2 hover:bg-white/[0.06] ${active ? 'text-cyan-400' : 'text-zinc-400'}`}>
-                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${active ? 'bg-cyan-500/20 border-cyan-500/40' : 'border-white/10'}`}>
-                    {active && <Check size={9} className="text-cyan-400" />}
-                  </div>
+                  className={`w-full text-left px-3 py-2 text-[11px] font-bold flex items-center gap-2 hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
                   <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(val) }} />
                   {val}
+                  {active && <Check size={11} className="text-cyan-400 ml-auto" />}
                 </motion.button>
               );
             })}
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
     </div>
   );
 };
@@ -617,7 +696,7 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
   })),
 ];
 
-const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateNew, onCreateInline, onDeleteMany, totalCount, onUpdateLead }) => {
+const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateInline, onDeleteMany, totalCount, onUpdateLead, onSchemaChange }) => {
   const [density] = useState(2);
   const [businessId, setBusinessId] = useState(null);
   const [customFields, setCustomFields] = useState([]);
@@ -685,6 +764,10 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
       return next;
     });
   }, [customFields, fieldConfig]);
+
+  useEffect(() => {
+    onSchemaChange?.({ columns, customFields, fieldConfig });
+  }, [columns, customFields, fieldConfig, onSchemaChange]);
 
   const measureHeaderMetrics = useCallback(() => {
     if (!headerRowRef.current) return;
@@ -1101,7 +1184,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
         <div className="flex items-center gap-3">
           <div>
             <h2 className="text-2xl font-bold text-white tracking-tight">People</h2>
-            <p className="text-[11px] text-zinc-600 mt-0.5">{leads.length} of {totalCount} people</p>
+            <p className="text-[11px] text-zinc-600 mt-0.5">{totalCount} People</p>
           </div>
           <button onClick={() => setShowColorbarStudio(true)} className="group/colorbar relative ml-2 flex items-center gap-2 px-4 py-2 rounded-xl text-zinc-400 text-[10px] font-bold transition-all hover:text-white">
             <div className="absolute rounded-xl opacity-0 group-hover/colorbar:opacity-100 transition-opacity duration-300 pointer-events-none overflow-hidden" style={{ inset: '-0.7px' }}>
@@ -1119,9 +1202,6 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
           <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search people..." className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-white/20 transition-colors" />
           {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
         </div>
-        <button onClick={onCreateNew} className="w-10 h-10 flex items-center justify-center bg-white rounded-xl text-black hover:bg-cyan-400 transition-all active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)] group/newlead">
-          <Plus size={16} className="transition-transform duration-300 group-hover/newlead:rotate-90" />
-        </button>
       </div>
 
       <div className="flex-1 px-6 pb-6 min-h-0">
@@ -1342,9 +1422,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
                             className={`${col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'} ${index <= 1 ? 'flex items-center text-zinc-700' : ''}`}
                           >
                             {index === 0 ? (
-                              <div className="w-8 h-8 flex items-center justify-center text-zinc-700">
-                                <Plus size={19} strokeWidth={1.0} />
-                              </div>
+                              <span className="text-transparent select-none">.</span>
                             ) : index === 1 ? (
                               <span className="text-transparent select-none">.</span>
                             ) : (

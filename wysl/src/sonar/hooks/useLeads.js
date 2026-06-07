@@ -31,6 +31,10 @@ const TRIMMED_TEXT_FIELDS = new Set([
 ]);
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const isRlsInsertError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('row-level security') || error?.code === '42501';
+};
 
 const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
   const next = { ...payload };
@@ -182,11 +186,26 @@ export function useLeads() {
       user_id: userId,
       business_id: businessId,
     }, { isCreate: true });
-    const { data, error: err } = await supabase
+    let { data, error: err } = await supabase
       .from('people')
       .insert(payload)
       .select()
       .single();
+
+    if (err && isRlsInsertError(err)) {
+      const legacyPayload = normalizePayload({
+        ...leadData,
+        user: userId,
+      }, { isCreate: true });
+      const retry = await supabase
+        .from('people')
+        .insert(legacyPayload)
+        .select()
+        .single();
+      data = retry.data;
+      err = retry.error;
+    }
+
     if (err) throw err;
     markLeadJustAdded(data.id);
     if (options.placement === 'end') {

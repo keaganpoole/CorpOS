@@ -1220,18 +1220,6 @@
   z-index: 1;
 }
 
-.sb-panel-tab-indicator {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 1px;
-  border-radius: 999px;
-  background: #c0c0c0;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
-  transition: left 0.25s ease, width 0.25s ease, opacity 0.2s ease;
-  pointer-events: none;
-}
-
 .sb-panel-tab.active {
   background: transparent;
   color: #fff;

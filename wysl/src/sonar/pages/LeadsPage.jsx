@@ -16,8 +16,7 @@ const PeoplePage = () => {
   } = useLeads();
 
   const [creating, setCreating] = useState(false);
-
-  const handleCreateNew = () => { setCreating(true); setSelectedId(null); };
+  const [tableSchema, setTableSchema] = useState(null);
 
   const handleInlineCreate = async () => {
     try {
@@ -81,10 +80,11 @@ const PeoplePage = () => {
         searchQuery={searchQuery} onSearchChange={setSearchQuery}
         sourceFilter={sourceFilter} onSourceFilterChange={setSourceFilter}
         sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
-        onCreateNew={handleCreateNew} totalCount={allLeads.length}
+        totalCount={allLeads.length}
         onCreateInline={handleInlineCreate}
         onDeleteMany={handleDeleteMany}
         onUpdateLead={handleInlineUpdate}
+        onSchemaChange={setTableSchema}
       />
 
       {/* Detail Panel (no backdrop blur) */}
@@ -97,6 +97,7 @@ const PeoplePage = () => {
             onSave={creating ? handleSaveNew : handleSaveExisting}
             onDelete={creating ? handleClosePanel : handleDelete}
             onClose={handleClosePanel}
+            tableSchema={tableSchema}
           />
         )}
       </AnimatePresence>
