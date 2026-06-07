@@ -131,7 +131,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
       >
         {/* Header */}
         <div className="text-center mb-10 space-y-2">
-          <h1 className="text-xs uppercase tracking-[6px] font-bold text-white/20">System Config</h1>
+          <h1 className="text-xs uppercase tracking-[6px] font-bold text-white/20">RECEPTIONIST CATALOG</h1>
           <p className="text-2xl font-semibold tracking-tight text-white">Hire a Receptionist</p>
         </div>
 

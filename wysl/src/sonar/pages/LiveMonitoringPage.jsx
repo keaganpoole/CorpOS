@@ -1,12 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import * as d3 from 'd3';
 import { sankey, sankeyJustify } from 'd3-sankey';
 import {
   CalendarDays,
+  CheckCircle2,
+  Check,
   CreditCard,
+  DollarSign,
+  ListChecks,
+  PhoneIncoming,
+  PhoneOutgoing,
+  Settings2,
+  Timer,
   Phone,
   UserRoundPlus,
+  XCircle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -25,12 +34,36 @@ const OPACITY = {
   nodeDimmed: 0.3,
 };
 
-const analyticsSeed = [
+const DEFAULT_ANALYTICS_KEYS = ['calls', 'appointments', 'customers', 'revenue'];
+const MAX_ANALYTICS_SELECTION = 8;
+const ANALYTICS_SELECTION_STORAGE_KEY = 'live-monitoring.analytics.selection';
+const ANALYTICS_PERIOD_STORAGE_KEY = 'live-monitoring.analytics.period';
+
+const analyticsCatalog = [
   { key: 'calls', label: 'Total Calls', icon: Phone },
+  { key: 'incomingCalls', label: 'Incoming Calls', icon: PhoneIncoming },
+  { key: 'outgoingCalls', label: 'Outgoing Calls', icon: PhoneOutgoing },
+  { key: 'avgCallDuration', label: 'Avg Call Length', suffix: 'm', icon: Timer },
   { key: 'appointments', label: 'Appointments', icon: CalendarDays },
+  { key: 'completedAppointments', label: 'Completed Appts', icon: CheckCircle2 },
+  { key: 'cancelledAppointments', label: 'Cancelled Appts', icon: XCircle },
+  { key: 'appointmentRate', label: 'Appt Rate', suffix: '%', icon: ListChecks },
   { key: 'customers', label: 'New Customers', icon: UserRoundPlus },
   { key: 'revenue', label: 'Revenue', prefix: '$', icon: CreditCard },
+  { key: 'payments', label: 'Payments', icon: DollarSign },
+  { key: 'avgPayment', label: 'Avg Payment', prefix: '$', icon: CreditCard },
 ];
+
+const analyticsByKey = Object.fromEntries(analyticsCatalog.map((item) => [item.key, item]));
+
+const comparisonPeriods = [
+  { key: 'day', label: 'Day-over-Day', bucketCount: 24 },
+  { key: 'week', label: 'Week-over-Week', bucketCount: 7 },
+  { key: 'month', label: 'Month-over-Month', bucketCount: 10 },
+  { key: 'year', label: 'Year-over-Year', bucketCount: 12 },
+];
+
+const periodByKey = Object.fromEntries(comparisonPeriods.map((item) => [item.key, item]));
 
 const sankeyData = {
   nodes: [
@@ -249,10 +282,75 @@ const startOfCurrentLocalWeek = () => {
   return start;
 };
 
+const startOfCurrentLocalMonth = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+};
+
+const startOfCurrentLocalYear = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), 0, 1);
+};
+
 const addDays = (date, days) => {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+};
+
+const addMonths = (date, months) => {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+};
+
+const addYears = (date, years) => {
+  const next = new Date(date);
+  next.setFullYear(next.getFullYear() + years);
+  return next;
+};
+
+const comparisonWindow = (periodKey) => {
+  const now = new Date();
+  if (periodKey === 'day') {
+    const currentStart = startOfLocalDay(now);
+    return {
+      now,
+      currentStart,
+      currentEnd: addDays(currentStart, 1),
+      previousStart: addDays(currentStart, -1),
+      bucketCount: periodByKey.day.bucketCount,
+    };
+  }
+  if (periodKey === 'month') {
+    const currentStart = startOfCurrentLocalMonth();
+    return {
+      now,
+      currentStart,
+      currentEnd: addMonths(currentStart, 1),
+      previousStart: addMonths(currentStart, -1),
+      bucketCount: periodByKey.month.bucketCount,
+    };
+  }
+  if (periodKey === 'year') {
+    const currentStart = startOfCurrentLocalYear();
+    return {
+      now,
+      currentStart,
+      currentEnd: addYears(currentStart, 1),
+      previousStart: addYears(currentStart, -1),
+      bucketCount: periodByKey.year.bucketCount,
+    };
+  }
+
+  const currentStart = startOfCurrentLocalWeek();
+  return {
+    now,
+    currentStart,
+    currentEnd: addDays(currentStart, 7),
+    previousStart: addDays(currentStart, -7),
+    bucketCount: periodByKey.week.bucketCount,
+  };
 };
 
 const percentChange = (current, previous) => {
@@ -291,8 +389,29 @@ const paymentValue = (payment) => {
 };
 
 const formatValue = (item, value) => {
-  const body = Math.round(value || 0).toLocaleString();
-  return `${item.prefix || ''}${body}`;
+  const numeric = Number(value || 0);
+  const body = item.precision
+    ? numeric.toLocaleString(undefined, { maximumFractionDigits: item.precision, minimumFractionDigits: item.precision })
+    : Math.round(numeric).toLocaleString();
+  return `${item.prefix || ''}${body}${item.suffix || ''}`;
+};
+
+const callDirection = (row) => {
+  const raw = String(row?.direction || row?.call_direction || row?.type || '').toLowerCase();
+  if (raw.includes('inbound') || raw.includes('incoming')) return 'incoming';
+  if (raw.includes('outbound') || raw.includes('outgoing')) return 'outgoing';
+  return null;
+};
+
+const callDurationMinutes = (row) => {
+  const seconds = Number(row?.duration || row?.duration_seconds || 0);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds / 60 : 0;
+};
+
+const average = (values) => {
+  const valid = values.filter((value) => Number.isFinite(value));
+  if (!valid.length) return 0;
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
 };
 
 const formatTooltipTime = (value) => {
@@ -488,8 +607,121 @@ function AnalyticsCard({ item, value, index }) {
   );
 }
 
-function useLiveAnalytics() {
-  const [analytics, setAnalytics] = useState(() => analyticsSeed.map((item) => ({
+function getInitialAnalyticsSelection() {
+  if (typeof window === 'undefined') return DEFAULT_ANALYTICS_KEYS;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ANALYTICS_SELECTION_STORAGE_KEY) || '[]');
+    const valid = parsed.filter((key) => analyticsByKey[key]).slice(0, MAX_ANALYTICS_SELECTION);
+    return valid.length ? valid : DEFAULT_ANALYTICS_KEYS;
+  } catch {
+    return DEFAULT_ANALYTICS_KEYS;
+  }
+}
+
+function getInitialAnalyticsPeriod() {
+  if (typeof window === 'undefined') return 'week';
+  const saved = window.localStorage.getItem(ANALYTICS_PERIOD_STORAGE_KEY);
+  return periodByKey[saved] ? saved : 'week';
+}
+
+function AnalyticsControls({ selectedKeys, periodKey, onToggleMetric, onPeriodChange }) {
+  const pickerRef = useRef(null);
+  const periodRef = useRef(null);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [isPeriodOpen, setIsPeriodOpen] = useState(false);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (!pickerRef.current?.contains(event.target)) {
+        setIsPickerOpen(false);
+      }
+      if (!periodRef.current?.contains(event.target)) {
+        setIsPeriodOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+    };
+  }, []);
+
+  return (
+    <section className="live-analytics-controls">
+      <div className="live-period-picker" ref={periodRef}>
+        <button
+          type="button"
+          className="live-period-trigger"
+          aria-expanded={isPeriodOpen}
+          onClick={() => setIsPeriodOpen((value) => !value)}
+        >
+          <span>Comparison</span>
+          <strong>{periodByKey[periodKey]?.label || 'Week-over-Week'}</strong>
+        </button>
+        <div className={`live-period-options ${isPeriodOpen ? 'live-period-options-open' : ''}`} aria-label="Comparison period">
+          {comparisonPeriods.map((period) => (
+            <button
+              key={period.key}
+              type="button"
+              className={`live-period-option ${periodKey === period.key ? 'live-period-option-active' : ''}`}
+              onClick={() => {
+                onPeriodChange(period.key);
+                setIsPeriodOpen(false);
+              }}
+            >
+              {period.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="live-metric-picker" ref={pickerRef}>
+        <button
+          type="button"
+          className="live-metric-picker-trigger"
+          aria-expanded={isPickerOpen}
+          onClick={() => setIsPickerOpen((value) => !value)}
+        >
+          <Settings2 size={14} />
+          <span>Tiles</span>
+          <strong>{selectedKeys.length}/{MAX_ANALYTICS_SELECTION}</strong>
+        </button>
+        {isPickerOpen ? (
+          <div className="live-metric-menu">
+            <div className="live-metric-menu-grid">
+              {analyticsCatalog.map((metric) => {
+                const Icon = metric.icon;
+                const selected = selectedKeys.includes(metric.key);
+                const disabled = !selected && selectedKeys.length >= MAX_ANALYTICS_SELECTION;
+                return (
+                  <button
+                    key={metric.key}
+                    type="button"
+                    className={`live-metric-option ${selected ? 'live-metric-option-active' : ''}`}
+                    disabled={disabled}
+                    onClick={() => onToggleMetric(metric.key)}
+                  >
+                    <span className="live-metric-option-icon">
+                      {selected ? <Check size={12} /> : <Icon size={14} />}
+                    </span>
+                    <span className="live-metric-option-copy">
+                      <span className="live-metric-option-title">{metric.label}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function useLiveAnalytics(periodKey) {
+  const [analytics, setAnalytics] = useState(() => analyticsCatalog.map((item) => ({
     ...item,
     value: 0,
     delta: '0%',
@@ -504,22 +736,19 @@ function useLiveAnalytics() {
 
     const fetchAnalytics = async () => {
       try {
-        const now = new Date();
-        const weekStart = startOfCurrentLocalWeek();
-        const nextWeekStart = addDays(weekStart, 7);
-        const previousWeekStart = addDays(weekStart, -7);
-        const since = previousWeekStart.toISOString();
-        const inCurrentWeek = (row) => {
+        const { now, currentStart, currentEnd, previousStart, bucketCount } = comparisonWindow(periodKey);
+        const since = previousStart.toISOString();
+        const inCurrentPeriod = (row) => {
           const dt = safeDate(row.created_at || row.started_at);
-          return dt && dt >= weekStart && dt < nextWeekStart;
+          return dt && dt >= currentStart && dt < currentEnd;
         };
-        const inPreviousWeek = (row) => {
+        const inPreviousPeriod = (row) => {
           const dt = safeDate(row.created_at || row.started_at);
-          return dt && dt >= previousWeekStart && dt < weekStart;
+          return dt && dt >= previousStart && dt < currentStart;
         };
 
         const [callsRes, appointmentsRes, customersRes, paymentsRes] = await Promise.all([
-          supabase.from('call_logs').select('id,created_at,started_at').gte('created_at', since),
+          supabase.from('call_logs').select('id,created_at,started_at,direction,duration_seconds').gte('created_at', since),
           supabase.from('appointments').select('id,created_at,status').gte('created_at', since),
           supabase.from('people').select('id,created_at').gte('created_at', since),
           supabase.from('payments').select('id,created_at,amount,status').gte('created_at', since),
@@ -534,41 +763,101 @@ function useLiveAnalytics() {
           ['succeeded', 'paid', 'completed'].includes(String(row.status || '').toLowerCase())
         ));
 
-        const currentWeekCalls = calls.filter(inCurrentWeek);
-        const previousWeekCalls = calls.filter(inPreviousWeek);
-        const currentWeekAppointments = appointments.filter(inCurrentWeek);
-        const previousWeekAppointments = appointments.filter(inPreviousWeek);
-        const currentWeekCustomers = customers.filter(inCurrentWeek);
-        const previousWeekCustomers = customers.filter(inPreviousWeek);
-        const currentWeekRevenueRows = revenuePayments.filter(inCurrentWeek);
-        const previousWeekRevenueRows = revenuePayments.filter(inPreviousWeek);
-        const currentWeekRevenue = currentWeekRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
-        const previousWeekRevenue = previousWeekRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
+        const currentCalls = calls.filter(inCurrentPeriod);
+        const previousCalls = calls.filter(inPreviousPeriod);
+        const currentIncomingCalls = currentCalls.filter((row) => callDirection(row) === 'incoming');
+        const previousIncomingCalls = previousCalls.filter((row) => callDirection(row) === 'incoming');
+        const currentOutgoingCalls = currentCalls.filter((row) => callDirection(row) === 'outgoing');
+        const previousOutgoingCalls = previousCalls.filter((row) => callDirection(row) === 'outgoing');
+        const currentAppointments = appointments.filter(inCurrentPeriod);
+        const previousAppointments = appointments.filter(inPreviousPeriod);
+        const currentCompletedAppointments = currentAppointments.filter((row) => String(row.status || '').toLowerCase() === 'completed');
+        const previousCompletedAppointments = previousAppointments.filter((row) => String(row.status || '').toLowerCase() === 'completed');
+        const currentCancelledAppointments = (appointmentsRes.data || [])
+          .filter((row) => String(row.status || '').toLowerCase() === 'cancelled')
+          .filter(inCurrentPeriod);
+        const previousCancelledAppointments = (appointmentsRes.data || [])
+          .filter((row) => String(row.status || '').toLowerCase() === 'cancelled')
+          .filter(inPreviousPeriod);
+        const currentCustomers = customers.filter(inCurrentPeriod);
+        const previousCustomers = customers.filter(inPreviousPeriod);
+        const currentRevenueRows = revenuePayments.filter(inCurrentPeriod);
+        const previousRevenueRows = revenuePayments.filter(inPreviousPeriod);
+        const currentRevenue = currentRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
+        const previousRevenue = previousRevenueRows.reduce((sum, row) => sum + paymentValue(row), 0);
+        const currentAvgDuration = average(currentCalls.map(callDurationMinutes));
+        const previousAvgDuration = average(previousCalls.map(callDurationMinutes));
+        const currentAppointmentRate = currentCalls.length ? (currentAppointments.length / currentCalls.length) * 100 : 0;
+        const previousAppointmentRate = previousCalls.length ? (previousAppointments.length / previousCalls.length) * 100 : 0;
+        const currentAvgPayment = currentRevenueRows.length ? currentRevenue / currentRevenueRows.length : 0;
+        const previousAvgPayment = previousRevenueRows.length ? previousRevenue / previousRevenueRows.length : 0;
 
         const byKey = {
           calls: {
-            value: currentWeekCalls.length,
-            delta: percentChange(currentWeekCalls.length, previousWeekCalls.length),
-            series: bucketSeries(currentWeekCalls, () => 1, weekStart, 7, now),
+            value: currentCalls.length,
+            delta: percentChange(currentCalls.length, previousCalls.length),
+            series: bucketSeries(currentCalls, () => 1, currentStart, bucketCount, now),
+          },
+          incomingCalls: {
+            value: currentIncomingCalls.length,
+            delta: percentChange(currentIncomingCalls.length, previousIncomingCalls.length),
+            series: bucketSeries(currentIncomingCalls, () => 1, currentStart, bucketCount, now),
+          },
+          outgoingCalls: {
+            value: currentOutgoingCalls.length,
+            delta: percentChange(currentOutgoingCalls.length, previousOutgoingCalls.length),
+            series: bucketSeries(currentOutgoingCalls, () => 1, currentStart, bucketCount, now),
+          },
+          avgCallDuration: {
+            value: currentAvgDuration,
+            delta: percentChange(currentAvgDuration, previousAvgDuration),
+            series: bucketSeries(currentCalls, callDurationMinutes, currentStart, bucketCount, now),
+            precision: 1,
           },
           appointments: {
-            value: currentWeekAppointments.length,
-            delta: percentChange(currentWeekAppointments.length, previousWeekAppointments.length),
-            series: bucketSeries(currentWeekAppointments, () => 1, weekStart, 7, now),
+            value: currentAppointments.length,
+            delta: percentChange(currentAppointments.length, previousAppointments.length),
+            series: bucketSeries(currentAppointments, () => 1, currentStart, bucketCount, now),
+          },
+          completedAppointments: {
+            value: currentCompletedAppointments.length,
+            delta: percentChange(currentCompletedAppointments.length, previousCompletedAppointments.length),
+            series: bucketSeries(currentCompletedAppointments, () => 1, currentStart, bucketCount, now),
+          },
+          cancelledAppointments: {
+            value: currentCancelledAppointments.length,
+            delta: percentChange(currentCancelledAppointments.length, previousCancelledAppointments.length),
+            series: bucketSeries(currentCancelledAppointments, () => 1, currentStart, bucketCount, now),
+          },
+          appointmentRate: {
+            value: currentAppointmentRate,
+            delta: percentChange(currentAppointmentRate, previousAppointmentRate),
+            series: bucketSeries(currentAppointments, () => 1, currentStart, bucketCount, now),
+            precision: 1,
           },
           customers: {
-            value: currentWeekCustomers.length,
-            delta: percentChange(currentWeekCustomers.length, previousWeekCustomers.length),
-            series: bucketSeries(currentWeekCustomers, () => 1, weekStart, 7, now),
+            value: currentCustomers.length,
+            delta: percentChange(currentCustomers.length, previousCustomers.length),
+            series: bucketSeries(currentCustomers, () => 1, currentStart, bucketCount, now),
           },
           revenue: {
-            value: currentWeekRevenue,
-            delta: percentChange(currentWeekRevenue, previousWeekRevenue),
-            series: bucketSeries(currentWeekRevenueRows, paymentValue, weekStart, 7, now),
+            value: currentRevenue,
+            delta: percentChange(currentRevenue, previousRevenue),
+            series: bucketSeries(currentRevenueRows, paymentValue, currentStart, bucketCount, now),
+          },
+          payments: {
+            value: currentRevenueRows.length,
+            delta: percentChange(currentRevenueRows.length, previousRevenueRows.length),
+            series: bucketSeries(currentRevenueRows, () => 1, currentStart, bucketCount, now),
+          },
+          avgPayment: {
+            value: currentAvgPayment,
+            delta: percentChange(currentAvgPayment, previousAvgPayment),
+            series: bucketSeries(currentRevenueRows, paymentValue, currentStart, bucketCount, now),
           },
         };
 
-        setAnalytics(analyticsSeed.map((item) => ({ ...item, ...byKey[item.key] })));
+        setAnalytics(analyticsCatalog.map((item) => ({ ...item, ...byKey[item.key] })));
       } catch (err) {
         console.error('[LiveMonitoring] analytics refresh failed:', err);
       }
@@ -595,7 +884,7 @@ function useLiveAnalytics() {
       window.clearTimeout(refreshTimer);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [periodKey]);
 
   return analytics;
 }
@@ -1511,11 +1800,37 @@ function RealtimeSankey({ flowState }) {
 }
 
 export default function LiveMonitoringPage() {
-  const analytics = useLiveAnalytics();
+  const [selectedMetricKeys, setSelectedMetricKeys] = useState(getInitialAnalyticsSelection);
+  const [periodKey, setPeriodKey] = useState(getInitialAnalyticsPeriod);
+  const analytics = useLiveAnalytics(periodKey);
   const flowState = useLiveSankeyState();
+  const selectedAnalytics = useMemo(() => (
+    selectedMetricKeys
+      .map((key) => analytics.find((item) => item.key === key))
+      .filter(Boolean)
+  ), [analytics, selectedMetricKeys]);
+
+  useEffect(() => {
+    window.localStorage.setItem(ANALYTICS_SELECTION_STORAGE_KEY, JSON.stringify(selectedMetricKeys));
+  }, [selectedMetricKeys]);
+
+  useEffect(() => {
+    window.localStorage.setItem(ANALYTICS_PERIOD_STORAGE_KEY, periodKey);
+  }, [periodKey]);
+
+  const toggleMetric = (key) => {
+    setSelectedMetricKeys((current) => {
+      if (current.includes(key)) {
+        const next = current.filter((item) => item !== key);
+        return next.length ? next : current;
+      }
+      if (current.length >= MAX_ANALYTICS_SELECTION) return current;
+      return [...current, key];
+    });
+  };
 
   return (
-    <div className="h-full overflow-hidden bg-[#020202] text-white relative">
+    <div className="h-full overflow-visible bg-[#020202] text-white relative">
       <style>{`
         .live-monitor-grid {
           background: #020202;
@@ -1526,22 +1841,225 @@ export default function LiveMonitoringPage() {
           letter-spacing: 0 !important;
         }
 
+        .live-analytics-controls {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+          overflow: visible;
+        }
+
+        .live-period-picker {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          overflow: visible;
+        }
+
+        .live-period-trigger {
+          min-height: 38px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.03);
+          border-radius: 18px;
+          padding: 0 14px;
+          box-shadow: 0 20px 48px rgba(0,0,0,0.28);
+          font-size: 12px;
+          font-weight: 500;
+          line-height: 1.2;
+          color: #e5e5e5;
+          cursor: pointer;
+          white-space: nowrap;
+          appearance: none;
+        }
+
+        .live-period-trigger strong {
+          color: #8a8a8a;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .live-period-options {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          overflow: hidden;
+          max-width: 0;
+          opacity: 0;
+          padding-left: 0;
+          transition: max-width 420ms cubic-bezier(0.23,1,0.32,1), opacity 220ms ease, padding-left 220ms ease;
+          white-space: nowrap;
+        }
+
+        .live-period-options-open {
+          max-width: 720px;
+          opacity: 1;
+          padding-left: 4px;
+        }
+
+        .live-period-option {
+          border: 0;
+          background: transparent;
+          color: #8a8a8a;
+          font-size: 12px;
+          font-weight: 500;
+          line-height: 1.2;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: color 160ms ease, transform 160ms ease;
+          padding: 0;
+        }
+
+        .live-period-option:hover {
+          color: #f5f5f5;
+        }
+
+        .live-period-option-active {
+          color: #ffffff;
+        }
+
+        .live-metric-picker {
+          position: relative;
+          z-index: 40;
+          overflow: visible;
+        }
+
+        .live-metric-picker-trigger {
+          min-height: 38px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 18px;
+          background: rgba(255,255,255,0.03);
+          color: #e5e5e5;
+          font-size: 12px;
+          font-weight: 500;
+          line-height: 1.2;
+          padding: 0 14px;
+          cursor: pointer;
+          user-select: none;
+          box-shadow: 0 20px 48px rgba(0,0,0,0.28);
+          white-space: nowrap;
+          appearance: none;
+        }
+
+        .live-metric-picker-trigger strong {
+          color: #8a8a8a;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .live-metric-menu {
+          position: absolute;
+          top: calc(100% + 10px);
+          right: 0;
+          width: min(220px, calc(100vw - 32px));
+          display: grid;
+          gap: 0;
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 16px;
+          background: rgba(15,15,15,0.96);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.42);
+          padding: 6px;
+          backdrop-filter: blur(16px);
+          overflow: hidden;
+        }
+
+        .live-metric-menu-grid {
+          display: grid;
+          gap: 0;
+          max-height: min(360px, 56vh);
+          overflow-y: auto;
+          padding-right: 0;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        .live-metric-menu-grid::-webkit-scrollbar {
+          display: none;
+        }
+
+        .live-metric-option {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border: 0;
+          border-radius: 10px;
+          background: transparent;
+          color: #d4d4d4;
+          font-size: 12px;
+          font-weight: 500;
+          padding: 6px 8px;
+          cursor: pointer;
+          text-align: left;
+          overflow: hidden;
+          line-height: 1.15;
+        }
+
+        .live-metric-option:hover:not(:disabled),
+        .live-metric-option-active {
+          background: rgba(255,255,255,0.045);
+          color: #ffffff;
+        }
+
+        .live-metric-option:disabled {
+          cursor: not-allowed;
+          opacity: 0.42;
+        }
+
+        .live-metric-option-icon {
+          width: 16px;
+          height: 16px;
+          display: grid;
+          place-items: center;
+          border-radius: 0;
+          background: transparent;
+          color: #8a8a8a;
+          flex: 0 0 auto;
+        }
+
+        .live-metric-option-active .live-metric-option-icon {
+          color: #f5f5f5;
+        }
+
+        .live-metric-option-copy {
+          min-width: 0;
+          flex: 1 1 auto;
+          overflow: hidden;
+        }
+
+        .live-metric-option-title {
+          color: inherit;
+          font-size: 12px;
+          font-weight: 500;
+          line-height: 1.1;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
         .live-stat-card {
           position: relative;
-          min-height: 102px;
+          min-height: 128px;
           overflow: hidden;
-          border-radius: 10px;
-          border: 1px solid #1f1f22;
-          background: #070707;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.025), 0 22px 48px rgba(0,0,0,0.34);
-          padding: 12px 16px;
+          border-radius: 24px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.03);
+          box-shadow: 0 28px 80px rgba(0,0,0,0.34);
+          padding: 18px;
+          backdrop-filter: blur(18px);
         }
 
         .live-stat-card::before {
           content: "";
           position: absolute;
           inset: 0;
-          background: linear-gradient(180deg, rgba(255,255,255,0.018), transparent 52%);
+          background: linear-gradient(180deg, rgba(255,255,255,0.05), transparent 48%);
           pointer-events: none;
         }
 
@@ -1560,28 +2078,26 @@ export default function LiveMonitoringPage() {
         }
 
         .live-stat-icon {
-          width: 32px;
-          height: 32px;
+          width: 40px;
+          height: 40px;
           display: grid;
           place-items: center;
           flex: 0 0 auto;
-          border-radius: 8px;
-          color: #a1a1aa;
-          border: 1px solid #27272a;
-          background: linear-gradient(180deg, rgba(39,39,42,0.62), rgba(24,24,27,0.35));
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.055);
+          border-radius: 14px;
+          color: #b0b0b0;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.04);
         }
 
         .live-stat-label {
-          color: #7c7c84;
-          font-size: 9px;
-          font-weight: 800;
-          text-transform: uppercase;
-          line-height: 0.9;
+          color: #8a8a8a;
+          font-size: 12px;
+          font-weight: 400;
+          line-height: 1.2;
           min-width: 0;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
+          white-space: normal;
         }
 
         .live-stat-value-row {
@@ -1589,28 +2105,31 @@ export default function LiveMonitoringPage() {
           z-index: 1;
           display: flex;
           align-items: center;
-          gap: 8px;
-          margin-top: 15px;
+          gap: 10px;
+          margin-top: 14px;
+          flex-wrap: wrap;
         }
 
         .live-stat-value {
           display: block;
           color: #ffffff;
-          font-size: 24px;
-          font-weight: 900;
-          line-height: 1;
-          white-space: nowrap;
+          font-size: 30px;
+          font-weight: 600;
+          line-height: 0.95;
+          letter-spacing: -0.03em;
+          white-space: normal;
+          word-break: break-word;
         }
 
         .live-stat-delta {
-          color: #18d79d;
-          font-size: 10px;
-          font-weight: 900;
-          text-transform: uppercase;
-          border-radius: 5px;
-          background: rgba(0,214,155,0.12);
-          padding: 4px 6px;
-          line-height: 1;
+          color: #d4d4d4;
+          font-size: 12px;
+          font-weight: 400;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.04);
+          padding: 6px 10px;
+          line-height: 1.1;
         }
 
         .live-stat-chart-row {
@@ -1620,7 +2139,7 @@ export default function LiveMonitoringPage() {
           align-items: center;
           justify-content: space-between;
           gap: 18px;
-          margin-top: 10px;
+          margin-top: 16px;
         }
 
         .live-stat-line {
@@ -1643,9 +2162,9 @@ export default function LiveMonitoringPage() {
 
         .live-stat-line-shadow {
           stroke: #00d69b;
-          stroke-width: 4;
-          opacity: 0.14;
-          filter: blur(2px);
+          stroke-width: 5;
+          opacity: 0.28;
+          filter: blur(2.5px);
         }
 
         .live-stat-line-path {
@@ -1824,8 +2343,14 @@ export default function LiveMonitoringPage() {
 
       <div className="live-monitor-grid h-full overflow-auto custom-scrollbar px-7 py-5">
         <div className="min-h-full flex flex-col gap-4">
+          <AnalyticsControls
+            selectedKeys={selectedMetricKeys}
+            periodKey={periodKey}
+            onToggleMetric={toggleMetric}
+            onPeriodChange={setPeriodKey}
+          />
           <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 shrink-0">
-            {analytics.map((item, index) => (
+            {selectedAnalytics.map((item, index) => (
               <AnalyticsCard key={item.label} item={item} value={item.value} index={index} />
             ))}
           </section>

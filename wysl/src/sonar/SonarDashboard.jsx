@@ -29,7 +29,6 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
   ChevronRight,
   GripHorizontal,
   AlertCircle,
@@ -127,40 +126,6 @@ class ErrorBoundary extends Component {
   }
 }
 
-const StatusDot = ({ status, pulse = false }) => {
-  const colors = {
-    active: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]',
-    focused: 'bg-fuchsia-500 shadow-[0_0_10px_rgba(217,70,239,0.6)]',
-    idle: 'bg-zinc-700',
-    blocked: 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]',
-    urgent: 'bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.6)]',
-    success: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]',
-    info: 'bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.6)]',
-    recurring: 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.6)]',
-    InProgress: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]',
-    in_progress: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]',
-    completed: 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.6)]',
-    failed: 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]',
-    warning: 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.6)]',
-    paused: 'bg-zinc-500',
-    queued: 'bg-zinc-700',
-    offline: 'bg-zinc-800',
-    error: 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]',
-    waiting: 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.6)]',
-    ok: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]',
-    critical: 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]',
-  };
-
-  return (
-    <div className="relative flex items-center justify-center">
-      <div className={`h-2 w-2 rounded-full ${colors[status] || 'bg-zinc-500'}`} />
-      {pulse && (
-        <div className={`absolute h-2 w-2 rounded-full ${colors[status] || 'bg-zinc-500'} animate-ping opacity-50`} />
-      )}
-    </div>
-  );
-};
-
 const Badge = ({ children, color = 'zinc' }) => {
   const variants = {
     magenta: 'text-fuchsia-400 bg-fuchsia-500/5 border-fuchsia-500/20 shadow-[inset_0_0_10px_rgba(217,70,239,0.05)]',
@@ -180,39 +145,6 @@ const Badge = ({ children, color = 'zinc' }) => {
 };
 
 const AVATAR_BASE = 'https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges';
-
-const timeAgo = (timestamp) => {
-  const ts = String(timestamp);
-  const date = ts.endsWith('Z') || ts.includes('+') ? new Date(ts) : new Date(ts + 'Z');
-  const now = new Date();
-
-  const estOpts = { timeZone: 'America/New_York' };
-  const dateEST = new Date(date.toLocaleString('en-US', estOpts));
-  const nowEST = new Date(now.toLocaleString('en-US', estOpts));
-
-  const diffMs = nowEST - dateEST;
-  if (isNaN(diffMs)) return '-';
-  const diff = Math.max(0, diffMs);
-  const secs = Math.floor(diff / 1000);
-  const mins = Math.floor(secs / 60);
-  const hrs = Math.floor(mins / 60);
-  const days = Math.floor(hrs / 24);
-
-  if (secs < 10) return 'just now';
-  if (secs < 60) return `${secs}s ago`;
-  if (mins < 60) return `${mins}m ago`;
-  if (days === 0) return `${hrs}h ago`;
-  if (days === 1) {
-    const hour = parseInt(date.toLocaleString('en-US', { ...estOpts, hour: 'numeric', hour12: false }));
-    if (hour >= 18 || hour < 5) return 'last night';
-    if (hour >= 12) return 'yesterday afternoon';
-    if (hour >= 5) return 'yesterday morning';
-    return 'yesterday';
-  }
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...estOpts });
-};
 
 const formatDisplayPhoneNumber = (value) => {
   const raw = String(value || '').trim();
@@ -1861,7 +1793,6 @@ const SonarDashboard = () => {
   const [showCommander, setShowCommander] = useState(false);
   const [logoHover, setLogoHover] = useState(false);
   const [terminateAgent, setTerminateAgent] = useState(null);
-  const [isLivePulseCollapsed, setIsLivePulseCollapsed] = useState(false);
   const userId = authSession?.user?.id || profile?.id || null;
 
   const [agentScenarios, setAgentScenarios] = useState({});
@@ -1944,7 +1875,6 @@ const SonarDashboard = () => {
     agents,
     controlState,
     session,
-    livePulse,
     systemLogs,
     pipeline,
     reactions,
@@ -2316,74 +2246,6 @@ const SonarDashboard = () => {
             </AnimatePresence>
           </div>
         </main>
-
-        {/* Live Pulse sidebar */}
-        <aside className={`${isLivePulseCollapsed ? 'w-[56px]' : 'w-[320px]'} border-l border-white/5 bg-[#020202] hidden xl:flex flex-col shadow-2xl transition-[width] duration-300 ease-out`}>
-          <div className={`${isLivePulseCollapsed ? 'px-3 pt-10 pb-5 justify-center' : 'p-6 pt-10 justify-between'} border-b border-white/5 flex items-center`}>
-            {!isLivePulseCollapsed && (
-              <div className="flex items-center gap-3">
-                <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-600">LIVE Pulse</h2>
-                <div className="relative flex items-center justify-center">
-                  <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
-                  <div className="absolute h-1.5 w-1.5 rounded-full bg-red-500 animate-ping opacity-50" />
-                </div>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setIsLivePulseCollapsed((value) => !value)}
-              aria-label={isLivePulseCollapsed ? 'Expand live pulse' : 'Collapse live pulse'}
-              aria-expanded={!isLivePulseCollapsed}
-              className="no-drag h-8 w-8 rounded-full border border-white/5 bg-zinc-950/80 flex items-center justify-center text-zinc-600 hover:text-white hover:border-white/10 hover:bg-zinc-900 transition-all active:scale-95"
-            >
-              {isLivePulseCollapsed ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
-            </button>
-          </div>
-
-          {isLivePulseCollapsed ? (
-            <div className="flex-1 flex flex-col items-center py-5 gap-4">
-              <div className="relative flex items-center justify-center">
-                <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.65)]" />
-                <div className="absolute h-2 w-2 rounded-full bg-red-500 animate-ping opacity-40" />
-              </div>
-              <div className="[writing-mode:vertical-rl] rotate-180 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-700 whitespace-nowrap">
-                Live Pulse
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
-              {livePulse.map((evt) => {
-                const actorDisplay = (!evt.actor || evt.actor.toLowerCase() === 'user') ? 'Keagan' : evt.actor.charAt(0).toUpperCase() + evt.actor.slice(1);
-                const actorLower = (evt.actor || 'system').toLowerCase() === 'user' ? 'keagan' : (evt.actor || 'system').toLowerCase();
-                const avatarUrl = ['max', 'yanna', 'allie', 'brian', 'keagan'].includes(actorLower)
-                  ? `${AVATAR_BASE}/${actorLower}.jpg`
-                  : `${AVATAR_BASE}/keagan.jpg`;
-
-                return (
-                <div key={evt.id || `${evt.timestamp}-${evt.message}`} className="flex gap-3 group">
-                  <div className="flex flex-col items-center pt-0.5">
-                    <div className="w-6 h-6 rounded-full shrink-0 overflow-hidden bg-zinc-900 border border-white/5">
-                      <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
-                    </div>
-                    <div className="flex-1 w-[1px] bg-zinc-900/50 mt-2 mb-1 group-last:bg-transparent" />
-                  </div>
-
-                  <div className="pb-4 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <StatusDot status={evt.severity || 'info'} pulse={evt.severity === 'critical' && !isPaused} />
-                      <span className="text-[12px] font-bold text-zinc-200 group-hover:text-white transition-colors">{actorDisplay}</span>
-                      <span className="text-[9px] text-zinc-700 font-bold">
-                        {evt.timestamp ? timeAgo(evt.timestamp) : '-'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-zinc-500 font-medium leading-relaxed group-hover:text-zinc-400 transition-colors">{evt.message}</p>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
-          )}
-        </aside>
       </div>
       <PersistentAudioPlayer />
     </div>
