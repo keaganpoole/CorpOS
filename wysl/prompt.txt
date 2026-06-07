@@ -1,0 +1,282 @@
+# UI / UX Improvements
+
+---
+
+# 📊 LIVE MONITORING PAGE
+
+### Metrics Tiles
+
+* Currently, there are tiles at the top. However, users may not care about the existing metrics and may prefer to monitor different KPIs.
+* Allow users to customize which metrics appear as the showcased tiles.
+* The selection experience should feel intuitive and follow the existing design language of the page.
+* Include as many meaningful metrics as possible based on available backend data and what users would realistically want to track.
+* Keep the current metrics available as selectable options.
+
+### Comparison Periods
+
+* I believe the current tiles are showing week-over-week comparisons, but I'm not completely sure.
+* Allow users to choose between:
+
+  * Day-over-Day
+  * Week-over-Week
+  * Month-over-Month
+  * Year-over-Year
+
+### Live Pulse
+
+* Remove the Live Pulse pop-out panel entirely.
+
+### Tile Styling
+
+* Make the shadow/glow effect from the graph lines inside the tiles slightly more visible.
+
+---
+
+# 🎙️ RECEPTIONISTS PAGE
+
+### Card Layout
+
+* Increase the overall size of receptionist cards so they occupy more space on the page.
+* The page currently feels too empty.
+* The goal is to make the cards feel more like a modern showcase of receptionists.
+
+### Image Sizing
+
+* Increase the size of the receptionist images.
+* The images should act as the primary visual showcase.
+
+### Information Sizing
+
+* Do **not** significantly increase the size of the card content.
+* Keep text, labels, and supporting information close to their current size.
+* Enlarging everything would make the cards feel overwhelming and sloppy.
+
+### Card Shape
+
+* Round the top corners of the cards to match the bottom corners.
+
+### Metrics
+
+* Reduce the size of metric values slightly to a more comfortable scale that fits the larger card design.
+
+### Remove Scenario Section
+
+* Remove the Scenario section located beneath the phone number.
+
+### Remove Voice Sample Text
+
+* Remove all text beneath the arrows:
+
+  * "Voice Sample Available"
+  * "Low Latency"
+
+### Hired Receptionist Layout
+
+* Hired receptionist cards should appear centered on the page instead of stacking from left to right.
+* Example:
+
+  * If there is only one hired receptionist, it should be perfectly centered horizontally and vertically within the available canvas.
+  * When a second receptionist is added, the layout should remain centered as a group.
+* The overall behavior should feel like **centered stacking**, rather than traditional left-to-right alignment.
+* This will make the page feel cleaner and more intuitive.
+
+---
+
+# ⚡ SCENARIOS PAGE
+
+### Add Component Button
+
+* Instead of displaying:
+
+  * "Add Component"
+
+* Display:
+
+  * "Add Trigger" for the first node.
+  * "Add Action" for any node added after the first node.
+
+### Trigger / Action / Utility Tabs
+
+* Remove the active pill-style background behind:
+
+  * Triggers
+  * Actions
+  * Utilities
+
+* Replace it with:
+
+  * A clean white or gray underline (whichever best fits the design system).
+  * A subtle animated sweep effect similar to the page navigation indicator in the left sidebar.
+  * The animation should move horizontally.
+
+---
+
+# 📞 CALL LOGS PAGE
+
+* Remove the indicator in the top-right corner that displays how many call logs are currently visible.
+
+---
+
+# 👥 PEOPLE PAGE
+
+### Pop-Out Panel Modernization
+
+* The record pop-out panel is currently outdated.
+* It must display the exact same fields that are available inline within the table.
+
+### Custom Fields Support
+
+* The pop-out panel must fully support all custom field types.
+* Any custom field created inline must automatically appear inside the pop-out panel.
+* The panel must always remain synchronized with the table structure.
+
+Example:
+
+* If a custom Single Select field is added inline:
+
+  * The same field should automatically appear in the pop-out panel.
+  * The field should behave exactly the same way.
+
+### Remove Unused Data
+
+* Remove any fields from the pop-out panel that do not exist in the backend.
+
+### UX Consistency
+
+* The pop-out panel should be as intuitive and polished as the table itself.
+* Users should be able to edit and configure field values with the same ease as inline editing.
+
+### Remove Avatar
+
+* Remove the avatar thumbnail from the pop-out panel.
+* It is unnecessary.
+
+### Remove Summary Tiles
+
+* Remove the showcase tiles at the top of the panel:
+
+  * Missed Calls
+  * Last Call Status
+
+### Visual Consistency
+
+* The pop-out panel must visually match the table.
+* Example:
+
+  * If the table uses a specific date picker style, the pop-out panel should use the exact same component and styling.
+* Avoid introducing alternate versions of existing UI controls.
+
+### Remove New Record Button
+
+* Remove the large "+" button in the top-right corner.
+* New records can already be created inline.
+
+### Record Count Display
+
+Current:
+
+* "2 of 100 People"
+
+Replace with:
+
+* "100 People"
+
+Displayed directly beneath the page title.
+
+### Remove Teaser Row Add Button
+
+* Remove the "+" icon from the teaser row.
+
+---
+
+# ⚙️ SETTINGS PAGE
+
+### Two-Column Layout
+
+* Convert the Settings page into a two-column layout.
+
+Example:
+
+* Left Column:
+
+  * Business Info
+  * Services & Pricing
+  * Hours
+  * etc.
+
+* Right Column:
+
+  * Displays the selected section's settings.
+
+This should make the Settings page feel more organized and significantly less overwhelming.
+
+### Variable Chips
+
+* In the Intro Message section:
+
+  * Do not display raw variable text when variables are dragged into a field.
+  * Display variable chips using the same visual treatment used in Scenario Builder node configuration forms.
+
+### Focus State
+
+* Remove the white border "flash" that appears when selecting a field.
+* A field should not briefly reveal a white border before returning to its normal state.
+
+### Appointment Settings
+
+Remove:
+
+* Buffer Between Appointments
+* Default Duration
+
+### Calls & Notifications
+
+* Remove the Calls & Notifications section entirely.
+
+### Services & Pricing
+
+Remove:
+
+* Price Type field
+* Preview button
+
+---
+
+# 🏠 DASHBOARD
+
+### User Profile Area
+
+* Remove everything in the bottom-left profile section where it currently displays:
+
+  * "Keagan Poole"
+  * Any related information
+
+* This entire section is unnecessary.
+
+### Page Title Typography
+
+* Use the same font and styling currently used on the onboarding pages for all page titles throughout the application.
+* The onboarding typography looks significantly more polished.
+* Apply that same treatment to page names displayed at the top of each page.
+
+### Sidebar Animation Speed
+
+* Increase the speed of the color sweep animation when a user selects a page in the left navigation.
+
+### Collapsible Sidebar
+
+* Make the left sidebar collapsible.
+
+Behavior:
+
+* When the mouse is outside the sidebar:
+
+  * Collapse to icon-only mode.
+
+* When the mouse enters the sidebar:
+
+  * Expand to its full current width and contents.
+
+* The behavior should feel similar to how the Live Pulse panel previously expanded and collapsed.
+
+* The transition should feel smooth, fast, and premium.

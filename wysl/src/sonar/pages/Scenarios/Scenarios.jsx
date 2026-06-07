@@ -1086,14 +1086,15 @@ export default function ScenariosPage() {
   );
   const categoryMeta = CATEGORY_META[panelCategory] || CATEGORY_META.TRIGGERS;
   const hasConfiguredTrigger = nodes.some(n => n.categoryType === 'TRIGGERS' && n.configured);
-  const visibleCategories = !hasConfiguredTrigger
+  const visibleCategories = isPrimaryNode
     ? ['TRIGGERS']
-    : isPrimaryNode
-      ? PANEL_CATEGORIES
+    : !hasConfiguredTrigger
+      ? ['TRIGGERS']
       : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
   const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'runNode'].includes(panelStage);
+  const panelTitle = isPrimaryNode ? 'Add Trigger' : 'Add Action';
   const appointmentDateInputMode = appointmentConfig.date_input_mode || 'picker';
   const appointmentTimeInputMode = appointmentConfig.time_input_mode || 'picker';
   const scheduleDateInputMode = scheduleConfig.date_input_mode || 'picker';
@@ -1103,6 +1104,7 @@ export default function ScenariosPage() {
   const hasConnectedEmailIntegration = ['gmail', 'outlook'].some((provider) => integrations[provider]?.status === 'connected');
   const hasConnectedStripeIntegration = integrations.stripe?.status === 'connected';
   const connectedIntegrationCount = Object.values(integrations).filter((integration) => integration?.status === 'connected').length;
+
   const actionRequiresEmailIntegration = actionConfig?._key === 'send_email';
   const actionRequiresStripeIntegration = STRIPE_ACTION_KEYS.has(actionConfig?._key);
   const actionIntegrationMissing = (actionRequiresEmailIntegration && !hasConnectedEmailIntegration)
@@ -3577,7 +3579,7 @@ export default function ScenariosPage() {
                   {showNodeConfigText && (
                     <>
                       <p className="sb-panel-label">Node Config</p>
-                      <h3 className="sb-panel-title">Add Component</h3>
+                      <h3 className="sb-panel-title">{panelTitle}</h3>
                     </>
                   )}
                 </div>
@@ -3665,7 +3667,7 @@ export default function ScenariosPage() {
                           setActiveOption(null);
                         }}
                       >
-                        {PANEL_CATEGORY_LABELS[category] || category}
+                        <span>{PANEL_CATEGORY_LABELS[category] || category}</span>
                       </button>
                     ))}
                   </div>

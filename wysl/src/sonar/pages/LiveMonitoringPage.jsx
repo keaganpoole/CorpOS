@@ -436,8 +436,44 @@ const formatValue = (item, value) => {
   return `${item.prefix || ''}${body}${item.suffix || ''}`;
 };
 
+const pickNestedValue = (source, paths) => {
+  for (const path of paths) {
+    const value = path.split('.').reduce((current, key) => (
+      current && typeof current === 'object' ? current[key] : undefined
+    ), source);
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return null;
+};
+
 const callDirection = (row) => {
-  const raw = String(row?.direction || row?.call_direction || row?.type || '').toLowerCase();
+  const raw = String(
+    row?.direction
+    || row?.call_direction
+    || row?.type
+    || pickNestedValue(row?.conversation_initiation_data, [
+      'direction',
+      'metadata.direction',
+      'metadata.phone_call.direction',
+      'conversation_initiation_client_data.dynamic_variables.direction',
+      'conversation_initiation_client_data.dynamic_variables.call_direction',
+      'dynamic_variables.direction',
+      'dynamic_variables.call_direction',
+      'phone_call.direction',
+    ])
+    || pickNestedValue(row?.raw_payload, [
+      'direction',
+      'Direction',
+      'metadata.direction',
+      'metadata.phone_call.direction',
+      'conversation_initiation_client_data.dynamic_variables.direction',
+      'conversation_initiation_client_data.dynamic_variables.call_direction',
+      'dynamic_variables.direction',
+      'dynamic_variables.call_direction',
+      'phone_call.direction',
+    ])
+    || ''
+  ).toLowerCase();
   if (raw.includes('inbound') || raw.includes('incoming')) return 'incoming';
   if (raw.includes('outbound') || raw.includes('outgoing')) return 'outgoing';
   return null;
@@ -889,7 +925,7 @@ function useLiveAnalytics(periodKey, dateRange) {
         };
 
         const [callsRes, appointmentsRes, customersRes, paymentsRes] = await Promise.all([
-          supabase.from('call_logs').select('id,created_at,started_at,direction,duration_seconds').gte('created_at', since),
+          supabase.from('call_logs').select('id,created_at,started_at,duration_seconds,conversation_initiation_data,raw_payload').gte('created_at', since),
           supabase.from('appointments').select('id,created_at,status').gte('created_at', since),
           supabase.from('people').select('id,created_at').gte('created_at', since),
           supabase.from('payments').select('id,created_at,amount,status').gte('created_at', since),

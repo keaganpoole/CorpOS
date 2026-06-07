@@ -313,11 +313,12 @@ export default function ScenarioBuilderPage() {
   );
   const categoryMeta = CATEGORY_META[panelCategory] || CATEGORY_META.TRIGGERS;
   const visibleCategories = isPrimaryNode
-    ? PANEL_CATEGORIES
+    ? ['TRIGGERS']
     : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
   const showNodeConfigText = panelStage !== 'subOptions';
+  const panelTitle = isPrimaryNode ? 'Add Trigger' : 'Add Action';
 
   const repositionPanel = useCallback(() => {
     if (!selectedNodeId) {
@@ -717,7 +718,7 @@ export default function ScenarioBuilderPage() {
                   {showNodeConfigText && (
                     <>
                       <p className="panel-label">Node Config</p>
-                      <h3 className="panel-title">Add Component</h3>
+                      <h3 className="panel-title">{panelTitle}</h3>
                     </>
                   )}
                 </div>
@@ -796,7 +797,7 @@ export default function ScenarioBuilderPage() {
                       setActiveOption(null);
                     }}
                   >
-                    {PANEL_CATEGORY_LABELS[category] || category}
+                    <span>{PANEL_CATEGORY_LABELS[category] || category}</span>
                   </button>
                 ))}
               </div>
