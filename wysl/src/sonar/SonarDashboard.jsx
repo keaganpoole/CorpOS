@@ -1950,13 +1950,9 @@ const SonarDashboard = () => {
     reactions,
     summary,
     wsStatus,
-    isPaused,
-    toggleRuntime,
     setZone,
     setCallsFilter,
-    pingMax,
     updateAgentActive,
-    refresh,
   } = useSonarState();
 
   const enrichedAgents = (agents || []).map(a => {
@@ -2244,10 +2240,10 @@ const SonarDashboard = () => {
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center z-10">
           <div className="relative" style={{ width: '120px', textAlign: 'center' }}>
             <GradientBleed
-              trigger="Zone"
-              options={['7', '6', '5', '4', '3', '2', '1']}
+              trigger="Autonomy"
+              options={['1', '2', '3', '4', '5']}
               variant="prism"
-              icon={<Sparkles size={12} />}
+              icon={<Gavel size={12} />}
               value={String(displayZone)}
               onSelect={(val) => setZone(parseInt(val))}
               onOpenChange={(open) => setZoneOpen(open)}
@@ -2278,22 +2274,6 @@ const SonarDashboard = () => {
             </div>
           </div>
 
-          <div className="relative flex items-center gap-6" style={{ width: '180px' }}>
-            <button onClick={toggleRuntime} className="no-drag flex items-center gap-3 group cursor-pointer">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-white">{isPaused ? 'Paused' : 'Live'}</span>
-              {isPaused ? <Play size={11} className="text-white" fill="currentColor" /> : <Pause size={11} className="text-white" fill="currentColor" />}
-            </button>
-
-            <button
-              onClick={async () => {
-                await pingMax();
-                setTimeout(() => refresh(), 3500);
-              }}
-              className="no-drag px-4 py-1.5 bg-white rounded-full text-[10px] font-black uppercase tracking-widest text-black hover:bg-cyan-400 transition-all active:scale-95 shadow-xl"
-            >
-              Ping
-            </button>
-          </div>
         </div>
       </header>
 

@@ -183,6 +183,7 @@ const defaultSettings = {
   reminder_before_minutes: 60,
   allow_cancellations: true,
   cancellation_window_hours: 24,
+  autonomy_index: 1,
   knowledge_base: {
     about: '',
     services: '',

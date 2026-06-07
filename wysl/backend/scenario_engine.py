@@ -34,6 +34,14 @@ TABLE_CONTEXT_ALIASES = {
 AGENT_REF_PREFIXES = {"rec", "agent", "receptionist"}
 
 
+def normalize_autonomy_index(value: Any) -> int:
+    try:
+        parsed = int(value or 1)
+    except Exception:
+        parsed = 1
+    return min(5, max(1, parsed))
+
+
 def normalize_phone_number(phone_value: Optional[str]) -> Optional[str]:
     if phone_value is None:
         return None
@@ -754,6 +762,22 @@ class ScenarioActionExecutor:
 
         return str(persisted_phone_number_id or "")
 
+    def _get_account_autonomy_index(self, context: dict) -> int:
+        user_id = (
+            (context.get("business") or {}).get("user_id")
+            or context.get("user_id")
+        )
+        try:
+            query = self.supabase.table("account_settings").select("autonomy_index")
+            if user_id:
+                query = query.eq("user_id", str(user_id))
+            response = query.limit(1).execute()
+            row = (response.data or [None])[0] or {}
+            return normalize_autonomy_index(row.get("autonomy_index"))
+        except Exception as exc:
+            logging.warning("[ActionExecutor] Failed to load autonomy index for user %s: %s", user_id, exc)
+            return 1
+
     async def execute(self, node: dict, context: dict):
         if node.get("type") == "end_call":
             return {"success": True, "data": {"action": "end_call"}}
@@ -999,6 +1023,7 @@ class ScenarioActionExecutor:
             dynamic_vars = {
                 "user_id": str((context.get("business") or {}).get("user_id") or context.get("user_id") or ""),
                 "company_name": (context.get("business") or {}).get("name") or "",
+                "autonomy_index": self._get_account_autonomy_index(context),
                 "receptionist_name": (context.get("receptionist") or {}).get("first_name") or "Receptionist",
                 "receptionist_id": str((context.get("receptionist") or {}).get("id") or ""),
                 "customer_name": (context.get("customer") or {}).get("first_name") or (context.get("person") or {}).get("first_name") or "",

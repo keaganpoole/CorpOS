@@ -480,6 +480,24 @@ def get_account_call_routing_for_user(user_id: Optional[str]) -> str:
         return "all"
 
 
+def get_account_autonomy_index_for_user(user_id: Optional[str] = None) -> int:
+    try:
+        query = (
+            supabase
+            .table("account_settings")
+            .select("autonomy_index")
+        )
+        if user_id:
+            query = query.eq("user_id", str(user_id))
+        response = query.limit(1).execute()
+        row = (response.data or [None])[0]
+        parsed = int((row or {}).get("autonomy_index") or 1)
+        return min(5, max(1, parsed))
+    except Exception as exc:
+        logging.warning("Failed to load account autonomy index for user %s: %s", user_id, exc)
+        return 1
+
+
 def call_routing_allows(direction: str, call_routing: Optional[str] = None) -> bool:
     normalized_direction = str(direction or "").strip().lower()
     normalized_routing = str(call_routing or get_account_call_routing()).strip().lower()
@@ -889,6 +907,7 @@ def start_number_quality_test_call(phone_number_id: str, label: str) -> dict:
             "conversation_initiation_client_data": {
                 "dynamic_variables": {
                     "company_name": label,
+                    "autonomy_index": 1,
                     "direction": "outgoing",
                     "mission": "Outbound deliverability quality check",
                 },
@@ -4377,6 +4396,7 @@ async def twilio_inbound_webhook(request: Request):
         "direction": "inbound",
         "conversation_initiation_client_data": {
             "dynamic_variables": {
+                "autonomy_index": get_account_autonomy_index_for_user(context.get("user_id") or (business or {}).get("user_id")),
                 "caller_number": from_number,
                 "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
                 "business_name": business.get("name") if business else None,
@@ -4468,6 +4488,7 @@ async def route_call_compat(request: Request):
     )
 
     dynamic_variables = {
+        "autonomy_index": get_account_autonomy_index_for_user(context.get("user_id") or (business or {}).get("user_id")),
         "caller_number": call_payload.get("from_number"),
         "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
         "business_name": business.get("name") if business else None,
@@ -6552,16 +6573,30 @@ async def update_payment(request: PaymentUpdateRequest):
 
 @app.post("/stripe-webhook", tags=["Billing"])
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+    raw_body = await request.body()
+    logging.info(
+        "[Stripe Webhook] Incoming request signature_present=%s body_bytes=%s",
+        bool(stripe_signature),
+        len(raw_body or b""),
+    )
     try:
-        event = stripe.Webhook.construct_event(payload=await request.body(), sig_header=stripe_signature, secret=stripe_webhook_secret)
+        event = stripe.Webhook.construct_event(payload=raw_body, sig_header=stripe_signature, secret=stripe_webhook_secret)
     except ValueError:
+        logging.warning("[Stripe Webhook] Invalid payload")
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError:
+        logging.warning("[Stripe Webhook] Invalid signature")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     event_type = event["type"]
     connected_account_id = event.get("account")
     is_connected_account_event = bool(connected_account_id)
+    logging.info(
+        "[Stripe Webhook] Event accepted type=%s connected_account=%s livemode=%s",
+        event_type,
+        connected_account_id,
+        event.get("livemode"),
+    )
 
     if event_type == 'checkout.session.completed':
         session = event['data']['object']
