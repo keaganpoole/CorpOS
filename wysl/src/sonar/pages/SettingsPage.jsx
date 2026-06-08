@@ -433,13 +433,6 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
             placeholder="e.g. Roofing, Gutters"
             className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 placeholder:text-zinc-800 focus:outline-none focus:border-amber-500/30 transition-all" />
         </div>
-        <div>
-          <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1.5 block">Price Type</label>
-          <select value={form.price_type} onChange={e => setForm(f => ({ ...f, price_type: e.target.value }))}
-            className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 focus:outline-none focus:border-amber-500/30 transition-all appearance-none cursor-pointer">
-            {PRICE_TYPES.map(pt => <option key={pt.value} value={pt.value}>{pt.label}</option>)}
-          </select>
-        </div>
         {form.price_type !== 'free' && form.price_type !== 'quote' && (
           <>
             <div>
@@ -906,6 +899,20 @@ const INTRO_VARIABLES = [
 
 const IntroMessageEditor = ({ value, onChange }) => {
   const [focused, setFocused] = useState(false);
+  const textareaRef = React.useRef(null);
+
+  const renderTokenizedValue = (text) => {
+    const parts = String(text || '').split(/({{receptionist_name}}|{{company_name}})/g);
+    return parts.map((part, index) => {
+      const variable = INTRO_VARIABLES.find(v => v.key === part);
+      if (!variable) return <span key={`${part}-${index}`}>{part}</span>;
+      return (
+        <span key={`${part}-${index}`} className="sb-var-chip mx-0.5 align-middle" contentEditable={false}>
+          <span className="sb-var-chip-text">{variable.label}</span>
+        </span>
+      );
+    });
+  };
 
   const handleDragStart = (e, variable) => {
     e.dataTransfer.setData('text/plain', variable);
@@ -917,16 +924,17 @@ const IntroMessageEditor = ({ value, onChange }) => {
     const variable = e.dataTransfer.getData('text/plain');
     if (!variable) return;
 
-    const textarea = e.target;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const newValue = (value || '').substring(0, start) + variable + (value || '').substring(end);
+    const target = textareaRef.current;
+    const start = target?.selectionStart ?? (value || '').length;
+    const end = target?.selectionEnd ?? (value || '').length;
+    const currentValue = value || '';
+    const newValue = `${currentValue.slice(0, start)}${variable}${currentValue.slice(end)}`;
     onChange(newValue);
-
-    // Restore cursor position after the inserted variable
     setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + variable.length, start + variable.length);
+      if (!target) return;
+      const cursor = start + variable.length;
+      target.focus();
+      target.setSelectionRange(cursor, cursor);
     }, 0);
   };
 
@@ -936,15 +944,17 @@ const IntroMessageEditor = ({ value, onChange }) => {
   };
 
   const insertVariable = (variable) => {
-    const textarea = document.getElementById('intro-message-textarea');
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const newValue = (value || '').substring(0, start) + variable + (value || '').substring(end);
+    const target = textareaRef.current;
+    const start = target?.selectionStart ?? (value || '').length;
+    const end = target?.selectionEnd ?? (value || '').length;
+    const currentValue = value || '';
+    const newValue = `${currentValue.slice(0, start)}${variable}${currentValue.slice(end)}`;
     onChange(newValue);
     setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + variable.length, start + variable.length);
+      if (!target) return;
+      const cursor = start + variable.length;
+      target.focus();
+      target.setSelectionRange(cursor, cursor);
     }, 0);
   };
 
@@ -976,20 +986,26 @@ const IntroMessageEditor = ({ value, onChange }) => {
       <div className="p-5">
         <textarea
           id="intro-message-textarea"
+          ref={textareaRef}
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
-          placeholder="Hey, this is {{receptionist_name}} at {{company_name}}. What can I do for you?"
-          rows={4}
-          className={`w-full bg-black/30 border rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 focus:outline-none transition-all resize-y leading-relaxed font-mono ${
+          placeholder="Hey, this is Receptionist Name at Business Name. What can I do for you?"
+          className={`min-h-[118px] w-full resize-none bg-black/30 border rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 focus:outline-none transition-all leading-relaxed font-sans ${
             focused
               ? 'border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.06)]'
               : 'border-white/[0.04]'
           }`}
         />
+        <div className="mt-3 rounded-xl border border-white/[0.04] bg-black/20 px-4 py-3">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-600">Preview</div>
+          <div className="min-h-[24px] text-[13px] leading-relaxed text-zinc-300">
+            {value ? renderTokenizedValue(value) : <span className="text-zinc-800">Hey, this is Receptionist Name at Business Name. What can I do for you?</span>}
+          </div>
+        </div>
       </div>
 
       {/* Footer */}
@@ -1013,6 +1029,7 @@ const SettingsPage = () => {
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState(null);
+  const [activeSection, setActiveSection] = useState('business');
 
   useEffect(() => {
     loadSettings();
@@ -1250,6 +1267,124 @@ const SettingsPage = () => {
     setSettings(prev => ({ ...prev, [field]: value }));
   };
 
+  const settingsSections = [
+    { id: 'business', title: 'Business Info', icon: Building2, color: 'text-indigo-400', hint: 'Name, contact, and location' },
+    { id: 'intro', title: 'Intro Message', icon: MessageSquareText, color: 'text-indigo-400', hint: 'Opening call greeting' },
+    { id: 'appointments', title: 'Hours', icon: Calendar, color: 'text-cyan-400', hint: 'Business availability' },
+    { id: 'services', title: 'Services & Pricing', icon: Tag, color: 'text-amber-400', hint: 'Offer catalog and rates' },
+    { id: 'knowledge', title: 'Knowledge Base', icon: BookOpen, color: 'text-amber-400', hint: 'Policies, FAQs, and context' },
+  ];
+
+  const activeSectionConfig = settingsSections.find(section => section.id === activeSection) || settingsSections[0];
+  const ActiveSettingsIcon = activeSectionConfig.icon;
+
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case 'intro':
+        return (
+          <>
+            <div className="mb-4">
+              <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
+                The first thing callers hear when your AI receptionist picks up. Use variables to personalize it automatically.
+              </p>
+              <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
+                <Info size={11} className="text-indigo-400/60 shrink-0" />
+                Variables resolve dynamically if the receptionist changes.
+              </p>
+            </div>
+            <IntroMessageEditor
+              value={settings.intro_message_prompt}
+              onChange={(v) => update('intro_message_prompt', v)}
+            />
+          </>
+        );
+      case 'appointments':
+        return (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Clock size={14} className="text-cyan-400/60" />
+              <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Business Hours</span>
+            </div>
+            <div className="flex flex-col">
+              {DAYS.map(day => (
+                <DayHoursRow key={day} day={day} settings={settings} onChange={setSettings} />
+              ))}
+            </div>
+          </div>
+        );
+      case 'services':
+        return (
+          <>
+            <div className="mb-4">
+              <p className="text-[12px] text-zinc-500 leading-relaxed">
+                Your AI receptionist uses these to answer pricing questions and describe what you offer.
+              </p>
+            </div>
+            <ServicesManager
+              businessId={settings._business_id}
+              ensureBusinessRecord={ensureBusinessRecord}
+              onBusinessLinked={syncBusinessId}
+            />
+          </>
+        );
+      case 'knowledge':
+        return (
+          <>
+            <div className="mb-4">
+              <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
+                Your AI receptionist reads these documents during calls. They contain your business story, policies, and common answers.
+              </p>
+              <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
+                <Info size={11} className="text-amber-400/60 shrink-0" />
+                Each tab has a ready-to-customize template.
+              </p>
+            </div>
+            <KnowledgeBaseEditor
+              value={settings.knowledge_base || {}}
+              onChange={(v) => update('knowledge_base', v)}
+            />
+          </>
+        );
+      default:
+        return (
+          <>
+            <div className="grid grid-cols-2 gap-x-6">
+              <Field label="Business Name">
+                <TextInput value={settings.business_name} onChange={(v) => update('business_name', v)} placeholder="Acme Corp" />
+              </Field>
+              <Field label="Phone Number">
+                <TextInput value={settings.business_phone} onChange={(v) => update('business_phone', v)} placeholder="+1 (555) 000-0000" />
+              </Field>
+              <Field label="Email">
+                <TextInput value={settings.business_email} onChange={(v) => update('business_email', v)} placeholder="hello@acme.com" type="email" />
+              </Field>
+              <Field label="Timezone">
+                <SelectInput
+                  value={settings.business_timezone}
+                  onChange={(v) => update('business_timezone', v)}
+                  options={TIMEZONES.map(tz => ({ value: tz, label: tz.replace('America/', '').replace('_', ' ') }))}
+                />
+              </Field>
+            </div>
+            <Field label="Street Address">
+              <TextInput value={settings.business_street} onChange={(v) => update('business_street', v)} placeholder="123 Main St" />
+            </Field>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="City">
+                <TextInput value={settings.business_city} onChange={(v) => update('business_city', v)} placeholder="City" />
+              </Field>
+              <Field label="State">
+                <TextInput value={settings.business_state} onChange={(v) => update('business_state', v)} placeholder="ME" />
+              </Field>
+              <Field label="ZIP Code">
+                <TextInput value={settings.business_zip} onChange={(v) => update('business_zip', v)} placeholder="04901" />
+              </Field>
+            </div>
+          </>
+        );
+    }
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-[#020202]">
@@ -1268,7 +1403,7 @@ const SettingsPage = () => {
             <Settings className="text-indigo-400" size={22} />
           </div>
           <div>
-            <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic leading-none">Settings</h2>
+            <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Settings</h2>
             <p className="text-[11px] text-zinc-600 mt-1 tracking-wider uppercase">Account &amp; Business Configuration</p>
           </div>
         </div>
@@ -1295,7 +1430,53 @@ const SettingsPage = () => {
       )}
 
       {/* ─── Content ────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-auto custom-scrollbar px-8 py-6">
+      <div className="flex-1 overflow-hidden px-8 py-6">
+        <div className="mx-auto grid h-full max-w-6xl grid-cols-[260px_minmax(0,1fr)] gap-5">
+          <aside className="rounded-[28px] border border-white/[0.05] bg-zinc-950/30 p-3">
+            <nav className="space-y-1">
+              {settingsSections.map(section => {
+                const Icon = section.icon;
+                const isActive = activeSection === section.id;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setActiveSection(section.id)}
+                    className={`w-full rounded-2xl px-4 py-3 text-left transition-all ${
+                      isActive
+                        ? 'bg-white/[0.06] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]'
+                        : 'text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-200'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Icon size={16} className={isActive ? section.color : 'text-zinc-600'} />
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-semibold tracking-[-0.02em]">{section.title}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{section.hint}</span>
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          <section className="min-h-0 overflow-auto custom-scrollbar rounded-[28px] border border-white/[0.05] bg-gradient-to-b from-zinc-950/40 to-transparent p-6">
+            <div className="mb-6 flex items-center gap-3 border-b border-white/[0.04] pb-5">
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2.5">
+                <ActiveSettingsIcon size={18} className={activeSectionConfig.color} />
+              </div>
+              <div>
+                <h3 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">{activeSectionConfig.title}</h3>
+                <p className="mt-2 text-[13px] leading-5 text-zinc-600">{activeSectionConfig.hint}</p>
+              </div>
+            </div>
+            {renderSectionContent()}
+          </section>
+        </div>
+      </div>
+
+      <div className="hidden">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
 
           {/* ── Business Info ────────────────────────────────────────────── */}
@@ -1353,21 +1534,6 @@ const SettingsPage = () => {
 
           {/* ── Calendar & Appointments ──────────────────────────────────── */}
           <Section title="Calendar & Appointments" icon={Calendar} color="bg-cyan-500/10 text-cyan-400" defaultOpen={true}>
-            <div className="flex items-center gap-8 mb-6">
-              <Field label="Default Duration">
-                <div className="flex items-center gap-2">
-                  <NumberInput value={settings.default_appointment_duration} onChange={(v) => update('default_appointment_duration', v)} min={5} max={480} step={5} />
-                  <span className="text-[12px] text-zinc-500">minutes</span>
-                </div>
-              </Field>
-              <Field label="Buffer Between Appointments">
-                <div className="flex items-center gap-2">
-                  <NumberInput value={settings.appointment_buffer_minutes} onChange={(v) => update('appointment_buffer_minutes', v)} min={0} max={120} step={5} />
-                  <span className="text-[12px] text-zinc-500">minutes</span>
-                </div>
-              </Field>
-            </div>
-
             <div className="border-t border-white/[0.03] pt-5 mt-1">
               <div className="flex items-center gap-2 mb-4">
                 <Clock size={14} className="text-cyan-400/60" />
@@ -1382,45 +1548,6 @@ const SettingsPage = () => {
           </Section>
 
           {/* ── Call & Notification Settings ─────────────────────────────── */}
-          <Section title="Calls & Notifications" icon={Bell} color="bg-fuchsia-500/10 text-fuchsia-400" defaultOpen={false}>
-            <div className="flex flex-col gap-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[12px] font-medium text-zinc-300">Auto-Confirm Appointments</div>
-                  <div className="text-[10px] text-zinc-600 mt-0.5">Automatically confirm new bookings without manual review</div>
-                </div>
-                <Toggle value={settings.auto_confirm_appointments} onChange={(v) => update('auto_confirm_appointments', v)} />
-              </div>
-
-              <div className="border-t border-white/[0.03]" />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[12px] font-medium text-zinc-300">SMS Confirmations</div>
-                  <div className="text-[10px] text-zinc-600 mt-0.5">Send text message confirmations for new bookings</div>
-                </div>
-                <Toggle value={settings.send_confirmation_sms} onChange={(v) => update('send_confirmation_sms', v)} color="cyan" />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[12px] font-medium text-zinc-300">Email Confirmations</div>
-                  <div className="text-[10px] text-zinc-600 mt-0.5">Send email confirmations for new bookings</div>
-                </div>
-                <Toggle value={settings.send_confirmation_email} onChange={(v) => update('send_confirmation_email', v)} color="cyan" />
-              </div>
-
-              <div className="border-t border-white/[0.03]" />
-
-              <Field label="Send Reminders Before Appointment">
-                <div className="flex items-center gap-2">
-                  <NumberInput value={settings.reminder_before_minutes} onChange={(v) => update('reminder_before_minutes', v)} min={0} max={1440} step={15} />
-                  <span className="text-[12px] text-zinc-500">minutes</span>
-                </div>
-              </Field>
-            </div>
-          </Section>
-
           {/* ── Services & Pricing ──────────────────────────────────────── */}
           <Section title="Services & Pricing" icon={Tag} color="bg-amber-500/10 text-amber-400" defaultOpen={true}>
             <div className="mb-4">

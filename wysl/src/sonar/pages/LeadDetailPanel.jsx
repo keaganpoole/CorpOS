@@ -64,7 +64,7 @@ const SelectEditor = ({ field, value, onChange, fieldConfig }) => {
       <button
         type="button"
         onClick={() => setOpen((next) => !next)}
-        className={`flex min-h-[34px] w-full items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-bold transition ${currentStyle.className}`}
+        className={`flex min-h-[34px] w-full items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-semibold tracking-[-0.02em] transition ${currentStyle.className}`}
       >
         <span className="flex min-w-0 items-center gap-2">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: currentStyle.dot }} />
@@ -83,7 +83,7 @@ const SelectEditor = ({ field, value, onChange, fieldConfig }) => {
             <button
               type="button"
               onClick={() => { onChange(null); setOpen(false); }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-bold text-zinc-500 hover:bg-white/[0.06]"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:bg-white/[0.06]"
             >
               <span className="h-2 w-2 rounded-full bg-zinc-700" />
               Empty
@@ -96,7 +96,7 @@ const SelectEditor = ({ field, value, onChange, fieldConfig }) => {
                   key={option}
                   type="button"
                   onClick={() => { onChange(option); setOpen(false); }}
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-bold hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: optionStyle.dot }} />
                   <span className="min-w-0 flex-1 truncate">{option}</span>
@@ -132,7 +132,7 @@ const MultiSelectEditor = ({ field, value, onChange, fieldConfig }) => {
             key={option}
             type="button"
             onClick={() => toggle(option)}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-bold transition ${active ? 'border-cyan-500/25 bg-cyan-500/10 text-cyan-300' : 'border-white/[0.06] bg-white/[0.02] text-zinc-500 hover:border-white/15 hover:text-zinc-300'}`}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-semibold tracking-[-0.02em] transition ${active ? 'border-cyan-500/25 bg-cyan-500/10 text-cyan-300' : 'border-white/[0.06] bg-white/[0.02] text-zinc-500 hover:border-white/15 hover:text-zinc-300'}`}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: dot }} />
             {option}
@@ -204,7 +204,7 @@ const FieldEditor = ({ field, value, onChange, errors, fieldConfig }) => {
     const current = value === true ? 'Yes' : value === false ? 'No' : 'Empty';
     const next = value == null ? true : value === true ? false : null;
     return (
-      <button type="button" onClick={() => onChange(next)} className="inline-flex min-h-[34px] w-full items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.025] px-2.5 py-1.5 text-[11px] font-bold text-zinc-400 transition hover:text-white">
+      <button type="button" onClick={() => onChange(next)} className="inline-flex min-h-[34px] w-full items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.025] px-2.5 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 transition hover:text-white">
         {current}
         <span className={`h-1.5 w-1.5 rounded-full ${value === true ? 'bg-emerald-400' : value === false ? 'bg-amber-400' : 'bg-zinc-700'}`} />
       </button>
@@ -213,7 +213,7 @@ const FieldEditor = ({ field, value, onChange, errors, fieldConfig }) => {
   if (field.type === 'currency') {
     return (
       <div className="relative">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] font-bold text-zinc-600">$</span>
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] font-semibold tracking-[-0.02em] text-zinc-600">$</span>
         <input value={value ?? ''} inputMode="decimal" onChange={(event) => {
           const raw = event.target.value.replace(/[^0-9.]/g, '');
           const parsed = raw === '' ? null : parseFloat(raw);
@@ -358,8 +358,8 @@ const LeadDetailPanel = ({ lead, onSave, onDelete, onClose, isNew = false, table
         <div className="shrink-0 border-b border-white/[0.04] px-7 py-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">{isNew ? 'New Person' : 'Person'}</p>
-              <h3 className="truncate text-2xl font-bold tracking-tight text-white">{displayName}</h3>
+              <p className="mb-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">{isNew ? 'New Person' : 'Person'}</p>
+              <h3 className="truncate text-2xl font-semibold tracking-[-0.04em] text-white">{displayName}</h3>
               <p className="mt-1 truncate text-[12px] text-zinc-500">{contactLine}</p>
             </div>
             <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-zinc-500 transition hover:bg-white/[0.08] hover:text-white">
@@ -373,7 +373,7 @@ const LeadDetailPanel = ({ lead, onSave, onDelete, onClose, isNew = false, table
             <button
               onClick={handleSave}
               disabled={saving || (!hasChanges && !isNew)}
-              className={`flex-1 rounded-xl px-4 py-2.5 text-[11px] font-black uppercase tracking-wider transition active:scale-[0.98] disabled:opacity-30 ${saveSuccess ? 'border border-emerald-500/30 bg-emerald-500/20 text-emerald-400' : 'bg-white text-black hover:bg-cyan-400'}`}
+              className={`flex-1 rounded-xl px-4 py-2.5 text-[11px] font-semibold tracking-[-0.02em] transition active:scale-[0.98] disabled:opacity-30 ${saveSuccess ? 'border border-emerald-500/30 bg-emerald-500/20 text-emerald-400' : 'bg-white text-black hover:bg-cyan-400'}`}
             >
               {saveSuccess ? 'Saved' : saving ? 'Saving...' : <span className="inline-flex items-center justify-center gap-2"><Save size={12} /> Save</span>}
             </button>
@@ -393,14 +393,14 @@ const LeadDetailPanel = ({ lead, onSave, onDelete, onClose, isNew = false, table
         )}
 
         <div className="custom-scrollbar flex-1 overflow-y-auto px-7 py-5">
-          <div className="space-y-3">
+          <div className="space-y-4">
             {fields.map((field) => {
               const value = field.custom ? getCustomValue(currentLead.custom_fields, field.key) : currentLead[field.key];
               return (
-                <div key={field.key} className="rounded-xl border border-white/[0.04] bg-white/[0.015] p-3">
-                  <label className="mb-2 flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate text-[9px] font-black uppercase tracking-wider text-zinc-600">{field.label}</span>
-                    {field.custom && <span className="shrink-0 rounded-md bg-white/[0.035] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Custom</span>}
+                <div key={field.key} className="space-y-2">
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">{field.label}</span>
+                    {field.custom && <span className="shrink-0 rounded-md bg-white/[0.035] px-1.5 py-0.5 text-[9px] font-semibold tracking-[-0.02em] text-zinc-700">Custom</span>}
                   </label>
                   <FieldEditor
                     field={field}

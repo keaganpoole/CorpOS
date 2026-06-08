@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+﻿import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -163,7 +163,7 @@ const InlineCurrency = ({ value, onSave }) => {
   };
   return editing ? (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px] text-zinc-500 font-bold">$</span>
+      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">$</span>
       <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^0-9.]/g, ''))}
         onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
         className="bg-white/[0.06] border border-cyan-500/30 rounded-lg pl-6 pr-2 py-1 text-[12px] text-white focus:outline-none w-[110px]" />
@@ -295,7 +295,7 @@ const InlineBoolean = ({ value, onSave }) => {
         e.stopPropagation();
         onSave(nextValue);
       }}
-      className={`w-full inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${state.className}`}
+      className={`w-full inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-[-0.02em] border transition-all ${state.className}`}
       title="Click to cycle Blank / Yes / No"
     >
       {current !== 'blank' ? (
@@ -368,7 +368,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
   return (
     <div className="relative" ref={ref}>
       <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className={`w-full min-h-[26px] inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${currentStyle.bg} ${currentStyle.text} ${currentStyle.border}`}>
+        className={`w-full min-h-[26px] inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-[-0.02em] border ${currentStyle.bg} ${currentStyle.text} ${currentStyle.border}`}>
         {current ? (
           <>
             <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: currentStyle.dot }} />
@@ -395,7 +395,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
             onClick={(e) => e.stopPropagation()}>
             <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
               onClick={() => { setOpen(false); onSave(null); }}
-              className={`w-full text-left px-3 py-2 text-[11px] font-bold flex items-center gap-2 hover:bg-white/[0.06] ${current == null || current === '' ? 'text-white' : 'text-zinc-400'}`}>
+              className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${current == null || current === '' ? 'text-white' : 'text-zinc-400'}`}>
               <div className="w-2 h-2 rounded-full bg-zinc-700" />
               <span className="invisible">.</span>
               {(current == null || current === '') && <Check size={11} className="text-cyan-400 ml-auto" />}
@@ -407,7 +407,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
               return (
                 <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: (idx + 1) * 0.02 }}
                   onClick={() => { setOpen(false); if (!isActive) onSave(val); }}
-                  className={`w-full text-left px-3 py-2 text-[11px] font-bold flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
+                  className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
                   {val}
                   {isActive && <Check size={11} className="text-cyan-400 ml-auto" />}
@@ -474,11 +474,11 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
     <div className="relative" ref={ref} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
       <div onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="w-full min-h-[26px] cursor-pointer flex items-center justify-start gap-1 flex-wrap">
         {selected.length === 0 ? <span className="invisible text-[12px]">&nbsp;</span> : selected.slice(0, 2).map((tag) => (
-          <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-bold border whitespace-nowrap bg-white/[0.04] text-zinc-300 border-white/[0.06]">
+          <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg border whitespace-nowrap bg-white/[0.04] text-[9px] font-semibold tracking-[-0.02em] text-zinc-300 border-white/[0.06]">
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(tag) }} />{tag}
           </span>
         ))}
-        {selected.length > 2 && <span className="text-[9px] text-zinc-600 font-bold">+{selected.length - 2}</span>}
+        {selected.length > 2 && <span className="text-[9px] font-semibold tracking-[-0.02em] text-zinc-600">+{selected.length - 2}</span>}
       </div>
       {createPortal(
       <AnimatePresence>
@@ -498,7 +498,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
           >
             <div className="flex flex-wrap gap-1.5">
               {selected.map((tag) => (
-                <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-bold border whitespace-nowrap bg-white/[0.04] text-zinc-300 border-white/[0.06]">
+                <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg border whitespace-nowrap bg-white/[0.04] text-[9px] font-semibold tracking-[-0.02em] text-zinc-300 border-white/[0.06]">
                   <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(tag) }} />
                   {tag}
                 </span>
@@ -531,7 +531,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               return (
                 <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }}
                   onClick={() => toggle(val)}
-                  className={`w-full text-left px-3 py-2 text-[11px] font-bold flex items-center gap-2 hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
+                  className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
                   <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(val) }} />
                   {val}
                   {active && <Check size={11} className="text-cyan-400 ml-auto" />}
@@ -565,7 +565,7 @@ const DraggableHeader = ({
       </div>
       {col.label ? (
         <button onClick={() => col.sortKey && onSort(col.sortKey)}
-          className="flex items-center gap-1.5 text-[9px] font-black text-zinc-600 uppercase tracking-widest hover:text-zinc-300 transition-colors whitespace-nowrap">
+          className="flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:text-zinc-300 transition-colors">
           {IconComp && <IconComp size={10} className="text-zinc-700" />}
           {displayName}
           {sortBy === col.sortKey && (sortDir === 'asc' ? <ChevronUp size={9} /> : <ChevronDown size={9} />)}
@@ -588,7 +588,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
     if (customField.type === 'date') return <InlineDateOnly value={value} onSave={saveCustom} />;
     if (customField.type === 'select') return <InlineSelect value={value} options={customField.options || []} onSave={saveCustom} optionColors={fieldConfig[colId]?.optionColors || {}} />;
     if (customField.type === 'multi_select') return <InlineMultiSelect value={value} options={customField.options || []} onSave={saveCustom} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-    return <InlineText value={value} onSave={saveCustom} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
+    return <InlineText value={value} onSave={saveCustom} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
   }
 
   switch (colId) {
@@ -631,14 +631,14 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       return (
         <div className="min-w-0 overflow-hidden">
           <div className="flex items-center gap-1.5 min-w-0">
-            <InlineText value={lead.first_name} onSave={(v) => autoSave(lead.id, 'first_name', v)} className="text-[13px] font-bold text-white leading-tight block truncate" placeholder="First" />
-            <InlineText value={lead.last_name} onSave={(v) => autoSave(lead.id, 'last_name', v)} className="text-[13px] font-bold text-white leading-tight block truncate" placeholder="Last" />
+            <InlineText value={lead.first_name} onSave={(v) => autoSave(lead.id, 'first_name', v)} className="block truncate text-[13px] font-semibold tracking-[-0.02em] leading-tight text-white" placeholder="First" />
+            <InlineText value={lead.last_name} onSave={(v) => autoSave(lead.id, 'last_name', v)} className="block truncate text-[13px] font-semibold tracking-[-0.02em] leading-tight text-white" placeholder="Last" />
           </div>
           {!lead.first_name && !lead.last_name && <span className="text-[12px] text-zinc-700 italic">Untitled Person</span>}
         </div>
       );
-    case 'phone': return <InlineText value={lead.phone} onSave={(v) => autoSave(lead.id, 'phone', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
-    case 'email': return <InlineText value={lead.email} onSave={(v) => autoSave(lead.id, 'email', v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
+    case 'phone': return <InlineText value={lead.phone} onSave={(v) => autoSave(lead.id, 'phone', v)} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
+    case 'email': return <InlineText value={lead.email} onSave={(v) => autoSave(lead.id, 'email', v)} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
     case 'source': return <InlineSelect value={lead.source} options={getConfiguredOptions('source', SOURCE_OPTIONS)} onSave={(v) => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
     case 'preferred_contact_method': return <InlineSelect value={lead.preferred_contact_method} options={getConfiguredOptions('preferred_contact_method', CONTACT_METHOD_OPTIONS)} onSave={(v) => autoSave(lead.id, 'preferred_contact_method', v)} optionColors={fieldConfig.preferred_contact_method?.optionColors || {}} />;
     case 'last_call_status': return <InlineSelect value={lead.last_call_status} options={getConfiguredOptions('last_call_status', CALL_STATUS_OPTIONS)} onSave={(v) => autoSave(lead.id, 'last_call_status', v)} optionColors={fieldConfig.last_call_status?.optionColors || {}} />;
@@ -650,12 +650,12 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       if (!field) return null;
       const value = lead[colId];
       if (field.type === 'boolean') return <InlineBoolean value={value} onSave={(v) => autoSave(lead.id, colId, v)} />;
-      if (field.type === 'currency') return field.editable ? <InlineCurrency value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{formatCurrency(value)}</span>;
-      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span className="text-[12px] text-zinc-400 tabular-nums">{value ?? ''}</span>;
-      if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] text-zinc-500">{formatTimestamp(value)}</span>;
+      if (field.type === 'currency') return field.editable ? <InlineCurrency value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 tabular-nums">{formatCurrency(value)}</span>;
+      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 tabular-nums">{value ?? ''}</span>;
+      if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTimestamp(value)}</span>;
       if (field.type === 'select') return <InlineSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
       if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-      return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="text-[12px] text-zinc-400 truncate block" placeholder="" />;
+      return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
     }
   }
 };
@@ -696,8 +696,271 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
   })),
 ];
 
+const PEOPLE_TABLE_VIEW_KEY = 'SONAR_people_table_view';
+
+const parseColumnWidth = (width) => {
+  const numeric = parseFloat(String(width || '').replace('px', ''));
+  return Number.isFinite(numeric) ? numeric : 160;
+};
+
+const getColumnLabel = (column, fieldConfig = {}) => fieldConfig[column.id]?.name || column.label || column.id;
+
+const getAllDataColumns = (customFields = [], fieldConfig = {}) => [
+  ...TABLE_COLUMNS.map((field) => ({
+    id: field.key,
+    label: field.label,
+    width: field.tableWidth || {
+      text: '180px',
+      email: '210px',
+      phone: '150px',
+      select: '140px',
+      multi_select: '220px',
+      boolean: '110px',
+      timestamp: '150px',
+      currency: '120px',
+      number: '110px',
+      textarea: '260px',
+    }[field.type] || '160px',
+    sortKey: field.key,
+  })),
+  ...customFields.map((field) => ({
+    id: field.key,
+    label: field.label,
+    width: field.tableWidth || {
+      boolean: '110px',
+      text: '180px',
+      number: '120px',
+      date: '150px',
+      select: '140px',
+      multi_select: '220px',
+    }[field.type] || '160px',
+    sortKey: null,
+    custom: true,
+  })),
+].map((column) => ({ ...column, label: getColumnLabel(column, fieldConfig) }));
+
+const loadPeopleTableView = () => {
+  try {
+    return JSON.parse(localStorage.getItem(PEOPLE_TABLE_VIEW_KEY) || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const savePeopleTableView = (view) => {
+  try {
+    localStorage.setItem(PEOPLE_TABLE_VIEW_KEY, JSON.stringify(view));
+  } catch {}
+};
+
+const TableControlButton = React.forwardRef(({ active, children, onClick }, ref) => (
+  <button
+    ref={ref}
+    type="button"
+    onClick={onClick}
+    className={`inline-flex h-8 items-center gap-2 rounded-xl border px-3 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
+      active
+        ? 'border-cyan-500/25 bg-cyan-500/10 text-white'
+        : 'border-white/[0.06] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200'
+    }`}
+  >
+    {children}
+  </button>
+));
+TableControlButton.displayName = 'TableControlButton';
+
+const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) => {
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const popoverRef = useRef(null);
+
+  const updatePosition = useCallback(() => {
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const left = Math.min(rect.left, window.innerWidth - width - 14);
+    setPosition({ top: rect.bottom + 8, left: Math.max(14, left) });
+  }, [anchorRef, width]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    updatePosition();
+    const close = (event) => {
+      if (anchorRef.current?.contains(event.target) || popoverRef.current?.contains(event.target)) return;
+      onClose();
+    };
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    document.addEventListener('mousedown', close);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+      document.removeEventListener('mousedown', close);
+    };
+  }, [anchorRef, onClose, open, updatePosition]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          ref={popoverRef}
+          initial={{ opacity: 0, y: -4, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -4, scale: 0.96 }}
+          style={{ top: position.top, left: position.left, width }}
+          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d0d]/96 shadow-[0_24px_70px_rgba(0,0,0,0.86)] backdrop-blur-xl"
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const ControlPopoverHeader = ({ title, caption }) => (
+  <div className="border-b border-white/[0.05] px-4 py-3">
+    <p className="text-[12px] font-semibold tracking-[-0.03em] text-white">{title}</p>
+    {caption && <p className="mt-0.5 text-[10px] font-medium tracking-[-0.01em] text-zinc-600">{caption}</p>}
+  </div>
+);
+
+const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
+  const sortableColumns = columns.filter((column) => !['select', 'avatar'].includes(column.id));
+  const addRule = () => {
+    const first = sortableColumns[0];
+    if (!first) return;
+    onChange([...rules, { id: `sort_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, field: first.id, direction: 'asc' }]);
+  };
+  const updateRule = (index, updates) => onChange(rules.map((rule, idx) => (idx === index ? { ...rule, ...updates } : rule)));
+  const removeRule = (index) => onChange(rules.filter((_, idx) => idx !== index));
+  const moveRule = (index, offset) => {
+    const nextIndex = index + offset;
+    if (nextIndex < 0 || nextIndex >= rules.length) return;
+    const next = [...rules];
+    const [moved] = next.splice(index, 1);
+    next.splice(nextIndex, 0, moved);
+    onChange(next);
+  };
+
+  return (
+    <div>
+      <ControlPopoverHeader title="Sort" caption="Apply rules top to bottom." />
+      <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-3 space-y-2">
+        {rules.length === 0 && (
+          <div className="rounded-xl border border-dashed border-white/[0.06] px-3 py-6 text-center">
+            <p className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-500">No sort rules</p>
+          </div>
+        )}
+        {rules.map((rule, index) => (
+          <div key={rule.id || index} className="flex items-center gap-2 rounded-xl border border-white/[0.05] bg-white/[0.025] px-2 py-2">
+            <div className="flex flex-col">
+              <button type="button" onClick={() => moveRule(index, -1)} className="text-zinc-700 hover:text-white disabled:opacity-20" disabled={index === 0}><ChevronUp size={11} /></button>
+              <button type="button" onClick={() => moveRule(index, 1)} className="text-zinc-700 hover:text-white disabled:opacity-20" disabled={index === rules.length - 1}><ChevronDown size={11} /></button>
+            </div>
+            <select value={rule.field} onChange={(event) => updateRule(index, { field: event.target.value })} className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none">
+              {sortableColumns.map((column) => <option key={column.id} value={column.id} className="bg-[#111]">{getColumnLabel(column, fieldConfig)}</option>)}
+            </select>
+            <button type="button" onClick={() => updateRule(index, { direction: rule.direction === 'asc' ? 'desc' : 'asc' })} className="w-[78px] rounded-lg border border-white/[0.06] bg-black/30 px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 hover:text-white">
+              {rule.direction === 'asc' ? 'Asc' : 'Desc'}
+            </button>
+            <button type="button" onClick={() => removeRule(index)} className="rounded-lg p-1 text-zinc-700 hover:bg-rose-500/10 hover:text-rose-400"><X size={12} /></button>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-white/[0.05] p-3">
+        <button type="button" onClick={addRule} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.08] py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 transition-colors hover:border-cyan-500/25 hover:text-cyan-400">
+          <Plus size={12} /> Add Sort
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll, onHideAll }) => {
+  const [query, setQuery] = useState('');
+  const filtered = columns.filter((column) => getColumnLabel(column, fieldConfig).toLowerCase().includes(query.toLowerCase()));
+  return (
+    <div>
+      <ControlPopoverHeader title="Hide / Show" caption="Choose visible table columns." />
+      <div className="border-b border-white/[0.05] p-3">
+        <div className="relative">
+          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:border-white/15" />
+        </div>
+        <div className="mt-2 flex gap-2">
+          <button type="button" onClick={onShowAll} className="flex-1 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 hover:text-white">Show All</button>
+          <button type="button" onClick={onHideAll} className="flex-1 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 hover:text-white">Hide All</button>
+        </div>
+      </div>
+      <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
+        {filtered.map((column) => {
+          const hidden = !!fieldConfig[column.id]?.hidden;
+          return (
+            <button key={column.id} type="button" onClick={() => onSetHidden(column.id, !hidden)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04]">
+              <span className="w-4">{!hidden && <Check size={12} className="text-cyan-400" />}</span>
+              <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${hidden ? 'text-zinc-500' : 'text-zinc-300'}`}>{getColumnLabel(column, fieldConfig)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const ColumnOrderPopover = ({ columns, fieldConfig, onMove, onReset }) => {
+  const [query, setQuery] = useState('');
+  const filtered = columns.filter((column) => getColumnLabel(column, fieldConfig).toLowerCase().includes(query.toLowerCase()));
+  return (
+    <div>
+      <ControlPopoverHeader title="Column Order" caption="Reorder visible columns." />
+      <div className="border-b border-white/[0.05] p-3">
+        <div className="relative">
+          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:border-white/15" />
+        </div>
+      </div>
+      <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
+        {filtered.map((column) => {
+          const realIndex = columns.findIndex((item) => item.id === column.id);
+          return (
+            <div key={column.id} draggable onDragStart={(event) => event.dataTransfer.setData('text/plain', String(realIndex))} onDragOver={(event) => event.preventDefault()} onDrop={(event) => onMove(Number(event.dataTransfer.getData('text/plain')), realIndex)} className="flex cursor-grab items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04] active:cursor-grabbing">
+              <GripVertical size={12} className="text-zinc-700" />
+              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] text-zinc-300">{getColumnLabel(column, fieldConfig)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="border-t border-white/[0.05] p-3">
+        <button type="button" onClick={onReset} className="w-full rounded-xl border border-white/[0.06] py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 transition-colors hover:text-white">Reset to Default</button>
+      </div>
+    </div>
+  );
+};
+
+const RowHeightPopover = ({ value, onChange }) => {
+  const options = [
+    { key: 1, label: 'Compact' },
+    { key: 3, label: 'Standard' },
+    { key: 5, label: 'Comfortable' },
+  ];
+  return (
+    <div className="p-2">
+      {options.map((option) => (
+        <button key={option.key} type="button" onClick={() => onChange(option.key)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] transition-colors hover:bg-white/[0.04] ${value === option.key ? 'text-white' : 'text-zinc-500'}`}>
+          <span className="w-4">{value === option.key && <Check size={12} className="text-cyan-400" />}</span>
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateInline, onDeleteMany, totalCount, onUpdateLead, onSchemaChange }) => {
-  const [density] = useState(2);
+  const [viewSettings, setViewSettings] = useState(() => ({
+    rowHeight: 3,
+    sortRules: [],
+    frozenCount: 0,
+    ...loadPeopleTableView(),
+  }));
+  const density = viewSettings.rowHeight ?? 3;
   const [businessId, setBusinessId] = useState(null);
   const [customFields, setCustomFields] = useState([]);
   const [fieldConfig, setFieldConfig] = useState(() => loadFieldConfig());
@@ -709,6 +972,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
   const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, left: 0 });
   const columnOptionsButtonRef = useRef(null);
   const tableScrollRef = useRef(null);
+  const horizontalScrollRef = useRef(null);
   const headerStickyRef = useRef(null);
   const headerRowRef = useRef(null);
   const headerRefs = useRef({});
@@ -721,10 +985,25 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
   const [zonePaletteId, setZonePaletteId] = useState(null);
   const [zonePreviewColor, setZonePreviewColor] = useState(null);
   const [headerMetrics, setHeaderMetrics] = useState([]);
+  const [activeControl, setActiveControl] = useState(null);
+  const [isDraggingFrozenDivider, setIsDraggingFrozenDivider] = useState(false);
+  const sortButtonRef = useRef(null);
+  const visibilityButtonRef = useRef(null);
+  const orderButtonRef = useRef(null);
+  const rowHeightButtonRef = useRef(null);
 
   const column_options = CUSTOM_FIELD_TYPES;
   const anySelected = selectedIds.length > 0;
   const zones = useMemo(() => getSavedZones(fieldConfig), [fieldConfig]);
+  const allDataColumns = useMemo(() => getAllDataColumns(customFields, fieldConfig), [customFields, fieldConfig]);
+
+  const updateViewSettings = useCallback((updates) => {
+    setViewSettings((current) => {
+      const next = { ...current, ...(typeof updates === 'function' ? updates(current) : updates) };
+      savePeopleTableView(next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -774,14 +1053,16 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
     const nextMetrics = columns
       .map((col, index) => {
         const el = headerRefs.current[col.id];
+        const rowRect = headerRowRef.current.getBoundingClientRect();
         if (!el) return null;
+        const rect = el.getBoundingClientRect();
         return {
           id: col.id,
           index,
-          left: el.offsetLeft,
-          right: el.offsetLeft + el.offsetWidth,
-          width: el.offsetWidth,
-          center: el.offsetLeft + (el.offsetWidth / 2),
+          left: rect.left - rowRect.left,
+          right: rect.right - rowRect.left,
+          width: rect.width,
+          center: rect.left - rowRect.left + (rect.width / 2),
           eligible: isZoneEligibleColumn(col),
         };
       })
@@ -901,7 +1182,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
     setSettingsField(nextField.key);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const scroller = tableScrollRef.current;
+        const scroller = horizontalScrollRef.current;
         if (!scroller) return;
         scroller.scrollTo({ left: scroller.scrollWidth, behavior: 'smooth' });
       });
@@ -998,10 +1279,17 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
   const handleDrop = (e, dropIndex) => {
     e.preventDefault();
     if (dragIndex == null || dragIndex === dropIndex) return;
+    moveVisibleColumn(dragIndex, dropIndex);
+    setDragIndex(null); setDragOverIndex(null);
+  };
+
+  const moveVisibleColumn = useCallback((fromIndex, toIndex) => {
+    if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) return;
     setColumns((prev) => {
       const next = [...prev];
-      const [moved] = next.splice(dragIndex, 1);
-      next.splice(dropIndex, 0, moved);
+      const [moved] = next.splice(fromIndex, 1);
+      if (!moved) return prev;
+      next.splice(toIndex, 0, moved);
       if (businessId) {
         const orderedCustomKeys = next.filter((col) => col.custom).map((col) => col.id);
         updateCustomFieldPositions(businessId, orderedCustomKeys).catch((err) => {
@@ -1014,8 +1302,112 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
       }
       return next;
     });
-    setDragIndex(null); setDragOverIndex(null);
-  };
+  }, [businessId]);
+
+  const resetColumnOrder = useCallback(() => {
+    setColumns(buildColumns(customFields, fieldConfig));
+  }, [customFields, fieldConfig]);
+
+  const setColumnHidden = useCallback((key, hidden) => {
+    persistFieldConfig({
+      ...fieldConfig,
+      [key]: { ...fieldConfig[key], hidden },
+    });
+  }, [fieldConfig]);
+
+  const setAllColumnsHidden = useCallback((hidden) => {
+    const next = { ...fieldConfig };
+    allDataColumns.forEach((column) => {
+      next[column.id] = { ...next[column.id], hidden };
+    });
+    persistFieldConfig(next);
+    updateViewSettings({ frozenCount: 0 });
+  }, [allDataColumns, fieldConfig, updateViewSettings]);
+
+  const sortedLeads = useMemo(() => {
+    const rules = (viewSettings.sortRules || []).filter((rule) => rule.field);
+    if (!rules.length) return leads;
+    return [...leads].sort((a, b) => {
+      for (const rule of rules) {
+        const aValue = isCustomFieldKey(rule.field) ? getCustomValue(a.custom_fields, rule.field) : a[rule.field];
+        const bValue = isCustomFieldKey(rule.field) ? getCustomValue(b.custom_fields, rule.field) : b[rule.field];
+        const emptyA = aValue == null || aValue === '';
+        const emptyB = bValue == null || bValue === '';
+        let result = 0;
+        if (emptyA && !emptyB) result = 1;
+        else if (!emptyA && emptyB) result = -1;
+        else if (Array.isArray(aValue) || Array.isArray(bValue)) result = String(aValue || '').localeCompare(String(bValue || ''));
+        else if (!Number.isNaN(parseFloat(aValue)) && !Number.isNaN(parseFloat(bValue))) result = parseFloat(aValue) - parseFloat(bValue);
+        else result = String(aValue || '').localeCompare(String(bValue || ''), undefined, { sensitivity: 'base' });
+        if (result !== 0) return rule.direction === 'desc' ? -result : result;
+      }
+      return 0;
+    });
+  }, [leads, viewSettings.sortRules]);
+
+  const frozenCount = Math.min(Math.max(viewSettings.frozenCount || 0, 0), columns.length);
+  const frozenSnapTargets = useMemo(() => {
+    const dataColumns = columns
+      .map((column, index) => ({ column, index }))
+      .filter(({ column }) => !['select', 'avatar'].includes(column.id));
+    if (!dataColumns.length) return [{ count: 0, left: 0 }];
+
+    const rowPadding = 20;
+    const columnGap = 12;
+    let cursor = rowPadding;
+    const bounds = columns.map((column) => {
+      const left = cursor;
+      const width = parseColumnWidth(column.width);
+      const right = left + width;
+      cursor = right + columnGap;
+      return { left, right, width };
+    });
+
+    const targets = [{ count: 0, left: bounds[dataColumns[0].index].left / 2 }];
+    dataColumns.slice(1).forEach(({ index }) => {
+      const previous = bounds[index - 1];
+      const current = bounds[index];
+      targets.push({ count: index, left: (previous.right + current.left) / 2 });
+    });
+    targets.push({ count: columns.length, left: bounds[columns.length - 1].right + 24 });
+    return targets;
+  }, [columns]);
+
+  const frozenDividerLeft = useMemo(() => (
+    frozenSnapTargets.find((target) => target.count === frozenCount)?.left ?? frozenSnapTargets[0]?.left ?? 0
+  ), [frozenCount, frozenSnapTargets]);
+  const frozenHandleLeft = frozenDividerLeft;
+  const frozenColumns = useMemo(() => columns.slice(0, frozenCount), [columns, frozenCount]);
+  const scrollableColumns = useMemo(() => columns.slice(frozenCount), [columns, frozenCount]);
+  const frozenPaneWidth = frozenCount > 0 ? frozenDividerLeft : 0;
+  const splitPaneScrollPadding = frozenCount > 0 ? 6 : 20;
+
+  const findClosestFrozenBoundary = useCallback((clientX) => {
+    const rowRect = headerRowRef.current?.getBoundingClientRect();
+    if (!rowRect) return 0;
+    const relativeX = clientX - rowRect.left;
+    const closestTarget = frozenSnapTargets.reduce((closest, target) => (
+      Math.abs(target.left - relativeX) < Math.abs(closest.left - relativeX) ? target : closest
+    ), frozenSnapTargets[0] || { count: 0, left: 0 });
+    return closestTarget.count;
+  }, [frozenSnapTargets]);
+
+  const handleFrozenPointerDown = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingFrozenDivider(true);
+    const move = (moveEvent) => {
+      updateViewSettings({ frozenCount: findClosestFrozenBoundary(moveEvent.clientX) });
+    };
+    const up = (upEvent) => {
+      updateViewSettings({ frozenCount: findClosestFrozenBoundary(upEvent.clientX) });
+      setIsDraggingFrozenDivider(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up, { once: true });
+  }, [findClosestFrozenBoundary, updateViewSettings]);
 
   const persistZones = useCallback((nextZones) => {
     persistFieldConfig({ ...fieldConfig, [ZONE_META_KEY]: nextZones });
@@ -1177,16 +1569,293 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
     : null;
 
   const zoneCandidateRange = draftSpan ? new Set(draftSpan.metrics.map((metric) => metric.id)) : null;
+  const renderHeaderColumn = (col, index) => (
+    <DraggableHeader
+      key={col.id}
+      col={col}
+      index={index}
+      sortBy={sortBy}
+      sortDir={sortDir}
+      onSort={onSort}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onDragEnd={() => setDragIndex(null)}
+      isDragging={dragIndex === index}
+      dragOverIndex={dragOverIndex}
+      fieldConfig={fieldConfig}
+      onFieldSettings={setSettingsField}
+      headerRef={(node) => {
+        if (node) headerRefs.current[col.id] = node;
+        else delete headerRefs.current[col.id];
+      }}
+      isZoneCandidate={zoneCandidateRange?.has(col.id)}
+    />
+  );
+
+  const renderLeadColumn = (col, lead) => (
+    <div
+      key={col.id}
+      style={{ width: col.width, minWidth: col.width }}
+      className={col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'}
+    >
+      <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(lead.id), toggle: toggleSelectedId }} />
+    </div>
+  );
+
+  const renderCreateColumn = (col, index) => (
+    <div
+      key={col.id}
+      style={{ width: col.width, minWidth: col.width }}
+      className={`${col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'} ${index <= 1 ? 'flex items-center text-zinc-700' : ''}`}
+    >
+      <span className="text-transparent select-none">.</span>
+    </div>
+  );
+
+  const renderColorbar = (lead, prefix = 'cb') => {
+    const matchedRule = evaluateColorbar(lead, colorbarRules);
+    if (!matchedRule) return null;
+    const colors = matchedRule.colors || ['#6366f1'];
+    const animation = matchedRule.animation || 'none';
+    const gradId = `${prefix}-${lead.id}`;
+    return (
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-full overflow-hidden pointer-events-none" style={{ top: '25%', bottom: '25%' }}>
+        <svg width="3" height="100%" className="block">
+          <defs>
+            {colors.length > 1 && <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">{colors.map((c, i) => <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={c} />)}</linearGradient>}
+          </defs>
+          <rect width="3" height="100%" rx="1.5" fill={colors.length > 1 ? `url(#${gradId})` : colors[0]}>{animation === 'pulse' && <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />}</rect>
+        </svg>
+      </div>
+    );
+  };
+
+  const renderNewRecordEmptyState = () => (
+    <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
+      <div className="mx-auto flex w-full max-w-[420px] flex-col items-center justify-center px-14 py-16 text-center">
+        <button
+          type="button"
+          onClick={onCreateInline}
+          className="group flex h-20 w-20 items-center justify-center rounded-[24px] border border-white/[0.08] bg-white/[0.02] text-white shadow-[0_0_30px_rgba(255,255,255,0.08)] transition-transform duration-300 hover:scale-105"
+        >
+          <Plus size={40} strokeWidth={1.6} />
+        </button>
+        <div className="mt-5">
+          <p className="text-3xl font-semibold tracking-tight text-neutral-50">Create your first record</p>
+          <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">Add your first person to start building out your database.</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSplitTable = () => (
+    <div ref={tableScrollRef} className="relative flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
+      <div ref={headerRowRef} className="relative flex min-w-0">
+        <div
+          className="shrink-0 overflow-hidden border-r border-white/[0.04] bg-[#0a0a0a]"
+          style={{ width: frozenPaneWidth, minWidth: frozenPaneWidth }}
+        >
+          {frozenCount > 0 && (
+            <div className="sticky top-0 z-20 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm">
+              <div className="flex items-center gap-3 py-2 pl-5 pr-0 group" style={{ paddingTop: '15px' }}>
+                {frozenColumns.map((col) => renderHeaderColumn(col, columns.findIndex((column) => column.id === col.id)))}
+              </div>
+            </div>
+          )}
+          <div className="divide-y divide-white/[0.02]">
+            {!loading && leads.length > 0 && sortedLeads.map((lead, idx) => {
+              const isJustAdded = justAddedLeadIds.includes(lead.id);
+              const isRowSelected = selectedId === lead.id;
+              const isRowBulkSelected = selectedIds.includes(lead.id);
+              return (
+                <motion.div
+                  key={`frozen-${lead.id}`}
+                  initial={{ opacity: 0, y: 3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(idx * 0.012, 0.35) }}
+                  onContextMenu={(event) => handleContextMenu(event, lead.id)}
+                  className={`group pl-5 pr-0 ${dc.row} flex items-center gap-3 transition-all duration-150 relative ${isRowSelected ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-cyan-500/[0.04]' : ''}`}
+                >
+                  {isJustAdded && (
+                    <motion.div
+                      initial={{ opacity: 0, backgroundPosition: '-140% 0%' }}
+                      animate={{ opacity: [0, 0.6, 0], backgroundPosition: ['-140% 0%', '140% 0%'] }}
+                      transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
+                      className="pointer-events-none absolute inset-0 z-10"
+                      style={{
+                        backgroundImage: 'linear-gradient(102deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 32%, rgba(255,255,255,0.028) 44%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.028) 56%, rgba(255,255,255,0) 68%, rgba(255,255,255,0) 100%)',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '42% 100%',
+                        filter: 'blur(10px)',
+                        mixBlendMode: 'screen',
+                      }}
+                    />
+                  )}
+                  {renderColorbar(lead, 'cb-frozen')}
+                  {frozenColumns.map((col) => renderLeadColumn(col, lead))}
+                </motion.div>
+              );
+            })}
+            {!loading && leads.length > 0 && frozenCount > 0 && (
+              <button
+                type="button"
+                onClick={onCreateInline}
+                className={`w-full pl-5 pr-0 ${dc.row} flex items-center gap-3 text-left transition-all duration-150 hover:bg-white/[0.02]`}
+              >
+                {frozenColumns.map((col) => renderCreateColumn(col, columns.findIndex((column) => column.id === col.id)))}
+              </button>
+            )}
+          </div>
+        </div>
+        <div
+          className="pointer-events-none absolute top-0 z-[80] h-0 w-0"
+          style={{ left: frozenCount > 0 ? frozenPaneWidth : frozenHandleLeft }}
+        >
+          {isDraggingFrozenDivider && (
+            <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-cyan-300/30" />
+          )}
+          <button
+            type="button"
+            onPointerDown={handleFrozenPointerDown}
+            className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-cyan-300/70 transition-colors hover:border-cyan-400/30 hover:text-white"
+            aria-label="Drag frozen column divider"
+          >
+            <GripVertical size={10} />
+          </button>
+        </div>
+        <div ref={horizontalScrollRef} className="min-w-0 flex-1 overflow-x-auto overflow-y-visible custom-scrollbar">
+          <div className="min-w-max">
+            <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
+              <div className="relative">
+                <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
+                  {isDraggingFrozenDivider && <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-cyan-300/30" />}
+                </div>
+                <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
+                  <button
+                    type="button"
+                    onPointerDown={handleFrozenPointerDown}
+                    className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-cyan-300/70 transition-colors hover:border-cyan-400/30 hover:text-white"
+                    aria-label="Drag frozen column divider"
+                  >
+                    <GripVertical size={10} />
+                  </button>
+                </div>
+                <div className="absolute inset-x-0 top-0 h-6">
+                  {headerMetrics.filter((metric) => metric.eligible).map((metric) => (
+                    <button
+                      key={`zone-hit-${metric.id}`}
+                      type="button"
+                      onPointerDown={(event) => handleZonePointerDown(event, metric.index)}
+                      onMouseEnter={() => setHoveredZoneColumnId(metric.id)}
+                      onMouseLeave={() => setHoveredZoneColumnId((current) => (current === metric.id ? null : current))}
+                      className="absolute top-[1px] h-4 z-20"
+                      style={{ left: metric.left + 4, width: Math.max(metric.width - 8, 0) }}
+                      aria-label={`Create zone from ${fieldConfig[metric.id]?.name || columns[metric.index]?.label || metric.id}`}
+                    />
+                  ))}
+                  {zoneLayouts.map((zone) => (
+                    <button
+                      key={zone.id}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setZonePaletteId(zone.id);
+                      }}
+                      className="absolute z-10 rounded-full pointer-events-auto"
+                      style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 8, 0), height: 16 }}
+                      aria-label="Edit zone color"
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-3 py-2 pr-5 group" style={{ paddingTop: '15px', paddingLeft: splitPaneScrollPadding }}>
+                  {scrollableColumns.map((col) => renderHeaderColumn(col, columns.findIndex((column) => column.id === col.id)))}
+                  <div className="shrink-0 pl-1">
+                    <button
+                      ref={columnOptionsButtonRef}
+                      type="button"
+                      onClick={toggleColumnOptions}
+                      className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-cyan-500/25 hover:bg-cyan-500/10 transition-all flex items-center justify-center"
+                      aria-label="Add column"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                  {showColumnOptions && <div className="w-[190px] shrink-0" />}
+                </div>
+              </div>
+            </div>
+
+            <div className="divide-y divide-white/[0.02]">
+              {loading ? (
+                <div className="h-full flex flex-col items-center justify-center gap-4 pt-20">
+                  <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-cyan-500/60 animate-spin" />
+                  <p className="text-[11px] text-zinc-600 font-medium">Loading people...</p>
+                </div>
+              ) : leads.length === 0 ? (
+                renderNewRecordEmptyState()
+              ) : (
+                <>
+                  {sortedLeads.map((lead, idx) => {
+                    const isJustAdded = justAddedLeadIds.includes(lead.id);
+                    const isRowSelected = selectedId === lead.id;
+                    const isRowBulkSelected = selectedIds.includes(lead.id);
+                    return (
+                      <motion.div
+                        key={lead.id}
+                        initial={{ opacity: 0, y: 3 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: Math.min(idx * 0.012, 0.35) }}
+                        onContextMenu={(event) => handleContextMenu(event, lead.id)}
+                        className={`group pr-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${isRowSelected ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-cyan-500/[0.04]' : ''}`}
+                        style={{ paddingLeft: splitPaneScrollPadding }}
+                      >
+                        {isJustAdded && (
+                          <motion.div
+                            initial={{ opacity: 0, backgroundPosition: '-140% 0%' }}
+                            animate={{ opacity: [0, 0.6, 0], backgroundPosition: ['-140% 0%', '140% 0%'] }}
+                            transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
+                            className="pointer-events-none absolute inset-0 z-10"
+                            style={{
+                              backgroundImage: 'linear-gradient(102deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 32%, rgba(255,255,255,0.028) 44%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.028) 56%, rgba(255,255,255,0) 68%, rgba(255,255,255,0) 100%)',
+                              backgroundRepeat: 'no-repeat',
+                              backgroundSize: '42% 100%',
+                              filter: 'blur(10px)',
+                              mixBlendMode: 'screen',
+                            }}
+                          />
+                        )}
+                        {frozenCount === 0 && renderColorbar(lead)}
+                        {scrollableColumns.map((col) => renderLeadColumn(col, lead))}
+                      </motion.div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={onCreateInline}
+                    className={`w-full pr-5 ${dc.row} flex items-center gap-3 min-w-max text-left transition-all duration-150 hover:bg-white/[0.02]`}
+                    style={{ paddingLeft: splitPaneScrollPadding }}
+                  >
+                    {scrollableColumns.map((col) => renderCreateColumn(col, columns.findIndex((column) => column.id === col.id)))}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full">
       <div className="shrink-0 px-8 py-5 flex items-center gap-3">
         <div className="flex items-center gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">People</h2>
+            <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">People</h2>
             <p className="text-[11px] text-zinc-600 mt-0.5">{totalCount} People</p>
           </div>
-          <button onClick={() => setShowColorbarStudio(true)} className="group/colorbar relative ml-2 flex items-center gap-2 px-4 py-2 rounded-xl text-zinc-400 text-[10px] font-bold transition-all hover:text-white">
+          <button onClick={() => setShowColorbarStudio(true)} className="group/colorbar relative ml-2 flex items-center gap-2 rounded-xl px-4 py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 transition-all hover:text-white">
             <div className="absolute rounded-xl opacity-0 group-hover/colorbar:opacity-100 transition-opacity duration-300 pointer-events-none overflow-hidden" style={{ inset: '-0.7px' }}>
               <div className="absolute inset-0 animate-[colorbarFlow_3s_linear_infinite]" style={{ background: 'linear-gradient(90deg, #22d3ee, #d946ef, #f59e0b, #22d3ee, #22d3ee, #d946ef, #f59e0b)', backgroundSize: '300% 100%' }} />
             </div>
@@ -1206,239 +1875,59 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
 
       <div className="flex-1 px-6 pb-6 min-h-0">
         <div className="relative group/table h-full flex flex-col">
+          <div className="mb-3 flex shrink-0 items-center gap-2 px-1">
+            <TableControlButton ref={sortButtonRef} active={activeControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setActiveControl((current) => (current === 'sort' ? null : 'sort'))}>
+              Sort
+            </TableControlButton>
+            <TableControlButton ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
+              Hide/Show Columns
+            </TableControlButton>
+            <TableControlButton ref={orderButtonRef} active={activeControl === 'order'} onClick={() => setActiveControl((current) => (current === 'order' ? null : 'order'))}>
+              Column Order
+            </TableControlButton>
+            <TableControlButton ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
+              Row Height
+            </TableControlButton>
+            <div className="ml-auto text-[10px] font-semibold tracking-[-0.02em] text-zinc-700">
+              {frozenCount > 0 ? `${frozenCount} frozen` : 'No frozen columns'}
+            </div>
+          </div>
           <div className="relative bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/[0.06] rounded-[1.5rem] flex flex-col h-full overflow-hidden">
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div ref={tableScrollRef} className="flex-1 overflow-auto custom-scrollbar">
-                <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
-                  <div ref={headerRowRef} className="relative min-w-max">
-                    <div className="absolute inset-x-0 top-0 h-6">
-                      {headerMetrics.filter((metric) => metric.eligible).map((metric) => (
-                        <button
-                          key={`zone-hit-${metric.id}`}
-                          type="button"
-                          onPointerDown={(event) => handleZonePointerDown(event, metric.index)}
-                          onMouseEnter={() => setHoveredZoneColumnId(metric.id)}
-                          onMouseLeave={() => setHoveredZoneColumnId((current) => (current === metric.id ? null : current))}
-                          className="absolute top-[1px] h-4 z-20"
-                          style={{ left: metric.left + 4, width: Math.max(metric.width - 8, 0) }}
-                          aria-label={`Create zone from ${fieldConfig[metric.id]?.name || columns[metric.index]?.label || metric.id}`}
-                        />
-                      ))}
-                      {draftSpan?.metrics.map((metric) => (
-                        <motion.div
-                          key={`draft-glow-${metric.id}`}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="pointer-events-none absolute top-0 bottom-1 rounded-b-xl"
-                          style={{
-                            left: metric.left + 2,
-                            width: Math.max(metric.width - 4, 0),
-                            background: 'linear-gradient(180deg, rgba(125,211,252,0.14), rgba(125,211,252,0.04) 55%, transparent 100%)',
-                          }}
-                        />
-                      ))}
-                      {zoneLayouts.map((zone) => (
-                        <button
-                          key={zone.id}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setZonePaletteId(zone.id);
-                          }}
-                          className="absolute z-10 rounded-full pointer-events-auto"
-                          style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 8, 0), height: 16 }}
-                          aria-label="Edit zone color"
-                        >
-                          <span
-                            className="absolute blur-[9px] opacity-26"
-                            style={{
-                              left: '2%',
-                              width: '96%',
-                              top: zone.top - Math.max(zone.top - 6, 0) + 1,
-                              height: 8,
-                              background: `radial-gradient(ellipse at center top, ${zone.displayColor}14 0%, ${zone.displayColor}10 34%, ${zone.displayColor}00 78%), linear-gradient(90deg, transparent 0%, ${zone.displayColor}14 10%, ${zone.displayColor}30 50%, ${zone.displayColor}14 90%, transparent 100%)`,
-                            }}
-                          />
-                          <span
-                            className="absolute inset-x-0 h-px rounded-full"
-                            style={{
-                              top: zone.top - Math.max(zone.top - 6, 0),
-                              background: `linear-gradient(90deg, ${zone.displayColor}AA 0%, ${zone.displayColor} 12%, ${zone.displayColor} 88%, ${zone.displayColor}AA 100%)`,
-                              boxShadow: zonePaletteId === zone.id ? `0 0 0 1px ${zone.displayColor}44, 0 0 18px ${zone.displayColor}55` : `0 0 12px ${zone.displayColor}35`,
-                            }}
-                          />
-                        </button>
-                      ))}
-                      {draftSpan && (
-                        <motion.div
-                          initial={{ opacity: 0, scaleX: 0.98 }}
-                          animate={{ opacity: 1, scaleX: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="pointer-events-none absolute h-4"
-                          style={{ left: draftSpan.left, width: draftSpan.width, top: 0 }}
-                        >
-                          <span
-                            className="absolute h-[8px] blur-[9px]"
-                            style={{
-                              left: '2%',
-                              top: '3px',
-                              width: '96%',
-                              background: 'radial-gradient(ellipse at center top, rgba(125,211,252,0.12) 0%, rgba(125,211,252,0.09) 34%, rgba(125,211,252,0) 78%), linear-gradient(90deg, transparent 0%, rgba(125,211,252,0.1) 10%, rgba(125,211,252,0.22) 50%, rgba(125,211,252,0.1) 90%, transparent 100%)',
-                            }}
-                          />
-                          <span className="absolute inset-x-0 top-[3px] h-px rounded-full bg-cyan-200 shadow-[0_0_16px_rgba(125,211,252,0.55)]" />
-                        </motion.div>
-                      )}
-                      {!zoneDraft && hoveredZoneMetric && (
-                        <motion.div
-                          initial={{ opacity: 0, scaleX: 0.94 }}
-                          animate={{ opacity: 1, scaleX: 1 }}
-                          exit={{ opacity: 0, scaleX: 0.94 }}
-                          className="absolute h-4"
-                          style={{ left: hoveredZoneMetric.left, width: hoveredZoneMetric.width, top: 0 }}
-                        >
-                          <span className="absolute inset-x-1 top-[3px] h-px rounded-full bg-white/20 shadow-[0_0_10px_rgba(255,255,255,0.08)]" />
-                        </motion.div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 px-5 py-2 group" style={{ paddingTop: '15px' }}>
-                      {columns.map((col, index) => (
-                        <div key={col.id} className="shrink-0">
-                          <DraggableHeader
-                            col={col}
-                            index={index}
-                            sortBy={sortBy}
-                            sortDir={sortDir}
-                            onSort={onSort}
-                            onDragStart={handleDragStart}
-                            onDragOver={handleDragOver}
-                            onDrop={handleDrop}
-                            onDragEnd={() => setDragIndex(null)}
-                            isDragging={dragIndex === index}
-                            dragOverIndex={dragOverIndex}
-                            fieldConfig={fieldConfig}
-                            onFieldSettings={setSettingsField}
-                            headerRef={(node) => {
-                              if (node) headerRefs.current[col.id] = node;
-                              else delete headerRefs.current[col.id];
-                            }}
-                            isZoneCandidate={zoneCandidateRange?.has(col.id)}
-                          />
-                        </div>
-                      ))}
-                      <div className="shrink-0 pl-1">
-                        <button
-                          ref={columnOptionsButtonRef}
-                          type="button"
-                          onClick={toggleColumnOptions}
-                          className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-cyan-500/25 hover:bg-cyan-500/10 transition-all flex items-center justify-center"
-                          aria-label="Add column"
-                        >
-                          <Plus size={13} />
-                        </button>
-                      </div>
-                      {showColumnOptions && <div className="w-[190px] shrink-0" />}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-white/[0.02]">
-                  {loading ? (
-                    <div className="h-full flex flex-col items-center justify-center gap-4 pt-20">
-                      <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-cyan-500/60 animate-spin" />
-                      <p className="text-[11px] text-zinc-600 font-medium">Loading people...</p>
-                    </div>
-                  ) : leads.length === 0 ? (
-                    <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
-                      <div className="mx-auto flex w-full max-w-[420px] flex-col items-center justify-center px-14 py-16 text-center">
-                        <button
-                          type="button"
-                          onClick={onCreateInline}
-                          className="group flex h-20 w-20 items-center justify-center rounded-[24px] border border-white/[0.08] bg-white/[0.02] text-white shadow-[0_0_30px_rgba(255,255,255,0.08)] transition-transform duration-300 hover:scale-105"
-                        >
-                          <Plus size={40} strokeWidth={1.6} />
-                        </button>
-                        <div className="mt-5">
-                          <p className="text-3xl font-semibold tracking-tight text-neutral-50">Create your first record</p>
-                          <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">Add your first person to start building out your database.</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {leads.map((lead, idx) => {
-                    const isJustAdded = justAddedLeadIds.includes(lead.id);
-                    return (
-                    <motion.div key={lead.id} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.012, 0.35) }} onContextMenu={(event) => handleContextMenu(event, lead.id)} className={`group px-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative overflow-hidden ${selectedId === lead.id ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'} ${selectedIds.includes(lead.id) ? 'bg-cyan-500/[0.04]' : ''}`}>
-                          {isJustAdded && (
-                            <motion.div
-                              initial={{ opacity: 0, backgroundPosition: '-140% 0%' }}
-                              animate={{ opacity: [0, 0.6, 0], backgroundPosition: ['-140% 0%', '140% 0%'] }}
-                              transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
-                              className="pointer-events-none absolute inset-0 z-10"
-                              style={{
-                                backgroundImage: 'linear-gradient(102deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 32%, rgba(255,255,255,0.028) 44%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.028) 56%, rgba(255,255,255,0) 68%, rgba(255,255,255,0) 100%)',
-                                backgroundRepeat: 'no-repeat',
-                                backgroundSize: '42% 100%',
-                                filter: 'blur(10px)',
-                                mixBlendMode: 'screen',
-                              }}
-                            />
-                          )}
-                          {(() => {
-                            const matchedRule = evaluateColorbar(lead, colorbarRules);
-                            if (!matchedRule) return null;
-                            const colors = matchedRule.colors || ['#6366f1'];
-                            const animation = matchedRule.animation || 'none';
-                            const gradId = `cb-${lead.id}`;
-                            return (
-                              <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-full overflow-hidden pointer-events-none" style={{ top: '25%', bottom: '25%' }}>
-                                <svg width="3" height="100%" className="block">
-                                  <defs>
-                                    {colors.length > 1 && <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">{colors.map((c, i) => <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={c} />)}</linearGradient>}
-                                  </defs>
-                                  <rect width="3" height="100%" rx="1.5" fill={colors.length > 1 ? `url(#${gradId})` : colors[0]}>{animation === 'pulse' && <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />}</rect>
-                                </svg>
-                              </div>
-                            );
-                          })()}
-                          {columns.map((col) => (
-                            <div key={col.id} style={{ width: col.width, minWidth: col.width }} className={col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'}>
-                              <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(lead.id), toggle: toggleSelectedId }} />
-                            </div>
-                          ))}
-                        </motion.div>
-                      )})}
-                      <button
-                        type="button"
-                        onClick={onCreateInline}
-                        className={`w-full px-5 ${dc.row} flex items-center gap-3 min-w-max text-left transition-all duration-150 hover:bg-white/[0.02]`}
-                      >
-                        {columns.map((col, index) => (
-                          <div
-                            key={col.id}
-                            style={{ width: col.width, minWidth: col.width }}
-                            className={`${col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'} ${index <= 1 ? 'flex items-center text-zinc-700' : ''}`}
-                          >
-                            {index === 0 ? (
-                              <span className="text-transparent select-none">.</span>
-                            ) : index === 1 ? (
-                              <span className="text-transparent select-none">.</span>
-                            ) : (
-                              <span className="text-transparent select-none">.</span>
-                            )}
-                          </div>
-                        ))}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
+              {renderSplitTable()}
             </div>
           </div>
         </div>
       </div>
+
+      <FloatingPopover anchorRef={sortButtonRef} open={activeControl === 'sort'} onClose={() => setActiveControl(null)} width={390}>
+        <SortBuilderPopover
+          columns={columns}
+          fieldConfig={fieldConfig}
+          rules={viewSettings.sortRules || []}
+          onChange={(sortRules) => updateViewSettings({ sortRules })}
+        />
+      </FloatingPopover>
+      <FloatingPopover anchorRef={visibilityButtonRef} open={activeControl === 'visibility'} onClose={() => setActiveControl(null)} width={320}>
+        <ColumnsVisibilityPopover
+          columns={allDataColumns}
+          fieldConfig={fieldConfig}
+          onSetHidden={setColumnHidden}
+          onShowAll={() => setAllColumnsHidden(false)}
+          onHideAll={() => setAllColumnsHidden(true)}
+        />
+      </FloatingPopover>
+      <FloatingPopover anchorRef={orderButtonRef} open={activeControl === 'order'} onClose={() => setActiveControl(null)} width={310}>
+        <ColumnOrderPopover
+          columns={columns.filter((column) => !['select', 'avatar'].includes(column.id))}
+          fieldConfig={fieldConfig}
+          onMove={(fromIndex, toIndex) => moveVisibleColumn(fromIndex + 2, toIndex + 2)}
+          onReset={resetColumnOrder}
+        />
+      </FloatingPopover>
+      <FloatingPopover anchorRef={rowHeightButtonRef} open={activeControl === 'height'} onClose={() => setActiveControl(null)} width={190}>
+        <RowHeightPopover value={density} onChange={(rowHeight) => updateViewSettings({ rowHeight })} />
+      </FloatingPopover>
 
       <AnimatePresence>
         {zonePalette && (
@@ -1473,7 +1962,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
                 onSelect(contextMenu.leadId);
                 setContextMenu(null);
               }}
-              className="w-full px-3 py-2 text-left text-[11px] font-bold text-zinc-300 hover:bg-white/[0.05] flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 hover:bg-white/[0.05]"
             >
               <ArrowUpRight size={11} className="text-zinc-500" />
               Expand record
@@ -1481,7 +1970,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
             <button
               type="button"
               onClick={() => handleDeleteRecords(anySelected ? selectedIds : [contextMenu.leadId])}
-              className="w-full px-3 py-2 text-left text-[11px] font-bold text-rose-400 hover:bg-rose-500/[0.08] flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-rose-400 hover:bg-rose-500/[0.08]"
             >
               <Trash2 size={11} className="text-rose-400" />
               Delete record{(anySelected ? selectedIds : [contextMenu.leadId]).length > 1 ? 's' : ''}
@@ -1511,7 +2000,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
                     className="w-full px-3 py-2 text-left transition-all hover:bg-white/[0.04] flex items-center gap-2.5 group/fieldtype"
                   >
                     <IconComp size={13} className="text-zinc-600 group-hover/fieldtype:text-cyan-300 transition-colors" />
-                    <span className="text-[11px] font-bold text-zinc-400 group-hover/fieldtype:text-white transition-colors">{option.label}</span>
+                    <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 group-hover/fieldtype:text-white transition-colors">{option.label}</span>
                   </motion.button>
                 );
               })}
@@ -1522,7 +2011,13 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
           <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={handleFieldHide} onClose={() => setSettingsField(null)} />
         )}
         {showColorbarStudio && (
-          <ColorbarConfigModal onClose={() => setShowColorbarStudio(false)} onRulesChange={handleColorbarRulesChange} />
+          <ColorbarConfigModal
+            onClose={() => setShowColorbarStudio(false)}
+            onRulesChange={handleColorbarRulesChange}
+            columns={columns}
+            customFields={customFields}
+            fieldConfig={fieldConfig}
+          />
         )}
       </AnimatePresence>
 

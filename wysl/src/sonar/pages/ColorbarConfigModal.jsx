@@ -1,16 +1,111 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Plus, Trash2, Play, Palette, Sparkles, Check, GripVertical,
   ChevronDown, ChevronUp, Eye, Wand2, Zap, ArrowRight,
 } from 'lucide-react';
 import {
-  COLORBAR_PRESETS, CONDITIONAL_FIELDS, OPERATORS, loadColorbarRules, saveColorbarRules,
+  COLORBAR_PRESETS, OPERATORS, loadColorbarRules, saveColorbarRules,
 } from '../lib/fieldConfig';
+import { TABLE_COLUMNS, getFieldDef } from '../lib/leadSchema';
+import { isCustomFieldKey } from '../lib/customFields';
 
 const uid = () => {
   try { return crypto.randomUUID(); } catch {}
   return 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+};
+
+const StudioSelect = ({ value, options, onChange, placeholder = 'Select...', className = '', buttonClassName = '' }) => {
+  const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const ref = useRef(null);
+  const menuRef = useRef(null);
+  const selected = options.find((option) => option.value === value);
+  const label = selected?.label || placeholder;
+
+  const updateMenuPosition = useCallback(() => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setMenuPosition({
+      left: rect.left,
+      top: rect.bottom + 6,
+      width: Math.max(rect.width, 150),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const handler = (event) => {
+      if (ref.current?.contains(event.target) || menuRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    const update = () => updateMenuPosition();
+    document.addEventListener('mousedown', handler);
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, updateMenuPosition]);
+
+  return (
+    <div ref={ref} className={`relative min-w-0 ${className}`}>
+      <button
+        type="button"
+        onClick={(event) => { event.stopPropagation(); setOpen((current) => !current); }}
+        className={`w-full min-h-[28px] inline-flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-black/30 px-2.5 py-1.5 text-left text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 transition-colors hover:border-white/[0.12] hover:bg-white/[0.04] ${buttonClassName}`}
+      >
+        <span className="min-w-0 truncate">{label}</span>
+        <ChevronDown size={11} className={`shrink-0 text-zinc-600 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {createPortal(
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              ref={menuRef}
+              initial={{ opacity: 0, y: -4, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.96 }}
+              style={{
+                left: menuPosition?.left ?? 0,
+                top: menuPosition?.top ?? 0,
+                width: menuPosition?.width ?? 150,
+              }}
+              className="fixed z-[280] max-h-[240px] overflow-y-auto custom-scrollbar rounded-xl border border-white/[0.08] bg-[#111] py-1 shadow-[0_12px_40px_rgba(0,0,0,0.8)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {options.map((option, index) => {
+                const active = option.value === value;
+                return (
+                  <motion.button
+                    key={`${option.value}-${index}`}
+                    type="button"
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.015 }}
+                    onClick={() => {
+                      setOpen(false);
+                      if (!active) onChange(option.value);
+                    }}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}
+                  >
+                    {option.color ? <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: option.color }} /> : null}
+                    <span className="min-w-0 truncate">{option.label}</span>
+                    {active && <Check size={11} className="ml-auto shrink-0 text-cyan-400" />}
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </div>
+  );
 };
 
 // ─── Animated Colorbar Preview ─────────────────────────────────────────────
@@ -48,34 +143,111 @@ const ColorbarPreview = ({ rule, height = 48 }) => {
 };
 
 // ─── Single Condition Row ──────────────────────────────────────────────────
-const ConditionRow = ({ condition, index, onChange, onRemove, canRemove }) => {
-  const field = CONDITIONAL_FIELDS.find(f => f.key === condition.field);
+const normalizeConditionType = (type) => {
+  if (['select', 'multi_select', 'number', 'currency', 'boolean'].includes(type)) return type;
+  return 'text';
+};
+
+const optionValues = (options = []) => options
+  .map((option) => (typeof option === 'string' ? option : option?.value))
+  .filter(Boolean);
+
+const buildConditionFields = ({ columns = [], customFields = [], fieldConfig = {} } = {}) => {
+  const customByKey = new Map(customFields.map((field) => [field.key, field]));
+  const sourceColumns = columns.length
+    ? columns.filter((col) => !['select', 'avatar'].includes(col.id))
+    : TABLE_COLUMNS.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({ id: field.key, label: field.label }));
+
+  return sourceColumns
+    .map((column) => {
+      const customField = customByKey.get(column.id);
+      const baseField = customField || getFieldDef(column.id);
+      if (!baseField) return null;
+
+      const configured = fieldConfig[column.id] || {};
+      const type = normalizeConditionType(baseField.type);
+      const field = {
+        key: column.id,
+        label: configured.name || column.label || baseField.label,
+        type,
+        custom: isCustomFieldKey(column.id),
+      };
+
+      if (type === 'select' || type === 'multi_select') field.options = optionValues(baseField.options);
+      if (type === 'boolean') field.options = ['True', 'False'];
+      return field;
+    })
+    .filter(Boolean);
+};
+
+const sanitizeRulesForFields = (rules = [], fields = []) => {
+  const defaultField = fields[0]?.key || '';
+  if (!defaultField) return rules;
+  const fieldByKey = new Map(fields.map((field) => [field.key, field]));
+
+  return rules.map((rule) => ({
+    ...rule,
+    conditions: (rule.conditions || []).map((condition) => {
+      const field = fieldByKey.get(condition.field) || fields[0];
+      const operators = OPERATORS[field.type] || OPERATORS.text;
+      const operator = operators.some((op) => op.v === condition.operator)
+        ? condition.operator
+        : operators[0]?.v || 'equals';
+      return {
+        ...condition,
+        field: field.key,
+        operator,
+        value: field.key === condition.field ? condition.value : '',
+      };
+    }),
+  }));
+};
+
+const ConditionRow = ({ condition, index, onChange, onRemove, canRemove, fields }) => {
+  const fallbackField = fields[0];
+  const field = fields.find(f => f.key === condition.field) || fallbackField;
+  const fieldKey = field?.key || '';
   const operators = OPERATORS[field?.type] || OPERATORS.text;
+  const operator = operators.some((op) => op.v === condition.operator) ? condition.operator : operators[0]?.v || 'equals';
+  const fieldOptions = fields.map((item) => ({ value: item.key, label: item.label }));
+  const operatorOptions = operators.map((item) => ({ value: item.v, label: item.l }));
+  const valueOptions = [
+    { value: '', label: 'Select...' },
+    ...(field?.options || []).map((item) => ({ value: item, label: item })),
+  ];
 
   return (
     <div className="flex items-center gap-2 bg-white/[0.02] border border-white/[0.04] rounded-xl px-3 py-2 group/cond">
       {/* Field */}
-      <select value={condition.field} onChange={e => onChange(index, { ...condition, field: e.target.value, operator: 'equals', value: '' })}
-        className="bg-transparent text-[11px] text-zinc-300 font-bold focus:outline-none appearance-none cursor-pointer min-w-0 flex-1">
-        {CONDITIONAL_FIELDS.map(f => <option key={f.key} value={f.key} className="bg-[#111]">{f.label}</option>)}
-      </select>
+      <StudioSelect
+        value={fieldKey}
+        options={fieldOptions}
+        onChange={(nextField) => onChange(index, { ...condition, field: nextField, operator: 'equals', value: '' })}
+        className="flex-1"
+        buttonClassName="border-transparent bg-transparent px-0 hover:bg-transparent hover:border-transparent"
+      />
 
       {/* Operator */}
-      <select value={condition.operator} onChange={e => onChange(index, { ...condition, operator: e.target.value })}
-        className="bg-transparent text-[10px] text-zinc-500 font-bold focus:outline-none appearance-none cursor-pointer w-auto">
-        {operators.map(op => <option key={op.v} value={op.v} className="bg-[#111]">{op.l}</option>)}
-      </select>
+      <StudioSelect
+        value={operator}
+        options={operatorOptions}
+        onChange={(nextOperator) => onChange(index, { ...condition, operator: nextOperator })}
+        className="w-[96px] shrink-0"
+        buttonClassName="border-transparent bg-transparent px-0 text-[10px] text-zinc-500 hover:bg-transparent hover:border-transparent"
+      />
 
       {/* Value */}
-      {!['is_empty', 'is_not_empty'].includes(condition.operator) && (
+      {!['is_empty', 'is_not_empty'].includes(operator) && (
         field?.options ? (
-          <select value={condition.value} onChange={e => onChange(index, { ...condition, value: e.target.value })}
-            className="bg-black/40 border border-white/[0.06] rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none appearance-none cursor-pointer min-w-[80px]">
-            <option value="" className="bg-[#111]">Select...</option>
-            {field.options.map(o => <option key={o} value={o} className="bg-[#111]">{o}</option>)}
-          </select>
+          <StudioSelect
+            value={condition.value}
+            options={valueOptions}
+            onChange={(nextValue) => onChange(index, { ...condition, value: nextValue })}
+            className="w-[118px] shrink-0"
+            buttonClassName="bg-black/40 text-white"
+          />
         ) : (
-          <input type="text" value={condition.value} onChange={e => onChange(index, { ...condition, value: e.target.value })}
+          <input type={field?.type === 'number' || field?.type === 'currency' ? 'number' : 'text'} value={condition.value} onChange={e => onChange(index, { ...condition, value: e.target.value })}
             placeholder={field?.type === 'number' || field?.type === 'currency' ? '100000' : 'Value...'}
             className="bg-black/40 border border-white/[0.06] rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none w-[100px]" />
         )
@@ -92,8 +264,9 @@ const ConditionRow = ({ condition, index, onChange, onRemove, canRemove }) => {
 };
 
 // ─── Rule Editor ───────────────────────────────────────────────────────────
-const RuleEditor = ({ rule, onChange, onRemove }) => {
+const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
   const [expanded, setExpanded] = useState(true);
+  const defaultField = fields[0]?.key || '';
 
   const updateRule = (updates) => onChange({ ...rule, ...updates });
   const updateCondition = (idx, cond) => {
@@ -107,7 +280,7 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
   };
   const addCondition = () => {
     updateRule({
-      conditions: [...(rule.conditions || []), { field: 'status', operator: 'equals', value: '' }],
+      conditions: [...(rule.conditions || []), { field: defaultField, operator: 'equals', value: '' }],
     });
   };
 
@@ -125,7 +298,7 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
           <input type="text" value={rule.name || ''} onChange={e => { e.stopPropagation(); updateRule({ name: e.target.value }); }}
             onClick={e => e.stopPropagation()}
             placeholder="Rule name..."
-            className="bg-transparent text-[12px] text-white font-bold focus:outline-none w-full placeholder:text-zinc-700" />
+            className="w-full bg-transparent text-[12px] font-semibold tracking-[-0.02em] text-white focus:outline-none placeholder:text-zinc-700" />
           <p className="text-[9px] text-zinc-600 mt-0.5">
             {(rule.conditions || []).length} condition{(rule.conditions || []).length !== 1 ? 's' : ''} · {rule.animation || 'static'}
           </p>
@@ -151,12 +324,12 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
             <div className="px-4 pb-4 space-y-4">
               {/* Logic Toggle */}
               <div className="flex items-center gap-2">
-                <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">Match</span>
+                <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Match</span>
                 <div className="flex bg-black/40 border border-white/[0.06] rounded-lg p-0.5">
                   <button onClick={() => updateRule({ logic: 'and' })}
-                    className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${rule.logic === 'and' ? 'bg-white/10 text-white' : 'text-zinc-600'}`}>All</button>
+                    className={`rounded-md px-3 py-1 text-[11px] font-semibold tracking-[-0.02em] transition-all ${rule.logic === 'and' ? 'bg-white/10 text-white' : 'text-zinc-600'}`}>All</button>
                   <button onClick={() => updateRule({ logic: 'or' })}
-                    className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${rule.logic === 'or' ? 'bg-white/10 text-white' : 'text-zinc-600'}`}>Any</button>
+                    className={`rounded-md px-3 py-1 text-[11px] font-semibold tracking-[-0.02em] transition-all ${rule.logic === 'or' ? 'bg-white/10 text-white' : 'text-zinc-600'}`}>Any</button>
                 </div>
               </div>
 
@@ -165,17 +338,18 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
                 {(rule.conditions || []).map((cond, idx) => (
                   <ConditionRow key={idx} condition={cond} index={idx}
                     onChange={updateCondition} onRemove={removeCondition}
-                    canRemove={(rule.conditions || []).length > 1} />
+                    canRemove={(rule.conditions || []).length > 1}
+                    fields={fields} />
                 ))}
                 <button onClick={addCondition}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-bold text-zinc-600 uppercase tracking-widest hover:text-cyan-400 transition-colors">
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 hover:text-cyan-400 transition-colors">
                   <Plus size={10} /> Add Condition
                 </button>
               </div>
 
               {/* Color Styling */}
               <div>
-                <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">Colorbar Style</label>
+                <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Colorbar Style</label>
 
                 {/* Presets */}
                 <div className="flex flex-wrap gap-1.5 mb-3">
@@ -183,7 +357,7 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
                     const isActive = JSON.stringify(rule.colors) === JSON.stringify(preset.gradient);
                     return (
                       <button key={preset.name} onClick={() => updateRule({ colors: preset.gradient, animation: preset.animation })}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${
+                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold tracking-[-0.02em] transition-all ${
                           isActive ? 'border-white/20 text-white bg-white/[0.05]' : 'border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/10'
                         }`}>
                         <div className="w-3 h-3 rounded-full" style={{ background: `linear-gradient(135deg, ${preset.gradient[0]}, ${preset.gradient[1]})` }} />
@@ -195,7 +369,7 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
 
                 {/* Custom Colors */}
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-[9px] text-zinc-600 font-bold">Custom:</span>
+                  <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Custom:</span>
                   {(rule.colors || ['#6366f1']).map((c, i) => (
                     <div key={i} className="relative group/swatch">
                       <input type="color" value={c}
@@ -223,11 +397,11 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
 
                 {/* Animation */}
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-zinc-600 font-bold">Animation:</span>
+                  <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Animation:</span>
                   <div className="flex bg-black/40 border border-white/[0.06] rounded-lg p-0.5">
                     {['none', 'sweep', 'pulse'].map(a => (
                       <button key={a} onClick={() => updateRule({ animation: a })}
-                        className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
+                        className={`rounded-md px-2.5 py-1 text-[10px] font-semibold tracking-[-0.02em] transition-all ${
                           rule.animation === a ? 'bg-white/10 text-white' : 'text-zinc-600 hover:text-zinc-400'
                         }`}>
                         {a === 'none' ? 'Static' : a === 'sweep' ? 'Sweep' : 'Pulse'}
@@ -239,13 +413,13 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
 
               {/* Live Preview Row */}
               <div>
-                <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2 block">
+                <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">
                   <Eye size={9} className="inline mr-1" /> Preview
                 </label>
                 <div className="bg-black/60 border border-white/[0.04] rounded-xl p-3 flex items-center gap-3">
                   <ColorbarPreview rule={{ ...rule, animation: rule.animation }} height={40} />
                   <div className="flex-1">
-                    <p className="text-[12px] text-white font-bold">Acme Roofing Co</p>
+                    <p className="text-[12px] font-semibold tracking-[-0.02em] text-white">Acme Roofing Co</p>
                     <p className="text-[10px] text-zinc-500">Interested · Roofing · $3,500</p>
                   </div>
                   <span className="text-[10px] text-zinc-600 px-2 py-0.5 bg-white/5 rounded-md">Live</span>
@@ -260,12 +434,19 @@ const RuleEditor = ({ rule, onChange, onRemove }) => {
 };
 
 // ─── Main Colorbar Config Modal ────────────────────────────────────────────
-const ColorbarConfigModal = ({ onClose, onRulesChange }) => {
+const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customFields = [], fieldConfig = {} }) => {
   const [rules, setRules] = useState([]);
+  const fields = useMemo(() => buildConditionFields({ columns, customFields, fieldConfig }), [columns, customFields, fieldConfig]);
+  const defaultField = fields[0]?.key || '';
 
   useEffect(() => {
     setRules(loadColorbarRules());
   }, []);
+
+  useEffect(() => {
+    if (!fields.length) return;
+    setRules((current) => sanitizeRulesForFields(current, fields));
+  }, [fields]);
 
   const handleUpdateRule = (index, updated) => {
     const next = [...rules];
@@ -278,20 +459,22 @@ const ColorbarConfigModal = ({ onClose, onRulesChange }) => {
   };
 
   const handleAddRule = () => {
+    if (!defaultField) return;
     setRules([...rules, {
       id: uid(),
       name: 'New Rule',
       enabled: true,
       logic: 'and',
-    conditions: [{ field: 'status', operator: 'equals', value: '' }],
+      conditions: [{ field: defaultField, operator: 'equals', value: '' }],
       colors: ['#6366f1', '#ec4899'],
       animation: 'sweep',
     }]);
   };
 
   const handleSave = () => {
-    saveColorbarRules(rules);
-    onRulesChange(rules);
+    const nextRules = sanitizeRulesForFields(rules, fields);
+    saveColorbarRules(nextRules);
+    onRulesChange(nextRules);
   };
 
   return (
@@ -314,11 +497,11 @@ const ColorbarConfigModal = ({ onClose, onRulesChange }) => {
                 <Wand2 size={14} className="text-cyan-400" />
               </div>
               <div>
-                <h3 className="text-[14px] font-bold text-white flex items-center gap-2">
+                <h3 className="flex items-center gap-2 text-[14px] font-semibold tracking-[-0.03em] text-white">
                   Colorbar Studio
                   <Sparkles size={12} className="text-fuchsia-400" />
                 </h3>
-                <p className="text-[9px] text-zinc-600 uppercase tracking-widest font-bold">Conditional Record Coloring</p>
+                <p className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Conditional Record Coloring</p>
               </div>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/5 transition-all">
@@ -338,7 +521,7 @@ const ColorbarConfigModal = ({ onClose, onRulesChange }) => {
                 <Palette size={20} className="text-zinc-700" />
               </div>
               <div className="text-center">
-                <p className="text-[12px] text-zinc-500 font-bold">No rules yet</p>
+                <p className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">No rules yet</p>
                 <p className="text-[10px] text-zinc-700 mt-0.5">Create your first colorbar rule to get started</p>
               </div>
             </div>
@@ -346,27 +529,28 @@ const ColorbarConfigModal = ({ onClose, onRulesChange }) => {
             rules.map((rule, idx) => (
               <RuleEditor key={rule.id || idx} rule={rule}
                 onChange={(updated) => handleUpdateRule(idx, updated)}
-                onRemove={() => handleRemoveRule(idx)} />
+                onRemove={() => handleRemoveRule(idx)}
+                fields={fields} />
             ))
           )}
 
           {/* Add Rule */}
-          <button onClick={handleAddRule}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-white/[0.06] text-[11px] font-bold text-zinc-600 hover:text-cyan-400 hover:border-cyan-500/20 transition-all">
+          <button onClick={handleAddRule} disabled={!defaultField}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[0.06] py-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 transition-all hover:border-cyan-500/20 hover:text-cyan-400">
             <Plus size={13} /> Add Rule
           </button>
         </div>
 
         {/* Footer */}
         <div className="shrink-0 px-6 py-4 border-t border-white/[0.04] flex items-center justify-between">
-          <span className="text-[9px] text-zinc-700 font-bold">{rules.length} rule{rules.length !== 1 ? 's' : ''}</span>
+          <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-700">{rules.length} rule{rules.length !== 1 ? 's' : ''}</span>
           <div className="flex gap-2">
             <button onClick={onClose}
-              className="px-4 py-2 rounded-xl text-[10px] font-bold text-zinc-500 hover:text-white transition-all">
+              className="rounded-xl px-4 py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 transition-all hover:text-white">
               Cancel
             </button>
             <button onClick={() => { handleSave(); onClose(); }}
-              className="px-5 py-2.5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider hover:bg-cyan-400 transition-all active:scale-95">
+              className="rounded-xl bg-white px-5 py-2.5 text-[11px] font-semibold tracking-[-0.02em] text-black transition-all hover:bg-cyan-400 active:scale-95">
               <Zap size={10} className="inline mr-1" /> Apply Rules
             </button>
           </div>

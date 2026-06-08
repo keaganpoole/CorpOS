@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
 import { supabase } from './lib/supabase';
 import {
-  Users,
+  Headset,
   Activity,
   BarChart3,
   Database,
@@ -39,13 +39,14 @@ import {
   Star,
   X,
   Trash2,
-  GitBranch,
-  Calendar,
+  Webhook,
+  CalendarFold,
   Phone,
   Copy,
   CheckCircle2,
   ArrowDown,
   ArrowUpDown,
+  BookUser,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
@@ -1672,7 +1673,7 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
   );
 };
 
-const NavButton = ({ item, isActive, onClick }) => {
+const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
   const [sweeping, setSweeping] = useState(false);
 
   const handleClick = () => {
@@ -1686,20 +1687,27 @@ const NavButton = ({ item, isActive, onClick }) => {
   return (
     <button
       onClick={handleClick}
-      className={`no-drag w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-[13px] transition-all relative group overflow-hidden ${isActive ? 'text-zinc-100 bg-white/5' : 'text-zinc-500 hover:text-white'}`}
+      className={`no-drag w-full flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] relative group overflow-hidden ${isActive ? 'text-zinc-100 bg-white/5' : 'text-zinc-500 hover:text-white'}`}
+      title={collapsed ? item.label : undefined}
     >
-      <span className={`relative transition-colors duration-300 ${isActive ? '' : 'text-zinc-600 group-hover:text-white'}`}
+      <span className={`relative w-5 shrink-0 transition-colors duration-300 ${isActive ? '' : 'text-zinc-600 group-hover:text-white'}`}
         style={isActive ? {
           background: 'linear-gradient(90deg, #22d3ee, #ec4899, #a855f7, #22d3ee)',
           backgroundSize: '200% 100%',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
-          animation: sweeping ? 'navIconSweep 1s ease-in-out' : 'navIconIdle 3s ease-in-out infinite',
+          animation: sweeping ? 'navIconSweep 0.42s ease-out' : 'navIconIdle 1.8s ease-in-out infinite',
         } : undefined}
       >
         {item.icon}
       </span>
-      <span className="font-bold tracking-tight">{item.label}</span>
+      <span
+        className={`overflow-hidden font-bold tracking-tight whitespace-nowrap transition-[max-width,opacity,transform,margin] duration-180 ease-out ${
+          collapsed ? 'ml-0 max-w-0 opacity-0 translate-x-[-4px]' : 'ml-0.5 max-w-[140px] opacity-100 translate-x-0'
+        }`}
+      >
+        {item.label}
+      </span>
       {isActive && (
         <motion.div layoutId="nav-active" className="absolute left-0 w-1 h-5 bg-white rounded-r-full shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
       )}
@@ -1729,7 +1737,7 @@ const NavButton = ({ item, isActive, onClick }) => {
           100% { background-position: 0% 50%; }
         }
         .nav-sweep {
-          animation: navSweep 1s ease-in-out forwards;
+          animation: navSweep 0.42s ease-out forwards;
         }
         @keyframes navSweep {
           0% { transform: translateX(-100%) skewX(-12deg); }
@@ -1767,6 +1775,7 @@ const SonarDashboard = () => {
   const [showCommander, setShowCommander] = useState(false);
   const [logoHover, setLogoHover] = useState(false);
   const [terminateAgent, setTerminateAgent] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const userId = authSession?.user?.id || profile?.id || null;
 
   const [agentScenarios, setAgentScenarios] = useState({});
@@ -1895,11 +1904,11 @@ const SonarDashboard = () => {
 
   const navItems = [
     { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
-    { id: 'receptionists', icon: <Users size={18} />, label: 'Receptionists' },
-    { id: 'scenarios', icon: <GitBranch size={18} />, label: 'Scenarios' },
-    { id: 'calendar', icon: <Calendar size={18} />, label: 'Calendar' },
+    { id: 'receptionists', icon: <Headset size={18} />, label: 'Receptionists' },
+    { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios' },
+    { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
-    { id: 'pipeline', icon: <BarChart3 size={18} />, label: 'People' },
+    { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
     { id: 'settings', icon: <Settings size={18} />, label: 'Settings' },
   ];
 
@@ -1911,10 +1920,10 @@ const SonarDashboard = () => {
             <div className="shrink-0 px-7 py-5 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="p-2.5 bg-indigo-500/5 rounded-xl border border-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.05)]">
-                  <Users size={22} className="text-indigo-400" />
+                  <Headset size={22} className="text-indigo-400" />
                 </div>
                 <div>
-                  <h2 className="text-[28px] font-black text-white tracking-tighter leading-none">Receptionists</h2>
+                  <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Receptionists</h2>
                   <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1">{enrichedAgents.length} active</p>
                 </div>
               </div>
@@ -2164,8 +2173,12 @@ const SonarDashboard = () => {
 
       {/* Layout */}
       <div className="flex flex-1 min-h-0">
-        <aside className="w-[240px] flex flex-col border-r border-white/5 bg-[#020202] transition-all">
-          <div className="p-6 pt-10">
+        <aside
+          onMouseEnter={() => setSidebarCollapsed(false)}
+          onMouseLeave={() => setSidebarCollapsed(true)}
+          className={`group/sidebar flex flex-col border-r border-white/5 bg-[#020202] transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-[76px]' : 'w-[240px]'}`}
+        >
+          <div className="px-3 pt-10">
             <nav className="space-y-1">
               {navItems.map((item) => (
                 <NavButton
@@ -2173,20 +2186,10 @@ const SonarDashboard = () => {
                   item={item}
                   isActive={currentRoute === item.id}
                   onClick={() => setCurrentRoute(item.id)}
+                  collapsed={sidebarCollapsed}
                 />
               ))}
             </nav>
-          </div>
-
-          <div className="mt-auto p-6">
-            <div className="flex items-center gap-3.5 px-2 group cursor-pointer text-zinc-400">
-              <div className="w-8 h-8 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-[11px] font-bold text-white group-hover:border-white transition-colors">KP</div>
-              <div className="flex-1 overflow-hidden">
-                <p className="text-[12px] font-bold truncate text-zinc-100 tracking-tight group-hover:text-white">Keagan Poole</p>
-                <p className="text-[9px] text-zinc-600 truncate font-bold uppercase tracking-widest mt-1 opacity-60">CEO - {wsStatus === 'connected' ? 'Connected' : 'Offline'}</p>
-              </div>
-              <Settings size={15} className="no-drag text-zinc-700 hover:text-white transition-colors" />
-            </div>
           </div>
         </aside>
 

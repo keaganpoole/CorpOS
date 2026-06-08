@@ -598,7 +598,7 @@
 }
 
 .input-field:focus {
-  border-color: #ffffff;
+  border-color: rgba(50, 240, 217, 0.42);
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -626,7 +626,7 @@
 }
 
 .select-field:focus {
-  border-color: #ffffff;
+  border-color: rgba(50, 240, 217, 0.42);
 }
 
 .select-icon {

@@ -12,7 +12,7 @@ import {
   CALL_ROUTE_OPTIONS,
 } from './leadSchema';
 import { supabase } from './supabase';
-import { getCurrentBusinessId } from './customFields';
+import { getCurrentBusinessId, getCustomValue, isCustomFieldKey } from './customFields';
 
 const STORAGE_KEY = 'SONAR_field_config';
 const COLORBAR_KEY = 'SONAR_colorbar_rules';
@@ -215,13 +215,15 @@ export const evaluateColorbar = (lead, rules) => {
 
 const checkCondition = (lead, condition) => {
   const { field, operator, value } = condition;
-  const leadVal = lead[field];
+  const leadVal = isCustomFieldKey(field) ? getCustomValue(lead?.custom_fields, field) : lead[field];
   if (leadVal == null && operator !== 'is_empty' && operator !== 'is_not_empty') return false;
 
   switch (operator) {
     case 'equals':
+      if (typeof leadVal === 'boolean') return leadVal === value || String(leadVal).toLowerCase() === String(value).toLowerCase();
       return String(leadVal).toLowerCase() === String(value).toLowerCase();
     case 'not_equals':
+      if (typeof leadVal === 'boolean') return leadVal !== value && String(leadVal).toLowerCase() !== String(value).toLowerCase();
       return String(leadVal).toLowerCase() !== String(value).toLowerCase();
     case 'contains':
       return String(leadVal || '').toLowerCase().includes(String(value).toLowerCase());
@@ -234,7 +236,9 @@ const checkCondition = (lead, condition) => {
     case 'is_not_empty':
       return leadVal && (!Array.isArray(leadVal) || leadVal.length > 0);
     case 'includes':
-      return Array.isArray(leadVal) ? leadVal.includes(value) : String(leadVal).includes(value);
+      return Array.isArray(leadVal)
+        ? leadVal.some((item) => String(item).toLowerCase() === String(value).toLowerCase())
+        : String(leadVal).toLowerCase().includes(String(value).toLowerCase());
     default:
       return false;
   }

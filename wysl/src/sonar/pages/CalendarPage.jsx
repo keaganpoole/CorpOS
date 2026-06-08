@@ -178,7 +178,7 @@ export default function CalendarPage() {
               <CalendarIcon className="text-cyan-400" size={22} />
             </div>
             <div>
-              <h2 className="text-[28px] font-black text-white tracking-tighter leading-none">
+              <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">
                 {MONTHS[month]}
               </h2>
               <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1">{year}</p>

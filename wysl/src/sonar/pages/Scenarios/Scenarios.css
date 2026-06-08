@@ -59,9 +59,10 @@
 }
 
 .scenario-list-title {
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
+  font-size: 1.875rem;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1;
   margin: 0;
 }
 
@@ -571,9 +572,9 @@
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #ffffff;
+  border-color: rgba(50, 240, 217, 0.42);
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.08);
 }
 
 .form-group textarea {
@@ -1183,8 +1184,8 @@
 }
 
 .sb-panel-search input:focus {
-  border-color: #ffffff;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  border-color: rgba(50, 240, 217, 0.42);
+  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.08);
 }
 
 .sb-panel-search-icon {
@@ -1680,9 +1681,9 @@
 }
 
 .sb-select-field:focus {
-  border-color: #ffffff;
+  border-color: rgba(50, 240, 217, 0.42);
   background: rgba(14, 14, 16, 0.98);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.08);
 }
 
 .sb-select-field option {
@@ -2186,9 +2187,9 @@
 
 .sb-action-textarea-wrapper .sb-input-field:focus,
 .sb-action-input-wrapper .sb-input-field:focus {
-  border-color: #ffffff;
+  border-color: rgba(50, 240, 217, 0.42);
   background: rgba(0, 0, 0, 0.8);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.08);
 }
 
 /* Variable Insertion Chips */

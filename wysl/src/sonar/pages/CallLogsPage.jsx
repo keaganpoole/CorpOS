@@ -726,7 +726,7 @@ export default function CallLogsPage() {
               <Phone size={21} />
             </div>
             <div>
-              <h2 className="text-[28px] font-black leading-none text-white">Call Logs</h2>
+              <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Call Logs</h2>
               <p className="mt-1 text-[12px] font-medium text-zinc-600">{loading ? 'Loading calls' : `${calls.length} recent calls`}</p>
             </div>
           </div>

@@ -159,7 +159,7 @@ const SortableOptionRow = ({
                 boxShadow: `0 0 10px ${currentColor}35`,
               }}
             />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.08em] text-zinc-500">
+            <span className="text-[10px] font-mono font-semibold tracking-[-0.01em] text-zinc-500">
               {currentColor}
             </span>
             <ChevronDown
@@ -193,9 +193,9 @@ const SortableOptionRow = ({
             className="absolute right-0 top-full z-30 mt-2 w-[220px] origin-top-right rounded-xl border border-white/[0.08] bg-[#121215] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.85)]"
           >
             <div className="mb-2.5 flex items-center justify-between border-b border-white/[0.04] pb-2">
-              <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400">Select Color</span>
+              <span className="text-[10px] font-semibold tracking-[-0.02em] text-zinc-400">Select Color</span>
               <span
-                className="text-[9px] font-mono font-bold uppercase"
+                className="text-[9px] font-mono font-semibold tracking-[-0.01em]"
                 style={{ color: currentColor }}
               >
                 {currentColor}
@@ -354,7 +354,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
               <Sparkles size={14} className="text-indigo-400" />
             </div>
             <div>
-              <h3 className="text-[13px] font-bold text-white">Edit Field</h3>
+              <h3 className="text-[14px] font-semibold tracking-[-0.03em] text-white">Edit Field</h3>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -381,7 +381,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`-mb-px flex items-center gap-1.5 border-b px-3 pb-2 text-[10px] font-bold uppercase tracking-wider transition-all ${
+              className={`-mb-px flex items-center gap-1.5 border-b px-3 pb-2 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
                 activeTab === tab.key
                   ? 'border-white text-white'
                   : 'border-transparent text-zinc-600 hover:text-zinc-400'
@@ -397,7 +397,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
           {activeTab === 'name' && (
             <>
               <div>
-                <label className="mb-2 block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">Display Name</label>
+                <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Display Name</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -406,7 +406,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
                     className="w-full rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[14px] font-semibold text-white transition-colors focus:border-indigo-500/30 focus:outline-none"
                     placeholder="Field name..."
                   />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-mono uppercase text-zinc-700">
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-mono tracking-[-0.01em] text-zinc-700">
                     {name.length}/30
                   </div>
                 </div>
@@ -417,7 +417,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
 
               {isCustomField && (
                 <div>
-                  <label className="mb-2 block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">Description</label>
+                  <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Description</label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -430,7 +430,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
               )}
 
               <div>
-                <label className="mb-2 block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">Icon</label>
+                <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Icon</label>
                 <div className="grid max-h-[180px] grid-cols-8 gap-1.5 overflow-y-auto p-1 custom-scrollbar">
                   {AVAILABLE_ICONS.map((iconName) => {
                     const IconComp = ICON_MAP[iconName];
@@ -459,7 +459,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
           {activeTab === 'colors' && hasOptions && (
             <div>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600">
+                <label className="block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">
                   {isOptionsField ? 'Options' : 'Option Colors'}
                 </label>
                 {isOptionsField && (
@@ -469,7 +469,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
                       const nextId = `option-${Date.now()}`;
                       setOptionDrafts((prev) => [...prev, { id: nextId, name: '', color: '#71717a' }]);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400 transition-all hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 transition-all hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white"
                   >
                     <Plus size={11} /> Add
                   </button>
@@ -541,14 +541,14 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
         <div className="flex items-center gap-2 border-t border-white/[0.04] px-6 py-4">
           <button
             onClick={handleReset}
-            className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500 transition-all hover:text-white"
+            className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 transition-all hover:text-white"
           >
             <RotateCcw size={11} className="mr-1 inline" /> Reset
           </button>
           <div className="flex-1" />
           <button
             onClick={handleSave}
-            className={`rounded-xl px-5 py-2.5 text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${
+            className={`rounded-xl px-5 py-2.5 text-[11px] font-semibold tracking-[-0.02em] transition-all active:scale-95 ${
               saved ? 'border border-emerald-500/30 bg-emerald-500/20 text-emerald-400' : 'bg-white text-black hover:bg-cyan-400'
             }`}
           >
