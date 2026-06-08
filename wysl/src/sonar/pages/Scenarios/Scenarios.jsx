@@ -665,6 +665,7 @@ export default function ScenariosPage() {
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const [viewportReady, setViewportReady] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState('node-1');
+  const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [panelStyle, setPanelStyle] = useState({ top: 0, left: 0 });
   const panelDragRef = useRef({ dragging: false, startX: 0, startY: 0, startTop: 0, startLeft: 0 });
   const [isPanelVisible, setIsPanelVisible] = useState(false);
@@ -1407,12 +1408,32 @@ export default function ScenariosPage() {
     return { x: node.x, y };
   }, [nodeMap]);
 
-  const getClosestEdgeTarget = useCallback((point, fromNodeId) => {
+  const isValidConnectionTarget = useCallback((fromNodeId, toNodeId, editingEdgeId = null) => {
+    if (!fromNodeId || !toNodeId || fromNodeId === toNodeId) return false;
+    const toNode = nodeMap[toNodeId];
+    if (!toNode?.configured || toNode.categoryType === 'TRIGGERS') return false;
+
+    const stack = [toNodeId];
+    const visited = new Set();
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (current === fromNodeId) return false;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      edges.forEach((edge) => {
+        if (edge.id === editingEdgeId) return;
+        if (edge.from === current) stack.push(edge.to);
+      });
+    }
+    return true;
+  }, [edges, nodeMap]);
+
+  const getClosestEdgeTarget = useCallback((point, fromNodeId, editingEdgeId = null) => {
     if (!point) return null;
     const snapRadius = 132 / Math.max(view.scale, 0.65);
     let closest = null;
     nodes.forEach((node) => {
-      if (!node.configured || node.id === fromNodeId) return;
+      if (!isValidConnectionTarget(fromNodeId, node.id, editingEdgeId)) return;
       const measured = circleCenterRef.current[node.id];
       const targetX = measured?.cx ?? node.x;
       const targetY = measured?.cy ?? node.y;
@@ -1424,7 +1445,7 @@ export default function ScenariosPage() {
       }
     });
     return closest;
-  }, [getNodeAnchor, nodes, view.scale]);
+  }, [getNodeAnchor, isValidConnectionTarget, nodes, view.scale]);
 
   const handleEdgeHandlePointerDown = useCallback((edge, event) => {
     if (event.button !== 0) return;
@@ -1437,23 +1458,18 @@ export default function ScenariosPage() {
     setPanelIntent(false);
     setLogicPanel(null);
     setVarsPane(prev => ({ ...prev, visible: false }));
-    const toNode = nodeMap[edge.to];
-    const canContinueFromTarget = Boolean(
-      toNode?.configured && (toNode.type === 'router' || !edges.some((candidate) => candidate.from === edge.to))
-    );
     const nextEdgeDrag = {
       mode: 'rewire',
       edgeId: edge.id,
       from: edge.from,
       originalTo: edge.to,
-      continueFrom: canContinueFromTarget ? edge.to : null,
       point: toAnchor,
-      snapTargetId: canContinueFromTarget ? null : edge.to,
+      snapTargetId: null,
       isDragging: false,
     };
     edgeDragRef.current = nextEdgeDrag;
     setEdgeDrag(nextEdgeDrag);
-  }, [edges, getNodeAnchor, nodeMap]);
+  }, [getNodeAnchor]);
 
   const handleNodeOutputPointerDown = useCallback((nodeId, event) => {
     if (event.button !== 0) return;
@@ -1561,8 +1577,7 @@ export default function ScenariosPage() {
         event.preventDefault();
         const point = getCanvasPointFromEvent(event);
         if (!point) return;
-        const dragSourceNodeId = activeEdgeDrag.continueFrom || activeEdgeDrag.from;
-        const target = getClosestEdgeTarget(point, dragSourceNodeId);
+        const target = getClosestEdgeTarget(point, activeEdgeDrag.from, activeEdgeDrag.edgeId);
         setEdgeDrag((prev) => {
           if (!prev) return prev;
           const next = {
@@ -1652,7 +1667,7 @@ export default function ScenariosPage() {
               edgeDragRef.current?.from !== activeEdgeDrag.from ||
               edgeDragRef.current?.edgeId !== activeEdgeDrag.edgeId
             ) return;
-            if (activeEdgeDrag.mode === 'rewire' && !activeEdgeDrag.continueFrom) {
+            if (activeEdgeDrag.mode === 'rewire') {
               setEdges((prev) => prev.filter((edge) => edge.id !== activeEdgeDrag.edgeId));
             }
             edgeDragRef.current = null;
@@ -1663,25 +1678,12 @@ export default function ScenariosPage() {
         }
 
         const targetNodeId = activeEdgeDrag.snapTargetId;
-        if (activeEdgeDrag.continueFrom) {
-          const nextEdgeId = `edge-${edgeIdCounter.current + 1}`;
-          edgeIdCounter.current += 1;
-          setEdges((prev) => {
-            const alreadyExists = prev.some((edge) => edge.from === activeEdgeDrag.continueFrom && edge.to === targetNodeId);
-            if (alreadyExists || activeEdgeDrag.continueFrom === targetNodeId) return prev;
-            return [...prev, { id: nextEdgeId, from: activeEdgeDrag.continueFrom, to: targetNodeId, filter: null }];
-          });
-          edgeDragRef.current = null;
-          setEdgeDrag(null);
-          return;
-        }
-
         if (activeEdgeDrag.mode === 'create') {
           const nextEdgeId = `edge-${edgeIdCounter.current + 1}`;
           edgeIdCounter.current += 1;
           setEdges((prev) => {
             const alreadyExists = prev.some((edge) => edge.from === activeEdgeDrag.from && edge.to === targetNodeId);
-            if (alreadyExists) return prev;
+            if (alreadyExists || !isValidConnectionTarget(activeEdgeDrag.from, targetNodeId)) return prev;
             return [...prev, { id: nextEdgeId, from: activeEdgeDrag.from, to: targetNodeId, filter: null }];
           });
           edgeDragRef.current = null;
@@ -1692,7 +1694,7 @@ export default function ScenariosPage() {
         setEdges((prev) =>
           prev.map((edge) =>
             edge.id === activeEdgeDrag.edgeId
-              ? { ...edge, to: targetNodeId }
+              ? (isValidConnectionTarget(activeEdgeDrag.from, targetNodeId, activeEdgeDrag.edgeId) ? { ...edge, to: targetNodeId } : edge)
               : edge
           )
         );
@@ -1721,7 +1723,7 @@ export default function ScenariosPage() {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
+  }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, isValidConnectionTarget, nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
 
   const handleNodePointerDown = (nodeId, event) => {
     if (event.button !== 0) return;
@@ -3677,7 +3679,7 @@ export default function ScenariosPage() {
                 if (!from || !to) return null;
                 const isDraft = !nodeMap[edge.to]?.configured;
                 const isFallback = edge.filter?.type === 'fallback';
-                const isDraggingEdge = edgeDrag?.edgeId === edge.id && !edgeDrag?.continueFrom;
+                const isDraggingEdge = edgeDrag?.edgeId === edge.id;
                 // For unconfigured nodes, edge should target circle bottom (center + radius)
                 // Configured nodes already have node.y near sphere bottom due to label+connector below
                 const fromMeasured = circleCenterRef.current[edge.from];
@@ -3700,11 +3702,10 @@ export default function ScenariosPage() {
                   />
                 );
               })}
-              {(edgeDrag?.mode === 'create' || edgeDrag?.continueFrom) && (() => {
-                const previewFromNodeId = edgeDrag.continueFrom || edgeDrag.from;
-                const from = nodeMap[previewFromNodeId];
+              {edgeDrag?.mode === 'create' && (() => {
+                const from = nodeMap[edgeDrag.from];
                 if (!from) return null;
-                const fromAnchor = getNodeAnchor(previewFromNodeId);
+                const fromAnchor = getNodeAnchor(edgeDrag.from);
                 if (!fromAnchor) return null;
                 const toX = edgeDrag.point?.x ?? fromAnchor.x;
                 const toY = edgeDrag.point?.y ?? fromAnchor.y;
@@ -3752,8 +3753,8 @@ export default function ScenariosPage() {
                 <button
                   key={`node-output-${node.id}`}
                   type="button"
-                  className={`sb-node-output-handle ${hasOutgoing ? 'has-outgoing' : ''}`}
-                  style={{ left: anchor.x, top: anchor.y }}
+                  className={`sb-node-output-handle ${hasOutgoing ? 'has-outgoing' : ''} ${hoveredNodeId === node.id ? 'is-visible' : ''}`}
+                  style={{ left: anchor.x + 22, top: anchor.y }}
                   aria-label="Create node connection"
                   onPointerDown={(event) => handleNodeOutputPointerDown(node.id, event)}
                 />
@@ -3800,8 +3801,7 @@ export default function ScenariosPage() {
               const accent = node.accent || '#e11d48';
               const hasOutgoingNode = edges.some((edge) => edge.from === node.id);
               const nodeRunState = nodeRunStates[node.id]?.status || null;
-              const edgeDragSourceNodeId = edgeDrag?.continueFrom || edgeDrag?.from;
-              const isEdgeDropCandidate = Boolean(edgeDrag && node.configured && node.id !== edgeDragSourceNodeId);
+              const isEdgeDropCandidate = Boolean(edgeDrag && isValidConnectionTarget(edgeDrag.from, node.id, edgeDrag.edgeId));
               const isEdgeDropTarget = edgeDrag?.snapTargetId === node.id;
               return (
                 <div
@@ -3814,6 +3814,8 @@ export default function ScenariosPage() {
                     isActive ? 'sb-active-node' : ''
                   } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''}`}
                   style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
+                  onPointerEnter={() => setHoveredNodeId(node.id)}
+                  onPointerLeave={() => setHoveredNodeId((current) => (current === node.id ? null : current))}
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
                     event.preventDefault();

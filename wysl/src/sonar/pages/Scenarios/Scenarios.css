@@ -730,11 +730,10 @@
 
 .sb-node-output-handle {
   position: absolute;
-  width: 46px;
-  height: 46px;
+  width: 34px;
+  height: 20px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
   background: transparent;
   cursor: crosshair;
   z-index: 12;
@@ -744,21 +743,28 @@
 .sb-node-output-handle::before {
   content: '';
   position: absolute;
-  inset: 12px;
-  border-radius: 50%;
-  background: rgba(50, 240, 217, 0.06);
-  border: 1px solid rgba(50, 240, 217, 0.22);
+  left: 0;
+  top: 50%;
+  width: 28px;
+  height: 2px;
+  transform: translateY(-50%) scaleX(0.55);
+  transform-origin: left center;
+  background:
+    repeating-linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.18) 0 5px,
+      rgba(255, 255, 255, 0) 5px 9px
+    );
   opacity: 0;
-  transform: scale(0.72);
-  transition: opacity 0.16s ease, transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.12));
+  transition: opacity 0.16s ease, transform 0.16s ease, filter 0.16s ease;
 }
 
+.sb-node-output-handle.is-visible::before,
 .sb-node-output-handle:hover::before {
-  opacity: 1;
-  transform: scale(1);
-  background: rgba(50, 240, 217, 0.12);
-  border-color: rgba(50, 240, 217, 0.65);
-  box-shadow: 0 0 18px rgba(50, 240, 217, 0.28);
+  opacity: 0.88;
+  transform: translateY(-50%) scaleX(1);
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.14));
 }
 
 .sb-node-output-handle:active {
