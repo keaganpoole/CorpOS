@@ -661,6 +661,7 @@ export default function ScenariosPage() {
   const [scenarios, setScenarios] = useState([]); // List of saved scenarios
   const [nodes, setNodes] = useState([INITIAL_NODE]);
   const [edges, setEdges] = useState([]);
+  const [edgeDrag, setEdgeDrag] = useState(null);
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const [viewportReady, setViewportReady] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState('node-1');
@@ -833,6 +834,7 @@ export default function ScenariosPage() {
   const nodeRefs = useRef({});
   const introCircleRef = useRef(null);
   const circleRefs = useRef({}); // per-node circle element refs
+  const edgeDragRef = useRef(null);
 
   const dragRef = useRef({ id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 });
   const panRef = useRef(null);
@@ -843,6 +845,10 @@ export default function ScenariosPage() {
   useEffect(() => {
     edgeRulesRef.current = edgeRules;
   }, [edgeRules]);
+
+  useEffect(() => {
+    edgeDragRef.current = edgeDrag;
+  }, [edgeDrag]);
 
   // Auto-save edge rules to edges whenever rules change (while panel is open)
   useEffect(() => {
@@ -1384,6 +1390,95 @@ export default function ScenariosPage() {
 
   // Measure each node's actual circle center in canvas coordinates (no state mutation)
   const circleCenterRef = useRef({});
+  const getCanvasPointFromEvent = useCallback((event) => {
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return null;
+    return {
+      x: (event.clientX - canvasRect.left - view.x) / view.scale,
+      y: (event.clientY - canvasRect.top - view.y) / view.scale,
+    };
+  }, [view.x, view.y, view.scale]);
+
+  const getNodeAnchor = useCallback((nodeId) => {
+    const node = nodeMap[nodeId];
+    if (!node) return null;
+    const measured = circleCenterRef.current[nodeId];
+    const y = !node.configured && measured ? measured.cy + measured.r : node.y;
+    return { x: node.x, y };
+  }, [nodeMap]);
+
+  const getClosestEdgeTarget = useCallback((point, fromNodeId) => {
+    if (!point) return null;
+    const snapRadius = 132 / Math.max(view.scale, 0.65);
+    let closest = null;
+    nodes.forEach((node) => {
+      if (!node.configured || node.id === fromNodeId) return;
+      const measured = circleCenterRef.current[node.id];
+      const targetX = measured?.cx ?? node.x;
+      const targetY = measured?.cy ?? node.y;
+      const dx = targetX - point.x;
+      const dy = targetY - point.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance <= snapRadius && (!closest || distance < closest.distance)) {
+        closest = { nodeId: node.id, distance, x: node.x, y: getNodeAnchor(node.id)?.y ?? node.y };
+      }
+    });
+    return closest;
+  }, [getNodeAnchor, nodes, view.scale]);
+
+  const handleEdgeHandlePointerDown = useCallback((edge, event) => {
+    if (event.button !== 0) return;
+    const toAnchor = getNodeAnchor(edge.to);
+    if (!toAnchor) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedNodeId(null);
+    setIsPanelVisible(false);
+    setPanelIntent(false);
+    setLogicPanel(null);
+    setVarsPane(prev => ({ ...prev, visible: false }));
+    const toNode = nodeMap[edge.to];
+    const canContinueFromTarget = Boolean(
+      toNode?.configured && (toNode.type === 'router' || !edges.some((candidate) => candidate.from === edge.to))
+    );
+    const nextEdgeDrag = {
+      mode: 'rewire',
+      edgeId: edge.id,
+      from: edge.from,
+      originalTo: edge.to,
+      continueFrom: canContinueFromTarget ? edge.to : null,
+      point: toAnchor,
+      snapTargetId: canContinueFromTarget ? null : edge.to,
+      isDragging: false,
+    };
+    edgeDragRef.current = nextEdgeDrag;
+    setEdgeDrag(nextEdgeDrag);
+  }, [edges, getNodeAnchor, nodeMap]);
+
+  const handleNodeOutputPointerDown = useCallback((nodeId, event) => {
+    if (event.button !== 0) return;
+    const fromAnchor = getNodeAnchor(nodeId);
+    if (!fromAnchor) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedNodeId(null);
+    setIsPanelVisible(false);
+    setPanelIntent(false);
+    setLogicPanel(null);
+    setVarsPane(prev => ({ ...prev, visible: false }));
+    const nextEdgeDrag = {
+      mode: 'create',
+      edgeId: null,
+      from: nodeId,
+      originalTo: null,
+      point: fromAnchor,
+      snapTargetId: null,
+      isDragging: false,
+    };
+    edgeDragRef.current = nextEdgeDrag;
+    setEdgeDrag(nextEdgeDrag);
+  }, [getNodeAnchor]);
+
   useLayoutEffect(() => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     if (!canvasRect) return;
@@ -1461,6 +1556,27 @@ export default function ScenariosPage() {
 
   useEffect(() => {
     const handlePointerMove = (event) => {
+      const activeEdgeDrag = edgeDragRef.current;
+      if (activeEdgeDrag) {
+        event.preventDefault();
+        const point = getCanvasPointFromEvent(event);
+        if (!point) return;
+        const dragSourceNodeId = activeEdgeDrag.continueFrom || activeEdgeDrag.from;
+        const target = getClosestEdgeTarget(point, dragSourceNodeId);
+        setEdgeDrag((prev) => {
+          if (!prev) return prev;
+          const next = {
+            ...prev,
+            point: target ? { x: target.x, y: target.y } : point,
+            snapTargetId: target?.nodeId || null,
+            isDragging: true,
+          };
+          edgeDragRef.current = next;
+          return next;
+        });
+        return;
+      }
+
       if (panelDragRef.current.dragging) {
         const dx = event.clientX - panelDragRef.current.startX;
         const dy = event.clientY - panelDragRef.current.startY;
@@ -1502,6 +1618,89 @@ export default function ScenariosPage() {
     };
 
     const handlePointerUp = () => {
+      const activeEdgeDrag = edgeDragRef.current;
+      if (activeEdgeDrag) {
+        if (!activeEdgeDrag.snapTargetId) {
+          const fromAnchor = getNodeAnchor(activeEdgeDrag.from);
+          if (!fromAnchor) {
+            edgeDragRef.current = null;
+            setEdgeDrag(null);
+            return;
+          }
+          const startPoint = activeEdgeDrag.point || fromAnchor;
+          const startedAt = performance.now();
+          const duration = 170;
+          const animateRetract = (now) => {
+            const progress = Math.min(1, (now - startedAt) / duration);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const next = {
+              ...activeEdgeDrag,
+              point: {
+                x: startPoint.x + (fromAnchor.x - startPoint.x) * eased,
+                y: startPoint.y + (fromAnchor.y - startPoint.y) * eased,
+              },
+              snapTargetId: null,
+              isRetracting: true,
+            };
+            edgeDragRef.current = next;
+            setEdgeDrag(next);
+            if (progress < 1) {
+              window.requestAnimationFrame(animateRetract);
+              return;
+            }
+            if (
+              edgeDragRef.current?.from !== activeEdgeDrag.from ||
+              edgeDragRef.current?.edgeId !== activeEdgeDrag.edgeId
+            ) return;
+            if (activeEdgeDrag.mode === 'rewire' && !activeEdgeDrag.continueFrom) {
+              setEdges((prev) => prev.filter((edge) => edge.id !== activeEdgeDrag.edgeId));
+            }
+            edgeDragRef.current = null;
+            setEdgeDrag(null);
+          };
+          window.requestAnimationFrame(animateRetract);
+          return;
+        }
+
+        const targetNodeId = activeEdgeDrag.snapTargetId;
+        if (activeEdgeDrag.continueFrom) {
+          const nextEdgeId = `edge-${edgeIdCounter.current + 1}`;
+          edgeIdCounter.current += 1;
+          setEdges((prev) => {
+            const alreadyExists = prev.some((edge) => edge.from === activeEdgeDrag.continueFrom && edge.to === targetNodeId);
+            if (alreadyExists || activeEdgeDrag.continueFrom === targetNodeId) return prev;
+            return [...prev, { id: nextEdgeId, from: activeEdgeDrag.continueFrom, to: targetNodeId, filter: null }];
+          });
+          edgeDragRef.current = null;
+          setEdgeDrag(null);
+          return;
+        }
+
+        if (activeEdgeDrag.mode === 'create') {
+          const nextEdgeId = `edge-${edgeIdCounter.current + 1}`;
+          edgeIdCounter.current += 1;
+          setEdges((prev) => {
+            const alreadyExists = prev.some((edge) => edge.from === activeEdgeDrag.from && edge.to === targetNodeId);
+            if (alreadyExists) return prev;
+            return [...prev, { id: nextEdgeId, from: activeEdgeDrag.from, to: targetNodeId, filter: null }];
+          });
+          edgeDragRef.current = null;
+          setEdgeDrag(null);
+          return;
+        }
+
+        setEdges((prev) =>
+          prev.map((edge) =>
+            edge.id === activeEdgeDrag.edgeId
+              ? { ...edge, to: targetNodeId }
+              : edge
+          )
+        );
+        edgeDragRef.current = null;
+        setEdgeDrag(null);
+        return;
+      }
+
       if (panelDragRef.current.dragging) {
         panelDragRef.current.dragging = false;
         document.body.style.userSelect = '';
@@ -1522,7 +1721,7 @@ export default function ScenariosPage() {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
+  }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
 
   const handleNodePointerDown = (nodeId, event) => {
     if (event.button !== 0) return;
@@ -1544,6 +1743,8 @@ export default function ScenariosPage() {
   const handleCanvasPointerDown = (event) => {
     if (event.button !== 0) return;
     if (event.target.closest('.sb-builder-node')) return;
+    if (event.target.closest('.sb-edge-end-handle')) return;
+    if (event.target.closest('.sb-node-output-handle')) return;
     event.preventDefault();
     panRef.current = {
       startX: event.clientX,
@@ -1551,6 +1752,20 @@ export default function ScenariosPage() {
       originX: view.x,
       originY: view.y,
     };
+  };
+
+  const handleCanvasContextMenu = (event) => {
+    if (event.target.closest('.sb-builder-node') || event.target.closest('.sb-filter-pin')) return;
+    event.preventDefault();
+    const point = getCanvasPointFromEvent(event);
+    if (!point) return;
+    setContextMenu({
+      type: 'canvas',
+      x: event.clientX,
+      y: event.clientY,
+      canvasX: point.x,
+      canvasY: point.y,
+    });
   };
 
   const handleWheel = (event) => {
@@ -1597,6 +1812,28 @@ export default function ScenariosPage() {
     setSelectedNodeId(nextId);
     setLogicPanel(null);
   };
+
+  const handleSpawnCanvasNode = useCallback((canvasX, canvasY) => {
+    const nextId = `node-${nodeIdCounter.current + 1}`;
+    nodeIdCounter.current += 1;
+    const newNode = {
+      id: nextId,
+      x: canvasX,
+      y: canvasY,
+      configured: false,
+      label: 'New Step',
+    };
+    setNodes((prev) => [...prev, newNode]);
+    setSelectedNodeId(nextId);
+    setPanelIntent(true);
+    setIsPanelVisible(true);
+    setPanelStage('options');
+    setActiveOption(null);
+    setPanelSearch('');
+    setPanelCategory(nodes.length === 0 ? 'TRIGGERS' : 'ACTIONS');
+    setLogicPanel(null);
+    setVarsPane(prev => ({ ...prev, visible: false }));
+  }, [nodes.length]);
 
   const handleDeleteNode = useCallback(() => {
     if (!selectedNodeId) return;
@@ -1944,6 +2181,8 @@ export default function ScenariosPage() {
       event.target.closest('.sb-selection-panel') ||
       event.target.closest('.aether-logic-wrapper') ||
       event.target.closest('.sb-node-add') ||
+      event.target.closest('.sb-node-output-handle') ||
+      event.target.closest('.sb-edge-end-handle') ||
       event.target.closest('.sb-variables-pane') ||
       event.target.closest('.sb-vars-field')
     )
@@ -3405,6 +3644,7 @@ export default function ScenariosPage() {
           className="sb-canvas"
           ref={canvasRef}
           onPointerDown={handleCanvasPointerDown}
+          onContextMenu={handleCanvasContextMenu}
           onWheel={handleWheel}
         >
           <div className="sb-canvas-grid" />
@@ -3427,6 +3667,9 @@ export default function ScenariosPage() {
                 <marker id="sb-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                   <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.2)" />
                 </marker>
+                <marker id="sb-arrowhead-active" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(50,240,217,0.85)" />
+                </marker>
               </defs>
               {edges.map((edge) => {
                 const from = nodeMap[edge.from];
@@ -3434,27 +3677,88 @@ export default function ScenariosPage() {
                 if (!from || !to) return null;
                 const isDraft = !nodeMap[edge.to]?.configured;
                 const isFallback = edge.filter?.type === 'fallback';
+                const isDraggingEdge = edgeDrag?.edgeId === edge.id && !edgeDrag?.continueFrom;
                 // For unconfigured nodes, edge should target circle bottom (center + radius)
                 // Configured nodes already have node.y near sphere bottom due to label+connector below
                 const fromMeasured = circleCenterRef.current[edge.from];
                 const toMeasured = circleCenterRef.current[edge.to];
                 const fromY = !from.configured && fromMeasured ? fromMeasured.cy + fromMeasured.r : from.y;
-                const toY = !to.configured && toMeasured ? toMeasured.cy + toMeasured.r : to.y;
-                const dx = to.x - from.x;
-                const path = `M ${from.x} ${fromY} C ${from.x + dx/2} ${fromY}, ${from.x + dx/2} ${toY}, ${to.x} ${toY}`;
+                const dragPoint = isDraggingEdge ? edgeDrag.point : null;
+                const toX = dragPoint?.x ?? to.x;
+                const toY = dragPoint?.y ?? (!to.configured && toMeasured ? toMeasured.cy + toMeasured.r : to.y);
+                const dx = toX - from.x;
+                const path = `M ${from.x} ${fromY} C ${from.x + dx/2} ${fromY}, ${from.x + dx/2} ${toY}, ${toX} ${toY}`;
 
                 return (
                   <path
                     key={edge.id}
                     d={path}
-                    className={`sb-edge-line ${isDraft ? 'sb-edge-draft' : ''} ${isFallback ? 'sb-edge-fallback' : ''}`}
+                    className={`sb-edge-line ${isDraft ? 'sb-edge-draft' : ''} ${isFallback ? 'sb-edge-fallback' : ''} ${isDraggingEdge ? 'sb-edge-dragging' : ''}`}
                     fill="none"
-                    markerEnd={!isDraft ? "url(#sb-arrowhead)" : ""}
+                    markerEnd={!isDraft ? (isDraggingEdge ? "url(#sb-arrowhead-active)" : "url(#sb-arrowhead)") : ""}
                     style={isFallback ? { stroke: '#f59e0b', strokeDasharray: '8 4', strokeWidth: '2px' } : {}}
                   />
                 );
               })}
+              {(edgeDrag?.mode === 'create' || edgeDrag?.continueFrom) && (() => {
+                const previewFromNodeId = edgeDrag.continueFrom || edgeDrag.from;
+                const from = nodeMap[previewFromNodeId];
+                if (!from) return null;
+                const fromAnchor = getNodeAnchor(previewFromNodeId);
+                if (!fromAnchor) return null;
+                const toX = edgeDrag.point?.x ?? fromAnchor.x;
+                const toY = edgeDrag.point?.y ?? fromAnchor.y;
+                const dx = toX - fromAnchor.x;
+                const path = `M ${fromAnchor.x} ${fromAnchor.y} C ${fromAnchor.x + dx/2} ${fromAnchor.y}, ${fromAnchor.x + dx/2} ${toY}, ${toX} ${toY}`;
+                return (
+                  <path
+                    key="edge-create-preview"
+                    d={path}
+                    className="sb-edge-line sb-edge-dragging"
+                    fill="none"
+                    markerEnd="url(#sb-arrowhead-active)"
+                  />
+                );
+              })()}
             </svg>
+
+            {edges.map((edge) => {
+              if (edgeDrag?.edgeId === edge.id) return null;
+              const from = nodeMap[edge.from];
+              const to = nodeMap[edge.to];
+              if (!from || !to) return null;
+              const toMeasuredHandle = circleCenterRef.current[edge.to];
+              const handleY = !to.configured && toMeasuredHandle ? toMeasuredHandle.cy + toMeasuredHandle.r : to.y;
+              return (
+                <button
+                  key={`edge-handle-${edge.id}`}
+                  type="button"
+                  className="sb-edge-end-handle"
+                  style={{ left: to.x, top: handleY }}
+                  aria-label="Reconnect node connection"
+                  onPointerDown={(event) => handleEdgeHandlePointerDown(edge, event)}
+                />
+              );
+            })}
+
+            {nodes.map((node) => {
+              if (!node.configured || node.id === INITIAL_NODE.id && !node.configured) return null;
+              const anchor = getNodeAnchor(node.id);
+              if (!anchor) return null;
+              const hasOutgoing = edges.some((edge) => edge.from === node.id);
+              const canStartOutgoing = node.type === 'router' || !hasOutgoing;
+              if (!canStartOutgoing) return null;
+              return (
+                <button
+                  key={`node-output-${node.id}`}
+                  type="button"
+                  className={`sb-node-output-handle ${hasOutgoing ? 'has-outgoing' : ''}`}
+                  style={{ left: anchor.x, top: anchor.y }}
+                  aria-label="Create node connection"
+                  onPointerDown={(event) => handleNodeOutputPointerDown(node.id, event)}
+                />
+              );
+            })}
             
             {edges.map((edge) => {
               const from = nodeMap[edge.from];
@@ -3496,6 +3800,9 @@ export default function ScenariosPage() {
               const accent = node.accent || '#e11d48';
               const hasOutgoingNode = edges.some((edge) => edge.from === node.id);
               const nodeRunState = nodeRunStates[node.id]?.status || null;
+              const edgeDragSourceNodeId = edgeDrag?.continueFrom || edgeDrag?.from;
+              const isEdgeDropCandidate = Boolean(edgeDrag && node.configured && node.id !== edgeDragSourceNodeId);
+              const isEdgeDropTarget = edgeDrag?.snapTargetId === node.id;
               return (
                 <div
                   key={node.id}
@@ -3505,7 +3812,7 @@ export default function ScenariosPage() {
                   }}
                   className={`sb-builder-node ${node.type === 'router' ? 'router-node' : ''} ${
                     isActive ? 'sb-active-node' : ''
-                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'}`}
+                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''}`}
                   style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
@@ -5517,7 +5824,7 @@ export default function ScenariosPage() {
     <div className="scenarios-container">
       {viewMode === 'list' ? renderListView() : renderBuilderView()}
 
-      {/* Right-click context menu for Search Records Run Node */}
+      {/* Right-click context menu */}
       {contextMenu && (
         <div
           className="sb-context-menu-overlay"
@@ -5534,18 +5841,22 @@ export default function ScenariosPage() {
             }}
             onClick={async (e) => {
               e.stopPropagation();
-              const { nodeId } = contextMenu;
+              const menu = contextMenu;
               setContextMenu(null);
+              if (menu.type === 'canvas') {
+                handleSpawnCanvasNode(menu.canvasX, menu.canvasY);
+                return;
+              }
               try {
-                await handleRunNodeRequest(nodeId);
+                await handleRunNodeRequest(menu.nodeId);
               } catch (err) {
                 console.error('[Run Node] Request failed:', err.message);
               }
             }}
           >
             <div className="sb-context-menu-action">
-              <Zap size={13} />
-              <span>Run Node</span>
+              {contextMenu.type === 'canvas' ? <Plus size={13} /> : <Zap size={13} />}
+              <span>{contextMenu.type === 'canvas' ? 'New Node' : 'Run Node'}</span>
             </div>
           </div>
         </div>

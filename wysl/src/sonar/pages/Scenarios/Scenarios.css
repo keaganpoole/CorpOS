@@ -679,9 +679,90 @@
   transition: stroke 0.3s ease;
 }
 
+.sb-edge-line.sb-edge-dragging {
+  stroke: rgba(50, 240, 217, 0.82);
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 0 10px rgba(50, 240, 217, 0.32));
+  transition: none;
+}
+
 .sb-edge-draft {
   stroke-dasharray: 6 4;
   stroke: rgba(255, 255, 255, 0.05);
+}
+
+.sb-edge-end-handle {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: grab;
+  z-index: 9;
+  transform: translate(-50%, -50%);
+}
+
+.sb-edge-end-handle::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  opacity: 0;
+  transform: scale(0.72);
+  transition: opacity 0.16s ease, transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.sb-edge-end-handle:hover::before {
+  opacity: 1;
+  transform: scale(1);
+  background: rgba(50, 240, 217, 0.1);
+  border-color: rgba(50, 240, 217, 0.58);
+  box-shadow: 0 0 18px rgba(50, 240, 217, 0.24);
+}
+
+.sb-edge-end-handle:active {
+  cursor: grabbing;
+}
+
+.sb-node-output-handle {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: crosshair;
+  z-index: 12;
+  transform: translate(-50%, -50%);
+}
+
+.sb-node-output-handle::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: rgba(50, 240, 217, 0.06);
+  border: 1px solid rgba(50, 240, 217, 0.22);
+  opacity: 0;
+  transform: scale(0.72);
+  transition: opacity 0.16s ease, transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.sb-node-output-handle:hover::before {
+  opacity: 1;
+  transform: scale(1);
+  background: rgba(50, 240, 217, 0.12);
+  border-color: rgba(50, 240, 217, 0.65);
+  box-shadow: 0 0 18px rgba(50, 240, 217, 0.28);
+}
+
+.sb-node-output-handle:active {
+  cursor: grabbing;
 }
 
 /* Nodes */
@@ -738,6 +819,40 @@
 .sb-builder-node:hover .sb-node-aura {
   opacity: 0.1;
   transform: scale(0.95);
+}
+
+.sb-builder-node.sb-edge-drop-candidate {
+  z-index: 7;
+}
+
+.sb-builder-node.sb-edge-drop-candidate .sb-node-aura {
+  opacity: 0.18;
+  transform: scale(1.06);
+}
+
+.sb-builder-node.sb-edge-drop-candidate .sb-node-ring {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 0 22px rgba(255, 255, 255, 0.06);
+}
+
+.sb-builder-node.sb-edge-drop-target {
+  z-index: 10;
+}
+
+.sb-builder-node.sb-edge-drop-target .sb-node-aura {
+  opacity: 0.34;
+  filter: blur(22px);
+  transform: scale(1.18);
+}
+
+.sb-builder-node.sb-edge-drop-target .sb-node-ring {
+  border-color: rgba(50, 240, 217, 0.72);
+  box-shadow: 0 0 0 2px rgba(50, 240, 217, 0.16), 0 0 30px rgba(50, 240, 217, 0.24);
+}
+
+.sb-builder-node.sb-edge-drop-target .sb-node-sphere {
+  transform: scale(1.07);
+  box-shadow: 0 14px 34px -10px rgba(50, 240, 217, 0.55), inset 0 2px 18px rgba(255, 255, 255, 0.18);
 }
 
 /* Concentric design */
