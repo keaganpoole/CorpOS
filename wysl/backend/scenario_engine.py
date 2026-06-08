@@ -2,8 +2,11 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+import calendar
+import asyncio
+from datetime import date, datetime, time, timezone, timedelta
 from typing import Any, Callable, Optional
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -101,6 +104,10 @@ TRIGGER_EVENT_MAP = {
     "manual_trigger": "manual_trigger",
 }
 
+SCHEDULE_JOB_TYPE = "scenario_schedule"
+SCHEDULE_TRIGGER_EVENT = "scheduled_no_trigger"
+WEEKDAY_INDEX = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+
 TABLE_REF_ALIASES = {
     "person": "people",
     "payment": "payments",
@@ -112,6 +119,7 @@ TABLE_REF_ALIASES = {
 }
 
 TABLE_REF_REVERSE_ALIASES = {value: key for key, value in TABLE_REF_ALIASES.items()}
+ITERATOR_STATE_KEYS = {"iterator", "_iterator_state", "_iterator_branch_mode"}
 
 
 def deep_get(data: Any, dotted_key: str):
@@ -788,6 +796,7 @@ class ScenarioActionExecutor:
 
         handlers = {
             "search_records": self._search_records,
+            "search_appointments": self._search_appointments,
             "update_record": self._update_record,
             "update_records": self._update_record,
             "create_new_record": self._create_record,
@@ -825,12 +834,12 @@ class ScenarioActionExecutor:
     async def _search_records(self, node: dict, context: dict):
         try:
             config = node.get("actionConfig") or {}
-            table = str(config.get("target_table") or config.get("table") or "people").lower().replace(" ", "_")
+            table = "people"
             limit = int(config.get("search_limit") or config.get("limit") or 10)
-            user_id = self._resolve_variables(config.get("search_user_id") or config.get("user_id") or "", context) or context.get("business", {}).get("user_id")
+            user_id = context.get("business", {}).get("user_id") or context.get("user_id")
 
             query = self.supabase.table(table).select("*").limit(limit)
-            if user_id and table not in {"businesses", "services"}:
+            if user_id:
                 try:
                     query = query.eq("user_id", str(user_id))
                 except Exception:
@@ -849,6 +858,30 @@ class ScenarioActionExecutor:
             }
         except Exception as exc:
             logging.error("[ActionExecutor] searchRecords failed: %s", exc)
+            return {"success": False, "error": str(exc)}
+
+    async def _search_appointments(self, node: dict, context: dict):
+        try:
+            config = node.get("actionConfig") or {}
+            limit = int(config.get("search_limit") or config.get("limit") or 10)
+            business_id = (context.get("business") or {}).get("id") or context.get("business_id")
+            query = self.supabase.table("appointments").select("*").limit(limit)
+            if business_id is not None:
+                query = query.eq("business_id", business_id)
+            response = query.execute()
+            records = response.data or []
+            logging.info("Search appointments: %s", len(records))
+            return {
+                "success": True,
+                "data": {
+                    "action": "search_appointments",
+                    "table": "appointments",
+                    "records": records,
+                    "count": len(records),
+                },
+            }
+        except Exception as exc:
+            logging.error("[ActionExecutor] searchAppointments failed: %s", exc)
             return {"success": False, "error": str(exc)}
 
     async def _update_record(self, node: dict, context: dict):
@@ -1265,6 +1298,153 @@ class ScenarioFlowExecutor:
         self.supabase = supabase
         self.action_executor = action_executor
 
+    def _get_node_key(self, node: dict) -> str:
+        return ((node.get("actionConfig") or {}).get("_key") or node.get("subOptionKey") or "").strip()
+
+    def _clone_context(self, context: dict) -> dict:
+        try:
+            return json.loads(json.dumps(context, default=str))
+        except Exception:
+            return dict(context or {})
+
+    def _strip_iterator_context(self, context: dict) -> dict:
+        return {key: value for key, value in (context or {}).items() if key not in ITERATOR_STATE_KEYS}
+
+    def _resolve_iterator_collection(self, raw_value: Any, context: dict):
+        if isinstance(raw_value, list):
+            return raw_value, "", ""
+        collection_path = normalize_condition_ref(raw_value) if isinstance(raw_value, str) else ""
+        resolved = deep_get(context, collection_path) if collection_path else None
+        if resolved is None and isinstance(raw_value, str):
+            maybe_path = self.action_executor._resolve_variables(raw_value, context)
+            if isinstance(maybe_path, str) and maybe_path != raw_value:
+                normalized = normalize_condition_ref(maybe_path)
+                resolved = deep_get(context, normalized)
+                if resolved is not None:
+                    collection_path = normalized
+
+        source_table = ""
+        if isinstance(resolved, dict) and isinstance(resolved.get("records"), list):
+            items = resolved.get("records") or []
+            source_table = self.action_executor._normalize_table_key(resolved.get("table") or collection_path.split(".")[0] if collection_path else "")
+        elif isinstance(resolved, list):
+            items = resolved
+            source_table = self.action_executor._normalize_table_key(collection_path.split(".")[0] if collection_path else "")
+            if collection_path.endswith(".records"):
+                parent = deep_get(context, collection_path[: -len(".records")])
+                if isinstance(parent, dict) and parent.get("table"):
+                    source_table = self.action_executor._normalize_table_key(parent.get("table"))
+        else:
+            items = []
+        return items, source_table, collection_path
+
+    def _apply_iterator_item_context(self, base_context: dict, item: Any, index: int, total: int, iterator_state: dict) -> dict:
+        context = self._clone_context(base_context)
+        source_table = iterator_state.get("source_table") or ""
+        context["iterator"] = {
+            "current": item,
+            "index": index,
+            "position": index + 1,
+            "total": total,
+            "is_first": index == 0,
+            "is_last": index == (total - 1),
+            "collection_path": iterator_state.get("collection_path") or "",
+        }
+        if source_table:
+            context[source_table] = item
+            alias = TABLE_REF_REVERSE_ALIASES.get(source_table)
+            if alias:
+                context[alias] = item
+        context["_iterator_branch_mode"] = True
+        context["_iterator_state"] = {
+            **iterator_state,
+            "next_index": index + 1,
+        }
+        return context
+
+    async def _continue_iterator_from_state(self, node_map: dict, edge_map: dict, context: dict, execution_id: Optional[str], scenario: dict, iterator_state: dict):
+        items = iterator_state.get("items") or []
+        branch_start_node_id = iterator_state.get("branch_start_node_id")
+        base_context = iterator_state.get("base_context") or self._strip_iterator_context(context)
+        results = iterator_state.get("results") or []
+        total = len(items)
+
+        if not branch_start_node_id:
+            final_context = self._clone_context(base_context)
+            final_context.pop("_iterator_state", None)
+            final_context.pop("_iterator_branch_mode", None)
+            return {
+                "success": True,
+                "data": {
+                    "action": "iterator",
+                    "count": 0,
+                    "results": [],
+                    "collection_path": iterator_state.get("collection_path") or "",
+                },
+                "context": final_context,
+            }
+
+        start_index = max(0, int(iterator_state.get("next_index") or 0))
+        for index in range(start_index, total):
+            item_context = self._apply_iterator_item_context(base_context, items[index], index, total, {
+                **iterator_state,
+                "results": results,
+            })
+            branch_result = await self._execute_from_node(
+                branch_start_node_id,
+                node_map,
+                edge_map,
+                item_context,
+                execution_id,
+                scenario,
+                finalize_execution=False,
+            )
+            if branch_result.get("paused"):
+                return branch_result
+            if not branch_result.get("success"):
+                return branch_result
+            branch_context = branch_result.get("context") if isinstance(branch_result.get("context"), dict) else {}
+            results.append({
+                "index": index,
+                "item": items[index],
+                "result": self._strip_iterator_context(branch_context),
+            })
+
+        final_context = self._clone_context(base_context)
+        final_context.pop("_iterator_state", None)
+        final_context.pop("_iterator_branch_mode", None)
+        return {
+            "success": True,
+            "data": {
+                "action": "iterator",
+                "count": total,
+                "results": results,
+                "collection_path": iterator_state.get("collection_path") or "",
+            },
+            "context": final_context,
+        }
+
+    async def _execute_iterator_node(self, node: dict, node_map: dict, edge_map: dict, context: dict, execution_id: Optional[str], scenario: dict):
+        config = node.get("actionConfig") or {}
+        items, source_table, collection_path = self._resolve_iterator_collection(
+            config.get("collection_path") or config.get("collection") or config.get("array_path") or "",
+            context,
+        )
+        if not isinstance(items, list):
+            return {"success": False, "error": "Iterator collection must resolve to a list"}
+
+        iterator_state = {
+            "iterator_node_id": node.get("id"),
+            "branch_start_node_id": self._get_next_node(node.get("id"), edge_map, context),
+            "source_table": source_table,
+            "collection_path": collection_path,
+            "items": items,
+            "next_index": 0,
+            "results": [],
+            "base_context": self._strip_iterator_context(context),
+        }
+        return await self._continue_iterator_from_state(node_map, edge_map, context, execution_id, scenario, iterator_state)
+
     async def start(self, scenario: dict, trigger_event: dict, flow_context: Optional[dict] = None, trigger_node_id: Optional[str] = None):
         nodes = scenario.get("nodes_data")
         edges = scenario.get("edges_data")
@@ -1365,17 +1545,63 @@ class ScenarioFlowExecutor:
             next_node_id = (pause_data or {}).get("resume_node_id") or self._get_next_node(execution.get("current_node_id"), edge_map, context)
             logging.info("▶ Resume: %s | exec=%s | next=%s", scenario.get("name"), execution_id, next_node_id or "end")
             if not next_node_id:
+                if context.get("_iterator_state"):
+                    iterator_result = await self._continue_iterator_from_state(
+                        node_map,
+                        edge_map,
+                        context,
+                        execution_id,
+                        scenario,
+                        context.get("_iterator_state") or {},
+                    )
+                    if not iterator_result.get("success"):
+                        await self._update_execution(execution_id, "failed", execution.get("current_node_id"), context, iterator_result.get("error"))
+                        return iterator_result
+                    final_context = iterator_result.get("context") or context
+                    iterator_node_id = (context.get("_iterator_state") or {}).get("iterator_node_id")
+                    if iterator_node_id and iterator_result.get("data"):
+                        final_context[iterator_node_id] = iterator_result.get("data")
+                    await self._update_execution(execution_id, "completed", None, final_context)
+                    return {"success": True, "completed": True, "context": final_context}
                 await self._update_execution(execution_id, "completed", None, context)
                 logging.info("✅ Complete: %s | exec=%s", scenario.get("name"), execution_id)
                 return {"success": True, "completed": True, "context": context}
 
             await self._update_execution(execution_id, "running", next_node_id, context)
-            return await self._execute_from_node(next_node_id, node_map, edge_map, context, execution_id, scenario)
+            result = await self._execute_from_node(
+                next_node_id,
+                node_map,
+                edge_map,
+                context,
+                execution_id,
+                scenario,
+                finalize_execution=not bool(context.get("_iterator_state")),
+            )
+            resumed_context = result.get("context") if isinstance(result, dict) else None
+            if result.get("success") and result.get("completed") and isinstance(resumed_context, dict) and resumed_context.get("_iterator_state"):
+                iterator_result = await self._continue_iterator_from_state(
+                    node_map,
+                    edge_map,
+                    resumed_context,
+                    execution_id,
+                    scenario,
+                    resumed_context.get("_iterator_state") or {},
+                )
+                if not iterator_result.get("success"):
+                    await self._update_execution(execution_id, "failed", next_node_id, resumed_context, iterator_result.get("error"))
+                    return iterator_result
+                final_context = iterator_result.get("context") or resumed_context
+                iterator_node_id = (resumed_context.get("_iterator_state") or {}).get("iterator_node_id")
+                if iterator_node_id and iterator_result.get("data"):
+                    final_context[iterator_node_id] = iterator_result.get("data")
+                await self._update_execution(execution_id, "completed", None, final_context)
+                return {"success": True, "completed": True, "context": final_context}
+            return result
         except Exception as exc:
             logging.error("❌ Resume failed: %s", exc)
             return {"success": False, "error": str(exc)}
 
-    async def _execute_from_node(self, start_node_id: str, node_map: dict, edge_map: dict, context: dict, execution_id: Optional[str], scenario: dict):
+    async def _execute_from_node(self, start_node_id: str, node_map: dict, edge_map: dict, context: dict, execution_id: Optional[str], scenario: dict, finalize_execution: bool = True):
         current_node_id = start_node_id
         steps = 0
         max_steps = 100
@@ -1392,7 +1618,13 @@ class ScenarioFlowExecutor:
                 current_node_id = self._get_next_node(current_node_id, edge_map, context)
                 continue
 
-            result = await self.action_executor.execute(node, context)
+            node_key = self._get_node_key(node)
+            if node.get("categoryType") == "UTILITIES" and node_key == "iterator":
+                result = await self._execute_iterator_node(node, node_map, edge_map, context, execution_id, scenario)
+            else:
+                result = await self.action_executor.execute(node, context)
+            if result.get("paused"):
+                return result
             if not result.get("success"):
                 logging.error("❌ %s: %s", node.get("label"), result.get("error"))
                 await self._update_execution(execution_id, "failed", current_node_id, context, result.get("error"))
@@ -1419,6 +1651,16 @@ class ScenarioFlowExecutor:
                     if alias:
                         context[alias] = data
 
+            if node.get("categoryType") == "UTILITIES" and node_key == "iterator":
+                iterator_context = result.get("context")
+                if isinstance(iterator_context, dict):
+                    context.clear()
+                    context.update(iterator_context)
+                if data:
+                    context[node["id"]] = data
+                current_node_id = None
+                continue
+
             if result.get("pause"):
                 next_node_id = self._get_next_node(current_node_id, edge_map, context)
                 pause_data = {
@@ -1438,7 +1680,8 @@ class ScenarioFlowExecutor:
             return {"success": False, "error": "Max steps exceeded"}
 
         logging.info("✅ %s", scenario.get("name"))
-        await self._update_execution(execution_id, "completed", None, context)
+        if finalize_execution:
+            await self._update_execution(execution_id, "completed", None, context)
         return {"success": True, "completed": True, "context": context}
 
     def _get_next_node(self, from_node_id: str, edge_map: dict, context: dict):
@@ -1504,11 +1747,28 @@ class ScenarioEngine:
         self.scenarios: list[dict] = []
         self.action_executor = ScenarioActionExecutor(supabase, callbacks, base_url)
         self.flow_executor = ScenarioFlowExecutor(supabase, self.action_executor)
+        self.scheduler_task: Optional[asyncio.Task] = None
+        self.scheduler_worker_id = f"scenario-engine-{os.getpid()}"
 
     async def start(self):
         logging.info("🚀 Scenarios engine started")
         await self.load_scenarios()
         logging.info("🔌 Listening for scenario events")
+
+    def start_scheduler(self):
+        if self.scheduler_task and not self.scheduler_task.done():
+            return
+        self.scheduler_task = asyncio.create_task(self._scheduler_loop())
+
+    async def stop_scheduler(self):
+        if not self.scheduler_task:
+            return
+        self.scheduler_task.cancel()
+        try:
+            await self.scheduler_task
+        except asyncio.CancelledError:
+            pass
+        self.scheduler_task = None
 
     async def load_scenarios(self):
         try:
@@ -1521,10 +1781,214 @@ class ScenarioEngine:
                 .execute()
             )
             self.scenarios = response.data or []
+            await self.sync_scheduled_jobs()
         except Exception as exc:
             logging.error("[ScenarioEngine] Failed to load scenarios: %s", exc)
             self.scenarios = []
         return self.scenarios
+
+    async def sync_scheduled_jobs(self):
+        try:
+            response = (
+                self.supabase.table("scenarios")
+                .select("*")
+                .order("created_at", desc=True)
+                .execute()
+            )
+            scenarios = response.data or []
+        except Exception as exc:
+            logging.warning("[ScenarioEngine] Could not sync scheduled scenario jobs: %s", exc)
+            return
+
+        for scenario in scenarios:
+            try:
+                await self._sync_scheduled_job_for_scenario(scenario)
+            except Exception as exc:
+                logging.warning(
+                    "[ScenarioEngine] Could not sync job for scenario %s: %s",
+                    scenario.get("id"),
+                    exc,
+                )
+
+    async def _sync_scheduled_job_for_scenario(self, scenario: dict):
+        scenario_id = scenario.get("id")
+        if not scenario_id:
+            return
+
+        schedule_config = self._coerce_dict(scenario.get("schedule_config"))
+        should_schedule = (
+            self._scenario_has_no_trigger(scenario)
+            and scenario.get("is_active") is not False
+            and str(scenario.get("status") or "active").lower() == "active"
+            and bool(schedule_config)
+        )
+
+        if not should_schedule:
+            self.supabase.table("jobs").update({
+                "status": "cancelled",
+                "locked_at": None,
+                "locked_by": None,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("scenario_id", scenario_id).eq("type", SCHEDULE_JOB_TYPE).neq("status", "completed").execute()
+            return
+
+        next_run_at = self._calculate_next_run_at(schedule_config)
+        if not next_run_at:
+            self.supabase.table("jobs").update({
+                "status": "cancelled",
+                "locked_at": None,
+                "locked_by": None,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("scenario_id", scenario_id).eq("type", SCHEDULE_JOB_TYPE).execute()
+            return
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        payload = {
+            "scenario_id": scenario_id,
+            "user_id": scenario.get("user_id") or scenario.get("created_by"),
+            "business_id": scenario.get("business_id"),
+            "schedule_config": schedule_config,
+        }
+        existing_response = (
+            self.supabase.table("jobs")
+            .select("*")
+            .eq("scenario_id", scenario_id)
+            .eq("type", SCHEDULE_JOB_TYPE)
+            .limit(1)
+            .execute()
+        )
+        existing = existing_response.data[0] if existing_response.data else None
+        job_row = {
+            "scenario_id": scenario_id,
+            "user_id": scenario.get("user_id") or scenario.get("created_by"),
+            "business_id": scenario.get("business_id"),
+            "type": SCHEDULE_JOB_TYPE,
+            "status": "active",
+            "schedule_config": schedule_config,
+            "payload": payload,
+            "locked_at": None,
+            "locked_by": None,
+            "updated_at": now_iso,
+        }
+        if existing:
+            update_row = dict(job_row)
+            existing_schedule = self._coerce_dict(existing.get("schedule_config"))
+            schedule_changed = existing_schedule != schedule_config
+            update_row["next_run_at"] = next_run_at.isoformat() if schedule_changed else (existing.get("next_run_at") or next_run_at.isoformat())
+            if existing.get("status") in {"cancelled", "completed"}:
+                update_row["next_run_at"] = next_run_at.isoformat()
+            self.supabase.table("jobs").update(update_row).eq("id", existing["id"]).execute()
+        else:
+            self.supabase.table("jobs").insert({
+                **job_row,
+                "next_run_at": next_run_at.isoformat(),
+                "created_at": now_iso,
+            }).execute()
+
+    async def _scheduler_loop(self):
+        while True:
+            try:
+                await self.run_due_scheduled_jobs()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logging.error("[ScenarioEngine] Scheduled job worker failed: %s", exc, exc_info=True)
+            await asyncio.sleep(30)
+
+    async def run_due_scheduled_jobs(self):
+        try:
+            response = self.supabase.rpc("claim_due_scenario_jobs", {
+                "worker_id": self.scheduler_worker_id,
+                "batch_size": 10,
+            }).execute()
+            jobs = response.data or []
+        except Exception as exc:
+            logging.warning("[ScenarioEngine] Could not claim due scenario jobs: %s", exc)
+            return {"ok": False, "claimed": 0, "error": str(exc)}
+
+        runs = []
+        for job in jobs:
+            result = await self._run_scheduled_job(job)
+            runs.append({"job_id": job.get("id"), "result": result})
+        return {"ok": True, "claimed": len(jobs), "runs": runs}
+
+    async def _run_scheduled_job(self, job: dict):
+        job_id = job.get("id")
+        scenario_id = job.get("scenario_id")
+        now_iso = datetime.now(timezone.utc).isoformat()
+        try:
+            response = self.supabase.table("scenarios").select("*").eq("id", scenario_id).limit(1).execute()
+            scenario = response.data[0] if response.data else None
+            if not scenario:
+                return self._mark_job_failed(job_id, "Scenario not found")
+
+            if scenario.get("is_active") is False or str(scenario.get("status") or "active").lower() != "active":
+                self.supabase.table("jobs").update({
+                    "status": "cancelled",
+                    "locked_at": None,
+                    "locked_by": None,
+                    "updated_at": now_iso,
+                }).eq("id", job_id).execute()
+                return {"ok": True, "skipped": "Scenario inactive"}
+
+            if not self._scenario_has_no_trigger(scenario):
+                self.supabase.table("jobs").update({
+                    "status": "cancelled",
+                    "locked_at": None,
+                    "locked_by": None,
+                    "updated_at": now_iso,
+                }).eq("id", job_id).execute()
+                return {"ok": True, "skipped": "Scenario is no longer triggerless"}
+
+            payload = self._coerce_dict(job.get("payload"))
+            payload.update({
+                "scenario_id": scenario_id,
+                "user_id": scenario.get("user_id") or scenario.get("created_by") or job.get("user_id"),
+                "business_id": scenario.get("business_id") or job.get("business_id"),
+                "job_id": job_id,
+            })
+            result = await self.trigger_scenario(str(scenario_id), payload, event_type=SCHEDULE_TRIGGER_EVENT)
+
+            schedule_config = self._coerce_dict(scenario.get("schedule_config") or job.get("schedule_config"))
+            frequency = str(schedule_config.get("frequency") or "once").lower()
+            if frequency == "once":
+                update = {
+                    "status": "completed",
+                    "last_run_at": now_iso,
+                    "locked_at": None,
+                    "locked_by": None,
+                    "updated_at": now_iso,
+                }
+            else:
+                next_run_at = self._calculate_next_run_at(schedule_config, after=datetime.now(timezone.utc))
+                update = {
+                    "status": "active" if next_run_at else "completed",
+                    "next_run_at": next_run_at.isoformat() if next_run_at else None,
+                    "last_run_at": now_iso,
+                    "locked_at": None,
+                    "locked_by": None,
+                    "attempt_count": 0,
+                    "last_error": None,
+                    "updated_at": now_iso,
+                }
+            self.supabase.table("jobs").update(update).eq("id", job_id).execute()
+            return {"ok": True, "scenario_id": scenario_id, "result": result}
+        except Exception as exc:
+            return self._mark_job_failed(job_id, str(exc))
+
+    def _mark_job_failed(self, job_id: Optional[str], error: str):
+        if job_id:
+            try:
+                self.supabase.table("jobs").update({
+                    "status": "failed",
+                    "locked_at": None,
+                    "locked_by": None,
+                    "last_error": error,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", job_id).execute()
+            except Exception as exc:
+                logging.error("[ScenarioEngine] Could not mark job failed: %s", exc)
+        return {"ok": False, "error": error}
 
     async def handle_event(self, event_type: str, payload: Optional[dict] = None):
         payload = payload or {}
@@ -1534,6 +1998,8 @@ class ScenarioEngine:
         for scenario in self.scenarios:
             match = self._find_matching_trigger_node(scenario, event_type)
             if not match:
+                continue
+            if not self._event_matches_scenario_tenant(scenario, payload):
                 continue
             trigger_node = match
             logging.info("⚡ %s → %s", event_type, scenario.get("name"))
@@ -1547,15 +2013,26 @@ class ScenarioEngine:
             runs.append({"scenario_id": scenario.get("id"), "scenario_name": scenario.get("name"), "result": result})
         return {"ok": True, "matched": len(runs), "runs": runs}
 
-    async def trigger_scenario(self, scenario_id: str, payload: Optional[dict] = None):
+    def _event_matches_scenario_tenant(self, scenario: dict, payload: dict) -> bool:
+        event_user_id = payload.get("user_id")
+        event_business_id = payload.get("business_id")
+        scenario_user_id = scenario.get("user_id") or scenario.get("created_by")
+        scenario_business_id = scenario.get("business_id")
+        if event_business_id and scenario_business_id:
+            return str(event_business_id) == str(scenario_business_id)
+        if event_user_id and scenario_user_id:
+            return str(event_user_id) == str(scenario_user_id)
+        return True
+
+    async def trigger_scenario(self, scenario_id: str, payload: Optional[dict] = None, event_type: str = "manual_trigger"):
         response = self.supabase.table("scenarios").select("*").eq("id", scenario_id).limit(1).execute()
         scenario = response.data[0] if response.data else None
         if not scenario:
             return {"ok": False, "error": "Scenario not found"}
-        flow_context = await self._build_flow_context(scenario, "manual_trigger", payload or {})
+        flow_context = await self._build_flow_context(scenario, event_type, payload or {})
         result = await self.flow_executor.start(
             scenario,
-            {"event_type": "manual_trigger", "payload": payload or {}},
+            {"event_type": event_type, "payload": payload or {}},
             flow_context=flow_context,
         )
         return {"ok": True, "result": result}
@@ -1570,6 +2047,137 @@ class ScenarioEngine:
     async def get_execution(self, execution_id: str):
         response = self.supabase.table("flow_executions").select("*").eq("id", execution_id).limit(1).execute()
         return response.data[0] if response.data else None
+
+    def _coerce_dict(self, value: Any) -> dict:
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str) and value.strip():
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, dict) else {}
+            except Exception:
+                return {}
+        return {}
+
+    def _scenario_has_no_trigger(self, scenario: dict) -> bool:
+        nodes = scenario.get("nodes_data")
+        if isinstance(nodes, str):
+            try:
+                nodes = json.loads(nodes)
+            except Exception:
+                nodes = []
+        for node in nodes or []:
+            if not (node.get("configured") and node.get("categoryType") == "TRIGGERS"):
+                continue
+            key = str(node.get("subOptionKey") or node.get("categoryKey") or "").lower()
+            label = str(node.get("label") or "").strip().lower()
+            if key == "no_trigger" or label == "no trigger":
+                return True
+        return False
+
+    def _parse_schedule_timezone(self, schedule_config: dict):
+        timezone_name = (
+            schedule_config.get("timezone")
+            or schedule_config.get("timeZone")
+            or schedule_config.get("tz")
+            or "UTC"
+        )
+        try:
+            return ZoneInfo(str(timezone_name))
+        except Exception:
+            return timezone.utc
+
+    def _parse_schedule_time(self, schedule_config: dict) -> time:
+        raw_value = str(schedule_config.get("time") or "09:00").strip()
+        try:
+            hour, minute = raw_value.split(":")[:2]
+            return time(hour=max(0, min(23, int(hour))), minute=max(0, min(59, int(minute))))
+        except Exception:
+            return time(hour=9, minute=0)
+
+    def _parse_schedule_date(self, schedule_config: dict) -> Optional[date]:
+        raw_value = schedule_config.get("date") or schedule_config.get("run_date") or schedule_config.get("runDate")
+        if not raw_value:
+            return None
+        try:
+            return date.fromisoformat(str(raw_value)[:10])
+        except Exception:
+            return None
+
+    def _schedule_interval(self, schedule_config: dict) -> int:
+        try:
+            return max(1, int(schedule_config.get("interval") or 1))
+        except Exception:
+            return 1
+
+    def _add_months(self, source: datetime, months: int) -> datetime:
+        month_index = source.month - 1 + months
+        year = source.year + month_index // 12
+        month = month_index % 12 + 1
+        day = min(source.day, calendar.monthrange(year, month)[1])
+        return source.replace(year=year, month=month, day=day)
+
+    def _calculate_next_run_at(self, schedule_config: dict, after: Optional[datetime] = None) -> Optional[datetime]:
+        if not schedule_config:
+            return None
+        frequency = str(schedule_config.get("frequency") or "once").lower()
+        interval = self._schedule_interval(schedule_config)
+        schedule_tz = self._parse_schedule_timezone(schedule_config)
+        run_time = self._parse_schedule_time(schedule_config)
+        after_utc = after or datetime.now(timezone.utc)
+        if after_utc.tzinfo is None:
+            after_utc = after_utc.replace(tzinfo=timezone.utc)
+        local_after = after_utc.astimezone(schedule_tz)
+        minimum_local = local_after + timedelta(seconds=30)
+
+        if frequency == "once":
+            run_date = self._parse_schedule_date(schedule_config)
+            if run_date:
+                candidate = datetime.combine(run_date, run_time, tzinfo=schedule_tz)
+                return candidate.astimezone(timezone.utc) if candidate > minimum_local else None
+            candidate = datetime.combine(local_after.date(), run_time, tzinfo=schedule_tz)
+            if candidate <= minimum_local:
+                candidate += timedelta(days=1)
+            return candidate.astimezone(timezone.utc)
+
+        if frequency == "hourly":
+            return (local_after + timedelta(hours=interval)).astimezone(timezone.utc)
+
+        if frequency == "daily":
+            candidate = datetime.combine(local_after.date(), run_time, tzinfo=schedule_tz)
+            while candidate <= minimum_local:
+                candidate += timedelta(days=interval)
+            return candidate.astimezone(timezone.utc)
+
+        if frequency == "weekly":
+            selected_days = schedule_config.get("daysOfWeek") or schedule_config.get("days_of_week") or []
+            selected_indexes = {
+                WEEKDAY_INDEX.get(str(day).strip().lower()[:3])
+                for day in selected_days
+            }
+            selected_indexes.discard(None)
+            if not selected_indexes:
+                selected_indexes = {local_after.weekday()}
+            anchor_date = self._parse_schedule_date(schedule_config) or local_after.date()
+            for day_offset in range(0, max(28, interval * 14 + 7)):
+                candidate_date = local_after.date() + timedelta(days=day_offset)
+                if candidate_date.weekday() not in selected_indexes:
+                    continue
+                weeks_since_anchor = max(0, (candidate_date - anchor_date).days // 7)
+                if weeks_since_anchor % interval != 0:
+                    continue
+                candidate = datetime.combine(candidate_date, run_time, tzinfo=schedule_tz)
+                if candidate > minimum_local:
+                    return candidate.astimezone(timezone.utc)
+            return None
+
+        if frequency == "monthly":
+            candidate = datetime.combine(local_after.date(), run_time, tzinfo=schedule_tz)
+            while candidate <= minimum_local:
+                candidate = self._add_months(candidate, interval)
+            return candidate.astimezone(timezone.utc)
+
+        return None
 
     def _hydrate_business_with_assigned_line(self, business: Optional[dict]) -> Optional[dict]:
         if not business or business.get("id") is None:

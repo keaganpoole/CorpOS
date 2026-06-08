@@ -456,18 +456,13 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.records,
       sub_options: [
         { key: 'search_records', name: 'Search Records', description: 'Find records from a table', configFields: [
-          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
-          { key: 'search_user_id', label: 'User ID', type: 'text' },
           { key: 'search_limit', label: 'Limit', type: 'number' },
         ]},
         { key: 'create_new_record', name: 'Create New Record', description: 'Create a new record', configFields: [
-          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
         ]},
         { key: 'update_record', name: 'Update Record', description: 'Modify an existing record', configFields: [
-          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
         ]},
         { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a record', configFields: [
-          { key: 'target_table', label: 'Table', type: 'select', options: ['People', 'Appointments', 'Services', 'Payments', 'Businesses', 'Hired Receptionists'] },
         ]},
       ],
     },
@@ -478,6 +473,9 @@ const AUTOMATION_HIERARCHY = {
       accent: '#38bdf8',
       icon: OPTION_ICONS.appointments,
       sub_options: [
+        { key: 'search_appointments', name: 'Search Appointments', description: 'Find appointments for this business', configFields: [
+          { key: 'search_limit', label: 'Limit', type: 'number' },
+        ]},
         { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment', configFields: [
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'service_id', label: 'Service ID', type: 'service_id' },
@@ -583,6 +581,11 @@ const AUTOMATION_HIERARCHY = {
   UTILITIES: [
     { key: 'wait', option: 'Wait', description: 'Pause the workflow temporarily', icon: OPTION_ICONS.wait, accent: '#f472b6' },
     { key: 'router', option: 'Router', description: 'Send flow to different paths', icon: OPTION_ICONS.router, accent: '#f472b6' },
+    { key: 'iterator', option: 'Iterator', description: 'Run the downstream branch once for each item in a list', icon: OPTION_ICONS.records, accent: '#f472b6', sub_options: [
+      { key: 'iterator', name: 'Iterator', description: 'Iterate over a collection from a previous step', configFields: [
+        { key: 'collection_path', label: 'Collection Path', type: 'text' },
+      ] },
+    ] },
     { key: 'intent_router', option: 'Intent Router', description: 'Re-evaluate the conversation and choose the correct path', icon: OPTION_ICONS.intent_router, accent: '#f472b6' },
     { key: 'end_call', option: 'End Call', description: 'Immediately end the current call', icon: OPTION_ICONS.end_call, accent: '#f472b6' },
   ],
@@ -603,6 +606,30 @@ const CATEGORY_META = {
 const PANEL_CATEGORIES = ['TRIGGERS', 'ACTIONS', 'UTILITIES'];
 
 const INITIAL_NODE = { id: 'node-1', x: 200, y: 300, configured: false, label: 'Start Flow' };
+const PEOPLE_RECORD_TABLE = 'People';
+const LOCAL_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+const padDatePart = (value) => String(value).padStart(2, '0');
+const toLocalDateInputValue = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+};
+const toLocalTimeInputValue = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  return `${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+};
+const getDefaultSchedule = () => {
+  const nextHour = new Date(Date.now() + 60 * 60 * 1000);
+  nextHour.setMinutes(0, 0, 0);
+  return {
+    frequency: 'once',
+    interval: 1,
+    date: toLocalDateInputValue(nextHour),
+    time: toLocalTimeInputValue(nextHour),
+    timezone: LOCAL_TIMEZONE,
+    daysOfWeek: [],
+  };
+};
 
 const sbLabelStyle = { fontSize: 9, fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 4, display: 'block' };
 const sbInputStyle = { width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: '#e4e4e7', outline: 'none', boxSizing: 'border-box' };
@@ -709,7 +736,7 @@ export default function ScenariosPage() {
   const [showJsonModal, setShowJsonModal] = useState(false);
   const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
   const [integrationStep, setIntegrationStep] = useState(0);
-  const [recurringSchedule, setRecurringSchedule] = useState({ frequency: 'once', interval: 1, time: '09:00' });
+  const [recurringSchedule, setRecurringSchedule] = useState(getDefaultSchedule);
   const [scenarioNotes, setScenarioNotes] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [runProgress, setRunProgress] = useState('');
@@ -1040,10 +1067,10 @@ export default function ScenariosPage() {
   }, [nodes.length]);
 
   const formatScheduleDisplay = (config) => {
-    const { frequency, interval, time, daysOfWeek } = config;
+    const { frequency, interval, date, time, daysOfWeek } = config;
     const timeStr = time ? ` at ${time}` : '';
     switch (frequency) {
-      case 'once': return 'Run once';
+      case 'once': return date ? `Once ${date}${timeStr}` : `Run once${timeStr}`;
       case 'hourly': return `Every ${interval}h`;
       case 'daily': return `Every ${interval}d${timeStr}`;
       case 'weekly': {
@@ -1053,6 +1080,22 @@ export default function ScenariosPage() {
       case 'monthly': return `Every ${interval}mo${timeStr}`;
       default: return 'Run once';
     }
+  };
+
+  const normalizeScenarioSchedule = (config = {}) => {
+    const defaults = getDefaultSchedule();
+    return {
+      frequency: config.frequency || defaults.frequency,
+      interval: Math.max(1, parseInt(config.interval, 10) || defaults.interval),
+      date: config.date || defaults.date,
+      time: config.time || defaults.time,
+      timezone: config.timezone || config.timeZone || defaults.timezone,
+      daysOfWeek: Array.isArray(config.daysOfWeek)
+        ? config.daysOfWeek
+        : Array.isArray(config.days_of_week)
+          ? config.days_of_week
+          : [],
+    };
   };
 
   const handleToggleRecurring = async () => {
@@ -1672,6 +1715,8 @@ export default function ScenariosPage() {
               category: meta.detail,
               accent: accentColor || meta.accent,
               categoryType,
+              subOptionKey: label === 'No Trigger' ? 'no_trigger' : node.subOptionKey,
+              categoryKey: label === 'No Trigger' ? 'no_trigger' : node.categoryKey,
             }
           : node
       )
@@ -1682,6 +1727,8 @@ export default function ScenariosPage() {
     // Show toolbar for "No Trigger" option
     if (label === 'No Trigger') {
       setNoTriggerActive(true);
+    } else if (categoryType === 'TRIGGERS') {
+      setNoTriggerActive(false);
     }
   };
 
@@ -1762,14 +1809,15 @@ export default function ScenariosPage() {
     // Check if this action needs config BEFORE finalizing
     const needsAppointmentConfig = APPOINTMENT_CONFIG_ACTIONS.has(subOption.key);
     const needsActionConfig = subOption.configFields && subOption.configFields.length > 0;
+    const needsRecordConfig = subOption.key === 'create_new_record' || subOption.key === 'update_record' || subOption.key === 'delete_record';
     
-    if (needsAppointmentConfig || needsActionConfig) {
+    if (needsAppointmentConfig || needsActionConfig || needsRecordConfig) {
       // Snap intro node to overlay center before configuring
       if (currentNodeId === INITIAL_NODE.id) {
         snapIntroNodePosition();
       }
       // Configure the node but DON'T close the panel yet
-      const nodeType = 'action';
+      const nodeType = panelCategory === 'UTILITIES' ? 'utility' : 'action';
       setNodes((prev) =>
         prev.map((node) =>
           node.id === currentNodeId
@@ -1823,6 +1871,9 @@ export default function ScenariosPage() {
       } else {
         const initialConfig = { _key: subOption.key, _fields: subOption.configFields };
         subOption.configFields.forEach(f => { initialConfig[f.key] = ''; });
+        if (subOption.key === 'create_new_record' || subOption.key === 'update_record' || subOption.key === 'delete_record') {
+          initialConfig.target_table = PEOPLE_RECORD_TABLE;
+        }
         restoringFromNodeRef.current = true;
         setActionConfig(initialConfig);
         setNodes(prev => prev.map(n => n.id === currentNodeId ? { ...n, actionConfig: initialConfig } : n));
@@ -1934,7 +1985,7 @@ export default function ScenariosPage() {
     // Reset toolbar state
     setNoTriggerActive(false);
     setScenarioIsActive(true);
-    setRecurringSchedule({ frequency: 'once', interval: 1, time: '09:00' });
+    setRecurringSchedule(getDefaultSchedule());
     setScenarioNotes('');
     setTriggerFilter({});
   };
@@ -2120,7 +2171,7 @@ export default function ScenariosPage() {
       
       // Load toolbar state
       if (scenario.schedule_config) {
-        setRecurringSchedule(scenario.schedule_config);
+        setRecurringSchedule(normalizeScenarioSchedule(scenario.schedule_config));
       }
       setScenarioNotes(scenario.notes || '');
       setScenarioIsActive(scenario.is_active !== false); // default true
@@ -2177,6 +2228,7 @@ export default function ScenariosPage() {
         return true;
       }));
     };
+    const normalizedSchedule = normalizeScenarioSchedule(recurringSchedule);
     const scenarioData = {
       user_id: userId,
       created_by: currentScenario?.created_by || userId,
@@ -2208,7 +2260,7 @@ export default function ScenariosPage() {
       })),
       status: 'active',
       is_active: scenarioIsActive,
-      schedule_config: recurringSchedule,
+      schedule_config: normalizedSchedule,
       notes: scenarioNotes,
     };
     
@@ -2416,9 +2468,12 @@ export default function ScenariosPage() {
       resultsMap[nodeId] = node.outputData;
 
       const actionKey = node.actionConfig?._key;
-      const tableKey = normalizeTableRefKey((node.actionConfig?.target_table || '').toLowerCase().replace(/\s+/g, '_'));
+      const tableKey =
+        actionKey === 'search_appointments'
+          ? 'appointments'
+          : normalizeTableRefKey((node.actionConfig?.target_table || 'people').toLowerCase().replace(/\s+/g, '_'));
 
-      if (actionKey === 'search_records' || actionKey === 'update_record' || actionKey === 'create_new_record') {
+      if (actionKey === 'search_records' || actionKey === 'search_appointments' || actionKey === 'update_record' || actionKey === 'create_new_record') {
         if (tableKey) {
           resultsMap[tableKey] = node.outputData;
           const alias = TABLE_REF_REVERSE_ALIASES[tableKey];
@@ -2513,13 +2568,18 @@ export default function ScenariosPage() {
     setNodeRunState(nodeId, 'running');
 
     try {
-      if (actionKey === 'search_records') {
-        const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+      if (actionKey === 'search_records' || actionKey === 'search_appointments') {
+        const tableKey = actionKey === 'search_appointments' ? 'appointments' : 'people';
         const limit = config.search_limit || 10;
-        console.log('[Run Node] search_records request', { nodeId, tableKey, limit });
+        console.log('[Run Node] search request', { nodeId, actionKey, tableKey, limit });
         let query = supabase.from(tableKey).select('*').limit(limit);
-        const searchUserId = getValue('search_user_id');
-        if (searchUserId) query = query.eq('user_id', searchUserId);
+        if (actionKey === 'search_appointments') {
+          const businessId = await getCurrentBusinessId();
+          if (businessId) query = query.eq('business_id', businessId);
+        } else {
+          const searchUserId = session?.user?.id || null;
+          if (searchUserId) query = query.eq('user_id', searchUserId);
+        }
         const { data, error } = await query;
         if (error) throw new Error(error.message || 'Search failed');
         const result = data || [];
@@ -2838,14 +2898,19 @@ export default function ScenariosPage() {
       log(`⚙ ${step} ${node.label} — running...`);
 
       try {
-        if (actionKey === 'search_records') {
+        if (actionKey === 'search_records' || actionKey === 'search_appointments') {
           const config = node.actionConfig;
-          const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+          const tableKey = actionKey === 'search_appointments' ? 'appointments' : 'people';
           const limit = config.search_limit || 10;
-          const userId = resolveVariableRefs(resolveTableVariableRefs(config.search_user_id, resultsMap), resultsMap) || config.search_user_id;
-          console.log(`[Scenario Run]   ├ Query: ${tableKey} | limit: ${limit} | user_id: ${userId || '(default)'}`);
+          const businessId = await getCurrentBusinessId();
+          const userId = session?.user?.id || null;
+          console.log(`[Scenario Run]   ├ Query: ${tableKey} | limit: ${limit} | scope: ${actionKey === 'search_appointments' ? `business ${businessId || '(default)'}` : `user ${userId || '(default)'}`}`);
           let query = supabase.from(tableKey).select('*').limit(limit);
-          if (userId) query = query.eq('user_id', userId);
+          if (actionKey === 'search_appointments') {
+            if (businessId) query = query.eq('business_id', businessId);
+          } else if (userId) {
+            query = query.eq('user_id', userId);
+          }
           const { data, error } = await query;
           if (!error) {
             const resultData = data || [];
@@ -3445,7 +3510,7 @@ export default function ScenariosPage() {
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
                     event.preventDefault();
-                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'create_customer' || node.actionConfig?._key === 'update_customer' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'send_payment_link' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice' || node.actionConfig?._key === 'refund_payment' || node.actionConfig?._key === 'cancel_subscription' || node.actionConfig?._key === 'send_email') && node.configured) {
+                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'search_appointments' || node.actionConfig?._key === 'create_customer' || node.actionConfig?._key === 'update_customer' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'send_payment_link' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice' || node.actionConfig?._key === 'refund_payment' || node.actionConfig?._key === 'cancel_subscription' || node.actionConfig?._key === 'send_email') && node.configured) {
                       setRunNodeModal(null);
                       setIsPanelVisible(false);
                       setPanelIntent(false);
@@ -3587,7 +3652,15 @@ export default function ScenariosPage() {
                   <button
                     type="button"
                     className="sb-panel-delete"
-                    onClick={handleDeleteNode}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleDeleteNode();
+                    }}
                     disabled={selectedNodeId === INITIAL_NODE.id}
                     style={selectedNodeId === INITIAL_NODE.id ? { opacity: 0.35, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
                   >
@@ -4121,19 +4194,19 @@ export default function ScenariosPage() {
                     )}
 
                     {/* Table-specific fields — dynamic based on selected table */}
-                    {actionConfig.target_table && (
+                    {['create_new_record', 'update_record', 'delete_record'].includes(actionConfig._key) && (
                       <div className="sb-record-fields-section">
                         {/* Record ID — shown for update/delete actions */}
                         {(actionConfig._key === 'update_record' || actionConfig._key === 'delete_record') && (
                           <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          <label className="sb-record-label" style={{ display: 'block' }}><Hash size={11} className="sb-record-label-icon" style={{ marginRight: 4, display: 'inline', verticalAlign: -1 }} />{getRecordIdLabelForTable(actionConfig.target_table)}</label>
+                          <label className="sb-record-label" style={{ display: 'block' }}><Hash size={11} className="sb-record-label-icon" style={{ marginRight: 4, display: 'inline', verticalAlign: -1 }} />{getRecordIdLabelForTable(PEOPLE_RECORD_TABLE)}</label>
                           <div style={{ position: 'relative' }}>
                             <input
                               className="sb-input-field"
                               type="text"
                               value={actionConfig.record_id || ''}
                               onChange={e => setActionConfig(prev => ({ ...prev, record_id: e.target.value }))}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'record_id', fieldLabel: getRecordIdLabelForTable(actionConfig.target_table), fieldType: 'text' })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'record_id', fieldLabel: getRecordIdLabelForTable(PEOPLE_RECORD_TABLE), fieldType: 'text' })}
                               style={{
                                 ...(actionConfig.record_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && hoveredTableColor && 'record_id' === varsPane.fieldKey ? {
@@ -4161,8 +4234,8 @@ export default function ScenariosPage() {
                         {/* Field inputs — shown for create and update actions */}
                         {(actionConfig._key === 'update_record' || actionConfig._key === 'create_new_record') && (
                         <div className="sb-record-fields-grid">
-                          {getRecordFieldsForTable(actionConfig.target_table)
-                            .filter((field) => !(actionConfig._key === 'update_record' && field.key === 'id'))
+                          {getRecordFieldsForTable(PEOPLE_RECORD_TABLE)
+                            .filter((field) => field.key !== 'id')
                             .map((field) => {
                             const fieldKey = `field_${field.key}`;
                             const val = actionConfig[fieldKey] || '';
@@ -5182,7 +5255,7 @@ export default function ScenariosPage() {
                   <select
                     className="sb-input-field sb-select-field"
                     value={recurringSchedule.frequency}
-                    onChange={e => setRecurringSchedule(prev => ({ ...prev, frequency: e.target.value }))}
+                    onChange={e => setRecurringSchedule(prev => normalizeScenarioSchedule({ ...prev, frequency: e.target.value }))}
                   >
                     <option value="once">Run Once</option>
                     <option value="hourly">Hourly</option>
@@ -5191,6 +5264,28 @@ export default function ScenariosPage() {
                     <option value="monthly">Monthly</option>
                   </select>
                 </div>
+                {recurringSchedule.frequency === 'once' && (
+                  <div className="sb-schedule-field">
+                    <label className="sb-schedule-label">Date</label>
+                    <input
+                      className="sb-input-field"
+                      type="date"
+                      value={recurringSchedule.date || getDefaultSchedule().date}
+                      onChange={e => setRecurringSchedule(prev => normalizeScenarioSchedule({ ...prev, date: e.target.value }))}
+                    />
+                  </div>
+                )}
+                {recurringSchedule.frequency === 'once' && (
+                  <div className="sb-schedule-field">
+                    <label className="sb-schedule-label">Time</label>
+                    <input
+                      className="sb-input-field"
+                      type="time"
+                      value={recurringSchedule.time}
+                      onChange={e => setRecurringSchedule(prev => normalizeScenarioSchedule({ ...prev, time: e.target.value }))}
+                    />
+                  </div>
+                )}
                 
                 {/* Scheduling options — hidden for "Run Once" */}
                 {recurringSchedule.frequency !== 'once' && (
@@ -5207,7 +5302,7 @@ export default function ScenariosPage() {
                       min={1}
                       max={recurringSchedule.frequency === 'hourly' ? 24 : recurringSchedule.frequency === 'daily' ? 365 : 52}
                       value={recurringSchedule.interval}
-                      onChange={e => setRecurringSchedule(prev => ({ ...prev, interval: Math.max(1, parseInt(e.target.value) || 1) }))}
+                      onChange={e => setRecurringSchedule(prev => normalizeScenarioSchedule({ ...prev, interval: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
                     />
                     <span className="sb-schedule-unit">
                       {recurringSchedule.frequency === 'hourly' ? 'hours' :
@@ -5226,7 +5321,7 @@ export default function ScenariosPage() {
                       className="sb-input-field"
                       type="time"
                       value={recurringSchedule.time}
-                      onChange={e => setRecurringSchedule(prev => ({ ...prev, time: e.target.value }))}
+                      onChange={e => setRecurringSchedule(prev => normalizeScenarioSchedule({ ...prev, time: e.target.value }))}
                     />
                   </div>
                 )}
@@ -5247,7 +5342,7 @@ export default function ScenariosPage() {
                               setRecurringSchedule(prev => {
                                 const current = prev.daysOfWeek || [];
                                 const updated = isSelected ? current.filter(d => d !== day) : [...current, day];
-                                return { ...prev, daysOfWeek: updated };
+                                return normalizeScenarioSchedule({ ...prev, daysOfWeek: updated });
                               });
                             }}
                           >
@@ -5260,6 +5355,21 @@ export default function ScenariosPage() {
                 )}
                 </>
                 )}
+                <div className="sb-schedule-field">
+                  <label className="sb-schedule-label">Timezone</label>
+                  <select
+                    className="sb-input-field sb-select-field"
+                    value={recurringSchedule.timezone || LOCAL_TIMEZONE}
+                    onChange={e => setRecurringSchedule(prev => normalizeScenarioSchedule({ ...prev, timezone: e.target.value }))}
+                  >
+                    <option value={LOCAL_TIMEZONE}>Local Time ({LOCAL_TIMEZONE})</option>
+                    <option value="America/New_York">Eastern Time</option>
+                    <option value="America/Chicago">Central Time</option>
+                    <option value="America/Denver">Mountain Time</option>
+                    <option value="America/Los_Angeles">Pacific Time</option>
+                    <option value="UTC">UTC</option>
+                  </select>
+                </div>
               </div>
               
               <div className="sb-schedule-modal-footer">
@@ -5343,7 +5453,7 @@ export default function ScenariosPage() {
                       to: e.to,
                       filter: e.filter,
                     })),
-                    schedule_config: recurringSchedule,
+                    schedule_config: normalizeScenarioSchedule(recurringSchedule),
                     notes: scenarioNotes,
                     is_active: scenarioIsActive,
                   }, null, 2)}

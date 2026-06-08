@@ -1597,8 +1597,19 @@ async def startup_scenario_engine():
     try:
         if scenario_engine:
             await scenario_engine.start()
+            scenario_engine.start_scheduler()
     except Exception as exc:
         logging.error("Failed to start scenario engine: %s", exc, exc_info=True)
+
+
+@app.on_event("shutdown")
+async def shutdown_scenario_engine():
+    global scenario_engine
+    try:
+        if scenario_engine:
+            await scenario_engine.stop_scheduler()
+    except Exception as exc:
+        logging.error("Failed to stop scenario scheduler: %s", exc, exc_info=True)
 
 
 # --------------------------------------------------------------------------

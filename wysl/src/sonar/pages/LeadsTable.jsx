@@ -1952,9 +1952,6 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
             <TableControlButton ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
               Row Height
             </TableControlButton>
-            <div className="ml-auto text-[10px] font-semibold tracking-[-0.02em] text-zinc-700">
-              {frozenCount > 0 ? `${frozenCount} frozen` : 'No frozen columns'}
-            </div>
           </div>
           <div className="relative bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/[0.06] rounded-[1.5rem] flex flex-col h-full overflow-hidden">
             <div className="flex-1 flex flex-col overflow-hidden">

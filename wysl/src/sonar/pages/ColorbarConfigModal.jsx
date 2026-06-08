@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Plus, Trash2, Play, Palette, Sparkles, Check, GripVertical,
-  ChevronDown, ChevronUp, Eye, Wand2, Zap, ArrowRight,
+  ChevronDown, ChevronUp, Wand2, Zap, ArrowRight,
 } from 'lucide-react';
 import {
   COLORBAR_PRESETS, OPERATORS, loadColorbarRules, saveColorbarRules,
@@ -351,78 +351,73 @@ const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
               <div>
                 <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Colorbar Style</label>
 
-                {/* Presets */}
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {COLORBAR_PRESETS.map(preset => {
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {COLORBAR_PRESETS.map((preset) => {
                     const isActive = JSON.stringify(rule.colors) === JSON.stringify(preset.gradient);
                     return (
-                      <button key={preset.name} onClick={() => updateRule({ colors: preset.gradient, animation: preset.animation })}
+                      <button
+                        key={preset.name}
+                        onClick={() => updateRule({ colors: preset.gradient, animation: preset.animation })}
                         className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold tracking-[-0.02em] transition-all ${
-                          isActive ? 'border-white/20 text-white bg-white/[0.05]' : 'border-white/[0.04] text-zinc-500 hover:text-zinc-300 hover:border-white/10'
-                        }`}>
-                        <div className="w-3 h-3 rounded-full" style={{ background: `linear-gradient(135deg, ${preset.gradient[0]}, ${preset.gradient[1]})` }} />
+                          isActive ? 'border-white/20 bg-white/[0.05] text-white' : 'border-white/[0.04] text-zinc-500 hover:border-white/10 hover:text-zinc-300'
+                        }`}
+                      >
+                        <div className="h-3 w-3 rounded-full" style={{ background: `linear-gradient(135deg, ${preset.gradient[0]}, ${preset.gradient[1]})` }} />
                         {preset.name}
                       </button>
                     );
                   })}
                 </div>
 
-                {/* Custom Colors */}
-                <div className="flex items-center gap-2 mb-3">
+                <div className="mb-3 flex items-center gap-2">
                   <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Custom:</span>
-                  {(rule.colors || ['#6366f1']).map((c, i) => (
-                    <div key={i} className="relative group/swatch">
-                      <input type="color" value={c}
-                        onChange={e => {
+                  {(rule.colors || ['#6366f1']).map((color, index) => (
+                    <div key={index} className="relative group/swatch">
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => {
                           const next = [...(rule.colors || ['#6366f1'])];
-                          next[i] = e.target.value;
+                          next[index] = e.target.value;
                           updateRule({ colors: next });
                         }}
-                        className="w-7 h-7 rounded-lg cursor-pointer appearance-none border border-white/10 bg-transparent [&::-webkit-color-swatch-wrapper]:p-0.5 [&::-webkit-color-swatch]:rounded [&::-webkit-color-swatch]:border-none" />
+                        className="w-7 h-7 cursor-pointer appearance-none rounded-lg border border-white/10 bg-transparent [&::-webkit-color-swatch-wrapper]:p-0.5 [&::-webkit-color-swatch]:rounded [&::-webkit-color-swatch]:border-none"
+                      />
                     </div>
                   ))}
                   {(rule.colors || []).length < 3 && (
-                    <button onClick={() => updateRule({ colors: [...(rule.colors || ['#6366f1']), '#ffffff'] })}
-                      className="w-7 h-7 rounded-lg border border-dashed border-white/10 flex items-center justify-center text-zinc-700 hover:text-white hover:border-white/30 transition-all">
+                    <button
+                      onClick={() => updateRule({ colors: [...(rule.colors || ['#6366f1']), '#ffffff'] })}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-dashed border-white/10 text-zinc-700 transition-all hover:border-white/30 hover:text-white"
+                    >
                       <Plus size={10} />
                     </button>
                   )}
                   {(rule.colors || []).length > 1 && (
-                    <button onClick={() => updateRule({ colors: (rule.colors || []).slice(0, -1) })}
-                      className="w-7 h-7 rounded-lg border border-white/[0.04] flex items-center justify-center text-zinc-700 hover:text-rose-400 transition-all">
+                    <button
+                      onClick={() => updateRule({ colors: (rule.colors || []).slice(0, -1) })}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.04] text-zinc-700 transition-all hover:text-rose-400"
+                    >
                       <X size={10} />
                     </button>
                   )}
                 </div>
 
-                {/* Animation */}
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Animation:</span>
-                  <div className="flex bg-black/40 border border-white/[0.06] rounded-lg p-0.5">
-                    {['none', 'sweep', 'pulse'].map(a => (
-                      <button key={a} onClick={() => updateRule({ animation: a })}
+                  <div className="flex rounded-lg border border-white/[0.06] bg-black/40 p-0.5">
+                    {['none', 'sweep', 'pulse'].map((animation) => (
+                      <button
+                        key={animation}
+                        onClick={() => updateRule({ animation })}
                         className={`rounded-md px-2.5 py-1 text-[10px] font-semibold tracking-[-0.02em] transition-all ${
-                          rule.animation === a ? 'bg-white/10 text-white' : 'text-zinc-600 hover:text-zinc-400'
-                        }`}>
-                        {a === 'none' ? 'Static' : a === 'sweep' ? 'Sweep' : 'Pulse'}
+                          rule.animation === animation ? 'bg-white/10 text-white' : 'text-zinc-600 hover:text-zinc-400'
+                        }`}
+                      >
+                        {animation === 'none' ? 'Static' : animation === 'sweep' ? 'Sweep' : 'Pulse'}
                       </button>
                     ))}
                   </div>
-                </div>
-              </div>
-
-              {/* Live Preview Row */}
-              <div>
-                <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">
-                  <Eye size={9} className="inline mr-1" /> Preview
-                </label>
-                <div className="bg-black/60 border border-white/[0.04] rounded-xl p-3 flex items-center gap-3">
-                  <ColorbarPreview rule={{ ...rule, animation: rule.animation }} height={40} />
-                  <div className="flex-1">
-                    <p className="text-[12px] font-semibold tracking-[-0.02em] text-white">Acme Roofing Co</p>
-                    <p className="text-[10px] text-zinc-500">Interested · Roofing · $3,500</p>
-                  </div>
-                  <span className="text-[10px] text-zinc-600 px-2 py-0.5 bg-white/5 rounded-md">Live</span>
                 </div>
               </div>
             </div>
