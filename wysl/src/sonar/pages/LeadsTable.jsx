@@ -1754,6 +1754,20 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
                       aria-label={`Create zone from ${fieldConfig[metric.id]?.name || columns[metric.index]?.label || metric.id}`}
                     />
                   ))}
+                  {draftSpan?.metrics.map((metric) => (
+                    <motion.div
+                      key={`draft-glow-${metric.id}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="pointer-events-none absolute top-0 bottom-1 rounded-b-xl"
+                      style={{
+                        left: metric.left + 2,
+                        width: Math.max(metric.width - 4, 0),
+                        background: 'linear-gradient(180deg, rgba(125,211,252,0.14), rgba(125,211,252,0.04) 55%, transparent 100%)',
+                      }}
+                    />
+                  ))}
                   {zoneLayouts.map((zone) => (
                     <button
                       key={zone.id}
@@ -1765,8 +1779,58 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
                       className="absolute z-10 rounded-full pointer-events-auto"
                       style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 8, 0), height: 16 }}
                       aria-label="Edit zone color"
-                    />
+                    >
+                      <span
+                        className="absolute blur-[9px] opacity-26"
+                        style={{
+                          left: '2%',
+                          width: '96%',
+                          top: zone.top - Math.max(zone.top - 6, 0) + 1,
+                          height: 8,
+                          background: `radial-gradient(ellipse at center top, ${zone.displayColor}14 0%, ${zone.displayColor}10 34%, ${zone.displayColor}00 78%), linear-gradient(90deg, transparent 0%, ${zone.displayColor}14 10%, ${zone.displayColor}30 50%, ${zone.displayColor}14 90%, transparent 100%)`,
+                        }}
+                      />
+                      <span
+                        className="absolute inset-x-0 h-px rounded-full"
+                        style={{
+                          top: zone.top - Math.max(zone.top - 6, 0),
+                          background: `linear-gradient(90deg, ${zone.displayColor}AA 0%, ${zone.displayColor} 12%, ${zone.displayColor} 88%, ${zone.displayColor}AA 100%)`,
+                          boxShadow: zonePaletteId === zone.id ? `0 0 0 1px ${zone.displayColor}44, 0 0 18px ${zone.displayColor}55` : `0 0 12px ${zone.displayColor}35`,
+                        }}
+                      />
+                    </button>
                   ))}
+                  {draftSpan && (
+                    <motion.div
+                      initial={{ opacity: 0, scaleX: 0.98 }}
+                      animate={{ opacity: 1, scaleX: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="pointer-events-none absolute h-4"
+                      style={{ left: draftSpan.left, width: draftSpan.width, top: 0 }}
+                    >
+                      <span
+                        className="absolute h-[8px] blur-[9px]"
+                        style={{
+                          left: '2%',
+                          top: '3px',
+                          width: '96%',
+                          background: 'radial-gradient(ellipse at center top, rgba(125,211,252,0.12) 0%, rgba(125,211,252,0.09) 34%, rgba(125,211,252,0) 78%), linear-gradient(90deg, transparent 0%, rgba(125,211,252,0.1) 10%, rgba(125,211,252,0.22) 50%, rgba(125,211,252,0.1) 90%, transparent 100%)',
+                        }}
+                      />
+                      <span className="absolute inset-x-0 top-[3px] h-px rounded-full bg-cyan-200 shadow-[0_0_16px_rgba(125,211,252,0.55)]" />
+                    </motion.div>
+                  )}
+                  {!zoneDraft && hoveredZoneMetric && (
+                    <motion.div
+                      initial={{ opacity: 0, scaleX: 0.94 }}
+                      animate={{ opacity: 1, scaleX: 1 }}
+                      exit={{ opacity: 0, scaleX: 0.94 }}
+                      className="absolute h-4"
+                      style={{ left: hoveredZoneMetric.left, width: hoveredZoneMetric.width, top: 0 }}
+                    >
+                      <span className="absolute inset-x-1 top-[3px] h-px rounded-full bg-white/20 shadow-[0_0_10px_rgba(255,255,255,0.08)]" />
+                    </motion.div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 py-2 pr-5 group" style={{ paddingTop: '15px', paddingLeft: splitPaneScrollPadding }}>
                   {scrollableColumns.map((col) => renderHeaderColumn(col, columns.findIndex((column) => column.id === col.id)))}
