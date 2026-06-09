@@ -341,28 +341,15 @@ const AUTOMATION_HIERARCHY = {
       ],
     },
     {
-      key: 'text_messages',
-      option: 'Text Messages',
-      description: 'When something happens with SMS',
-      accent: '#32f0d9',
-      icon: OPTION_ICONS.text_messages,
-      sub_options: [
-        { key: 'sms_received', name: 'SMS Received', description: 'When a message is received' },
-        { key: 'sms_sent', name: 'SMS Sent', description: 'When a message is sent' },
-        { key: 'sms_failed', name: 'SMS Failed', description: 'When message delivery fails' },
-        { key: 'customer_replied', name: 'Customer Replied', description: 'When a customer responds' },
-      ],
-    },
-    {
       key: 'records',
-      option: 'Records',
-      description: 'When something happens to a record',
+      option: 'People',
+      description: 'When something happens to a person',
       accent: '#32f0d9',
       icon: OPTION_ICONS.records,
       sub_options: [
-        { key: 'record_created', name: 'Record Created', description: 'When a new record is created' },
-        { key: 'record_updated', name: 'Record Updated', description: 'When a record is updated' },
-        { key: 'record_deleted', name: 'Record Deleted', description: 'When a record is deleted' },
+        { key: 'record_created', name: 'Person Created', description: 'When a new person is created' },
+        { key: 'record_updated', name: 'Person Updated', description: 'When a person is updated' },
+        { key: 'record_deleted', name: 'Person Deleted', description: 'When a person is deleted' },
       ],
     },
     {
@@ -432,37 +419,20 @@ const AUTOMATION_HIERARCHY = {
       ],
     },
     {
-      key: 'text_messaging',
-      option: 'Text Messaging',
-      description: 'Send or manage SMS messages',
-      accent: '#38bdf8',
-      icon: OPTION_ICONS.text_messaging,
-      sub_options: [
-        { key: 'send_to_phone_number', name: 'Send To Phone Number', description: 'Send SMS to any number', configFields: [
-          { key: 'recipient', label: 'Recipient Number', type: 'text' },
-          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
-        ]},
-        { key: 'send_to_customer', name: 'Send SMS to an existing customer', configFields: [
-          { key: 'person_id', label: 'Person ID', type: 'person_id' },
-          { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
-        ]},
-      ],
-    },
-    {
       key: 'records',
-      option: 'Records',
-      description: 'Manage records in the database',
+      option: 'People',
+      description: 'Manage people in the database',
       accent: '#38bdf8',
       icon: OPTION_ICONS.records,
       sub_options: [
-        { key: 'search_records', name: 'Search Records', description: 'Find records from a table', configFields: [
+        { key: 'search_records', name: 'Search People', description: 'Find people', configFields: [
           { key: 'search_limit', label: 'Limit', type: 'number' },
         ]},
-        { key: 'create_new_record', name: 'Create New Record', description: 'Create a new record', configFields: [
+        { key: 'create_new_record', name: 'Create New Person', description: 'Create a new person', configFields: [
         ]},
-        { key: 'update_record', name: 'Update Record', description: 'Modify an existing record', configFields: [
+        { key: 'update_record', name: 'Update Person', description: 'Modify an existing person', configFields: [
         ]},
-        { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a record', configFields: [
+        { key: 'delete_record', name: 'Delete Person', description: 'Permanently delete a person', configFields: [
         ]},
       ],
     },
@@ -622,6 +592,7 @@ const getDefaultSchedule = () => {
   const nextHour = new Date(Date.now() + 60 * 60 * 1000);
   nextHour.setMinutes(0, 0, 0);
   return {
+    mode: 'manual',
     frequency: 'once',
     interval: 1,
     date: toLocalDateInputValue(nextHour),
@@ -658,6 +629,7 @@ export default function ScenariosPage() {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
   const { session } = useAuth();
   const userId = session?.user?.id || null;
+  const [builderTimezone, setBuilderTimezone] = useState(LOCAL_TIMEZONE);
   const [scenarios, setScenarios] = useState([]); // List of saved scenarios
   const [nodes, setNodes] = useState([INITIAL_NODE]);
   const [edges, setEdges] = useState([]);
@@ -793,10 +765,31 @@ export default function ScenariosPage() {
     }
   }, [applyScenarioOwnershipFilter, userId]);
 
+  const loadBuilderTimezone = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('business_timezone')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (error && error.code !== 'PGRST116') throw error;
+      setBuilderTimezone(data?.business_timezone || LOCAL_TIMEZONE);
+    } catch (error) {
+      console.warn('[Scenarios] Failed to load business timezone:', error?.message || error);
+      setBuilderTimezone(LOCAL_TIMEZONE);
+    }
+  }, [userId]);
+
   // Fetch scenarios from Supabase on mount
   useEffect(() => {
     loadScenarios();
   }, [loadScenarios]);
+
+  useEffect(() => {
+    loadBuilderTimezone();
+  }, [loadBuilderTimezone]);
 
   useEffect(() => {
     if (scenarios.length === 0 && !currentScenario) {
@@ -1086,6 +1079,7 @@ export default function ScenariosPage() {
   }, [nodes.length]);
 
   const formatScheduleDisplay = (config) => {
+    if (!config || config.mode === 'manual') return 'Manual';
     const { frequency, interval, date, time, daysOfWeek } = config;
     const timeStr = time ? ` at ${time}` : '';
     switch (frequency) {
@@ -1102,8 +1096,12 @@ export default function ScenariosPage() {
   };
 
   const normalizeScenarioSchedule = (config = {}) => {
-    const defaults = getDefaultSchedule();
+    const defaults = {
+      ...getDefaultSchedule(),
+      timezone: builderTimezone || LOCAL_TIMEZONE,
+    };
     return {
+      mode: config.mode === 'scheduled' ? 'scheduled' : 'manual',
       frequency: config.frequency || defaults.frequency,
       interval: Math.max(1, parseInt(config.interval, 10) || defaults.interval),
       date: config.date || defaults.date,
@@ -1116,6 +1114,10 @@ export default function ScenariosPage() {
           : [],
     };
   };
+
+  useEffect(() => {
+    setRecurringSchedule((prev) => normalizeScenarioSchedule({ ...prev, timezone: builderTimezone || LOCAL_TIMEZONE }));
+  }, [builderTimezone]);
 
   const handleToggleRecurring = async () => {
     const newActive = !scenarioIsActive;
@@ -2113,7 +2115,7 @@ export default function ScenariosPage() {
           time: '09:00',
           days_of_week: [],
           reminder_minutes: 30,
-          timezone: 'America/New_York',
+          timezone: builderTimezone || LOCAL_TIMEZONE,
         };
         restoringFromNodeRef.current = true;
         setScheduleConfig(initSchedConfig);
@@ -2425,6 +2427,8 @@ export default function ScenariosPage() {
       // Load toolbar state
       if (scenario.schedule_config) {
         setRecurringSchedule(normalizeScenarioSchedule(scenario.schedule_config));
+      } else {
+        setRecurringSchedule(normalizeScenarioSchedule({ mode: 'manual' }));
       }
       setScenarioNotes(scenario.notes || '');
       setScenarioIsActive(scenario.is_active !== false); // default true
@@ -2513,7 +2517,7 @@ export default function ScenariosPage() {
       })),
       status: 'active',
       is_active: scenarioIsActive,
-      schedule_config: normalizedSchedule,
+      schedule_config: normalizedSchedule.mode === 'scheduled' ? normalizedSchedule : null,
       notes: scenarioNotes,
     };
     
@@ -5331,20 +5335,6 @@ export default function ScenariosPage() {
                           )}
                         </div>
                       )}
-                      {/* Timezone */}
-                      {scheduleConfig.key !== 'appointment_reminder' && (
-                        <div>
-                          <label style={sbLabelStyle}>Timezone</label>
-                          <select value={scheduleConfig.timezone || 'America/New_York'}
-                            onChange={e => setScheduleConfig({ ...scheduleConfig, timezone: e.target.value })}
-                            style={sbInputStyle}>
-                            <option value="America/New_York">Eastern Time</option>
-                            <option value="America/Chicago">Central Time</option>
-                            <option value="America/Denver">Mountain Time</option>
-                            <option value="America/Los_Angeles">Pacific Time</option>
-                          </select>
-                        </div>
-                      )}
                       {/* Days of week for recurring_weekly */}
                       {scheduleConfig.key === 'recurring_weekly' && (
                         <div>
@@ -5620,15 +5610,40 @@ export default function ScenariosPage() {
             </div>
             
             {/* Schedule — greyed out when trigger is not "No Trigger" */}
-            <button
-              type="button"
-              className={`sb-toolbar-schedule ${!noTriggerActive ? 'sb-toolbar-schedule-disabled' : ''}`}
-              onClick={() => noTriggerActive && setShowScheduleModal(true)}
-              disabled={!noTriggerActive}
-            >
-              <Clock size={10} />
-              <span>{formatScheduleDisplay(recurringSchedule)}</span>
-            </button>
+            {noTriggerActive && (
+              <div className="sb-toolbar-mode-group" role="tablist" aria-label="Scenario run mode">
+                <button
+                  type="button"
+                  className={`sb-toolbar-mode-btn ${recurringSchedule.mode === 'manual' ? 'active' : ''}`}
+                  onClick={() => setRecurringSchedule((prev) => normalizeScenarioSchedule({
+                    ...prev,
+                    mode: 'manual',
+                  }))}
+                >
+                  Manual
+                </button>
+                <button
+                  type="button"
+                  className={`sb-toolbar-mode-btn ${recurringSchedule.mode === 'scheduled' ? 'active' : ''}`}
+                  onClick={() => setRecurringSchedule((prev) => normalizeScenarioSchedule({
+                    ...prev,
+                    mode: 'scheduled',
+                  }))}
+                >
+                  Scheduled
+                </button>
+              </div>
+            )}
+            {noTriggerActive && recurringSchedule.mode === 'scheduled' && (
+              <button
+                type="button"
+                className="sb-toolbar-schedule"
+                onClick={() => setShowScheduleModal(true)}
+              >
+                <Clock size={10} />
+                <span>{formatScheduleDisplay(recurringSchedule)}</span>
+              </button>
+            )}
             
             {/* Notes */}
             <button
@@ -5987,21 +6002,6 @@ export default function ScenariosPage() {
                 )}
                 </>
                 )}
-                <div className="sb-schedule-field">
-                  <label className="sb-schedule-label">Timezone</label>
-                  <select
-                    className="sb-input-field sb-select-field"
-                    value={recurringSchedule.timezone || LOCAL_TIMEZONE}
-                    onChange={e => setRecurringSchedule(prev => normalizeScenarioSchedule({ ...prev, timezone: e.target.value }))}
-                  >
-                    <option value={LOCAL_TIMEZONE}>Local Time ({LOCAL_TIMEZONE})</option>
-                    <option value="America/New_York">Eastern Time</option>
-                    <option value="America/Chicago">Central Time</option>
-                    <option value="America/Denver">Mountain Time</option>
-                    <option value="America/Los_Angeles">Pacific Time</option>
-                    <option value="UTC">UTC</option>
-                  </select>
-                </div>
               </div>
               
               <div className="sb-schedule-modal-footer">
