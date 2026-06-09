@@ -1758,6 +1758,9 @@ class ScenarioEngine:
     def start_scheduler(self):
         if self.scheduler_task and not self.scheduler_task.done():
             return
+        message = f"[ScenarioEngine] Scheduler worker starting as {self.scheduler_worker_id}"
+        print(message, flush=True)
+        logging.info(message)
         self.scheduler_task = asyncio.create_task(self._scheduler_loop())
 
     async def stop_scheduler(self):
@@ -1888,6 +1891,8 @@ class ScenarioEngine:
     async def _scheduler_loop(self):
         while True:
             try:
+                logging.info("[ScenarioEngine] Scheduler worker tick: %s", self.scheduler_worker_id)
+                print(f"[ScenarioEngine] Scheduler worker tick: {self.scheduler_worker_id}", flush=True)
                 await self.run_due_scheduled_jobs()
             except asyncio.CancelledError:
                 raise

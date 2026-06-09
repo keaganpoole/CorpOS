@@ -742,6 +742,7 @@ export default function ScenariosPage() {
   const [scenarioNotes, setScenarioNotes] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [runProgress, setRunProgress] = useState('');
+  const [scenarioRunState, setScenarioRunState] = useState(null);
   const [integrations, setIntegrations] = useState(DEFAULT_INTEGRATIONS);
   const [integrationLoading, setIntegrationLoading] = useState(false);
   const [integrationSaving, setIntegrationSaving] = useState(false);
@@ -803,6 +804,12 @@ export default function ScenariosPage() {
     }
   }, [currentScenario, scenarios.length]);
 
+  useEffect(() => {
+    const triggerNode = nodes.find((node) => node.categoryType === 'TRIGGERS');
+    if (!triggerNode) return;
+    setNoTriggerActive(triggerNode.label === 'No Trigger' || triggerNode.subOptionKey === 'no_trigger');
+  }, [nodes]);
+
   const refreshPeopleCustomFields = useCallback(async () => {
     try {
       const businessId = await getCurrentBusinessId();
@@ -836,6 +843,7 @@ export default function ScenariosPage() {
   const introCircleRef = useRef(null);
   const circleRefs = useRef({}); // per-node circle element refs
   const edgeDragRef = useRef(null);
+  const scenarioRunStateRef = useRef(null);
 
   const dragRef = useRef({ id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 });
   const panRef = useRef(null);
@@ -850,6 +858,10 @@ export default function ScenariosPage() {
   useEffect(() => {
     edgeDragRef.current = edgeDrag;
   }, [edgeDrag]);
+
+  useEffect(() => {
+    scenarioRunStateRef.current = scenarioRunState;
+  }, [scenarioRunState]);
 
   // Auto-save edge rules to edges whenever rules change (while panel is open)
   useEffect(() => {
@@ -2752,6 +2764,113 @@ export default function ScenariosPage() {
     return true;
   };
 
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const formatRunDuration = (durationMs) => {
+    if (!Number.isFinite(durationMs) || durationMs < 0) return '';
+    if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
+    return `${(durationMs / 1000).toFixed(durationMs >= 10000 ? 0 : 1)}s`;
+  };
+
+  const summarizeRunResult = (actionKey, result, errorMessage = '') => {
+    if (errorMessage) return errorMessage;
+    if (actionKey === 'search_records') {
+      return `Found ${Array.isArray(result) ? result.length : 0} records`;
+    }
+    if (actionKey === 'search_appointments') {
+      return `Found ${Array.isArray(result) ? result.length : 0} appointments`;
+    }
+    if (actionKey === 'create_appointment' || actionKey === 'update_appointment') {
+      return result?.id ? `Appointment #${String(result.id).slice(0, 8)} updated` : 'Appointment updated';
+    }
+    if (actionKey === 'create_customer' || actionKey === 'update_customer') {
+      return result?.customer_id ? `Customer ${result.customer_id}` : 'Customer updated';
+    }
+    if (actionKey === 'create_payment') {
+      return result?.status ? `Payment ${result.status}` : 'Payment created';
+    }
+    if (actionKey === 'send_payment_link') {
+      return result?.payment_url ? 'Payment link created' : 'Payment link sent';
+    }
+    if (actionKey === 'create_invoice' || actionKey === 'send_invoice') {
+      return result?.invoice_id ? `Invoice ${result.invoice_id}` : 'Invoice updated';
+    }
+    if (actionKey === 'refund_payment') {
+      return result?.refund_id ? `Refund ${result.refund_id}` : 'Refund created';
+    }
+    if (actionKey === 'cancel_subscription') {
+      return result?.subscription_id ? `Subscription ${result.subscription_id}` : 'Subscription cancelled';
+    }
+    if (actionKey === 'send_email') {
+      return result?.id ? `Sent email ${result.id}` : 'Email sent';
+    }
+    if (actionKey === 'create_new_record') {
+      return result?.id ? `Created record ${result.id}` : 'Record created';
+    }
+    if (actionKey === 'update_record') {
+      return result?.id ? `Updated record ${result.id}` : 'Record updated';
+    }
+    if (Array.isArray(result)) return `${result.length} item${result.length === 1 ? '' : 's'}`;
+    if (result && typeof result === 'object') return 'Completed';
+    return 'Completed';
+  };
+
+  const buildScenarioExecutionOrder = useCallback(() => {
+    const triggerNode = nodes.find((node) => node.categoryType === 'TRIGGERS');
+    if (!triggerNode) return [];
+    const visited = new Set([triggerNode.id]);
+    const queue = [triggerNode.id];
+    const order = [triggerNode];
+    while (queue.length > 0) {
+      const currentId = queue.shift();
+      const outgoing = edges.filter((edge) => edge.from === currentId);
+      for (const edge of outgoing) {
+        if (visited.has(edge.to)) continue;
+        visited.add(edge.to);
+        queue.push(edge.to);
+        const node = nodeMap[edge.to];
+        if (node) order.push(node);
+      }
+    }
+    return order;
+  }, [edges, nodeMap, nodes]);
+
+  const focusRunNode = useCallback((nodeId, originalView) => {
+    const node = nodeMap[nodeId];
+    if (!node) return;
+    const viewportWidth = canvasRef.current?.clientWidth || window.innerWidth;
+    const viewportHeight = canvasRef.current?.clientHeight || window.innerHeight;
+    const current = scenarioRunStateRef.current?.viewport || view;
+    const screenX = current.x + node.x * current.scale;
+    const screenY = current.y + node.y * current.scale;
+    const centerX = viewportWidth / 2;
+    const centerY = viewportHeight / 2;
+    const distance = Math.hypot(screenX - centerX, screenY - centerY);
+    let nextScale = current.scale;
+    if (distance > Math.min(viewportWidth, viewportHeight) * 0.85) {
+      nextScale = Math.max(0.86, Math.min(current.scale, 0.92));
+    } else if (distance > Math.min(viewportWidth, viewportHeight) * 0.5) {
+      nextScale = Math.max(0.94, Math.min(current.scale, 1));
+    }
+    if (distance < Math.min(viewportWidth, viewportHeight) * 0.26 && Math.abs(nextScale - current.scale) < 0.01) {
+      return;
+    }
+    const nextView = {
+      x: centerX - node.x * nextScale,
+      y: centerY - node.y * nextScale,
+      scale: nextScale,
+    };
+    setView(nextView);
+    setScenarioRunState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        viewport: nextView,
+        originalView: prev.originalView || originalView,
+      };
+    });
+  }, [nodeMap, view]);
+
   const setNodeRunState = useCallback((nodeId, status) => {
     if (nodeRunTimersRef.current[nodeId]) {
       clearTimeout(nodeRunTimersRef.current[nodeId]);
@@ -2813,17 +2932,14 @@ export default function ScenariosPage() {
         const tableKey = actionKey === 'search_appointments' ? 'appointments' : 'people';
         const limit = config.search_limit || 10;
         console.log('[Run Node] search request', { nodeId, actionKey, tableKey, limit });
-        let query = supabase.from(tableKey).select('*').limit(limit);
-        if (actionKey === 'search_appointments') {
-          const businessId = await getCurrentBusinessId();
-          if (businessId) query = query.eq('business_id', businessId);
-        } else {
-          const searchUserId = session?.user?.id || null;
-          if (searchUserId) query = query.eq('user_id', searchUserId);
+        const endpoint = actionKey === 'search_appointments'
+          ? `/api/sonar/appointments?limit=${encodeURIComponent(limit)}`
+          : `/api/sonar/people?limit=${encodeURIComponent(limit)}`;
+        const resp = await authorizedApiFetch(endpoint, { method: 'GET' });
+        const result = await resp.json();
+        if (!resp.ok || result?.detail || result?.error) {
+          throw new Error(result?.detail || result?.error || 'Search failed');
         }
-        const { data, error } = await query;
-        if (error) throw new Error(error.message || 'Search failed');
-        const result = data || [];
         setNodes(prev => prev.map(n => n.id === nodeId
           ? { ...n, searchResults: result, outputData: result }
           : n
@@ -3015,7 +3131,6 @@ export default function ScenariosPage() {
       }
 
       if (actionKey === 'update_record' || actionKey === 'create_new_record') {
-        const tableKey = (config.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
         const resolvedRecordId = getValue('record_id') || null;
         const updateData = {};
 
@@ -3029,26 +3144,29 @@ export default function ScenariosPage() {
           }
         });
 
-        console.log('[Run Node] record request', { nodeId, actionKey, tableKey, resolvedRecordId, updateData });
+        console.log('[Run Node] record request', { nodeId, actionKey, tableKey: 'people', resolvedRecordId, updateData });
 
         let result;
         if (actionKey === 'update_record' && resolvedRecordId) {
-          const { data, error } = await supabase
-            .from(tableKey)
-            .update(updateData)
-            .eq('id', resolvedRecordId)
-            .select()
-            .single();
-          if (error) throw new Error(error.message || 'Update record failed');
-          result = data;
+          const resp = await authorizedApiFetch(`/api/sonar/people/${encodeURIComponent(resolvedRecordId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
+          });
+          result = await resp.json();
+          if (!resp.ok || result?.detail || result?.error) {
+            throw new Error(result?.detail || result?.error || 'Update record failed');
+          }
         } else if (actionKey === 'create_new_record') {
-          const { data, error } = await supabase
-            .from(tableKey)
-            .insert(updateData)
-            .select()
-            .single();
-          if (error) throw new Error(error.message || 'Create record failed');
-          result = data;
+          const resp = await authorizedApiFetch('/api/sonar/people', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
+          });
+          result = await resp.json();
+          if (!resp.ok || result?.detail || result?.error) {
+            throw new Error(result?.detail || result?.error || 'Create record failed');
+          }
         } else {
           throw new Error('Record ID is required to update a record.');
         }
@@ -3481,6 +3599,171 @@ export default function ScenariosPage() {
     return undefined;
   }, [nodes, isRunning]);
 
+  const handleRunScenarioInBuilder = async () => {
+    if (isRunning || !noTriggerActive) return;
+    const execOrder = buildScenarioExecutionOrder();
+    if (!execOrder.length) {
+      setRunProgress('No trigger found');
+      return;
+    }
+
+    const originalView = { ...view };
+    const orderIds = execOrder.map((node) => node.id);
+    const pathEdgeIds = edges
+      .filter((edge) => orderIds.includes(edge.from) && orderIds.includes(edge.to))
+      .map((edge) => edge.id);
+
+    for (const node of execOrder) {
+      if (!node?.configured || !node.actionConfig?._key) continue;
+      const unresolvedFields = getUnresolvedRunFields(node, buildFlowResultsMap(node.id));
+      if (unresolvedFields.length > 0) {
+        setRunProgress(`${node.label}: missing ${unresolvedFields.map((field) => field.label).join(', ')}`);
+        return;
+      }
+    }
+
+    setIsRunning(true);
+    setRunProgress('Starting scenario...');
+    setScenarioRunState({
+      mode: 'running',
+      orderIds,
+      pathEdgeIds,
+      activeNodeId: null,
+      activeEdgeId: null,
+      completedNodeIds: [],
+      breadcrumbs: [],
+      previews: {},
+      timings: {},
+      viewport: originalView,
+      originalView,
+    });
+
+    try {
+      for (let index = 0; index < execOrder.length; index += 1) {
+        const node = execOrder[index];
+        const actionKey = node.actionConfig?._key;
+        const stepText = `[${index + 1}/${execOrder.length}] ${node.label || node.id}`;
+        const previousNodeId = index > 0 ? execOrder[index - 1].id : null;
+        const incomingEdgeId = previousNodeId
+          ? edges.find((edge) => edge.from === previousNodeId && edge.to === node.id)?.id || null
+          : null;
+
+        setScenarioRunState((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            activeNodeId: null,
+            activeEdgeId: incomingEdgeId,
+            breadcrumbs: [
+              ...prev.breadcrumbs,
+              { nodeId: node.id, label: node.label || node.id, status: 'running' },
+            ],
+          };
+        });
+        setRunProgress(`Routing to ${stepText}`);
+        await delay(previousNodeId ? 140 : 100);
+        focusRunNode(node.id, originalView);
+
+        if (!node.configured || !actionKey) {
+          setScenarioRunState((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              activeNodeId: null,
+              activeEdgeId: null,
+              completedNodeIds: [...prev.completedNodeIds, node.id],
+              breadcrumbs: prev.breadcrumbs.map((entry) => (
+                entry.nodeId === node.id ? { ...entry, status: 'skipped', preview: 'Skipped' } : entry
+              )),
+              timings: {
+                ...prev.timings,
+                [node.id]: { durationMs: 0, label: '0ms', preview: 'Skipped', status: 'skipped' },
+              },
+            };
+          });
+          continue;
+        }
+
+        setScenarioRunState((prev) => prev ? { ...prev, activeNodeId: node.id } : prev);
+        setRunProgress(`Running ${stepText}`);
+
+        const startedAt = performance.now();
+        try {
+          const result = await executeRunnableNode(node.id);
+          const durationMs = performance.now() - startedAt;
+          const preview = summarizeRunResult(actionKey, result);
+          setScenarioRunState((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              activeNodeId: null,
+              activeEdgeId: null,
+              completedNodeIds: [...prev.completedNodeIds, node.id],
+              previews: { ...prev.previews, [node.id]: preview },
+              timings: {
+                ...prev.timings,
+                [node.id]: {
+                  durationMs,
+                  label: formatRunDuration(durationMs),
+                  preview,
+                  status: 'success',
+                },
+              },
+              breadcrumbs: prev.breadcrumbs.map((entry) => (
+                entry.nodeId === node.id ? { ...entry, status: 'success', preview } : entry
+              )),
+            };
+          });
+          setRunProgress(`${stepText} completed`);
+        } catch (error) {
+          const durationMs = performance.now() - startedAt;
+          const preview = summarizeRunResult(actionKey, null, error?.message || 'Failed');
+          setScenarioRunState((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              mode: 'failed',
+              activeNodeId: null,
+              activeEdgeId: null,
+              completedNodeIds: [...prev.completedNodeIds, node.id],
+              previews: { ...prev.previews, [node.id]: preview },
+              timings: {
+                ...prev.timings,
+                [node.id]: {
+                  durationMs,
+                  label: formatRunDuration(durationMs),
+                  preview,
+                  status: 'error',
+                },
+              },
+              breadcrumbs: prev.breadcrumbs.map((entry) => (
+                entry.nodeId === node.id ? { ...entry, status: 'error', preview } : entry
+              )),
+            };
+          });
+          setRunProgress(`${stepText} failed: ${error?.message || 'Unknown error'}`);
+          throw error;
+        }
+
+        await delay(220);
+      }
+
+      setRunProgress('Scenario complete');
+      setScenarioRunState((prev) => prev ? { ...prev, mode: 'complete', activeNodeId: null, activeEdgeId: null } : prev);
+    } catch (error) {
+      console.error('[Scenario Run] Scenario execution failed', error);
+    } finally {
+      await delay(420);
+      setView(originalView);
+      setScenarioRunState((prev) => prev ? { ...prev, viewport: originalView } : prev);
+      setIsRunning(false);
+      window.setTimeout(() => {
+        setScenarioRunState(null);
+        setRunProgress('');
+      }, 3200);
+    }
+  };
+
   const handleEditScenario = (scenario) => {
     // Load scenario and show save modal with current values
     handleLoadScenario(scenario);
@@ -3680,6 +3963,11 @@ export default function ScenariosPage() {
                 const isDraft = !nodeMap[edge.to]?.configured;
                 const isFallback = edge.filter?.type === 'fallback';
                 const isDraggingEdge = edgeDrag?.edgeId === edge.id;
+                const isRunPathEdge = scenarioRunState?.pathEdgeIds?.includes(edge.id);
+                const isCompletedEdge = scenarioRunState?.completedNodeIds?.includes(edge.from) && scenarioRunState?.completedNodeIds?.includes(edge.to);
+                const isActiveEdge = scenarioRunState?.activeEdgeId === edge.id;
+                const isFutureEdge = isRunPathEdge && !isCompletedEdge && !isActiveEdge;
+                const isUnrelatedEdge = Boolean(scenarioRunState) && !isRunPathEdge;
                 // For unconfigured nodes, edge should target circle bottom (center + radius)
                 // Configured nodes already have node.y near sphere bottom due to label+connector below
                 const fromMeasured = circleCenterRef.current[edge.from];
@@ -3695,7 +3983,7 @@ export default function ScenariosPage() {
                   <path
                     key={edge.id}
                     d={path}
-                    className={`sb-edge-line ${isDraft ? 'sb-edge-draft' : ''} ${isFallback ? 'sb-edge-fallback' : ''} ${isDraggingEdge ? 'sb-edge-dragging' : ''}`}
+                    className={`sb-edge-line ${isDraft ? 'sb-edge-draft' : ''} ${isFallback ? 'sb-edge-fallback' : ''} ${isDraggingEdge ? 'sb-edge-dragging' : ''} ${isActiveEdge ? 'is-run-active' : ''} ${isCompletedEdge ? 'is-run-complete' : ''} ${isFutureEdge ? 'is-run-future' : ''} ${isUnrelatedEdge ? 'is-run-unrelated' : ''}`}
                     fill="none"
                     markerEnd={!isDraft ? (isDraggingEdge ? "url(#sb-arrowhead-active)" : "url(#sb-arrowhead)") : ""}
                     style={isFallback ? { stroke: '#f59e0b', strokeDasharray: '8 4', strokeWidth: '2px' } : {}}
@@ -3803,6 +4091,11 @@ export default function ScenariosPage() {
               const nodeRunState = nodeRunStates[node.id]?.status || null;
               const isEdgeDropCandidate = Boolean(edgeDrag && isValidConnectionTarget(edgeDrag.from, node.id, edgeDrag.edgeId));
               const isEdgeDropTarget = edgeDrag?.snapTargetId === node.id;
+              const inRunPath = scenarioRunState?.orderIds?.includes(node.id);
+              const isRunActiveNode = scenarioRunState?.activeNodeId === node.id;
+              const isRunCompletedNode = scenarioRunState?.completedNodeIds?.includes(node.id);
+              const isRunFutureNode = inRunPath && !isRunCompletedNode && !isRunActiveNode;
+              const isRunUnrelatedNode = Boolean(scenarioRunState) && !inRunPath;
               return (
                 <div
                   key={node.id}
@@ -3812,7 +4105,7 @@ export default function ScenariosPage() {
                   }}
                   className={`sb-builder-node ${node.type === 'router' ? 'router-node' : ''} ${
                     isActive ? 'sb-active-node' : ''
-                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''}`}
+                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''} ${isRunActiveNode ? 'sb-run-node-active' : ''} ${isRunCompletedNode ? 'sb-run-node-complete' : ''} ${isRunFutureNode ? 'sb-run-node-future' : ''} ${isRunUnrelatedNode ? 'sb-run-node-unrelated' : ''}`}
                   style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
                   onPointerEnter={() => setHoveredNodeId(node.id)}
                   onPointerLeave={() => setHoveredNodeId((current) => (current === node.id ? null : current))}
@@ -3886,6 +4179,7 @@ export default function ScenariosPage() {
 
                         {/* Pulse Effect for Activity */}
                         <div className="sb-node-pulse-dot" />
+                        {isRunActiveNode && <div className="sb-node-live-marker" aria-hidden="true" />}
 
                         {/* Add button */}
                         {!hasOutgoingNode && (
@@ -5356,8 +5650,37 @@ export default function ScenariosPage() {
               <Code size={13} />
             </button>
 
+            {noTriggerActive && (
+              <button
+                type="button"
+                className={`sb-toolbar-run-btn ${isRunning ? 'running' : ''}`}
+                onClick={handleRunScenarioInBuilder}
+                disabled={isRunning}
+                title="Run scenario in builder"
+              >
+                <Zap size={13} />
+                <span>{isRunning ? (runProgress || 'Running scenario...') : 'Run Scenario'}</span>
+              </button>
+            )}
+
           </div>
         </div>
+        )}
+
+        {scenarioRunState && (
+          <div className="sb-execution-feed" aria-live="polite">
+            {scenarioRunState.breadcrumbs.map((entry) => (
+              <div
+                key={`${entry.nodeId}-${entry.status}`}
+                className={`sb-execution-feed-item is-${entry.status}`}
+              >
+                <span className="sb-execution-feed-marker">
+                  {entry.status === 'running' ? '->' : entry.status === 'error' ? '!' : '✓'}
+                </span>
+                <span className="sb-execution-feed-label">{entry.label}</span>
+              </div>
+            ))}
+          </div>
         )}
 
         {showIntegrationsModal && (

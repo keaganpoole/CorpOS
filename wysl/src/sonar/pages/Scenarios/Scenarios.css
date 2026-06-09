@@ -676,7 +676,25 @@
 .sb-edge-line {
   stroke: rgba(255, 255, 255, 0.15);
   stroke-width: 2px;
-  transition: stroke 0.3s ease;
+  transition: stroke 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
+}
+
+.sb-edge-line.is-run-active {
+  stroke: rgba(255, 255, 255, 0.42);
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.12));
+}
+
+.sb-edge-line.is-run-complete {
+  stroke: rgba(255, 255, 255, 0.3);
+  opacity: 0.85;
+}
+
+.sb-edge-line.is-run-future {
+  opacity: 0.7;
+}
+
+.sb-edge-line.is-run-unrelated {
+  opacity: 0.5;
 }
 
 .sb-edge-line.sb-edge-dragging {
@@ -786,6 +804,23 @@
 .sb-builder-node:hover {
   transform: translate(-50%, -50%) scale(1.005);
   z-index: 6;
+}
+
+.sb-builder-node.sb-run-node-active {
+  opacity: 1 !important;
+  z-index: 12;
+}
+
+.sb-builder-node.sb-run-node-complete {
+  opacity: 0.85 !important;
+}
+
+.sb-builder-node.sb-run-node-future {
+  opacity: 0.7 !important;
+}
+
+.sb-builder-node.sb-run-node-unrelated {
+  opacity: 0.5 !important;
 }
 
 .sb-builder-node:active {
@@ -1144,6 +1179,30 @@
   }
 }
 
+.sb-node-live-marker {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.22);
+  animation: sb-node-live-pulse 1.4s ease-in-out infinite;
+  z-index: 14;
+}
+
+@keyframes sb-node-live-pulse {
+  0%, 100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.18);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0);
+  }
+}
+
 
 
 .sb-node-add {
@@ -1200,6 +1259,7 @@
 .sb-builder-node:hover .sb-node-below-desc {
   opacity: 1;
 }
+
 
 /* Connecting Line � mt-6, w-px, h-16, gradient from-white/20, opacity-30, hover:h-20 */
 .sb-node-connector-line {
@@ -4099,6 +4159,53 @@
 
 .sb-toolbar-run-btn:disabled {
   opacity: 0.7;
+}
+
+.sb-execution-feed {
+  position: absolute;
+  right: 22px;
+  bottom: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 190px;
+  padding: 12px 14px;
+  background: rgba(12, 12, 16, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  z-index: 40;
+}
+
+.sb-execution-feed-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.sb-execution-feed-item.is-running {
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.sb-execution-feed-item.is-error {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.sb-execution-feed-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  font-weight: 700;
+}
+
+.sb-execution-feed-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ─── Schedule Modal ────────────────────────────────────────────────── */
