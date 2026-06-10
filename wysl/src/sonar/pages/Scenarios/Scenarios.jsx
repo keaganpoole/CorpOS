@@ -3011,7 +3011,30 @@ export default function ScenariosPage() {
     );
     const runStartedAt = Date.now();
     const finishNodeRun = (result) => {
-      const complete = () => setNodeRunState(nodeId, hasMeaningfulNodeResponse(result) ? 'success' : 'empty');
+      const isMeaningful = hasMeaningfulNodeResponse(result);
+      const complete = () => {
+        setNodeRunState(nodeId, isMeaningful ? 'success' : 'empty');
+        const elapsedMs = Date.now() - runStartedAt;
+        if (isMeaningful) {
+          console.log('[Run Node] executeRunnableNode completed', {
+            nodeId,
+            actionKey,
+            durationMs: elapsedMs,
+            resultSummary: Array.isArray(result)
+              ? { type: 'array', count: result.length }
+              : result && typeof result === 'object'
+                ? { type: 'object', keys: Object.keys(result).slice(0, 12) }
+                : { type: typeof result, value: result },
+          });
+        } else {
+          console.warn('[Run Node] executeRunnableNode returned empty result', {
+            nodeId,
+            actionKey,
+            durationMs: elapsedMs,
+            result,
+          });
+        }
+      };
       const elapsed = Date.now() - runStartedAt;
       const remaining = Math.max(0, 900 - elapsed);
       if (remaining > 0) {
@@ -3057,6 +3080,13 @@ export default function ScenariosPage() {
         if (!resp.ok || result?.detail || result?.error) {
           throw new Error(result?.detail || result?.error || 'Search failed');
         }
+        console.log('[Run Node] search response', {
+          nodeId,
+          actionKey,
+          tableKey,
+          count: Array.isArray(result) ? result.length : null,
+          sample: Array.isArray(result) && result.length > 0 ? result[0] : null,
+        });
         setNodes(prev => prev.map(n => n.id === nodeId
           ? { ...n, searchResults: result, outputData: result }
           : n
