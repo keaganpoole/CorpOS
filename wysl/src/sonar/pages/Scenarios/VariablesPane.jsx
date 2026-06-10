@@ -176,6 +176,7 @@ const getIteratorCurrentFieldsFromNode = (iteratorNode, nodes, edges) => {
     .map((key) => ({
       key,
       label: getIteratorFieldLabel(key),
+      value: sample[key],
     }));
 
   return { fields, sourceNode };
@@ -1052,15 +1053,27 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
                         Run the upstream bundle source first to inspect the current bundle fields.
                       </div>
                     ) : iteratorCurrentFields.map((field) => (
-                      <button
-                        key={field.key}
-                        type="button"
-                        className="sb-vars-field"
-                        onClick={(e) => { e.stopPropagation(); onInsertVariable?.(`{{iterator.current.${field.key}}}`, field.label, color); }}
-                        title={`Insert {{iterator.current.${field.key}}}`}
-                      >
-                        <span className="sb-vars-field-name" style={{ color }}>{field.label}</span>
-                      </button>
+                      (() => {
+                        const displayVal = field.value == null
+                          ? ''
+                          : (typeof field.value === 'object'
+                              ? JSON.stringify(field.value)
+                              : String(field.value));
+                        return (
+                          <button
+                            key={field.key}
+                            type="button"
+                            className="sb-vars-field"
+                            onClick={(e) => { e.stopPropagation(); onInsertVariable?.(`{{iterator.current.${field.key}}}`, field.label, color); }}
+                            title={`Insert {{iterator.current.${field.key}}}`}
+                          >
+                            <span className="sb-vars-field-name" style={{ color }}>{field.label}</span>
+                            {displayVal && (
+                              <span className="sb-vars-field-value">{displayVal.length > 40 ? `${displayVal.slice(0, 40)}…` : displayVal}</span>
+                            )}
+                          </button>
+                        );
+                      })()
                     ))}
                   </>
                 ) : prev.outputVars.length === 0 ? (

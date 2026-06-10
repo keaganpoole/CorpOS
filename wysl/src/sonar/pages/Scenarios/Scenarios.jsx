@@ -956,7 +956,12 @@ export default function ScenariosPage() {
     }
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${session.access_token}`);
-    return fetch(`${API_BASE_URL}${path}`, { ...options, headers, signal: options.signal });
+    try {
+      return await fetch(`${API_BASE_URL}${path}`, { ...options, headers, signal: options.signal });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Request failed';
+      throw new Error(`API request failed for ${path}: ${detail}`);
+    }
   }, [session?.access_token]);
 
   const refreshIntegrations = useCallback(async () => {
@@ -2684,6 +2689,68 @@ export default function ScenariosPage() {
     return resolveVariableRefs(resolveTableVariableRefs(configValue, resultsMap), resultsMap);
   };
 
+  const resolveIteratorCollectionFromResultsMap = useCallback((rawValue, resultsMap) => {
+    if (Array.isArray(rawValue)) {
+      return { items: rawValue, sourceTable: '', collectionPath: '' };
+    }
+
+    const normalizePathValue = (value) => (
+      typeof value === 'string'
+        ? value.trim().replace(/^\{\{/, '').replace(/\}\}$/, '').trim()
+        : ''
+    );
+
+    const directPath = normalizePathValue(rawValue);
+    const directResolved = directPath ? readRuntimePath(resultsMap, directPath.split('.').filter(Boolean)) : null;
+    const interpolated = typeof rawValue === 'string'
+      ? resolveVariableRefs(resolveTableVariableRefs(rawValue, resultsMap), resultsMap)
+      : rawValue;
+    const interpolatedPath = normalizePathValue(interpolated);
+    const interpolatedResolved = interpolatedPath && interpolatedPath !== directPath
+      ? readRuntimePath(resultsMap, interpolatedPath.split('.').filter(Boolean))
+      : null;
+    const resolved = directResolved ?? interpolatedResolved ?? interpolated;
+
+    let items = [];
+    let sourceTable = '';
+    if (Array.isArray(resolved)) {
+      items = resolved;
+      sourceTable = normalizeScenarioTableKey(directPath.split('.')[0] || interpolatedPath.split('.')[0] || '');
+    } else if (resolved && typeof resolved === 'object' && Array.isArray(resolved.records)) {
+      items = resolved.records;
+      sourceTable = normalizeScenarioTableKey(resolved.table || directPath.split('.')[0] || interpolatedPath.split('.')[0] || '');
+    }
+
+    return {
+      items,
+      sourceTable,
+      collectionPath: directPath || interpolatedPath || '',
+    };
+  }, [readRuntimePath, resolveTableVariableRefs, resolveVariableRefs]);
+
+  const applyIteratorItemResultsMap = useCallback((resultsMap, item, index, total, sourceTable, collectionPath) => {
+    const nextMap = {
+      ...resultsMap,
+      iterator: {
+        current: item,
+        index,
+        position: index + 1,
+        total,
+        is_first: index === 0,
+        is_last: index === total - 1,
+        collection_path: collectionPath || '',
+      },
+    };
+
+    if (sourceTable) {
+      nextMap[sourceTable] = item;
+      const alias = TABLE_REF_REVERSE_ALIASES[sourceTable];
+      if (alias) nextMap[alias] = item;
+    }
+
+    return nextMap;
+  }, []);
+
   const getUnresolvedRunFields = (node, resultsMap) => {
     const config = node?.actionConfig;
     const fields = Array.isArray(config?._fields) ? config._fields : [];
@@ -2720,7 +2787,30 @@ export default function ScenariosPage() {
 
     for (const nodeId of priorIds) {
       const node = nodeMap[nodeId];
-      if (!node || node.outputData == null) continue;
+      if (!node) continue;
+
+      if (node.actionConfig?._key === 'iterator') {
+        const { items, sourceTable, collectionPath } = resolveIteratorCollectionFromResultsMap(
+          node.actionConfig?.collection_path || node.actionConfig?.collection || node.actionConfig?.array_path || '',
+          resultsMap
+        );
+        const sampleItem = items.find((item) => item && typeof item === 'object') || items[0];
+        if (sampleItem != null) {
+          Object.assign(
+            resultsMap,
+            applyIteratorItemResultsMap(
+              resultsMap,
+              sampleItem,
+              0,
+              Math.max(items.length, 1),
+              sourceTable,
+              collectionPath
+            )
+          );
+        }
+      }
+
+      if (node.outputData == null) continue;
 
       resultsMap[nodeId] = node.outputData;
 
@@ -2807,6 +2897,9 @@ export default function ScenariosPage() {
     }
     if (actionKey === 'send_email') {
       return result?.id ? `Sent email ${result.id}` : 'Email sent';
+    }
+    if (actionKey === 'iterator') {
+      return `Iterated ${result?.count || 0} item${result?.count === 1 ? '' : 's'}`;
     }
     if (actionKey === 'create_new_record') {
       return result?.id ? `Created record ${result.id}` : 'Record created';
@@ -2901,14 +2994,14 @@ export default function ScenariosPage() {
     }
   }, []);
 
-  const executeRunnableNode = async (nodeId, manualValues = {}) => {
+  const executeRunnableNode = async (nodeId, manualValues = {}, runtimeResultsMap = null) => {
     const node = nodeMap[nodeId];
     if (!node?.actionConfig) return;
 
     const config = node.actionConfig;
     const actionKey = config._key;
     console.log('[Run Node] Starting executeRunnableNode', { nodeId, actionKey, manualValues });
-    const flowResultsMap = buildFlowResultsMap(nodeId);
+    const flowResultsMap = runtimeResultsMap || buildFlowResultsMap(nodeId);
     const hasManualValue = (fieldKey) => Object.prototype.hasOwnProperty.call(manualValues, fieldKey);
     const getValue = (fieldKey) => resolveRunFieldValue(
       config[fieldKey],
@@ -2932,6 +3025,26 @@ export default function ScenariosPage() {
     setNodeRunState(nodeId, 'running');
 
     try {
+      if (actionKey === 'iterator') {
+        const {
+          items,
+          sourceTable,
+          collectionPath,
+        } = resolveIteratorCollectionFromResultsMap(
+          config.collection_path || config.collection || config.array_path || '',
+          flowResultsMap
+        );
+        const result = {
+          action: 'iterator',
+          count: items.length,
+          results: [],
+          collection_path: collectionPath,
+          source_table: sourceTable,
+        };
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
+
       if (actionKey === 'search_records' || actionKey === 'search_appointments') {
         const tableKey = actionKey === 'search_appointments' ? 'appointments' : 'people';
         const limit = config.search_limit || 10;
@@ -3617,14 +3730,172 @@ export default function ScenariosPage() {
       .filter((edge) => orderIds.includes(edge.from) && orderIds.includes(edge.to))
       .map((edge) => edge.id);
 
-    for (const node of execOrder) {
-      if (!node?.configured || !node.actionConfig?._key) continue;
-      const unresolvedFields = getUnresolvedRunFields(node, buildFlowResultsMap(node.id));
-      if (unresolvedFields.length > 0) {
-        setRunProgress(`${node.label}: missing ${unresolvedFields.map((field) => field.label).join(', ')}`);
-        return;
+    const execIndexMap = new Map(execOrder.map((node, index) => [node.id, index]));
+    let breadcrumbSequence = 0;
+    const nextBreadcrumbId = () => `run-breadcrumb-${breadcrumbSequence += 1}`;
+    const getOutgoingEdgesForNode = (nodeId) => (
+      edges
+        .filter((edge) => edge.from === nodeId)
+        .sort((a, b) => (execIndexMap.get(a.to) ?? Number.MAX_SAFE_INTEGER) - (execIndexMap.get(b.to) ?? Number.MAX_SAFE_INTEGER))
+    );
+
+    const markNodeOutcome = (nodeId, status, preview, durationMs, nextMode = null) => {
+      setScenarioRunState((prev) => {
+        if (!prev) return prev;
+        const completedNodeIds = prev.completedNodeIds.includes(nodeId)
+          ? prev.completedNodeIds
+          : [...prev.completedNodeIds, nodeId];
+        return {
+          ...prev,
+          ...(nextMode ? { mode: nextMode } : {}),
+          activeNodeId: null,
+          activeEdgeId: null,
+          completedNodeIds,
+          previews: { ...prev.previews, [nodeId]: preview },
+          timings: {
+            ...prev.timings,
+            [nodeId]: {
+              durationMs,
+              label: formatRunDuration(durationMs),
+              preview,
+              status,
+            },
+          },
+          breadcrumbs: prev.breadcrumbs.map((entry) => (
+            entry.nodeId === nodeId && entry.status === 'running'
+              ? { ...entry, status, preview }
+              : entry
+          )),
+        };
+      });
+    };
+
+    const executeNodeBranch = async (nodeId, runtimeResultsMap, parentNodeId = null) => {
+      const node = nodeMap[nodeId];
+      if (!node) return runtimeResultsMap;
+
+      const actionKey = node.actionConfig?._key;
+      const stepNumber = (execIndexMap.get(nodeId) ?? 0) + 1;
+      const stepText = `[${stepNumber}/${execOrder.length}] ${node.label || node.id}`;
+      const incomingEdgeId = parentNodeId
+        ? edges.find((edge) => edge.from === parentNodeId && edge.to === nodeId)?.id || null
+        : null;
+
+      setScenarioRunState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          activeNodeId: null,
+          activeEdgeId: incomingEdgeId,
+          breadcrumbs: [
+            ...prev.breadcrumbs,
+            { runId: nextBreadcrumbId(), nodeId: node.id, label: node.label || node.id, status: 'running' },
+          ],
+        };
+      });
+      setRunProgress(`Routing to ${stepText}`);
+      await delay(parentNodeId ? 140 : 100);
+      focusRunNode(node.id, originalView);
+
+      if (!node.configured || !actionKey) {
+        markNodeOutcome(node.id, 'skipped', 'Skipped', 0);
+        return runtimeResultsMap;
       }
-    }
+
+      const unresolvedFields = getUnresolvedRunFields(node, runtimeResultsMap);
+      if (unresolvedFields.length > 0) {
+        const errorMessage = `${node.label}: missing ${unresolvedFields.map((field) => field.label).join(', ')}`;
+        markNodeOutcome(node.id, 'error', errorMessage, 0, 'failed');
+        setRunProgress(errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      setScenarioRunState((prev) => prev ? { ...prev, activeNodeId: node.id } : prev);
+      setRunProgress(`Running ${stepText}`);
+      const startedAt = performance.now();
+
+      try {
+        if (actionKey === 'iterator') {
+          const iteratorResult = await executeRunnableNode(node.id, {}, runtimeResultsMap);
+          const durationMs = performance.now() - startedAt;
+          const preview = summarizeRunResult(actionKey, iteratorResult);
+          markNodeOutcome(node.id, 'success', preview, durationMs);
+          setRunProgress(`${stepText} completed`);
+
+          let branchResultsMap = {
+            ...runtimeResultsMap,
+            [node.id]: iteratorResult,
+          };
+          const {
+            items,
+            sourceTable,
+            collectionPath,
+          } = resolveIteratorCollectionFromResultsMap(
+            node.actionConfig?.collection_path || node.actionConfig?.collection || node.actionConfig?.array_path || '',
+            runtimeResultsMap
+          );
+          const branchEdges = getOutgoingEdgesForNode(node.id);
+          const branchResults = [];
+
+          for (let index = 0; index < items.length; index += 1) {
+            let itemResultsMap = applyIteratorItemResultsMap(
+              branchResultsMap,
+              items[index],
+              index,
+              items.length,
+              sourceTable,
+              collectionPath
+            );
+
+            for (const edge of branchEdges) {
+              itemResultsMap = await executeNodeBranch(edge.to, itemResultsMap, node.id);
+            }
+
+            branchResults.push({
+              index,
+              item: items[index],
+            });
+          }
+
+          const finalizedIteratorResult = {
+            ...iteratorResult,
+            results: branchResults,
+          };
+          setNodes((prev) => prev.map((entry) => (
+            entry.id === node.id ? { ...entry, outputData: finalizedIteratorResult } : entry
+          )));
+
+          return {
+            ...branchResultsMap,
+            [node.id]: finalizedIteratorResult,
+          };
+        }
+
+        const result = await executeRunnableNode(node.id, {}, runtimeResultsMap);
+        const durationMs = performance.now() - startedAt;
+        const preview = summarizeRunResult(actionKey, result);
+        markNodeOutcome(node.id, 'success', preview, durationMs);
+        setRunProgress(`${stepText} completed`);
+
+        let nextResultsMap = {
+          ...runtimeResultsMap,
+          [node.id]: result,
+        };
+        const outgoingEdges = getOutgoingEdgesForNode(node.id);
+        for (const edge of outgoingEdges) {
+          nextResultsMap = await executeNodeBranch(edge.to, nextResultsMap, node.id);
+        }
+        return nextResultsMap;
+      } catch (error) {
+        const durationMs = performance.now() - startedAt;
+        const preview = summarizeRunResult(actionKey, null, error?.message || 'Failed');
+        markNodeOutcome(node.id, 'error', preview, durationMs, 'failed');
+        setRunProgress(`${stepText} failed: ${error?.message || 'Unknown error'}`);
+        throw error;
+      } finally {
+        await delay(220);
+      }
+    };
 
     setIsRunning(true);
     setRunProgress('Starting scenario...');
@@ -3643,113 +3914,26 @@ export default function ScenariosPage() {
     });
 
     try {
-      for (let index = 0; index < execOrder.length; index += 1) {
-        const node = execOrder[index];
-        const actionKey = node.actionConfig?._key;
-        const stepText = `[${index + 1}/${execOrder.length}] ${node.label || node.id}`;
-        const previousNodeId = index > 0 ? execOrder[index - 1].id : null;
-        const incomingEdgeId = previousNodeId
-          ? edges.find((edge) => edge.from === previousNodeId && edge.to === node.id)?.id || null
-          : null;
+      const triggerNode = execOrder[0];
+      const triggerLabel = triggerNode?.label || triggerNode?.id || 'Trigger';
+      setScenarioRunState((prev) => {
+        if (!prev || !triggerNode) return prev;
+        return {
+          ...prev,
+          completedNodeIds: prev.completedNodeIds.includes(triggerNode.id)
+            ? prev.completedNodeIds
+            : [...prev.completedNodeIds, triggerNode.id],
+          breadcrumbs: [
+            ...prev.breadcrumbs,
+            { runId: nextBreadcrumbId(), nodeId: triggerNode.id, label: triggerLabel, status: 'success', preview: 'Ready' },
+          ],
+        };
+      });
 
-        setScenarioRunState((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            activeNodeId: null,
-            activeEdgeId: incomingEdgeId,
-            breadcrumbs: [
-              ...prev.breadcrumbs,
-              { nodeId: node.id, label: node.label || node.id, status: 'running' },
-            ],
-          };
-        });
-        setRunProgress(`Routing to ${stepText}`);
-        await delay(previousNodeId ? 140 : 100);
-        focusRunNode(node.id, originalView);
-
-        if (!node.configured || !actionKey) {
-          setScenarioRunState((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              activeNodeId: null,
-              activeEdgeId: null,
-              completedNodeIds: [...prev.completedNodeIds, node.id],
-              breadcrumbs: prev.breadcrumbs.map((entry) => (
-                entry.nodeId === node.id ? { ...entry, status: 'skipped', preview: 'Skipped' } : entry
-              )),
-              timings: {
-                ...prev.timings,
-                [node.id]: { durationMs: 0, label: '0ms', preview: 'Skipped', status: 'skipped' },
-              },
-            };
-          });
-          continue;
-        }
-
-        setScenarioRunState((prev) => prev ? { ...prev, activeNodeId: node.id } : prev);
-        setRunProgress(`Running ${stepText}`);
-
-        const startedAt = performance.now();
-        try {
-          const result = await executeRunnableNode(node.id);
-          const durationMs = performance.now() - startedAt;
-          const preview = summarizeRunResult(actionKey, result);
-          setScenarioRunState((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              activeNodeId: null,
-              activeEdgeId: null,
-              completedNodeIds: [...prev.completedNodeIds, node.id],
-              previews: { ...prev.previews, [node.id]: preview },
-              timings: {
-                ...prev.timings,
-                [node.id]: {
-                  durationMs,
-                  label: formatRunDuration(durationMs),
-                  preview,
-                  status: 'success',
-                },
-              },
-              breadcrumbs: prev.breadcrumbs.map((entry) => (
-                entry.nodeId === node.id ? { ...entry, status: 'success', preview } : entry
-              )),
-            };
-          });
-          setRunProgress(`${stepText} completed`);
-        } catch (error) {
-          const durationMs = performance.now() - startedAt;
-          const preview = summarizeRunResult(actionKey, null, error?.message || 'Failed');
-          setScenarioRunState((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              mode: 'failed',
-              activeNodeId: null,
-              activeEdgeId: null,
-              completedNodeIds: [...prev.completedNodeIds, node.id],
-              previews: { ...prev.previews, [node.id]: preview },
-              timings: {
-                ...prev.timings,
-                [node.id]: {
-                  durationMs,
-                  label: formatRunDuration(durationMs),
-                  preview,
-                  status: 'error',
-                },
-              },
-              breadcrumbs: prev.breadcrumbs.map((entry) => (
-                entry.nodeId === node.id ? { ...entry, status: 'error', preview } : entry
-              )),
-            };
-          });
-          setRunProgress(`${stepText} failed: ${error?.message || 'Unknown error'}`);
-          throw error;
-        }
-
-        await delay(220);
+      let runtimeResultsMap = buildFlowResultsMap(triggerNode?.id);
+      const triggerOutgoingEdges = triggerNode ? getOutgoingEdgesForNode(triggerNode.id) : [];
+      for (const edge of triggerOutgoingEdges) {
+        runtimeResultsMap = await executeNodeBranch(edge.to, runtimeResultsMap, triggerNode.id);
       }
 
       setRunProgress('Scenario complete');
@@ -5674,7 +5858,7 @@ export default function ScenariosPage() {
                 title="Run scenario in builder"
               >
                 <Zap size={13} />
-                <span>{isRunning ? (runProgress || 'Running scenario...') : 'Run Scenario'}</span>
+                <span>{isRunning ? (runProgress || 'Running scenario...') : (runProgress || 'Run Scenario')}</span>
               </button>
             )}
 
@@ -5686,7 +5870,7 @@ export default function ScenariosPage() {
           <div className="sb-execution-feed" aria-live="polite">
             {scenarioRunState.breadcrumbs.map((entry) => (
               <div
-                key={`${entry.nodeId}-${entry.status}`}
+                key={entry.runId || `${entry.nodeId}-${entry.status}`}
                 className={`sb-execution-feed-item is-${entry.status}`}
               >
                 <span className="sb-execution-feed-marker">

@@ -3285,6 +3285,65 @@ def load_people_schema_labels(business_id: Optional[str]) -> dict:
         return {}
 
 
+def load_people_schema_types(business_id: Optional[str]) -> dict:
+    if not business_id:
+        return {}
+    try:
+        rows = (
+            supabase.table("people_schema")
+            .select("field_key,field_type")
+            .eq("business_id", str(business_id))
+            .eq("is_active", True)
+            .execute()
+            .data
+            or []
+        )
+        return {row.get("field_key"): row.get("field_type") for row in rows if row.get("field_key")}
+    except Exception as exc:
+        logging.warning("Failed to load people schema field types: %s", exc)
+        return {}
+
+
+def coerce_people_custom_field_value(value, field_type: Optional[str]):
+    if value in (None, ""):
+        return value
+    if field_type == "boolean":
+        if isinstance(value, bool):
+            return value
+        normalized = str(value).strip().lower()
+        if normalized in {"true", "yes", "1", "on"}:
+            return True
+        if normalized in {"false", "no", "0", "off"}:
+            return False
+    if field_type == "number":
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return value
+    return value
+
+
+def normalize_people_payload_custom_fields(payload: dict, business_id: Optional[str], existing_custom_fields: Optional[dict] = None) -> dict:
+    normalized = {**(payload or {})}
+    custom_field_types = load_people_schema_types(business_id)
+    merged_custom_fields = {
+        **((existing_custom_fields or {}) if isinstance(existing_custom_fields, dict) else {}),
+        **((normalized.get("custom_fields") or {}) if isinstance(normalized.get("custom_fields"), dict) else {}),
+    }
+
+    for key in list(normalized.keys()):
+        if not str(key).startswith("custom_"):
+            continue
+        merged_custom_fields[key] = coerce_people_custom_field_value(normalized.pop(key), custom_field_types.get(key))
+
+    if merged_custom_fields:
+        normalized["custom_fields"] = merged_custom_fields
+    elif "custom_fields" in normalized and not isinstance(normalized.get("custom_fields"), dict):
+        normalized.pop("custom_fields", None)
+
+    return normalized
+
+
 def add_person_custom_dynamic_variables(dynamic_variables: dict, person: Optional[dict], business_id: Optional[str]):
     if not person or not isinstance(person.get("custom_fields"), dict):
         return dynamic_variables
@@ -5413,6 +5472,10 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
     insert_payload["user_id"] = insert_payload.get("user_id") or str(current_user.id)
     if business and "business_id" not in insert_payload:
         insert_payload["business_id"] = business["id"]
+    insert_payload = normalize_people_payload_custom_fields(
+        insert_payload,
+        (business or {}).get("id") or insert_payload.get("business_id"),
+    )
     response = supabase.table("people").insert(insert_payload).execute()
     created = response.data[0] if response.data else insert_payload
     schedule_backend_scenario_execution("record_created", {
@@ -5427,29 +5490,59 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
 
 @app.put("/api/sonar/people/{person_id}", tags=["Sonar People"])
 async def update_sonar_person(person_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
-    existing_query = supabase.table("people").select("*").eq("id", person_id)
-    if business:
-        existing_query = existing_query.eq("business_id", business["id"])
-    else:
-        existing_query = existing_query.eq("user_id", str(current_user.id))
-    existing_response = existing_query.limit(1).execute()
-    if not existing_response.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+    try:
+        business = load_business_by_user_id(str(current_user.id))
+        existing_query = supabase.table("people").select("*").eq("id", person_id)
+        if business:
+            existing_query = existing_query.eq("business_id", business["id"])
+        else:
+            existing_query = existing_query.eq("user_id", str(current_user.id))
+        existing_response = existing_query.limit(1).execute()
+        if not existing_response.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
 
-    updates = {key: value for key, value in payload.items() if key not in {"id", "user_id", "business_id", "created_at"}}
-    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+        updates = {
+            key: value
+            for key, value in payload.items()
+            if key not in {"id", "user_id", "business_id", "created_at"}
+        }
+        updates = normalize_people_payload_custom_fields(
+            updates,
+            (business or {}).get("id") or existing_response.data[0].get("business_id"),
+            existing_response.data[0].get("custom_fields"),
+        )
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    response = supabase.table("people").update(updates).eq("id", person_id).execute()
-    updated = response.data[0] if response.data else {**existing_response.data[0], **updates}
-    schedule_backend_scenario_execution("record_updated", {
-        "record_id": updated.get("id") or person_id,
-        "person_id": updated.get("id") or person_id,
-        "user_id": updated.get("user_id") or existing_response.data[0].get("user_id") or str(current_user.id),
-        "business_id": updated.get("business_id") or existing_response.data[0].get("business_id") or (business or {}).get("id"),
-        "person": updated,
-        "record": updated,
-    })
+        supabase.table("people").update(updates).eq("id", person_id).execute()
+
+        refreshed_query = supabase.table("people").select("*").eq("id", person_id)
+        if business:
+            refreshed_query = refreshed_query.eq("business_id", business["id"])
+        else:
+            refreshed_query = refreshed_query.eq("user_id", str(current_user.id))
+        refreshed_response = refreshed_query.limit(1).execute()
+        updated = refreshed_response.data[0] if refreshed_response.data else {**existing_response.data[0], **updates}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to update person %s with payload %s: %s", person_id, payload, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc) or "Failed to update person",
+        ) from exc
+
+    try:
+        schedule_backend_scenario_execution("record_updated", {
+            "record_id": updated.get("id") or person_id,
+            "person_id": updated.get("id") or person_id,
+            "user_id": updated.get("user_id") or existing_response.data[0].get("user_id") or str(current_user.id),
+            "business_id": updated.get("business_id") or existing_response.data[0].get("business_id") or (business or {}).get("id"),
+            "person": updated,
+            "record": updated,
+        })
+    except Exception as exc:
+        logging.error("Failed to emit record_updated scenario event for person %s: %s", person_id, exc, exc_info=True)
+
     return updated
 
 @app.delete("/api/sonar/people/{person_id}", tags=["Sonar People"])
