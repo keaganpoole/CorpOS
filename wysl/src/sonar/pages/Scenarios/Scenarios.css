@@ -2713,9 +2713,9 @@
   background: linear-gradient(
     110deg,
     transparent 40%,
-    rgba(255, 255, 255, 0.03) 46%,
-    rgba(255, 255, 255, 0.38) 50%,
-    rgba(255, 255, 255, 0.03) 54%,
+    rgba(244, 114, 182, 0.03) 46%,
+    rgba(244, 114, 182, 0.48) 50%,
+    rgba(244, 114, 182, 0.03) 54%,
     transparent 60%
   );
   transform: translateX(-115%) skewX(-16deg);
@@ -2778,6 +2778,10 @@
   background: linear-gradient(90deg, transparent, rgba(50, 240, 217, 0.15), transparent);
   animation: sb-badge-glow 2.5s ease-in-out infinite;
   pointer-events: none;
+}
+
+.sb-vars-table-badge--iterator::after {
+  background: linear-gradient(90deg, transparent, rgba(244, 114, 182, 0.16), transparent);
 }
 
 .sb-vars-no-data {

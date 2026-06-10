@@ -1019,6 +1019,22 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
               </span>
               <span className="sb-vars-table-icon" style={{ color }}><NodeIcon size={11} /></span>
               <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{prev.isIteratorNode ? 'Iterator' : prev.label}</span>
+              {prev.isIteratorNode && iteratorSourceLabel && (
+                <span
+                  className="sb-vars-table-badge sb-vars-table-badge--iterator sb-vars-table-source-name sb-vars-table-source-name--sweep"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    background: 'rgba(244,114,182,0.10)',
+                    color: '#f472b6',
+                    borderColor: 'rgba(244,114,182,0.24)',
+                  }}
+                >
+                  <Layers size={10} />
+                  <span>{iteratorSourceLabel}</span>
+                </span>
+              )}
               {sourceName && (
                 <span className="sb-vars-table-source">
                   <span className="sb-vars-table-source-prefix">via</span>
@@ -1031,11 +1047,6 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
               <div className="sb-vars-fields">
                 {prev.isIteratorNode ? (
                   <>
-                    {iteratorSourceLabel && (
-                      <div className="sb-vars-empty" style={{ paddingBottom: 6 }}>
-                        Derived from {iteratorSourceLabel}
-                      </div>
-                    )}
                     {iteratorCurrentFields.length === 0 ? (
                       <div className="sb-vars-empty">
                         Run the upstream bundle source first to inspect the current bundle fields.
