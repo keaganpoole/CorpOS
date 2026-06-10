@@ -91,6 +91,96 @@ const withCustomFields = (table) => {
   return { ...table, fields: [...table.fields, ...customFields] };
 };
 
+const getIteratorFieldLabel = (key) => {
+  if (key === 'id') return 'Record ID';
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const normalizeIteratorCollectionPath = (value) => {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  const match = trimmed.match(/^\{\{([^}]+)\}\}$/);
+  return (match?.[1] || trimmed).trim();
+};
+
+const getNodeArrayOutput = (node) => {
+  if (Array.isArray(node?.searchResults)) return node.searchResults;
+  if (Array.isArray(node?.outputData)) return node.outputData;
+  if (Array.isArray(node?.outputData?.records)) return node.outputData.records;
+  return null;
+};
+
+const getAncestorIdsInOrder = (startNodeId, nodes, edges) => {
+  if (!startNodeId || !nodes.length) return [];
+  const visited = new Set([startNodeId]);
+  const queue = [startNodeId];
+  const topoOrder = [];
+  const visitedTopo = new Set();
+  const topoQueue = ['node-1'];
+  visitedTopo.add('node-1');
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    for (const edge of edges) {
+      if (edge.to === current && !visited.has(edge.from)) {
+        visited.add(edge.from);
+        queue.push(edge.from);
+      }
+    }
+  }
+
+  while (topoQueue.length > 0) {
+    const current = topoQueue.shift();
+    topoOrder.push(current);
+    for (const edge of edges) {
+      if (edge.from === current && !visitedTopo.has(edge.to)) {
+        visitedTopo.add(edge.to);
+        topoQueue.push(edge.to);
+      }
+    }
+  }
+
+  const currentIdx = topoOrder.indexOf(startNodeId);
+  return currentIdx > 0 ? topoOrder.slice(0, currentIdx).reverse() : [];
+};
+
+const findIteratorSourceNode = (iteratorNode, nodes, edges) => {
+  const collectionPath = normalizeIteratorCollectionPath(
+    iteratorNode?.actionConfig?.collection_path
+      || iteratorNode?.actionConfig?.collection
+      || iteratorNode?.actionConfig?.array_path
+      || ''
+  );
+  const parts = collectionPath.split('.').filter(Boolean);
+  if (parts.length > 0) {
+    const directNode = nodes.find((node) => node.id === parts[0]);
+    if (directNode) return directNode;
+  }
+
+  const ancestorIds = getAncestorIdsInOrder(iteratorNode?.id, nodes, edges);
+  return ancestorIds
+    .map((nodeId) => nodes.find((node) => node.id === nodeId))
+    .find((node) => Array.isArray(getNodeArrayOutput(node))) || null;
+};
+
+const getIteratorCurrentFieldsFromNode = (iteratorNode, nodes, edges) => {
+  const sourceNode = findIteratorSourceNode(iteratorNode, nodes, edges);
+  const records = getNodeArrayOutput(sourceNode) || [];
+  const sample = records.find((item) => item && typeof item === 'object' && !Array.isArray(item)) || null;
+  if (!sample) {
+    return { fields: [], sourceNode };
+  }
+
+  const fields = Object.keys(sample)
+    .filter((key) => key !== '__proto__' && key !== '_id')
+    .map((key) => ({
+      key,
+      label: getIteratorFieldLabel(key),
+    }));
+
+  return { fields, sourceNode };
+};
+
 export const getTableFields = (tableKey) => {
   const table = TABLE_DEFS.find((item) => item.key === tableKey);
   return withCustomFields(table)?.fields || [];
@@ -124,6 +214,9 @@ const readOutputPath = (source, path) => {
 };
 
 export const getFieldDisplayLabel = (tableKey, fieldKey) => {
+  if (fieldKey === 'id' || fieldKey === 'record_id' || fieldKey === 'person_id' || fieldKey === 'payment_id' || fieldKey === 'invoice_id' || fieldKey === 'customer_id') {
+    return 'Record ID';
+  }
   const field = getTableFields(tableKey).find((item) => item.key === fieldKey);
   return field?.label || fieldKey;
 };
@@ -289,7 +382,7 @@ const TABLE_DEFS = [
     colorBorder: 'rgba(244,114,182,0.2)',
     icon: CreditCard,
     fields: [
-      { key: 'id', label: 'Payment ID', type: 'text' },
+      { key: 'id', label: 'Record ID', type: 'text' },
       { key: 'amount', label: 'Amount', type: 'number' },
       { key: 'currency', label: 'Currency', type: 'text' },
       { key: 'status', label: 'Status', type: 'text' },
@@ -318,8 +411,8 @@ const TABLE_DEFS = [
     colorBorder: 'rgba(245,158,11,0.2)',
     icon: CreditCard,
     fields: [
-      { key: 'id', label: 'Invoice ID', type: 'text' },
-      { key: 'invoice_id', label: 'Invoice ID', type: 'text' },
+      { key: 'id', label: 'Record ID', type: 'text' },
+      { key: 'invoice_id', label: 'Record ID', type: 'text' },
       { key: 'amount_due', label: 'Amount Due', type: 'number' },
       { key: 'amount_paid', label: 'Amount Paid', type: 'number' },
       { key: 'currency', label: 'Currency', type: 'text' },
@@ -542,7 +635,17 @@ export const renderVarChipsHTML = (value) => {
       const fieldLabel = getFieldDisplayLabel(tableKey, parts[2]);
       return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">rec.${escapeHtml(tableLabel)}.${escapeHtml(fieldLabel)}</span>`;
     }
+    if (parts.length >= 3 && parts[0] === 'iterator' && parts[1] === 'current') {
+      const color = '#f472b6';
+      const fieldLabel = getIteratorFieldLabel(parts.slice(2).join('.'));
+      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Iterator.Current Bundle.${escapeHtml(fieldLabel)}</span>`;
+    }
     if (parts.length !== 2) return match;
+    if (parts[1] === 'records') {
+      const color = '#32f0d9';
+      const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
+      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${escapeHtml(tableLabel)}.records</span>`;
+    }
     if (parts[0] === 'agent' || parts[0] === 'receptionist') {
       const receptionistColor = TABLE_COLORS.appointments || '#38bdf8';
       return `<span class="sb-var-chip" style="background:${receptionistColor}18;color:${receptionistColor};border:1px solid ${receptionistColor}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Receptionist.${parts[1]}</span>`;
@@ -568,6 +671,8 @@ export const parseVariables = (value) => {
       matches.push({ full, source: null, table: normalizeParsedTableKey(parts[0]), field: parts[1] });
     } else if (parts.length >= 3 && (parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist')) {
       matches.push({ full, source: parts[0], table: normalizeParsedTableKey(parts[1]), field: parts.slice(2).join('.') });
+    } else if (parts.length >= 3 && parts[0] === 'iterator' && parts[1] === 'current') {
+      matches.push({ full, source: 'iterator', table: 'current', field: parts.slice(2).join('.') });
     }
   }
   return matches;
@@ -727,7 +832,7 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
 
         return (
           <div key={node.nodeId} className="sb-vars-table-group"
-            style={{ '--table-color': color, '--table-bg': 'rgba(50,240,217,0.08)', '--table-border': 'rgba(50,240,217,0.2)' }}
+            style={{ '--table-color': '#32f0d9', '--table-bg': 'rgba(50,240,217,0.08)', '--table-border': 'rgba(50,240,217,0.2)' }}
             onMouseEnter={() => onTableHover?.(color)}
             onMouseLeave={() => onTableHover?.('')}
           >
@@ -737,6 +842,16 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
               {hasResults && <span className="sb-vars-table-badge">{records.length} records</span>}
             </div>
             <div className="sb-vars-fields">
+              <button
+                type="button"
+                className="sb-vars-field"
+                onClick={(e) => { e.stopPropagation(); onInsertVariable?.(getVariableRef(node.nodeId, 'records'), `${node.label} records`, '#32f0d9'); }}
+                title={`Insert {{${node.nodeId}.records}}`}
+                style={{ fontWeight: 700 }}
+              >
+                <span className="sb-vars-field-name" style={{ color: '#32f0d9' }}>All records</span>
+                <span className="sb-vars-field-value">{hasResults ? `${records.length} item${records.length === 1 ? '' : 's'}` : 'List output'}</span>
+              </button>
               {!hasResults ? (
                 <div className="sb-vars-empty" style={{ padding: '12px 8px' }}>
                   <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Run node to generate output</span>
@@ -850,11 +965,12 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
       if (node.actionConfig?._key === 'search_records') return null;
       const display = getNodeDisplay(node.categoryType);
       const label = node.label || display.defaultLabel;
-      const outputVars = getOutputVariables(node);
+      const isIteratorNode = node.actionConfig?._key === 'iterator';
+      const outputVars = isIteratorNode ? [] : getOutputVariables(node);
       const outputData = node.outputData || null;
-      if (outputData == null && outputVars.length === 0) return null;
+      if (!isIteratorNode && outputData == null && outputVars.length === 0) return null;
       const isStripeResponse = isStripeResponseNode(node);
-      return { nodeId, label, categoryType: node.categoryType, icon: display.icon, outputVars, outputData, isStripeResponse };
+      return { nodeId, label, categoryType: node.categoryType, icon: display.icon, outputVars, outputData, isStripeResponse, isIteratorNode };
     }).filter(Boolean);
   };
 
@@ -868,29 +984,41 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
     <>
       {prevNodes.map((prev) => {
         const NodeIcon = prev.icon;
-        const color = '#a78bfa';
+        const color = prev.isIteratorNode ? '#f472b6' : '#a78bfa';
         const isExpanded = expandedNodes[prev.nodeId] !== false;
         const hasOutput = prev.outputData != null;
         const sourceName = prev.isStripeResponse ? 'Stripe' : null;
+        const iteratorSource = prev.isIteratorNode ? getIteratorCurrentFieldsFromNode(nodes.find((n) => n.id === prev.nodeId), nodes, edges) : { fields: [], sourceNode: null };
+        const iteratorCurrentFields = iteratorSource.fields;
+        const iteratorSourceLabel = iteratorSource.sourceNode?.label || null;
 
         return (
           <div
             key={prev.nodeId}
             className="sb-vars-table-group sb-vars-table-group--response"
-            style={{ '--table-color': color, '--table-bg': 'rgba(167,139,250,0.08)', '--table-border': 'rgba(167,139,250,0.2)' }}
+            style={{
+              '--table-color': color,
+              '--table-bg': 'rgba(167,139,250,0.08)',
+              '--table-border': 'rgba(167,139,250,0.2)',
+            }}
             onMouseEnter={() => onTableHover?.(color)}
             onMouseLeave={() => onTableHover?.('')}
           >
             <button
               type="button"
               className="sb-vars-table-header sb-vars-table-header--response"
+              style={prev.isIteratorNode ? {
+                background: 'rgba(244,114,182,0.08)',
+                borderColor: 'rgba(244,114,182,0.2)',
+                boxShadow: 'none',
+              } : undefined}
               onClick={() => setExpandedNodes(p => ({ ...p, [prev.nodeId]: !isExpanded }))}
             >
               <span className="sb-vars-table-chevron">
                 {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </span>
               <span className="sb-vars-table-icon" style={{ color }}><NodeIcon size={11} /></span>
-              <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{prev.label}</span>
+              <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{prev.isIteratorNode ? 'Iterator' : prev.label}</span>
               {sourceName && (
                 <span className="sb-vars-table-source">
                   <span className="sb-vars-table-source-prefix">via</span>
@@ -901,7 +1029,30 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
 
             {isExpanded && (
               <div className="sb-vars-fields">
-                {prev.outputVars.length === 0 ? (
+                {prev.isIteratorNode ? (
+                  <>
+                    {iteratorSourceLabel && (
+                      <div className="sb-vars-empty" style={{ paddingBottom: 6 }}>
+                        Derived from {iteratorSourceLabel}
+                      </div>
+                    )}
+                    {iteratorCurrentFields.length === 0 ? (
+                      <div className="sb-vars-empty">
+                        Run the upstream bundle source first to inspect the current bundle fields.
+                      </div>
+                    ) : iteratorCurrentFields.map((field) => (
+                      <button
+                        key={field.key}
+                        type="button"
+                        className="sb-vars-field"
+                        onClick={(e) => { e.stopPropagation(); onInsertVariable?.(`{{iterator.current.${field.key}}}`, field.label, color); }}
+                        title={`Insert {{iterator.current.${field.key}}}`}
+                      >
+                        <span className="sb-vars-field-name" style={{ color }}>{field.label}</span>
+                      </button>
+                    ))}
+                  </>
+                ) : prev.outputVars.length === 0 ? (
                   <div className="sb-vars-empty">No output variables</div>
                 ) : (
                   prev.outputVars.map((field) => {

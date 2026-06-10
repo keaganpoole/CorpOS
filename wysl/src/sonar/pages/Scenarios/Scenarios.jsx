@@ -166,12 +166,12 @@ const TABLE_REF_REVERSE_ALIASES = Object.fromEntries(
 );
 
 const RECORD_ID_LABELS = {
-  People: 'Person ID',
-  Appointments: 'Appointment ID',
-  Services: 'Service ID',
-  Payments: 'Payment ID',
-  Businesses: 'Business ID',
-  'Hired Receptionists': 'Hired Receptionist ID',
+  People: 'Record ID',
+  Appointments: 'Record ID',
+  Services: 'Record ID',
+  Payments: 'Record ID',
+  Businesses: 'Record ID',
+  'Hired Receptionists': 'Record ID',
 };
 
 const normalizeTableRefKey = (tableKey) => {
@@ -411,7 +411,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
-          { key: 'person_id', label: 'Person ID', type: 'person_id' },
+          { key: 'person_id', label: 'Record ID', type: 'person_id' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
           { key: 'first_message', label: 'First Message', type: 'first_message_textarea', smartActions: true, toggleLabel: 'Override First Message' },
           { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text' },
@@ -520,17 +520,17 @@ const AUTOMATION_HIERARCHY = {
           { key: 'due_days', label: 'Days Until Due', type: 'text' },
         ]},
         { key: 'send_invoice', name: 'Send Invoice', description: 'Finalize and send an existing invoice', configFields: [
-          { key: 'invoice_id', label: 'Invoice ID', type: 'text' },
+          { key: 'invoice_id', label: 'Record ID', type: 'text' },
         ]},
         { key: 'refund_payment', name: 'Refund Payment', description: 'Refund a previous payment', configFields: [
-          { key: 'payment_id', label: 'Payment ID', type: 'text' },
+          { key: 'payment_id', label: 'Record ID', type: 'text' },
           { key: 'amount', label: 'Refund Amount ($)', type: 'text' },
           { key: 'refund_reason', label: 'Refund Reason', type: 'prompt_textarea', smartActions: true },
         ]},
         { key: 'cancel_subscription', name: 'Cancel Subscription', description: 'Cancel an active subscription', configFields: [
           { key: 'subscription_id', label: 'Subscription ID', type: 'text' },
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
-          { key: 'person_id', label: 'Person ID', type: 'person_id' },
+          { key: 'person_id', label: 'Record ID', type: 'person_id' },
         ]},
       ],
     },
@@ -4928,17 +4928,17 @@ export default function ScenariosPage() {
                       {appointmentConfig.key === 'delete_appointment' && 'Set cancellation criteria.'}
                     </div>
                     <div className="sb-record-fields-grid">
-                      {/* Person ID — for create and update_appointment (person_id field) */}
+                      {/* Record ID — for create and update_appointment (person_id field) */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
                         <div className="sb-record-field">
-                          <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Person ID</label>
+                          <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Record ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
                               className="sb-input-field"
                               type="text"
                               value={appointmentConfig.person_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, person_id: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Person ID', fieldType: 'person_id' })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Record ID', fieldType: 'person_id' })}
                               style={{
                                 ...(appointmentConfig.person_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'person_id' ? {
