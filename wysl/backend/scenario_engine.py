@@ -6,6 +6,7 @@ import calendar
 import asyncio
 from datetime import date, datetime, time, timezone, timedelta
 from typing import Any, Callable, Optional
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import requests
@@ -19,7 +20,6 @@ BASE_TABLE_LABELS = {
         "notes": "Notes",
     },
     "appointments": {
-        "client_name": "Client Name",
         "date": "Date",
         "time": "Time",
         "duration": "Duration",
@@ -35,6 +35,7 @@ TABLE_CONTEXT_ALIASES = {
 }
 
 AGENT_REF_PREFIXES = {"rec", "agent", "receptionist"}
+APPOINTMENT_ALLOWED_STATUSES = {"pending", "confirmed", "cancelled", "completed", "missed"}
 
 
 def normalize_autonomy_index(value: Any) -> int:
@@ -215,6 +216,74 @@ def normalize_string(value: Any) -> str:
     if isinstance(value, str):
         return value.strip()
     return str(value).strip()
+
+
+def normalize_appointment_status(value: Any, fallback: str = "pending") -> str:
+    normalized = normalize_string(value).lower()
+    if normalized in APPOINTMENT_ALLOWED_STATUSES:
+        return normalized
+    return fallback
+
+
+def normalize_appointment_duration(value: Any, fallback: int = 30) -> int:
+    try:
+        parsed = int(value)
+    except Exception:
+        return fallback
+    if parsed <= 0:
+        return fallback
+    return min(parsed, 1440)
+
+
+def normalize_appointment_date_value(value: Any, fallback: Optional[str] = None) -> str:
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped:
+            candidate = stripped.replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(candidate).date().isoformat()
+            except ValueError:
+                pass
+            for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%m/%d/%y", "%m-%d-%y"):
+                try:
+                    return datetime.strptime(stripped, fmt).date().isoformat()
+                except ValueError:
+                    continue
+    return fallback or datetime.now().date().isoformat()
+
+
+def normalize_appointment_time_value(value: Any, fallback: str = "09:00") -> str:
+    if isinstance(value, time):
+        return value.strftime("%H:%M")
+    if isinstance(value, datetime):
+        return value.strftime("%H:%M")
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped:
+            try:
+                return datetime.strptime(stripped, "%H:%M").strftime("%H:%M")
+            except ValueError:
+                pass
+            for fmt in ("%I:%M %p", "%I:%M%p", "%I %p", "%I%p"):
+                try:
+                    return datetime.strptime(stripped.upper(), fmt).strftime("%H:%M")
+                except ValueError:
+                    continue
+            return stripped
+    return fallback
+
+
+def uuid_or_none(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        return str(UUID(str(value)))
+    except Exception:
+        return None
 
 
 def values_equal(actual: Any, expected: Any) -> bool:
@@ -967,20 +1036,57 @@ class ScenarioActionExecutor:
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
+    async def _safe_appointment_person(self, raw_value: Any):
+        try:
+            parsed = int(raw_value)
+        except Exception:
+            return None, None
+        try:
+            response = self.supabase.table("people").select("id,first_name,last_name,name,full_name").eq("id", parsed).limit(1).execute()
+            if not response.data:
+                return None, None
+            person = response.data[0]
+            return parsed, person
+        except Exception:
+            return None, None
+
+    async def _safe_appointment_service_id(self, raw_value: Any):
+        parsed = uuid_or_none(raw_value)
+        if not parsed:
+            return None
+        try:
+            response = self.supabase.table("services").select("id").eq("id", parsed).limit(1).execute()
+            return parsed if response.data else None
+        except Exception:
+            return None
+
     async def _create_appointment(self, node: dict, context: dict):
         try:
-            config = node.get("actionConfig") or {}
+            config = node.get("appointmentConfig") or node.get("actionConfig") or {}
             business = context.get("business") or {}
+            resolved_date = self._resolve_variables(config.get("date") or config.get("field_date") or "", context)
+            resolved_time = self._resolve_variables(config.get("time") or config.get("field_time") or "", context)
+            resolved_person_id, _resolved_person = await self._safe_appointment_person(
+                context.get("person", {}).get("id") or context.get("person_id")
+            )
+            resolved_service_id = await self._safe_appointment_service_id(
+                self._resolve_variables(config.get("service_id") or config.get("field_service_id") or "", context)
+            )
             row = {
-                "person_id": context.get("person", {}).get("id") or context.get("person_id"),
-                "client_name": self._resolve_variables(config.get("client_name") or config.get("field_client_name") or "", context),
-                "date": self._resolve_variables(config.get("date") or config.get("field_date") or "", context),
-                "time": self._resolve_variables(config.get("time") or config.get("field_time") or "", context),
-                "duration": int(config.get("duration") or config.get("field_duration") or 30),
-                "status": self._resolve_variables(config.get("status") or "pending", context),
+                "person_id": resolved_person_id,
+                "service_id": resolved_service_id,
+                "date": normalize_appointment_date_value(resolved_date),
+                "time": normalize_appointment_time_value(resolved_time),
+                "duration": normalize_appointment_duration(
+                    self._resolve_variables(config.get("duration") or config.get("field_duration") or 30, context)
+                ),
+                "status": normalize_appointment_status(
+                    self._resolve_variables(config.get("status") or "pending", context)
+                ),
                 "assigned_receptionist": self._resolve_variables(config.get("assigned_receptionist") or "", context),
                 "notes": self._resolve_variables(config.get("notes") or "", context),
                 "business_id": business.get("id"),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             response = self.supabase.table("appointments").insert(row).execute()
             created = response.data[0] if response.data else row
@@ -991,15 +1097,41 @@ class ScenarioActionExecutor:
 
     async def _update_appointment(self, node: dict, context: dict):
         try:
-            config = node.get("actionConfig") or {}
+            config = node.get("appointmentConfig") or node.get("actionConfig") or {}
             appointment_id = self._resolve_variables(config.get("appointment_id") or config.get("record_id") or "", context) or context.get("appointment", {}).get("id")
             if not appointment_id:
-                return {"success": False, "error": "No appointment ID specified"}
+                return {"success": True, "data": {"action": "update_appointment", "skipped": True, "reason": "No appointment ID specified"}}
+            appointment_id = uuid_or_none(appointment_id)
+            if not appointment_id:
+                return {"success": True, "data": {"action": "update_appointment", "skipped": True, "reason": "Invalid appointment ID"}}
             updates = {}
-            for key in ("client_name", "date", "time", "duration", "status", "assigned_receptionist", "notes", "person_id", "service_id"):
+            for key in ("date", "time", "duration", "status", "assigned_receptionist", "notes", "person_id", "service_id"):
                 raw = config.get(key) or config.get(f"field_{key}")
                 if raw not in (None, ""):
-                    updates[key] = self._resolve_variables(raw, context)
+                    resolved = self._resolve_variables(raw, context)
+                    if is_empty_value(resolved):
+                        continue
+                    if key == "date":
+                        updates[key] = normalize_appointment_date_value(resolved)
+                    elif key == "time":
+                        updates[key] = normalize_appointment_time_value(resolved)
+                    elif key == "duration":
+                        updates[key] = normalize_appointment_duration(resolved)
+                    elif key == "status":
+                        updates[key] = normalize_appointment_status(resolved)
+                    elif key == "person_id":
+                        safe_person_id, _safe_person = await self._safe_appointment_person(resolved)
+                        if safe_person_id is not None:
+                            updates[key] = safe_person_id
+                    elif key == "service_id":
+                        safe_service_id = await self._safe_appointment_service_id(resolved)
+                        if safe_service_id is not None:
+                            updates[key] = safe_service_id
+                    else:
+                        updates[key] = resolved
+            if not updates:
+                return {"success": True, "data": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
+            updates["updated_at"] = datetime.now(timezone.utc).isoformat()
             response = self.supabase.table("appointments").update(updates).eq("id", str(appointment_id)).execute()
             row = response.data[0] if response.data else {"id": appointment_id, **updates}
             logging.info("📅 Appointment updated")
@@ -1009,11 +1141,17 @@ class ScenarioActionExecutor:
 
     async def _cancel_appointment(self, node: dict, context: dict):
         try:
-            config = node.get("actionConfig") or {}
+            config = node.get("appointmentConfig") or node.get("actionConfig") or {}
             appointment_id = self._resolve_variables(config.get("appointment_id") or config.get("record_id") or "", context) or context.get("appointment", {}).get("id")
             if not appointment_id:
-                return {"success": False, "error": "No appointment ID specified"}
-            response = self.supabase.table("appointments").update({"status": "cancelled"}).eq("id", str(appointment_id)).execute()
+                return {"success": True, "data": {"action": "cancel_appointment", "skipped": True, "reason": "No appointment ID specified"}}
+            appointment_id = uuid_or_none(appointment_id)
+            if not appointment_id:
+                return {"success": True, "data": {"action": "cancel_appointment", "skipped": True, "reason": "Invalid appointment ID"}}
+            response = self.supabase.table("appointments").update({
+                "status": "cancelled",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", str(appointment_id)).execute()
             row = response.data[0] if response.data else {"id": appointment_id, "status": "cancelled"}
             logging.info("📅 Appointment cancelled")
             return {"success": True, "data": row}

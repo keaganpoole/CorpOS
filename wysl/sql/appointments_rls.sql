@@ -1,0 +1,61 @@
+alter table public.appointments enable row level security;
+
+drop policy if exists "users can read own appointments" on public.appointments;
+create policy "users can read own appointments"
+on public.appointments
+for select
+using (
+  exists (
+    select 1
+    from public.businesses b
+    where b.id = appointments.business_id
+      and b.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "users can insert own appointments" on public.appointments;
+create policy "users can insert own appointments"
+on public.appointments
+for insert
+with check (
+  exists (
+    select 1
+    from public.businesses b
+    where b.id = appointments.business_id
+      and b.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "users can update own appointments" on public.appointments;
+create policy "users can update own appointments"
+on public.appointments
+for update
+using (
+  exists (
+    select 1
+    from public.businesses b
+    where b.id = appointments.business_id
+      and b.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.businesses b
+    where b.id = appointments.business_id
+      and b.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "users can delete own appointments" on public.appointments;
+create policy "users can delete own appointments"
+on public.appointments
+for delete
+using (
+  exists (
+    select 1
+    from public.businesses b
+    where b.id = appointments.business_id
+      and b.user_id = auth.uid()
+  )
+);

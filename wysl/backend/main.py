@@ -29,6 +29,7 @@ SUPPRESSED_ACCESS_LOG_PATHS = {
     "/api/reactions",
     "/businesses/me/forwarding",
 }
+APPOINTMENT_ALLOWED_STATUSES = {"pending", "confirmed", "cancelled", "completed", "missed"}
 
 
 class UvicornAccessFilter(logging.Filter):
@@ -3780,6 +3781,92 @@ def first_present(data, *paths):
             return value
     return None
 
+
+def blank_to_none(value):
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped if stripped else None
+    return value
+
+
+def normalize_appointment_status(value, fallback: str = "pending") -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in APPOINTMENT_ALLOWED_STATUSES:
+        return normalized
+    return fallback
+
+
+def normalize_appointment_duration(value, fallback: int = 30) -> int:
+    try:
+        parsed = int(value)
+    except Exception:
+        return fallback
+    if parsed <= 0:
+        return fallback
+    return min(parsed, 1440)
+
+
+def normalize_appointment_date_value(value, fallback: str | None = None) -> str:
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped:
+            candidate = stripped.replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(candidate).date().isoformat()
+            except ValueError:
+                pass
+            for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%m/%d/%y", "%m-%d-%y"):
+                try:
+                    return datetime.strptime(stripped, fmt).date().isoformat()
+                except ValueError:
+                    continue
+    return fallback or datetime.now().date().isoformat()
+
+
+def normalize_appointment_time_value(value, fallback: str = "09:00") -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%H:%M")
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped:
+            try:
+                return datetime.strptime(stripped, "%H:%M").strftime("%H:%M")
+            except ValueError:
+                pass
+            for fmt in ("%I:%M %p", "%I:%M%p", "%I %p", "%I%p"):
+                try:
+                    return datetime.strptime(stripped.upper(), fmt).strftime("%H:%M")
+                except ValueError:
+                    continue
+            return stripped
+    return fallback
+
+
+def safe_appointment_person_id(value):
+    parsed = int_or_none(value)
+    if parsed is None:
+        return None
+    try:
+        response = supabase.table("people").select("id").eq("id", parsed).limit(1).execute()
+        return parsed if response.data else None
+    except Exception:
+        return None
+
+
+def safe_appointment_service_id(value):
+    parsed = uuid_or_none(value)
+    if not parsed:
+        return None
+    try:
+        response = supabase.table("services").select("id").eq("id", parsed).limit(1).execute()
+        return parsed if response.data else None
+    except Exception:
+        return None
+
 def parse_optional_datetime(value):
     if value is None or value == "":
         return None
@@ -4820,17 +4907,18 @@ async def legacy_server_tool(tool_name: str, request: Request):
         }
 
     if normalized_tool == "create-appointment":
+        person_id = safe_appointment_person_id(first_present(payload, "person_id"))
         appointment_row = {
-            "client_name": first_present(payload, "client_name", "name", "customer_name"),
-            "date": first_present(payload, "date", "appointment_date"),
-            "time": first_present(payload, "time", "appointment_time"),
-            "duration": first_present(payload, "duration", "appointment_duration") or 30,
-            "status": first_present(payload, "status") or "pending",
+            "date": normalize_appointment_date_value(first_present(payload, "date", "appointment_date")),
+            "time": normalize_appointment_time_value(first_present(payload, "time", "appointment_time")),
+            "duration": normalize_appointment_duration(first_present(payload, "duration", "appointment_duration")),
+            "status": normalize_appointment_status(first_present(payload, "status")),
             "assigned_receptionist": first_present(payload, "assigned_receptionist", "receptionist_name") or (receptionist or {}).get("full_name"),
             "notes": first_present(payload, "notes"),
-            "person_id": first_present(payload, "person_id"),
-            "service_id": first_present(payload, "service_id"),
+            "person_id": person_id,
+            "service_id": safe_appointment_service_id(first_present(payload, "service_id")),
             "business_id": business.get("id") if business else None,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         response = supabase.table("appointments").insert(appointment_row).execute()
         created = response.data[0] if response.data else appointment_row
@@ -4838,32 +4926,46 @@ async def legacy_server_tool(tool_name: str, request: Request):
         return {"ok": True, "appointment": created}
 
     if normalized_tool == "update-appointment":
-        appointment_id = first_present(payload, "appointment_id", "id")
+        appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
         if not appointment_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="appointment_id is required")
-        updates = {
-            key: value for key, value in {
-                "client_name": first_present(payload, "client_name", "name", "customer_name"),
-                "date": first_present(payload, "date", "appointment_date"),
-                "time": first_present(payload, "time", "appointment_time"),
-                "duration": first_present(payload, "duration", "appointment_duration"),
-                "status": first_present(payload, "status"),
-                "assigned_receptionist": first_present(payload, "assigned_receptionist", "receptionist_name"),
-                "notes": first_present(payload, "notes"),
-                "person_id": first_present(payload, "person_id"),
-                "service_id": first_present(payload, "service_id"),
-            }.items() if value is not None
-        }
+            return {"ok": True, "appointment": {"action": "update_appointment", "skipped": True, "reason": "appointment_id is required"}}
+        updates = {}
+        if first_present(payload, "date", "appointment_date") is not None:
+            updates["date"] = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
+        if first_present(payload, "time", "appointment_time") is not None:
+            updates["time"] = normalize_appointment_time_value(first_present(payload, "time", "appointment_time"))
+        if first_present(payload, "duration", "appointment_duration") is not None:
+            updates["duration"] = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
+        if first_present(payload, "status") is not None:
+            updates["status"] = normalize_appointment_status(first_present(payload, "status"))
+        if first_present(payload, "assigned_receptionist", "receptionist_name") is not None:
+            updates["assigned_receptionist"] = first_present(payload, "assigned_receptionist", "receptionist_name")
+        if first_present(payload, "notes") is not None:
+            updates["notes"] = first_present(payload, "notes")
+        if first_present(payload, "person_id") is not None:
+            safe_person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+            if safe_person_id is not None:
+                updates["person_id"] = safe_person_id
+        if first_present(payload, "service_id") is not None:
+            safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"))
+            if safe_service_id is not None:
+                updates["service_id"] = safe_service_id
+        if not updates:
+            return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
         response = supabase.table("appointments").update(updates).eq("id", appointment_id).execute()
         updated = response.data[0] if response.data else {"id": appointment_id, **updates}
         emit_scenario_trigger("appointment_updated", {"appointment": updated, "business_id": business.get("id") if business else None})
         return {"ok": True, "appointment": updated}
 
     if normalized_tool == "cancel-appointment":
-        appointment_id = first_present(payload, "appointment_id", "id")
+        appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
         if not appointment_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="appointment_id is required")
-        response = supabase.table("appointments").update({"status": "cancelled"}).eq("id", appointment_id).execute()
+            return {"ok": True, "appointment": {"action": "cancel_appointment", "skipped": True, "reason": "appointment_id is required"}}
+        response = supabase.table("appointments").update({
+            "status": "cancelled",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", appointment_id).execute()
         cancelled = response.data[0] if response.data else {"id": appointment_id, "status": "cancelled"}
         emit_scenario_trigger("appointment_cancelled", {"appointment": cancelled, "business_id": business.get("id") if business else None})
         return {"ok": True, "appointment": cancelled}

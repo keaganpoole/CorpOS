@@ -2099,7 +2099,6 @@ export default function ScenariosPage() {
       if (needsAppointmentConfig) {
         const initApptConfig = {
           key: subOption.key,
-          client_name: '',
           date: '',
           time: '',
           duration: '30',
@@ -2996,10 +2995,10 @@ export default function ScenariosPage() {
 
   const executeRunnableNode = async (nodeId, manualValues = {}, runtimeResultsMap = null) => {
     const node = nodeMap[nodeId];
-    if (!node?.actionConfig) return;
+    const config = node?.actionConfig || node?.appointmentConfig;
+    if (!config) return;
 
-    const config = node.actionConfig;
-    const actionKey = config._key;
+    const actionKey = config._key || config.key;
     console.log('[Run Node] Starting executeRunnableNode', { nodeId, actionKey, manualValues });
     const flowResultsMap = runtimeResultsMap || buildFlowResultsMap(nodeId);
     const hasManualValue = (fieldKey) => Object.prototype.hasOwnProperty.call(manualValues, fieldKey);
@@ -3398,14 +3397,14 @@ export default function ScenariosPage() {
       const step = `[${i + 1}/${execOrder.length}]`;
 
       if (!node.configured) { log(`⏭ ${step} ${node.label || node.id} — skipped (not configured)`); continue; }
-      const actionKey = node.actionConfig?._key;
+      const actionKey = node.actionConfig?._key || node.appointmentConfig?.key;
       if (!actionKey) { log(`⏭ ${step} ${node.label || node.id} — skipped (no action)`); continue; }
 
       log(`⚙ ${step} ${node.label} — running...`);
 
       try {
         if (actionKey === 'search_records' || actionKey === 'search_appointments') {
-          const config = node.actionConfig;
+          const config = node.actionConfig || node.appointmentConfig;
           const tableKey = actionKey === 'search_appointments' ? 'appointments' : 'people';
           const limit = config.search_limit || 10;
           const businessId = await getCurrentBusinessId();
@@ -3431,7 +3430,7 @@ export default function ScenariosPage() {
             console.error(`[Scenario Run]   └ Error:`, error.message);
           }
         } else if (actionKey === 'create_customer') {
-          const config = node.actionConfig;
+          const config = node.actionConfig || node.appointmentConfig;
           const body = {
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
             customer_name: resolveVariableRefs(resolveTableVariableRefs(config.customer_name, resultsMap), resultsMap) || config.customer_name || '',
@@ -3452,7 +3451,7 @@ export default function ScenariosPage() {
             console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'update_customer') {
-          const config = node.actionConfig;
+          const config = node.actionConfig || node.appointmentConfig;
           const body = {
             customer_id: resolveVariableRefs(resolveTableVariableRefs(config.customer_id, resultsMap), resultsMap) || config.customer_id || null,
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
@@ -3474,7 +3473,7 @@ export default function ScenariosPage() {
             console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'create_payment') {
-          const config = node.actionConfig;
+          const config = node.actionConfig || node.appointmentConfig;
           const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
           const body = {
             amount: amountCents,
@@ -3502,7 +3501,7 @@ export default function ScenariosPage() {
             console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'send_payment_link') {
-          const config = node.actionConfig;
+          const config = node.actionConfig || node.appointmentConfig;
           const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
           const body = {
             amount: amountCents,
@@ -3531,7 +3530,7 @@ export default function ScenariosPage() {
             console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'create_invoice') {
-          const config = node.actionConfig;
+          const config = node.actionConfig || node.appointmentConfig;
           const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
           const body = {
             amount: amountCents,
@@ -3561,7 +3560,7 @@ export default function ScenariosPage() {
             console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'send_invoice') {
-          const config = node.actionConfig;
+          const config = node.actionConfig || node.appointmentConfig;
           const body = {
             invoice_id: resolveVariableRefs(resolveTableVariableRefs(config.invoice_id, resultsMap), resultsMap) || config.invoice_id || null,
           };
@@ -3580,7 +3579,7 @@ export default function ScenariosPage() {
             console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
           }
         } else if (actionKey === 'refund_payment') {
-          const config = node.actionConfig;
+          const config = node.actionConfig || node.appointmentConfig;
           const amountValue = resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || null;
           const amountCents = amountValue ? Math.round(Number(amountValue) * 100) : null;
           const body = {
