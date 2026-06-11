@@ -166,7 +166,7 @@ const TABLE_REF_REVERSE_ALIASES = Object.fromEntries(
 );
 
 const RECORD_ID_LABELS = {
-  People: 'Record ID',
+  People: 'Person ID',
   Appointments: 'Record ID',
   Services: 'Record ID',
   Payments: 'Record ID',
@@ -411,7 +411,7 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
-          { key: 'person_id', label: 'Record ID', type: 'person_id' },
+          { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
           { key: 'first_message', label: 'First Message', type: 'first_message_textarea', smartActions: true, toggleLabel: 'Override First Message' },
           { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text' },
@@ -5143,15 +5143,15 @@ export default function ScenariosPage() {
                     <div className="sb-record-fields-grid">
                       {/* Record ID — for create and update_appointment (person_id field) */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field">
-                          <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Record ID</label>
+                        <div className="sb-record-field" style={{ order: 1 }}>
+                          <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Person ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
                               className="sb-input-field"
                               type="text"
                               value={appointmentConfig.person_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, person_id: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Record ID', fieldType: 'person_id' })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Person ID', fieldType: 'person_id' })}
                               style={{
                                 ...(appointmentConfig.person_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'person_id' ? {
@@ -5170,7 +5170,7 @@ export default function ScenariosPage() {
                       )}
                       {/* Service ID — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field">
+                        <div className="sb-record-field" style={{ order: 2 }}>
                           <label className="sb-record-label">Service ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
@@ -5211,7 +5211,7 @@ export default function ScenariosPage() {
                       )}
                       {/* Appointment ID — for update/delete_appointment (first field) */}
                       {(appointmentConfig.key === 'update_appointment' || appointmentConfig.key === 'delete_appointment') && (
-                        <div className="sb-record-field">
+                        <div className="sb-record-field" style={{ order: 0 }}>
                           <label className="sb-record-label"><Hash size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Appointment ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
