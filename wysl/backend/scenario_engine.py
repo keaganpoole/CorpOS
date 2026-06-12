@@ -86,6 +86,8 @@ TRIGGER_EVENT_MAP = {
     "appointment_created": "appointment_created",
     "appointment_updated": "appointment_updated",
     "appointment_cancelled": "appointment_cancelled",
+    "appointment_rescheduled": "appointment_rescheduled",
+    "appointment_confirmed": "appointment_confirmed",
     "appointment_completed": "appointment_completed",
     "appointment_missed": "appointment_missed",
     "appointment_reminder": "appointment_reminder",

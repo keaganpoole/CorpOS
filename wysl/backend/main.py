@@ -1581,11 +1581,18 @@ def provision_twilio_number_for_business(business: dict):
 def schedule_backend_scenario_execution(event_type: str, payload: Optional[dict] = None):
     global scenario_engine
     if not scenario_engine:
+        logging.warning("[ScenarioEngine] Skipping event %s because scenario_engine is not initialized", event_type)
         return
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
+        logging.warning("[ScenarioEngine] Skipping event %s because no running event loop was found", event_type)
         return
+    logging.info(
+        "[ScenarioEngine] Queueing event type=%s payload_keys=%s",
+        event_type,
+        sorted((payload or {}).keys()),
+    )
     loop.create_task(scenario_engine.handle_event(event_type, payload or {}))
 
 
@@ -2651,13 +2658,25 @@ INTENT_KEY_ALIASES = {
     "intent_appointment_created": "appointment_created",
     "intent_appointment_updated": "appointment_updated",
     "intent_appointment_cancelled": "appointment_cancelled",
+    "intent_appointment_rescheduled": "appointment_rescheduled",
+    "intent_appointment_confirmed": "appointment_confirmed",
+    "intent_appointment_completed": "appointment_completed",
+    "intent_appointment_missed": "appointment_missed",
     "appointment_create": "appointment_created",
     "appointment_update": "appointment_updated",
     "appointment_cancel": "appointment_cancelled",
+    "appointment_reschedule": "appointment_rescheduled",
+    "appointment_confirm": "appointment_confirmed",
+    "appointment_complete": "appointment_completed",
+    "appointment_mark_missed": "appointment_missed",
     "create_appointment": "appointment_created",
     "update_appointment": "appointment_updated",
-    "delete_appointment": "cancel_appointment",
+    "delete_appointment": "appointment_cancelled",
     "cancel_appointment": "appointment_cancelled",
+    "reschedule_appointment": "appointment_rescheduled",
+    "confirm_appointment": "appointment_confirmed",
+    "complete_appointment": "appointment_completed",
+    "miss_appointment": "appointment_missed",
     "intent_record_created": "record_created",
     "intent_record_updated": "record_updated",
     "create_record": "record_created",
@@ -2696,6 +2715,10 @@ SUPPORTED_INTENT_KEYS = {
     "appointment_created",
     "appointment_updated",
     "appointment_cancelled",
+    "appointment_rescheduled",
+    "appointment_confirmed",
+    "appointment_completed",
+    "appointment_missed",
     "create_appointment",
     "update_appointment",
     "cancel_appointment",
@@ -3182,6 +3205,55 @@ def emit_scenario_trigger(trigger_key: str, payload: Optional[dict] = None, crea
 
     schedule_backend_scenario_execution(normalized_trigger_key, payload or {})
     return {"ok": True, "event": saved_event, "persisted": persisted}
+
+
+def emit_appointment_change_triggers(
+    previous_appointment: Optional[dict],
+    current_appointment: Optional[dict],
+    *,
+    business_id=None,
+    include_updated: bool = True,
+):
+    if not isinstance(current_appointment, dict) or not current_appointment:
+        return
+
+    resolved_business_id = (
+        current_appointment.get("business_id")
+        if isinstance(current_appointment, dict)
+        else None
+    ) or (
+        previous_appointment.get("business_id")
+        if isinstance(previous_appointment, dict)
+        else None
+    ) or business_id
+
+    payload = {
+        "appointment": current_appointment,
+        "business_id": resolved_business_id,
+    }
+
+    if include_updated:
+        emit_scenario_trigger("appointment_updated", payload)
+
+    previous_status = str((previous_appointment or {}).get("status") or "").strip().lower()
+    current_status = str((current_appointment or {}).get("status") or "").strip().lower()
+    if current_status != previous_status:
+        if current_status == "cancelled":
+            emit_scenario_trigger("appointment_cancelled", payload)
+        elif current_status == "confirmed":
+            emit_scenario_trigger("appointment_confirmed", payload)
+        elif current_status == "completed":
+            emit_scenario_trigger("appointment_completed", payload)
+        elif current_status == "missed":
+            emit_scenario_trigger("appointment_missed", payload)
+
+    if previous_appointment:
+        previous_date = str(previous_appointment.get("date") or "").strip()
+        current_date = str(current_appointment.get("date") or "").strip()
+        previous_time = str(previous_appointment.get("time") or "").strip()
+        current_time = str(current_appointment.get("time") or "").strip()
+        if previous_date != current_date or previous_time != current_time:
+            emit_scenario_trigger("appointment_rescheduled", payload)
 
 def normalize_phone_number(value) -> Optional[str]:
     if value is None:
@@ -4348,6 +4420,28 @@ def update_payment_record(match_field: str, match_value: str, update_data: dict)
     response = supabase.table("payments").update(update_data).eq(match_field, match_value).execute()
     return response.data[0] if response.data else None
 
+
+def normalize_payment_record_status(value: Optional[str], fallback: str = "pending") -> str:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return fallback
+    status_map = {
+        "paid": "succeeded",
+        "complete": "succeeded",
+        "completed": "succeeded",
+        "succeeded": "succeeded",
+        "pending": "pending",
+        "unpaid": "pending",
+        "open": "pending",
+        "failed": "failed",
+        "error": "failed",
+        "declined": "failed",
+        "refunded": "refunded",
+        "partial_refund": "partial_refund",
+        "partial_refunded": "partial_refund",
+    }
+    return status_map.get(normalized, normalized)
+
 def upsert_payment_from_stripe(
     *,
     payment_intent_id: Optional[str] = None,
@@ -4370,7 +4464,7 @@ def upsert_payment_from_stripe(
 
     update_data = {}
     if status is not None:
-        update_data["status"] = status
+        update_data["status"] = normalize_payment_record_status(status)
     if receipt_url is not None:
         update_data["receipt_url"] = receipt_url
     if error_message is not None:
@@ -4923,12 +5017,17 @@ async def legacy_server_tool(tool_name: str, request: Request):
         response = supabase.table("appointments").insert(appointment_row).execute()
         created = response.data[0] if response.data else appointment_row
         emit_scenario_trigger("appointment_created", {"appointment": created, "business_id": business.get("id") if business else None})
+        emit_appointment_change_triggers(None, created, business_id=business.get("id") if business else None, include_updated=False)
         return {"ok": True, "appointment": created}
 
     if normalized_tool == "update-appointment":
         appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
         if not appointment_id:
             return {"ok": True, "appointment": {"action": "update_appointment", "skipped": True, "reason": "appointment_id is required"}}
+        existing_response = supabase.table("appointments").select("*").eq("id", appointment_id).limit(1).execute()
+        existing = existing_response.data[0] if existing_response.data else None
+        if not existing:
+            return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "Appointment not found"}}
         updates = {}
         if first_present(payload, "date", "appointment_date") is not None:
             updates["date"] = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
@@ -4954,20 +5053,24 @@ async def legacy_server_tool(tool_name: str, request: Request):
             return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()
         response = supabase.table("appointments").update(updates).eq("id", appointment_id).execute()
-        updated = response.data[0] if response.data else {"id": appointment_id, **updates}
-        emit_scenario_trigger("appointment_updated", {"appointment": updated, "business_id": business.get("id") if business else None})
+        updated = response.data[0] if response.data else {**existing, **updates}
+        emit_appointment_change_triggers(existing, updated, business_id=business.get("id") if business else None)
         return {"ok": True, "appointment": updated}
 
     if normalized_tool == "cancel-appointment":
         appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
         if not appointment_id:
             return {"ok": True, "appointment": {"action": "cancel_appointment", "skipped": True, "reason": "appointment_id is required"}}
+        existing_response = supabase.table("appointments").select("*").eq("id", appointment_id).limit(1).execute()
+        existing = existing_response.data[0] if existing_response.data else None
+        if not existing:
+            return {"ok": True, "appointment": {"id": appointment_id, "action": "cancel_appointment", "skipped": True, "reason": "Appointment not found"}}
         response = supabase.table("appointments").update({
             "status": "cancelled",
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", appointment_id).execute()
-        cancelled = response.data[0] if response.data else {"id": appointment_id, "status": "cancelled"}
-        emit_scenario_trigger("appointment_cancelled", {"appointment": cancelled, "business_id": business.get("id") if business else None})
+        cancelled = response.data[0] if response.data else {**existing, "status": "cancelled", "updated_at": datetime.now(timezone.utc).isoformat()}
+        emit_appointment_change_triggers(existing, cancelled, business_id=business.get("id") if business else None)
         return {"ok": True, "appointment": cancelled}
 
     if normalized_tool == "log-call-outcome":
@@ -5703,6 +5806,55 @@ async def list_sonar_appointments(limit: int = 100, current_user: dict = Depends
             pass
     response = query.order("date").order("time").limit(max(1, min(limit, 500))).execute()
     return response.data or []
+
+
+@app.put("/api/sonar/appointments/{appointment_id}", tags=["Sonar Appointments"])
+async def update_sonar_appointment(appointment_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
+    appointment_id = uuid_or_none(appointment_id)
+    if not appointment_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid appointment ID")
+
+    business = load_business_by_user_id(str(current_user.id))
+    existing_query = supabase.table("appointments").select("*").eq("id", appointment_id)
+    if business:
+        existing_query = existing_query.eq("business_id", business["id"])
+    existing_response = existing_query.limit(1).execute()
+    if not existing_response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    updates = {}
+    if first_present(payload, "date", "appointment_date") is not None:
+        updates["date"] = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
+    if first_present(payload, "time", "appointment_time") is not None:
+        updates["time"] = normalize_appointment_time_value(first_present(payload, "time", "appointment_time"))
+    if first_present(payload, "duration", "appointment_duration") is not None:
+        updates["duration"] = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
+    if first_present(payload, "status") is not None:
+        updates["status"] = normalize_appointment_status(first_present(payload, "status"))
+    if first_present(payload, "assigned_receptionist", "receptionist_name") is not None:
+        updates["assigned_receptionist"] = first_present(payload, "assigned_receptionist", "receptionist_name")
+    if first_present(payload, "notes") is not None:
+        updates["notes"] = first_present(payload, "notes")
+    if first_present(payload, "person_id") is not None:
+        safe_person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+        if safe_person_id is not None:
+            updates["person_id"] = safe_person_id
+    if first_present(payload, "service_id") is not None:
+        safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"))
+        if safe_service_id is not None:
+            updates["service_id"] = safe_service_id
+    if not updates:
+        return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
+
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    response = supabase.table("appointments").update(updates).eq("id", appointment_id).execute()
+    updated = response.data[0] if response.data else {**existing_response.data[0], **updates}
+    emit_appointment_change_triggers(
+        existing_response.data[0],
+        updated,
+        business_id=updated.get("business_id") or (business or {}).get("id"),
+    )
+    return updated
 
 @app.get("/api/sonar/appointments/stats", tags=["Sonar Appointments"])
 async def get_sonar_appointment_stats(current_user: dict = Depends(get_current_user)):
@@ -6477,8 +6629,7 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
             stripe_session_id=checkout_session.id,
         )
         saved_payment = insert_payment_record(payment_row)
-
-        return {
+        response_payload = {
             "customer_id": customer.get("id"),
             "payment_url": checkout_session.url,
             "amount": request.amount,
@@ -6490,6 +6641,17 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
             "stripe_session_id": checkout_session.id,
             "payment_id": saved_payment.get("id"),
         }
+        emit_payment_trigger("payment_link_sent", {
+            "payment": saved_payment,
+            "payment_id": saved_payment.get("id"),
+            "stripe_session_id": checkout_session.id,
+            "payment_url": checkout_session.url,
+            "customer_id": customer.get("id"),
+            "amount": request.amount,
+            "currency": request.currency,
+            "status": "pending",
+        })
+        return response_payload
     except Exception as exc:
         logging.error("Error creating payment link: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
@@ -6911,11 +7073,23 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             payment_status = session.get("payment_status")
             payment_record = upsert_payment_from_stripe(
                 session_id=session.get("id"),
-                status="paid" if payment_status == "paid" else payment_status or "completed",
+                status="succeeded" if payment_status == "paid" else payment_status or "succeeded",
+            )
+            logging.info(
+                "[Stripe Webhook] checkout.session.completed id=%s connected=%s payment_status=%s metadata_keys=%s",
+                session.get("id"),
+                is_connected_account_event,
+                payment_status,
+                sorted((session.get("metadata") or {}).keys()),
             )
             if is_connected_account_event and payment_status == "paid":
                 metadata = session.get("metadata") or {}
                 user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+                logging.info(
+                    "[Stripe Webhook] checkout.session.completed resolved user_id=%s person_id=%s",
+                    user_id,
+                    metadata.get("person_id"),
+                )
                 if user_id:
                     emit_payment_trigger("payment_received", {
                         "checkout_session": session,
@@ -7226,6 +7400,14 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         )
         metadata = payment_intent.get("metadata") or {}
         user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+        logging.info(
+            "[Stripe Webhook] payment_intent.succeeded id=%s connected=%s resolved_user_id=%s person_id=%s metadata_keys=%s",
+            payment_intent.get("id"),
+            is_connected_account_event,
+            user_id,
+            metadata.get("person_id"),
+            sorted(metadata.keys()),
+        )
         if user_id:
             emit_payment_trigger("payment_received", {
                 "payment_intent": payment_intent,

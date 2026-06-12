@@ -496,7 +496,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'customer_email', label: 'Customer Email', type: 'text' },
           { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
         ]},
-        { key: 'send_payment_link', name: 'Send Payment Link', description: 'Generate a hosted payment link for the customer', configFields: [
+        { key: 'send_payment_link', name: 'Create Payment Link', description: 'Generate a hosted payment link for the customer', configFields: [
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
           { key: 'amount', label: 'Amount ($)', type: 'text' },
