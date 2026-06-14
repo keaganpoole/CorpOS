@@ -880,7 +880,6 @@ class ScenarioActionExecutor:
             "update_customer": self._update_customer,
             "create_payment": self._create_payment,
             "send_payment_link": self._send_payment_link,
-            "create_payment_profile": self._send_payment_link,
             "create_invoice": self._create_invoice,
             "send_invoice": self._send_invoice,
             "refund_payment": self._refund_payment,
@@ -1330,9 +1329,9 @@ class ScenarioActionExecutor:
         return {"success": True, "data": {"action": "update_customer", **result}}
 
     async def _send_payment_link(self, node: dict, context: dict):
-        callback = self.callbacks.get("send_payment_link") or self.callbacks.get("create_payment_profile")
+        callback = self.callbacks.get("send_payment_link")
         if not callback:
-            return {"success": False, "error": "Payment profile callback not configured"}
+            return {"success": False, "error": "Payment link callback not configured"}
         config = node.get("actionConfig") or {}
         person = context.get("person") or {}
         payload = {
@@ -1777,7 +1776,7 @@ class ScenarioFlowExecutor:
                 if action in {"create_invoice", "send_invoice"}:
                     context["invoice"] = data
                     context["invoices"] = data
-                if action in {"create_payment", "send_payment_link", "refund_payment", "create_payment_profile", "update_payment"}:
+                if action in {"create_payment", "send_payment_link", "refund_payment", "update_payment"}:
                     context["payment"] = data
                     context["payments"] = data
                 if action in {"create_customer", "update_customer"}:

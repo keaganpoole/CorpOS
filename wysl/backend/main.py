@@ -6566,13 +6566,6 @@ async def send_payment_link(
 
 
 @app.post("/api/sonar/create-payment-profile", tags=["Sonar Payments"])
-async def create_payment_profile_legacy(
-    request: PaymentLinkCreateRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    return await _send_payment_link_for_user(request, str(current_user.id))
-
-
 async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id: str):
     description = request.description or ""
     payment_mode_base_url = get_payment_frontend_base_url()
@@ -6976,7 +6969,6 @@ scenario_engine = ScenarioEngine(
         "update_customer": scenario_update_customer_callback,
         "create_payment": scenario_create_payment_callback,
         "send_payment_link": scenario_send_payment_link_callback,
-        "create_payment_profile": scenario_send_payment_link_callback,
         "create_invoice": scenario_create_invoice_callback,
         "send_invoice": scenario_send_invoice_callback,
         "refund_payment": scenario_refund_payment_callback,

@@ -1,282 +1,385 @@
-# UI / UX Improvements
-
----
-
-# 📊 LIVE MONITORING PAGE
-
-### Metrics Tiles
-
-* Currently, there are tiles at the top. However, users may not care about the existing metrics and may prefer to monitor different KPIs.
-* Allow users to customize which metrics appear as the showcased tiles.
-* The selection experience should feel intuitive and follow the existing design language of the page.
-* Include as many meaningful metrics as possible based on available backend data and what users would realistically want to track.
-* Keep the current metrics available as selectable options.
-
-### Comparison Periods
-
-* I believe the current tiles are showing week-over-week comparisons, but I'm not completely sure.
-* Allow users to choose between:
-
-  * Day-over-Day
-  * Week-over-Week
-  * Month-over-Month
-  * Year-over-Year
-
-### Live Pulse
-
-* Remove the Live Pulse pop-out panel entirely.
-
-### Tile Styling
-
-* Make the shadow/glow effect from the graph lines inside the tiles slightly more visible.
-
----
-
-# 🎙️ RECEPTIONISTS PAGE
-
-### Card Layout
-
-* Increase the overall size of receptionist cards so they occupy more space on the page.
-* The page currently feels too empty.
-* The goal is to make the cards feel more like a modern showcase of receptionists.
-
-### Image Sizing
-
-* Increase the size of the receptionist images.
-* The images should act as the primary visual showcase.
-
-### Information Sizing
-
-* Do **not** significantly increase the size of the card content.
-* Keep text, labels, and supporting information close to their current size.
-* Enlarging everything would make the cards feel overwhelming and sloppy.
-
-### Card Shape
-
-* Round the top corners of the cards to match the bottom corners.
-
-### Metrics
-
-* Reduce the size of metric values slightly to a more comfortable scale that fits the larger card design.
-
-### Remove Scenario Section
-
-* Remove the Scenario section located beneath the phone number.
-
-### Remove Voice Sample Text
-
-* Remove all text beneath the arrows:
-
-  * "Voice Sample Available"
-  * "Low Latency"
-
-### Hired Receptionist Layout
-
-* Hired receptionist cards should appear centered on the page instead of stacking from left to right.
-* Example:
-
-  * If there is only one hired receptionist, it should be perfectly centered horizontally and vertically within the available canvas.
-  * When a second receptionist is added, the layout should remain centered as a group.
-* The overall behavior should feel like **centered stacking**, rather than traditional left-to-right alignment.
-* This will make the page feel cleaner and more intuitive.
-
----
-
-# ⚡ SCENARIOS PAGE
-
-### Add Component Button
-
-* Instead of displaying:
-
-  * "Add Component"
-
-* Display:
-
-  * "Add Trigger" for the first node.
-  * "Add Action" for any node added after the first node.
-
-### Trigger / Action / Utility Tabs
-
-* Remove the active pill-style background behind:
-
-  * Triggers
-  * Actions
-  * Utilities
-
-* Replace it with:
-
-  * A clean white or gray underline (whichever best fits the design system).
-  * A subtle animated sweep effect similar to the page navigation indicator in the left sidebar.
-  * The animation should move horizontally.
-
----
-
-# 📞 CALL LOGS PAGE
-
-* Remove the indicator in the top-right corner that displays how many call logs are currently visible.
-
----
-
-# 👥 PEOPLE PAGE
-
-### Pop-Out Panel Modernization
-
-* The record pop-out panel is currently outdated.
-* It must display the exact same fields that are available inline within the table.
-
-### Custom Fields Support
-
-* The pop-out panel must fully support all custom field types.
-* Any custom field created inline must automatically appear inside the pop-out panel.
-* The panel must always remain synchronized with the table structure.
-
-Example:
-
-* If a custom Single Select field is added inline:
-
-  * The same field should automatically appear in the pop-out panel.
-  * The field should behave exactly the same way.
-
-### Remove Unused Data
-
-* Remove any fields from the pop-out panel that do not exist in the backend.
-
-### UX Consistency
-
-* The pop-out panel should be as intuitive and polished as the table itself.
-* Users should be able to edit and configure field values with the same ease as inline editing.
-
-### Remove Avatar
-
-* Remove the avatar thumbnail from the pop-out panel.
-* It is unnecessary.
-
-### Remove Summary Tiles
-
-* Remove the showcase tiles at the top of the panel:
-
-  * Missed Calls
-  * Last Call Status
-
-### Visual Consistency
-
-* The pop-out panel must visually match the table.
-* Example:
-
-  * If the table uses a specific date picker style, the pop-out panel should use the exact same component and styling.
-* Avoid introducing alternate versions of existing UI controls.
-
-### Remove New Record Button
-
-* Remove the large "+" button in the top-right corner.
-* New records can already be created inline.
-
-### Record Count Display
-
-Current:
-
-* "2 of 100 People"
-
-Replace with:
-
-* "100 People"
-
-Displayed directly beneath the page title.
-
-### Remove Teaser Row Add Button
-
-* Remove the "+" icon from the teaser row.
-
----
-
-# ⚙️ SETTINGS PAGE
-
-### Two-Column Layout
-
-* Convert the Settings page into a two-column layout.
-
-Example:
-
-* Left Column:
-
-  * Business Info
-  * Services & Pricing
-  * Hours
-  * etc.
-
-* Right Column:
-
-  * Displays the selected section's settings.
-
-This should make the Settings page feel more organized and significantly less overwhelming.
-
-### Variable Chips
-
-* In the Intro Message section:
-
-  * Do not display raw variable text when variables are dragged into a field.
-  * Display variable chips using the same visual treatment used in Scenario Builder node configuration forms.
-
-### Focus State
-
-* Remove the white border "flash" that appears when selecting a field.
-* A field should not briefly reveal a white border before returning to its normal state.
-
-### Appointment Settings
-
-Remove:
-
-* Buffer Between Appointments
-* Default Duration
-
-### Calls & Notifications
-
-* Remove the Calls & Notifications section entirely.
-
-### Services & Pricing
-
-Remove:
-
-* Price Type field
-* Preview button
-
----
-
-# 🏠 DASHBOARD
-
-### User Profile Area
-
-* Remove everything in the bottom-left profile section where it currently displays:
-
-  * "Keagan Poole"
-  * Any related information
-
-* This entire section is unnecessary.
-
-### Page Title Typography
-
-* Use the same font and styling currently used on the onboarding pages for all page titles throughout the application.
-* The onboarding typography looks significantly more polished.
-* Apply that same treatment to page names displayed at the top of each page.
-
-### Sidebar Animation Speed
-
-* Increase the speed of the color sweep animation when a user selects a page in the left navigation.
-
-### Collapsible Sidebar
-
-* Make the left sidebar collapsible.
-
-Behavior:
-
-* When the mouse is outside the sidebar:
-
-  * Collapse to icon-only mode.
-
-* When the mouse enters the sidebar:
-
-  * Expand to its full current width and contents.
-
-* The behavior should feel similar to how the Live Pulse panel previously expanded and collapsed.
-
-* The transition should feel smooth, fast, and premium.
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Calendar as CalendarIcon, 
+  ChevronLeft, 
+  ChevronRight, 
+  Clock, 
+  Sparkles, 
+  Layers, 
+  ArrowRight,
+  Plus,
+  Command,
+  Sliders,
+  CheckCircle,
+  MapPin,
+  CalendarDays,
+  Activity
+} from 'lucide-react';
+
+const CSS_ANIMATIONS = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+.hero-title-match {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.04em !important;
+  line-height: 1.05 !important;
+}
+
+.hero-subheadline-match {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  font-weight: 400 !important;
+  line-height: 1.6 !important;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(0.5deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.03); }
+}
+
+/* Cinematic Slow Easing */
+.premium-easing {
+  transition: all 1200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.canvas-exit {
+  opacity: 0;
+  transform: translateY(12px) scale(0.985);
+  filter: blur(12px);
+}
+
+.canvas-enter {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+
+.custom-easing {
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Custom glowing elements */
+.neon-glow-cyan {
+  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25);
+}
+.neon-glow-violet {
+  box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.25);
+}
+.neon-glow-rose {
+  box-shadow: 0 0 25px -5px rgba(244, 63, 94, 0.25);
+}
+`;
+
+export default function App() {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [studioLightIntensity, setStudioLightIntensity] = useState(40);
+  const [isAutoplay, setIsAutoplay] = useState(true);
+  
+  const TOTAL_SLIDES = 3;
+
+  useEffect(() => {
+    if (!isAutoplay) return;
+    const interval = setInterval(() => {
+      handleNext();
+    }, 7000); 
+    return () => clearInterval(interval);
+  }, [isAutoplay, currentSlide]);
+
+  const handleNext = () => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    // Increased timeout to allow for a beautiful long fade-out before the next component mounts
+    setTimeout(() => {
+      setCurrentSlide((prev) => (prev + 1) % TOTAL_SLIDES);
+      setIsTransitioning(false);
+    }, 600); 
+  };
+
+  const handlePrev = () => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentSlide((prev) => (prev - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
+      setIsTransitioning(false);
+    }, 600);
+  };
+
+  return (
+    <div className="w-full min-h-screen bg-[#000000] text-white antialiased overflow-x-hidden relative flex flex-col justify-between custom-easing duration-700">
+      <style>{CSS_ANIMATIONS}</style>
+      
+      {/* Monochromatic Studio Spotlight Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div 
+          style={{
+            opacity: studioLightIntensity / 100 * 0.25,
+            background: 'radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.4) 0%, rgba(0, 0, 0, 0) 70%)',
+            transition: 'opacity 1000ms ease-out'
+          }}
+          className="absolute inset-0 w-full h-full animate-pulse-glow" 
+        />
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900/40 via-black to-black opacity-60" />
+      </div>
+
+      <main className="flex-grow flex-1 relative z-10 flex flex-col items-center justify-center px-4 md:px-12 py-16 max-w-5xl mx-auto w-full select-none text-center">
+        
+        {/* Anchored Brand Text Block */}
+        <div className="flex flex-col items-center space-y-6 mb-12 max-w-3xl">
+          <h1 className="hero-title-match text-4xl md:text-6xl lg:text-7xl text-transparent bg-clip-text bg-gradient-to-b from-white via-zinc-200 to-zinc-600 mb-2">
+            automated appointment<br/>
+            booking.
+          </h1>
+          
+          <p className="hero-subheadline-match text-lg md:text-xl text-zinc-400 max-w-2xl leading-relaxed">
+            Chronos is an elite scheduling canvas engineered for luxury salons. Elevate client hospitality with seamless booking, visual station allocation, and a flawless guest journey.
+          </p>
+
+          <div className="pt-2 flex flex-wrap justify-center gap-6">
+            <span className="flex items-center space-x-2 text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#06b6d4]" />
+              <span>Guest Journey</span>
+            </span>
+            <span className="flex items-center space-x-2 text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shadow-[0_0_8px_#8b5cf6]" />
+              <span>Station Allocation</span>
+            </span>
+            <span className="flex items-center space-x-2 text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e]" />
+              <span>Stylist Harmony</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Dynamic Interactive Showcases with ultra-smooth cinematic transition */}
+        <div className="w-full flex items-center justify-center relative min-h-[520px]">
+          <div 
+            className={`w-full premium-easing ${
+              isTransitioning ? 'canvas-exit' : 'canvas-enter'
+            }`}
+          >
+            {currentSlide === 0 && <RightHeroWidget />}
+            {currentSlide === 1 && <RightCalendarGrid />}
+            {currentSlide === 2 && <RightNlpSandbox />}
+          </div>
+        </div>
+
+      </main>
+
+      {/* Footer Navigation */}
+      <footer className="relative z-50 px-8 py-8 max-w-7xl mx-auto w-full flex flex-col md:flex-row items-center justify-between gap-6 border-t border-white/5">
+        <div className="flex items-center space-x-3">
+          {[0, 1, 2].map((idx) => {
+            const activeColors = [
+              'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]',
+              'bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-[0_0_15px_rgba(139,92,246,0.5)]',
+              'bg-gradient-to-r from-rose-500 to-amber-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]'
+            ];
+            
+            return (
+              <button
+                key={idx}
+                onClick={() => {
+                  if (isTransitioning) return;
+                  setIsTransitioning(true);
+                  setTimeout(() => {
+                    setCurrentSlide(idx);
+                    setIsTransitioning(false);
+                  }, 600);
+                }}
+                className="group relative py-2"
+              >
+                <div className={`h-1.5 rounded-full transition-all duration-700 ${currentSlide === idx ? `w-20 ${activeColors[idx]}` : 'w-8 bg-zinc-800 hover:bg-zinc-600'}`} />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center space-x-6">
+          <button 
+            onClick={() => setIsAutoplay(!isAutoplay)}
+            className={`px-3 py-1 rounded-full text-[9px] font-bold tracking-widest border transition-all duration-500 ${isAutoplay ? 'bg-white text-black border-white' : 'border-zinc-800 text-zinc-500'}`}
+          >
+            {isAutoplay ? 'AUTOPLAY ACTIVE' : 'PAUSED'}
+          </button>
+
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handlePrev}
+              className="w-12 h-12 rounded-full border border-zinc-800 bg-zinc-950/40 text-white flex items-center justify-center hover:bg-zinc-900 hover:border-zinc-700 transition-all duration-300 hover:scale-105 active:scale-95"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={handleNext}
+              className="w-28 h-12 rounded-full bg-white text-black flex items-center justify-center gap-2 font-semibold transition-all duration-300 hover:scale-105 active:scale-95 hover:bg-zinc-200"
+            >
+              <span>Next</span>
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function RightHeroWidget() {
+  const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
+  const containerRef = useRef(null);
+
+  const handleMouseMove = (e) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    setHoverPosition({ x, y });
+  };
+
+  const handleMouseLeave = () => {
+    setHoverPosition({ x: 0, y: 0 });
+  };
+
+  const scheduledItems = [
+    { time: "09:00 AM", title: "Balayage & Couture Blowout", detail: "Marcus - VIP Salon Suite", colorClass: "from-cyan-500 to-blue-500", tag: "Color", tagColor: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" },
+    { time: "11:30 AM", title: "Platinum Weft Extensions Fitting", detail: "Elena - Styling Station 4", colorClass: "from-violet-500 to-fuchsia-500", tag: "Extensions", tagColor: "bg-violet-500/10 text-violet-400 border-violet-500/20" },
+    { time: "03:00 PM", title: "Editorial Bridal Trial Package", detail: "Chloe - VIP Beauty Lounge", colorClass: "from-amber-500 to-rose-500", tag: "Bridal", tagColor: "bg-amber-500/10 text-amber-400 border-amber-500/20" }
+  ];
+
+  return (
+    <div ref={containerRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} className="w-full flex justify-center py-4">
+      <div style={{ transform: `perspective(1000px) rotateY(${hoverPosition.x * 12}deg) rotateX(${-hoverPosition.y * 12}deg) scale(1.02)`, transition: 'transform 800ms cubic-bezier(0.2, 0.8, 0.2, 1)', boxShadow: '0 30px 60px -15px rgba(0,0,0,0.9), 0 0 40px -20px rgba(6,182,212,0.3)' }} className="w-full max-w-md aspect-[4/5] rounded-[24px] border border-white/10 bg-gradient-to-b from-zinc-950 to-[#030303] p-8 relative overflow-hidden group transition-all">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/10 blur-[80px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-violet-500/10 blur-[80px] rounded-full pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none" />
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-1.5"><span className="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.8)]" /><span className="w-2.5 h-2.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]" /></div>
+        </div>
+        <div className="space-y-1 mb-8 text-left">
+          <span className="text-zinc-500 font-bold text-xs tracking-widest uppercase block">Selected Date</span>
+          <div className="flex items-baseline space-x-2"><span className="text-3xl font-bold tracking-tight text-white">Saturday 13</span><span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" /></div>
+        </div>
+        <div className="space-y-3.5 text-left">
+          {scheduledItems.map((item, index) => (
+            <div key={index} className="group/item flex items-center justify-between p-4 rounded-xl bg-zinc-900/40 border border-white/5 hover:border-white/15 hover:bg-zinc-900/80 transition-all duration-300 cursor-pointer">
+              <div className="flex items-center space-x-4">
+                <div className={`w-[3px] h-10 rounded-full bg-gradient-to-b ${item.colorClass}`} />
+                <div>
+                  <div className="flex items-center space-x-2"><span className="text-[10px] font-mono text-zinc-400 block">{item.time}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${item.tagColor}`}>{item.tag}</span></div>
+                  <span className="text-sm font-semibold tracking-tight text-zinc-100 group-hover/item:text-white transition-colors block">{item.title}</span>
+                  <span className="text-[10px] text-zinc-500 block">{item.detail}</span>
+                </div>
+              </div>
+              <div className="w-7 h-7 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity"><Plus size={12} className="text-cyan-400" /></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RightCalendarGrid() {
+  const [selectedDay, setSelectedDay] = useState(15);
+  const [currentMonth, setCurrentMonth] = useState('October');
+  const itemsDatabase = {
+    12: [{ title: 'Color Masterclass', category: 'Academy', time: '10:00 AM', color: 'bg-cyan-500', colorText: 'text-cyan-400' }],
+    15: [{ title: 'Vogue Editorial Shoot', category: 'High Fashion', time: '11:00 AM', color: 'bg-violet-500', colorText: 'text-violet-400' }, { title: 'VIP Bridal Suite', category: 'VIP', time: '2:30 PM', color: 'bg-pink-500', colorText: 'text-pink-400' }],
+    22: [{ title: 'Stylist Reviews', category: 'Internal', time: '9:00 AM', color: 'bg-violet-500', colorText: 'text-violet-400' }],
+    27: [{ title: 'Winter Collection Launch', category: 'Gala', time: '4:00 PM', color: 'bg-emerald-500', colorText: 'text-emerald-400' }]
+  };
+
+  return (
+    <div className="w-full max-w-2xl mx-auto rounded-2xl border border-white/5 bg-[#08080A] p-6 shadow-2xl relative overflow-hidden text-left">
+      <div className="absolute top-0 left-1/4 w-64 h-64 bg-violet-600/5 blur-[90px] rounded-full pointer-events-none" />
+      <div className="flex items-center justify-between mb-6 pb-6 border-b border-white/5">
+        <div className="flex items-center space-x-4">
+          <span className="text-lg font-bold tracking-tight text-white flex items-center space-x-2"><CalendarIcon className="text-violet-400" size={18} /><span>{currentMonth} 2026</span></span>
+          <div className="flex space-x-1">
+            <button onClick={() => setCurrentMonth(currentMonth === 'October' ? 'November' : 'October')} className="w-7 h-7 rounded-full bg-zinc-950 hover:bg-zinc-800 border border-white/5 flex items-center justify-center text-zinc-400 transition"><ChevronLeft size={14} /></button>
+            <button onClick={() => setCurrentMonth(currentMonth === 'October' ? 'November' : 'October')} className="w-7 h-7 rounded-full bg-zinc-950 hover:bg-zinc-800 border border-white/5 flex items-center justify-center text-zinc-400 transition"><ChevronRight size={14} /></button>
+          </div>
+        </div>
+        <div className="flex items-center space-x-1.5 text-[10px] font-bold tracking-wider text-zinc-400"><span className="px-2.5 py-1 rounded bg-gradient-to-r from-violet-600 to-indigo-600 border border-violet-500/30 text-white shadow-sm">Month</span><span className="px-2.5 py-1 rounded text-zinc-500">Week</span></div>
+      </div>
+      <div className="grid grid-cols-7 gap-1.5 mb-2 text-center">
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (<span key={i} className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase py-1">{day}</span>))}
+      </div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {Array.from({ length: 3 }).map((_, i) => (<div key={`empty-${i}`} className="aspect-square bg-transparent opacity-5" />))}
+        {Array.from({ length: 28 }).map((_, i) => {
+          const dayNum = i + 1;
+          const isSelected = selectedDay === dayNum;
+          const eventsList = itemsDatabase[dayNum] || [];
+          return (
+            <button key={dayNum} onClick={() => setSelectedDay(dayNum)} className={`aspect-square rounded-xl relative p-1.5 transition-all duration-300 flex flex-col justify-between overflow-hidden border ${isSelected ? 'bg-gradient-to-tr from-violet-600 via-purple-600 to-fuchsia-600 border-transparent text-white scale-[1.04] z-10 shadow-[0_0_20px_rgba(139,92,246,0.4)]' : 'bg-zinc-950/60 border-white/5 text-zinc-400 hover:border-white/20'}`}>
+              <span className={`text-[10px] font-bold ${isSelected ? 'text-white' : 'text-zinc-500'}`}>{dayNum}</span>
+              <div className="flex space-x-1 justify-center mt-auto w-full">{eventsList.map((ev, idx) => (<div key={idx} className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : ev.color} shadow-sm`} />))}</div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-6 pt-5 border-t border-white/5">
+        <span className="text-[9px] font-bold tracking-widest text-zinc-400 uppercase block mb-3 flex items-center space-x-1.5"><Activity size={10} className="text-violet-400" /><span>Atelier Floor Agenda • {currentMonth} {selectedDay}</span></span>
+        {itemsDatabase[selectedDay] ? (
+          <div className="space-y-2">{itemsDatabase[selectedDay].map((ev, i) => (
+            <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-zinc-950 border border-white/5 hover:border-white/10 transition-colors">
+              <div className="flex items-center space-x-3"><span className={`w-2.5 h-2.5 rounded-full ${ev.color} ring-4 ring-${ev.color.split('-')[1]}-500/10`} /><span className="text-xs font-semibold text-zinc-200">{ev.title}</span></div>
+              <div className="flex items-center space-x-2"><span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/5 bg-white/5 ${ev.colorText}`}>{ev.category}</span><span className="text-[10px] font-mono text-zinc-400">{ev.time}</span></div>
+            </div>
+          ))}</div>
+        ) : (<p className="text-xs text-zinc-600 italic">No large-scale bookings scheduled. Open stations available.</p>)}
+      </div>
+    </div>
+  );
+}
+
+function RightNlpSandbox() {
+  const [inputText, setInputText] = useState('Balayage and couture cut with Marcus next Friday at 2:30pm');
+  const [isParsing, setIsParsing] = useState(false);
+  const [parsedStructure, setParsedStructure] = useState({ title: 'Balayage & Couture Cut', location: 'Marcus (Master Colorist)', time: '2:30 PM', date: 'Friday (Next)', colorTheme: 'from-cyan-500 to-blue-500', highlightText: 'text-cyan-400' });
+  const promptSuggestions = [{ text: "Silk press with Chloe next Tuesday at 11am", accent: "hover:border-violet-500/30 hover:text-violet-300" }, { text: "Bridal hair package tomorrow at 1:30pm", accent: "hover:border-rose-500/30 hover:text-rose-300" }, { text: "Extension fitting in VIP Suite at 4pm", accent: "hover:border-cyan-500/30 hover:text-cyan-300" }];
+  const handleApplyPreset = (text) => { setInputText(text); triggerMockAnalysis(text); };
+  const triggerMockAnalysis = (text) => {
+    setIsParsing(true);
+    setTimeout(() => {
+      let title = "Bespoke Treatment Session", location = "Styling Floor", time = "12:00 PM", date = "Scheduled", colorTheme = "from-cyan-500 to-blue-500", highlightText = "text-cyan-400";
+      const lowerText = text.toLowerCase();
+      if (lowerText.includes('silk press')) { title = "Silk Press & Conditioning"; location = "Chloe (Senior Stylist)"; time = "11:00 AM"; date = "Next Tuesday"; colorTheme = "from-violet-500 to-purple-500"; highlightText = "text-violet-400"; }
+      else if (lowerText.includes('bridal')) { title = "Bridal Hair Design"; location = "Elite Bridal Suite"; time = "1:30 PM"; date = "Tomorrow"; colorTheme = "from-rose-500 to-pink-500"; highlightText = "text-rose-400"; }
+      else if (lowerText.includes('extensions')) { title = "Atelier Extensions Fitting"; location = "Private VIP Suite"; time = "4:00 PM"; date = "Scheduled Day"; colorTheme = "from-amber-500 to-orange-500"; highlightText = "text-amber-400"; }
+      setParsedStructure({ title, location, time, date, colorTheme, highlightText });
+      setIsParsing(false);
+    }, 500);
+  };
+
+  return (
+    <div className="w-full max-w-xl mx-auto rounded-2xl border border-white/5 bg-[#08080A] p-8 shadow-2xl relative overflow-hidden text-left">
+      <div className="absolute top-1/2 right-0 w-48 h-48 bg-rose-500/5 blur-[80px] rounded-full pointer-events-none" />
+      <div className="mb-8 flex items-center justify-between"><span className="text-[10px] font-bold tracking-widest text-zinc-400 uppercase flex items-center space-x-1.5"><Command size={11} className="text-rose-400" /><span>Cognitive Request Parser</span></span></div>
+      <div className="relative mb-6">
+        <input type="text" value={inputText} onChange={(e) => { setInputText(e.target.value); triggerMockAnalysis(e.target.value); }} className="w-full bg-zinc-950 border border-white/5 rounded-xl p-4 pr-12 text-xs text-white focus:outline-none focus:border-rose-500/30 focus:ring-1 focus:ring-rose-500/20 transition-all font-sans" placeholder="Describe guest appointment needs intuitively..." />
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-rose-400 animate-pulse"><Command size={14} /></div>
+      </div>
+      <div className="space-y-2 mb-8">
+        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Preset Client Requests (Tap to evaluate):</span>
+        <div className="flex flex-col space-y-1.5">{promptSuggestions.map((p, index) => (<button key={index} onClick={() => handleApplyPreset(p.text)} className={`text-left px-3 py-2 rounded-lg border border-white/5 bg-zinc-950/60 text-[11px] text-zinc-400 transition-all ${p.accent}`}>"{p.text}"</button>))}</div>
+      </div>
+      <div className="relative p-5 rounded-xl border border-white/5 bg-zinc-950 overflow-hidden min-h-[140px] flex flex-col justify-between">
+        {isParsing && (<div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center space-x-1.5 z-20"><span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-bounce" /><span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-bounce [animation-delay:0.1s]" /><span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-bounce [animation-delay:0.2s]" /></div>)}
+        <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-3"><span className="text-[9px] font-mono text-zinc-400 tracking-wider uppercase flex items-center space-x-1"><span className="w-2 h-2 rounded-full bg-rose-500" /><span>Extracted Booking Parameters</span></span><span className="px-2 py-0.5 rounded bg-emerald-950/40 text-[9px] text-emerald-400 border border-emerald-500/20 font-mono font-bold">CONFIDENCE 100%</span></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div><span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Service Requested</span><div className="flex items-center space-x-1.5"><span className={`w-1.5 h-3 rounded-full bg-gradient-to-b ${parsedStructure.colorTheme}`} /><span className="text-xs font-semibold text-white">{parsedStructure.title}</span></div></div>
+          <div><span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Assigned Stylist</span><div className="flex items-center space-x-1 text-zinc-300"><MapPin size={11} className={parsedStructure.highlightText} /><span className="text-xs font-semibold">{parsedStructure.location}</span></div></div>
+          <div><span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Time Slot</span><div className="flex items-center space-x-1 text-zinc-300"><Clock size={11} className={parsedStructure.highlightText} /><span className="text-xs font-semibold">{parsedStructure.time}</span></div></div>
+          <div><span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Target Date</span><div className="flex items-center space-x-1 text-zinc-300"><CalendarDays size={11} className={parsedStructure.highlightText} /><span className="text-xs font-semibold">{parsedStructure.date}</span></div></div>
+        </div>
+      </div>
+    </div>
+  );
+}

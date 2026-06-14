@@ -797,7 +797,7 @@ export default function CallLogsPage() {
             {!loading && !error && filteredCalls.length === 0 && (
               <div className="p-6 text-center">
                 <p className="text-[13px] font-semibold text-zinc-300">No calls found</p>
-                <p className="mt-2 text-[12px] text-zinc-600">{calls.length ? 'Adjust the filters or search another caller.' : 'New ElevenLabs post-call webhooks will appear here.'}</p>
+                <p className="mt-2 text-[12px] text-zinc-600">{calls.length ? 'Adjust the filters or search another caller.' : 'Call details will appear here.'}</p>
               </div>
             )}
           </div>
@@ -880,7 +880,7 @@ export default function CallLogsPage() {
             <div className="flex flex-1 items-center justify-center p-8 text-center">
               <div>
                 <p className="text-[14px] font-semibold text-zinc-300">No conversation selected</p>
-                <p className="mt-2 text-[12px] text-zinc-600">Completed calls will show their transcript here.</p>
+                <p className="mt-2 text-[12px] text-zinc-600">Calls transcripts will appear here.</p>
               </div>
             </div>
           )}

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
+const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalogIds = [] }) => {
   const [receptionists, setReceptionists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -16,17 +16,29 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
   const [hiringId, setHiringId] = useState(null);
   const [hireError, setHireError] = useState('');
   const audioRef = useRef(null);
+  const hiredCatalogKey = (hiredCatalogIds || [])
+    .filter(Boolean)
+    .map((value) => String(value))
+    .sort()
+    .join('|');
 
   const loadReceptionists = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: catalogData, error: catalogError } = await supabase
         .from('receptionist_catalog')
         .select('*')
         .order('full_name', { ascending: true });
 
-      if (error) throw error;
-      setReceptionists(data || []);
+      if (catalogError) throw catalogError;
+
+      const hiredIds = new Set((hiredCatalogIds || []).filter(Boolean).map((value) => String(value)));
+
+      const availableReceptionists = (catalogData || []).filter(
+        (row) => !hiredIds.has(String(row.id))
+      );
+
+      setReceptionists(availableReceptionists);
     } catch (err) {
       console.error('[HireReceptionistModal] Failed to load receptionists:', err);
     } finally {
@@ -36,7 +48,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
 
   useEffect(() => {
     loadReceptionists();
-  }, []);
+  }, [hiredCatalogKey]);
 
   const nextCard = () => {
     if (isAnimating || receptionists.length === 0) return;
@@ -162,9 +174,10 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false }) => {
             {/* Card Carousel — 3D perspective */}
             <div className="relative w-full aspect-[2/3] mb-6" style={{ perspective: '1500px' }}>
               {receptionists.map((person, index) => {
+                const hasNeighbors = receptionists.length > 1;
                 const isActive = index === currentIndex;
-                const isNext = index === (currentIndex + 1) % receptionists.length;
-                const isPrev = index === (currentIndex - 1 + receptionists.length) % receptionists.length;
+                const isNext = hasNeighbors && index === (currentIndex + 1) % receptionists.length;
+                const isPrev = hasNeighbors && index === (currentIndex - 1 + receptionists.length) % receptionists.length;
 
                 const baseClasses = "absolute top-0 left-0 w-full h-full transition-all duration-700 ease-in-out transform";
                 let stateClasses = "opacity-0 scale-90 pointer-events-none";

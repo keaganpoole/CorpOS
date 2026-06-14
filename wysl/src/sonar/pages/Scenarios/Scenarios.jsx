@@ -124,15 +124,6 @@ const STRIPE_ACTION_KEYS = new Set([
 ]);
 
 const LEGACY_ACTION_FIELD_MAP = {
-  create_payment_profile: [
-    { key: 'person_id', label: 'Person ID', type: 'person_id' },
-    { key: 'amount', label: 'Amount ($)', type: 'text' },
-    { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
-    { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
-    { key: 'customer_name', label: 'Customer Name', type: 'text' },
-    { key: 'customer_email', label: 'Customer Email', type: 'text' },
-    { key: 'customer_phone', label: 'Customer Phone', type: 'text' },
-  ],
   update_payment: [
     { key: 'payment_id', label: 'Payment ID', type: 'text' },
     { key: 'status', label: 'Status', type: 'select', options: ['succeeded', 'failed', 'refunded', 'partial_refund', 'pending'] },
@@ -337,7 +328,6 @@ const AUTOMATION_HIERARCHY = {
         { key: 'call_answered', name: 'Call Answered', description: 'When someone answers a call' },
         { key: 'missed_call', name: 'Missed Call', description: 'When a call goes unanswered' },
         { key: 'call_failed', name: 'Call Failed', description: 'When a call cannot connect' },
-        { key: 'voicemail_received', name: 'Voicemail Received', description: 'When a caller leaves a voicemail' },
       ],
     },
     {
@@ -414,7 +404,6 @@ const AUTOMATION_HIERARCHY = {
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
           { key: 'first_message', label: 'First Message', type: 'first_message_textarea', smartActions: true, toggleLabel: 'Override First Message' },
-          { key: 'transfer_to', label: 'Transfer To (optional)', type: 'text' },
         ]},
       ],
     },
@@ -2831,7 +2820,7 @@ export default function ScenariosPage() {
         resultsMap.customer = node.outputData;
       }
 
-      if (actionKey === 'create_payment' || actionKey === 'send_payment_link' || actionKey === 'refund_payment' || actionKey === 'create_payment_profile' || actionKey === 'update_payment') {
+      if (actionKey === 'create_payment' || actionKey === 'send_payment_link' || actionKey === 'refund_payment' || actionKey === 'update_payment') {
         resultsMap.payment = node.outputData;
         resultsMap.payments = node.outputData;
       }

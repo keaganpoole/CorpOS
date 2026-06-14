@@ -1,244 +1,253 @@
-import React, { useRef } from 'react';
-import { motion, useInView, useScroll, useTransform } from 'framer-motion';
-import '../styles/Calendar.css';
+import React, { useEffect, useState } from 'react';
+import {
+  Activity,
+  Calendar as CalendarIcon,
+  CalendarDays,
+  Clock,
+  Command,
+  MapPin,
+} from 'lucide-react';
+
+const TOTAL_SLIDES = 2;
 
 const CalendarShowcase = () => {
-  const sectionRef = useRef(null);
-  const isInView = useInView(sectionRef, { once: true, amount: 0.3 });
-  const calendarRef = useRef(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Subtle parallax on scroll
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ["start end", "end start"]
-  });
-  const floatY = useTransform(scrollYProgress, [0, 0.5, 1], [20, -5, 20]);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % TOTAL_SLIDES);
+    }, 6500);
 
-  const gridDayHeaders = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-
-  // August 2024 calendar data (matches the existing calendar)
-  const firstDay = 4; // Thursday (adjusted for Mon-start)
-  const daysInMonth = 31;
-  const selectedDay = 17;
-
-  const appointments = {
-    12: 'Doctor',
-    17: 'Report, Review, Meeting',
-    25: 'Dentist',
-  };
-
-  const renderGrid = () => {
-    const cells = [];
-    for (let i = 0; i < firstDay; i++) {
-      cells.push(<div key={`empty-${i}`} className="grid-cell" style={{ opacity: 0.2 }} />);
-    }
-    for (let day = 1; day <= daysInMonth; day++) {
-      const isSelected = day === selectedDay;
-      const hasAppointment = appointments[day];
-      cells.push(
-        <motion.div
-          key={day}
-          className="grid-cell"
-          initial={isInView ? { opacity: 0, y: 8 } : false}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.4, delay: 0.8 + day * 0.012, ease: "easeOut" }}
-          style={{ position: 'relative' }}
-        >
-          <div
-            className={`grid-number ${isSelected ? 'selected' : ''}`}
-            style={isSelected ? {
-              background: 'linear-gradient(135deg, var(--color1), var(--color2))',
-              color: '#fff',
-              borderRadius: '50%',
-              width: '28px',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.85rem',
-            } : {}}
-          >
-            {day}
-          </div>
-          {hasAppointment && (
-            <motion.div
-              initial={isInView ? { opacity: 0, scale: 0 } : false}
-              animate={isInView ? { opacity: 1, scale: 1 } : {}}
-              transition={{ duration: 0.4, delay: 1.8, ease: "easeOut" }}
-              style={{
-                marginTop: '4px',
-                display: 'flex',
-                gap: '3px',
-                flexWrap: 'wrap',
-              }}
-            >
-              {hasAppointment.split(', ').map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: '5px',
-                    height: '5px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, var(--color1), var(--color2))',
-                  }}
-                />
-              ))}
-            </motion.div>
-          )}
-        </motion.div>
-      );
-    }
-    return cells;
-  };
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div ref={sectionRef} className="relative w-full flex justify-center py-8">
-      {/* Ambient glow behind calendar */}
-      <motion.div
-        initial={isInView ? { opacity: 0 } : false}
-        animate={isInView ? { opacity: 1 } : {}}
-        transition={{ duration: 2, delay: 0.5 }}
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '70%',
-          height: '70%',
-          background: 'radial-gradient(ellipse, rgba(129,140,248,0.08) 0%, transparent 70%)',
-          filter: 'blur(60px)',
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* Floating confirmation card */}
-      <motion.div
-        initial={isInView ? { opacity: 0, y: 30, x: 20 } : false}
-        animate={isInView ? { opacity: 1, y: 0, x: 0 } : {}}
-        transition={{ duration: 1, delay: 2.2, ease: [0.19, 1, 0.22, 1] }}
-        style={{
-          position: 'absolute',
-          top: '15%',
-          right: '8%',
-          zIndex: 20,
-          background: 'rgba(30, 30, 30, 0.85)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          minWidth: '220px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(129,140,248,0.06)',
-        }}
-      >
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          marginBottom: '12px',
-        }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--color1), var(--color2))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
+    <div className="relative w-full">
+      <div className="relative z-10 mx-auto w-full max-w-[1300px] px-6 md:px-10 lg:px-12">
+        <div className="grid min-h-[700px] grid-cols-1 items-center gap-16 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] lg:gap-24">
+          <div className="flex min-h-[220px] items-center justify-center lg:justify-start">
+            <div className="text-left">
+              <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-5xl font-black leading-[0.88] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[6rem]">
+                Sculpting
+                <br />
+                Time.
+              </h2>
+            </div>
           </div>
-          <span style={{
-            fontSize: '0.65rem',
-            fontWeight: 800,
-            letterSpacing: '0.15em',
-            textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.4)',
-          }}>Confirmed</span>
+
+          <div className="flex items-center justify-start">
+            <div className="relative h-[680px] w-full max-w-[720px]">
+              <div
+                className={`absolute inset-0 transition-opacity duration-500 ease-out ${
+                  currentSlide === 0 ? 'opacity-100' : 'pointer-events-none opacity-0'
+                }`}
+              >
+                <RightHeroWidget />
+              </div>
+              <div
+                className={`absolute inset-0 transition-opacity duration-500 ease-out ${
+                  currentSlide === 1 ? 'opacity-100' : 'pointer-events-none opacity-0'
+                }`}
+              >
+                <RightCalendarGrid />
+              </div>
+            </div>
+          </div>
         </div>
-        <p style={{
-          margin: 0,
-          fontSize: '0.95rem',
-          fontWeight: 600,
-          color: '#fff',
-        }}>Team Meeting</p>
-        <p style={{
-          margin: '4px 0 0',
-          fontSize: '0.8rem',
-          color: 'rgba(255,255,255,0.4)',
-        }}>Aug 17 · 11:00 AM</p>
-      </motion.div>
-
-      {/* Calendar panel */}
-      <motion.div
-        ref={calendarRef}
-        style={{ float: floatY }}
-        initial={isInView ? { opacity: 0, y: 40, scale: 0.97 } : false}
-        animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
-        transition={{ duration: 1.2, delay: 0.3, ease: [0.19, 1, 0.22, 1] }}
-      >
-        <motion.div
-          animate={{ y: [0, -4, 0] }}
-          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          style={{
-            width: '100%',
-            maxWidth: '860px',
-            background: '#1e1e1e',
-            borderRadius: '20px',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderTop: '3px solid var(--color1)',
-            overflow: 'hidden',
-            boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 60px rgba(129,140,248,0.04)',
-          }}
-        >
-          {/* Month header */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '32px 0 24px',
-          }}>
-            <span style={{
-              fontSize: '1.8rem',
-              fontWeight: 700,
-              color: '#fff',
-              letterSpacing: '-0.01em',
-            }}>AUG 2024</span>
-          </div>
-
-          {/* Day headers */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            textAlign: 'center',
-            padding: '0 24px',
-            marginBottom: '8px',
-          }}>
-            {gridDayHeaders.map(day => (
-              <div key={day} style={{
-                fontSize: '0.65rem',
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                color: 'rgba(255,255,255,0.3)',
-              }}>{day}</div>
-            ))}
-          </div>
-
-          {/* Calendar grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: '4px',
-            padding: '0 20px 32px',
-          }}>
-            {renderGrid()}
-          </div>
-        </motion.div>
-      </motion.div>
+      </div>
     </div>
   );
 };
+
+function RightHeroWidget() {
+  const scheduledItems = [
+    {
+      time: '09:00 AM',
+      title: 'Balayage & Couture Blowout',
+      detail: 'Marcus - VIP Salon Suite',
+      colorClass: 'from-cyan-500 to-blue-500',
+      tag: 'Color',
+      tagColor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+    },
+    {
+      time: '11:30 AM',
+      title: 'Platinum Weft Extensions Fitting',
+      detail: 'Elena - Styling Station 4',
+      colorClass: 'from-violet-500 to-fuchsia-500',
+      tag: 'Extensions',
+      tagColor: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+    },
+    {
+      time: '03:00 PM',
+      title: 'Editorial Bridal Trial Package',
+      detail: 'Chloe - VIP Beauty Lounge',
+      colorClass: 'from-amber-500 to-rose-500',
+      tag: 'Bridal',
+      tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    },
+  ];
+
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <div className="relative w-full max-w-[720px] overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-b from-zinc-950 to-[#030303] p-10 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)]">
+        <div className="mb-9 flex items-center justify-between">
+          <div className="flex items-center space-x-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-cyan-500" />
+            <span className="h-2.5 w-2.5 rounded-full bg-violet-500" />
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+          </div>
+        </div>
+
+        <div className="mb-8 space-y-1">
+          <span className="block text-xs font-bold uppercase tracking-widest text-zinc-500">
+          </span>
+          <div className="flex items-baseline space-x-2">
+            <span className="text-3xl font-bold tracking-tight text-white">Saturday 13</span>
+          </div>
+        </div>
+
+        <div className="space-y-3.5">
+          {scheduledItems.map((item) => (
+            <div
+              key={item.title}
+              className="flex items-center justify-between rounded-xl border border-white/5 bg-zinc-900/40 p-4 transition hover:border-white/15 hover:bg-zinc-900/80"
+            >
+              <div className="flex items-center space-x-4 text-left">
+                <div className={`h-10 w-[3px] rounded-full bg-gradient-to-b ${item.colorClass}`} />
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="block text-[10px] font-mono text-zinc-400">{item.time}</span>
+                    <span
+                      className={`rounded border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${item.tagColor}`}
+                    >
+                      {item.tag}
+                    </span>
+                  </div>
+                  <span className="block text-sm font-semibold tracking-tight text-zinc-100">
+                    {item.title}
+                  </span>
+                  <span className="block text-[10px] text-zinc-500">{item.detail}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-5 text-[10px] font-semibold tracking-wider text-zinc-500">
+          <span className="flex items-center space-x-1.5">
+            <Clock size={11} className="text-cyan-400" />
+            <span className="text-zinc-400">Appointments</span>
+          </span>
+          <span className="text-zinc-400">See more details</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RightCalendarGrid() {
+  const [selectedDay, setSelectedDay] = useState(17);
+
+  const itemsDatabase = {
+    12: [{ title: 'Color Masterclass (Stylist Academy)', category: 'Academy', time: '10:00 AM', color: 'bg-cyan-500', colorText: 'text-cyan-400' }],
+    15: [
+      { title: 'Vogue Couture Editorial Shoot', category: 'High Fashion', time: '11:00 AM', color: 'bg-violet-500', colorText: 'text-violet-400' },
+      { title: 'VIP Guest Session: Bridal Suite Closeout', category: 'VIP Closeout', time: '2:30 PM', color: 'bg-pink-500', colorText: 'text-pink-400' },
+    ],
+    17: [{ title: 'Atelier Client Day Sequence', category: 'Featured', time: 'All Day', color: 'bg-fuchsia-500', colorText: 'text-fuchsia-300' }],
+    22: [{ title: 'Master Stylist Performance Reviews', category: 'Internal Sync', time: '9:00 AM', color: 'bg-violet-500', colorText: 'text-violet-400' }],
+    27: [{ title: 'Atelier Winter Collection Launch Gala', category: 'Gala Launch', time: '4:00 PM', color: 'bg-emerald-500', colorText: 'text-emerald-400' }],
+  };
+
+  return (
+    <div className="relative flex h-full w-full items-center">
+      <div className="relative w-full overflow-hidden rounded-[28px] border border-white/5 bg-[#08080A] p-10 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)]">
+      <div className="mb-6 border-b border-white/5 pb-6 text-left">
+        <span className="flex items-center space-x-2 text-[2rem] font-bold tracking-tight text-white">
+          <CalendarIcon className="text-violet-400" size={22} />
+          <span>October 2026</span>
+        </span>
+      </div>
+
+      <div className="mb-2 grid grid-cols-7 gap-2 text-center">
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day) => (
+          <span key={day} className="py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+            {day}
+          </span>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-2">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={`empty-${index}`} className="aspect-square bg-transparent opacity-5" />
+        ))}
+
+        {Array.from({ length: 28 }).map((_, index) => {
+          const dayNum = index + 1;
+          const isSelected = selectedDay === dayNum;
+          const eventsList = itemsDatabase[dayNum] || [];
+
+          return (
+            <button
+              key={dayNum}
+              onClick={() => setSelectedDay(dayNum)}
+              className={`relative flex aspect-square flex-col justify-between overflow-hidden rounded-xl border p-2 transition-all duration-300 ${
+                isSelected
+                  ? 'z-10 scale-[1.03] border-transparent bg-gradient-to-tr from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-[0_0_24px_rgba(139,92,246,0.45)]'
+                  : 'border-white/5 bg-zinc-950/60 text-zinc-400 hover:border-white/20'
+              }`}
+            >
+              <span className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
+                {dayNum}
+              </span>
+
+              <div className="mt-auto flex w-full justify-center space-x-1">
+                {eventsList.map((event) => (
+                  <div
+                    key={`${dayNum}-${event.title}`}
+                    className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white' : event.color}`}
+                  />
+                ))}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-8 border-t border-white/5 pt-5">
+        <span className="mb-3 flex items-center space-x-1.5 text-[9px] font-bold uppercase tracking-widest text-zinc-400">
+          <Activity size={10} className="text-violet-400" />
+          <span>Atelier Floor Agenda • October {selectedDay}</span>
+        </span>
+        {itemsDatabase[selectedDay] ? (
+          <div className="space-y-2">
+            {itemsDatabase[selectedDay].map((event) => (
+              <div
+                key={event.title}
+                className="flex items-center justify-between rounded-lg border border-white/5 bg-zinc-950 p-3 text-left"
+              >
+                <div className="flex items-center space-x-3">
+                  <span className={`h-2.5 w-2.5 rounded-full ${event.color}`} />
+                  <span className="text-xs font-semibold text-zinc-200">{event.title}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className={`rounded border border-white/5 bg-white/5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${event.colorText}`}>
+                    {event.category}
+                  </span>
+                  <span className="text-[10px] font-mono text-zinc-400">{event.time}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs italic text-zinc-500">
+            No large-scale bookings scheduled. Open stations available for boutique appointments.
+          </p>
+        )}
+      </div>
+      </div>
+    </div>
+  );
+}
 
 export default CalendarShowcase;

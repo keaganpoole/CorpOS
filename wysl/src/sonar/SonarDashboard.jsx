@@ -1937,7 +1937,7 @@ const SonarDashboard = () => {
             </div>
 
             <div className="flex flex-1 overflow-x-auto overflow-y-hidden px-12 py-8" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333 transparent' }}>
-              <div className="flex min-w-max items-center justify-start gap-8">
+              <div className={`flex min-w-max items-center gap-8 ${enrichedAgents.length < 3 ? 'justify-center w-full min-w-full' : 'justify-start'}`}>
                 {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
                   const reactionsMap = {};
                   for (const r of (reactions || [])) {
@@ -1965,6 +1965,7 @@ const SonarDashboard = () => {
               {showHireModal && (
                 <HireReceptionistModal
                   onClose={() => setShowHireModal(false)}
+                  hiredCatalogIds={enrichedAgents.map((agent) => agent.catalog_id).filter(Boolean)}
                   onHire={async (receptionist) => {
                     try {
                       const result = await api.hireReceptionist(receptionist.id);

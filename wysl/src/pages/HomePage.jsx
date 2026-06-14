@@ -456,17 +456,8 @@ const HomePage = () => {
         <HeroConcept ref={heroRef} />
 
 
-        <section className="content-section dark-bg text-center">
-          <h3 data-animate="true">No More Missed <span className="glitch-text">Calls</span></h3>
-          <p data-animate="true">
-            Every missed call is a lost customer. Sonar picks up instantly, greets callers professionally, and handles bookings, FAQs, and transfers — so you never leave money on the table again.
-          </p>
+        <section className="content-section content-section--showcase dark-bg text-center">
           <CalendarShowcase />
-          <div className="mt-12 flex justify-center">
-            <Link to="/pricing" className="text-base font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity py-3 px-8">
-              Try for free
-            </Link>
-          </div>
         </section>
 
         <section className="content-section dark-bg text-center">
