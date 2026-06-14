@@ -211,7 +211,7 @@ main > section:nth-of-type(5) {
 .content-section.light-bg { background-color: var(--color-white); color: var(--color-black); min-height: 700px; }
 .content-section.dark-bg { background-color: #070707; color: var(--color-white); }
 .content-section--showcase {
-    padding: 112px 0 128px;
+    padding: 180px 0 200px;
     background-color: #070707;
     min-height: 1080px;
     display: flex;
@@ -224,6 +224,21 @@ main > section:nth-of-type(5) {
 .content-section p { font-size: 1.4em; font-weight: 400; max-width: 950px; margin: 0 auto 50px auto; color: var(--color-medium-gray); line-height: 1.6; }
 .content-section.dark-bg p { color: var(--color-light-gray); }
 .content-section-image { margin-top: 60px; max-width: 90%; height: auto; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); }
+.agenda-item {
+    opacity: 0;
+    transform: translateY(6px);
+    animation: agendaCascade 360ms ease-out forwards;
+}
+.agenda-item:nth-child(1) { animation-delay: 70ms; }
+.agenda-item:nth-child(2) { animation-delay: 130ms; }
+.agenda-item:nth-child(3) { animation-delay: 190ms; }
+.agenda-item:nth-child(4) { animation-delay: 250ms; }
+@keyframes agendaCascade {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
 .features-grid-section { padding: 80px 20px; background-color: var(--color-white); display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; max-width: 1300px; margin: 0 auto; position: relative; overflow: hidden; }
 .feature-card {
     background-color: var(--color-white);
@@ -260,8 +275,8 @@ main > section:nth-of-type(5) {
 .footer-legal { border-top: 1px solid rgba(0, 0, 0, 0.04); padding-top: 25px; margin-top: 25px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; }
 .footer-legal p { margin: 5px 0; font-size: 0.8em; color: var(--color-medium-gray); }
 .footer-legal-links { color: var(--color-medium-gray); font-size: 0.8em; }
-@media (max-width: 768px) { .nav-menu { display: none; } .nav-content { justify-content: center; } .hero-section { padding: 200px 15px 60px; min-height: 550px; } .hero-section h1 { font-size: 3.5em; } .hero-section .hero-headline { font-size: 1.8em; } .hero-section .hero-subheadline { font-size: 1.2em; } .content-section { padding: 70px 15px; } .content-section--showcase { padding: 84px 0 92px; min-height: 920px; } .content-section h3 { font-size: 2.8em; } .content-section p { font-size: 1.2em; } .features-grid-section { grid-template-columns: 1fr; } .feature-card { min-height: auto; padding: 40px 25px; } .feature-card h4 { font-size: 2em; } .feature-card p { font-size: 1.05em; } .footer-legal { flex-direction: column; align-items: flex-start; } .footer-legal-links { margin-top: 15px; margin-left: 0; margin-right: 15px; } }
-@media (max-width: 480px) { .hero-section { padding: 200px 10px 40px; min-height: 400px; } .hero-section h1 { font-size: 2.5em; } .hero-section .hero-headline { font-size: 1.4em; } .hero-section .hero-subheadline { font-size: 1.1em; } .content-section { padding: 50px 10px; } .content-section--showcase { padding: 64px 0 72px; min-height: 820px; } .content-section h3 { font-size: 2.2em; } .content-section p { font-size: 1em; } .feature-card { padding: 30px 20px; } }
+@media (max-width: 768px) { .nav-menu { display: none; } .nav-content { justify-content: center; } .hero-section { padding: 200px 15px 60px; min-height: 550px; } .hero-section h1 { font-size: 3.5em; } .hero-section .hero-headline { font-size: 1.8em; } .hero-section .hero-subheadline { font-size: 1.2em; } .content-section { padding: 70px 15px; } .content-section--showcase { padding: 132px 0 148px; min-height: 980px; } .content-section h3 { font-size: 2.8em; } .content-section p { font-size: 1.2em; } .features-grid-section { grid-template-columns: 1fr; } .feature-card { min-height: auto; padding: 40px 25px; } .feature-card h4 { font-size: 2em; } .feature-card p { font-size: 1.05em; } .footer-legal { flex-direction: column; align-items: flex-start; } .footer-legal-links { margin-top: 15px; margin-left: 0; margin-right: 15px; } }
+@media (max-width: 480px) { .hero-section { padding: 200px 10px 40px; min-height: 400px; } .hero-section h1 { font-size: 2.5em; } .hero-section .hero-headline { font-size: 1.4em; } .hero-section .hero-subheadline { font-size: 1.1em; } .content-section { padding: 50px 10px; } .content-section--showcase { padding: 112px 0 124px; min-height: 900px; } .content-section h3 { font-size: 2.2em; } .content-section p { font-size: 1em; } .feature-card { padding: 30px 20px; } }
 
 .image-container {
   perspective: 1000px;

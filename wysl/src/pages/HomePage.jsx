@@ -456,7 +456,10 @@ const HomePage = () => {
         <HeroConcept ref={heroRef} />
 
 
-        <section className="content-section content-section--showcase dark-bg text-center">
+        <section
+          className="content-section content-section--showcase dark-bg text-center"
+          style={{ paddingTop: '240px', paddingBottom: '240px' }}
+        >
           <CalendarShowcase />
         </section>
 
