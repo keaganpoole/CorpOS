@@ -1,721 +1,154 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
-  Clock, 
-  Sparkles, 
-  Layers, 
-  ArrowRight,
-  Plus,
-  Command,
-  Sliders,
-  CheckCircle,
-  MapPin,
-  CalendarDays,
-  Activity
-} from 'lucide-react';
-
-const CSS_ANIMATIONS = `
-@keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-8px) rotate(0.5deg); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.15; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(1.03); }
-}
-
-@keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(20px); filter: blur(4px); }
-  to { opacity: 1; transform: translateX(0); filter: blur(0); }
-}
-
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 4s ease-in-out infinite;
-}
-
-.custom-easing {
-  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Custom glowing elements */
-.neon-glow-cyan {
-  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25);
-}
-.neon-glow-violet {
-  box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.25);
-}
-.neon-glow-rose {
-  box-shadow: 0 0 25px -5px rgba(244, 63, 94, 0.25);
-}
-`;
+import React, { useState } from 'react';
 
 export default function App() {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [direction, setDirection] = useState('next');
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [studioLightIntensity, setStudioLightIntensity] = useState(40); // 0 to 100 scale
-  const [isAutoplay, setIsAutoplay] = useState(false);
-  
-  const TOTAL_SLIDES = 3;
+  const [hoveredIdx, setHoveredIdx] = useState(null);
 
-  useEffect(() => {
-    if (!isAutoplay) return;
-    const interval = setInterval(() => {
-      handleNext();
-    }, 7000);
-    return () => clearInterval(interval);
-  }, [isAutoplay, currentSlide]);
-
-  const handleNext = () => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setDirection('next');
-    setTimeout(() => {
-      setCurrentSlide((prev) => (prev + 1) % TOTAL_SLIDES);
-      setIsTransitioning(false);
-    }, 400);
-  };
-
-  const handlePrev = () => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setDirection('prev');
-    setTimeout(() => {
-      setCurrentSlide((prev) => (prev - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
-      setIsTransitioning(false);
-    }, 400);
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'Space') {
-        e.preventDefault();
-        handleNext();
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        handlePrev();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSlide, isTransitioning]);
-
-  return (
-    <div className="w-full min-h-screen bg-[#000000] text-white font-sans antialiased overflow-x-hidden relative flex flex-col justify-between custom-easing duration-700">
-      <style>{CSS_ANIMATIONS}</style>
-      
-      {/* Monochromatic Studio Spotlight Background - STRICTLY BLACK & WHITE FOCUS */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div 
-          style={{
-            opacity: studioLightIntensity / 100 * 0.25,
-            background: 'radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.4) 0%, rgba(0, 0, 0, 0) 70%)',
-            transition: 'opacity 0.5s ease-out'
-          }}
-          className="absolute inset-0 w-full h-full animate-pulse-glow" 
-        />
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900/40 via-black to-black opacity-60" />
-      </div>
-
-      {/* Presentation Header */}
-      <header className="relative z-50 px-8 py-6 flex items-center justify-between border-b border-white/5 max-w-7xl mx-auto w-full">
-        <div className="flex items-center space-x-3 group cursor-pointer">
-          <div className="w-9 h-9 rounded-lg bg-white text-black flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-105">
-            <span className="font-bold text-base tracking-tight">C</span>
-          </div>
-          <div>
-            <span className="font-medium text-base tracking-tight text-zinc-100">Chronos</span>
-            <span className="text-[10px] block text-zinc-500 tracking-wider uppercase font-semibold">Atelier Edition</span>
-          </div>
-        </div>
-
-        {/* Studio Lighting Controls */}
-        <div className="flex items-center space-x-6 bg-zinc-900/60 border border-white/5 px-4 py-2 rounded-full">
-          <div className="flex items-center space-x-2">
-            <Sliders size={12} className="text-zinc-400" />
-            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Studio Light</span>
-          </div>
-          <input 
-            type="range" 
-            min="10" 
-            max="100" 
-            value={studioLightIntensity}
-            onChange={(e) => setStudioLightIntensity(Number(e.target.value))}
-            className="w-20 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-white"
-            title="Adjust cinematic spotlight background brightness"
-          />
-          <button 
-            onClick={() => setIsAutoplay(!isAutoplay)}
-            className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-widest transition-all ${isAutoplay ? 'bg-white text-black' : 'border border-zinc-800 text-zinc-500 hover:text-zinc-300'}`}
-          >
-            {isAutoplay ? 'AUTOPLAY' : 'MANUAL'}
-          </button>
-        </div>
-      </header>
-
-      {/* Main Grid: Anchored Text Left, Vibrant Interactive Canvas Right */}
-      <main className="flex-1 relative z-10 flex items-center justify-center px-4 md:px-12 py-12 max-w-7xl mx-auto w-full select-none">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center w-full">
-          
-          {/* Static Left Side (Anchored Value Proposition for Luxury Salon) */}
-          <div className="lg:col-span-5 flex flex-col justify-center space-y-6 text-left relative z-20">
-            <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-zinc-300 text-xs font-semibold uppercase tracking-wider w-fit">
-              <Sparkles size={12} className="text-cyan-400" />
-              <span>The Atelier Experience</span
-            </div>
-            
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[0.9] text-transparent bg-clip-text bg-gradient-to-b from-white via-zinc-200 to-zinc-600">
-              Sculpting<br/>
-              Time.
-            </h1>
-            
-            <p className="text-lg text-zinc-400 font-light max-w-md leading-relaxed">
-              Chronos is an elite scheduling canvas engineered for luxury salons. Elevate client hospitality with seamless booking, visual station allocation, and a flawless guest journey.
-            </p>
-
-            <div className="pt-4 flex flex-wrap items-center gap-4">
-              <span className="flex items-center space-x-2 text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#06b6d4]" />
-                <span>Guest Journey</span>
-              </span>
-              <span className="flex items-center space-x-2 text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shadow-[0_0_8px_#8b5cf6]" />
-                <span>Station Allocation</span>
-              </span>
-              <span className="flex items-center space-x-2 text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e]" />
-                <span>Stylist Harmony</span>
-              </span>
-            </div>
-
-            {/* Micro Indicator highlighting current view scope */}
-            <div className="pt-8 border-t border-white/5 mt-6 hidden lg:block">
-              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest block mb-2">Active Spec Scope</span>
-              <div className="flex space-x-6 text-xs">
-                <span className={`transition-all duration-300 ${currentSlide === 0 ? 'text-cyan-400 font-semibold' : 'text-zinc-600'}`}>01. Guest Card</span>
-                <span className={`transition-all duration-300 ${currentSlide === 1 ? 'text-violet-400 font-semibold' : 'text-zinc-600'}`}>02. Floor Matrix</span>
-                <span className={`transition-all duration-300 ${currentSlide === 2 ? 'text-rose-400 font-semibold' : 'text-zinc-600'}`}>03. Request Parser</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Dynamic Active Right Column */}
-          <div className="lg:col-span-7 flex items-center justify-center relative min-h-[520px] w-full">
-            <div 
-              className={`w-full transition-all duration-400 transform custom-easing ${
-                isTransitioning 
-                  ? (direction === 'next' ? 'opacity-0 translate-x-4 scale-98 filter blur-sm' : 'opacity-0 translate-x--4 scale-98 filter blur-sm') 
-                  : 'opacity-100 translate-x-0 scale-100 filter blur-none'
-              }`}
-            >
-              {currentSlide === 0 && <RightHeroWidget />}
-              {currentSlide === 1 && <RightCalendarGrid />}
-              {currentSlide === 2 && <RightNlpSandbox />}
-            </div>
-          </div>
-
-        </div>
-      </main>
-
-      {/* Presentation Footer */}
-      <footer className="relative z-50 px-8 py-8 max-w-7xl mx-auto w-full flex flex-col md:flex-row items-center justify-between gap-6 border-t border-white/5">
-        {/* Navigation Indicator Dots with slide color themes */}
-        <div className="flex items-center space-x-3">
-          {[0, 1, 2].map((idx) => {
-            const titles = ["01/ Guest Schedule", "02/ Atelier Floor Matrix", "03/ Guest Request Parser"];
-            const activeColors = [
-              'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]',
-              'bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-[0_0_15px_rgba(139,92,246,0.5)]',
-              'bg-gradient-to-r from-rose-500 to-amber-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]'
-            ];
-            const textActiveColors = ['text-cyan-300', 'text-violet-300', 'text-rose-300'];
-            
-            return (
-              <button
-                key={idx}
-                onClick={() => {
-                  if (isTransitioning) return;
-                  setIsTransitioning(true);
-                  setDirection(idx > currentSlide ? 'next' : 'prev');
-                  setTimeout(() => {
-                    setCurrentSlide(idx);
-                    setIsTransitioning(false);
-                  }, 400);
-                }}
-                className="group relative py-2"
-              >
-                <div className={`h-1.5 rounded-full transition-all duration-500 ${currentSlide === idx ? `w-20 ${activeColors[idx]}` : 'w-8 bg-zinc-800 hover:bg-zinc-600'}`} />
-                <span className={`absolute top-6 left-0 text-[9px] tracking-wider font-semibold uppercase whitespace-nowrap transition-all duration-300 ${currentSlide === idx ? `${textActiveColors[idx]} opacity-100 translate-y-0` : 'text-zinc-600 opacity-0 -translate-y-1'}`}>
-                  {titles[idx]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Navigation Control Buttons */}
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={handlePrev}
-            className="w-12 h-12 rounded-full border border-zinc-800 bg-zinc-950/40 text-white flex items-center justify-center hover:bg-zinc-900 hover:border-zinc-700 transition-all duration-300 hover:scale-105 active:scale-95"
-            aria-label="Previous slide"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <button
-            onClick={handleNext}
-            className="w-28 h-12 rounded-full bg-white text-black flex items-center justify-center gap-2 font-semibold transition-all duration-300 hover:scale-105 active:scale-95 hover:bg-zinc-200"
-          >
-            <span>Advance</span>
-            <ArrowRight size={14} />
-          </button>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function RightHeroWidget() {
-  const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
-  const containerRef = useRef(null);
-
-  const handleMouseMove = (e) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width - 0.5;
-    const y = (e.clientY - rect.top) / rect.height - 0.5;
-    setHoverPosition({ x, y });
-  };
-
-  const handleMouseLeave = () => {
-    setHoverPosition({ x: 0, y: 0 });
-  };
-
-  const scheduledItems = [
-    { 
-      time: "09:00 AM", 
-      title: "Balayage & Couture Blowout", 
-      detail: "Marcus - VIP Salon Suite",
-      colorClass: "from-cyan-500 to-blue-500", 
-      tag: "Color",
-      tagColor: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+  const features = [
+    {
+      title: "Manage Appointments Intelligently",
+      desc: "Your AI receptionist handles the entire conversation naturally, guiding callers to the right service and securing the appointment without friction.",
+      color: "bg-purple-500",
+      glowColor: "shadow-[0_0_12px_rgba(168,85,247,0.6)]",
+      textColor: "group-hover:text-purple-400",
+      icon: (
+        <svg className="w-5 h-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" className="transition-all duration-500 group-hover:stroke-purple-400" />
+          <polyline points="12 6 12 12 16 14" className="origin-center transition-all duration-700 ease-in-out group-hover:rotate-[360deg] group-hover:stroke-purple-300" />
+        </svg>
+      )
     },
-    { 
-      time: "11:30 AM", 
-      title: "Platinum Weft Extensions Fitting", 
-      detail: "Elena - Styling Station 4",
-      colorClass: "from-violet-500 to-fuchsia-500",
-      tag: "Extensions",
-      tagColor: "bg-violet-500/10 text-violet-400 border-violet-500/20"
+    {
+      title: "24/7 Answering",
+      desc: "Your AI receptionist answers every call instantly, handles multiple conversations at once, and never sends opportunities to voicemail.",
+      color: "bg-pink-500",
+      glowColor: "shadow-[0_0_12px_rgba(236,72,153,0.6)]",
+      textColor: "group-hover:text-pink-400",
+      icon: (
+        <svg className="w-5 h-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" className="transition-all duration-500 group-hover:stroke-pink-400" />
+          <line x1="9" y1="10" x2="9" y2="14" className="origin-center transition-all duration-500 group-hover:scale-y-150 group-hover:stroke-pink-300" />
+          <line x1="12" y1="8" x2="12" y2="16" className="origin-center transition-all duration-500 delay-75 group-hover:scale-y-75 group-hover:stroke-pink-300" />
+          <line x1="15" y1="10" x2="15" y2="14" className="origin-center transition-all duration-500 delay-100 group-hover:scale-y-150 group-hover:stroke-pink-300" />
+        </svg>
+      )
     },
-    { 
-      time: "03:00 PM", 
-      title: "Editorial Bridal Trial Package", 
-      detail: "Chloe - VIP Beauty Lounge",
-      colorClass: "from-amber-500 to-rose-500",
-      tag: "Bridal",
-      tagColor: "bg-amber-500/10 text-amber-400 border-amber-500/20"
+    {
+      title: "70+ Languages",
+      desc: "Your AI receptionist automatically detects the caller's language and responds fluently, allowing customers from around the world to communicate naturally without translators, transfers, or awkward misunderstandings.",
+      color: "bg-amber-400",
+      glowColor: "shadow-[0_0_12px_rgba(251,191,36,0.6)]",
+      textColor: "group-hover:text-amber-400",
+      icon: (
+        <svg className="w-5 h-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" className="transition-all duration-500 group-hover:stroke-amber-400" />
+          <path d="M2 12h20" className="transition-all duration-500 group-hover:opacity-60" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="origin-center transition-all duration-700 ease-in-out group-hover:rotate-[180deg] group-hover:stroke-amber-300" />
+        </svg>
+      )
+    },
+    {
+      title: "Take Payments",
+      desc: "Connect your payment processor and get paid the moment customers are ready. Your AI receptionist can collect deposits, process payments, and handle billing questions automatically.",
+      color: "bg-blue-500",
+      glowColor: "shadow-[0_0_12px_rgba(59,130,246,0.6)]",
+      textColor: "group-hover:text-blue-400",
+      icon: (
+        <svg className="w-5 h-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2" className="transition-all duration-500 origin-center group-hover:-translate-y-0.5 group-hover:rotate-3 group-hover:stroke-blue-400" />
+          <line x1="2" y1="10" x2="22" y2="10" className="transition-all duration-500 group-hover:-translate-y-0.5" />
+          <rect x="6" y="14" width="3" height="2" rx="0.5" className="transition-all duration-500 group-hover:fill-blue-300/30" />
+        </svg>
+      )
+    },
+    {
+      title: "Follow Ups",
+      desc: "Most businesses don't have a lead problem. They have a follow-up problem. Your AI receptionist knows when to reach out, what to say, and can even trigger personalized follow-ups through custom workflow automations.",
+      color: "bg-emerald-500",
+      glowColor: "shadow-[0_0_12px_rgba(16,185,129,0.6)]",
+      textColor: "group-hover:text-emerald-400",
+      icon: (
+        <svg className="w-5 h-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" className="transition-all duration-500 origin-center group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:scale-105 group-hover:stroke-emerald-400" />
+          <path d="M3 21a18 18 0 0 1 8-8" strokeDasharray="3 3" className="transition-all duration-500 group-hover:stroke-emerald-300" />
+        </svg>
+      )
+    },
+    {
+      title: "Step-by-Step Directions",
+      desc: "Powered by Google Maps, your AI receptionist can intelligently guide customers to your business with real-time directions, parking recommendations, traffic insights, and location-specific assistance.",
+      color: "bg-indigo-400",
+      glowColor: "shadow-[0_0_12px_rgba(129,140,248,0.6)]",
+      textColor: "group-hover:text-indigo-400",
+      icon: (
+        <svg className="w-5 h-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" className="transition-all duration-500 origin-center group-hover:-translate-y-1 group-hover:stroke-indigo-400" />
+          <circle cx="12" cy="10" r="3" className="transition-all duration-500 origin-center group-hover:scale-125 group-hover:fill-indigo-300/30" />
+        </svg>
+      )
     }
   ];
 
   return (
-    <div 
-      ref={containerRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      className="w-full flex justify-center py-4"
-    >
-      <div 
-        style={{
-          transform: `perspective(1000px) rotateY(${hoverPosition.x * 12}deg) rotateX(${-hoverPosition.y * 12}deg) scale(1.02)`,
-          transition: 'transform 0.1s ease-out',
-          boxShadow: '0 30px 60px -15px rgba(0,0,0,0.9), 0 0 40px -20px rgba(6,182,212,0.3)'
-        }}
-        className="w-full max-w-md aspect-[4/5] rounded-[24px] border border-white/10 bg-gradient-to-b from-zinc-950 to-[#030303] p-6 relative overflow-hidden group transition-all"
-      >
-        {/* Subtle, atmospheric background light reflecting active elements */}
-        <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/10 blur-[80px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-violet-500/10 blur-[80px] rounded-full pointer-events-none" />
+    <div className="min-h-screen bg-[#050505] text-[#ededed] flex items-center justify-center p-4 md:p-8 selection:bg-purple-500/30 selection:text-purple-200">
+      {/* Container holding ONLY the premium compact vertical list */}
+      <div className="max-w-3xl w-full mx-auto">
+        <div className="flex flex-col">
+          
+          {features.map((feature, idx) => {
+            const isHovered = hoveredIdx === idx;
+            return (
+              <div
+                key={idx}
+                onMouseEnter={() => setHoveredIdx(idx)}
+                onMouseLeave={() => setHoveredIdx(null)}
+                className="group relative flex flex-col md:flex-row md:items-center justify-between py-4 md:py-5 border-b border-zinc-900/40 cursor-pointer transition-all duration-300 ease-out"
+              >
+                {/* Compact horizontal hover track overlay */}
+                <div 
+                  className={`absolute inset-y-0.5 -inset-x-3 bg-zinc-900/[0.12] rounded-lg scale-98 opacity-0 transition-all duration-300 ease-out -z-10 ${
+                    isHovered ? 'scale-100 opacity-100' : ''
+                  }`} 
+                />
 
-        {/* Fine-line glass highlight */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none" />
-
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]" />
-          </div>
-          <div className="px-3 py-1 rounded-full bg-zinc-900 border border-white/10 text-[9px] font-mono tracking-widest text-zinc-300 flex items-center space-x-1">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>SALON FLOOR SYNCHRONIZED</span>
-          </div>
-        </div>
-
-        <div className="space-y-1 mb-8">
-          <span className="text-zinc-500 font-bold text-xs tracking-widest uppercase block">Selected Date</span>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-3xl font-bold tracking-tight text-white">Saturday 13</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-          </div>
-        </div>
-
-        {/* Colored Items List */}
-        <div className="space-y-3.5">
-          {scheduledItems.map((item, index) => (
-            <div 
-              key={index} 
-              className="group/item flex items-center justify-between p-4 rounded-xl bg-zinc-900/40 border border-white/5 hover:border-white/15 hover:bg-zinc-900/80 transition-all duration-300 cursor-pointer"
-            >
-              <div className="flex items-center space-x-4">
-                {/* Colored Accent Strip */}
-                <div className={`w-[3px] h-10 rounded-full bg-gradient-to-b ${item.colorClass}`} />
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[10px] font-mono text-zinc-400 block">{item.time}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${item.tagColor}`}>
-                      {item.tag}
-                    </span>
+                {/* Left Side: Glowing Indicator Dot & Icon + Bold Compressed Title */}
+                <div className="flex items-center gap-4 md:gap-5 transition-transform duration-300 ease-out group-hover:translate-x-1.5">
+                  
+                  {/* Premium Glow Dot Indicator (Number removed) */}
+                  <div className="relative flex items-center justify-center w-3 h-3">
+                    {/* Glowing Accent Dot */}
+                    <span 
+                      className={`absolute w-1.5 h-1.5 rounded-full transition-all duration-300 ease-out ${feature.color} ${
+                        isHovered ? `${feature.glowColor} scale-110 opacity-100` : 'opacity-30 scale-75'
+                      }`} 
+                    />
                   </div>
-                  <span className="text-sm font-semibold tracking-tight text-zinc-100 group-hover/item:text-white transition-colors block">
-                    {item.title}
-                  </span>
-                  <span className="text-[10px] text-zinc-500 block">
-                    {item.detail}
-                  </span>
+
+                  {/* Clean borderless & outline-free icon container with smooth hover transitions */}
+                  <div className={`flex items-center justify-center overflow-visible transition-all duration-300 ${
+                    isHovered ? 'text-white scale-110' : 'text-zinc-600'
+                  }`}>
+                    {feature.icon}
+                  </div>
+
+                  {/* Feature Title (Tighter tracking, lowercase compressed font impact) */}
+                  <h3 className={`text-xl md:text-2xl font-black tracking-tighter uppercase transition-colors duration-300 font-sans ${feature.textColor} text-zinc-100`}>
+                    {feature.title}
+                  </h3>
                 </div>
-              </div>
-              <div className="w-7 h-7 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity">
-                <Plus size={12} className="text-cyan-400" />
-              </div>
-            </div>
-          ))}
-        </div>
 
-        <div className="mt-8 pt-5 border-t border-white/5 flex items-center justify-between text-zinc-500 text-[10px] font-semibold tracking-wider">
-          <span className="flex items-center space-x-1.5">
-            <Clock size={11} className="text-cyan-400" />
-            <span className="text-zinc-400">Atelier Standard Clock</span>
-          </span>
-          <span className="text-zinc-400">Interactive View</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RightCalendarGrid() {
-  const [selectedDay, setSelectedDay] = useState(15);
-  const [currentMonth, setCurrentMonth] = useState('October');
-
-  // Multi-colored salon event database
-  const itemsDatabase = {
-    12: [{ title: 'Color Masterclass (Stylist Academy)', category: 'Academy', time: '10:00 AM', color: 'bg-cyan-500', colorText: 'text-cyan-400' }],
-    15: [
-      { title: 'Vogue Couture Editorial Shoot', category: 'High Fashion', time: '11:00 AM', color: 'bg-violet-500', colorText: 'text-violet-400' },
-      { title: 'VIP Guest Session: Bridal Suite Closeout', category: 'VIP Closeout', time: '2:30 PM', color: 'bg-pink-500', colorText: 'text-pink-400' }
-    ],
-    22: [{ title: 'Master Stylist Performance Reviews', category: 'Internal Sync', time: '9:00 AM', color: 'bg-violet-500', colorText: 'text-violet-400' }],
-    27: [{ title: 'Atelier Winter Collection Launch Gala', category: 'Gala Launch', time: '4:00 PM', color: 'bg-emerald-500', colorText: 'text-emerald-400' }]
-  };
-
-  return (
-    <div className="w-full max-w-2xl rounded-2xl border border-white/5 bg-[#08080A] p-6 shadow-2xl relative overflow-hidden">
-      {/* Dynamic Background Colored Accent Blobs */}
-      <div className="absolute top-0 left-1/4 w-64 h-64 bg-violet-600/5 blur-[90px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-fuchsia-600/5 blur-[90px] rounded-full pointer-events-none" />
-
-      {/* Dynamic Month Header Controls */}
-      <div className="flex items-center justify-between mb-6 pb-6 border-b border-white/5">
-        <div className="flex items-center space-x-4">
-          <span className="text-lg font-bold tracking-tight text-white flex items-center space-x-2">
-            <CalendarIcon className="text-violet-400" size={18} />
-            <span>{currentMonth} 2026</span>
-          </span>
-          <div className="flex space-x-1">
-            <button 
-              onClick={() => setCurrentMonth(currentMonth === 'October' ? 'November' : 'October')}
-              className="w-7 h-7 rounded-full bg-zinc-950 hover:bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-400 transition"
-              title="Previous Month"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <button 
-              onClick={() => setCurrentMonth(currentMonth === 'October' ? 'November' : 'October')}
-              className="w-7 h-7 rounded-full bg-zinc-950 hover:bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-400 transition"
-              title="Next Month"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-1.5 text-[10px] font-bold tracking-wider text-zinc-400">
-          <span className="px-2.5 py-1 rounded bg-gradient-to-r from-violet-600 to-indigo-600 border border-violet-500/30 text-white shadow-sm">Month</span>
-          <span className="px-2.5 py-1 rounded text-zinc-500 hover:text-zinc-300 cursor-pointer">Week</span>
-        </div>
-      </div>
-
-      {/* Weekday Labels */}
-      <div className="grid grid-cols-7 gap-1.5 mb-2 text-center">
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
-          <span key={i} className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase py-1">
-            {day}
-          </span>
-        ))}
-      </div>
-
-      {/* Grid rendering (28 days layout) */}
-      <div className="grid grid-cols-7 gap-1.5">
-        {/* Placeholder pad offset for Month Layout */}
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={`empty-${i}`} className="aspect-square bg-transparent opacity-5" />
-        ))}
-
-        {Array.from({ length: 28 }).map((_, i) => {
-          const dayNum = i + 1;
-          const isSelected = selectedDay === dayNum;
-          const eventsList = itemsDatabase[dayNum] || [];
-
-          return (
-            <button
-              key={dayNum}
-              onClick={() => setSelectedDay(dayNum)}
-              className={`aspect-square rounded-xl relative p-1.5 transition-all duration-300 flex flex-col justify-between overflow-hidden border ${
-                isSelected 
-                  ? 'bg-gradient-to-tr from-violet-600 via-purple-600 to-fuchsia-600 border-transparent text-white scale-[1.04] z-10 shadow-[0_0_20px_rgba(139,92,246,0.4)]' 
-                  : 'bg-zinc-950/60 border-white/5 text-zinc-400 hover:border-white/20'
-              }`}
-            >
-              <span className={`text-[10px] font-bold ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
-                {dayNum}
-              </span>
-
-              {/* Colorful dot indicators */}
-              <div className="flex space-x-1 justify-center mt-auto w-full">
-                {eventsList.map((ev, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : ev.color} shadow-sm`} 
-                  />
-                ))}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Unified Agenda preview nested elegantly below with vibrant color themes */}
-      <div className="mt-6 pt-5 border-t border-white/5">
-        <span className="text-[9px] font-bold tracking-widest text-zinc-400 uppercase block mb-3 flex items-center space-x-1.5">
-          <Activity size={10} className="text-violet-400" />
-          <span>Atelier Floor Agenda • {currentMonth} {selectedDay}</span>
-        </span>
-        {itemsDatabase[selectedDay] ? (
-          <div className="space-y-2">
-            {itemsDatabase[selectedDay].map((ev, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-zinc-950 border border-white/5 hover:border-white/10 transition-colors">
-                <div className="flex items-center space-x-3">
-                  <span className={`w-2.5 h-2.5 rounded-full ${ev.color} ring-4 ring-${ev.color.split('-')[1]}-500/10`} />
-                  <span className="text-xs font-semibold text-zinc-200">{ev.title}</span>
+                {/* Right Side: High-contrast premium descriptions (scaled down font size for luxury look) */}
+                <div className="mt-2 md:mt-0 md:max-w-xs lg:max-w-sm w-full pl-7 md:pl-0 transition-transform duration-300 ease-out group-hover:translate-x-1">
+                  <p className="text-xs md:text-[13px] leading-relaxed text-zinc-400 font-medium tracking-tight">
+                    {feature.desc}
+                  </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/5 bg-white/5 ${ev.colorText}`}>
-                    {ev.category}
-                  </span>
-                  <span className="text-[10px] font-mono text-zinc-400">{ev.time}</span>
-                </div>
+
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-zinc-500 italic">No large-scale bookings scheduled. Open stations available for boutique appointments.</p>
-        )}
-      </div>
+            );
+          })}
 
-    </div>
-  );
-}
-
-function RightNlpSandbox() {
-  const [inputText, setInputText] = useState('Balayage and couture cut with Marcus next Friday at 2:30pm');
-  const [isParsing, setIsParsing] = useState(false);
-  const [parsedStructure, setParsedStructure] = useState({
-    title: 'Balayage & Couture Cut',
-    location: 'Marcus (Master Colorist)',
-    time: '2:30 PM',
-    date: 'Friday (Next)',
-    colorTheme: 'from-cyan-500 to-blue-500',
-    highlightText: 'text-cyan-400'
-  });
-
-  const promptSuggestions = [
-    { text: "Silk press and deep conditioning treatment with Chloe next Tuesday at 11am", accent: "hover:border-violet-500/30 hover:text-violet-300" },
-    { text: "Bridal hair and makeup design package tomorrow at 1:30pm", accent: "hover:border-rose-500/30 hover:text-rose-300" },
-    { text: "Luxury custom hair extensions fitting in VIP Suite at 4pm", accent: "hover:border-cyan-500/30 hover:text-cyan-300" }
-  ];
-
-  const handleApplyPreset = (text) => {
-    setInputText(text);
-    triggerMockAnalysis(text);
-  };
-
-  const triggerMockAnalysis = (text) => {
-    setIsParsing(true);
-    setTimeout(() => {
-      let title = "Bespoke Treatment Session";
-      let location = "Open Styling Floor";
-      let time = "12:00 PM";
-      let date = "Scheduled";
-      let colorTheme = "from-cyan-500 to-blue-500";
-      let highlightText = "text-cyan-400";
-
-      const lowerText = text.toLowerCase();
-      if (lowerText.includes('silk press') || lowerText.includes('conditioning')) {
-        title = "Silk Press & Deep Conditioning";
-        location = "Chloe (Senior Stylist)";
-        time = "11:00 AM";
-        date = "Next Tuesday";
-        colorTheme = "from-violet-500 to-purple-500";
-        highlightText = "text-violet-400";
-      } else if (lowerText.includes('bridal') || lowerText.includes('makeup')) {
-        title = "Bridal Hair & Makeup Design";
-        location = "Elite Bridal Suite";
-        time = "1:30 PM";
-        date = "Tomorrow";
-        colorTheme = "from-rose-500 to-pink-500";
-        highlightText = "text-rose-400";
-      } else if (lowerText.includes('extensions') || lowerText.includes('fitting')) {
-        title = "Luxury Atelier Extensions Fitting";
-        location = "Private VIP Suite";
-        time = "4:00 PM";
-        date = "Scheduled Day";
-        colorTheme = "from-amber-500 to-orange-500";
-        highlightText = "text-amber-400";
-      } else if (lowerText.includes('balayage') || lowerText.includes('couture')) {
-        title = "Balayage & Couture Cut";
-        location = "Marcus (Master Colorist)";
-        time = "2:30 PM";
-        date = "Friday (Next)";
-        colorTheme = "from-cyan-500 to-blue-500";
-        highlightText = "text-cyan-400";
-      }
-
-      setParsedStructure({ title, location, time, date, colorTheme, highlightText });
-      setIsParsing(false);
-    }, 500);
-  };
-
-  return (
-    <div className="w-full max-w-xl rounded-2xl border border-white/5 bg-[#08080A] p-6 shadow-2xl relative overflow-hidden">
-      {/* Background neon light flare */}
-      <div className="absolute top-1/2 right-0 w-48 h-48 bg-rose-500/5 blur-[80px] rounded-full pointer-events-none" />
-
-      <div className="mb-6 flex items-center justify-between">
-        <span className="text-[10px] font-bold tracking-widest text-zinc-400 uppercase flex items-center space-x-1.5">
-          <Command size={11} className="text-rose-400" />
-          <span>Cognitive Request Parser</span>
-        </span>
-        <span className="flex items-center space-x-1.5 text-[10px] text-emerald-400 font-mono bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-0.5 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>GUEST INTAKE ONLINE</span>
-        </span>
-      </div>
-
-      {/* Input Module with active glowing indicator */}
-      <div className="relative mb-5">
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => {
-            setInputText(e.target.value);
-            triggerMockAnalysis(e.target.value);
-          }}
-          className="w-full bg-zinc-950 border border-white/5 rounded-xl p-4 pr-12 text-xs text-white focus:outline-none focus:border-rose-500/30 focus:ring-1 focus:ring-rose-500/20 transition-all font-sans"
-          placeholder="Describe guest appointment needs intuitively..."
-        />
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-rose-400 animate-pulse">
-          <Command size={14} />
         </div>
       </div>
-
-      {/* Suggestion tags */}
-      <div className="space-y-2 mb-6">
-        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">
-          Preset Client Requests (Tap to evaluate):
-        </span>
-        <div className="flex flex-col space-y-1.5">
-          {promptSuggestions.map((p, index) => (
-            <button
-              key={index}
-              onClick={() => handleApplyPreset(p.text)}
-              className={`text-left px-3 py-2 rounded-lg border border-white/5 bg-zinc-950/60 text-[11px] text-zinc-400 transition-all ${p.accent}`}
-            >
-              "{p.text}"
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Decoded structured data visual card with colorful nodes */}
-      <div className="relative p-5 rounded-xl border border-white/5 bg-zinc-950 overflow-hidden min-h-[140px] flex flex-col justify-between">
-        {isParsing && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center space-x-1.5 z-20">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-bounce" />
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-bounce [animation-delay:0.1s]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-bounce [animation-delay:0.2s]" />
-          </div>
-        )}
-
-        <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-3">
-          <span className="text-[9px] font-mono text-zinc-400 tracking-wider uppercase flex items-center space-x-1">
-            <span className="w-2 h-2 rounded-full bg-rose-500" />
-            <span>Extracted Booking Parameters</span>
-          </span>
-          <span className="px-2 py-0.5 rounded bg-emerald-950/40 text-[9px] text-emerald-400 border border-emerald-500/20 font-mono font-bold">
-            CONFIDENCE 100%
-          </span>
-        </div>
-
-        {/* Structured Node Grids */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Service Requested</span>
-            <div className="flex items-center space-x-1.5">
-              <span className={`w-1.5 h-3 rounded-full bg-gradient-to-b ${parsedStructure.colorTheme}`} />
-              <span className="text-xs font-semibold text-white">{parsedStructure.title}</span>
-            </div>
-          </div>
-          <div>
-            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Assigned Stylist / Station</span>
-            <div className="flex items-center space-x-1 text-zinc-300">
-              <MapPin size={11} className={parsedStructure.highlightText} />
-              <span className="text-xs font-semibold">{parsedStructure.location}</span>
-            </div>
-          </div>
-          <div>
-            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Requested Time Slot</span>
-            <div className="flex items-center space-x-1 text-zinc-300">
-              <Clock size={11} className={parsedStructure.highlightText} />
-              <span className="text-xs font-semibold">{parsedStructure.time}</span>
-            </div>
-          </div>
-          <div>
-            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Target Date context</span>
-            <div className="flex items-center space-x-1 text-zinc-300">
-              <CalendarDays size={11} className={parsedStructure.highlightText} />
-              <span className="text-xs font-semibold">{parsedStructure.date}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div>
   );
 }
