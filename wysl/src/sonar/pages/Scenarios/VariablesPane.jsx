@@ -4,6 +4,7 @@ import {
   User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, CreditCard, Search, Layers
 } from 'lucide-react';
 import { getOutputVariables, isStripeResponseNode } from '../../../sonar/lib/fieldContexts';
+import { api } from '../../lib/api';
 import { fetchCustomFields, getCurrentBusinessId, getCustomValue, isCustomFieldKey } from '../../lib/customFields';
 import { getSmartActionByKey, getSmartActions } from './smartActions';
 
@@ -58,6 +59,42 @@ const getReceptionistBannerUrl = (bannerId) => (
     ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${bannerId}.png`
     : null
 );
+
+const isScenarioDebugEnabled = () => {
+  if (typeof window === 'undefined') return false;
+  return window.__SCENARIOS_DEBUG__ === true || window.__VARIABLES_PANE_DEBUG__ === true;
+};
+
+const scenarioLog = (level, ...args) => {
+  if (!isScenarioDebugEnabled()) return;
+  const logger = console[level] || console.log;
+  logger(...args);
+};
+
+const findNearestUpstreamCallNode = (startNodeId, nodes, edges) => {
+  if (!startNodeId || !nodes.length) return null;
+  const visited = new Set();
+  const queue = [startNodeId];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    const node = nodes.find((entry) => entry.id === current);
+    if (node && node.configured && (node.subOptionKey === 'call_customer' || node.actionConfig?._key === 'call_customer')) {
+      return node;
+    }
+
+    for (const edge of edges) {
+      if (edge.to === current && !visited.has(edge.from)) {
+        queue.push(edge.from);
+      }
+    }
+  }
+
+  return null;
+};
 
 const SEARCH_FIELDS = {
   people: ['first_name', 'last_name', 'email'],
@@ -519,13 +556,11 @@ const TABLE_DEFS = [
     ],
     fetch: async () => {
       try {
-        const { data: authData } = await supabase.auth.getUser();
-        const userId = authData?.user?.id;
-        if (!userId) return [];
+        const businessId = await getCurrentBusinessId();
         const { data } = await supabase
           .from('hired_receptionists')
           .select('*')
-          .eq('user_id', userId)
+          .eq('business_id', businessId)
           .limit(20);
         return data || [];
       } catch { return []; }
@@ -814,7 +849,7 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
   };
 
   const searchNodes = getSearchRecordsNodes();
-  console.log('[SearchRecordsOutput] Found nodes:', searchNodes.length, searchNodes.map(n => ({ id: n.nodeId, hasResults: !!n.records, recordCount: n.records?.length })));
+  scenarioLog('log', '[SearchRecordsOutput] Found nodes:', searchNodes.length, searchNodes.map(n => ({ id: n.nodeId, hasResults: !!n.records, recordCount: n.records?.length })));
 
   if (searchNodes.length === 0) return null;
 
@@ -1133,7 +1168,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
         const fields = await fetchCustomFields(businessId);
         if (!cancelled) setPeopleCustomVariableFields(fields);
       } catch (error) {
-        console.warn('[VariablesPane] Could not load custom people fields:', error?.message || error);
+        scenarioLog('warn', '[VariablesPane] Could not load custom people fields:', error?.message || error);
         if (!cancelled) setPeopleCustomVariableFields([]);
       } finally {
         if (!cancelled) setCustomFieldsReady(true);
@@ -1172,39 +1207,148 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 
     const loadActiveReceptionist = async () => {
       try {
-        const { data: user } = await supabase.from('users').select('id').limit(1).single();
+        scenarioLog('log', '[VariablesPane] loadActiveReceptionist:start', {
+          currentNodeId,
+          visible,
+        });
+
+        const { data: authData } = await supabase.auth.getUser();
         if (cancelled) return;
 
-        const userId = user?.id;
+        const userId = authData?.user?.id;
         if (!userId) {
+          scenarioLog('warn', '[VariablesPane] loadActiveReceptionist:no-user');
           setActiveReceptionist(null);
           return;
         }
 
-        const { data: settings } = await supabase
+        const businessId = await getCurrentBusinessId().catch(() => null);
+        if (cancelled) return;
+        scenarioLog('log', '[VariablesPane] loadActiveReceptionist:scope', {
+          userId,
+          businessId,
+        });
+
+        const agents = await api.getAgents();
+        scenarioLog('log', '[VariablesPane] loadActiveReceptionist:agents', agents);
+
+        const activeAgents = Array.isArray(agents)
+          ? agents.filter((agent) => agent && agent.is_active !== false)
+          : [];
+
+        if (activeAgents.length > 0) {
+          const upstreamCallNode = findNearestUpstreamCallNode(currentNodeId, nodes, edges);
+          const assignedReceptionist = String(upstreamCallNode?.actionConfig?.assigned_receptionist || '').trim().toLowerCase();
+          const preferredAgent = assignedReceptionist
+            ? activeAgents.find((agent) => {
+                const id = String(agent.id || '').trim().toLowerCase();
+                const fullName = String(agent.full_name || agent.name || '').trim().toLowerCase();
+                const firstName = String(agent.first_name || '').trim().toLowerCase();
+                return assignedReceptionist === id || assignedReceptionist === fullName || assignedReceptionist === firstName;
+              }) || activeAgents[0]
+            : activeAgents[0];
+
+          let bannerId = preferredAgent?.banner_id || null;
+          if (!bannerId && preferredAgent?.catalog_id) {
+            const { data: catalogRow } = await supabase
+              .from('receptionist_catalog')
+              .select('banner_id')
+              .eq('id', preferredAgent.catalog_id)
+              .maybeSingle();
+            if (!cancelled) {
+              bannerId = catalogRow?.banner_id || null;
+            }
+          }
+
+          if (cancelled) return;
+
+          const nextReceptionist = {
+            ...preferredAgent,
+            full_name: preferredAgent.full_name || preferredAgent.name || '',
+            first_name: preferredAgent.first_name || preferredAgent.name || '',
+            banner_id: bannerId,
+            banner_url: preferredAgent.banner_url || getReceptionistBannerUrl(bannerId) || preferredAgent.avatar || null,
+          };
+          scenarioLog('log', '[VariablesPane] loadActiveReceptionist:resolved-from-agents', nextReceptionist);
+          setActiveReceptionist(nextReceptionist);
+          return;
+        }
+
+        let settingsQuery = supabase
           .from('account_settings')
           .select('call_routing')
-          .limit(1)
-          .maybeSingle();
+          .eq('user_id', userId)
+          .limit(1);
+
+        if (businessId) {
+          settingsQuery = settingsQuery.eq('business_id', businessId);
+        }
+
+        const { data: settings } = await settingsQuery.maybeSingle();
+        scenarioLog('log', '[VariablesPane] loadActiveReceptionist:settings', settings);
 
         const callRouting = String(settings?.call_routing || 'all').toLowerCase();
         if (!['outbound', 'all'].includes(callRouting)) {
+          scenarioLog('warn', '[VariablesPane] loadActiveReceptionist:blocked-by-routing', {
+            callRouting,
+          });
           setActiveReceptionist(null);
           return;
         }
 
-        const { data: rows } = await supabase
+        let receptionistQuery = supabase
           .from('hired_receptionists')
-          .select('id, full_name, first_name, avatar, status, user_id, catalog_id')
-          .eq('user_id', userId)
+          .select('id, full_name, first_name, avatar, status, user_id, business_id, catalog_id, call_types')
           .eq('is_active', true)
           .limit(10);
 
+        if (businessId) {
+          receptionistQuery = receptionistQuery.eq('business_id', businessId);
+        } else {
+          receptionistQuery = receptionistQuery.eq('user_id', userId);
+        }
+
+        let { data: rows } = await receptionistQuery;
+        scenarioLog('log', '[VariablesPane] loadActiveReceptionist:initial-rows', rows);
+
+        if ((!rows || rows.length === 0) && businessId) {
+          const fallbackResponse = await supabase
+            .from('hired_receptionists')
+            .select('id, full_name, first_name, avatar, status, user_id, business_id, catalog_id, call_types')
+            .eq('user_id', userId)
+            .eq('is_active', true)
+            .limit(10);
+          rows = fallbackResponse.data || [];
+          scenarioLog('log', '[VariablesPane] loadActiveReceptionist:fallback-rows', rows);
+        }
+
         if (cancelled) return;
 
-        const preferred = (rows || [])[0] || null;
+        const outboundRows = (rows || []).filter((row) => {
+          const callTypes = String(row.call_types || 'both').toLowerCase();
+          return callTypes === 'both' || callTypes === 'outbound';
+        });
+        const eligibleRows = outboundRows.length > 0 ? outboundRows : (rows || []);
+
+        const upstreamCallNode = findNearestUpstreamCallNode(currentNodeId, nodes, edges);
+        const assignedReceptionist = String(upstreamCallNode?.actionConfig?.assigned_receptionist || '').trim().toLowerCase();
+        scenarioLog('log', '[VariablesPane] loadActiveReceptionist:selection-input', {
+          upstreamCallNodeId: upstreamCallNode?.id || null,
+          assignedReceptionist,
+          totalRows: (rows || []).length,
+          eligibleRows,
+        });
+        const preferred = assignedReceptionist
+          ? eligibleRows.find((row) => {
+              const id = String(row.id || '').trim().toLowerCase();
+              const fullName = String(row.full_name || '').trim().toLowerCase();
+              const firstName = String(row.first_name || '').trim().toLowerCase();
+              return assignedReceptionist === id || assignedReceptionist === fullName || assignedReceptionist === firstName;
+            }) || eligibleRows[0] || null
+          : eligibleRows[0] || null;
 
         if (!preferred) {
+          scenarioLog('warn', '[VariablesPane] loadActiveReceptionist:no-preferred');
           setActiveReceptionist(null);
           return;
         }
@@ -1218,24 +1362,31 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
             .single();
           if (!cancelled) {
             bannerId = catalogRow?.banner_id || null;
+            scenarioLog('log', '[VariablesPane] loadActiveReceptionist:catalog', {
+              catalogId: preferred.catalog_id,
+              bannerId,
+            });
           }
         }
 
         if (cancelled) return;
 
-        setActiveReceptionist({
+        const nextReceptionist = {
           ...preferred,
           banner_id: bannerId,
           banner_url: getReceptionistBannerUrl(bannerId),
-        });
-      } catch {
+        };
+        scenarioLog('log', '[VariablesPane] loadActiveReceptionist:resolved', nextReceptionist);
+        setActiveReceptionist(nextReceptionist);
+      } catch (error) {
+        scenarioLog('error', '[VariablesPane] loadActiveReceptionist:error', error);
         if (!cancelled) setActiveReceptionist(null);
       }
     };
 
     loadActiveReceptionist();
     return () => { cancelled = true; };
-  }, [visible]);
+  }, [visible, currentNodeId, nodes, edges]);
 
   useEffect(() => {
     if (!visible || !customFieldsReady) return;
@@ -1270,6 +1421,11 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       seenSourceLabelsRef.current.add(`${sourceStateKey(table.key)}::${activeSource}`);
     });
   }, [visible, currentNodeId, nodes, edges, activeSources, customFieldsReady]);
+
+  useEffect(() => {
+    if (!visible) return;
+    scenarioLog('log', '[VariablesPane] activeReceptionist:state', activeReceptionist);
+  }, [visible, activeReceptionist]);
 
   useEffect(() => {
     const panel = paneRef.current;
@@ -1557,6 +1713,15 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           const sourceLabel = showingAgent
             ? (receptionistName || 'Receptionist')
             : 'Trigger';
+          if (table.key === 'people' && showingAgent) {
+            scenarioLog('log', '[VariablesPane] render:agent-source-label', {
+              tableKey: table.key,
+              activeSource,
+              receptionistName,
+              sourceLabel,
+              activeReceptionist,
+            });
+          }
           const sourceSweepKey = `${sourceStateKey(table.key)}::${activeSource}`;
           const shouldSweepSource = !seenSourceLabelsRef.current.has(sourceSweepKey);
           const showReceptionistArt = showingAgent && !!activeReceptionist?.banner_url;

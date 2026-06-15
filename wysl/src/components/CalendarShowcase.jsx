@@ -3,11 +3,6 @@ import {
   Activity,
   Calendar as CalendarIcon,
   Clock,
-  CreditCard,
-  Globe2,
-  MapPinned,
-  MessageCircle,
-  Send,
 } from 'lucide-react';
 
 const HERO_COLORS = ['#818cf8', '#2dd4bf', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#34d399'];
@@ -28,58 +23,86 @@ const TAG_COLORS = {
 
 const FEATURE_ITEMS = [
   {
-    icon: Clock,
+    icon: (
+      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" className="transition-all duration-500 group-hover:stroke-purple-400" />
+        <polyline points="12 6 12 12 16 14" className="origin-center transition-all duration-700 ease-in-out group-hover:rotate-[360deg] group-hover:stroke-purple-300" />
+      </svg>
+    ),
     colorClass: 'bg-purple-500',
     glowClass: 'shadow-[0_0_12px_rgba(168,85,247,0.6)]',
     hoverTextClass: 'group-hover:text-purple-400',
-    accent: '#f472b6',
     title: 'Manage Appointments Intelligently',
-    copy: 'Handles the conversation naturally, guides callers to the right service, and secures appointments without friction.',
+    copy: 'Your AI receptionist handles the entire conversation naturally, guiding callers to the right service and securing the appointment without friction.',
   },
   {
-    icon: MessageCircle,
+    icon: (
+      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" className="transition-all duration-500 group-hover:stroke-pink-400" />
+        <line x1="9" y1="10" x2="9" y2="14" className="origin-center transition-all duration-500 group-hover:scale-y-150 group-hover:stroke-pink-300" />
+        <line x1="12" y1="8" x2="12" y2="16" className="origin-center transition-all duration-500 delay-75 group-hover:scale-y-75 group-hover:stroke-pink-300" />
+        <line x1="15" y1="10" x2="15" y2="14" className="origin-center transition-all duration-500 delay-100 group-hover:scale-y-150 group-hover:stroke-pink-300" />
+      </svg>
+    ),
     colorClass: 'bg-pink-500',
     glowClass: 'shadow-[0_0_12px_rgba(236,72,153,0.6)]',
     hoverTextClass: 'group-hover:text-pink-400',
-    accent: '#a78bfa',
     title: '24/7 Answering',
-    copy: 'Answers every call instantly, handles multiple conversations at once, and keeps opportunities out of voicemail.',
+    copy: 'Your AI receptionist answers every call instantly, handles multiple conversations at once, and never sends opportunities to voicemail.',
   },
   {
-    icon: Globe2,
+    icon: (
+      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" className="transition-all duration-500 group-hover:stroke-amber-400" />
+        <path d="M2 12h20" className="transition-all duration-500 group-hover:opacity-60" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="origin-center transition-all duration-700 ease-in-out group-hover:rotate-[180deg] group-hover:stroke-amber-300" />
+      </svg>
+    ),
     colorClass: 'bg-amber-400',
     glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
     hoverTextClass: 'group-hover:text-amber-400',
-    accent: '#fbbf24',
     title: '70+ Languages',
-    copy: 'Detects the caller language and responds fluently, helping customers communicate without awkward handoffs.',
+    copy: "Your AI receptionist automatically detects the caller's language and responds fluently, allowing customers from around the world to communicate naturally without translators, transfers, or awkward misunderstandings.",
   },
   {
-    icon: CreditCard,
+    icon: (
+      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="5" width="20" height="14" rx="2" className="origin-center transition-all duration-500 group-hover:-translate-y-0.5 group-hover:rotate-3 group-hover:stroke-blue-400" />
+        <line x1="2" y1="10" x2="22" y2="10" className="transition-all duration-500 group-hover:-translate-y-0.5" />
+        <rect x="6" y="14" width="3" height="2" rx="0.5" className="transition-all duration-500 group-hover:fill-blue-300/30" />
+      </svg>
+    ),
     colorClass: 'bg-blue-500',
     glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
     hoverTextClass: 'group-hover:text-blue-400',
-    accent: '#60a5fa',
     title: 'Take Payments',
-    copy: 'Collects deposits, processes payments, and answers billing questions when customers are ready to book.',
+    copy: 'Connect your payment processor and get paid the moment customers are ready. Your AI receptionist can collect deposits, process payments, and handle billing questions automatically.',
   },
   {
-    icon: Send,
+    icon: (
+      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" className="origin-center transition-all duration-500 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:scale-105 group-hover:stroke-emerald-400" />
+        <path d="M3 21a18 18 0 0 1 8-8" strokeDasharray="3 3" className="transition-all duration-500 group-hover:stroke-emerald-300" />
+      </svg>
+    ),
     colorClass: 'bg-emerald-500',
     glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
     hoverTextClass: 'group-hover:text-emerald-400',
-    accent: '#34d399',
     title: 'Follow Ups',
-    copy: 'Reaches back out with context, timing, and workflow automation so promising leads keep moving.',
+    copy: "Most businesses don't have a lead problem. They have a follow-up problem. Your AI receptionist knows when to reach out, what to say, and can even trigger personalized follow-ups through custom workflow automations.",
   },
   {
-    icon: MapPinned,
+    icon: (
+      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" className="origin-center transition-all duration-500 group-hover:-translate-y-1 group-hover:stroke-indigo-400" />
+        <circle cx="12" cy="10" r="3" className="origin-center transition-all duration-500 group-hover:scale-125 group-hover:fill-indigo-300/30" />
+      </svg>
+    ),
     colorClass: 'bg-indigo-400',
     glowClass: 'shadow-[0_0_12px_rgba(129,140,248,0.6)]',
     hoverTextClass: 'group-hover:text-indigo-400',
-    accent: '#818cf8',
     title: 'Step-by-Step Directions',
-    copy: 'Uses location context to help callers with directions, parking, traffic, and arrival questions.',
+    copy: 'Powered by Google Maps, your AI receptionist can intelligently guide customers to your business with real-time directions, parking recommendations, traffic insights, and location-specific assistance.',
   },
 ];
 
@@ -140,20 +163,20 @@ const CalendarShowcase = () => {
     return () => observer.disconnect();
   }, [hasAnimatedDots]);
 
-  const calendarFadeProgress = clamp((sectionProgress - 0.34) / 0.16, 0, 1);
-  const featureFadeProgress = clamp((sectionProgress - 0.58) / 0.16, 0, 1);
+  const calendarFadeProgress = clamp((sectionProgress - 0.31) / 0.07, 0, 1);
+  const featureFadeProgress = clamp((sectionProgress - 0.365) / 0.08, 0, 1);
   const featureProgress = featureFadeProgress;
   const calendarOpacity = 1 - calendarFadeProgress;
   const featureOpacity = featureFadeProgress;
 
   return (
-    <div ref={rootRef} className="calendar-showcase relative h-[240vh] w-full md:h-[250vh] lg:h-[260vh]">
+    <div ref={rootRef} className="calendar-showcase relative h-[205vh] w-full md:h-[215vh] lg:h-[225vh]">
       <div ref={stickyRef} className="sticky top-0 flex h-screen items-center">
         <div className="relative z-10 mx-auto w-full max-w-[1300px] px-6 md:px-10 lg:px-12">
           <div className="grid min-h-[700px] grid-cols-1 items-center gap-16 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] lg:gap-24">
-            <div className="flex min-h-[220px] items-center justify-center lg:justify-start">
+            <div className="flex min-h-[260px] items-center justify-center lg:justify-start lg:min-h-[300px]">
               <div className="text-left">
-                <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-5xl font-black leading-[0.88] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[4rem]">
+                <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-1 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[4rem] lg:pb-2">
                   Fully Autonomous
                   <br />
                   Booking.
@@ -167,7 +190,7 @@ const CalendarShowcase = () => {
             <div className="flex items-center justify-start">
               <div className="relative h-[680px] w-full max-w-[720px]">
                 <div
-                  className={`absolute inset-0 transition-[opacity,transform] duration-500 ease-out ${
+                  className={`absolute inset-0 transition-[opacity,transform] duration-300 ease-out ${
                     calendarOpacity <= 0.01 ? 'pointer-events-none' : ''
                   }`}
                   style={{
@@ -209,7 +232,6 @@ function RightFeatureList({ featureProgress }) {
       <div className="w-full max-w-[720px] text-left">
         <div className="flex flex-col">
           {FEATURE_ITEMS.map((item, index) => {
-            const Icon = item.icon;
             const rowVisible = isVisible && featureProgress > 0.18 + index * 0.045;
             const isHovered = hoveredIndex === index;
 
@@ -245,18 +267,18 @@ function RightFeatureList({ featureProgress }) {
                       isHovered ? 'scale-110 text-white' : 'text-zinc-600'
                     }`}
                   >
-                    <Icon size={20} strokeWidth={2} />
+                    {item.icon}
                   </div>
 
-                  <h3 className={`text-xl font-black uppercase text-zinc-100 transition-colors duration-300 md:text-2xl ${item.hoverTextClass}`}>
+                  <div className={`text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-2xl ${item.hoverTextClass}`}>
                     {item.title}
-                  </h3>
+                  </div>
                 </div>
 
-                <div className="mt-2 w-full pl-7 transition-transform duration-300 ease-out group-hover:translate-x-1 md:mt-0 md:max-w-sm md:pl-0">
-                  <p className="text-xs font-medium leading-relaxed text-zinc-400 md:text-[13px]">
+                <div className="mt-2 w-full pl-7 transition-transform duration-300 ease-out group-hover:translate-x-1 md:mt-0 md:max-w-xs lg:max-w-sm md:pl-0">
+                  <div className="text-xs font-medium leading-relaxed tracking-tight text-zinc-400 md:text-[13px]">
                     {item.copy}
-                  </p>
+                  </div>
                 </div>
               </div>
             );
