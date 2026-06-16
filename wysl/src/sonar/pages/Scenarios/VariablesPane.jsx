@@ -99,7 +99,7 @@ const findNearestUpstreamCallNode = (startNodeId, nodes, edges) => {
 const SEARCH_FIELDS = {
   people: ['first_name', 'last_name', 'email'],
   payments: ['description', 'status', 'payment_method'],
-  appointments: ['client_name', 'notes', 'status', 'date'],
+  appointments: ['notes', 'status', 'date'],
   services: ['name', 'description', 'category'],
   hired_receptionists: ['full_name', 'stereotype', 'phone_number'],
   businesses: ['name', 'email', 'phone', 'address', 'city', 'state'],
@@ -344,7 +344,7 @@ const findTriggerKeyForNode = (currentNodeId, nodes, edges) => {
 };
 
 // Get available table defs for a given trigger key, sorted by fetch order
-const getAvailableTables = (triggerKey) => {
+const getAvailableTables = (triggerKey, currentNode = null) => {
   let tables;
   if (!triggerKey) {
     tables = [...TABLE_DEFS];
@@ -355,6 +355,14 @@ const getAvailableTables = (triggerKey) => {
     } else {
       const visibleKeys = new Set([...availableKeys, 'services']);
       tables = TABLE_DEFS.filter(t => visibleKeys.has(t.key));
+    }
+  }
+
+  const focusedTableKey = getFocusedTableKeyForNode(currentNode);
+  if (focusedTableKey === 'appointments' && !tables.some((table) => table.key === 'appointments')) {
+    const appointmentTable = TABLE_DEFS.find((table) => table.key === 'appointments');
+    if (appointmentTable) {
+      tables = [...tables, appointmentTable];
     }
   }
 
@@ -477,12 +485,10 @@ const TABLE_DEFS = [
     icon: Calendar,
     fields: [
       { key: 'id', label: 'Record ID', type: 'text' },
-      { key: 'client_name', label: 'Client Name', type: 'text' },
       { key: 'date', label: 'Date', type: 'text' },
       { key: 'time', label: 'Time', type: 'text' },
       { key: 'duration', label: 'Duration', type: 'number' },
       { key: 'status', label: 'Status', type: 'text' },
-      { key: 'assigned_receptionist', label: 'Assigned Receptionist', type: 'text' },
       { key: 'notes', label: 'Notes', type: 'text' },
       { key: 'created_at', label: 'Created At', type: 'timestamp' },
     ],
@@ -1183,7 +1189,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     if (!visible || !customFieldsReady) return;
     // Determine trigger key for filtering available tables
     const triggerKey = findTriggerKeyForNode(currentNodeId, nodes, edges);
-    const available = getAvailableTables(triggerKey);
+    const available = getAvailableTables(triggerKey, currentNode || null);
     const fetchAll = async () => {
       const results = {};
       const indices = {};
@@ -1194,12 +1200,18 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       }
       setRecords(results);
       setActiveIndex(indices);
-      const exp = {};
-      available.forEach(t => { exp[t.key] = true; });
-      setExpanded(exp);
+      setExpanded((prev) => {
+        const next = { ...prev };
+        available.forEach((table) => {
+          if (typeof next[table.key] !== 'boolean') {
+            next[table.key] = true;
+          }
+        });
+        return next;
+      });
     };
     fetchAll();
-  }, [visible, currentNodeId, nodes, edges, customFieldsReady]);
+  }, [visible, currentNodeId, nodes, edges, customFieldsReady, currentNode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1621,7 +1633,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     return matched;
   };
 
-  const availableTables = getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges)).slice().reverse();
+  const availableTables = getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges), currentNode || null).slice().reverse();
   const sourceStateKey = (tableKey) => `${currentNodeId || 'none'}::${tableKey}`;
 
   const getSourceCycleOrder = (tableKey) => {
@@ -1821,7 +1833,6 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                     <button type="button" onClick={(e) => { e.stopPropagation(); handleStart(table.key); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '0 2px', display: 'flex', flexShrink: 0, opacity: 0.6 }}>
                       <Search size={11} />
                     </button>
-                    {tableRecords.length === 0 && <span className="sb-vars-no-data">No data</span>}
                   </>
                 )}
               </div>
@@ -1873,9 +1884,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                         </button>
                       );
                     })
-                  ) : (
-                    <div className="sb-vars-empty">No records found</div>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>

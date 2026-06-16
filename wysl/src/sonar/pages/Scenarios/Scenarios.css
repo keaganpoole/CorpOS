@@ -1564,6 +1564,100 @@
   padding: 14px 16px;
   animation: sbSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sb-cyber-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 0 999px 999px 0;
+  box-shadow: 0 0 18px rgba(96, 165, 250, 0.18);
+  overflow: hidden;
+}
+
+.sb-cyber-rail::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.12) 24%, rgba(255, 255, 255, 0.04) 52%, rgba(255, 255, 255, 0.1) 76%, rgba(255, 255, 255, 0.02));
+  opacity: 0.38;
+  animation: sbRailAmbientPulse 11s ease-in-out infinite;
+}
+
+.sb-cyber-rail::after {
+  content: '';
+  position: absolute;
+  inset: -42% 0;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 18%,
+      rgba(255, 255, 255, 0.74) 42%,
+      rgba(255, 255, 255, 0.24) 54%,
+      rgba(255, 255, 255, 0.46) 66%,
+      transparent 100%
+    );
+  filter: blur(0.35px);
+  opacity: 0;
+  transform: translateY(-125%);
+  animation: sbRailSweepLoop 7.8s cubic-bezier(0.33, 0, 0.12, 1) infinite;
+}
+
+@keyframes sbRailAmbientPulse {
+  0%,
+  100% {
+    opacity: 0.24;
+  }
+  24% {
+    opacity: 0.36;
+  }
+  58% {
+    opacity: 0.28;
+  }
+  76% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes sbRailSweepLoop {
+  0% {
+    opacity: 0;
+    transform: translateY(-125%);
+  }
+  10% {
+    opacity: 0;
+    transform: translateY(-125%);
+  }
+  18% {
+    opacity: 0.22;
+  }
+  31% {
+    opacity: 0.5;
+  }
+  39% {
+    opacity: 0.3;
+  }
+  47% {
+    opacity: 0.62;
+  }
+  56% {
+    opacity: 0.22;
+  }
+  68% {
+    opacity: 0.36;
+  }
+  82% {
+    opacity: 0.14;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(125%);
+  }
 }
 
 .sb-cyber-inner {

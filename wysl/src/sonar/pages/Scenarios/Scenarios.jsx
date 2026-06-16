@@ -397,7 +397,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'phone_calls',
       option: 'Phone Calls',
       description: 'Call or manage phone calls',
-      accent: '#38bdf8',
+      accent: '#cbd5e1',
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
@@ -411,7 +411,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'records',
       option: 'People',
       description: 'Manage people in the database',
-      accent: '#38bdf8',
+      accent: '#cbd5e1',
       icon: OPTION_ICONS.records,
       sub_options: [
         { key: 'search_records', name: 'Search People', description: 'Find people', configFields: [
@@ -429,7 +429,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'appointments',
       option: 'Appointments',
       description: 'Create or manage appointments',
-      accent: '#38bdf8',
+      accent: '#cbd5e1',
       icon: OPTION_ICONS.appointments,
       sub_options: [
         { key: 'search_appointments', name: 'Search Appointments', description: 'Find appointments for this business', configFields: [
@@ -458,7 +458,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'payments',
       option: 'Payments',
       description: 'Manage customers, payments, invoices, and subscriptions',
-      accent: '#38bdf8',
+      accent: '#cbd5e1',
       icon: OPTION_ICONS.payments,
       sub_options: [
         { key: 'create_customer', name: 'Create Customer', description: 'Create a Stripe customer', configFields: [
@@ -527,7 +527,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'email',
       option: 'Email',
       description: 'Manage email',
-      accent: '#38bdf8',
+      accent: '#cbd5e1',
       icon: OPTION_ICONS.email,
       sub_options: [{ key: 'send_email', name: 'Send Email', description: 'Send an email', configFields: [
         { key: 'person_id', label: 'Person ID', type: 'person_id' },
@@ -561,6 +561,86 @@ const CATEGORY_META = {
   ACTIONS: { detail: 'Action', type: 'action', icon: Phone, accent: '#38bdf8' },
   UTILITIES: { detail: 'Utility', type: 'utility', icon: Zap, accent: '#f472b6' },
 };
+
+const getNodeHelperText = (node) => {
+  if (!node) return '';
+  if (typeof node.detail === 'string' && node.detail.trim()) return node.detail.trim();
+
+  const label = String(node.label || '').trim();
+  if (!label) return '';
+
+  const appointmentCopy = {
+    'Create Appointment': 'Create an appointment',
+    'Update Appointment': 'Update an appointment',
+    'Delete Appointment': 'Delete an appointment',
+    'Search Appointments': 'Find appointments for this business',
+  };
+
+  const peopleCopy = {
+    'Search People': 'Find people',
+    'Create New Person': "Create a person's record",
+    'Update Person': "Update a person's record",
+    'Delete Person': "Delete a person's record",
+  };
+
+  const paymentCopy = {
+    'Create Customer': 'Create a Stripe customer',
+    'Update Customer': 'Update a Stripe customer',
+    'Create Payment': 'Process a payment',
+    'Create Payment Link': 'Create a hosted payment link',
+    'Create Invoice': 'Create a Stripe invoice',
+    'Send Invoice': 'Send an existing invoice',
+    'Refund Payment': 'Refund a payment',
+    'Cancel Subscription': 'Cancel a subscription',
+  };
+
+  const phoneCopy = {
+    'Call Customer': 'Call an existing customer',
+  };
+
+  const emailCopy = {
+    'Send Email': 'Send an email',
+  };
+
+  return (
+    appointmentCopy[label]
+    || peopleCopy[label]
+    || paymentCopy[label]
+    || phoneCopy[label]
+    || emailCopy[label]
+    || label
+  );
+};
+
+const CATEGORY_RAIL_GRADIENTS = {
+  TRIGGERS: 'linear-gradient(180deg, #22d3ee 0%, #2dd4bf 100%)',
+  ACTIONS: 'linear-gradient(180deg, #38bdf8 0%, #60a5fa 52%, #7c93ff 100%)',
+  UTILITIES: 'linear-gradient(180deg, #c084fc 0%, #f472b6 100%)',
+};
+
+const CATEGORY_ICON_COLORS = {
+  TRIGGERS: '#2dd4bf',
+  ACTIONS: '#60a5fa',
+  UTILITIES: '#f472b6',
+};
+
+const CATEGORY_ICON_BACKGROUNDS = {
+  TRIGGERS: 'linear-gradient(135deg, rgba(45,212,191,0.14), rgba(255,255,255,0.03))',
+  ACTIONS: 'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(255,255,255,0.03))',
+  UTILITIES: 'linear-gradient(135deg, rgba(244,114,182,0.14), rgba(255,255,255,0.03))',
+};
+
+const getCategoryRailGradient = (categoryType) => (
+  CATEGORY_RAIL_GRADIENTS[categoryType] || CATEGORY_RAIL_GRADIENTS.TRIGGERS
+);
+
+const getCategoryIconColor = (categoryType) => (
+  CATEGORY_ICON_COLORS[categoryType] || CATEGORY_ICON_COLORS.TRIGGERS
+);
+
+const getCategoryIconBackground = (categoryType) => (
+  CATEGORY_ICON_BACKGROUNDS[categoryType] || CATEGORY_ICON_BACKGROUNDS.TRIGGERS
+);
 
 const PANEL_CATEGORIES = ['TRIGGERS', 'ACTIONS', 'UTILITIES'];
 
@@ -4494,28 +4574,36 @@ export default function ScenariosPage() {
                   <>
                   <div
                     className="sb-active-banner sleek-cyber"
-                    style={{ borderLeft: `4px solid ${categoryMeta.accent}` }}
+                    style={{ borderLeft: 'none' }}
                   >
+                    <div
+                      className="sb-cyber-rail"
+                      style={{ background: getCategoryRailGradient(panelCategory) }}
+                    />
                     <div className="sb-cyber-inner">
                       <div className="sb-cyber-header">
-                        <div
-                          className="sb-cyber-pill"
-                          style={{ backgroundColor: `${categoryMeta.accent}20`, color: categoryMeta.accent }}
-                        >
-                          {bannerCategoryLabel}
-                        </div>
+                      <div
+                        className="sb-cyber-pill"
+                        style={{
+                          backgroundColor: `${getCategoryIconColor(panelCategory)}20`,
+                          color: getCategoryIconColor(panelCategory),
+                        }}
+                      >
+                        {bannerCategoryLabel}
+                      </div>
                         <button type="button" className="sb-cyber-back" onClick={handleBackToOptions}>
                           <ChevronLeft size={14} /> Change Selection
                         </button>
                       </div>
                       <div className="sb-cyber-main">
-                        <div
-                          className="sb-cyber-icon-box"
-                          style={{
-                            background: `linear-gradient(135deg, ${categoryMeta.accent}40, transparent)`,
-                          }}
-                        >
-                          <BannerIcon size={24} style={{ color: categoryMeta.accent }} />
+                      <div
+                        className="sb-cyber-icon-box"
+                        style={{
+                            background: getCategoryIconBackground(panelCategory),
+                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
+                        }}
+                      >
+                          <BannerIcon size={24} style={{ color: getCategoryIconColor(panelCategory) }} />
                         </div>
                         <div className="sb-cyber-title-group">
                           <h2 className="sb-cyber-title">{activeOption.option}</h2>
@@ -4559,13 +4647,20 @@ export default function ScenariosPage() {
               {['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'runNode'].includes(panelStage) && selectedNode && (
                 <div
                   className="sb-active-banner sleek-cyber"
-                  style={{ borderLeft: `4px solid ${selectedNode.accent || categoryMeta.accent}` }}
+                  style={{ borderLeft: 'none' }}
                 >
-                  <div className="sb-cyber-inner">
+                  <div
+                    className="sb-cyber-rail"
+                    style={{ background: getCategoryRailGradient(selectedNode.categoryType || panelCategory) }}
+                  />
+                    <div className="sb-cyber-inner">
                     <div className="sb-cyber-header">
                       <div
                         className="sb-cyber-pill"
-                        style={{ backgroundColor: `${selectedNode.accent || categoryMeta.accent}20`, color: selectedNode.accent || categoryMeta.accent }}
+                        style={{
+                          backgroundColor: `${getCategoryIconColor(selectedNode.categoryType || panelCategory)}20`,
+                          color: getCategoryIconColor(selectedNode.categoryType || panelCategory),
+                        }}
                       >
                         {selectedNode.category || categoryMeta.detail}
                       </div>
@@ -4589,16 +4684,17 @@ export default function ScenariosPage() {
                       <div
                         className="sb-cyber-icon-box"
                         style={{
-                          background: `linear-gradient(135deg, ${selectedNode.accent || categoryMeta.accent}40, transparent)`,
+                          background: getCategoryIconBackground(selectedNode.categoryType || panelCategory),
+                          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
                         }}
                       >
                         {selectedNode.icon && typeof selectedNode.icon === 'function'
-                          ? <selectedNode.icon size={24} style={{ color: selectedNode.accent || categoryMeta.accent }} />
-                          : <Phone size={24} style={{ color: selectedNode.accent || categoryMeta.accent }} />}
+                          ? <selectedNode.icon size={24} style={{ color: getCategoryIconColor(selectedNode.categoryType || panelCategory) }} />
+                          : <Phone size={24} style={{ color: getCategoryIconColor(selectedNode.categoryType || panelCategory) }} />}
                       </div>
                       <div className="sb-cyber-title-group">
                         <h2 className="sb-cyber-title">{selectedNode.label}</h2>
-                        <p className="sb-cyber-desc">Configure {selectedNode.label}</p>
+                        <p className="sb-cyber-desc">{getNodeHelperText(selectedNode)}</p>
                       </div>
                     </div>
                   </div>
@@ -4757,7 +4853,7 @@ export default function ScenariosPage() {
                   <div className={`sb-action-config-form${actionIntegrationMissing ? ' sb-action-config-form--empty' : ''}`}>
                     {!actionIntegrationMissing && (
                       <div className="sb-action-config-header">
-                        <h4 className="sb-action-config-title">Configure Action</h4>
+                        <h4 className="sb-action-config-title">Action Details</h4>
                         <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); setActionConfig(null); }}>
                           <X size={14} />
                         </button>
@@ -4795,7 +4891,33 @@ export default function ScenariosPage() {
                       </div>
                     ) : (
                     <div className="sb-action-config-fields">
-                      {actionConfig._fields.map((field) => {
+                      {(() => {
+                        const idFieldPriority = {
+                          record_id: 0,
+                          appointment_id: 1,
+                          person_id: 2,
+                          service_id: 3,
+                          customer_id: 4,
+                          payment_id: 5,
+                          invoice_id: 6,
+                          subscription_id: 7,
+                        };
+
+                        const orderedFields = [...actionConfig._fields].sort((a, b) => {
+                          const aPriority = idFieldPriority[a.key];
+                          const bPriority = idFieldPriority[b.key];
+                          const aIsIdField = aPriority !== undefined || a.key.endsWith('_id');
+                          const bIsIdField = bPriority !== undefined || b.key.endsWith('_id');
+
+                          if (aIsIdField && bIsIdField) {
+                            return (aPriority ?? 100) - (bPriority ?? 100);
+                          }
+                          if (aIsIdField) return -1;
+                          if (bIsIdField) return 1;
+                          return 0;
+                        });
+
+                        return orderedFields.map((field) => {
                         const rawVal = actionConfig[field.key] || '';
 
                         return (
@@ -4998,7 +5120,8 @@ export default function ScenariosPage() {
                             )}
                           </div>
                         );
-                      })}
+                        });
+                      })()}
                     </div>
                     )}
 
@@ -5118,7 +5241,7 @@ export default function ScenariosPage() {
                 ) : panelStage === 'appointmentConfig' ? (
                   <div style={{ padding: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                      <h4 style={{ fontSize: 12, fontWeight: 800, color: '#fff', margin: 0 }}>Configure Appointment</h4>
+                      <h4 style={{ fontSize: 12, fontWeight: 800, color: '#fff', margin: 0 }}>Appointment Details</h4>
                       <button type="button" onClick={() => { setPanelStage('options'); setAppointmentConfig({}); }}
                         style={{ background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
                         <X size={14} />
@@ -5132,7 +5255,7 @@ export default function ScenariosPage() {
                     <div className="sb-record-fields-grid">
                       {/* Record ID — for create and update_appointment (person_id field) */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field" style={{ order: 1 }}>
+                        <div className="sb-record-field" style={{ order: appointmentConfig.key === 'update_appointment' ? 1 : 0 }}>
                           <label className="sb-record-label"><User size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Person ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
@@ -5159,7 +5282,7 @@ export default function ScenariosPage() {
                       )}
                       {/* Service ID — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field" style={{ order: 2 }}>
+                        <div className="sb-record-field" style={{ order: appointmentConfig.key === 'update_appointment' ? 2 : 1 }}>
                           <label className="sb-record-label">Service ID</label>
                           <div style={{ position: 'relative' }}>
                             <input
@@ -5227,7 +5350,7 @@ export default function ScenariosPage() {
                       )}
                       {/* Status — for update_appointment (second field) */}
                       {appointmentConfig.key === 'update_appointment' && (
-                        <div className="sb-record-field">
+                        <div className="sb-record-field" style={{ order: 3 }}>
                           <label className="sb-record-label">Status</label>
                           <select className="sb-input-field sb-select-field" value={appointmentConfig.status || ''}
                             onChange={e => setAppointmentConfig({ ...appointmentConfig, status: e.target.value })}>
@@ -5240,7 +5363,7 @@ export default function ScenariosPage() {
                       )}
                       {/* Date — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field">
+                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 4 } : appointmentConfig.key === 'create_appointment' ? { order: 2 } : undefined}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
                             <label className="sb-record-label" style={{ marginBottom: 0 }}>Date</label>
                             <button
@@ -5296,7 +5419,7 @@ export default function ScenariosPage() {
                       )}
                       {/* Time — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field">
+                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 5 } : appointmentConfig.key === 'create_appointment' ? { order: 3 } : undefined}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
                             <label className="sb-record-label" style={{ marginBottom: 0 }}>Time</label>
                             <button
@@ -5352,7 +5475,7 @@ export default function ScenariosPage() {
                       )}
                       {/* Duration */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field">
+                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 6 } : appointmentConfig.key === 'create_appointment' ? { order: 4 } : undefined}>
                           <label className="sb-record-label">Duration</label>
                           {(() => {
                             const durationValue = appointmentConfig.duration == null ? '' : String(appointmentConfig.duration);
@@ -5394,7 +5517,7 @@ export default function ScenariosPage() {
                       )}
                       {/* Notes */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field">
+                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 7 } : appointmentConfig.key === 'create_appointment' ? { order: 5 } : undefined}>
                           <label className="sb-record-label">Notes</label>
                           <div style={{ position: 'relative' }}>
                             <textarea
@@ -5609,7 +5732,7 @@ export default function ScenariosPage() {
                         >
                           <div
                             className="sb-panel-action-icon"
-                            style={{ backgroundColor: `${categoryMeta.accent}15`, color: categoryMeta.accent }}
+                            style={{ background: getCategoryIconBackground(panelCategory), color: getCategoryIconColor(panelCategory) }}
                           >
                             <OptionIcon size={20} />
                           </div>
@@ -5667,7 +5790,7 @@ export default function ScenariosPage() {
                       >
                         <div
                         className="sb-panel-action-icon"
-                        style={{ backgroundColor: `${categoryMeta.accent}15`, color: categoryMeta.accent }}
+                        style={{ background: getCategoryIconBackground(panelCategory), color: getCategoryIconColor(panelCategory) }}
                       >
                         <SubIcon size={20} />
                       </div>
