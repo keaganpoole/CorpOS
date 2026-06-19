@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   Calendar as CalendarIcon,
-  Clock,
   CreditCard,
   Database,
   GitBranch,
@@ -10,6 +9,7 @@ import {
   TimerReset,
   Workflow,
 } from 'lucide-react';
+import HomepageScenariosDemo from '../sonar/pages/Scenarios/HomepageScenariosDemo';
 
 const HERO_COLORS = ['#818cf8', '#2dd4bf', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#34d399'];
 const AVATAR_URLS = [
@@ -43,8 +43,6 @@ const TAG_COLORS = {
   Haircut: HERO_COLORS[4],
   Blowout: HERO_COLORS[5],
 };
-const SCENARIO_SCREENSHOT_URL = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/screenshots/1.png';
-
 const FEATURE_ITEMS = [
   {
     icon: (
@@ -244,6 +242,8 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const [sectionProgress, setSectionProgress] = useState(0);
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [bookingPlayState, setBookingPlayState] = useState('idle');
+  const [demoResetState, setDemoResetState] = useState(null);
+  const [demoInstanceKey, setDemoInstanceKey] = useState(0);
   const isScenariosVariant = variant === 'scenarios';
   const featureItems = isScenariosVariant ? SCENARIO_FEATURE_ITEMS : FEATURE_ITEMS;
 
@@ -335,6 +335,107 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const calendarOpacity = 1 - calendarFadeProgress;
   const featureOpacity = featureFadeProgress;
 
+  const handleDemoLimitExceeded = () => {
+    setDemoResetState('message');
+    window.setTimeout(() => {
+      setDemoInstanceKey((prev) => prev + 1);
+      setDemoResetState('intro');
+    }, 1300);
+    window.setTimeout(() => {
+      setDemoResetState(null);
+    }, 3400);
+  };
+
+  if (isScenariosVariant) {
+    const introFadeProgress = clamp((sectionProgress - 0.16) / 0.08, 0, 1);
+    const builderFadeInProgress = clamp((sectionProgress - 0.22) / 0.08, 0, 1);
+    const builderFadeOutProgress = clamp((sectionProgress - 0.6) / 0.1, 0, 1);
+    const scenariosFeatureProgress = clamp((sectionProgress - 0.68) / 0.12, 0, 1);
+    const isMessageReset = demoResetState === 'message';
+    const isIntroReset = demoResetState === 'intro';
+    const introOpacity = isMessageReset ? 0 : isIntroReset ? 1 : 1 - introFadeProgress;
+    const builderOpacity = demoResetState ? 0 : builderFadeInProgress * (1 - builderFadeOutProgress);
+    const scenariosFeatureOpacity = demoResetState ? 0 : scenariosFeatureProgress;
+
+    return (
+      <div ref={rootRef} className="calendar-showcase scenario-demo-showcase relative h-[250vh] w-full">
+        <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
+          <div
+            className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
+              introOpacity <= 0.01 ? 'pointer-events-none' : ''
+            }`}
+            style={{
+              opacity: introOpacity,
+              visibility: introOpacity <= 0.01 ? 'hidden' : 'visible',
+              transform: `translateY(${introFadeProgress * -12}px)`,
+            }}
+          >
+            <div className="mx-auto max-w-[860px] text-center">
+              <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.8rem]">
+                Scenario
+                <br />
+                Workflow
+                <br />
+                Builder.
+              </h2>
+              <div className="mx-auto mt-6 max-w-[760px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-zinc-300 md:text-xl">
+                Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${
+              builderOpacity <= 0.01 ? 'pointer-events-none' : ''
+            }`}
+            style={{
+              opacity: builderOpacity,
+              visibility: builderOpacity <= 0.01 ? 'hidden' : 'visible',
+              transform: `translateY(${(1 - builderFadeInProgress) * 18 - builderFadeOutProgress * 18}px)`,
+            }}
+          >
+            <HomepageScenariosDemo
+              key={demoInstanceKey}
+              demoMode
+              demoMaxNodes={4}
+              onDemoLimitExceeded={handleDemoLimitExceeded}
+              className="homepage-scenarios-builder"
+            />
+          </div>
+
+          <div
+            className={`absolute inset-0 z-30 flex items-center justify-center bg-[#020202] px-6 transition-opacity duration-300 ${
+              isMessageReset ? '' : 'pointer-events-none'
+            }`}
+            style={{
+              opacity: isMessageReset ? 1 : 0,
+              visibility: isMessageReset ? 'visible' : 'hidden',
+            }}
+          >
+            <div className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-center text-4xl font-black tracking-[-0.04em] text-transparent md:text-7xl">
+              You get the idea.
+            </div>
+          </div>
+
+          <div
+            className={`absolute inset-0 z-10 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
+              scenariosFeatureOpacity <= 0.01 ? 'pointer-events-none' : ''
+            }`}
+            style={{
+              opacity: scenariosFeatureOpacity,
+              visibility: scenariosFeatureOpacity <= 0.01 ? 'hidden' : 'visible',
+              transform: `translateY(${(1 - scenariosFeatureOpacity) * 18}px)`,
+            }}
+          >
+            <div className="w-full max-w-[980px]">
+              <RightFeatureList featureProgress={scenariosFeatureProgress} items={featureItems} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={rootRef} className="calendar-showcase relative h-[205vh] w-full md:h-[215vh] lg:h-[225vh]">
       <div ref={stickyRef} className="sticky top-0 flex h-screen items-center">
@@ -380,11 +481,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                     transform: `translateY(${calendarFadeProgress * -14}px) scale(${1 - calendarFadeProgress * 0.012})`,
                   }}
                 >
-                  {isScenariosVariant ? (
-                    <RightScenarioBuilderWindow />
-                  ) : (
-                    <RightCalendarGrid hasAnimatedDots={hasAnimatedDots} />
-                  )}
+                  <RightCalendarGrid hasAnimatedDots={hasAnimatedDots} />
                 </div>
 
                 <div
@@ -468,43 +565,6 @@ function RightFeatureList({ featureProgress, items }) {
               </div>
             );
           })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RightScenarioBuilderWindow() {
-  return (
-    <div className="relative flex h-full w-full items-center">
-      <div className="relative w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/80 shadow-2xl">
-        <div className="flex select-none items-center justify-between border-b border-zinc-900 bg-zinc-900/30 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-rose-500 transition-colors hover:bg-rose-400" />
-            <span className="h-3 w-3 rounded-full bg-amber-500 transition-colors hover:bg-amber-400" />
-            <span className="h-3 w-3 rounded-full bg-emerald-500 transition-colors hover:bg-emerald-400" />
-            <span className="ml-3 font-mono text-xs tracking-wider text-zinc-500">
-              SCENARIO_ENGINE_V2
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5 rounded-full border border-zinc-800/80 bg-zinc-900/80 px-2.5 py-1 text-xs text-zinc-500">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.55)]" />
-              Builder Ready
-            </span>
-          </div>
-        </div>
-
-        <div className="relative h-[560px] w-full overflow-hidden bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]">
-          <div className="absolute inset-5 overflow-hidden rounded-xl border border-zinc-800/80 bg-black/50 shadow-[0_24px_80px_-30px_rgba(0,0,0,0.95)]">
-            <img
-              src={SCENARIO_SCREENSHOT_URL}
-              alt="Scenario builder workflow canvas"
-              className="h-full w-full object-contain"
-            />
-          </div>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(255,255,255,0.08),transparent_36%),linear-gradient(180deg,rgba(9,9,11,0)_55%,rgba(9,9,11,0.44)_100%)]" />
         </div>
       </div>
     </div>
