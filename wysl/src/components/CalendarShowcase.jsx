@@ -12,6 +12,23 @@ const AVATAR_URLS = [
   'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie.png',
 ];
 const RECEPTIONISTS = ['Bonnie', 'Chloe', 'Maggie'];
+const BOOKING_DIAL_REELS = [
+  ['05', 'GMT', '12:00', 'MON', 'OCT', '22', 'UTC', '09:45', 'WED', 'DEC', '14', 'EST', '18:30', 'PST', 'B'],
+  ['12', 'CET', '15:30', 'TUE', 'JAN', '08', 'JST', '21:15', 'THU', 'APR', '29', 'AST', '11:00', 'MST', 'O'],
+  ['19', 'PST', '08:15', 'WED', 'FEB', '31', 'MST', '14:30', 'FRI', 'MAY', '03', 'CST', '23:45', 'AEST', 'O'],
+  ['27', 'EST', '23:00', 'THU', 'MAR', '11', 'NST', '07:00', 'SAT', 'JUN', '18', 'HST', '16:15', 'AKST', 'K'],
+  ['03', 'JST', '06:45', 'FRI', 'APR', '15', 'AEST', '19:30', 'SUN', 'JUL', '25', 'SST', '08:00', 'ChST', 'I'],
+  ['14', 'AEST', '17:00', 'SAT', 'MAY', '29', 'ChST', '11:15', 'MON', 'AUG', '07', 'GMT', '20:30', 'WET', 'N'],
+  ['22', 'NZST', '10:30', 'SUN', 'JUN', '04', 'WET', '16:00', 'TUE', 'SEP', '13', 'CET', '05:15', 'EET', 'G'],
+];
+const BOOKING_REEL_MOTION = {
+  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  delays: [0, 200, 400, 500, 400, 200, 0],
+  durations: [1500, 1500, 1500, 1500, 1500, 1500, 1500],
+};
+const BOOKING_TARGET_CHARS = ['B', 'o', 'o', 'k', 'i', 'n', 'g'];
+const BOOKING_LETTER_WIDTHS = ['0.71em', '0.58em', '0.58em', '0.61em', '0.28em', '0.57em', '0.61em'];
+const BOOKING_LETTER_OFFSETS = ['0em', '-0.015em', '-0.02em', '-0.03em', '-0.05em', '-0.03em', '-0.02em'];
 const TAG_COLORS = {
   Color: HERO_COLORS[0],
   Extensions: HERO_COLORS[1],
@@ -109,11 +126,66 @@ const FEATURE_ITEMS = [
 const getTagColor = (tag) => TAG_COLORS[tag] || HERO_COLORS[0];
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
+function BookingReelWord({ playState }) {
+  return (
+    <span className="inline-flex items-end">
+      {BOOKING_DIAL_REELS.map((reel, dialIdx) => {
+        const delayVal = BOOKING_REEL_MOTION.delays[dialIdx];
+        const durationVal = BOOKING_REEL_MOTION.durations[dialIdx];
+        const translateY = playState === 'playing' ? (14 * -0.98) : 0;
+
+        return (
+          <span
+            key={dialIdx}
+            style={{
+              height: '0.98em',
+              width: BOOKING_LETTER_WIDTHS[dialIdx],
+              marginRight: BOOKING_LETTER_OFFSETS[dialIdx],
+            }}
+            className="inline-block overflow-hidden last:mr-0"
+          >
+            <span
+              className="flex flex-col items-center"
+              style={{
+                transform: `translateY(${translateY}em)`,
+                transitionProperty: playState === 'resetting' ? 'none' : 'transform',
+                transitionDuration: `${durationVal}ms`,
+                transitionDelay: `${delayVal}ms`,
+                transitionTimingFunction: BOOKING_REEL_MOTION.easing,
+              }}
+            >
+              {reel.map((char, charIdx) => {
+                const isTarget = charIdx === 14;
+                const displayChar = isTarget ? BOOKING_TARGET_CHARS[dialIdx] : char;
+
+                return (
+                  <span
+                    key={charIdx}
+                    style={{ height: '0.98em' }}
+                    className={`flex w-full items-center justify-center text-center ${
+                      isTarget
+                        ? 'bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text font-black text-transparent'
+                        : 'scale-90 font-medium text-zinc-600/25 blur-[0.35px]'
+                    }`}
+                  >
+                    {displayChar}
+                  </span>
+                );
+              })}
+            </span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 const CalendarShowcase = () => {
   const rootRef = useRef(null);
   const stickyRef = useRef(null);
   const [sectionProgress, setSectionProgress] = useState(0);
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
+  const [bookingPlayState, setBookingPlayState] = useState('idle');
 
   useEffect(() => {
     const root = rootRef.current;
@@ -163,6 +235,40 @@ const CalendarShowcase = () => {
     return () => observer.disconnect();
   }, [hasAnimatedDots]);
 
+  useEffect(() => {
+    const sticky = stickyRef.current;
+    if (!sticky) return undefined;
+
+    let replayTimer = null;
+    let isVisible = false;
+
+    const replay = () => {
+      setBookingPlayState('resetting');
+      replayTimer = window.setTimeout(() => {
+        setBookingPlayState('playing');
+      }, 50);
+    };
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isVisible) {
+          isVisible = true;
+          replay();
+        } else if (!entry.isIntersecting) {
+          isVisible = false;
+        }
+      },
+      { threshold: 0.45 }
+    );
+
+    observer.observe(sticky);
+
+    return () => {
+      observer.disconnect();
+      if (replayTimer !== null) window.clearTimeout(replayTimer);
+    };
+  }, []);
+
   const calendarFadeProgress = clamp((sectionProgress - 0.31) / 0.07, 0, 1);
   const featureFadeProgress = clamp((sectionProgress - 0.365) / 0.08, 0, 1);
   const featureProgress = featureFadeProgress;
@@ -179,7 +285,8 @@ const CalendarShowcase = () => {
                 <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-1 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[4rem] lg:pb-2">
                   Fully Autonomous
                   <br />
-                  Booking.
+                  <BookingReelWord playState={bookingPlayState} />
+                  <span>.</span>
                 </h2>
                 <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-zinc-300 md:text-base">
                   Your customers want immediate answers, accurate availability, and a frictionless path to confirmation. This booking flow handles the entire conversation with calm precision.
@@ -359,8 +466,8 @@ function RightCalendarGrid({ hasAnimatedDots }) {
         </div>
 
         <div className="mb-2 grid grid-cols-7 gap-2 text-center">
-          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day) => (
-            <span key={day} className="py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+            <span key={`${day}-${index}`} className="py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
               {day}
             </span>
           ))}
