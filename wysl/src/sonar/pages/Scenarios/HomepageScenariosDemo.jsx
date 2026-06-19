@@ -1967,6 +1967,7 @@ export default function ScenariosPage({
   };
 
   const handleWheel = (event) => {
+    if (demoMode) return;
     event.preventDefault();
     const rate = -event.deltaY / 500;
     setView((prev) => {
@@ -6085,6 +6086,12 @@ export default function ScenariosPage({
               <Check size={16} />
               {currentScenario ? 'Save' : 'Save Scenario'}
             </button>
+          </div>
+        )}
+
+        {demoMode && (
+          <div className="sb-demo-watermark" aria-hidden="true">
+            DEMONSTRATION PURPOSES ONLY
           </div>
         )}
 

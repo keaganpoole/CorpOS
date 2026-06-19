@@ -349,13 +349,15 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   if (isScenariosVariant) {
     const introFadeProgress = clamp((sectionProgress - 0.16) / 0.08, 0, 1);
     const builderFadeInProgress = clamp((sectionProgress - 0.22) / 0.08, 0, 1);
-    const builderFadeOutProgress = clamp((sectionProgress - 0.6) / 0.1, 0, 1);
     const scenariosFeatureProgress = clamp((sectionProgress - 0.68) / 0.12, 0, 1);
     const isMessageReset = demoResetState === 'message';
     const isIntroReset = demoResetState === 'intro';
     const introOpacity = isMessageReset ? 0 : isIntroReset ? 1 : 1 - introFadeProgress;
-    const builderOpacity = demoResetState ? 0 : builderFadeInProgress * (1 - builderFadeOutProgress);
+    const builderDimFactor = scenariosFeatureProgress > 0.01 ? (1 - scenariosFeatureProgress * 0.52) : 1;
+    const builderOpacity = demoResetState ? 0 : builderFadeInProgress * builderDimFactor;
     const scenariosFeatureOpacity = demoResetState ? 0 : scenariosFeatureProgress;
+    const builderBlur = demoResetState ? 0 : (scenariosFeatureProgress > 0.01 ? 2.5 + scenariosFeatureProgress * 4.5 : 0);
+    const builderBrightness = demoResetState ? 0 : (scenariosFeatureProgress > 0.01 ? 0.9 - scenariosFeatureProgress * 0.42 : 1);
 
     return (
       <div ref={rootRef} className="calendar-showcase scenario-demo-showcase relative h-[250vh] w-full">
@@ -391,7 +393,8 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             style={{
               opacity: builderOpacity,
               visibility: builderOpacity <= 0.01 ? 'hidden' : 'visible',
-              transform: `translateY(${(1 - builderFadeInProgress) * 18 - builderFadeOutProgress * 18}px)`,
+              transform: `translateY(${(1 - builderFadeInProgress) * 18}px)`,
+              filter: `blur(${builderBlur}px) brightness(${builderBrightness}) saturate(0.88)`,
             }}
           >
             <HomepageScenariosDemo
@@ -418,7 +421,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
           </div>
 
           <div
-            className={`absolute inset-0 z-10 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
+            className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
               scenariosFeatureOpacity <= 0.01 ? 'pointer-events-none' : ''
             }`}
             style={{
@@ -427,7 +430,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               transform: `translateY(${(1 - scenariosFeatureOpacity) * 18}px)`,
             }}
           >
-            <div className="w-full max-w-[980px]">
+            <div className="mx-auto w-full max-w-[1120px]">
               <RightFeatureList featureProgress={scenariosFeatureProgress} items={featureItems} />
             </div>
           </div>
@@ -511,7 +514,7 @@ function RightFeatureList({ featureProgress, items }) {
 
   return (
     <div className="flex h-full w-full items-center">
-      <div className="w-full max-w-[720px] text-left">
+      <div className="mx-auto w-full max-w-[820px] text-left">
         <div className="flex flex-col">
           {items.map((item, index) => {
             const rowVisible = isVisible && featureProgress > 0.18 + index * 0.045;

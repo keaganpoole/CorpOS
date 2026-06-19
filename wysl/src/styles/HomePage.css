@@ -268,17 +268,103 @@ main > section:nth-of-type(5) {
 .scenario-demo-showcase .homepage-scenarios-builder label {
     text-align: left;
 }
-.content-section .homepage-scenarios-builder h1,
-.content-section .homepage-scenarios-builder h2,
-.content-section .homepage-scenarios-builder h3,
-.content-section .homepage-scenarios-builder h4,
-.content-section .homepage-scenarios-builder h5,
-.content-section .homepage-scenarios-builder h6,
-.content-section .homepage-scenarios-builder p {
-    font-size: inherit;
-    font-weight: inherit;
-    line-height: inherit;
-    letter-spacing: inherit;
+.scenario-demo-showcase .homepage-scenarios-builder .sb-panel-label {
+    font-size: 11px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-panel-title {
+    font-size: 18px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-panel-subheader {
+    font-size: 12px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-panel-action-label {
+    font-size: 12px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-panel-action-detail {
+    font-size: 10px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-title {
+    font-size: 16px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-desc {
+    font-size: 11px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-action-config-title {
+    font-size: 12px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-action-field-label {
+    font-size: 11px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-run-node-panel-subtitle {
+    font-size: 11px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-panel-empty-kicker {
+    font-size: 10px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-panel-empty-title {
+    font-size: 22px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-panel-empty-copy {
+    font-size: 12px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-node-below-title {
+    font-size: 14px;
+    line-height: 1;
+    margin-bottom: 0;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-node-below-desc {
+    font-size: 10px;
+    font-weight: 500;
+    color: #64748b;
+    line-height: 1.4;
+    opacity: 0.8;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-node-inner-wrap {
+    width: 140px;
+    height: 140px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-node-label-below {
+    margin-top: 24px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-node-below-desc {
+    margin-top: 6px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-demo-watermark {
+    position: absolute;
+    left: 50%;
+    bottom: 164px;
+    transform: translateX(-50%);
+    z-index: 18;
+    color: rgba(255, 255, 255, 0.28);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    pointer-events: none;
+    user-select: none;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-trigger-filter-form,
+.scenario-demo-showcase .homepage-scenarios-builder .sb-action-config-form:not(.sb-action-config-form--empty) {
+    padding-bottom: 8px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-trigger-filter-body {
+    gap: 8px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-action-config-fields {
+    gap: 8px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-action-config-field {
+    gap: 3px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-input-field {
+    min-height: 34px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .aether-condition-panel {
+    min-height: 0;
+    padding-bottom: 16px;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .aether-logic-wrapper {
+    width: 100%;
 }
 .feature-reveal-row {
     will-change: opacity, transform;
