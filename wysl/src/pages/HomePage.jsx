@@ -460,6 +460,10 @@ const HomePage = () => {
           <CalendarShowcase />
         </section>
 
+        <section className="content-section content-section--showcase dark-bg text-center">
+          <CalendarShowcase variant="scenarios" />
+        </section>
+
         <section className="content-section dark-bg text-center">
           <h3 data-animate="true" className="typing-animation-container">
             <TypingAnimation />

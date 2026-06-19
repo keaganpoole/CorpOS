@@ -3,6 +3,12 @@ import {
   Activity,
   Calendar as CalendarIcon,
   Clock,
+  CreditCard,
+  Database,
+  GitBranch,
+  PlayCircle,
+  TimerReset,
+  Workflow,
 } from 'lucide-react';
 
 const HERO_COLORS = ['#818cf8', '#2dd4bf', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#34d399'];
@@ -37,6 +43,7 @@ const TAG_COLORS = {
   Haircut: HERO_COLORS[4],
   Blowout: HERO_COLORS[5],
 };
+const SCENARIO_SCREENSHOT_URL = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/screenshots/1.png';
 
 const FEATURE_ITEMS = [
   {
@@ -123,12 +130,63 @@ const FEATURE_ITEMS = [
   },
 ];
 
+const SCENARIO_FEATURE_ITEMS = [
+  {
+    icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-cyan-300" />,
+    colorClass: 'bg-cyan-400',
+    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
+    hoverTextClass: 'group-hover:text-cyan-300',
+    title: 'Event-Driven Triggers',
+    copy: 'Start workflows from phone calls, people changes, appointment events, payments, invoices, subscriptions, or scheduled time-based triggers.',
+  },
+  {
+    icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-emerald-300" />,
+    colorClass: 'bg-emerald-500',
+    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
+    hoverTextClass: 'group-hover:text-emerald-400',
+    title: 'Branching Logic',
+    copy: 'Use routers, conditional edges, and intent routing to send every scenario run down the correct path based on live context.',
+  },
+  {
+    icon: <Database className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-amber-300" />,
+    colorClass: 'bg-amber-400',
+    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
+    hoverTextClass: 'group-hover:text-amber-400',
+    title: 'Live Variables',
+    copy: 'Pull data from upstream nodes, table fields, search results, and receptionist context directly into later workflow actions.',
+  },
+  {
+    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-blue-300" />,
+    colorClass: 'bg-blue-500',
+    glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
+    hoverTextClass: 'group-hover:text-blue-400',
+    title: 'Action Execution',
+    copy: 'Call customers, send email, manage records, create or update appointments, and run Stripe payment actions from the same workflow canvas.',
+  },
+  {
+    icon: <PlayCircle className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-rose-300" />,
+    colorClass: 'bg-rose-500',
+    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
+    hoverTextClass: 'group-hover:text-rose-400',
+    title: 'Run & Debug',
+    copy: 'Run the full scenario or individual nodes inside the builder, then watch active and completed path state as the workflow executes.',
+  },
+  {
+    icon: <Workflow className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6 group-hover:stroke-indigo-300" />,
+    colorClass: 'bg-indigo-400',
+    glowClass: 'shadow-[0_0_12px_rgba(129,140,248,0.6)]',
+    hoverTextClass: 'group-hover:text-indigo-400',
+    title: 'Schedules & Activation',
+    copy: 'Save scenarios, toggle them active or disabled, and run them manually or from daily, weekly, reminder, and specific-time schedules.',
+  },
+];
+
 const getTagColor = (tag) => TAG_COLORS[tag] || HERO_COLORS[0];
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 function BookingReelWord({ playState }) {
   return (
-    <span className="inline-flex items-end">
+    <span className="inline-flex items-end pb-[0.08em]">
       {BOOKING_DIAL_REELS.map((reel, dialIdx) => {
         const delayVal = BOOKING_REEL_MOTION.delays[dialIdx];
         const durationVal = BOOKING_REEL_MOTION.durations[dialIdx];
@@ -180,12 +238,14 @@ function BookingReelWord({ playState }) {
   );
 }
 
-const CalendarShowcase = () => {
+const CalendarShowcase = ({ variant = 'calendar' }) => {
   const rootRef = useRef(null);
   const stickyRef = useRef(null);
   const [sectionProgress, setSectionProgress] = useState(0);
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [bookingPlayState, setBookingPlayState] = useState('idle');
+  const isScenariosVariant = variant === 'scenarios';
+  const featureItems = isScenariosVariant ? SCENARIO_FEATURE_ITEMS : FEATURE_ITEMS;
 
   useEffect(() => {
     const root = rootRef.current;
@@ -283,13 +343,27 @@ const CalendarShowcase = () => {
             <div className="flex min-h-[260px] items-center justify-center lg:justify-start lg:min-h-[300px]">
               <div className="text-left">
                 <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-1 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[4rem] lg:pb-2">
-                  Fully Autonomous
-                  <br />
-                  <BookingReelWord playState={bookingPlayState} />
-                  <span>.</span>
+                  {isScenariosVariant ? (
+                    <>
+                      Scenario
+                      <br />
+                      Workflow
+                      <br />
+                      Builder.
+                    </>
+                  ) : (
+                    <>
+                      Fully Autonomous
+                      <br />
+                      <BookingReelWord playState={bookingPlayState} />
+                      <span>.</span>
+                    </>
+                  )}
                 </h2>
                 <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-zinc-300 md:text-base">
-                  Your customers want immediate answers, accurate availability, and a frictionless path to confirmation. This booking flow handles the entire conversation with calm precision.
+                  {isScenariosVariant
+                    ? 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.'
+                    : 'Your customers want immediate answers, accurate availability, and a frictionless path to confirmation. This booking flow handles the entire conversation with calm precision.'}
                 </div>
               </div>
             </div>
@@ -306,7 +380,11 @@ const CalendarShowcase = () => {
                     transform: `translateY(${calendarFadeProgress * -14}px) scale(${1 - calendarFadeProgress * 0.012})`,
                   }}
                 >
-                  <RightCalendarGrid hasAnimatedDots={hasAnimatedDots} />
+                  {isScenariosVariant ? (
+                    <RightScenarioBuilderWindow />
+                  ) : (
+                    <RightCalendarGrid hasAnimatedDots={hasAnimatedDots} />
+                  )}
                 </div>
 
                 <div
@@ -319,7 +397,7 @@ const CalendarShowcase = () => {
                     transform: `translateY(${(1 - featureOpacity) * 18}px)`,
                   }}
                 >
-                  <RightFeatureList featureProgress={featureProgress} />
+                  <RightFeatureList featureProgress={featureProgress} items={featureItems} />
                 </div>
               </div>
             </div>
@@ -330,7 +408,7 @@ const CalendarShowcase = () => {
   );
 };
 
-function RightFeatureList({ featureProgress }) {
+function RightFeatureList({ featureProgress, items }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const isVisible = featureProgress > 0.08;
 
@@ -338,7 +416,7 @@ function RightFeatureList({ featureProgress }) {
     <div className="flex h-full w-full items-center">
       <div className="w-full max-w-[720px] text-left">
         <div className="flex flex-col">
-          {FEATURE_ITEMS.map((item, index) => {
+          {items.map((item, index) => {
             const rowVisible = isVisible && featureProgress > 0.18 + index * 0.045;
             const isHovered = hoveredIndex === index;
 
@@ -390,6 +468,43 @@ function RightFeatureList({ featureProgress }) {
               </div>
             );
           })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RightScenarioBuilderWindow() {
+  return (
+    <div className="relative flex h-full w-full items-center">
+      <div className="relative w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/80 shadow-2xl">
+        <div className="flex select-none items-center justify-between border-b border-zinc-900 bg-zinc-900/30 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-full bg-rose-500 transition-colors hover:bg-rose-400" />
+            <span className="h-3 w-3 rounded-full bg-amber-500 transition-colors hover:bg-amber-400" />
+            <span className="h-3 w-3 rounded-full bg-emerald-500 transition-colors hover:bg-emerald-400" />
+            <span className="ml-3 font-mono text-xs tracking-wider text-zinc-500">
+              SCENARIO_ENGINE_V2
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5 rounded-full border border-zinc-800/80 bg-zinc-900/80 px-2.5 py-1 text-xs text-zinc-500">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.55)]" />
+              Builder Ready
+            </span>
+          </div>
+        </div>
+
+        <div className="relative h-[560px] w-full overflow-hidden bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]">
+          <div className="absolute inset-5 overflow-hidden rounded-xl border border-zinc-800/80 bg-black/50 shadow-[0_24px_80px_-30px_rgba(0,0,0,0.95)]">
+            <img
+              src={SCENARIO_SCREENSHOT_URL}
+              alt="Scenario builder workflow canvas"
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(255,255,255,0.08),transparent_36%),linear-gradient(180deg,rgba(9,9,11,0)_55%,rgba(9,9,11,0.44)_100%)]" />
         </div>
       </div>
     </div>
