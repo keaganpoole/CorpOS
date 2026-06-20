@@ -284,7 +284,7 @@ const InlineBoolean = ({ value, onSave }) => {
   const state = current === 'yes'
     ? { label: 'Yes', dot: '#10b981', className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
     : current === 'no'
-      ? { label: 'No', dot: '#f59e0b', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' }
+      ? { label: 'No', dot: '#71717a', className: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' }
       : { label: '', dot: 'transparent', className: 'bg-transparent text-transparent border-transparent shadow-none' };
   return (
     <button

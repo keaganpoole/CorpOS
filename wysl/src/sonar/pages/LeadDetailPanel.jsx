@@ -206,7 +206,7 @@ const FieldEditor = ({ field, value, onChange, errors, fieldConfig }) => {
     return (
       <button type="button" onClick={() => onChange(next)} className="inline-flex min-h-[34px] w-full items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.025] px-2.5 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 transition hover:text-white">
         {current}
-        <span className={`h-1.5 w-1.5 rounded-full ${value === true ? 'bg-emerald-400' : value === false ? 'bg-amber-400' : 'bg-zinc-700'}`} />
+        <span className={`h-1.5 w-1.5 rounded-full ${value === true ? 'bg-emerald-400' : value === false ? 'bg-zinc-400' : 'bg-zinc-700'}`} />
       </button>
     );
   }

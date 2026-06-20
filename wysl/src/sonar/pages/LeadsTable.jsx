@@ -5,7 +5,8 @@ import {
   Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2,
   User, Phone, Mail, Flag, Compass, Clock, Tag, Search as SearchIcon, FileText, Activity,
   Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays, ArrowUpRight, Trash2,
-  ToggleLeft,
+  ToggleLeft, Repeat, Wrench, Briefcase, Factory, TrendingUp, Globe, Calendar, MessageSquare, Gauge,
+  Star, Heart, Zap, Award, Bookmark, Layers, Database, Cpu, Settings, Package, Truck, BarChart3, PieChart, Wifi, Anchor, Aperture,
 } from 'lucide-react';
 import {
   TABLE_COLUMNS, SOURCE_OPTIONS, CONTACT_METHOD_OPTIONS,
@@ -24,9 +25,16 @@ import FieldSettingsModal from './FieldSettingsModal';
 import ColorbarConfigModal from './ColorbarConfigModal';
 
 const ICONS = {
-  user: User, phone: Phone, mail: Mail, flag: Flag, compass: Compass, clock: Clock, tag: Tag,
-  search: SearchIcon, 'file-text': FileText, activity: Activity, users: Users, 'map-pin': MapPin,
-  map: MapIcon, shield: Shield, 'dollar-sign': DollarSign, target: Target, navigation: Navigation,
+  building: Building2, user: User, briefcase: Briefcase, factory: Factory,
+  flag: Flag, compass: Compass, target: Target, 'dollar-sign': DollarSign,
+  'trending-up': TrendingUp, mail: Mail, phone: Phone, globe: Globe,
+  'map-pin': MapPin, map: MapIcon, calendar: Calendar, clock: Clock,
+  'message-square': MessageSquare, search: SearchIcon, 'file-text': FileText, gauge: Gauge,
+  star: Star, heart: Heart, zap: Zap, shield: Shield, award: Award,
+  bookmark: Bookmark, tag: Tag, layers: Layers, database: Database, cpu: Cpu,
+  settings: Settings, wrench: Wrench, package: Package, truck: Truck, users: Users,
+  'bar-chart': BarChart3, 'pie-chart': PieChart, activity: Activity, wifi: Wifi,
+  anchor: Anchor, aperture: Aperture, repeat: Repeat, navigation: Navigation,
 };
 
 const FIELD_TYPE_ICONS = {
@@ -138,7 +146,7 @@ const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
     <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={save}
       onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
       onClick={(e) => e.stopPropagation()}
-      className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-full min-w-[60px]" />
+      className="w-full min-w-[60px] rounded-lg border border-white/[0.08] bg-white/[0.06] px-2 py-1 text-[12px] text-white transition-colors focus:border-white/[0.14] focus:outline-none" />
   ) : (
     <span onClick={(e) => { e.stopPropagation(); setEditing(true); }}
       className={`inline-flex w-full min-w-[60px] cursor-pointer hover:text-white transition-colors ${className}`}>
@@ -166,7 +174,7 @@ const InlineCurrency = ({ value, onSave }) => {
       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">$</span>
       <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^0-9.]/g, ''))}
         onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
-        className="bg-white/[0.06] border border-cyan-500/30 rounded-lg pl-6 pr-2 py-1 text-[12px] text-white focus:outline-none w-[110px]" />
+        className="w-[110px] rounded-lg border border-white/[0.08] bg-white/[0.06] pl-6 pr-2 py-1 text-[12px] text-white transition-colors focus:border-white/[0.14] focus:outline-none" />
     </div>
   ) : (
     <span onClick={(e) => { e.stopPropagation(); setEditing(true); }} className="block w-full cursor-pointer hover:text-white transition-colors tabular-nums">
@@ -189,7 +197,7 @@ const InlineNumber = ({ value, onSave, min = 0, max = 999 }) => {
   return editing ? (
     <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))}
       onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
-      onClick={(e) => e.stopPropagation()} className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-[70px] text-center" />
+      onClick={(e) => e.stopPropagation()} className="w-[70px] rounded-lg border border-white/[0.08] bg-white/[0.06] px-2 py-1 text-center text-[12px] text-white transition-colors focus:border-white/[0.14] focus:outline-none" />
   ) : (
     <span onClick={(e) => { e.stopPropagation(); setDraft(value ?? ''); setEditing(true); }} className="block w-full cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400">
       {value == null || value === '' ? '' : value}
@@ -286,7 +294,7 @@ const InlineBoolean = ({ value, onSave }) => {
   const state = current === 'yes'
     ? { label: 'Yes', dot: '#10b981', className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
     : current === 'no'
-      ? { label: 'No', dot: '#f59e0b', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' }
+      ? { label: 'No', dot: '#71717a', className: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' }
       : { label: '', dot: 'transparent', className: 'bg-transparent text-transparent border-transparent shadow-none' };
   return (
     <button
@@ -1637,10 +1645,10 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
         <button
           type="button"
           onClick={onCreateInline}
-          className="group flex h-20 w-20 items-center justify-center rounded-[24px] border border-white/[0.08] bg-white/[0.02] text-white shadow-[0_0_30px_rgba(255,255,255,0.08)] transition-transform duration-300 hover:scale-105"
-        >
-          <Plus size={40} strokeWidth={1.6} />
-        </button>
+        className="group flex h-20 w-20 items-center justify-center rounded-[24px] border border-white/[0.08] bg-white/[0.02] text-white shadow-[0_0_30px_rgba(255,255,255,0.08)] transition-transform duration-300 hover:scale-105"
+      >
+        <Plus size={40} strokeWidth={1.6} />
+      </button>
         <div className="mt-5">
           <p className="text-3xl font-semibold tracking-tight text-neutral-50">Create your first record</p>
           <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">Add your first person to start building out your database.</p>
@@ -1839,10 +1847,10 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
                       ref={columnOptionsButtonRef}
                       type="button"
                       onClick={toggleColumnOptions}
-                      className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-cyan-500/25 hover:bg-cyan-500/10 transition-all flex items-center justify-center"
+                      className="group flex h-7 w-7 items-center justify-center rounded-xl bg-white/[0.025] text-zinc-600 transition-all duration-300 hover:bg-white/[0.05] hover:text-white"
                       aria-label="Add column"
                     >
-                      <Plus size={13} />
+                      <Plus size={13} className="transition-transform duration-300 ease-out group-hover:[transform:rotateY(180deg)]" />
                     </button>
                   </div>
                   {showColumnOptions && <div className="w-[190px] shrink-0" />}
