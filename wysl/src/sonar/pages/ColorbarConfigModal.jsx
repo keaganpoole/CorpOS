@@ -112,33 +112,56 @@ const StudioSelect = ({ value, options, onChange, placeholder = 'Select...', cla
 const ColorbarPreview = ({ rule, height = 48 }) => {
   const colors = rule.colors || ['#6366f1'];
   const animation = rule.animation || 'none';
-  const isGradient = colors.length > 1;
-  const gradId = `cb-prev-${rule.id || 'new'}`;
+  const solidColor = colors[0];
 
   return (
-    <svg width="3" height={height} className="rounded-full overflow-hidden shrink-0">
-      <defs>
-        {isGradient ? (
-          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            {colors.map((c, i) => (
-              <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={c}>
-                {animation === 'sweep' && (
-                  <animate attributeName="stop-color" values={`${c};${colors[(i + 1) % colors.length]};${c}`}
-                    dur="3s" repeatCount="indefinite" begin={`${i * 0.5}s`} />
-                )}
-              </stop>
-            ))}
-          </linearGradient>
-        ) : null}
-      </defs>
-      <rect width="3" height={height} rx="1.5"
-        fill={isGradient ? `url(#${gradId})` : colors[0]}
-        opacity={animation === 'pulse' ? undefined : 1}>
-        {animation === 'pulse' && (
-          <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
-        )}
-      </rect>
-    </svg>
+    <div className="relative shrink-0 overflow-hidden rounded-full" style={{ width: 3, height }}>
+      <span
+        className="absolute pointer-events-none"
+        style={{
+          inset: '-40% -55%',
+          left: '1px',
+          top: '0%',
+          width: '2px',
+          height: '100%',
+          transform: animation === 'sweep' ? 'translateX(-115%) skewX(-16deg)' : 'none',
+          background: animation === 'pulse'
+            ? `linear-gradient(180deg, ${solidColor}00 0%, ${solidColor}32 18%, ${solidColor}66 50%, ${solidColor}32 82%, ${solidColor}00 100%)`
+            : animation === 'sweep'
+              ? `linear-gradient(110deg, transparent 34%, ${colors[0]}04 42%, ${colors[0]}12 47%, ${colors[0]}20 50%, ${colors[colors.length - 1]}2a 52%, ${colors[0]}20 55%, ${colors[0]}12 60%, ${colors[0]}04 66%, transparent 74%)`
+              : `linear-gradient(180deg, ${solidColor}00 0%, ${solidColor}18 12%, ${solidColor}30 50%, ${solidColor}18 88%, ${solidColor}00 100%)`,
+          backgroundSize: animation === 'sweep' ? '260% 100%' : '100% 100%',
+          animation: animation === 'sweep'
+            ? 'colorbarSweep 1.55s cubic-bezier(0.22, 1, 0.36, 1) infinite'
+            : animation === 'pulse'
+              ? 'colorbarPulse 1.8s ease-in-out infinite'
+              : 'none',
+          mixBlendMode: animation === 'sweep' ? 'screen' : 'normal',
+          filter: animation === 'sweep' ? 'blur(0.8px)' : 'blur(9px)',
+          opacity: animation === 'sweep' ? 0.7 : 0.3,
+        }}
+      />
+      <span
+        className="absolute inset-y-0 left-[1px] w-px rounded-full"
+        style={{
+          background: colors.length > 1
+            ? `linear-gradient(180deg, ${colors[0]}AA 0%, ${colors[0]} 12%, ${colors[colors.length - 1]} 88%, ${colors[colors.length - 1]}AA 100%)`
+            : `linear-gradient(180deg, ${solidColor}AA 0%, ${solidColor} 12%, ${solidColor} 88%, ${solidColor}AA 100%)`,
+          backgroundSize: animation === 'sweep' ? '100% 360%' : '100% 100%',
+          opacity: animation === 'pulse' ? 0.85 : 1,
+          boxShadow: animation === 'pulse'
+            ? `0 0 0 1px ${solidColor}44, 0 0 18px ${solidColor}55`
+            : animation === 'sweep'
+              ? `0 0 14px ${solidColor}45`
+              : `0 0 12px ${solidColor}35`,
+          animation: animation === 'sweep'
+            ? 'colorbarSweep 1.8s linear infinite'
+            : animation === 'pulse'
+              ? 'colorbarPulse 1.8s ease-in-out infinite'
+              : 'none',
+        }}
+      />
+    </div>
   );
 };
 

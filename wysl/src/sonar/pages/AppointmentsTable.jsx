@@ -138,7 +138,11 @@ const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
       onClick={(e) => e.stopPropagation()}
       className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-full min-w-[60px]" />
   ) : (
-    <span onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+    <span
+      tabIndex={0}
+      onFocus={() => setEditing(true)}
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setEditing(true); }}
       className={`inline-flex w-full min-w-[60px] cursor-pointer hover:text-white transition-colors ${className}`}>
       {value || (
         placeholder
@@ -173,24 +177,36 @@ const InlineCurrency = ({ value, onSave }) => {
   );
 };
 
-const InlineNumber = ({ value, onSave, min = 0, max = 999 }) => {
+const InlineNumber = ({ value, onSave, min = null, max = null }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const ref = useRef(null);
+  useEffect(() => {
+    if (editing) setDraft(value == null ? '' : String(value));
+  }, [editing, value]);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
   const save = () => {
     setEditing(false);
     if (draft === '') return onSave(null);
     const num = parseInt(draft, 10);
-    if (!Number.isNaN(num)) onSave(Math.min(Math.max(num, min), max));
+    if (Number.isNaN(num)) return;
+    const lowerBounded = Number.isFinite(min) ? Math.max(num, min) : num;
+    const bounded = Number.isFinite(max) ? Math.min(lowerBounded, max) : lowerBounded;
+    onSave(bounded);
   };
   return editing ? (
     <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))}
       onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
-      onClick={(e) => e.stopPropagation()} className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-[70px] text-center" />
+      onClick={(e) => e.stopPropagation()} className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-[70px] text-left" />
   ) : (
-    <span onClick={(e) => { e.stopPropagation(); setDraft(value ?? ''); setEditing(true); }} className="block w-full cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400">
-      {value == null || value === '' ? '' : value}
+    <span
+      tabIndex={0}
+      onFocus={() => { setDraft(value ?? ''); setEditing(true); }}
+      onClick={(e) => { e.stopPropagation(); setDraft(value ?? ''); setEditing(true); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDraft(value ?? ''); setEditing(true); } }}
+      className="inline-flex w-full min-w-[60px] cursor-pointer hover:text-white transition-colors text-[12px] text-zinc-400"
+    >
+      {value == null || value === '' ? <span className="invisible">0</span> : value}
     </span>
   );
 };
@@ -759,11 +775,11 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
       if (!field) return null;
       const value = appointment[colId];
       if (field.type === 'boolean') return <InlineBoolean value={value} onSave={(v) => autoSave(appointment.id, colId, v)} />;
-      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(appointment.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 tabular-nums">{value ?? ''}</span>;
-      if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(appointment.id, colId, v)} /> : <span className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTimestamp(value)}</span>;
-      if (field.type === 'date') return field.editable ? <InlineDateOnly value={value} onSave={(v) => autoSave(appointment.id, colId, v)} /> : <span className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatDate(value)}</span>;
-      if (field.type === 'time') return field.editable ? <InlineText value={value} onSave={(v) => autoSave(appointment.id, { time: v, end_time: computeEndTime(v, appointment.duration) })} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" /> : <span className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTime(value)}</span>;
-      if (field.type === 'computed_time') return <span className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTime(computeEndTime(appointment.time, appointment.duration))}</span>;
+      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(appointment.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 tabular-nums">{value ?? ''}</span>;
+      if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(appointment.id, colId, v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTimestamp(value)}</span>;
+      if (field.type === 'date') return field.editable ? <InlineDateOnly value={value} onSave={(v) => autoSave(appointment.id, colId, v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatDate(value)}</span>;
+      if (field.type === 'time') return field.editable ? <InlineText value={value} onSave={(v) => autoSave(appointment.id, { time: v, end_time: computeEndTime(v, appointment.duration) })} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTime(value)}</span>;
+      if (field.type === 'computed_time') return <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTime(computeEndTime(appointment.time, appointment.duration))}</span>;
       if (field.type === 'select') return <InlineSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(appointment.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
       if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(appointment.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
       return <InlineText value={value} onSave={(v) => autoSave(appointment.id, colId, v)} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
@@ -1745,20 +1761,59 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
     </div>
   );
 
-  const renderColorbar = (lead, prefix = 'cb') => {
+  const renderColorbar = (lead) => {
     const matchedRule = evaluateColorbar(lead, colorbarRules);
     if (!matchedRule) return null;
     const colors = matchedRule.colors || ['#6366f1'];
     const animation = matchedRule.animation || 'none';
-    const gradId = `${prefix}-${lead.id}`;
+    const solidColor = colors[0];
     return (
-      <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-full overflow-hidden pointer-events-none" style={{ top: '25%', bottom: '25%' }}>
-        <svg width="3" height="100%" className="block">
-          <defs>
-            {colors.length > 1 && <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">{colors.map((c, i) => <stop key={i} offset={`${(i / (colors.length - 1)) * 100}%`} stopColor={c} />)}</linearGradient>}
-          </defs>
-          <rect width="3" height="100%" rx="1.5" fill={colors.length > 1 ? `url(#${gradId})` : colors[0]}>{animation === 'pulse' && <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />}</rect>
-        </svg>
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] pointer-events-none" style={{ top: '10%', bottom: '10%' }}>
+        <span
+          className="absolute pointer-events-none"
+          style={{
+            inset: '-40% -55%',
+            left: '1px',
+            top: '0%',
+            width: '2px',
+            height: '100%',
+          transform: animation === 'sweep' ? 'translateX(-115%) skewX(-16deg)' : 'none',
+          background: animation === 'pulse'
+            ? `linear-gradient(180deg, ${solidColor}00 0%, ${solidColor}32 18%, ${solidColor}66 50%, ${solidColor}32 82%, ${solidColor}00 100%)`
+            : animation === 'sweep'
+              ? `linear-gradient(110deg, transparent 34%, ${colors[0]}04 42%, ${colors[0]}12 47%, ${colors[0]}20 50%, ${colors[colors.length - 1]}2a 52%, ${colors[0]}20 55%, ${colors[0]}12 60%, ${colors[0]}04 66%, transparent 74%)`
+              : `linear-gradient(180deg, ${solidColor}00 0%, ${solidColor}18 12%, ${solidColor}30 50%, ${solidColor}18 88%, ${solidColor}00 100%)`,
+          backgroundSize: animation === 'sweep' ? '260% 100%' : '100% 100%',
+          animation: animation === 'sweep'
+            ? 'colorbarSweep 1.55s cubic-bezier(0.22, 1, 0.36, 1) infinite'
+            : animation === 'pulse'
+              ? 'colorbarPulse 1.8s ease-in-out infinite'
+              : 'none',
+          mixBlendMode: animation === 'sweep' ? 'screen' : 'normal',
+          filter: animation === 'sweep' ? 'blur(0.8px)' : 'blur(9px)',
+          opacity: animation === 'sweep' ? 0.7 : 0.3,
+          }}
+        />
+        <span
+          className="absolute inset-y-0 left-[1px] w-px rounded-full"
+          style={{
+          background: colors.length > 1
+            ? `linear-gradient(180deg, ${colors[0]}AA 0%, ${colors[0]} 12%, ${colors[colors.length - 1]} 88%, ${colors[colors.length - 1]}AA 100%)`
+            : `linear-gradient(180deg, ${solidColor}AA 0%, ${solidColor} 12%, ${solidColor} 88%, ${solidColor}AA 100%)`,
+          backgroundSize: animation === 'sweep' ? '100% 360%' : '100% 100%',
+            opacity: animation === 'pulse' ? 0.85 : 1,
+            boxShadow: animation === 'pulse'
+              ? `0 0 0 1px ${solidColor}44, 0 0 18px ${solidColor}55`
+              : animation === 'sweep'
+                ? `0 0 14px ${solidColor}45`
+                : `0 0 12px ${solidColor}35`,
+            animation: animation === 'sweep'
+              ? 'colorbarSweep 1.8s linear infinite'
+              : animation === 'pulse'
+                ? 'colorbarPulse 1.8s ease-in-out infinite'
+                : 'none',
+          }}
+        />
       </div>
     );
   };
@@ -2214,7 +2269,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
         )}
       </AnimatePresence>
 
-      <style>{`@keyframes colorbarFlow {0% { background-position: 0% 0; }100% { background-position: 300% 0; }}`}</style>
+      <style>{`@keyframes colorbarFlow {0% { background-position: 0% 0; }100% { background-position: 300% 0; }} @keyframes colorbarSweep {0% { background-position: 0% 0%; }100% { background-position: 0% 300%; }} @keyframes colorbarPulse {0%,100% { opacity: 0.45; } 50% { opacity: 1; }}`}</style>
     </div>
   );
 };

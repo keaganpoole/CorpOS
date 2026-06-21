@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -9,7 +10,7 @@ import {
   DollarSign, TrendingUp, Mail, Phone, Globe, MapPin, Map,
   Calendar, Clock, MessageSquare, Search, FileText, Gauge,
   Star, Heart, Zap, Shield, Award, Bookmark, Tag, Layers, Plus,
-  Database, Cpu, Settings, Wrench, Package, Truck, Users, ChevronDown, GripVertical,
+  Database, Cpu, Settings, Wrench, Package, Truck, Users, ChevronDown, GripVertical, Repeat, Navigation,
   BarChart3, PieChart, Activity, Wifi, Anchor, Aperture,
 } from 'lucide-react';
 import { AVAILABLE_ICONS } from '../lib/fieldConfig';
@@ -23,10 +24,10 @@ const ICON_MAP = {
   'message-square': MessageSquare, search: Search, 'file-text': FileText,
   gauge: Gauge, star: Star, heart: Heart, zap: Zap, shield: Shield,
   award: Award, bookmark: Bookmark, tag: Tag, layers: Layers,
-  database: Database, cpu: Cpu, settings: Settings, tool: Wrench,
+  database: Database, cpu: Cpu, settings: Settings, wrench: Wrench,
   package: Package, truck: Truck, users: Users, 'bar-chart': BarChart3,
   'pie-chart': PieChart, activity: Activity, wifi: Wifi, anchor: Anchor,
-  aperture: Aperture,
+  aperture: Aperture, repeat: Repeat, navigation: Navigation,
 };
 
 const OPTION_COLORS = [
@@ -74,6 +75,8 @@ const SortableOptionRow = ({
   setOptionColors,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: optionId });
+  const colorButtonRef = useRef(null);
+  const [popoverPosition, setPopoverPosition] = useState(null);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -81,6 +84,28 @@ const SortableOptionRow = ({
     opacity: isDragging ? 0.75 : 1,
     zIndex: isDragging ? 20 : 1,
   };
+
+  const updatePopoverPosition = useCallback(() => {
+    const rect = colorButtonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = 220;
+    setPopoverPosition({
+      top: rect.bottom + 8,
+      left: Math.max(12, rect.right - width),
+      width,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isPopoverOpen) return undefined;
+    updatePopoverPosition();
+    window.addEventListener('resize', updatePopoverPosition);
+    window.addEventListener('scroll', updatePopoverPosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePopoverPosition);
+      window.removeEventListener('scroll', updatePopoverPosition, true);
+    };
+  }, [isPopoverOpen, updatePopoverPosition]);
 
   return (
     <div
@@ -143,6 +168,7 @@ const SortableOptionRow = ({
 
       <div className="flex items-center gap-2">
         <button
+          ref={colorButtonRef}
           type="button"
           onClick={() => setActiveColorOption((prev) => (prev === optionId ? '' : optionId))}
           className={`shrink-0 rounded-lg border px-2 py-1.5 transition-all ${
@@ -183,14 +209,17 @@ const SortableOptionRow = ({
         )}
       </div>
 
-      <AnimatePresence>
-        {isPopoverOpen && (
+      {createPortal(
+        <AnimatePresence>
+          {isPopoverOpen && popoverPosition && (
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -4 }}
             transition={{ duration: 0.12, ease: 'easeOut' }}
-            className="absolute right-0 top-full z-30 mt-2 w-[220px] origin-top-right rounded-xl border border-white/[0.08] bg-[#121215] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.85)]"
+            className="fixed z-[260] origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#121215] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.85)] ring-1 ring-black/40 isolate"
+            style={{ top: popoverPosition.top, left: popoverPosition.left, width: popoverPosition.width, backgroundColor: '#121215' }}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-2.5 flex items-center justify-between border-b border-white/[0.04] pb-2">
               <span className="text-[10px] font-semibold tracking-[-0.02em] text-zinc-400">Select Color</span>
@@ -235,8 +264,10 @@ const SortableOptionRow = ({
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: currentColor }} />
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 export const CUSTOM_FIELD_PREFIX = 'custom_';
 
 export const CUSTOM_FIELD_TYPES = [
-  { type: 'boolean', label: 'Boolean', icon: 'toggle' },
+  { type: 'boolean', label: 'Yes/No', icon: 'toggle' },
   { type: 'text', label: 'Text', icon: 'type' },
   { type: 'number', label: 'Number', icon: 'hash' },
   { type: 'date', label: 'Date', icon: 'calendar' },
