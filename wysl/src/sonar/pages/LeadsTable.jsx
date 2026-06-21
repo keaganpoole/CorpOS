@@ -47,6 +47,17 @@ const FIELD_TYPE_ICONS = {
 const ZONE_META_KEY = '__zones';
 const ZONE_SWATCHES = ['#22d3ee', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#f59e0b', '#10b981', '#14b8a6'];
 const isZoneEligibleColumn = (col) => Boolean(col?.label) && col.id !== 'select' && col.id !== 'avatar';
+const sanitizeColorbarRuleList = (rules = []) => (
+  (Array.isArray(rules) ? rules : [])
+    .filter((rule) => rule && typeof rule === 'object')
+    .map((rule) => ({
+      ...rule,
+      conditions: Array.isArray(rule.conditions)
+        ? rule.conditions.filter((condition) => condition && typeof condition === 'object' && condition.field)
+        : [],
+    }))
+    .filter((rule) => rule.conditions.length > 0)
+);
 
 const getSavedZones = (config) => {
   if (!Array.isArray(config?.[ZONE_META_KEY])) return [];
@@ -807,7 +818,7 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
     };
   }, [anchorRef, onClose, open, updatePosition]);
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -816,19 +827,19 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
           style={{ top: position.top, left: position.left, width }}
-          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d0d]/96 shadow-[0_24px_70px_rgba(0,0,0,0.86)] backdrop-blur-xl"
+          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d0d]/97 shadow-[0_24px_70px_rgba(0,0,0,0.86)] backdrop-blur-xl"
         >
           {children}
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 
 const ControlPopoverHeader = ({ title, caption }) => (
-  <div className="border-b border-white/[0.05] px-4 py-3">
-    <p className="text-[12px] font-semibold tracking-[-0.03em] text-white">{title}</p>
-    {caption && <p className="mt-0.5 text-[10px] font-medium tracking-[-0.01em] text-zinc-600">{caption}</p>}
+  <div className="border-b border-white/[0.05] px-4 py-2.5">
+    {caption && <p className="text-[10px] font-medium tracking-[-0.01em] text-zinc-600">{caption}</p>}
   </div>
 );
 
@@ -988,6 +999,7 @@ const LeadsTable = ({
   demoInitialViewSettings = null,
   hideTitle = false,
   searchPlaceholder = 'Search people...',
+  searchFieldClassName = '',
 }) => {
   const [viewSettings, setViewSettings] = useState(() => ({
     rowHeight: 3,
@@ -1000,7 +1012,7 @@ const LeadsTable = ({
   const [customFields, setCustomFields] = useState(() => demoMode ? demoInitialCustomFields : []);
   const [fieldConfig, setFieldConfig] = useState(() => demoMode ? { ...DEFAULT_FIELD_CONFIG, ...(demoInitialFieldConfig || {}) } : loadFieldConfig());
   const [columns, setColumns] = useState(() => buildColumns(demoMode ? demoInitialCustomFields : [], demoMode ? { ...DEFAULT_FIELD_CONFIG, ...(demoInitialFieldConfig || {}) } : DEFAULT_FIELD_CONFIG));
-  const [colorbarRules, setColorbarRules] = useState(() => demoMode ? demoInitialColorbarRules : loadColorbarRules());
+  const [colorbarRules, setColorbarRules] = useState(() => demoMode ? sanitizeColorbarRuleList(demoInitialColorbarRules) : loadColorbarRules());
   const [settingsField, setSettingsField] = useState(null);
   const [showColorbarStudio, setShowColorbarStudio] = useState(false);
   const [showColumnOptions, setShowColumnOptions] = useState(false);
@@ -1187,8 +1199,9 @@ const LeadsTable = ({
     setSettingsField(null);
   };
   const handleColorbarRulesChange = (rules) => {
-    setColorbarRules(rules);
-    if (!demoMode) saveColorbarRules(rules);
+    const nextRules = sanitizeColorbarRuleList(rules);
+    setColorbarRules(nextRules);
+    if (!demoMode) saveColorbarRules(nextRules);
   };
   const autoSave = useCallback((leadId, field, value) => onUpdateLead(leadId, { [field]: value }), [onUpdateLead]);
 
@@ -1828,7 +1841,7 @@ const LeadsTable = ({
             <GripVertical size={10} />
           </button>
         </div>
-        <div ref={horizontalScrollRef} className="min-w-0 flex-1 overflow-x-auto overflow-y-visible custom-scrollbar">
+        <div ref={horizontalScrollRef} className="crm-horizontal-scroll min-w-0 flex-1 overflow-x-auto overflow-y-visible custom-scrollbar">
           <div className="min-w-max">
             <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
               <div className="relative">
@@ -2036,7 +2049,7 @@ const LeadsTable = ({
           </button>
         </div>
         <div className="flex-1" />
-        <div className="relative w-[260px]">
+        <div className={`relative w-[260px] ${searchFieldClassName}`}>
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
           <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder={searchPlaceholder} className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-white/20 transition-colors" />
           {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
@@ -2140,7 +2153,7 @@ const LeadsTable = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{ top: columnOptionsPosition.top, left: columnOptionsPosition.left }}
-            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d0d0d]/95 shadow-[0_18px_48px_rgba(0,0,0,0.82)] backdrop-blur-xl"
+            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d0d0d]/97 shadow-[0_18px_48px_rgba(0,0,0,0.82)] backdrop-blur-xl"
           >
             <div className="py-1">
               {column_options.map((option, idx) => {

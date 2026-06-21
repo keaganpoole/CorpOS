@@ -52,7 +52,7 @@ const StudioSelect = ({ value, options, onChange, placeholder = 'Select...', cla
     };
   }, [open, updateMenuPosition]);
 
-  return (
+  return createPortal(
     <div ref={ref} className={`relative min-w-0 ${className}`}>
       <button
         type="button"
@@ -288,7 +288,7 @@ const ConditionRow = ({ condition, index, onChange, onRemove, canRemove, fields 
 
 // ─── Rule Editor ───────────────────────────────────────────────────────────
 const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const defaultField = fields[0]?.key || '';
 
   const updateRule = (updates) => onChange({ ...rule, ...updates });
@@ -456,6 +456,7 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
   const [rules, setRules] = useState([]);
   const fields = useMemo(() => buildConditionFields({ columns, customFields, fieldConfig }), [columns, customFields, fieldConfig]);
   const defaultField = fields[0]?.key || '';
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     setRules(loadColorbarRules());
@@ -465,6 +466,10 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
     if (!fields.length) return;
     setRules((current) => sanitizeRulesForFields(current, fields));
   }, [fields]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
 
   const handleUpdateRule = (index, updated) => {
     const next = [...rules];
@@ -478,7 +483,7 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
 
   const handleAddRule = () => {
     if (!defaultField) return;
-    setRules([...rules, {
+    setRules([{
       id: uid(),
       name: 'New Rule',
       enabled: true,
@@ -486,7 +491,8 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
       conditions: [{ field: defaultField, operator: 'equals', value: '' }],
       colors: ['#6366f1', '#ec4899'],
       animation: 'sweep',
-    }]);
+    }, ...rules]);
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSave = () => {
@@ -495,7 +501,7 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
     onRulesChange(nextRules);
   };
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
@@ -508,31 +514,33 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="shrink-0 px-6 pt-5 pb-4 border-b border-white/[0.04]">
-          <div className="flex items-center justify-between mb-1">
+        <div className="shrink-0 border-b border-white/[0.04] px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-500/10 to-fuchsia-500/10 border border-white/[0.06]">
                 <Wand2 size={14} className="text-cyan-400" />
               </div>
-              <div>
-                <h3 className="flex items-center gap-2 text-[14px] font-semibold tracking-[-0.03em] text-white">
+              <div className="min-w-0">
+                <h3 className="flex items-center gap-2 text-[14px] font-semibold leading-none tracking-[-0.03em] text-white">
                   Colorbar Studio
                   <Sparkles size={12} className="text-fuchsia-400" />
                 </h3>
-                <p className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Conditional Record Coloring</p>
+                <p className="mt-1 text-[11px] font-semibold leading-none tracking-[-0.02em] text-zinc-600">Conditional Record Coloring</p>
               </div>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/5 transition-all">
               <X size={14} />
             </button>
           </div>
-          <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">
-            Create rules that color records based on conditions. Rules are evaluated top-to-bottom — first match wins.
-          </p>
         </div>
 
         {/* Rules List */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-3">
+        <div ref={scrollRef} className="crm-modal-scrollbar flex-1 overflow-y-auto p-6 space-y-3">
+          <button onClick={handleAddRule} disabled={!defaultField}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[0.06] py-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 transition-all hover:border-cyan-500/20 hover:text-cyan-400">
+            <Plus size={13} /> Add Rule
+          </button>
+
           {rules.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center gap-3">
               <div className="w-14 h-14 rounded-2xl bg-white/[0.02] border border-dashed border-white/[0.06] flex items-center justify-center">
@@ -552,11 +560,6 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
             ))
           )}
 
-          {/* Add Rule */}
-          <button onClick={handleAddRule} disabled={!defaultField}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[0.06] py-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 transition-all hover:border-cyan-500/20 hover:text-cyan-400">
-            <Plus size={13} /> Add Rule
-          </button>
         </div>
 
         {/* Footer */}
@@ -574,7 +577,8 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };
 

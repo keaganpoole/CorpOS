@@ -351,7 +351,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
 
   const tabs = [
     { key: 'name', label: 'Name & Icon', icon: <Type size={12} /> },
-    ...(hasOptions ? [{ key: 'colors', label: 'Colors', icon: <Palette size={12} /> }] : []),
+    ...(hasOptions ? [{ key: 'colors', label: 'Options', icon: <Palette size={12} /> }] : []),
   ];
 
   const sensors = useSensors(
@@ -363,7 +363,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
     ? optionDrafts
     : normalizedOptions;
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -442,7 +442,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
                   </div>
                 </div>
                 <p className="mt-1.5 text-[8px] text-zinc-700">
-                  Display only - Supabase column key stays: <code className="text-zinc-500">{fieldKey}</code>
+                  Shows as the name of the column.
                 </p>
               </div>
 
@@ -587,7 +587,8 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
           </button>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };
 

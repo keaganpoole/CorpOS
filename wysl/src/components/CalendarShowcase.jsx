@@ -405,14 +405,15 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     const introFadeProgress = clamp((sectionProgress - 0.16) / 0.08, 0, 1);
     const builderFadeInProgress = clamp((sectionProgress - 0.22) / 0.08, 0, 1);
     const scenariosFeatureProgress = clamp((sectionProgress - 0.68) / 0.12, 0, 1);
+    const featuresEntered = sectionProgress >= 0.68;
     const isMessageReset = isScenariosVariant && demoResetState === 'message';
     const isIntroReset = isScenariosVariant && demoResetState === 'intro';
     const introOpacity = isMessageReset ? 0 : isIntroReset ? 1 : 1 - introFadeProgress;
     const builderDimFactor = scenariosFeatureProgress > 0.01 ? (1 - scenariosFeatureProgress * 0.52) : 1;
     const builderOpacity = isScenariosVariant && demoResetState ? 0 : builderFadeInProgress * builderDimFactor;
     const scenariosFeatureOpacity = isScenariosVariant && demoResetState ? 0 : scenariosFeatureProgress;
-    const builderBlur = isScenariosVariant && demoResetState ? 0 : (scenariosFeatureProgress > 0.01 ? 2.5 + scenariosFeatureProgress * 4.5 : 0);
-    const builderBrightness = isScenariosVariant && demoResetState ? 0 : (scenariosFeatureProgress > 0.01 ? 0.9 - scenariosFeatureProgress * 0.42 : 1);
+    const builderBlur = isScenariosVariant && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 2.5 + scenariosFeatureProgress * 4.5 : 0;
+    const builderBrightness = isScenariosVariant && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 0.9 - scenariosFeatureProgress * 0.42 : 1;
     const titleLines = isCrmVariant
       ? ['Relationship', 'CRM', 'Studio.']
       : ['Scenario', 'Workflow', 'Builder.'];
@@ -576,14 +577,14 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
 
 function RightFeatureList({ featureProgress, items }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
-  const isVisible = featureProgress > 0.08;
+  const isVisible = featureProgress > 0.12;
 
   return (
     <div className="flex h-full w-full items-center">
       <div className="mx-auto w-full max-w-[820px] text-left">
         <div className="flex flex-col">
           {items.map((item, index) => {
-            const rowVisible = isVisible && featureProgress > 0.18 + index * 0.045;
+            const rowVisible = isVisible && featureProgress > 0.24 + index * 0.075;
             const isHovered = hoveredIndex === index;
 
             return (
@@ -595,7 +596,7 @@ function RightFeatureList({ featureProgress, items }) {
                 style={{
                   opacity: rowVisible ? 1 : 0,
                   transform: rowVisible ? 'translateY(0)' : 'translateY(18px)',
-                  transition: `opacity 420ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 75}ms, transform 420ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 75}ms`,
+                  transition: `opacity 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms, transform 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms`,
                 }}
               >
                 <div

@@ -249,6 +249,8 @@ main > section:nth-of-type(5) {
     width: 100%;
     height: 100%;
     text-align: left;
+    padding-top: 36px;
+    transform: translateY(10px);
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-canvas {
     min-height: 100vh;

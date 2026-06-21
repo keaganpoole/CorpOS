@@ -203,27 +203,51 @@ const buildConditionFields = ({ columns = [], customFields = [], fieldConfig = {
     .filter(Boolean);
 };
 
-const sanitizeRulesForFields = (rules = [], fields = []) => {
+const normalizeRule = (rule, fields = []) => {
   const defaultField = fields[0]?.key || '';
-  if (!defaultField) return rules;
-  const fieldByKey = new Map(fields.map((field) => [field.key, field]));
+  if (!rule || typeof rule !== 'object') return null;
+  if (!defaultField) return null;
 
-  return rules.map((rule) => ({
-    ...rule,
-    conditions: (rule.conditions || []).map((condition) => {
-      const field = fieldByKey.get(condition.field) || fields[0];
+  const fieldByKey = new Map(fields.map((field) => [field.key, field]));
+  const nextConditions = Array.isArray(rule.conditions) ? rule.conditions : [];
+  const normalizedConditions = nextConditions
+    .map((condition) => {
+      const fallbackField = fieldByKey.get(defaultField);
+      const field = fieldByKey.get(condition?.field) || fallbackField;
+      if (!field) return null;
       const operators = OPERATORS[field.type] || OPERATORS.text;
-      const operator = operators.some((op) => op.v === condition.operator)
+      const fallbackOperator = operators[0]?.v || 'equals';
+      const operator = operators.some((op) => op.v === condition?.operator)
         ? condition.operator
-        : operators[0]?.v || 'equals';
+        : fallbackOperator;
+
       return {
-        ...condition,
+        id: condition?.id || uid(),
         field: field.key,
         operator,
-        value: field.key === condition.field ? condition.value : '',
+        value: typeof condition?.value === 'string' || typeof condition?.value === 'number' || typeof condition?.value === 'boolean'
+          ? condition.value
+          : '',
       };
-    }),
-  }));
+    })
+    .filter(Boolean);
+
+  return {
+    id: rule.id || uid(),
+    name: typeof rule.name === 'string' && rule.name.trim() ? rule.name : 'New Rule',
+    enabled: rule.enabled !== false,
+    logic: rule.logic === 'or' ? 'or' : 'and',
+    conditions: normalizedConditions.length ? normalizedConditions : [{ id: uid(), field: defaultField, operator: 'equals', value: '' }],
+    colors: Array.isArray(rule.colors) && rule.colors.length ? rule.colors : ['#6366f1', '#ec4899'],
+    animation: ['none', 'sweep', 'pulse'].includes(rule.animation) ? rule.animation : 'none',
+  };
+};
+
+const sanitizeRulesForFields = (rules = [], fields = []) => {
+  if (!fields.length) return [];
+  return rules
+    .map((rule) => normalizeRule(rule, fields))
+    .filter(Boolean);
 };
 
 const ConditionRow = ({ condition, index, onChange, onRemove, canRemove, fields }) => {
@@ -288,7 +312,7 @@ const ConditionRow = ({ condition, index, onChange, onRemove, canRemove, fields 
 
 // ─── Rule Editor ───────────────────────────────────────────────────────────
 const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const defaultField = fields[0]?.key || '';
 
   const updateRule = (updates) => onChange({ ...rule, ...updates });
@@ -456,15 +480,16 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
   const [rules, setRules] = useState([]);
   const fields = useMemo(() => buildConditionFields({ columns, customFields, fieldConfig }), [columns, customFields, fieldConfig]);
   const defaultField = fields[0]?.key || '';
+  const scrollRef = useRef(null);
 
   useEffect(() => {
-    setRules(initialRules || loadColorbarRules());
-  }, [initialRules]);
+    const sourceRules = initialRules || loadColorbarRules();
+    setRules(sanitizeRulesForFields(sourceRules, fields));
+  }, [initialRules, fields]);
 
   useEffect(() => {
-    if (!fields.length) return;
-    setRules((current) => sanitizeRulesForFields(current, fields));
-  }, [fields]);
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
 
   const handleUpdateRule = (index, updated) => {
     const next = [...rules];
@@ -478,7 +503,7 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
 
   const handleAddRule = () => {
     if (!defaultField) return;
-    setRules([...rules, {
+    setRules([{
       id: uid(),
       name: 'New Rule',
       enabled: true,
@@ -486,7 +511,8 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
       conditions: [{ field: defaultField, operator: 'equals', value: '' }],
       colors: ['#6366f1', '#ec4899'],
       animation: 'sweep',
-    }]);
+    }, ...rules]);
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSave = () => {
@@ -495,7 +521,7 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
     onRulesChange(nextRules);
   };
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
@@ -508,31 +534,33 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="shrink-0 px-6 pt-5 pb-4 border-b border-white/[0.04]">
-          <div className="flex items-center justify-between mb-1">
+        <div className="shrink-0 border-b border-white/[0.04] px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-500/10 to-fuchsia-500/10 border border-white/[0.06]">
                 <Wand2 size={14} className="text-cyan-400" />
               </div>
-              <div>
-                <h3 className="flex items-center gap-2 text-[14px] font-semibold tracking-[-0.03em] text-white">
+              <div className="min-w-0">
+                <h3 className="flex items-center gap-2 text-[14px] font-semibold leading-none tracking-[-0.03em] text-white">
                   Colorbar Studio
                   <Sparkles size={12} className="text-fuchsia-400" />
                 </h3>
-                <p className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Conditional Record Coloring</p>
+                <p className="mt-1 text-[11px] font-semibold leading-none tracking-[-0.02em] text-zinc-600">Conditional Record Coloring</p>
               </div>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-600 hover:text-white hover:bg-white/5 transition-all">
               <X size={14} />
             </button>
           </div>
-          <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">
-            Create rules that color records based on conditions. Rules are evaluated top-to-bottom — first match wins.
-          </p>
         </div>
 
         {/* Rules List */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-3">
+        <div ref={scrollRef} className="crm-modal-scrollbar flex-1 overflow-y-auto p-6 space-y-3">
+          <button onClick={handleAddRule} disabled={!defaultField}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[0.06] py-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 transition-all hover:border-cyan-500/20 hover:text-cyan-400">
+            <Plus size={13} /> Add Rule
+          </button>
+
           {rules.length === 0 ? (
             <div className="h-40 flex flex-col items-center justify-center gap-3">
               <div className="w-14 h-14 rounded-2xl bg-white/[0.02] border border-dashed border-white/[0.06] flex items-center justify-center">
@@ -551,12 +579,6 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
                 fields={fields} />
             ))
           )}
-
-          {/* Add Rule */}
-          <button onClick={handleAddRule} disabled={!defaultField}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[0.06] py-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 transition-all hover:border-cyan-500/20 hover:text-cyan-400">
-            <Plus size={13} /> Add Rule
-          </button>
         </div>
 
         {/* Footer */}
@@ -574,7 +596,8 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };
 

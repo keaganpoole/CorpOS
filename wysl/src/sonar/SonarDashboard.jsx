@@ -1936,7 +1936,7 @@ const SonarDashboard = () => {
               </button>
             </div>
 
-            <div className="flex flex-1 overflow-x-auto overflow-y-hidden px-12 py-8" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333 transparent' }}>
+            <div className="custom-scrollbar flex flex-1 overflow-x-auto overflow-y-hidden px-12 py-8">
               <div className={`flex min-w-max items-center gap-8 ${enrichedAgents.length < 3 ? 'justify-center w-full min-w-full' : 'justify-start'}`}>
                 {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
                   const reactionsMap = {};
@@ -2097,10 +2097,6 @@ const SonarDashboard = () => {
     <CallLogsProvider normalizeCall={normalizeCall}>
     <div className="flex flex-col h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #333; }
         .snap-x { scroll-snap-type: x proximity; }
         body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.015em; }
         .drag-region { -webkit-app-region: drag; }

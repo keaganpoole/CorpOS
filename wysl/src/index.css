@@ -151,6 +151,81 @@ p {
 .card-inner { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); border: 1px solid rgba(255, 255, 255, 0.05); }
 .card-scroll-area::-webkit-scrollbar, .modal-scroll-area::-webkit-scrollbar { display: none; }
 .card-scroll-area, .modal-scroll-area { -ms-overflow-style: none; scrollbar-width: none; }
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 90, 98, 0.72) rgba(255, 255, 255, 0.03);
+  scrollbar-gutter: stable;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(92, 92, 100, 0.92), rgba(72, 72, 80, 0.92));
+  border-radius: 9999px;
+  border: 2px solid rgba(7, 7, 9, 0.95);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(110, 110, 118, 0.94), rgba(82, 82, 90, 0.94));
+}
+
+.crm-horizontal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 90, 98, 0.72) rgba(255, 255, 255, 0.03);
+  scrollbar-gutter: stable;
+}
+
+.crm-horizontal-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.crm-horizontal-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9999px;
+}
+
+.crm-horizontal-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(92, 92, 100, 0.92), rgba(72, 72, 80, 0.92));
+  border-radius: 9999px;
+  border: 2px solid rgba(7, 7, 9, 0.95);
+}
+
+.crm-horizontal-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(110, 110, 118, 0.94), rgba(82, 82, 90, 0.94));
+}
+
+.crm-modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 90, 98, 0.72) rgba(255, 255, 255, 0.03);
+  scrollbar-gutter: stable;
+}
+
+.crm-modal-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.crm-modal-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9999px;
+}
+
+.crm-modal-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(92, 92, 100, 0.92), rgba(72, 72, 80, 0.92));
+  border-radius: 9999px;
+  border: 2px solid rgba(7, 7, 9, 0.95);
+}
+
+.crm-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(110, 110, 118, 0.94), rgba(82, 82, 90, 0.94));
+}
 .animate-on-scroll { opacity: 0; transform: translateY(20px) scale(0.98); filter: blur(2px); transition: opacity 0.6s cubic-bezier(0.19, 1, 0.22, 1), transform 0.6s cubic-bezier(0.19, 1, 0.22, 1), filter 0.6s cubic-bezier(0.19, 1, 0.22, 1); }
 .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 .stat-bar-bg { background-color: rgba(255, 255, 255, 0.1); cursor: pointer; }
