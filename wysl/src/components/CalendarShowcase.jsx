@@ -298,6 +298,8 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const [bookingPlayState, setBookingPlayState] = useState('idle');
   const [demoResetState, setDemoResetState] = useState(null);
   const [demoInstanceKey, setDemoInstanceKey] = useState(0);
+  const [scenarioAwaitingReentry, setScenarioAwaitingReentry] = useState(false);
+  const [crmAwaitingReentry, setCrmAwaitingReentry] = useState(false);
   const isScenariosVariant = variant === 'scenarios';
   const isCrmVariant = variant === 'people-crm';
   const featureItems = isCrmVariant ? CRM_FEATURE_ITEMS : isScenariosVariant ? SCENARIO_FEATURE_ITEMS : FEATURE_ITEMS;
@@ -384,13 +386,19 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     };
   }, []);
 
-  const calendarFadeProgress = clamp((sectionProgress - 0.31) / 0.07, 0, 1);
-  const featureFadeProgress = clamp((sectionProgress - 0.365) / 0.08, 0, 1);
-  const featureProgress = featureFadeProgress;
-  const calendarOpacity = 1 - calendarFadeProgress;
-  const featureOpacity = featureFadeProgress;
+  const calendarExited = sectionProgress >= 0.31;
+  const featureEntered = sectionProgress >= 0.365;
+  const featureProgress = featureEntered ? 1 : 0;
+  const calendarOpacity = calendarExited ? 0 : 1;
+  const featureOpacity = featureEntered ? 1 : 0;
 
   const handleDemoLimitExceeded = () => {
+    if (isScenariosVariant) {
+      setScenarioAwaitingReentry(true);
+    }
+    if (isCrmVariant) {
+      setCrmAwaitingReentry(true);
+    }
     setDemoResetState('message');
     window.setTimeout(() => {
       setDemoInstanceKey((prev) => prev + 1);
@@ -401,19 +409,37 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     }, 3400);
   };
 
+  useEffect(() => {
+    if (!isScenariosVariant || !scenarioAwaitingReentry) return;
+    if (sectionProgress <= 0.18) {
+      setScenarioAwaitingReentry(false);
+    }
+  }, [isScenariosVariant, scenarioAwaitingReentry, sectionProgress]);
+
+  useEffect(() => {
+    if (!isCrmVariant || !crmAwaitingReentry) return;
+    if (sectionProgress <= 0.18) {
+      setCrmAwaitingReentry(false);
+    }
+  }, [crmAwaitingReentry, isCrmVariant, sectionProgress]);
+
   if (isScenariosVariant || isCrmVariant) {
-    const introFadeProgress = clamp((sectionProgress - 0.16) / 0.08, 0, 1);
-    const builderFadeInProgress = clamp((sectionProgress - 0.22) / 0.08, 0, 1);
-    const scenariosFeatureProgress = clamp((sectionProgress - 0.68) / 0.12, 0, 1);
+    const introEntered = sectionProgress >= 0.16;
+    const builderEntered = sectionProgress >= 0.22;
     const featuresEntered = sectionProgress >= 0.68;
     const isMessageReset = isScenariosVariant && demoResetState === 'message';
     const isIntroReset = isScenariosVariant && demoResetState === 'intro';
-    const introOpacity = isMessageReset ? 0 : isIntroReset ? 1 : 1 - introFadeProgress;
-    const builderDimFactor = scenariosFeatureProgress > 0.01 ? (1 - scenariosFeatureProgress * 0.52) : 1;
-    const builderOpacity = isScenariosVariant && demoResetState ? 0 : builderFadeInProgress * builderDimFactor;
-    const scenariosFeatureOpacity = isScenariosVariant && demoResetState ? 0 : scenariosFeatureProgress;
-    const builderBlur = isScenariosVariant && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 2.5 + scenariosFeatureProgress * 4.5 : 0;
-    const builderBrightness = isScenariosVariant && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 0.9 - scenariosFeatureProgress * 0.42 : 1;
+    const isCrmMessageReset = isCrmVariant && demoResetState === 'message';
+    const isCrmIntroReset = isCrmVariant && demoResetState === 'intro';
+    const holdScenarioIntro = isScenariosVariant && scenarioAwaitingReentry && !isMessageReset;
+    const holdCrmIntro = isCrmVariant && crmAwaitingReentry && !isCrmMessageReset;
+    const introOpacity = isMessageReset || isCrmMessageReset ? 0 : isIntroReset || isCrmIntroReset || holdScenarioIntro || holdCrmIntro || !builderEntered ? 1 : 0;
+    const scenariosFeatureProgress = featuresEntered ? 1 : 0;
+    const builderDimFactor = scenariosFeatureProgress > 0.01 ? (1 - scenariosFeatureProgress * 0.68) : 1;
+    const builderOpacity = demoResetState || holdScenarioIntro || holdCrmIntro || !builderEntered ? 0 : builderDimFactor;
+    const scenariosFeatureOpacity = isScenariosVariant && demoResetState ? 0 : holdScenarioIntro || holdCrmIntro ? 0 : featuresEntered ? 1 : 0;
+    const builderBlur = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 3.5 + scenariosFeatureProgress * 7.5 : 0;
+    const builderBrightness = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 0.82 - scenariosFeatureProgress * 0.58 : 1;
     const titleLines = isCrmVariant
       ? ['Relationship', 'CRM', 'Studio.']
       : ['Scenario', 'Workflow', 'Builder.'];
@@ -431,7 +457,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             style={{
               opacity: introOpacity,
               visibility: introOpacity <= 0.01 ? 'hidden' : 'visible',
-              transform: `translateY(${introFadeProgress * -12}px)`,
+              transform: `translateY(${builderEntered ? -12 : 0}px)`,
             }}
           >
             <div className="mx-auto max-w-[860px] text-center">
@@ -456,12 +482,16 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             style={{
               opacity: builderOpacity,
               visibility: builderOpacity <= 0.01 ? 'hidden' : 'visible',
-              transform: `translateY(${(1 - builderFadeInProgress) * 18}px)`,
+              transform: `translateY(${builderEntered ? 0 : 18}px)`,
               filter: `blur(${builderBlur}px) brightness(${builderBrightness}) saturate(0.88)`,
             }}
           >
             {isCrmVariant ? (
-              <HomepagePeopleCrmDemo className="homepage-crm-demo" />
+              <HomepagePeopleCrmDemo
+                key={demoInstanceKey}
+                className="homepage-crm-demo"
+                onDemoLimitExceeded={handleDemoLimitExceeded}
+              />
             ) : (
               <HomepageScenariosDemo
                 key={demoInstanceKey}
@@ -475,11 +505,11 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
 
           <div
             className={`absolute inset-0 z-30 flex items-center justify-center bg-[#020202] px-6 transition-opacity duration-300 ${
-              isMessageReset ? '' : 'pointer-events-none'
+              isMessageReset || isCrmMessageReset ? '' : 'pointer-events-none'
             }`}
             style={{
-              opacity: isMessageReset ? 1 : 0,
-              visibility: isMessageReset ? 'visible' : 'hidden',
+              opacity: isMessageReset || isCrmMessageReset ? 1 : 0,
+              visibility: isMessageReset || isCrmMessageReset ? 'visible' : 'hidden',
             }}
           >
             <div className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-center text-4xl font-black tracking-[-0.04em] text-transparent md:text-7xl">
@@ -494,7 +524,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             style={{
               opacity: scenariosFeatureOpacity,
               visibility: scenariosFeatureOpacity <= 0.01 ? 'hidden' : 'visible',
-              transform: `translateY(${(1 - scenariosFeatureOpacity) * 18}px)`,
+              transform: `translateY(${featuresEntered ? 0 : 18}px)`,
             }}
           >
             <div className="mx-auto w-full max-w-[1120px]">
@@ -548,7 +578,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   style={{
                     opacity: calendarOpacity,
                     visibility: calendarOpacity <= 0.01 ? 'hidden' : 'visible',
-                    transform: `translateY(${calendarFadeProgress * -14}px) scale(${1 - calendarFadeProgress * 0.012})`,
+                    transform: `translateY(${calendarExited ? -14 : 0}px) scale(${calendarExited ? 0.988 : 1})`,
                   }}
                 >
                   <RightCalendarGrid hasAnimatedDots={hasAnimatedDots} />
@@ -561,7 +591,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   style={{
                     opacity: featureOpacity,
                     visibility: featureOpacity <= 0.01 ? 'hidden' : 'visible',
-                    transform: `translateY(${(1 - featureOpacity) * 18}px)`,
+                    transform: `translateY(${featureEntered ? 0 : 18}px)`,
                   }}
                 >
                   <RightFeatureList featureProgress={featureProgress} items={featureItems} />

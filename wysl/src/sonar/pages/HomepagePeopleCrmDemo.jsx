@@ -483,11 +483,17 @@ const createInitialRows = () => [
   }, '2026-06-07T18:16:10.433Z'),
 ];
 
-const HomepagePeopleCrmDemo = ({ className = '' }) => {
+const HomepagePeopleCrmDemo = ({ className = '', onDemoLimitExceeded }) => {
   const [rows, setRows] = useState(() => createInitialRows());
   const [selectedId, setSelectedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [justAddedIds, setJustAddedIds] = useState([]);
+
+  React.useEffect(() => {
+    if (rows.length > 14) {
+      onDemoLimitExceeded?.();
+    }
+  }, [onDemoLimitExceeded, rows.length]);
 
   const filteredRows = useMemo(() => {
     if (!searchQuery.trim()) return rows;
