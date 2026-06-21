@@ -1,14 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import { useLeads } from '../hooks/useLeads';
 import LeadsTable from './LeadsTable';
-import LeadDetailPanel from './LeadDetailPanel';
 
 const PeoplePage = () => {
   const {
     leads, allLeads, loading, error,
     justAddedLeadIds,
-    selectedId, setSelectedId, selectedLead,
+    selectedId, setSelectedId,
     searchQuery, setSearchQuery,
     sourceFilter, setSourceFilter,
     sortBy, sortDir, handleSort,
@@ -30,18 +28,7 @@ const PeoplePage = () => {
   const handleSaveNew = async (data) => {
     const result = await createLead(data);
     setCreating(false);
-    setSelectedId(result.id);
     return result;
-  };
-
-  const handleSaveExisting = async (data) => {
-    if (!selectedId) return;
-    const updates = {};
-    for (const key of Object.keys(data)) {
-      if (key === 'id' || key === 'created_at') continue;
-      updates[key] = data[key];
-    }
-    return await updateLead(selectedId, updates);
   };
 
   // Inline edit autosave — no debounce, instant save
@@ -53,13 +40,11 @@ const PeoplePage = () => {
     }
   }, [updateLead]);
 
-  const handleDelete = async () => { if (!selectedId) return; await deleteLead(selectedId); setSelectedId(null); };
   const handleDeleteMany = async (ids) => {
     for (const id of ids) {
       await deleteLead(id);
     }
   };
-  const handleClosePanel = () => { setSelectedId(null); setCreating(false); };
 
   return (
     <div className="flex h-full bg-[#020202] relative overflow-hidden">
@@ -76,7 +61,6 @@ const PeoplePage = () => {
       <LeadsTable
         leads={leads} loading={loading} selectedId={selectedId}
         justAddedLeadIds={justAddedLeadIds}
-        onSelect={(id) => { setSelectedId(id); setCreating(false); }}
         searchQuery={searchQuery} onSearchChange={setSearchQuery}
         sourceFilter={sourceFilter} onSourceFilterChange={setSourceFilter}
         sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
@@ -86,21 +70,6 @@ const PeoplePage = () => {
         onUpdateLead={handleInlineUpdate}
         onSchemaChange={setTableSchema}
       />
-
-      {/* Detail Panel (no backdrop blur) */}
-      <AnimatePresence>
-        {(selectedLead || creating) && (
-          <LeadDetailPanel
-            key={creating ? 'new' : selectedId}
-            lead={creating ? null : selectedLead}
-            isNew={creating}
-            onSave={creating ? handleSaveNew : handleSaveExisting}
-            onDelete={creating ? handleClosePanel : handleDelete}
-            onClose={handleClosePanel}
-            tableSchema={tableSchema}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 };

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2,
   User, Phone, Mail, Flag, Compass, Clock, Tag, Search as SearchIcon, FileText, Activity,
-  Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays, ArrowUpRight, Trash2,
+  Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays, Trash2,
   ToggleLeft,
 } from 'lucide-react';
 import {
@@ -732,20 +732,7 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
       );
     }
     case 'avatar': {
-      return (
-        <div className="relative shrink-0 h-8 w-6 flex items-center justify-center">
-          {!selection?.anySelected && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onSelect(appointment.id); }}
-              className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-zinc-600 hover:text-white"
-              aria-label="Expand record"
-            >
-              <ArrowUpRight size={15.5} />
-            </button>
-          )}
-        </div>
-      );
+      return <div className="relative shrink-0 h-8 w-6 flex items-center justify-center" />;
     }
     case 'person_id':
       return (
@@ -2204,17 +2191,6 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={() => {
-                onSelect(contextMenu.appointmentId);
-                setContextMenu(null);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 hover:bg-white/[0.05]"
-            >
-              <ArrowUpRight size={11} className="text-zinc-500" />
-              Expand record
-            </button>
             <button
               type="button"
               onClick={() => handleDeleteRecords(anySelected ? selectedIds : [contextMenu.appointmentId])}

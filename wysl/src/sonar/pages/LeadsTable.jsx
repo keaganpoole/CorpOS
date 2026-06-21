@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2,
   User, Phone, Mail, Flag, Compass, Clock, Tag, Search as SearchIcon, FileText, Activity,
-  Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays, ArrowUpRight, Trash2,
+  Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays, Trash2,
   ToggleLeft, Repeat, Wrench, Briefcase, Factory, TrendingUp, Globe, Calendar, MessageSquare, Gauge,
   Star, Heart, Zap, Award, Bookmark, Layers, Database, Cpu, Settings, Package, Truck, BarChart3, PieChart, Wifi, Anchor, Aperture,
 } from 'lucide-react';
@@ -46,7 +46,6 @@ const FIELD_TYPE_ICONS = {
 
 const ZONE_META_KEY = '__zones';
 const ZONE_SWATCHES = ['#22d3ee', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#f59e0b', '#10b981', '#14b8a6'];
-
 const isZoneEligibleColumn = (col) => Boolean(col?.label) && col.id !== 'select' && col.id !== 'avatar';
 
 const getSavedZones = (config) => {
@@ -636,20 +635,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       );
     }
     case 'avatar': {
-      return (
-        <div className="relative shrink-0 h-8 w-6 flex items-center justify-center">
-          {!selection?.anySelected && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onSelect(lead.id); }}
-              className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-zinc-600 hover:text-white"
-              aria-label="Expand record"
-            >
-              <ArrowUpRight size={15.5} />
-            </button>
-          )}
-        </div>
-      );
+      return <div className="relative shrink-0 h-8 w-6 flex items-center justify-center" />;
     }
     case 'contact':
       return (
@@ -977,19 +963,44 @@ const RowHeightPopover = ({ value, onChange }) => {
   );
 };
 
-const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateInline, onDeleteMany, totalCount, onUpdateLead, onSchemaChange }) => {
+const LeadsTable = ({
+  leads,
+  loading,
+  justAddedLeadIds = [],
+  selectedId,
+  onSelect,
+  searchQuery,
+  onSearchChange,
+  sourceFilter,
+  onSourceFilterChange,
+  sortBy,
+  sortDir,
+  onSort,
+  onCreateInline,
+  onDeleteMany,
+  totalCount,
+  onUpdateLead,
+  onSchemaChange,
+  demoMode = false,
+  demoInitialCustomFields = [],
+  demoInitialFieldConfig = null,
+  demoInitialColorbarRules = [],
+  demoInitialViewSettings = null,
+  hideTitle = false,
+  searchPlaceholder = 'Search people...',
+}) => {
   const [viewSettings, setViewSettings] = useState(() => ({
     rowHeight: 3,
     sortRules: [],
     frozenCount: 0,
-    ...loadPeopleTableView(),
+    ...(demoMode ? (demoInitialViewSettings || {}) : loadPeopleTableView()),
   }));
   const density = viewSettings.rowHeight ?? 3;
-  const [businessId, setBusinessId] = useState(null);
-  const [customFields, setCustomFields] = useState([]);
-  const [fieldConfig, setFieldConfig] = useState(() => loadFieldConfig());
-  const [columns, setColumns] = useState(() => buildColumns([], DEFAULT_FIELD_CONFIG));
-  const [colorbarRules, setColorbarRules] = useState(() => loadColorbarRules());
+  const [businessId, setBusinessId] = useState(demoMode ? 'demo' : null);
+  const [customFields, setCustomFields] = useState(() => demoMode ? demoInitialCustomFields : []);
+  const [fieldConfig, setFieldConfig] = useState(() => demoMode ? { ...DEFAULT_FIELD_CONFIG, ...(demoInitialFieldConfig || {}) } : loadFieldConfig());
+  const [columns, setColumns] = useState(() => buildColumns(demoMode ? demoInitialCustomFields : [], demoMode ? { ...DEFAULT_FIELD_CONFIG, ...(demoInitialFieldConfig || {}) } : DEFAULT_FIELD_CONFIG));
+  const [colorbarRules, setColorbarRules] = useState(() => demoMode ? demoInitialColorbarRules : loadColorbarRules());
   const [settingsField, setSettingsField] = useState(null);
   const [showColorbarStudio, setShowColorbarStudio] = useState(false);
   const [showColumnOptions, setShowColumnOptions] = useState(false);
@@ -1024,12 +1035,13 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
   const updateViewSettings = useCallback((updates) => {
     setViewSettings((current) => {
       const next = { ...current, ...(typeof updates === 'function' ? updates(current) : updates) };
-      savePeopleTableView(next);
+      if (!demoMode) savePeopleTableView(next);
       return next;
     });
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
+    if (demoMode) return undefined;
     let active = true;
     const load = async () => {
       try {
@@ -1049,7 +1061,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
     };
     load();
     return () => { active = false; };
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
     setColumns((prev) => {
@@ -1112,7 +1124,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
 
   const persistFieldConfig = async (next) => {
     setFieldConfig(next);
-    if (!businessId) return;
+    if (demoMode || !businessId) return;
     try {
       await saveFieldConfig(businessId, next);
     } catch (err) {
@@ -1131,7 +1143,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
       setColumns((prev) => prev.map((col) => (
         col.id === key ? { ...col, label: config.name || col.label } : col
       )));
-      if (businessId) {
+      if (!demoMode && businessId) {
         const fieldMeta = customFields.find((field) => field.key === key);
         const previousOptions = Array.isArray(fieldMeta?.options) ? fieldMeta.options : [];
         const nextOptions = Array.isArray(config.options) ? config.options : previousOptions;
@@ -1162,7 +1174,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
       persistFieldConfig(remainingFieldConfig);
       setColumns((prev) => prev.filter((col) => col.id !== key));
       setCustomFields((prev) => prev.filter((field) => field.key !== key));
-      if (businessId) {
+      if (!demoMode && businessId) {
         deleteCustomField(key, businessId).catch((err) => {
           console.error('[LeadsTable] Failed to delete custom field:', err.message);
         });
@@ -1174,12 +1186,39 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
 
     setSettingsField(null);
   };
-  const handleColorbarRulesChange = (rules) => { setColorbarRules(rules); saveColorbarRules(rules); };
+  const handleColorbarRulesChange = (rules) => {
+    setColorbarRules(rules);
+    if (!demoMode) saveColorbarRules(rules);
+  };
   const autoSave = useCallback((leadId, field, value) => onUpdateLead(leadId, { [field]: value }), [onUpdateLead]);
 
   const handleCreateColumn = async (type) => {
     if (!businessId) return;
-    const nextField = await createCustomField(type, customFields, businessId);
+    const countForType = customFields.filter((field) => field.type === type).length + 1;
+    const tableWidth = {
+      boolean: '110px',
+      text: '180px',
+      number: '120px',
+      date: '150px',
+      select: '140px',
+      multi_select: '220px',
+    }[type] || '160px';
+    const nextField = demoMode
+      ? {
+          key: `custom_${type}_${Date.now()}`,
+          label: `${type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())} Field ${countForType}`,
+          description: '',
+          type,
+          options: [],
+          table: true,
+          editable: true,
+          tableWidth,
+          position: customFields.length,
+          config: { tableWidth, description: '', options: [] },
+          id: `demo_${Date.now()}`,
+          createdAt: new Date().toISOString(),
+        }
+      : await createCustomField(type, customFields, businessId);
     const nextFields = [...customFields, nextField];
     setCustomFields(nextFields);
     setColumns((prev) => [
@@ -1195,7 +1234,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
     setFieldConfig((prev) => {
       const icon = { boolean: 'shield', text: 'file-text', number: 'activity', date: 'clock', select: 'tag', multi_select: 'layers' }[type] || 'tag';
       const next = { ...prev, [nextField.key]: { name: nextField.label, icon } };
-      if (businessId) {
+      if (!demoMode && businessId) {
         saveFieldConfig(businessId, next).catch((err) => {
           console.error('[LeadsTable] Failed to save new field config:', err.message);
         });
@@ -1314,7 +1353,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
       const [moved] = next.splice(fromIndex, 1);
       if (!moved) return prev;
       next.splice(toIndex, 0, moved);
-      if (businessId) {
+      if (!demoMode && businessId) {
         const orderedCustomKeys = next.filter((col) => col.custom).map((col) => col.id);
         updateCustomFieldPositions(businessId, orderedCustomKeys).catch((err) => {
           console.error('[LeadsTable] Failed to persist custom field positions:', err.message);
@@ -1326,7 +1365,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
       }
       return next;
     });
-  }, [businessId]);
+  }, [businessId, demoMode]);
 
   const resetColumnOrder = useCallback(() => {
     setColumns(buildColumns(customFields, fieldConfig));
@@ -1706,7 +1745,9 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
       </button>
         <div className="mt-5">
           <p className="text-3xl font-semibold tracking-tight text-neutral-50">Create your first record</p>
-          <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">Add your first person to start building out your database.</p>
+          <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">
+            {hideTitle ? 'Add your first record to start building out your database.' : 'Add your first person to start building out your database.'}
+          </p>
         </div>
       </div>
     </div>
@@ -1978,10 +2019,12 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
     <div className="flex-1 flex flex-col min-w-0 h-full">
       <div className="shrink-0 px-8 py-5 flex items-center gap-3">
         <div className="flex items-center gap-3">
-          <div>
-            <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">People</h2>
-            <p className="text-[11px] text-zinc-600 mt-0.5">{totalCount} People</p>
-          </div>
+          {!hideTitle && (
+            <div>
+              <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">People</h2>
+              <p className="text-[11px] text-zinc-600 mt-0.5">{totalCount} People</p>
+            </div>
+          )}
           <button onClick={() => setShowColorbarStudio(true)} className="group/colorbar relative ml-2 flex items-center gap-2 rounded-xl px-4 py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 transition-all hover:text-white">
             <div className="absolute rounded-xl opacity-0 group-hover/colorbar:opacity-100 transition-opacity duration-300 pointer-events-none overflow-hidden" style={{ inset: '-0.7px' }}>
               <div className="absolute inset-0 animate-[colorbarFlow_3s_linear_infinite]" style={{ background: 'linear-gradient(90deg, #22d3ee, #d946ef, #f59e0b, #22d3ee, #22d3ee, #d946ef, #f59e0b)', backgroundSize: '300% 100%' }} />
@@ -1995,7 +2038,7 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
         <div className="flex-1" />
         <div className="relative w-[260px]">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search people..." className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-white/20 transition-colors" />
+          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder={searchPlaceholder} className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-white/20 transition-colors" />
           {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
         </div>
       </div>
@@ -2082,17 +2125,6 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
           >
             <button
               type="button"
-              onClick={() => {
-                onSelect(contextMenu.leadId);
-                setContextMenu(null);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 hover:bg-white/[0.05]"
-            >
-              <ArrowUpRight size={11} className="text-zinc-500" />
-              Expand record
-            </button>
-            <button
-              type="button"
               onClick={() => handleDeleteRecords(anySelected ? selectedIds : [contextMenu.leadId])}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-rose-400 hover:bg-rose-500/[0.08]"
             >
@@ -2141,6 +2173,8 @@ const LeadsTable = ({ leads, loading, justAddedLeadIds = [], selectedId, onSelec
             columns={columns}
             customFields={customFields}
             fieldConfig={fieldConfig}
+            initialRules={demoMode ? colorbarRules : null}
+            disablePersistence={demoMode}
           />
         )}
       </AnimatePresence>

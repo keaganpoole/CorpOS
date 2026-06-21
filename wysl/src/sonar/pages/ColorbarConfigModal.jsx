@@ -452,14 +452,14 @@ const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
 };
 
 // ─── Main Colorbar Config Modal ────────────────────────────────────────────
-const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customFields = [], fieldConfig = {} }) => {
+const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customFields = [], fieldConfig = {}, initialRules = null, disablePersistence = false }) => {
   const [rules, setRules] = useState([]);
   const fields = useMemo(() => buildConditionFields({ columns, customFields, fieldConfig }), [columns, customFields, fieldConfig]);
   const defaultField = fields[0]?.key || '';
 
   useEffect(() => {
-    setRules(loadColorbarRules());
-  }, []);
+    setRules(initialRules || loadColorbarRules());
+  }, [initialRules]);
 
   useEffect(() => {
     if (!fields.length) return;
@@ -491,7 +491,7 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
 
   const handleSave = () => {
     const nextRules = sanitizeRulesForFields(rules, fields);
-    saveColorbarRules(nextRules);
+    if (!disablePersistence) saveColorbarRules(nextRules);
     onRulesChange(nextRules);
   };
 

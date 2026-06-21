@@ -245,6 +245,11 @@ main > section:nth-of-type(5) {
 .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page {
     min-height: 100vh;
 }
+.scenario-demo-showcase .homepage-crm-demo {
+    width: 100%;
+    height: 100%;
+    text-align: left;
+}
 .scenario-demo-showcase .homepage-scenarios-builder .sb-canvas {
     min-height: 100vh;
 }

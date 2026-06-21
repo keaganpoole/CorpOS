@@ -108,7 +108,7 @@ const pageDefinitions = [
     ],
     subMetricLabel: 'Intent Alignment',
     subMetricValue: '83%',
-    accent: '#32f0d9',
+    accent: 'linear-gradient(135deg, #7c3aed 0%, #c026d3 100%)',
     component: CRMPage,
     icon: CRMIcon,
   },

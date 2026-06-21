@@ -1,14 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import { useAppointments } from '../hooks/useAppointments';
 import AppointmentsTable from './AppointmentsTable';
-import AppointmentDetailPanel from './AppointmentDetailPanel';
 
 const AppointmentsPage = () => {
   const {
     appointments, allAppointments, people, services, receptionists, lookups, loading, error,
     justAddedAppointmentIds,
-    selectedId, setSelectedId, selectedAppointment,
+    selectedId, setSelectedId,
     searchQuery, setSearchQuery,
     sourceFilter, setSourceFilter,
     sortBy, sortDir, handleSort,
@@ -26,18 +24,7 @@ const AppointmentsPage = () => {
   const handleSaveNew = async (data) => {
     const result = await createAppointment(data);
     setCreating(false);
-    setSelectedId(result.id);
     return result;
-  };
-
-  const handleSaveExisting = async (data) => {
-    if (!selectedId) return;
-    const updates = {};
-    for (const key of Object.keys(data)) {
-      if (key === 'id' || key === 'created_at') continue;
-      updates[key] = data[key];
-    }
-    return await updateAppointment(selectedId, updates);
   };
 
   const handleInlineUpdate = useCallback(async (appointmentId, updates) => {
@@ -48,21 +35,10 @@ const AppointmentsPage = () => {
     }
   }, [updateAppointment]);
 
-  const handleDelete = async () => {
-    if (!selectedId) return;
-    await deleteAppointment(selectedId);
-    setSelectedId(null);
-  };
-
   const handleDeleteMany = async (ids) => {
     for (const id of ids) {
       await deleteAppointment(id);
     }
-  };
-
-  const handleClosePanel = () => {
-    setSelectedId(null);
-    setCreating(false);
   };
 
   return (
@@ -79,7 +55,6 @@ const AppointmentsPage = () => {
         loading={loading}
         selectedId={selectedId}
         justAddedAppointmentIds={justAddedAppointmentIds}
-        onSelect={(id) => { setSelectedId(id); setCreating(false); }}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         sourceFilter={sourceFilter}
@@ -97,24 +72,6 @@ const AppointmentsPage = () => {
         receptionists={receptionists}
         lookups={lookups}
       />
-
-      <AnimatePresence>
-        {(selectedAppointment || creating) && (
-          <AppointmentDetailPanel
-            key={creating ? 'new' : selectedId}
-            appointment={creating ? null : selectedAppointment}
-            isNew={creating}
-            onSave={creating ? handleSaveNew : handleSaveExisting}
-            onDelete={creating ? handleClosePanel : handleDelete}
-            onClose={handleClosePanel}
-            tableSchema={tableSchema}
-            people={people}
-            services={services}
-            receptionists={receptionists}
-            lookups={lookups}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 };

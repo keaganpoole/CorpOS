@@ -5,11 +5,14 @@ import {
   CreditCard,
   Database,
   GitBranch,
+  Layers,
   PlayCircle,
   TimerReset,
+  Users,
   Workflow,
 } from 'lucide-react';
 import HomepageScenariosDemo from '../sonar/pages/Scenarios/HomepageScenariosDemo';
+import HomepagePeopleCrmDemo from '../sonar/pages/HomepagePeopleCrmDemo';
 
 const HERO_COLORS = ['#818cf8', '#2dd4bf', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#34d399'];
 const AVATAR_URLS = [
@@ -179,6 +182,57 @@ const SCENARIO_FEATURE_ITEMS = [
   },
 ];
 
+const CRM_FEATURE_ITEMS = [
+  {
+    icon: <Database className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-cyan-300" />,
+    colorClass: 'bg-cyan-400',
+    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
+    hoverTextClass: 'group-hover:text-cyan-300',
+    title: 'Fully Editable Records',
+    copy: 'Edit names, phones, emails, custom fields, select fields, dates, numbers, and yes/no values directly inside the grid with immediate in-row feedback.',
+  },
+  {
+    icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-violet-300" />,
+    colorClass: 'bg-violet-500',
+    glowClass: 'shadow-[0_0_12px_rgba(139,92,246,0.6)]',
+    hoverTextClass: 'group-hover:text-violet-400',
+    title: 'Custom Columns',
+    copy: 'Add text, number, date, select, multi-select, and yes/no fields, then rename, configure, hide, reorder, and resize the table around how the business works.',
+  },
+  {
+    icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
+    colorClass: 'bg-emerald-500',
+    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
+    hoverTextClass: 'group-hover:text-emerald-400',
+    title: 'Colorbar Rules',
+    copy: 'Build visual rules from any visible field so high-priority records, active members, follow-ups, or risky accounts are marked instantly as the table changes.',
+  },
+  {
+    icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6 group-hover:stroke-fuchsia-300" />,
+    colorClass: 'bg-fuchsia-500',
+    glowClass: 'shadow-[0_0_12px_rgba(217,70,239,0.6)]',
+    hoverTextClass: 'group-hover:text-fuchsia-400',
+    title: 'Column Zones',
+    copy: 'Group related columns with draggable zone bars, color-code those groups, and keep dense CRM tables readable without changing the underlying record data.',
+  },
+  {
+    icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-amber-300" />,
+    colorClass: 'bg-amber-400',
+    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
+    hoverTextClass: 'group-hover:text-amber-400',
+    title: 'Saved Table Controls',
+    copy: 'Sort, hide, show, reorder, freeze, and adjust row height from the same compact controls used in the working CRM.',
+  },
+  {
+    icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-rose-300" />,
+    colorClass: 'bg-rose-500',
+    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
+    hoverTextClass: 'group-hover:text-rose-400',
+    title: 'Operational Data Model',
+    copy: 'Track contact details, membership state, preferred staff, primary service category, activity fields, payment context, and custom business-specific fields together.',
+  },
+];
+
 const getTagColor = (tag) => TAG_COLORS[tag] || HERO_COLORS[0];
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -245,7 +299,8 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const [demoResetState, setDemoResetState] = useState(null);
   const [demoInstanceKey, setDemoInstanceKey] = useState(0);
   const isScenariosVariant = variant === 'scenarios';
-  const featureItems = isScenariosVariant ? SCENARIO_FEATURE_ITEMS : FEATURE_ITEMS;
+  const isCrmVariant = variant === 'people-crm';
+  const featureItems = isCrmVariant ? CRM_FEATURE_ITEMS : isScenariosVariant ? SCENARIO_FEATURE_ITEMS : FEATURE_ITEMS;
 
   useEffect(() => {
     const root = rootRef.current;
@@ -346,18 +401,24 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     }, 3400);
   };
 
-  if (isScenariosVariant) {
+  if (isScenariosVariant || isCrmVariant) {
     const introFadeProgress = clamp((sectionProgress - 0.16) / 0.08, 0, 1);
     const builderFadeInProgress = clamp((sectionProgress - 0.22) / 0.08, 0, 1);
     const scenariosFeatureProgress = clamp((sectionProgress - 0.68) / 0.12, 0, 1);
-    const isMessageReset = demoResetState === 'message';
-    const isIntroReset = demoResetState === 'intro';
+    const isMessageReset = isScenariosVariant && demoResetState === 'message';
+    const isIntroReset = isScenariosVariant && demoResetState === 'intro';
     const introOpacity = isMessageReset ? 0 : isIntroReset ? 1 : 1 - introFadeProgress;
     const builderDimFactor = scenariosFeatureProgress > 0.01 ? (1 - scenariosFeatureProgress * 0.52) : 1;
-    const builderOpacity = demoResetState ? 0 : builderFadeInProgress * builderDimFactor;
-    const scenariosFeatureOpacity = demoResetState ? 0 : scenariosFeatureProgress;
-    const builderBlur = demoResetState ? 0 : (scenariosFeatureProgress > 0.01 ? 2.5 + scenariosFeatureProgress * 4.5 : 0);
-    const builderBrightness = demoResetState ? 0 : (scenariosFeatureProgress > 0.01 ? 0.9 - scenariosFeatureProgress * 0.42 : 1);
+    const builderOpacity = isScenariosVariant && demoResetState ? 0 : builderFadeInProgress * builderDimFactor;
+    const scenariosFeatureOpacity = isScenariosVariant && demoResetState ? 0 : scenariosFeatureProgress;
+    const builderBlur = isScenariosVariant && demoResetState ? 0 : (scenariosFeatureProgress > 0.01 ? 2.5 + scenariosFeatureProgress * 4.5 : 0);
+    const builderBrightness = isScenariosVariant && demoResetState ? 0 : (scenariosFeatureProgress > 0.01 ? 0.9 - scenariosFeatureProgress * 0.42 : 1);
+    const titleLines = isCrmVariant
+      ? ['Relationship', 'CRM', 'Studio.']
+      : ['Scenario', 'Workflow', 'Builder.'];
+    const description = isCrmVariant
+      ? 'Work directly inside a dense, configurable CRM grid with editable records, custom fields, visual color rules, zones, sorting, freezing, and row controls.'
+      : 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.';
 
     return (
       <div ref={rootRef} className="calendar-showcase scenario-demo-showcase relative h-[250vh] w-full">
@@ -374,14 +435,15 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
           >
             <div className="mx-auto max-w-[860px] text-center">
               <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.8rem]">
-                Scenario
-                <br />
-                Workflow
-                <br />
-                Builder.
+                {titleLines.map((line, index) => (
+                  <React.Fragment key={line}>
+                    {line}
+                    {index < titleLines.length - 1 && <br />}
+                  </React.Fragment>
+                ))}
               </h2>
               <div className="mx-auto mt-6 max-w-[760px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-zinc-300 md:text-xl">
-                Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.
+                {description}
               </div>
             </div>
           </div>
@@ -397,13 +459,17 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               filter: `blur(${builderBlur}px) brightness(${builderBrightness}) saturate(0.88)`,
             }}
           >
-            <HomepageScenariosDemo
-              key={demoInstanceKey}
-              demoMode
-              demoMaxNodes={4}
-              onDemoLimitExceeded={handleDemoLimitExceeded}
-              className="homepage-scenarios-builder"
-            />
+            {isCrmVariant ? (
+              <HomepagePeopleCrmDemo className="homepage-crm-demo" />
+            ) : (
+              <HomepageScenariosDemo
+                key={demoInstanceKey}
+                demoMode
+                demoMaxNodes={4}
+                onDemoLimitExceeded={handleDemoLimitExceeded}
+                className="homepage-scenarios-builder"
+              />
+            )}
           </div>
 
           <div

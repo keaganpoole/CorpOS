@@ -465,6 +465,10 @@ const HomePage = () => {
         </section>
 
         <section className="content-section content-section--showcase dark-bg text-center">
+          <CalendarShowcase variant="people-crm" />
+        </section>
+
+        <section className="content-section content-section--showcase dark-bg text-center">
           <CalendarShowcase />
         </section>
 
