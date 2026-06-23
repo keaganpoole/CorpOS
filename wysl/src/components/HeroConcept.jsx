@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -213,15 +213,6 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   const innerRef = useRef(null);
   const shouldPause = isPlaying !== null || isHoveringVoice;
 
-  const { scrollY } = useScroll();
-  const heroHeight = typeof window !== 'undefined' ? window.innerHeight * 1.3 : 1300;
-  const scrollYProgress = useTransform(scrollY, [0, heroHeight], [0, 1]);
-  const scale = useTransform(scrollYProgress, [0, 0.15, 0.4, 0.7, 1], [1, 1.03, 1.08, 1.18, 1.3]);
-  const opacity = useTransform(scrollYProgress, [0, 0.4, 0.7, 1], [1, 1, 0.6, 0]);
-  const motionBlur = useTransform(scrollYProgress, [0.3, 0.8, 1], [0, 4, 10]);
-  const backdropBlur = useTransform(scrollYProgress, [0.4, 0.9], [0, 20]);
-  const backdropOpacity = useTransform(scrollYProgress, [0.3, 0.7], [0, 0.3]);
-
   const active = receptionists[index] || receptionists[0];
   const activeGradient = HERO_GRADIENT;
   const activeIcon = pickTraitIcon(active.traits, active.stereotype);
@@ -256,15 +247,10 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
 
   const sliderFrame = (
     <motion.div
-      style={embedded ? undefined : { scale, opacity, filter: useTransform(motionBlur, (v) => `blur(${v}px)`) }}
-      className="relative h-full w-full origin-bottom bg-black"
+      className="relative isolate h-full w-full origin-bottom bg-black"
     >
           <motion.div
-            style={embedded ? { opacity: 0 } : {
-              opacity: backdropOpacity,
-              backdropFilter: useTransform(backdropBlur, (v) => `blur(${v}px)`),
-              WebkitBackdropFilter: useTransform(backdropBlur, (v) => `blur(${v}px)`),
-            }}
+            style={{ opacity: 0 }}
             className="pointer-events-none absolute inset-0 z-20 bg-white/[0.05]"
           />
 
@@ -365,10 +351,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                     )}
 
                     {!embedded && (
-                      <motion.div
-                        style={{ opacity: useTransform(scrollYProgress, [0, 0.15], [1, 0]) }}
-                        className="mt-4 flex flex-col items-start gap-2 pointer-events-none"
-                      >
+                      <motion.div className="mt-4 flex flex-col items-start gap-2 pointer-events-none">
                         <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/30">Scroll</p>
                         <div className="h-8 w-[1px] animate-pulse bg-gradient-to-b from-white/30 to-transparent" />
                       </motion.div>

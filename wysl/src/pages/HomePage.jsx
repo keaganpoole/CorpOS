@@ -239,11 +239,11 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     };
   }, []);
 
-  const crmOpacity = sectionProgress < 0.42 ? 1 : 0;
-  const receptionistOpacity = sectionProgress < 0.42 ? 0 : 1;
+  const crmOpacity = sectionProgress < 0.32 ? 1 : 0;
+  const receptionistOpacity = sectionProgress < 0.32 ? 0 : 1;
 
   return (
-    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[240vh] bg-[#020202]">
+    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[190vh] bg-[#020202]">
       <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
         <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -260,10 +260,10 @@ const StackedHeroShowcase = ({ sectionRef }) => {
           <div className="relative z-10 mx-auto w-full max-w-[1300px] text-center md:px-10 lg:px-12">
             <div className="mx-auto max-w-[1100px]">
               <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-4xl font-black leading-[0.95] tracking-[-0.06em] text-transparent md:text-7xl lg:text-[6.2rem]">
-                One. Stunning. CRM.
+                Meet Your AI Receptionist
               </h2>
               <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
-                Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.
+                Deploy an AI Receptionist that makes and receives calls, books appointments, processes payments, manages your CRM, and supports customers 24/7. Handle multiple conversations simultaneously with incredibly natural, human-like interactions that deliver a level of speed, availability, and consistency traditional staffing simply can't match—all at a fraction of the cost.
               </div>
             </div>
           </div>
@@ -277,7 +277,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
             transform: 'translateY(0)',
           }}
         >
-          <HeroConcept embedded />
+          <HeroConcept />
         </div>
       </div>
     </div>
