@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
 
@@ -7,9 +7,203 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 );
 
-const PALETTE = ['#818cf8', '#2dd4bf', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#34d399'];
+const HERO_GRADIENT = ['#ff1493', '#d946ef', '#7c3aed'];
 
-const HeroSlider = React.forwardRef(({ receptionists }, ref) => {
+const TRAIT_ICON_MASKS = {
+  bulb: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 .75a8.25 8.25 0 0 0-4.135 15.39c.686.398 1.115 1.008 1.134 1.623a.75.75 0 0 0 .577.706c.352.083.71.148 1.074.195.323.041.6-.218.6-.544v-4.661a6.714 6.714 0 0 1-.937-.171.75.75 0 1 1 .374-1.453 5.261 5.261 0 0 0 2.626 0 .75.75 0 1 1 .374 1.452 6.712 6.712 0 0 1-.937.172v4.66c0 .327.277.586.6.545.364-.047.722-.112 1.074-.195a.75.75 0 0 0 .577-.706c.02-.615.448-1.225 1.134-1.623A8.25 8.25 0 0 0 12 .75Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M9.013 19.9a.75.75 0 0 1 .877-.597 11.319 11.319 0 0 0 4.22 0 .75.75 0 1 1 .28 1.473 12.819 12.819 0 0 1-4.78 0 .75.75 0 0 1-.597-.876ZM9.754 22.344a.75.75 0 0 1 .824-.668 13.682 13.682 0 0 0 2.844 0 .75.75 0 1 1 .156 1.492 15.156 15.156 0 0 1-3.156 0 .75.75 0 0 1-.668-.824Z"/></svg>')}`,
+  sparkles: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M9 4.5a.75.75 0 0 1 .721.544l.813 2.846a3.75 3.75 0 0 0 2.576 2.576l2.846.813a.75.75 0 0 1 0 1.442l-2.846.813a3.75 3.75 0 0 0-2.576 2.576l-.813 2.846a.75.75 0 0 1-1.442 0l-.813-2.846a3.75 3.75 0 0 0-2.576-2.576l-2.846-.813a.75.75 0 0 1 0-1.442l2.846-.813A3.75 3.75 0 0 0 7.466 7.89l.813-2.846A.75.75 0 0 1 9 4.5ZM18 1.5a.75.75 0 0 1 .728.568l.258 1.036c.236.94.97 1.674 1.91 1.91l1.036.258a.75.75 0 0 1 0 1.456l-1.036.258c-.94.236-1.674.97-1.91 1.91l-.258 1.036a.75.75 0 0 1-1.456 0l-.258-1.036a2.625 2.625 0 0 0-1.91-1.91l-1.036-.258a.75.75 0 0 1 0-1.456l1.036-.258a2.625 2.625 0 0 0 1.91-1.91l.258-1.036A.75.75 0 0 1 18 1.5ZM16.5 15a.75.75 0 0 1 .712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 0 1 0 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 0 1-1.422 0l-.395-1.183a1.5 1.5 0 0 0-.948-.948l-1.183-.395a.75.75 0 0 1 0-1.422l1.183-.395c.447-.15.799-.5.948-.948l.395-1.183A.75.75 0 0 1 16.5 15Z"/></svg>')}`,
+  heart: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z"/></svg>')}`,
+  chat: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4.913 2.658c2.075-.27 4.19-.408 6.337-.408 2.147 0 4.262.139 6.337.408 1.922.25 3.291 1.861 3.405 3.727a4.403 4.403 0 0 0-1.032-.211 50.89 50.89 0 0 0-8.42 0c-2.358.196-4.04 2.19-4.04 4.434v4.286a4.47 4.47 0 0 0 2.433 3.984L7.28 21.53A.75.75 0 0 1 6 21v-4.03a48.527 48.527 0 0 1-1.087-.128C2.905 16.58 1.5 14.833 1.5 12.862V6.638c0-1.97 1.405-3.718 3.413-3.979Z"/><path d="M15.75 7.5c-1.376 0-2.739.057-4.086.169C10.124 7.797 9 9.103 9 10.609v4.285c0 1.507 1.128 2.814 2.67 2.94 1.243.102 2.5.157 3.768.165l2.782 2.781a.75.75 0 0 0 1.28-.53v-2.39l.33-.026c1.542-.125 2.67-1.433 2.67-2.94v-4.286c0-1.505-1.125-2.811-2.664-2.94A49.392 49.392 0 0 0 15.75 7.5Z"/></svg>')}`,
+  shield: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.516 2.17a.75.75 0 0 0-1.032 0 11.209 11.209 0 0 1-7.877 3.08.75.75 0 0 0-.722.515A12.74 12.74 0 0 0 2.25 9.75c0 5.942 4.064 10.933 9.563 12.348a.749.749 0 0 0 .374 0c5.499-1.415 9.563-6.406 9.563-12.348 0-1.39-.223-2.73-.635-3.985a.75.75 0 0 0-.722-.516l-.143.001c-2.996 0-5.717-1.17-7.734-3.08Zm3.094 8.016a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z"/></svg>')}`,
+  bolt: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z"/></svg>')}`,
+};
+
+function pickTraitIcon(traits = [], stereotype = '') {
+  const descriptors = `${traits.join(' ')} ${stereotype}`.toLowerCase();
+
+  if (/(warm|friendly|kind|sweet|gentle|caring|welcoming|easy-going)/.test(descriptors)) return 'heart';
+  if (/(clever|witty|intuitive|smart|sharp|insight|bright|thoughtful)/.test(descriptors)) return 'bulb';
+  if (/(professional|reliable|steady|calm|composed|polished|trust|precise)/.test(descriptors)) return 'shield';
+  if (/(chatty|social|conversational|talkative|outgoing|persuasive|charming)/.test(descriptors)) return 'chat';
+  if (/(fast|energetic|driven|bold|dynamic|direct|quick)/.test(descriptors)) return 'bolt';
+  if (/(playful|creative|free|spirited|quirky|fun|magnetic)/.test(descriptors)) return 'sparkles';
+  return 'sparkles';
+}
+
+function GradientIcon({ iconKey, colors, className = '' }) {
+  const iconMask = TRAIT_ICON_MASKS[iconKey] || TRAIT_ICON_MASKS.sparkles;
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block shrink-0 ${className}`}
+      style={{
+        backgroundImage: `linear-gradient(135deg, ${colors.join(', ')})`,
+        WebkitMaskImage: `url("${iconMask}")`,
+        maskImage: `url("${iconMask}")`,
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        maskPosition: 'center',
+        WebkitMaskSize: 'contain',
+        maskSize: 'contain',
+      }}
+    />
+  );
+}
+
+function MetamorphicFluidAura({ colors }) {
+  const canvasRef = useRef(null);
+  const frameRef = useRef(null);
+  const mouseRef = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
+
+    let time = 0;
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+    };
+
+    const onPointerMove = (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const px = (event.clientX - rect.left) / rect.width - 0.5;
+      const py = (event.clientY - rect.top) / rect.height - 0.5;
+      mouseRef.current.tx = px;
+      mouseRef.current.ty = py;
+    };
+
+    const onPointerLeave = () => {
+      mouseRef.current.tx = 0;
+      mouseRef.current.ty = 0;
+    };
+
+    const getBlobCoords = (cx, cy, rad, speedScale, offsetScale, mouseStrength) => {
+      const coords = [];
+      const steps = 180;
+      const mouse = mouseRef.current;
+      for (let i = 0; i <= steps; i += 1) {
+        const angle = (i / steps) * Math.PI * 2;
+        const wave1 = Math.sin(angle * 3 + time * speedScale) * 10;
+        const wave2 = Math.cos(angle * 5 - time * 1.4 * speedScale) * 12;
+        const wave3 = Math.sin(angle * 8 + time * 0.7) * 6;
+        const mouseAngle = Math.atan2(mouse.y, mouse.x || 0.0001);
+        const mouseDistance = Math.sqrt(mouse.x * mouse.x + mouse.y * mouse.y);
+        const mouseWarp = Math.cos(angle - mouseAngle) * (mouseDistance * mouseStrength);
+        const r = rad + (wave1 + wave2 + wave3) * offsetScale + mouseWarp;
+        coords.push({
+          x: cx + Math.cos(angle) * r,
+          y: cy + Math.sin(angle) * r,
+        });
+      }
+      return coords;
+    };
+
+    const drawBlob = (coords) => {
+      ctx.beginPath();
+      coords.forEach((point, index) => {
+        if (index === 0) {
+          ctx.moveTo(point.x, point.y);
+        } else {
+          ctx.lineTo(point.x, point.y);
+        }
+      });
+      ctx.closePath();
+    };
+
+    const render = () => {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const mouse = mouseRef.current;
+      const [primary, secondary, tertiary] = colors;
+
+      mouse.x += (mouse.tx - mouse.x) * 0.08;
+      mouse.y += (mouse.ty - mouse.y) * 0.08;
+      time += 0.008;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const baseRad = Math.min(w, h) * 0.28;
+
+      const outerCoords = getBlobCoords(cx, cy, baseRad * 1.35, 0.7, 1.8, 42);
+      drawBlob(outerCoords);
+      const auraGrad = ctx.createRadialGradient(cx, cy, baseRad * 0.45, cx, cy, baseRad * 1.85);
+      auraGrad.addColorStop(0, `${primary}33`);
+      auraGrad.addColorStop(0.42, `${secondary}24`);
+      auraGrad.addColorStop(0.72, `${tertiary}1a`);
+      auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = auraGrad;
+      ctx.fill();
+
+      const midCoords = getBlobCoords(cx, cy, baseRad * 1.05, 1.2, 1.2, 30);
+      drawBlob(midCoords);
+      const midGrad = ctx.createLinearGradient(cx - baseRad, cy - baseRad, cx + baseRad, cy + baseRad);
+      midGrad.addColorStop(0, `${primary}38`);
+      midGrad.addColorStop(0.55, `${secondary}3d`);
+      midGrad.addColorStop(1, `${tertiary}47`);
+      ctx.fillStyle = midGrad;
+      ctx.strokeStyle = `${secondary}57`;
+      ctx.lineWidth = 1;
+      ctx.fill();
+      ctx.stroke();
+
+      const coreCoords = getBlobCoords(cx, cy, baseRad * 0.82, 1.5, 0.8, 18);
+      drawBlob(coreCoords);
+      const coreGrad = ctx.createLinearGradient(cx - baseRad, cy - baseRad, cx + baseRad, cy + baseRad);
+      coreGrad.addColorStop(0, primary);
+      coreGrad.addColorStop(0.5, secondary);
+      coreGrad.addColorStop(1, tertiary);
+      ctx.fillStyle = coreGrad;
+      ctx.globalAlpha = 0.88;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      frameRef.current = window.requestAnimationFrame(render);
+    };
+
+    resize();
+    render();
+
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerleave', onPointerLeave);
+    window.addEventListener('resize', resize);
+
+    return () => {
+      if (frameRef.current) {
+        window.cancelAnimationFrame(frameRef.current);
+      }
+      resizeObserver.disconnect();
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
+      window.removeEventListener('resize', resize);
+    };
+  }, [colors]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 h-full w-full rounded-full opacity-95"
+      aria-hidden="true"
+    />
+  );
+}
+
+const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) => {
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isPlaying, setIsPlaying] = useState(null);
@@ -29,6 +223,8 @@ const HeroSlider = React.forwardRef(({ receptionists }, ref) => {
   const backdropOpacity = useTransform(scrollYProgress, [0.3, 0.7], [0, 0.3]);
 
   const active = receptionists[index] || receptionists[0];
+  const activeGradient = HERO_GRADIENT;
+  const activeIcon = pickTraitIcon(active.traits, active.stereotype);
 
   const nextSlide = () => {
     setDirection(1);
@@ -38,7 +234,7 @@ const HeroSlider = React.forwardRef(({ receptionists }, ref) => {
   useEffect(() => {
     if (shouldPause) {
       clearInterval(autoPlayRef.current);
-      return;
+      return undefined;
     }
     autoPlayRef.current = setInterval(nextSlide, 6000);
     return () => clearInterval(autoPlayRef.current);
@@ -58,47 +254,27 @@ const HeroSlider = React.forwardRef(({ receptionists }, ref) => {
     audio.onended = () => setIsPlaying(null);
   };
 
-  return (
-    <div ref={ref} className="relative" style={{ height: '130vh' }}>
-      <div ref={(el) => { innerRef.current = el; if (ref) ref.current = el; }} className="sticky top-0 h-screen overflow-hidden">
-        <motion.div
-          style={{ scale, opacity, filter: useTransform(motionBlur, v => `blur(${v}px)`) }}
-          className="relative w-full h-full bg-black origin-bottom"
-        >
-          {/* Glassmorphism overlay on scroll */}
+  const sliderFrame = (
+    <motion.div
+      style={embedded ? undefined : { scale, opacity, filter: useTransform(motionBlur, (v) => `blur(${v}px)`) }}
+      className="relative h-full w-full origin-bottom bg-black"
+    >
           <motion.div
-            style={{
+            style={embedded ? { opacity: 0 } : {
               opacity: backdropOpacity,
-              backdropFilter: useTransform(backdropBlur, v => `blur(${v}px)`),
-              WebkitBackdropFilter: useTransform(backdropBlur, v => `blur(${v}px)`),
+              backdropFilter: useTransform(backdropBlur, (v) => `blur(${v}px)`),
+              WebkitBackdropFilter: useTransform(backdropBlur, (v) => `blur(${v}px)`),
             }}
-            className="absolute inset-0 bg-white/[0.05] z-20 pointer-events-none"
+            className="pointer-events-none absolute inset-0 z-20 bg-white/[0.05]"
           />
 
-          {/* Background ambient glow */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={active.id + '-ambient'}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.15 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.5 }}
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: `radial-gradient(circle at 75% 50%, ${active.color} 0%, rgba(0, 0, 0, 0) 70%)`
-              }}
-            />
-          </AnimatePresence>
+          <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
 
-          {/* Dot grid overlay */}
-          <div className="absolute inset-0 opacity-[0.04] pointer-events-none bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
-
-          <div className="relative h-full max-w-7xl mx-auto px-8 lg:px-20 flex items-center">
-            {/* Left: Concept content */}
-            <div className="relative z-30 w-full lg:w-1/2 flex items-center">
+          <div className="relative mx-auto flex h-full max-w-7xl items-center px-8 lg:px-20">
+            <div className="relative z-30 flex w-full items-center lg:w-1/2">
               <AnimatePresence mode="wait" custom={direction}>
                 <motion.div
-                  key={active.id + '-content'}
+                  key={`${active.id}-content`}
                   custom={direction}
                   initial={{ opacity: 0, x: -30, filter: 'blur(10px)' }}
                   animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
@@ -107,20 +283,18 @@ const HeroSlider = React.forwardRef(({ receptionists }, ref) => {
                   className="w-full"
                 >
                   <div className="flex flex-col items-start gap-6">
-                    {/* Position / Meta */}
-                    <div className="flex items-center gap-6">
-                      <div className="flex flex-col items-start">
-                        <p className="text-[10px] tracking-[0.3em] font-black uppercase text-white/40 mb-1">Position</p>
-                        <p className="text-sm font-medium tracking-wide text-white">{active.role}</p>
-                      </div>
-                      <div className="w-[1px] h-8 bg-white/10" />
-                      <div className="flex flex-col items-start">
-                        <p className="text-[10px] tracking-[0.3em] font-black uppercase text-white/40 mb-1">Vibe</p>
-                        <p className="text-sm font-medium tracking-wide text-white">{active.stereotype}</p>
+                    <div className="inline-flex max-w-full items-center gap-3 rounded-full border border-white/20 bg-white/[0.04] px-4 py-3 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md">
+                      <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
+                      <div className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-white/60">
+                        {active.traits.map((trait, i) => (
+                          <React.Fragment key={`${active.id}-${trait}-${i}`}>
+                            <span className="truncate">{trait}</span>
+                            {i < active.traits.length - 1 && <span className="text-white/30">•</span>}
+                          </React.Fragment>
+                        ))}
                       </div>
                     </div>
 
-                    {/* Name */}
                     <h1
                       className="hero-concept-name"
                       style={{
@@ -128,7 +302,7 @@ const HeroSlider = React.forwardRef(({ receptionists }, ref) => {
                         lineHeight: 0.8,
                         letterSpacing: '-0.04em',
                         fontWeight: 400,
-                        background: `linear-gradient(to right, ${active.color}, #ff1493, #9400d3, ${active.color})`,
+                        background: `linear-gradient(90deg, ${activeGradient[0]}, ${activeGradient[1]}, ${activeGradient[2]}, ${activeGradient[0]})`,
                         backgroundSize: '200% auto',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
@@ -139,87 +313,100 @@ const HeroSlider = React.forwardRef(({ receptionists }, ref) => {
                       {active.name}
                     </h1>
 
-                    {/* Traits */}
-                    <div className="flex items-center gap-4 text-[10px] font-black tracking-[0.2em] uppercase text-white/50">
-                      {active.traits.map((trait, i) => (
-                        <React.Fragment key={i}>
-                          <span>{trait}</span>
-                          {i < active.traits.length - 1 && <span className="opacity-40">•</span>}
-                        </React.Fragment>
-                      ))}
+                    <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.24em] text-white/44">
+                      <span>{active.role}</span>
+                      <span className="text-white/24">•</span>
+                      <span>{active.stereotype}</span>
                     </div>
 
-                    {/* Description */}
                     {active.description && (
-                      <p className="text-base lg:text-lg text-white/60 leading-relaxed max-w-md font-light">
+                      <p className="max-w-md text-base font-light leading-relaxed text-white/60 lg:text-lg">
                         {active.description}
                       </p>
                     )}
 
-                    {/* Voice preview */}
                     {active.voice && (
                       <button
                         onClick={() => playVoice(active.voice, active.id)}
                         onMouseEnter={() => setIsHoveringVoice(true)}
                         onMouseLeave={() => setIsHoveringVoice(false)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white/[0.06] border border-white/10 rounded-full hover:bg-white/[0.12] transition-all cursor-pointer"
+                        className="relative flex cursor-pointer items-center gap-2 overflow-hidden rounded-full border border-white/10 px-4 py-2.5 transition-all duration-500 hover:-translate-y-[1px]"
+                        style={{
+                          backgroundImage: `linear-gradient(135deg, ${activeGradient[0]}, ${activeGradient[1]} 52%, ${activeGradient[2]})`,
+                          boxShadow: `0 0 0 1px rgba(255,255,255,0.05), 0 10px 36px ${activeGradient[1]}33, 0 0 30px ${activeGradient[2]}22`,
+                          animation: 'voice-button-float 6.5s ease-in-out infinite',
+                        }}
                       >
-                        {isPlaying === active.id ? (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                            <rect x="6" y="4" width="4" height="16" rx="1" />
-                            <rect x="14" y="4" width="4" height="16" rx="1" />
-                          </svg>
-                        ) : (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                            <polygon points="5,3 19,12 5,21" />
-                          </svg>
-                        )}
-                        <span className="text-[10px] font-bold tracking-widest uppercase text-white/80">
-                          {isPlaying === active.id ? 'Pause' : 'Preview Voice'}
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0 rounded-full opacity-70 blur-xl"
+                          style={{
+                            backgroundImage: `radial-gradient(circle at 30% 50%, ${activeGradient[0]}66, transparent 58%), radial-gradient(circle at 75% 45%, ${activeGradient[2]}55, transparent 62%)`,
+                            animation: 'voice-button-glow 7s ease-in-out infinite',
+                          }}
+                        />
+                        <span className="absolute inset-[1px] rounded-full bg-white/[0.02]" aria-hidden="true" />
+                        <span className="relative z-10 flex items-center gap-2">
+                          {isPlaying === active.id ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                              <rect x="6" y="4" width="4" height="16" rx="1" />
+                              <rect x="14" y="4" width="4" height="16" rx="1" />
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                              <polygon points="5,3 19,12 5,21" />
+                            </svg>
+                          )}
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-white">
+                            {isPlaying === active.id ? 'Pause' : 'Preview Voice'}
+                          </span>
                         </span>
                       </button>
                     )}
 
-                    {/* Scroll indicator */}
-                    <motion.div
-                      style={{ opacity: useTransform(scrollYProgress, [0, 0.15], [1, 0]) }}
-                      className="flex flex-col items-start gap-2 pointer-events-none mt-4"
-                    >
-                      <p className="text-[10px] tracking-[0.3em] uppercase text-white/30 font-bold">Scroll</p>
-                      <div className="w-[1px] h-8 bg-gradient-to-b from-white/30 to-transparent animate-pulse" />
-                    </motion.div>
+                    {!embedded && (
+                      <motion.div
+                        style={{ opacity: useTransform(scrollYProgress, [0, 0.15], [1, 0]) }}
+                        className="mt-4 flex flex-col items-start gap-2 pointer-events-none"
+                      >
+                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/30">Scroll</p>
+                        <div className="h-8 w-[1px] animate-pulse bg-gradient-to-b from-white/30 to-transparent" />
+                      </motion.div>
+                    )}
                   </div>
                 </motion.div>
               </AnimatePresence>
             </div>
 
-            {/* Right: Character visual */}
-            <div className="hidden lg:flex absolute right-0 top-0 bottom-0 w-[55%] items-end justify-center pointer-events-none">
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 hidden w-[55%] items-end justify-center lg:flex">
+              <div
+                className="absolute right-[-32%] top-1/2 -z-10 h-[160%] w-[160%] min-w-[760px] max-w-[1150px] -translate-y-1/2 opacity-95"
+                style={{
+                  filter: `drop-shadow(0 0 46px ${activeGradient[0]}38) drop-shadow(0 0 120px ${activeGradient[1]}29) drop-shadow(0 0 170px ${activeGradient[2]}1f)`,
+                }}
+              >
+                <MetamorphicFluidAura colors={activeGradient} />
+              </div>
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={active.id + '-visual'}
+                  key={`${active.id}-visual`}
                   initial={{ opacity: 0, scale: 0.95, x: 50 }}
                   animate={{ opacity: 1, scale: 1, x: 0 }}
                   exit={{ opacity: 0, scale: 1.05, filter: 'blur(40px)' }}
                   transition={{ duration: 1.2, ease: [0.19, 1, 0.22, 1] }}
-                  className="relative w-full h-[90%] flex items-end justify-center"
+                  className="relative flex h-[90%] w-full items-end justify-center"
                 >
                   <img
                     src={active.avatar}
                     alt={active.name}
-                    className="h-full w-auto object-contain object-bottom select-none z-10"
-                  />
-                  <div
-                    className="absolute bottom-[10%] -z-10 blur-[150px] opacity-20 rounded-full w-[60%] aspect-square"
-                    style={{ backgroundColor: active.color }}
+                    className="z-10 h-full w-auto select-none object-contain object-bottom"
                   />
                 </motion.div>
               </AnimatePresence>
             </div>
           </div>
 
-          {/* Navigation dots */}
-          <div className="absolute bottom-8 inset-x-8 lg:inset-x-20 max-w-7xl mx-auto flex items-center z-50">
+          <div className="absolute bottom-8 inset-x-8 z-50 mx-auto flex max-w-7xl items-center lg:inset-x-20">
             <div className="flex items-center gap-2">
               {receptionists.map((_, i) => (
                 <button
@@ -228,15 +415,15 @@ const HeroSlider = React.forwardRef(({ receptionists }, ref) => {
                     setDirection(i > index ? 1 : -1);
                     setIndex(i);
                   }}
-                  className={`h-0.5 rounded-full transition-all duration-500 relative overflow-hidden cursor-pointer ${
+                  className={`relative h-0.5 cursor-pointer overflow-hidden rounded-full transition-all duration-500 ${
                     i === index ? 'w-16 bg-white/20' : 'w-3 bg-white/10 hover:bg-white/30'
                   }`}
                 >
                   {i === index && (
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: "100%" }}
-                      transition={{ duration: 6, ease: "linear" }}
+                      animate={{ width: '100%' }}
+                      transition={{ duration: 6, ease: 'linear' }}
                       className="absolute inset-0 bg-white"
                     />
                   )}
@@ -244,13 +431,27 @@ const HeroSlider = React.forwardRef(({ receptionists }, ref) => {
               ))}
             </div>
           </div>
-        </motion.div>
+    </motion.div>
+  );
+
+  if (embedded) {
+    return (
+      <div ref={(el) => { innerRef.current = el; if (ref) ref.current = el; }} className="h-screen overflow-hidden">
+        {sliderFrame}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative" style={{ height: '130vh' }}>
+      <div ref={(el) => { innerRef.current = el; if (ref) ref.current = el; }} className="sticky top-0 h-screen overflow-hidden">
+        {sliderFrame}
       </div>
     </div>
   );
 });
 
-const HeroConcept = React.forwardRef((props, ref) => {
+const HeroConcept = React.forwardRef(({ embedded = false }, ref) => {
   const [receptionists, setReceptionists] = useState([]);
 
   useEffect(() => {
@@ -272,7 +473,6 @@ const HeroConcept = React.forwardRef((props, ref) => {
           traits: r.traits || [],
           avatar: r.hero_avatar || r.avatar,
           voice: r.voice,
-          color: PALETTE[i % PALETTE.length],
         })));
       }
     };
@@ -281,20 +481,28 @@ const HeroConcept = React.forwardRef((props, ref) => {
 
   return (
     <>
-      {/* Render hero only when data is ready */}
       {receptionists.length > 0 && (
-        <HeroSlider ref={ref} receptionists={receptionists} />
+        <HeroSlider ref={ref} receptionists={receptionists} embedded={embedded} />
       )}
 
-      {/* Loading placeholder */}
       {receptionists.length === 0 && (
-        <div ref={ref} className="relative bg-black" style={{ height: '130vh' }} />
+        <div ref={ref} className="relative bg-black" style={{ height: embedded ? '100vh' : '130vh' }} />
       )}
 
       <style>{`
         @keyframes miami-flow {
           0% { background-position: 0% center; }
           100% { background-position: 200% center; }
+        }
+
+        @keyframes voice-button-glow {
+          0%, 100% { opacity: 0.62; transform: scale(0.98); }
+          50% { opacity: 0.84; transform: scale(1.03); }
+        }
+
+        @keyframes voice-button-float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-2px); }
         }
       `}</style>
     </>

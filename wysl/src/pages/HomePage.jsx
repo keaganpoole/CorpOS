@@ -202,6 +202,88 @@ const CyclingImageGrid = ({ allExpandedImages }) => {
   );
 };
 
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const StackedHeroShowcase = ({ sectionRef }) => {
+  const rootRef = useRef(null);
+  const stickyRef = useRef(null);
+  const [sectionProgress, setSectionProgress] = useState(0);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+
+    let frame = null;
+
+    const updateProgress = () => {
+      frame = null;
+      const rect = root.getBoundingClientRect();
+      const scrollableDistance = Math.max(root.offsetHeight - window.innerHeight, 1);
+      const nextProgress = clamp((-rect.top) / scrollableDistance, 0, 1);
+      setSectionProgress(nextProgress);
+    };
+
+    const onScroll = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(updateProgress);
+    };
+
+    updateProgress();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
+  const crmOpacity = sectionProgress < 0.42 ? 1 : 0;
+  const receptionistOpacity = sectionProgress < 0.42 ? 0 : 1;
+
+  return (
+    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[240vh] bg-[#020202]">
+      <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_42%)]" />
+
+        <div
+          className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${crmOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
+          style={{
+            opacity: crmOpacity,
+            visibility: crmOpacity <= 0.01 ? 'hidden' : 'visible',
+            transform: 'translateY(0)',
+          }}
+        >
+          <div className="relative z-10 mx-auto w-full max-w-[1300px] text-center md:px-10 lg:px-12">
+            <div className="mx-auto max-w-[1100px]">
+              <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-4xl font-black leading-[0.95] tracking-[-0.06em] text-transparent md:text-7xl lg:text-[6.2rem]">
+                One. Stunning. CRM.
+              </h2>
+              <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
+                Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${receptionistOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
+          style={{
+            opacity: receptionistOpacity,
+            visibility: receptionistOpacity <= 0.01 ? 'hidden' : 'visible',
+            transform: 'translateY(0)',
+          }}
+        >
+          <HeroConcept embedded />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const HomePage = () => {
   const [showSplash, setShowSplash] = useState(true);
   useLegacyAnimation();
@@ -453,7 +535,7 @@ const HomePage = () => {
       </div>
 
       <main>
-        <HeroConcept ref={heroRef} />
+        <StackedHeroShowcase sectionRef={heroRef} />
 
 
         <section className="content-section content-section--showcase dark-bg text-center">

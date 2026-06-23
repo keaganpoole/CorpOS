@@ -302,6 +302,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const [crmAwaitingReentry, setCrmAwaitingReentry] = useState(false);
   const isScenariosVariant = variant === 'scenarios';
   const isCrmVariant = variant === 'people-crm';
+  const isCrmHeroVariant = variant === 'people-crm-hero';
   const featureItems = isCrmVariant ? CRM_FEATURE_ITEMS : isScenariosVariant ? SCENARIO_FEATURE_ITEMS : FEATURE_ITEMS;
 
   useEffect(() => {
@@ -385,6 +386,29 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
       if (replayTimer !== null) window.clearTimeout(replayTimer);
     };
   }, []);
+
+  if (isCrmHeroVariant) {
+    return (
+      <div ref={rootRef} className="calendar-showcase relative h-[135vh] w-full bg-[#020202] md:h-[145vh]">
+        <div ref={stickyRef} className="sticky top-0 flex h-screen items-center overflow-hidden bg-[#020202]">
+          <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_42%)]" />
+
+          <div className="relative z-10 mx-auto w-full max-w-[1300px] px-6 text-center md:px-10 lg:px-12">
+            <div className="mx-auto max-w-[1100px]">
+              <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-4xl font-black leading-[0.95] tracking-[-0.06em] text-transparent md:text-7xl lg:text-[6.2rem]">
+                One. Stunning. CRM.
+              </h2>
+              <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
+                Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const calendarExited = sectionProgress >= 0.31;
   const featureEntered = sectionProgress >= 0.365;
