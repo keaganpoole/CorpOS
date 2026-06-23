@@ -137,48 +137,48 @@ const SCENARIO_FEATURE_ITEMS = [
     colorClass: 'bg-cyan-400',
     glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
     hoverTextClass: 'group-hover:text-cyan-300',
-    title: 'Event-Driven Triggers',
-    copy: 'Start workflows from phone calls, people changes, appointment events, payments, invoices, subscriptions, or scheduled time-based triggers.',
+    title: 'Call Automation',
+    copy: 'Have your receptionist make phone calls as part of the workflow, so calls happen exactly when they should, at the perfect moment.',
   },
   {
     icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-emerald-300" />,
     colorClass: 'bg-emerald-500',
     glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
     hoverTextClass: 'group-hover:text-emerald-400',
-    title: 'Branching Logic',
-    copy: 'Use routers, conditional edges, and intent routing to send every scenario run down the correct path based on live context.',
+    title: 'Automated Follow-Ups',
+    copy: 'Stay on top of every customer by following up at the right time based on specific triggers within your business.',
   },
   {
     icon: <Database className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-amber-300" />,
     colorClass: 'bg-amber-400',
     glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
     hoverTextClass: 'group-hover:text-amber-400',
-    title: 'Live Variables',
-    copy: 'Pull data from upstream nodes, table fields, search results, and receptionist context directly into later workflow actions.',
+    title: 'Live Data',
+    copy: 'Use live variables to carry useful data through the workflow, so later steps can continue with full context.',
   },
   {
     icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-blue-300" />,
     colorClass: 'bg-blue-500',
     glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
     hoverTextClass: 'group-hover:text-blue-400',
-    title: 'Action Execution',
-    copy: 'Call customers, send email, manage records, create or update appointments, and run Stripe payment actions from the same workflow canvas.',
+    title: 'Built-In Payments',
+    copy: 'Automate billing tasks like payment collection, invoice creation, and payment links as part of the conversation.',
   },
   {
     icon: <PlayCircle className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-rose-300" />,
     colorClass: 'bg-rose-500',
     glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
     hoverTextClass: 'group-hover:text-rose-400',
-    title: 'Run & Debug',
-    copy: 'Run the full scenario or individual nodes inside the builder, then watch active and completed path state as the workflow executes.',
+    title: 'Workflow Resume',
+    copy: 'Scenarios can carry forward the latest details from earlier steps, letting your receptionist continue the workflow instead of starting over.',
   },
   {
     icon: <Workflow className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6 group-hover:stroke-indigo-300" />,
     colorClass: 'bg-indigo-400',
     glowClass: 'shadow-[0_0_12px_rgba(129,140,248,0.6)]',
     hoverTextClass: 'group-hover:text-indigo-400',
-    title: 'Schedules & Activation',
-    copy: 'Save scenarios, toggle them active or disabled, and run them manually or from daily, weekly, reminder, and specific-time schedules.',
+    title: 'Schedules',
+    copy: 'Set scenarios to run at specific times, on recurring intervals, or before important events.',
   },
 ];
 
@@ -189,7 +189,7 @@ const CRM_FEATURE_ITEMS = [
     glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
     hoverTextClass: 'group-hover:text-cyan-300',
     title: 'Fully Editable Records',
-    copy: 'Edit names, phones, emails, custom fields, select fields, dates, numbers, and yes/no values directly inside the grid with immediate in-row feedback.',
+    copy: 'Make changes directly from the table with instant updates and a seamless editing experience designed for speed and efficiency.',
   },
   {
     icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-violet-300" />,
@@ -197,23 +197,23 @@ const CRM_FEATURE_ITEMS = [
     glowClass: 'shadow-[0_0_12px_rgba(139,92,246,0.6)]',
     hoverTextClass: 'group-hover:text-violet-400',
     title: 'Custom Columns',
-    copy: 'Add text, number, date, select, multi-select, and yes/no fields, then rename, configure, hide, reorder, and resize the table around how the business works.',
+    copy: 'Build a CRM tailored to your business with custom fields and flexible data structures designed around the way your team operates.',
   },
   {
     icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
     colorClass: 'bg-emerald-500',
     glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
     hoverTextClass: 'group-hover:text-emerald-400',
-    title: 'Colorbar Rules',
-    copy: 'Build visual rules from any visible field so high-priority records, active members, follow-ups, or risky accounts are marked instantly as the table changes.',
+    title: 'Colorbar',
+    copy: 'Turn your data into a visual, animated workspace by automatically coloring records based on custom conditions',
   },
   {
     icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6 group-hover:stroke-fuchsia-300" />,
     colorClass: 'bg-fuchsia-500',
     glowClass: 'shadow-[0_0_12px_rgba(217,70,239,0.6)]',
     hoverTextClass: 'group-hover:text-fuchsia-400',
-    title: 'Column Zones',
-    copy: 'Group related columns with draggable zone bars, color-code those groups, and keep dense CRM tables readable without changing the underlying record data.',
+    title: 'Zones',
+    copy: 'Group related information into beautiful color-coded columns that make customer records easier to scan, manage, and understand.',
   },
   {
     icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-amber-300" />,
@@ -221,15 +221,15 @@ const CRM_FEATURE_ITEMS = [
     glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
     hoverTextClass: 'group-hover:text-amber-400',
     title: 'Saved Table Controls',
-    copy: 'Sort, hide, show, reorder, freeze, and adjust row height from the same compact controls used in the working CRM.',
+    copy: 'Sort, filter, hide, freeze, and arrange data to create the perfect workspace for your business.',
   },
   {
     icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-rose-300" />,
     colorClass: 'bg-rose-500',
     glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
     hoverTextClass: 'group-hover:text-rose-400',
-    title: 'Operational Data Model',
-    copy: 'Track contact details, membership state, preferred staff, primary service category, activity fields, payment context, and custom business-specific fields together.',
+    title: 'Real-Time Data',
+    copy: 'See live customer activity as it happens, making every record more useful and every decision faster.',
   },
 ];
 
@@ -441,11 +441,11 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     const builderBlur = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 3.5 + scenariosFeatureProgress * 7.5 : 0;
     const builderBrightness = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 0.82 - scenariosFeatureProgress * 0.58 : 1;
     const titleLines = isCrmVariant
-      ? ['Relationship', 'CRM', 'Studio.']
+      ? ['One.', 'Stunning.', 'CRM.']
       : ['Scenario', 'Workflow', 'Builder.'];
     const description = isCrmVariant
-      ? 'Work directly inside a dense, configurable CRM grid with editable records, custom fields, visual color rules, zones, sorting, freezing, and row controls.'
-      : 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.';
+      ? 'Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.'
+      : 'Create custom workflows that automate calls, bookings, payments, follow-ups, and more, with triggers, conditions, and actions that keep everything moving automatically.';
 
     return (
       <div ref={rootRef} className="calendar-showcase scenario-demo-showcase relative h-[250vh] w-full">
@@ -469,7 +469,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   </React.Fragment>
                 ))}
               </h2>
-              <div className="mx-auto mt-6 max-w-[760px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-zinc-300 md:text-xl">
+              <div className="mx-auto mt-6 max-w-[760px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
                 {description}
               </div>
             </div>
@@ -561,7 +561,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                     </>
                   )}
                 </h2>
-                <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-zinc-300 md:text-base">
+                <div className="calendar-showcase-description mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base">
                   {isScenariosVariant
                     ? 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.'
                     : 'Your customers want immediate answers, accurate availability, and a frictionless path to confirmation. This booking flow handles the entire conversation with calm precision.'}
