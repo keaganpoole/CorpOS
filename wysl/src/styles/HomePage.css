@@ -233,6 +233,66 @@ main > section:nth-of-type(5) {
     color: #d4d4d8;
     text-align: left;
 }
+.homepage-number-section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #d4d4d8;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+.homepage-number-section-label__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--color1), var(--color2));
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+}
+.homepage-number-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.015);
+    box-shadow: 0 6px 16px rgba(3, 7, 18, 0.12);
+    color: rgba(255, 255, 255, 0.52);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    width: fit-content;
+    text-transform: uppercase;
+    backdrop-filter: blur(6px);
+}
+.number-gradient-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 0 10px rgba(217, 70, 239, 0.18));
+}
+.homepage-number-title {
+    margin: 0;
+    background: linear-gradient(to bottom, #ffffff, #e4e4e7, #71717a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: 2.5rem;
+    font-weight: 900;
+    line-height: 0.96;
+    letter-spacing: -0.05em;
+}
 .calendar-showcase {
     z-index: 1;
 }
@@ -449,7 +509,7 @@ main > section:nth-of-type(5) {
 .footer-legal { border-top: 1px solid rgba(0, 0, 0, 0.04); padding-top: 25px; margin-top: 25px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; }
 .footer-legal p { margin: 5px 0; font-size: 0.8em; color: var(--color-medium-gray); }
 .footer-legal-links { color: var(--color-medium-gray); font-size: 0.8em; }
-@media (max-width: 768px) { .nav-menu { display: none; } .nav-content { justify-content: center; } .hero-section { padding: 200px 15px 60px; min-height: 550px; } .hero-section h1 { font-size: 3.5em; } .hero-section .hero-headline { font-size: 1.8em; } .hero-section .hero-subheadline { font-size: 1.2em; } .content-section { padding: 70px 15px; } .content-section--showcase { padding: 0; min-height: auto; overflow: visible; } .content-section h3 { font-size: 2.8em; } .content-section p { font-size: 1.2em; } .features-grid-section { grid-template-columns: 1fr; } .feature-card { min-height: auto; padding: 40px 25px; } .feature-card h4 { font-size: 2em; } .feature-card p { font-size: 1.05em; } .footer-legal { flex-direction: column; align-items: flex-start; } .footer-legal-links { margin-top: 15px; margin-left: 0; margin-right: 15px; } }
+@media (max-width: 768px) { .nav-menu { display: none; } .nav-content { justify-content: center; } .hero-section { padding: 200px 15px 60px; min-height: 550px; } .hero-section h1 { font-size: 3.5em; } .hero-section .hero-headline { font-size: 1.8em; } .hero-section .hero-subheadline { font-size: 1.2em; } .content-section { padding: 70px 15px; } .content-section--showcase { padding: 0; min-height: auto; overflow: visible; } .content-section h3 { font-size: 2.8em; } .content-section p { font-size: 1.2em; } .homepage-number-title { font-size: 2.1rem; } .homepage-number-card { padding: 16px 14px 14px; } .homepage-number-step { font-size: 0.8rem; } .homepage-number-copy { max-width: none; font-size: 0.92rem; } .features-grid-section { grid-template-columns: 1fr; } .feature-card { min-height: auto; padding: 40px 25px; } .feature-card h4 { font-size: 2em; } .feature-card p { font-size: 1.05em; } .footer-legal { flex-direction: column; align-items: flex-start; } .footer-legal-links { margin-top: 15px; margin-left: 0; margin-right: 15px; } }
 @media (max-width: 480px) { .hero-section { padding: 200px 10px 40px; min-height: 400px; } .hero-section h1 { font-size: 2.5em; } .hero-section .hero-headline { font-size: 1.4em; } .hero-section .hero-subheadline { font-size: 1.1em; } .content-section { padding: 50px 10px; } .content-section--showcase { padding: 0; min-height: auto; overflow: visible; } .content-section h3 { font-size: 2.2em; } .content-section p { font-size: 1em; } .feature-card { padding: 30px 20px; } }
 
 .image-container {

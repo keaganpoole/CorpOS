@@ -4,7 +4,7 @@ import useLegacyAnimation from '../hooks/useLegacyAnimation';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
-import { Menu as MenuIcon, X as XIcon } from 'lucide-react';
+import { Menu as MenuIcon, X as XIcon, ArrowRight, Check } from 'lucide-react';
 import SplashScreen from '../components/SplashScreen';
 import { getCookie } from '../utils/cookieUtils';
 import '../styles/HomePage.css';
@@ -45,6 +45,33 @@ import TypingAnimation from '../components/TypingAnimation';
 import HeroConcept from '../components/HeroConcept';
 import CalendarShowcase from '../components/CalendarShowcase';
 import { trackVisitor } from '../services/apiService';
+
+const NUMBER_ICON_MASKS = {
+  transfer: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.5 5.5a.75.75 0 0 1 1.06 0l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.75.75 0 1 1-1.06-1.06L16.47 10.5H8.5a.75.75 0 0 1 0-1.5h7.97l-1.97-1.97a.75.75 0 0 1 0-1.06Zm-5 8a.75.75 0 0 1 1.06 0A.75.75 0 0 1 10 14.56l-1.97 1.97H16a.75.75 0 0 1 0 1.5H8.03L10 19.97a.75.75 0 1 1-1.06 1.06L5.69 17.78a.75.75 0 0 1 0-1.06l3.81-3.81Z"/></svg>')}`,
+  plus: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2.25a9.75 9.75 0 1 0 0 19.5 9.75 9.75 0 0 0 0-19.5Zm0 4.25a.75.75 0 0 1 .75.75v3.25H16a.75.75 0 0 1 0 1.5h-3.25V15a.75.75 0 0 1-1.5 0v-3.25H8a.75.75 0 0 1 0-1.5h3.25V7.25A.75.75 0 0 1 12 6.5Z"/></svg>')}`,
+};
+
+const NumberGradientIcon = ({ icon = 'transfer', colors = ['#ff4fd8', '#8b5cf6'] }) => {
+  const iconMask = NUMBER_ICON_MASKS[icon] || NUMBER_ICON_MASKS.transfer;
+
+  return (
+    <span
+      aria-hidden="true"
+      className="number-gradient-icon"
+      style={{
+        backgroundImage: `linear-gradient(135deg, ${colors.join(', ')})`,
+        WebkitMaskImage: `url("${iconMask}")`,
+        maskImage: `url("${iconMask}")`,
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        maskPosition: 'center',
+        WebkitMaskSize: 'contain',
+        maskSize: 'contain',
+      }}
+    />
+  );
+};
 
 const FadingImageCollage = ({ images }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -263,7 +290,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
                 Meet Your AI Receptionist
               </h2>
               <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
-                Deploy an AI Receptionist that makes and receives calls, books appointments, processes payments, manages your CRM, and supports customers 24/7. Handle multiple conversations simultaneously with incredibly natural, human-like interactions that deliver a level of speed, availability, and consistency traditional staffing simply can't match—all at a fraction of the cost.
+                Deploy an AI Receptionist that makes and receives calls, books appointments, processes payments, manages your CRM, and handles customers 24/7. Handle multiple conversations simultaneously with incredibly natural, human-like interactions that deliver a level of speed, availability, and consistency traditional staffing simply can't match—all at a fraction of the cost.
               </div>
             </div>
           </div>
@@ -281,6 +308,42 @@ const StackedHeroShowcase = ({ sectionRef }) => {
         </div>
       </div>
     </div>
+  );
+};
+
+const NumberOptionsShowcase = () => {
+  return (
+    <div className="relative w-full bg-[#070707]">
+      <div className="relative z-10 mx-auto flex w-full max-w-[1300px] justify-center px-6 py-24 md:px-10 lg:px-12 lg:py-28">
+        <div className="grid w-full max-w-[980px] grid-cols-1 gap-16 justify-items-center lg:grid-cols-2 lg:gap-28">
+          <div className="w-full max-w-[24rem] text-left">
+              <div className="homepage-number-pill">
+                <NumberGradientIcon icon="transfer" colors={['#ff4fd8', '#8b5cf6']} />
+                <span>Forward existing line</span>
+              </div>
+              <h2 className="homepage-number-title">
+                Keep Your Number
+              </h2>
+              <div className="calendar-showcase-description mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base">
+                Keep your existing business number and route it into Sonar. Your customers keep calling the same line, while Sonar answers on the other end and handles the conversation for you.
+              </div>
+            </div>
+
+          <div className="w-full max-w-[24rem] text-left">
+              <div className="homepage-number-pill">
+                <NumberGradientIcon icon="plus" colors={['#ff4fd8', '#8b5cf6']} />
+                <span>Claim a new line</span>
+              </div>
+              <h2 className="homepage-number-title">
+                Choose New Number
+              </h2>
+              <div className="calendar-showcase-description mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base">
+                If you want a clean setup, claim a new number directly in Sonar. It becomes your dedicated business line for calls handled by the receptionist from day one.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
   );
 };
 
@@ -537,10 +600,10 @@ const HomePage = () => {
       <main>
         <StackedHeroShowcase sectionRef={heroRef} />
 
-
         <section className="content-section content-section--showcase dark-bg text-center">
-          <CalendarShowcase />
+          <NumberOptionsShowcase />
         </section>
+
 
         <section className="content-section content-section--showcase dark-bg text-center">
           <CalendarShowcase variant="scenarios" />
@@ -552,47 +615,6 @@ const HomePage = () => {
 
         <section className="content-section content-section--showcase dark-bg text-center">
           <CalendarShowcase />
-        </section>
-
-        <section className="content-section dark-bg text-center">
-          <h3 data-animate="true" className="typing-animation-container">
-            <TypingAnimation />
-          </h3>
-          <p data-animate="true">
-            Sonar's AI understands your business inside and out. It answers common questions, checks availability, books appointments, and escalates to your team when needed — all in real time.
-          </p>
-          <CyclingImageGrid allExpandedImages={allExpandedImages} className="mb-12" />
-
-        </section>
-
-        {/* 24/7 Assistance Section */}
-        <section className="hero-section text-center">
-          <h3 data-animate="true">
-            Virtual&nbsp;
-            <span className="animated-underline make-it-rain-container">
-              Receptionist
-              <svg className="marker-underline" xmlns="http://www.w3.org/2000/svg" viewBox="-1 0 100 12" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="underline-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" style={{ stopColor: 'var(--gradient-start)' }} />
-                    <stop offset="100%" style={{ stopColor: 'var(--gradient-end)' }} />
-                  </linearGradient>
-                </defs>
-                <path d="M2,8 C30,4,70,5,98,7" />
-              </svg>
-            </span>
-          </h3>
-          <p className="hero-subheadline" data-animate="true">
-            Meet your AI receptionist — always on, always professional. She greets every caller with a warm, natural voice, answers questions about your business, books and manages appointments, and routes urgent calls to the right person. Over time, she learns your preferences and gets even better at representing your business.
-          </p>
-          <div className="image-container w-full h-[490px] flex justify-center items-center" style={{ marginTop: '20px' }}>
-            <FadingImageCollage images={phoneHelperCollageImages} />
-          </div>
-          <div className="mt-12 flex justify-center">
-            <Link to="/pricing" className="text-base font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity py-3 px-8">
-              Try for free
-            </Link>
-          </div>
         </section>
 
         {/* Reliability Section */}
