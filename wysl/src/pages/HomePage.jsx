@@ -315,7 +315,7 @@ const NumberOptionsShowcase = () => {
   const isInView = useInView(sectionRef, { once: true, amount: 0.45 });
 
   return (
-    <div ref={sectionRef} className="relative w-full bg-[#070707]">
+    <div ref={sectionRef} className="relative w-full bg-[#020202]">
       <div className="relative z-10 mx-auto flex w-full max-w-[1300px] justify-center px-6 py-24 md:px-10 lg:px-12 lg:py-28">
         <div className="grid w-full max-w-[980px] grid-cols-1 gap-16 justify-items-center lg:grid-cols-[1fr_auto_1fr] lg:gap-12 lg:items-stretch">
           <div className="w-full max-w-[24rem] text-left">
@@ -327,7 +327,7 @@ const NumberOptionsShowcase = () => {
                 Keep Your Number
               </h2>
               <div className="calendar-showcase-description mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base">
-                Keep your existing business number and route it into Sonar. Your customers keep calling the same line, while Sonar answers on the other end and handles the conversation for you.
+                Keep your existing business number and route it into CorpOS. Your customers keep calling the same line, while CorpOS answers on the other end and handles the conversation for you.
               </div>
             </div>
 
@@ -356,16 +356,10 @@ const NumberOptionsShowcase = () => {
                 Choose New Number
               </h2>
               <div className="calendar-showcase-description mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base">
-                If you want a clean setup, claim a new number directly in Sonar. It becomes your dedicated business line for calls handled by the receptionist from day one.
+                If you want a clean setup, claim a new number directly in CorpOS. It becomes your dedicated business line for calls handled by the receptionist from day one.
               </div>
             </div>
           </div>
-        </div>
-        <div className="mt-14 flex justify-center">
-          <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta">
-            Get Started
-            <ArrowRight size={16} strokeWidth={2.4} />
-          </Link>
         </div>
       </div>
   );
@@ -562,7 +556,7 @@ const HomePage = () => {
       </AnimatePresence>
       <div className={`header${!navOnHero ? ' is-visible' : ''}`}>
         <nav className="nav-content">
-          <img src={logoImage} alt="Sonar" className="header-logo" />
+          <img src={logoImage} alt="CorpOS" className="header-logo" />
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6 ml-auto">
@@ -647,7 +641,7 @@ const HomePage = () => {
       </main>
       <footer className="bg-black text-gray-400 py-8 text-center">
         <div className="container mx-auto px-4">
-          <p className="text-sm">&copy; 2025 Sonar. All rights reserved.</p>
+          <p className="text-sm">&copy; 2025 CorpOS. All rights reserved.</p>
           <p className="text-sm mt-2">
             <Link to="/privacy-policy" className="text-gray-400 hover:text-white underline">Privacy Policy</Link>
           </p>

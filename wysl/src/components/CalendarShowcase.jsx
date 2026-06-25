@@ -594,7 +594,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
       ? ['Live Call Monitoring']
       : isCrmVariant
       ? ['One. Stunning. CRM.']
-      : ['Scenario', 'Workflow', 'Builder.'];
+      : ['Scenario Workflow Builder.'];
     const description = isMonitoringVariant
       ? 'Monitor calls as they happen and review every conversation later with the context, playback, and history your team actually needs.'
       : isCrmVariant
@@ -634,8 +634,16 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               <div className={`mx-auto text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl ${isMonitoringVariant ? 'mt-2 max-w-[820px]' : 'mt-6 max-w-[760px]'}`}>
                 {description}
               </div>
+              {isMonitoringVariant && (
+                <div className="mt-8 flex justify-center">
+                  <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta">
+                    Get Started
+                    <ArrowRight size={16} strokeWidth={2.4} />
+                  </Link>
+                </div>
+              )}
               {!isMonitoringVariant && !isCrmVariant && (
-                <div className="mt-8 flex justify-center lg:justify-start">
+                <div className="mt-12 flex justify-center">
                   <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta">
                     Start Booking Calls
                     <ArrowRight size={16} strokeWidth={2.4} />
@@ -703,14 +711,6 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
           >
             <div className="mx-auto w-full max-w-[1120px]">
               <RightFeatureList featureProgress={scenariosFeatureProgress} items={featureItems} />
-              {isScenariosVariant && (
-                <div className="mt-10 flex justify-center">
-                  <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta">
-                    Build Your Workflow
-                    <ArrowRight size={16} strokeWidth={2.4} />
-                  </Link>
-                </div>
-              )}
             </div>
           </div>
         </div>
