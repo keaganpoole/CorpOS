@@ -238,20 +238,28 @@ const CRM_FEATURE_ITEMS = [
 
 const MONITORING_FEATURE_ITEMS = [
   {
-    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-cyan-300" />,
-    colorClass: 'bg-cyan-400',
-    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
-    hoverTextClass: 'group-hover:text-cyan-300',
-    title: 'Live Call Visibility',
-    copy: 'Watch calls unfold in real time so your team always knows what is happening and where attention is needed.',
-  },
-  {
     icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
     colorClass: 'bg-emerald-500',
     glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
     hoverTextClass: 'group-hover:text-emerald-400',
     title: 'Real-Time Analytics',
-    copy: 'Track calls, appointments, customers, revenue, and payment activity from one live dashboard built for fast decision-making.',
+    copy: 'Track calls, appointments, customers, revenue, and payment activity in real time from one live dashboard.',
+  },
+  {
+    icon: <AudioLines className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-rose-300" />,
+    colorClass: 'bg-rose-500',
+    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
+    hoverTextClass: 'group-hover:text-rose-400',
+    title: 'Call Listening',
+    copy: 'Access recorded conversations so finding important information is always simple.',
+  },
+  {
+    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-cyan-300" />,
+    colorClass: 'bg-cyan-400',
+    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
+    hoverTextClass: 'group-hover:text-cyan-300',
+    title: 'Live Call Visibility',
+    copy: 'Experience every call as it happens with a live visual flow that reveals the path your AI receptionist takes from start to finish.',
   },
   {
     icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6 group-hover:stroke-fuchsia-300" />,
@@ -262,27 +270,11 @@ const MONITORING_FEATURE_ITEMS = [
     copy: 'See how each conversation moves through records, appointments, and payments with a clear visual path instead of guessing.',
   },
   {
-    icon: <Search className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-violet-300" />,
-    colorClass: 'bg-violet-500',
-    glowClass: 'shadow-[0_0_12px_rgba(139,92,246,0.6)]',
-    hoverTextClass: 'group-hover:text-violet-400',
-    title: 'Searchable Call Logs',
-    copy: 'Find the exact conversation you need with filters for caller, purpose, status, sentiment, and more.',
-  },
-  {
-    icon: <AudioLines className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-amber-300" />,
+    icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-amber-300" />,
     colorClass: 'bg-amber-400',
     glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
     hoverTextClass: 'group-hover:text-amber-400',
-    title: 'Recordings And Playback',
-    copy: 'Replay calls on demand with built-in audio controls, so reviewing important moments takes seconds instead of digging.',
-  },
-  {
-    icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-rose-300" />,
-    colorClass: 'bg-rose-500',
-    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
-    hoverTextClass: 'group-hover:text-rose-400',
-    title: 'Transcripts And Summaries',
+    title: 'Full Transcripts',
     copy: 'Review what mattered fast with transcripts, summaries, direction, duration, and outcomes attached to every call.',
   },
 ];
