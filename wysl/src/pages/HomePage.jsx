@@ -620,25 +620,24 @@ const HomePage = () => {
         <StackedHeroShowcase sectionRef={heroRef} />
 
         <section className="content-section content-section--showcase dark-bg text-center">
+          <CalendarShowcase />
+        </section>
+
+        <section className="content-section content-section--showcase dark-bg text-center">
+          <CalendarShowcase variant="people-crm" />
+        </section>
+
+        <section className="content-section content-section--showcase dark-bg text-center">
           <NumberOptionsShowcase />
         </section>
 
+        <section className="content-section content-section--showcase dark-bg text-center">
+          <CalendarShowcase variant="live-monitoring" />
+        </section>
 
         <section className="content-section content-section--showcase dark-bg text-center">
           <CalendarShowcase variant="scenarios" />
         </section>
-
-          <section className="content-section content-section--showcase dark-bg text-center">
-            <CalendarShowcase variant="people-crm" />
-          </section>
-
-          <section className="content-section content-section--showcase dark-bg text-center">
-            <CalendarShowcase variant="live-monitoring" />
-          </section>
-
-          <section className="content-section content-section--showcase dark-bg text-center">
-            <CalendarShowcase />
-          </section>
 
         {/* Reliability Section */}
         <section className="content-section light-bg text-center flex flex-col justify-center items-center">
