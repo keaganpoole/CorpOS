@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AudioLines,
+  ArrowRight,
   Calendar as CalendarIcon,
   CreditCard,
   Database,
@@ -14,6 +15,7 @@ import {
   Users,
   Workflow,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import HomepageScenariosDemo from '../sonar/pages/Scenarios/HomepageScenariosDemo';
 import HomepagePeopleCrmDemo from '../sonar/pages/HomepagePeopleCrmDemo';
 
@@ -53,15 +55,17 @@ const FEATURE_ITEMS = [
   {
     icon: (
       <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" className="transition-all duration-500 group-hover:stroke-purple-400" />
-        <polyline points="12 6 12 12 16 14" className="origin-center transition-all duration-700 ease-in-out group-hover:rotate-[360deg] group-hover:stroke-purple-300" />
+        <path d="M17 8h1a4 4 0 0 1 0 8h-1" className="transition-all duration-500 group-hover:stroke-cyan-400" />
+        <path d="M7 8H6a4 4 0 0 0 0 8h1" className="transition-all duration-500 group-hover:stroke-cyan-400" />
+        <rect x="7" y="6" width="10" height="12" rx="3" className="origin-center transition-all duration-500 group-hover:scale-105 group-hover:stroke-cyan-300" />
+        <path d="M10 10h4M10 14h4" className="transition-all duration-500 group-hover:stroke-cyan-300" />
       </svg>
     ),
-    colorClass: 'bg-purple-500',
-    glowClass: 'shadow-[0_0_12px_rgba(168,85,247,0.6)]',
-    hoverTextClass: 'group-hover:text-purple-400',
-    title: 'Manage Appointments Intelligently',
-    copy: 'Your AI receptionist handles the entire conversation naturally, guiding callers to the right service and securing the appointment without friction.',
+    colorClass: 'bg-cyan-400',
+    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
+    hoverTextClass: 'group-hover:text-cyan-400',
+    title: 'Multiple Conversations',
+    copy: 'Handle multiple conversations simultaneously without hold times, missed opportunities, or the limitations of traditional staffing.',
   },
   {
     icon: (
@@ -76,21 +80,7 @@ const FEATURE_ITEMS = [
     glowClass: 'shadow-[0_0_12px_rgba(236,72,153,0.6)]',
     hoverTextClass: 'group-hover:text-pink-400',
     title: '24/7 Answering',
-    copy: 'Your AI receptionist answers every call instantly, handles multiple conversations at once, and never sends opportunities to voicemail.',
-  },
-  {
-    icon: (
-      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" className="transition-all duration-500 group-hover:stroke-amber-400" />
-        <path d="M2 12h20" className="transition-all duration-500 group-hover:opacity-60" />
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="origin-center transition-all duration-700 ease-in-out group-hover:rotate-[180deg] group-hover:stroke-amber-300" />
-      </svg>
-    ),
-    colorClass: 'bg-amber-400',
-    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
-    hoverTextClass: 'group-hover:text-amber-400',
-    title: '70+ Languages',
-    copy: "Your AI receptionist automatically detects the caller's language and responds fluently, allowing customers from around the world to communicate naturally without translators, transfers, or awkward misunderstandings.",
+    copy: 'Your AI receptionist answers every call instantly, day or night, so customers always reach your business instead of voicemail.',
   },
   {
     icon: (
@@ -117,7 +107,21 @@ const FEATURE_ITEMS = [
     glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
     hoverTextClass: 'group-hover:text-emerald-400',
     title: 'Follow Ups',
-    copy: "Most businesses don't have a lead problem. They have a follow-up problem. Your AI receptionist knows when to reach out, what to say, and can even trigger personalized follow-ups through custom workflow automations.",
+    copy: 'Your AI receptionist knows when to reach out, what to say, and can even trigger personalized follow-ups through custom workflow automations.',
+  },
+  {
+    icon: (
+      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" className="transition-all duration-500 group-hover:stroke-amber-400" />
+        <path d="M2 12h20" className="transition-all duration-500 group-hover:opacity-60" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="origin-center transition-all duration-700 ease-in-out group-hover:rotate-[180deg] group-hover:stroke-amber-300" />
+      </svg>
+    ),
+    colorClass: 'bg-amber-400',
+    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
+    hoverTextClass: 'group-hover:text-amber-400',
+    title: '70+ Languages',
+    copy: "Your AI receptionist automatically detects the caller's language and responds fluently, allowing customers from around the world to communicate naturally without translators, transfers, or awkward misunderstandings.",
   },
   {
     icon: (
@@ -187,19 +191,11 @@ const SCENARIO_FEATURE_ITEMS = [
 
 const CRM_FEATURE_ITEMS = [
   {
-    icon: <Database className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-cyan-300" />,
-    colorClass: 'bg-cyan-400',
-    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
-    hoverTextClass: 'group-hover:text-cyan-300',
-    title: 'Fully Editable Records',
-    copy: 'Make changes directly from the table with instant updates and a seamless editing experience designed for speed and efficiency.',
-  },
-  {
     icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-violet-300" />,
     colorClass: 'bg-violet-500',
     glowClass: 'shadow-[0_0_12px_rgba(139,92,246,0.6)]',
     hoverTextClass: 'group-hover:text-violet-400',
-    title: 'Custom Columns',
+    title: 'Fully Customizable',
     copy: 'Build a CRM tailored to your business with custom fields and flexible data structures designed around the way your team operates.',
   },
   {
@@ -216,14 +212,14 @@ const CRM_FEATURE_ITEMS = [
     glowClass: 'shadow-[0_0_12px_rgba(217,70,239,0.6)]',
     hoverTextClass: 'group-hover:text-fuchsia-400',
     title: 'Zones',
-    copy: 'Group related information into beautiful color-coded columns that make customer records easier to scan, manage, and understand.',
+    copy: 'Organize records with beautiful, personalized color-coded columns for faster scanning and easier management.',
   },
   {
     icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-amber-300" />,
     colorClass: 'bg-amber-400',
     glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
     hoverTextClass: 'group-hover:text-amber-400',
-    title: 'Saved Table Controls',
+    title: 'Organization Tools',
     copy: 'Sort, filter, hide, freeze, and arrange data to create the perfect workspace for your business.',
   },
   {
@@ -231,7 +227,7 @@ const CRM_FEATURE_ITEMS = [
     colorClass: 'bg-rose-500',
     glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
     hoverTextClass: 'group-hover:text-rose-400',
-    title: 'Real-Time Data',
+    title: 'Real-Time Updates',
     copy: 'See live customer activity as it happens, making every record more useful and every decision faster.',
   },
 ];
@@ -309,20 +305,21 @@ function MonitoringHeadline({ playKey }) {
   return (
     <>
       <style>{MONITORING_HEADLINE_STYLES}</style>
-      <h2
-        key={playKey}
-        className="monitoring-merged-text relative inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.1rem] xl:text-[5.4rem]"
-        style={{
-          animation: 'monitoring-rec-text-sequence 1.8s ease-in-out forwards',
-          opacity: 0,
-        }}
-      >
+      <div key={playKey} className="relative inline-block">
         <span
           className="absolute left-1/2 top-1/2 z-10 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
           style={{ animation: 'monitoring-rec-dot-sequence 1.8s ease-in-out forwards' }}
         />
-        Live Call Monitoring
-      </h2>
+        <h2
+          className="monitoring-merged-text relative inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.1rem] xl:text-[5.4rem]"
+          style={{
+            animation: 'monitoring-rec-text-sequence 1.8s ease-in-out forwards',
+            opacity: 0,
+          }}
+        >
+          Live Call Monitoring
+        </h2>
+      </div>
     </>
   );
 }
@@ -637,6 +634,14 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               <div className={`mx-auto text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl ${isMonitoringVariant ? 'mt-2 max-w-[820px]' : 'mt-6 max-w-[760px]'}`}>
                 {description}
               </div>
+              {!isMonitoringVariant && !isCrmVariant && (
+                <div className="mt-8 flex justify-center lg:justify-start">
+                  <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta">
+                    Start Booking Calls
+                    <ArrowRight size={16} strokeWidth={2.4} />
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
 
@@ -698,6 +703,14 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
           >
             <div className="mx-auto w-full max-w-[1120px]">
               <RightFeatureList featureProgress={scenariosFeatureProgress} items={featureItems} />
+              {isScenariosVariant && (
+                <div className="mt-10 flex justify-center">
+                  <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta">
+                    Build Your Workflow
+                    <ArrowRight size={16} strokeWidth={2.4} />
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -733,7 +746,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 <div className="calendar-showcase-description mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base">
                   {isScenariosVariant
                     ? 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.'
-                    : 'Your customers want immediate answers, accurate availability, and a frictionless path to confirmation. This booking flow handles the entire conversation with calm precision.'}
+                    : 'Turn every conversation into a booked appointment. Your AI receptionist answers every call instantly, checks real-time availability, books, reschedules, and confirms appointments while handling multiple conversations at once. No hold times, no missed opportunities, no smoke breaks — just a calendar that fills itself 24/7.'}
                 </div>
               </div>
             </div>

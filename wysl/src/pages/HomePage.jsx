@@ -23,7 +23,6 @@ import pgg4 from '@/assets/pgg4.png';
 import pgg5 from '@/assets/pgg5.png';
 import pgg6 from '@/assets/pgg6.png';
 import pgg7 from '@/assets/pgg7.png';
-import AES256Stats from '../components/AES256Stats';
 import slimYahoo from '@/assets/t1-slim-yahoo.png';
 import slimHulu from '@/assets/t1-slim-hulu.png';
 import slimChime from '@/assets/t1-slim-chime.png';
@@ -362,6 +361,12 @@ const NumberOptionsShowcase = () => {
             </div>
           </div>
         </div>
+        <div className="mt-14 flex justify-center">
+          <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta">
+            Get Started
+            <ArrowRight size={16} strokeWidth={2.4} />
+          </Link>
+        </div>
       </div>
   );
 };
@@ -639,15 +644,6 @@ const HomePage = () => {
           <CalendarShowcase variant="scenarios" />
         </section>
 
-        {/* Reliability Section */}
-        <section className="content-section light-bg text-center flex flex-col justify-center items-center">
-          <h3 data-animate="true"><span className="animated-text" style={{ fontWeight: 700 }}>99.9%</span><span className="static-text">Uptime</span></h3>
-          <p data-animate="true">
-            Sonar runs on enterprise-grade infrastructure trusted by thousands of businesses. Your AI receptionist is always online, always ready, with crystal-clear call quality and instant response times. Zero downtime means zero missed opportunities.
-          </p>
-          <AES256Stats startAnimation={true} />
-
-        </section>
       </main>
       <footer className="bg-black text-gray-400 py-8 text-center">
         <div className="container mx-auto px-4">
