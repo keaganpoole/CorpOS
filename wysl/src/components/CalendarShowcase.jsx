@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
+  AudioLines,
   Calendar as CalendarIcon,
   CreditCard,
   Database,
   GitBranch,
   Layers,
+  Phone,
   PlayCircle,
+  Search,
   TimerReset,
   Users,
   Workflow,
@@ -233,6 +236,105 @@ const CRM_FEATURE_ITEMS = [
   },
 ];
 
+const MONITORING_FEATURE_ITEMS = [
+  {
+    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-cyan-300" />,
+    colorClass: 'bg-cyan-400',
+    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
+    hoverTextClass: 'group-hover:text-cyan-300',
+    title: 'Live Call Visibility',
+    copy: 'Watch calls unfold in real time so your team always knows what is happening and where attention is needed.',
+  },
+  {
+    icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
+    colorClass: 'bg-emerald-500',
+    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
+    hoverTextClass: 'group-hover:text-emerald-400',
+    title: 'Real-Time Analytics',
+    copy: 'Track calls, appointments, customers, revenue, and payment activity from one live dashboard built for fast decision-making.',
+  },
+  {
+    icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6 group-hover:stroke-fuchsia-300" />,
+    colorClass: 'bg-fuchsia-500',
+    glowClass: 'shadow-[0_0_12px_rgba(217,70,239,0.6)]',
+    hoverTextClass: 'group-hover:text-fuchsia-400',
+    title: 'Flow Tracking',
+    copy: 'See how each conversation moves through records, appointments, and payments with a clear visual path instead of guessing.',
+  },
+  {
+    icon: <Search className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-violet-300" />,
+    colorClass: 'bg-violet-500',
+    glowClass: 'shadow-[0_0_12px_rgba(139,92,246,0.6)]',
+    hoverTextClass: 'group-hover:text-violet-400',
+    title: 'Searchable Call Logs',
+    copy: 'Find the exact conversation you need with filters for caller, purpose, status, sentiment, and more.',
+  },
+  {
+    icon: <AudioLines className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-amber-300" />,
+    colorClass: 'bg-amber-400',
+    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
+    hoverTextClass: 'group-hover:text-amber-400',
+    title: 'Recordings And Playback',
+    copy: 'Replay calls on demand with built-in audio controls, so reviewing important moments takes seconds instead of digging.',
+  },
+  {
+    icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-rose-300" />,
+    colorClass: 'bg-rose-500',
+    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
+    hoverTextClass: 'group-hover:text-rose-400',
+    title: 'Transcripts And Summaries',
+    copy: 'Review what mattered fast with transcripts, summaries, direction, duration, and outcomes attached to every call.',
+  },
+];
+
+const MONITORING_HEADLINE_STYLES = `
+  .monitoring-merged-text {
+    color: white;
+  }
+
+  @keyframes monitoring-rec-dot-sequence {
+    0% { transform: scale(0); opacity: 0; }
+    15% { transform: scale(1); opacity: 1; background-color: #ff3333; box-shadow: 0 0 15px #ff3333; }
+    25% { transform: scale(0.6); opacity: 0.5; }
+    35% { transform: scale(1); opacity: 1; box-shadow: 0 0 15px #ff3333; }
+    45% { transform: scale(0.6); opacity: 0.5; }
+    55% { transform: scale(1); opacity: 1; box-shadow: 0 0 15px #ff3333; }
+    65% { transform: scaleX(25) scaleY(0.1); opacity: 1; background-color: white; box-shadow: 0 0 15px white; }
+    85% { transform: scaleX(25) scaleY(0.1) translateY(80px); opacity: 0; }
+    100% { opacity: 0; }
+  }
+
+  @keyframes monitoring-rec-text-sequence {
+    0%, 64% { opacity: 0; clip-path: inset(50% 0 50% 0); }
+    65% { opacity: 1; clip-path: inset(10% 0 80% 0); transform: translateX(-10px); color: cyan; }
+    70% { clip-path: inset(80% 0 10% 0); transform: translateX(10px); color: magenta; }
+    75% { clip-path: inset(0 0 0 0); transform: translateX(0); color: white; filter: drop-shadow(4px 0px 0px #ff003c) drop-shadow(-4px 0px 0px cyan); }
+    80%, 100% { filter: none; opacity: 1; clip-path: inset(0 0 0 0); }
+  }
+`;
+
+function MonitoringHeadline({ playKey }) {
+  return (
+    <>
+      <style>{MONITORING_HEADLINE_STYLES}</style>
+      <h2
+        key={playKey}
+        className="monitoring-merged-text relative inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.1rem] xl:text-[5.4rem]"
+        style={{
+          animation: 'monitoring-rec-text-sequence 1.8s ease-in-out forwards',
+          opacity: 0,
+        }}
+      >
+        <span
+          className="absolute left-1/2 top-1/2 z-10 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
+          style={{ animation: 'monitoring-rec-dot-sequence 1.8s ease-in-out forwards' }}
+        />
+        Live Call Monitoring
+      </h2>
+    </>
+  );
+}
+
 const getTagColor = (tag) => TAG_COLORS[tag] || HERO_COLORS[0];
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -300,10 +402,19 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const [demoInstanceKey, setDemoInstanceKey] = useState(0);
   const [scenarioAwaitingReentry, setScenarioAwaitingReentry] = useState(false);
   const [crmAwaitingReentry, setCrmAwaitingReentry] = useState(false);
+  const [monitoringHeadlineKey, setMonitoringHeadlineKey] = useState(null);
+  const monitoringHeadlinePlayedRef = useRef(false);
   const isScenariosVariant = variant === 'scenarios';
   const isCrmVariant = variant === 'people-crm';
   const isCrmHeroVariant = variant === 'people-crm-hero';
-  const featureItems = isCrmVariant ? CRM_FEATURE_ITEMS : isScenariosVariant ? SCENARIO_FEATURE_ITEMS : FEATURE_ITEMS;
+  const isMonitoringVariant = variant === 'live-monitoring';
+  const featureItems = isMonitoringVariant
+    ? MONITORING_FEATURE_ITEMS
+    : isCrmVariant
+      ? CRM_FEATURE_ITEMS
+      : isScenariosVariant
+        ? SCENARIO_FEATURE_ITEMS
+        : FEATURE_ITEMS;
 
   useEffect(() => {
     const root = rootRef.current;
@@ -447,32 +558,62 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     }
   }, [crmAwaitingReentry, isCrmVariant, sectionProgress]);
 
-  if (isScenariosVariant || isCrmVariant) {
+  useEffect(() => {
+    if (!isMonitoringVariant) return;
+
+    const root = rootRef.current;
+    if (!root || monitoringHeadlinePlayedRef.current) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          monitoringHeadlinePlayedRef.current = true;
+          setMonitoringHeadlineKey(0);
+          observer.disconnect();
+        }
+      },
+      {
+        threshold: 0,
+        rootMargin: '0px 0px -72% 0px',
+      }
+    );
+
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [isMonitoringVariant, sectionProgress]);
+
+  if (isScenariosVariant || isCrmVariant || isMonitoringVariant) {
     const introEntered = sectionProgress >= 0.16;
     const builderEntered = sectionProgress >= 0.22;
-    const featuresEntered = sectionProgress >= 0.68;
+    const featuresEntered = isMonitoringVariant ? sectionProgress >= 0.44 : sectionProgress >= 0.68;
     const isMessageReset = isScenariosVariant && demoResetState === 'message';
     const isIntroReset = isScenariosVariant && demoResetState === 'intro';
     const isCrmMessageReset = isCrmVariant && demoResetState === 'message';
     const isCrmIntroReset = isCrmVariant && demoResetState === 'intro';
     const holdScenarioIntro = isScenariosVariant && scenarioAwaitingReentry && !isMessageReset;
     const holdCrmIntro = isCrmVariant && crmAwaitingReentry && !isCrmMessageReset;
-    const introOpacity = isMessageReset || isCrmMessageReset ? 0 : isIntroReset || isCrmIntroReset || holdScenarioIntro || holdCrmIntro || !builderEntered ? 1 : 0;
+    const introOpacity = isMonitoringVariant
+      ? (featuresEntered ? 0 : 1)
+      : isMessageReset || isCrmMessageReset ? 0 : isIntroReset || isCrmIntroReset || holdScenarioIntro || holdCrmIntro || !builderEntered ? 1 : 0;
     const scenariosFeatureProgress = featuresEntered ? 1 : 0;
     const builderDimFactor = scenariosFeatureProgress > 0.01 ? (1 - scenariosFeatureProgress * 0.68) : 1;
-    const builderOpacity = demoResetState || holdScenarioIntro || holdCrmIntro || !builderEntered ? 0 : builderDimFactor;
-    const scenariosFeatureOpacity = isScenariosVariant && demoResetState ? 0 : holdScenarioIntro || holdCrmIntro ? 0 : featuresEntered ? 1 : 0;
+    const builderOpacity = isMonitoringVariant || demoResetState || holdScenarioIntro || holdCrmIntro || !builderEntered ? 0 : builderDimFactor;
+    const scenariosFeatureOpacity = isMonitoringVariant ? (featuresEntered ? 1 : 0) : isScenariosVariant && demoResetState ? 0 : holdScenarioIntro || holdCrmIntro ? 0 : featuresEntered ? 1 : 0;
     const builderBlur = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 3.5 + scenariosFeatureProgress * 7.5 : 0;
     const builderBrightness = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 0.82 - scenariosFeatureProgress * 0.58 : 1;
-    const titleLines = isCrmVariant
-      ? ['One.', 'Stunning.', 'CRM.']
+    const titleLines = isMonitoringVariant
+      ? ['Live Call Monitoring']
+      : isCrmVariant
+      ? ['One. Stunning. CRM.']
       : ['Scenario', 'Workflow', 'Builder.'];
-    const description = isCrmVariant
+    const description = isMonitoringVariant
+      ? 'Monitor calls as they happen and review every conversation later with the context, playback, and history your team actually needs.'
+      : isCrmVariant
       ? 'Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.'
       : 'Create custom workflows that automate calls, bookings, payments, follow-ups, and more, with triggers, conditions, and actions that keep everything moving automatically.';
 
     return (
-      <div ref={rootRef} className="calendar-showcase scenario-demo-showcase relative h-[250vh] w-full">
+      <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[170vh]' : 'h-[250vh]'}`}>
         <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
           <div
             className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
@@ -485,61 +626,73 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             }}
           >
             <div className="mx-auto max-w-[860px] text-center">
-              <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.8rem]">
-                {titleLines.map((line, index) => (
-                  <React.Fragment key={line}>
-                    {line}
-                    {index < titleLines.length - 1 && <br />}
-                  </React.Fragment>
-                ))}
-              </h2>
-              <div className="mx-auto mt-6 max-w-[760px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
+              {isMonitoringVariant ? (
+                monitoringHeadlineKey !== null ? (
+                  <MonitoringHeadline playKey={monitoringHeadlineKey} />
+                ) : (
+                  <div className="min-h-[10rem]" />
+                )
+              ) : (
+                <h2 className={`bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl ${isCrmVariant ? 'whitespace-nowrap lg:text-[5.1rem] xl:text-[5.4rem]' : 'lg:text-[5.8rem]'}`}>
+                  {titleLines.map((line, index) => (
+                    <React.Fragment key={line}>
+                      {line}
+                      {!isCrmVariant && index < titleLines.length - 1 && <br />}
+                    </React.Fragment>
+                  ))}
+                </h2>
+              )}
+              <div className={`mx-auto text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl ${isMonitoringVariant ? 'mt-2 max-w-[820px]' : 'mt-6 max-w-[760px]'}`}>
                 {description}
               </div>
             </div>
           </div>
 
-          <div
-            className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${
-              builderOpacity <= 0.01 ? 'pointer-events-none' : ''
-            }`}
-            style={{
-              opacity: builderOpacity,
-              visibility: builderOpacity <= 0.01 ? 'hidden' : 'visible',
-              transform: `translateY(${builderEntered ? 0 : 18}px)`,
-              filter: `blur(${builderBlur}px) brightness(${builderBrightness}) saturate(0.88)`,
-            }}
-          >
-            {isCrmVariant ? (
-              <HomepagePeopleCrmDemo
-                key={demoInstanceKey}
-                className="homepage-crm-demo"
-                onDemoLimitExceeded={handleDemoLimitExceeded}
-              />
-            ) : (
-              <HomepageScenariosDemo
-                key={demoInstanceKey}
-                demoMode
-                demoMaxNodes={4}
-                onDemoLimitExceeded={handleDemoLimitExceeded}
-                className="homepage-scenarios-builder"
-              />
-            )}
-          </div>
-
-          <div
-            className={`absolute inset-0 z-30 flex items-center justify-center bg-[#020202] px-6 transition-opacity duration-300 ${
-              isMessageReset || isCrmMessageReset ? '' : 'pointer-events-none'
-            }`}
-            style={{
-              opacity: isMessageReset || isCrmMessageReset ? 1 : 0,
-              visibility: isMessageReset || isCrmMessageReset ? 'visible' : 'hidden',
-            }}
-          >
-            <div className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-center text-4xl font-black tracking-[-0.04em] text-transparent md:text-7xl">
-              You get the idea.
+          {!isMonitoringVariant && (
+            <div
+              className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${
+                builderOpacity <= 0.01 ? 'pointer-events-none' : ''
+              }`}
+              style={{
+                opacity: builderOpacity,
+                visibility: builderOpacity <= 0.01 ? 'hidden' : 'visible',
+                transform: `translateY(${builderEntered ? 0 : 18}px)`,
+                filter: `blur(${builderBlur}px) brightness(${builderBrightness}) saturate(0.88)`,
+              }}
+            >
+              {isCrmVariant ? (
+                <HomepagePeopleCrmDemo
+                  key={demoInstanceKey}
+                  className="homepage-crm-demo"
+                  onDemoLimitExceeded={handleDemoLimitExceeded}
+                />
+              ) : (
+                <HomepageScenariosDemo
+                  key={demoInstanceKey}
+                  demoMode
+                  demoMaxNodes={4}
+                  onDemoLimitExceeded={handleDemoLimitExceeded}
+                  className="homepage-scenarios-builder"
+                />
+              )}
             </div>
-          </div>
+          )}
+
+          {!isMonitoringVariant && (
+            <div
+              className={`absolute inset-0 z-30 flex items-center justify-center bg-[#020202] px-6 transition-opacity duration-300 ${
+                isMessageReset || isCrmMessageReset ? '' : 'pointer-events-none'
+              }`}
+              style={{
+                opacity: isMessageReset || isCrmMessageReset ? 1 : 0,
+                visibility: isMessageReset || isCrmMessageReset ? 'visible' : 'hidden',
+              }}
+            >
+              <div className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-center text-4xl font-black tracking-[-0.04em] text-transparent md:text-7xl">
+                You get the idea.
+              </div>
+            </div>
+          )}
 
           <div
             className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${

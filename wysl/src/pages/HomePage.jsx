@@ -312,10 +312,13 @@ const StackedHeroShowcase = ({ sectionRef }) => {
 };
 
 const NumberOptionsShowcase = () => {
+  const sectionRef = useRef(null);
+  const isInView = useInView(sectionRef, { once: true, amount: 0.45 });
+
   return (
-    <div className="relative w-full bg-[#070707]">
+    <div ref={sectionRef} className="relative w-full bg-[#070707]">
       <div className="relative z-10 mx-auto flex w-full max-w-[1300px] justify-center px-6 py-24 md:px-10 lg:px-12 lg:py-28">
-        <div className="grid w-full max-w-[980px] grid-cols-1 gap-16 justify-items-center lg:grid-cols-2 lg:gap-28">
+        <div className="grid w-full max-w-[980px] grid-cols-1 gap-16 justify-items-center lg:grid-cols-[1fr_auto_1fr] lg:gap-12 lg:items-stretch">
           <div className="w-full max-w-[24rem] text-left">
               <div className="homepage-number-pill">
                 <NumberGradientIcon icon="transfer" colors={['#ff4fd8', '#8b5cf6']} />
@@ -328,6 +331,22 @@ const NumberOptionsShowcase = () => {
                 Keep your existing business number and route it into Sonar. Your customers keep calling the same line, while Sonar answers on the other end and handles the conversation for you.
               </div>
             </div>
+
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none hidden w-px self-stretch lg:block"
+            initial={{ opacity: 0, scaleY: 0.2, y: 12 }}
+            animate={isInView ? { opacity: 1, scaleY: 1, y: 0 } : { opacity: 0, scaleY: 0.2, y: 12 }}
+            transition={{ duration: 1.05, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              transformOrigin: 'center',
+              height: 'calc(100% - 2rem)',
+              marginTop: '1rem',
+              marginBottom: '1rem',
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.22), rgba(255,255,255,0.22), rgba(255,255,255,0))',
+              boxShadow: '0 0 18px rgba(255,255,255,0.08)',
+            }}
+          />
 
           <div className="w-full max-w-[24rem] text-left">
               <div className="homepage-number-pill">
@@ -609,13 +628,17 @@ const HomePage = () => {
           <CalendarShowcase variant="scenarios" />
         </section>
 
-        <section className="content-section content-section--showcase dark-bg text-center">
-          <CalendarShowcase variant="people-crm" />
-        </section>
+          <section className="content-section content-section--showcase dark-bg text-center">
+            <CalendarShowcase variant="people-crm" />
+          </section>
 
-        <section className="content-section content-section--showcase dark-bg text-center">
-          <CalendarShowcase />
-        </section>
+          <section className="content-section content-section--showcase dark-bg text-center">
+            <CalendarShowcase variant="live-monitoring" />
+          </section>
+
+          <section className="content-section content-section--showcase dark-bg text-center">
+            <CalendarShowcase />
+          </section>
 
         {/* Reliability Section */}
         <section className="content-section light-bg text-center flex flex-col justify-center items-center">
