@@ -618,7 +618,7 @@ const HomePage = () => {
       <main>
         <StackedHeroShowcase sectionRef={heroRef} />
 
-        <section className="content-section content-section--showcase dark-bg text-center">
+        <section className="content-section content-section--showcase content-section--booking dark-bg text-center">
           <CalendarShowcase />
         </section>
 

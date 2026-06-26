@@ -1553,17 +1553,18 @@ export default function ScenariosPage({
       return;
     }
     const rect = nodeEl.getBoundingClientRect();
-    const panelWidth = 440;
-    const panelHeight = 800;
+    const panelWidth = Math.min(440, Math.max(280, pageRect.width - 24));
+    const panelHeight = Math.min(800, Math.max(360, pageRect.height - 24));
     
     let left = rect.right - pageRect.left - rect.width * 0.13;
     if (left + panelWidth > pageRect.width) {
       left = rect.left - pageRect.left - panelWidth - 40;
     }
+    left = Math.max(12, Math.min(pageRect.width - panelWidth - 12, left));
     
     const top = Math.max(
-      20,
-      Math.min(pageRect.height - panelHeight - 20, rect.top - pageRect.top + rect.height / 2 - panelHeight / 2)
+      12,
+      Math.min(pageRect.height - panelHeight - 12, rect.top - pageRect.top + rect.height / 2 - panelHeight / 2)
     );
     setPanelStyle({ top, left });
     if (panelIntent) {
@@ -1791,9 +1792,14 @@ export default function ScenariosPage({
       if (panelDragRef.current.dragging) {
         const dx = event.clientX - panelDragRef.current.startX;
         const dy = event.clientY - panelDragRef.current.startY;
+        const builderRect = builderRef.current?.getBoundingClientRect();
+        const panelWidth = Math.min(440, Math.max(280, (builderRect?.width || 440) - 24));
+        const panelHeight = Math.min(800, Math.max(360, (builderRect?.height || 800) - 24));
+        const nextLeft = panelDragRef.current.startLeft + dx;
+        const nextTop = panelDragRef.current.startTop + dy;
         setPanelStyle({
-          top: panelDragRef.current.startTop + dy,
-          left: panelDragRef.current.startLeft + dx,
+          top: builderRect ? Math.max(12, Math.min(builderRect.height - panelHeight - 12, nextTop)) : nextTop,
+          left: builderRect ? Math.max(12, Math.min(builderRect.width - panelWidth - 12, nextLeft)) : nextLeft,
         });
         return;
       }

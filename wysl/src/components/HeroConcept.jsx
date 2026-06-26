@@ -361,9 +361,9 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
               </AnimatePresence>
             </div>
 
-            <div className="pointer-events-none absolute right-0 top-0 bottom-0 hidden w-[55%] items-end justify-center lg:flex">
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 hidden w-[52%] items-end justify-center overflow-hidden lg:flex">
               <div
-                className="absolute right-[-32%] top-1/2 -z-10 h-[160%] w-[160%] min-w-[760px] max-w-[1150px] -translate-y-1/2 opacity-95"
+                className="absolute right-[-18%] top-[48%] -z-10 h-[132%] w-[132%] min-w-[620px] max-w-[920px] -translate-y-1/2 opacity-90 xl:right-[-14%] xl:h-[138%] xl:w-[138%]"
                 style={{
                   filter: `drop-shadow(0 0 46px ${activeGradient[0]}38) drop-shadow(0 0 120px ${activeGradient[1]}29) drop-shadow(0 0 170px ${activeGradient[2]}1f)`,
                 }}
@@ -377,7 +377,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                   animate={{ opacity: 1, scale: 1, x: 0 }}
                   exit={{ opacity: 0, scale: 1.05, filter: 'blur(40px)' }}
                   transition={{ duration: 1.2, ease: [0.19, 1, 0.22, 1] }}
-                  className="relative flex h-[90%] w-full items-end justify-center"
+                  className="relative flex h-[88%] w-full items-end justify-center xl:h-[90%]"
                 >
                   <img
                     src={active.avatar}

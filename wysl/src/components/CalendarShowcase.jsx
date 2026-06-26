@@ -328,55 +328,103 @@ const getTagColor = (tag) => TAG_COLORS[tag] || HERO_COLORS[0];
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 function BookingReelWord({ playState }) {
+  const [isResolved, setIsResolved] = useState(false);
+
+  useEffect(() => {
+    if (playState === 'resetting') {
+      setIsResolved(false);
+      return undefined;
+    }
+
+    if (playState !== 'playing') return undefined;
+
+    const maxAnimationTime = Math.max(
+      ...BOOKING_REEL_MOTION.delays.map((delay, index) => delay + BOOKING_REEL_MOTION.durations[index])
+    );
+    const timer = window.setTimeout(() => setIsResolved(true), maxAnimationTime - 110);
+    return () => window.clearTimeout(timer);
+  }, [playState]);
+
   return (
-    <span className="inline-flex items-end pb-[0.08em]">
-      {BOOKING_DIAL_REELS.map((reel, dialIdx) => {
-        const delayVal = BOOKING_REEL_MOTION.delays[dialIdx];
-        const durationVal = BOOKING_REEL_MOTION.durations[dialIdx];
-        const translateY = playState === 'playing' ? (14 * -0.98) : 0;
+    <span
+      className="relative inline-flex items-end align-baseline"
+      style={{
+        height: '0.98em',
+        paddingBottom: '0.08em',
+      }}
+    >
+      <span className="invisible inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent">
+        Booking
+      </span>
 
-        return (
-          <span
-            key={dialIdx}
-            style={{
-              height: '0.98em',
-              width: BOOKING_LETTER_WIDTHS[dialIdx],
-              marginRight: BOOKING_LETTER_OFFSETS[dialIdx],
-            }}
-            className="inline-block overflow-hidden last:mr-0"
-          >
+      <span
+        className="absolute inset-0 inline-flex items-end"
+        style={{
+          opacity: isResolved ? 0 : 1,
+          filter: `blur(${isResolved ? 0.45 : 0}px)`,
+          transition: 'opacity 240ms ease-out, filter 260ms ease-out',
+        }}
+      >
+        {BOOKING_DIAL_REELS.map((reel, dialIdx) => {
+          const delayVal = BOOKING_REEL_MOTION.delays[dialIdx];
+          const durationVal = BOOKING_REEL_MOTION.durations[dialIdx];
+          const translateY = playState === 'playing' ? (14 * -0.98) : 0;
+
+          return (
             <span
-              className="flex flex-col items-center"
+              key={dialIdx}
               style={{
-                transform: `translateY(${translateY}em)`,
-                transitionProperty: playState === 'resetting' ? 'none' : 'transform',
-                transitionDuration: `${durationVal}ms`,
-                transitionDelay: `${delayVal}ms`,
-                transitionTimingFunction: BOOKING_REEL_MOTION.easing,
+                height: '0.98em',
+                width: BOOKING_LETTER_WIDTHS[dialIdx],
+                marginRight: BOOKING_LETTER_OFFSETS[dialIdx],
               }}
+              className="inline-block overflow-hidden last:mr-0"
             >
-              {reel.map((char, charIdx) => {
-                const isTarget = charIdx === 14;
-                const displayChar = isTarget ? BOOKING_TARGET_CHARS[dialIdx] : char;
+              <span
+                className="flex flex-col items-center"
+                style={{
+                  transform: `translateY(${translateY}em)`,
+                  transitionProperty: playState === 'resetting' ? 'none' : 'transform',
+                  transitionDuration: `${durationVal}ms`,
+                  transitionDelay: `${delayVal}ms`,
+                  transitionTimingFunction: BOOKING_REEL_MOTION.easing,
+                }}
+              >
+                {reel.map((char, charIdx) => {
+                  const isTarget = charIdx === 14;
+                  const displayChar = isTarget ? BOOKING_TARGET_CHARS[dialIdx] : char;
 
-                return (
-                  <span
-                    key={charIdx}
-                    style={{ height: '0.98em' }}
-                    className={`flex w-full items-center justify-center text-center ${
-                      isTarget
-                        ? 'bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text font-black text-transparent'
-                        : 'scale-90 font-medium text-zinc-600/25 blur-[0.35px]'
-                    }`}
-                  >
-                    {displayChar}
-                  </span>
-                );
-              })}
+                  return (
+                    <span
+                      key={charIdx}
+                      style={{ height: '0.98em' }}
+                      className={`flex w-full items-center justify-center text-center ${
+                        isTarget
+                          ? 'bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text font-black text-transparent'
+                          : 'scale-90 font-medium text-zinc-600/25 blur-[0.35px]'
+                      }`}
+                    >
+                      {displayChar}
+                    </span>
+                  );
+                })}
+              </span>
             </span>
-          </span>
-        );
-      })}
+          );
+        })}
+      </span>
+
+      <span
+        className="absolute inset-0 inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent"
+        style={{
+          opacity: isResolved ? 1 : 0,
+          filter: `blur(${isResolved ? 0 : 1.6}px)`,
+          transform: `translateY(${isResolved ? 0 : 1}px)`,
+          transition: 'opacity 280ms ease-out, filter 320ms ease-out, transform 320ms ease-out',
+        }}
+      >
+        Booking
+      </span>
     </span>
   );
 }
@@ -393,6 +441,11 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const [crmAwaitingReentry, setCrmAwaitingReentry] = useState(false);
   const [monitoringHeadlineKey, setMonitoringHeadlineKey] = useState(null);
   const monitoringHeadlinePlayedRef = useRef(false);
+  const [compactCalendarCycle, setCompactCalendarCycle] = useState(0);
+  const [viewportSize, setViewportSize] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1440,
+    height: typeof window !== 'undefined' ? window.innerHeight : 900,
+  }));
   const isScenariosVariant = variant === 'scenarios';
   const isCrmVariant = variant === 'people-crm';
   const isCrmHeroVariant = variant === 'people-crm-hero';
@@ -404,6 +457,34 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
       : isScenariosVariant
         ? SCENARIO_FEATURE_ITEMS
         : FEATURE_ITEMS;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateViewportSize = () => {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    updateViewportSize();
+    window.addEventListener('resize', updateViewportSize);
+    return () => window.removeEventListener('resize', updateViewportSize);
+  }, []);
+
+  const isMobileViewport = viewportSize.width < 768;
+  const isTabletViewport = viewportSize.width >= 768 && viewportSize.width < 1180;
+  const scenarioDemoScale = isScenariosVariant
+    ? Math.min(
+        1,
+        isMobileViewport
+          ? Math.max(0.62, Math.min(viewportSize.width / 440, viewportSize.height / 980))
+          : isTabletViewport
+            ? Math.max(0.78, Math.min(viewportSize.width / 1120, viewportSize.height / 1040))
+            : 1
+      )
+    : 1;
 
   useEffect(() => {
     const root = rootRef.current;
@@ -515,6 +596,24 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const featureProgress = featureEntered ? 1 : 0;
   const calendarOpacity = calendarExited ? 0 : 1;
   const featureOpacity = featureEntered ? 1 : 0;
+  const isCompactBookingViewport = viewportSize.width < 1024;
+  const mobileIntroExited = sectionProgress >= 0.24;
+  const mobileCalendarEntered = sectionProgress >= 0.18;
+  const mobileCalendarExited = sectionProgress >= 0.56;
+  const mobileFeatureEntered = sectionProgress >= 0.62;
+  const bookingIntroOpacity = isCompactBookingViewport ? (mobileIntroExited ? 0 : 1) : 1;
+  const bookingCalendarOpacity = isCompactBookingViewport
+    ? (mobileCalendarEntered && !mobileCalendarExited ? 1 : 0)
+    : calendarOpacity;
+  const bookingFeatureOpacity = isCompactBookingViewport ? (mobileFeatureEntered ? 1 : 0) : featureOpacity;
+  const bookingFeatureProgress = isCompactBookingViewport ? (mobileFeatureEntered ? 1 : 0) : featureProgress;
+
+  useEffect(() => {
+    if (!isCompactBookingViewport) return;
+    if (mobileCalendarEntered && !mobileCalendarExited) {
+      setCompactCalendarCycle((prev) => prev + 1);
+    }
+  }, [isCompactBookingViewport, mobileCalendarEntered, mobileCalendarExited]);
 
   const handleDemoLimitExceeded = () => {
     if (isScenariosVariant) {
@@ -672,13 +771,21 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   onDemoLimitExceeded={handleDemoLimitExceeded}
                 />
               ) : (
-                <HomepageScenariosDemo
-                  key={demoInstanceKey}
-                  demoMode
-                  demoMaxNodes={4}
-                  onDemoLimitExceeded={handleDemoLimitExceeded}
-                  className="homepage-scenarios-builder"
-                />
+                <div
+                  className="homepage-scenarios-builder-frame"
+                  style={{
+                    transform: `scale(${scenarioDemoScale})`,
+                    transformOrigin: 'center center',
+                  }}
+                >
+                  <HomepageScenariosDemo
+                    key={demoInstanceKey}
+                    demoMode
+                    demoMaxNodes={4}
+                    onDemoLimitExceeded={handleDemoLimitExceeded}
+                    className="homepage-scenarios-builder"
+                  />
+                </div>
               )}
             </div>
           )}
@@ -719,12 +826,21 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   }
 
   return (
-    <div ref={rootRef} className="calendar-showcase relative h-[205vh] w-full md:h-[215vh] lg:h-[225vh]">
-      <div ref={stickyRef} className="sticky top-0 flex h-screen items-center">
+    <div ref={rootRef} className="calendar-showcase relative h-[225vh] w-full lg:h-[225vh]">
+      <div ref={stickyRef} className="sticky top-0 flex h-screen items-center overflow-hidden">
         <div className="relative z-10 mx-auto w-full max-w-[1300px] px-6 md:px-10 lg:px-12">
-          <div className="grid min-h-[700px] grid-cols-1 items-center gap-16 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] lg:gap-24">
-            <div className="flex min-h-[260px] items-center justify-center lg:justify-start lg:min-h-[300px]">
-              <div className="text-left">
+          <div className="calendar-booking-layout grid min-h-[700px] grid-cols-1 items-center gap-8 md:gap-10 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] lg:gap-24">
+            <div
+              className={`booking-copy-panel flex min-h-[210px] items-center justify-center transition-[opacity,transform] duration-500 ease-out md:min-h-[230px] lg:min-h-[300px] lg:justify-start ${
+                bookingIntroOpacity <= 0.01 ? 'pointer-events-none' : ''
+              }`}
+              style={{
+                opacity: bookingIntroOpacity,
+                visibility: bookingIntroOpacity <= 0.01 ? 'hidden' : 'visible',
+                transform: isCompactBookingViewport ? `translateY(${mobileIntroExited ? -16 : 0}px)` : 'none',
+              }}
+            >
+              <div className="text-center lg:text-left">
                 <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-1 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[4rem] lg:pb-2">
                   {isScenariosVariant ? (
                     <>
@@ -743,7 +859,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                     </>
                   )}
                 </h2>
-                <div className="calendar-showcase-description mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base">
+                <div className="calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base lg:mx-0">
                   {isScenariosVariant
                     ? 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.'
                     : 'Turn every conversation into a booked appointment. Your AI receptionist answers every call instantly, checks real-time availability, books, reschedules, and confirms appointments while handling multiple conversations at once. No hold times, no missed opportunities, no smoke breaks — just a calendar that fills itself 24/7.'}
@@ -751,32 +867,37 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               </div>
             </div>
 
-            <div className="flex items-center justify-start">
-              <div className="relative h-[680px] w-full max-w-[720px]">
+            <div className="booking-visual-panel flex items-center justify-center lg:justify-start">
+              <div className="relative h-[calc(100vh-120px)] w-full max-w-[720px] sm:h-[calc(100vh-132px)] md:h-[calc(100vh-150px)] lg:h-[680px]">
                 <div
                   className={`absolute inset-0 transition-[opacity,transform] duration-300 ease-out ${
-                    calendarOpacity <= 0.01 ? 'pointer-events-none' : ''
+                    bookingCalendarOpacity <= 0.01 ? 'pointer-events-none' : ''
                   }`}
                   style={{
-                    opacity: calendarOpacity,
-                    visibility: calendarOpacity <= 0.01 ? 'hidden' : 'visible',
-                    transform: `translateY(${calendarExited ? -14 : 0}px) scale(${calendarExited ? 0.988 : 1})`,
+                    opacity: bookingCalendarOpacity,
+                    visibility: bookingCalendarOpacity <= 0.01 ? 'hidden' : 'visible',
+                    transform: isCompactBookingViewport
+                      ? `translateY(${mobileCalendarEntered ? 0 : 18}px) scale(${mobileCalendarEntered ? 1 : 0.99})`
+                      : `translateY(${calendarExited ? -14 : 0}px) scale(${calendarExited ? 0.988 : 1})`,
                   }}
                 >
-                  <RightCalendarGrid hasAnimatedDots={hasAnimatedDots} />
+                  <RightCalendarGrid
+                    key={isCompactBookingViewport ? `compact-calendar-${compactCalendarCycle}` : 'desktop-calendar'}
+                    hasAnimatedDots={hasAnimatedDots}
+                  />
                 </div>
 
                 <div
                   className={`absolute inset-0 transition-[opacity,transform] duration-500 ease-out ${
-                    featureOpacity <= 0.01 ? 'pointer-events-none' : ''
+                    bookingFeatureOpacity <= 0.01 ? 'pointer-events-none' : ''
                   }`}
                   style={{
-                    opacity: featureOpacity,
-                    visibility: featureOpacity <= 0.01 ? 'hidden' : 'visible',
-                    transform: `translateY(${featureEntered ? 0 : 18}px)`,
+                    opacity: bookingFeatureOpacity,
+                    visibility: bookingFeatureOpacity <= 0.01 ? 'hidden' : 'visible',
+                    transform: `translateY(${(isCompactBookingViewport ? mobileFeatureEntered : featureEntered) ? 0 : 18}px)`,
                   }}
                 >
-                  <RightFeatureList featureProgress={featureProgress} items={featureItems} />
+                  <RightFeatureList featureProgress={bookingFeatureProgress} items={featureItems} />
                 </div>
               </div>
             </div>
@@ -789,7 +910,23 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
 
 function RightFeatureList({ featureProgress, items }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
   const isVisible = featureProgress > 0.12;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const mediaQuery = window.matchMedia('(hover: none), (pointer: coarse)');
+    const updateTouchState = () => setIsTouchDevice(mediaQuery.matches);
+
+    updateTouchState();
+    mediaQuery.addEventListener?.('change', updateTouchState);
+    return () => mediaQuery.removeEventListener?.('change', updateTouchState);
+  }, []);
+
+  const touchActiveIndex = isTouchDevice && isVisible
+    ? Math.min(items.length - 1, Math.max(0, Math.floor((featureProgress - 0.24) / 0.075)))
+    : null;
 
   return (
     <div className="flex h-full w-full items-center">
@@ -798,21 +935,23 @@ function RightFeatureList({ featureProgress, items }) {
           {items.map((item, index) => {
             const rowVisible = isVisible && featureProgress > 0.24 + index * 0.075;
             const isHovered = hoveredIndex === index;
+            const isTouchHighlighted = touchActiveIndex === index || (isTouchDevice && rowVisible);
 
             return (
               <div
                 key={item.title}
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
-                className="feature-reveal-row group relative flex cursor-pointer flex-col justify-between border-b border-zinc-900/40 py-4 transition-all duration-300 ease-out md:flex-row md:items-center md:py-5"
+                onMouseEnter={() => !isTouchDevice && setHoveredIndex(index)}
+                onMouseLeave={() => !isTouchDevice && setHoveredIndex(null)}
+                className={`feature-reveal-row group relative flex cursor-pointer flex-col justify-between border-b border-zinc-900/40 py-4 transition-all duration-300 ease-out md:flex-row md:items-center md:py-5 ${isTouchHighlighted ? 'feature-reveal-row--touch' : ''}`}
                 style={{
+                  '--feature-touch-delay': `${index * 560}ms`,
                   opacity: rowVisible ? 1 : 0,
                   transform: rowVisible ? 'translateY(0)' : 'translateY(18px)',
                   transition: `opacity 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms, transform 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms`,
                 }}
               >
                 <div
-                  className={`absolute inset-y-0.5 -inset-x-3 -z-10 rounded-lg bg-zinc-900/[0.12] opacity-0 transition-all duration-300 ease-out ${
+                  className={`feature-reveal-row__bg absolute inset-y-0.5 -inset-x-3 -z-10 rounded-lg bg-zinc-900/[0.12] opacity-0 transition-all duration-300 ease-out ${
                     isHovered ? 'scale-100 opacity-100' : 'scale-[0.98]'
                   }`}
                 />
@@ -820,21 +959,21 @@ function RightFeatureList({ featureProgress, items }) {
                 <div className="flex items-center gap-4 transition-transform duration-300 ease-out group-hover:translate-x-1.5 md:gap-5">
                   <div className="relative flex h-3 w-3 items-center justify-center">
                     <span
-                      className={`absolute h-1.5 w-1.5 rounded-full transition-all duration-300 ease-out ${item.colorClass} ${
+                      className={`feature-reveal-row__dot absolute h-1.5 w-1.5 rounded-full transition-all duration-300 ease-out ${item.colorClass} ${
                         isHovered ? `${item.glowClass} scale-110 opacity-100` : 'scale-75 opacity-30'
                       }`}
                     />
                   </div>
 
                   <div
-                    className={`flex items-center justify-center overflow-visible transition-all duration-300 ${
+                    className={`feature-reveal-row__icon flex items-center justify-center overflow-visible transition-all duration-300 ${
                       isHovered ? 'scale-110 text-white' : 'text-zinc-600'
                     }`}
                   >
                     {item.icon}
                   </div>
 
-                  <div className={`text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-2xl ${item.hoverTextClass}`}>
+                  <div className={`feature-reveal-row__title text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-2xl ${item.hoverTextClass}`}>
                     {item.title}
                   </div>
                 </div>
@@ -855,6 +994,18 @@ function RightFeatureList({ featureProgress, items }) {
 
 function RightCalendarGrid({ hasAnimatedDots }) {
   const [selectedDay, setSelectedDay] = useState(17);
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const updateViewportWidth = () => setViewportWidth(window.innerWidth);
+    updateViewportWidth();
+    window.addEventListener('resize', updateViewportWidth);
+    return () => window.removeEventListener('resize', updateViewportWidth);
+  }, []);
+
+  const isMobile = viewportWidth < 768;
+  const isCompact = viewportWidth < 1180;
 
   const itemsDatabase = useMemo(
     () => ({
@@ -914,23 +1065,23 @@ function RightCalendarGrid({ hasAnimatedDots }) {
 
   return (
     <div className="relative flex h-full w-full items-center">
-      <div className="relative w-full overflow-hidden rounded-[28px] border border-white/5 bg-[#08080A] p-10 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)]">
-        <div className="mb-6 border-b border-white/5 pb-6 text-left">
-          <span className="flex items-center space-x-2 text-[2rem] font-bold tracking-tight text-white">
+      <div className={`relative w-full overflow-hidden border border-white/5 bg-[#08080A] shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] ${isCompact ? 'rounded-[22px] p-3 sm:p-4 md:p-5' : 'rounded-[28px] p-10'}`}>
+        <div className={`border-b border-white/5 text-left ${isCompact ? 'mb-3 pb-3 md:mb-4 md:pb-4' : 'mb-6 pb-6'}`}>
+          <span className={`flex items-center space-x-2 font-bold tracking-tight text-white ${isMobile ? 'text-[1rem]' : isCompact ? 'text-[1.25rem]' : 'text-[2rem]'}`}>
             <CalendarIcon className="text-zinc-300" size={22} />
             <span>October 2026</span>
           </span>
         </div>
 
-        <div className="mb-2 grid grid-cols-7 gap-2 text-center">
+        <div className={`mb-2 grid grid-cols-7 text-center ${isCompact ? 'gap-1 md:gap-1.5' : 'gap-2'}`}>
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
-            <span key={`${day}-${index}`} className="py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+            <span key={`${day}-${index}`} className={`py-1 font-bold uppercase tracking-widest text-zinc-500 ${isMobile ? 'text-[8px]' : isCompact ? 'text-[9px]' : 'text-[10px]'}`}>
               {day}
             </span>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-2">
+        <div className={`grid grid-cols-7 ${isCompact ? 'gap-1 md:gap-1.5' : 'gap-2'}`}>
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={`empty-${index}`} className="aspect-square bg-transparent opacity-5" />
           ))}
@@ -944,13 +1095,13 @@ function RightCalendarGrid({ hasAnimatedDots }) {
               <button
                 key={dayNum}
                 onClick={() => setSelectedDay(dayNum)}
-                className={`relative flex aspect-square flex-col justify-between overflow-hidden rounded-xl border p-2 transition-all duration-300 ${
+                className={`relative flex aspect-square flex-col justify-between overflow-hidden border transition-all duration-300 ${isMobile ? 'rounded-lg p-1.5' : isCompact ? 'rounded-lg p-2' : 'rounded-xl p-2'} ${
                   isSelected
                     ? 'z-10 border-transparent bg-gradient-to-tr from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-[0_0_18px_rgba(139,92,246,0.3)]'
                     : 'border-white/5 bg-zinc-950/60 text-zinc-400 hover:border-white/20'
                 }`}
               >
-                <span className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
+                <span className={`${isMobile ? 'text-[9px]' : isCompact ? 'text-[10px]' : 'text-[11px]'} font-bold ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
                   {dayNum}
                 </span>
 
@@ -958,7 +1109,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                   {eventsList.map((event, dotIndex) => (
                     <div
                       key={`${dayNum}-${event.title}`}
-                      className="dot-item h-1.5 w-1.5 rounded-full"
+                      className={`dot-item rounded-full ${isMobile ? 'h-[3px] w-[3px]' : isCompact ? 'h-1 w-1' : 'h-1.5 w-1.5'}`}
                       style={{
                         backgroundColor: isSelected ? '#ffffff' : event.tagColor,
                         animationDelay: hasAnimatedDots ? `${dayNum * 24 + dotIndex * 80}ms` : '0ms',
@@ -972,23 +1123,23 @@ function RightCalendarGrid({ hasAnimatedDots }) {
           })}
         </div>
 
-        <div className="mt-8 min-h-[170px] border-t border-white/5 pt-5">
-          <span className="mb-3 flex items-center space-x-1.5 text-[9px] font-bold tracking-widest text-zinc-400">
+        <div className={`border-t border-white/5 ${isMobile ? 'mt-3 min-h-[118px] pt-3' : isCompact ? 'mt-4 min-h-[138px] pt-4' : 'mt-8 min-h-[170px] pt-5'}`}>
+          <span className={`mb-3 flex items-center space-x-1.5 font-bold tracking-widest text-zinc-400 ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}>
             <Activity size={10} className="text-zinc-300" />
             <span>Appointments for October {selectedDay}</span>
           </span>
           {itemsDatabase[selectedDay] ? (
-            <div className="space-y-2">
+            <div className={isMobile ? 'space-y-1.5' : 'space-y-2'}>
               {itemsDatabase[selectedDay].map((event, index) => (
                 <div
                   key={event.title}
-                  className="agenda-item flex items-center justify-between rounded-lg border border-white/5 bg-zinc-950 p-3 text-left"
+                  className={`agenda-item flex items-center justify-between rounded-lg border border-white/5 bg-zinc-950 text-left ${isMobile ? 'gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
                   style={{ animationDelay: `${index * 90}ms` }}
                 >
-                  <div className="flex items-center space-x-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: event.tagColor }} />
-                    <span className="text-xs font-semibold text-zinc-200">{event.title}</span>
-                    <span className="text-[10px] font-medium italic text-zinc-500">via</span>
+                  <div className="flex min-w-0 flex-1 items-center space-x-2">
+                    <span className={`${isMobile ? 'h-1.5 w-1.5' : isCompact ? 'h-2 w-2' : 'h-2.5 w-2.5'} rounded-full`} style={{ backgroundColor: event.tagColor }} />
+                    <span className={`truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
+                    {!isMobile && !isCompact && <span className="text-[10px] font-medium italic text-zinc-500">via</span>}
                     <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900">
                       <img
                         src={AVATAR_URLS[index % AVATAR_URLS.length]}
@@ -996,13 +1147,13 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                         className="h-full w-full object-cover"
                       />
                     </span>
-                    <span className="text-[10px] font-medium text-zinc-400">
+                    <span className={`${isCompact ? 'hidden' : 'text-[10px]'} font-medium text-zinc-400`}>
                       {RECEPTIONISTS[index % RECEPTIONISTS.length]}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex shrink-0 items-center space-x-1.5">
                     <span
-                      className="rounded border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                      className={`rounded border font-bold uppercase tracking-wider ${isMobile ? 'px-1.5 py-0.5 text-[7px]' : isCompact ? 'px-1.5 py-0.5 text-[8px]' : 'px-2 py-0.5 text-[9px]'}`}
                       style={{
                         color: event.tagColor,
                         borderColor: `${event.tagColor}33`,
@@ -1011,7 +1162,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                     >
                       {event.category}
                     </span>
-                    <span className="text-[10px] font-mono text-zinc-400">{event.time}</span>
+                    <span className={`${isMobile ? 'text-[8px]' : isCompact ? 'text-[9px]' : 'text-[10px]'} font-mono text-zinc-400`}>{event.time}</span>
                   </div>
                 </div>
               ))}
