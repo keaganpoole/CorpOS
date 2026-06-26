@@ -859,7 +859,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                     </>
                   )}
                 </h2>
-                <div className="calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base lg:mx-0">
+                <div className="calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:mx-auto md:max-w-[36rem] md:text-center md:text-[1.1rem] md:leading-[1.55] lg:mx-0 lg:max-w-[24rem] lg:text-left lg:text-base lg:leading-[1.45]">
                   {isScenariosVariant
                     ? 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.'
                     : 'Turn every conversation into a booked appointment. Your AI receptionist answers every call instantly, checks real-time availability, books, reschedules, and confirms appointments while handling multiple conversations at once. No hold times, no missed opportunities, no smoke breaks — just a calendar that fills itself 24/7.'}
@@ -930,7 +930,7 @@ function RightFeatureList({ featureProgress, items }) {
 
   return (
     <div className="flex h-full w-full items-center">
-      <div className="mx-auto w-full max-w-[820px] text-left">
+      <div className="mx-auto w-full max-w-[820px] text-left md:max-w-[940px] lg:max-w-[820px]">
         <div className="flex flex-col">
           {items.map((item, index) => {
             const rowVisible = isVisible && featureProgress > 0.24 + index * 0.075;
@@ -942,7 +942,7 @@ function RightFeatureList({ featureProgress, items }) {
                 key={item.title}
                 onMouseEnter={() => !isTouchDevice && setHoveredIndex(index)}
                 onMouseLeave={() => !isTouchDevice && setHoveredIndex(null)}
-                className={`feature-reveal-row group relative flex cursor-pointer flex-col justify-between border-b border-zinc-900/40 py-4 transition-all duration-300 ease-out md:flex-row md:items-center md:py-5 ${isTouchHighlighted ? 'feature-reveal-row--touch' : ''}`}
+                className={`feature-reveal-row group relative flex cursor-pointer flex-col justify-between border-b border-zinc-900/40 py-4 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-10 md:py-5 lg:gap-0 ${isTouchHighlighted ? 'feature-reveal-row--touch' : ''}`}
                 style={{
                   '--feature-touch-delay': `${index * 560}ms`,
                   opacity: rowVisible ? 1 : 0,
@@ -956,7 +956,7 @@ function RightFeatureList({ featureProgress, items }) {
                   }`}
                 />
 
-                <div className="flex items-center gap-4 transition-transform duration-300 ease-out group-hover:translate-x-1.5 md:gap-5">
+                <div className="flex items-center gap-4 transition-transform duration-300 ease-out group-hover:translate-x-1.5 md:min-w-[280px] md:gap-5 lg:min-w-0">
                   <div className="relative flex h-3 w-3 items-center justify-center">
                     <span
                       className={`feature-reveal-row__dot absolute h-1.5 w-1.5 rounded-full transition-all duration-300 ease-out ${item.colorClass} ${
@@ -973,13 +973,13 @@ function RightFeatureList({ featureProgress, items }) {
                     {item.icon}
                   </div>
 
-                  <div className={`feature-reveal-row__title text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-2xl ${item.hoverTextClass}`}>
+                  <div className={`feature-reveal-row__title text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-[1.35rem] lg:text-2xl ${item.hoverTextClass}`}>
                     {item.title}
                   </div>
                 </div>
 
-                <div className="mt-2 w-full pl-7 transition-transform duration-300 ease-out group-hover:translate-x-1 md:mt-0 md:max-w-xs lg:max-w-sm md:pl-0">
-                  <div className="text-xs font-medium leading-relaxed tracking-tight text-zinc-400 md:text-[13px]">
+                <div className="mt-2 w-full pl-7 transition-transform duration-300 ease-out group-hover:translate-x-1 md:mt-0 md:max-w-[26rem] md:pl-0 lg:max-w-sm">
+                  <div className="text-xs font-medium leading-relaxed tracking-tight text-zinc-400 md:text-[13px] lg:text-xs">
                     {item.copy}
                   </div>
                 </div>

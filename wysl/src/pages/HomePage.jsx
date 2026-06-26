@@ -326,7 +326,7 @@ const NumberOptionsShowcase = () => {
               <h2 className="homepage-number-title">
                 Keep Your Number
               </h2>
-              <div className="calendar-showcase-description mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base">
+              <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
                 Keep your existing business number and route it into CorpOS. Your customers keep calling the same line, while CorpOS answers on the other end and handles the conversation for you.
               </div>
             </div>
@@ -355,7 +355,7 @@ const NumberOptionsShowcase = () => {
               <h2 className="homepage-number-title">
                 Choose New Number
               </h2>
-              <div className="calendar-showcase-description mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-base">
+              <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
                 If you want a clean setup, claim a new number directly in CorpOS. It becomes your dedicated business line for calls handled by the receptionist from day one.
               </div>
             </div>

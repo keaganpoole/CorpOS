@@ -300,7 +300,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
           <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
 
           <div className="relative mx-auto flex h-full max-w-7xl items-center px-8 lg:px-20">
-            <div className="relative z-30 flex w-full items-center lg:w-1/2">
+            <div className="relative z-30 flex w-full items-center lg:w-[46%] lg:justify-start xl:w-1/2">
               <AnimatePresence mode="wait" custom={direction}>
                 <motion.div
                   key={`${active.id}-content`}
@@ -311,9 +311,9 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                   transition={{ duration: 0.8, ease: [0.19, 1, 0.22, 1] }}
                   className="w-full"
                 >
-                  <div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
+                  <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:max-w-[34rem] lg:items-start lg:gap-5 lg:text-left">
                     <h1
-                      className="hero-concept-name"
+                      className="hero-concept-name lg:self-start"
                       style={{
                         fontSize: 'clamp(5rem, 12vw, 11rem)',
                         lineHeight: 0.8,
@@ -330,9 +330,9 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                       {active.name}
                     </h1>
 
-                    <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/20 bg-white/[0.04] px-2.5 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md">
+                    <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-2 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md md:px-2.5 md:py-2 lg:mx-0 lg:gap-2 lg:px-2.5 lg:py-1.5">
                       <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
-                      <div className="flex min-w-0 items-center gap-1.5 text-[9px] font-black tracking-[0.16em] text-white/60">
+                      <div className="flex min-w-0 items-center gap-1 text-[8px] font-black tracking-[0.14em] text-white/60 md:text-[9px] lg:gap-1.5 lg:text-[9px] lg:tracking-[0.16em]">
                         {active.traits.map((trait, i) => (
                           <React.Fragment key={`${active.id}-${trait}-${i}`}>
                             <span className="truncate">{toTitleCase(trait)}</span>
@@ -343,7 +343,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                     </div>
 
                     {active.description && (
-                      <p className="max-w-md text-base font-light leading-relaxed text-white/60 lg:text-lg">
+                      <p className="max-w-md text-base font-light leading-relaxed text-white/60 md:max-w-[36rem] md:text-[1.22rem] md:leading-[1.75] lg:mx-0 lg:max-w-md lg:text-lg lg:leading-relaxed">
                         {active.description}
                       </p>
                     )}
@@ -380,16 +380,16 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                               <polygon points="5,3 19,12 5,21" />
                             </svg>
                           )}
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-white">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-white md:text-[11px] lg:text-[10px]">
                             {isPlaying === active.id ? 'Pause' : 'Preview Voice'}
                           </span>
                         </span>
                       </button>
                     )}
 
-                    <div className="relative flex h-[18rem] w-full items-end justify-center lg:hidden">
+                    <div className="relative flex h-[18rem] w-full items-end justify-center md:h-[29rem] lg:hidden">
                       <div
-                        className="absolute left-1/2 top-3 h-[11.75rem] w-[11.75rem] -translate-x-1/2 rounded-full opacity-90 sm:h-[12.75rem] sm:w-[12.75rem]"
+                        className="absolute left-1/2 top-3 h-[11.75rem] w-[11.75rem] -translate-x-1/2 rounded-full opacity-90 sm:h-[12.75rem] sm:w-[12.75rem] md:top-5 md:h-[19rem] md:w-[19rem]"
                         style={{
                           filter: `drop-shadow(0 0 38px ${activeGradient[0]}38) drop-shadow(0 0 90px ${activeGradient[1]}28) drop-shadow(0 0 130px ${activeGradient[2]}1d)`,
                         }}
@@ -403,7 +403,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 1.03, filter: 'blur(24px)' }}
                           transition={{ duration: 0.9, ease: [0.19, 1, 0.22, 1] }}
-                          className="relative z-10 flex h-[15.5rem] w-full items-end justify-center sm:h-[16.75rem]"
+                          className="relative z-10 flex h-[15.5rem] w-full items-end justify-center sm:h-[16.75rem] md:h-[27rem]"
                         >
                           <img
                             src={active.avatar}
@@ -418,9 +418,9 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
               </AnimatePresence>
             </div>
 
-            <div className="pointer-events-none absolute right-0 top-0 bottom-0 hidden w-[52%] items-end justify-center overflow-hidden lg:flex">
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 hidden w-[54%] items-end justify-center overflow-hidden lg:flex">
               <div
-                className="absolute right-[-18%] top-[48%] -z-10 h-[132%] w-[132%] min-w-[620px] max-w-[920px] -translate-y-1/2 opacity-90 xl:right-[-14%] xl:h-[138%] xl:w-[138%]"
+                className="absolute right-[-8%] top-[50%] -z-10 h-[102%] w-[102%] min-w-[500px] max-w-[720px] -translate-y-1/2 opacity-88 xl:right-[-6%] xl:h-[110%] xl:w-[110%] xl:max-w-[780px]"
                 style={{
                   filter: `drop-shadow(0 0 46px ${activeGradient[0]}38) drop-shadow(0 0 120px ${activeGradient[1]}29) drop-shadow(0 0 170px ${activeGradient[2]}1f)`,
                 }}
