@@ -312,18 +312,6 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                   className="w-full"
                 >
                   <div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
-                    <div className="hidden">
-                      <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
-                      <div className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-white/60">
-                        {active.traits.map((trait, i) => (
-                          <React.Fragment key={`${active.id}-${trait}-${i}`}>
-                            <span className="truncate">{toTitleCase(trait)}</span>
-                            {i < active.traits.length - 1 && <span className="text-white/30">•</span>}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    </div>
-
                     <h1
                       className="hero-concept-name"
                       style={{
