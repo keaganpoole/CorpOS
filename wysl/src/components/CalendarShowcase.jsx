@@ -606,7 +606,9 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     ? (mobileCalendarEntered && !mobileCalendarExited ? 1 : 0)
     : calendarOpacity;
   const bookingFeatureOpacity = isCompactBookingViewport ? (mobileFeatureEntered ? 1 : 0) : featureOpacity;
-  const bookingFeatureProgress = isCompactBookingViewport ? (mobileFeatureEntered ? 1 : 0) : featureProgress;
+  const bookingFeatureProgress = isCompactBookingViewport
+    ? Math.min(1, Math.max(0, (sectionProgress - 0.58) / 0.42))
+    : featureProgress;
 
   useEffect(() => {
     if (!isCompactBookingViewport) return;
@@ -671,6 +673,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   }, [isMonitoringVariant, sectionProgress]);
 
   if (isScenariosVariant || isCrmVariant || isMonitoringVariant) {
+    const isCompactFeatureViewport = viewportSize.width < 1024;
     const introEntered = sectionProgress >= 0.16;
     const builderEntered = sectionProgress >= 0.22;
     const featuresEntered = isMonitoringVariant ? sectionProgress >= 0.44 : sectionProgress >= 0.68;
@@ -684,6 +687,11 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
       ? (featuresEntered ? 0 : 1)
       : isMessageReset || isCrmMessageReset ? 0 : isIntroReset || isCrmIntroReset || holdScenarioIntro || holdCrmIntro || !builderEntered ? 1 : 0;
     const scenariosFeatureProgress = featuresEntered ? 1 : 0;
+    const compactFeaturesListProgress = isCompactFeatureViewport
+      ? isMonitoringVariant
+        ? Math.min(1, Math.max(0, (sectionProgress - 0.44) / 0.38))
+        : Math.min(1, Math.max(0, (sectionProgress - 0.68) / 0.28))
+      : scenariosFeatureProgress;
     const builderDimFactor = scenariosFeatureProgress > 0.01 ? (1 - scenariosFeatureProgress * 0.68) : 1;
     const builderOpacity = isMonitoringVariant || demoResetState || holdScenarioIntro || holdCrmIntro || !builderEntered ? 0 : builderDimFactor;
     const scenariosFeatureOpacity = isMonitoringVariant ? (featuresEntered ? 1 : 0) : isScenariosVariant && demoResetState ? 0 : holdScenarioIntro || holdCrmIntro ? 0 : featuresEntered ? 1 : 0;
@@ -817,7 +825,11 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             }}
           >
             <div className="mx-auto w-full max-w-[1120px]">
-              <RightFeatureList featureProgress={scenariosFeatureProgress} items={featureItems} />
+              <RightFeatureList
+                featureProgress={compactFeaturesListProgress}
+                items={featureItems}
+                useScrollHighlight={isCompactFeatureViewport}
+              />
             </div>
           </div>
         </div>
@@ -897,7 +909,11 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                     transform: `translateY(${(isCompactBookingViewport ? mobileFeatureEntered : featureEntered) ? 0 : 18}px)`,
                   }}
                 >
-                  <RightFeatureList featureProgress={bookingFeatureProgress} items={featureItems} />
+                  <RightFeatureList
+                    featureProgress={bookingFeatureProgress}
+                    items={featureItems}
+                    useScrollHighlight={isCompactBookingViewport}
+                  />
                 </div>
               </div>
             </div>
@@ -908,7 +924,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   );
 };
 
-function RightFeatureList({ featureProgress, items }) {
+function RightFeatureList({ featureProgress, items, useScrollHighlight = false }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const isVisible = featureProgress > 0.12;
@@ -924,8 +940,9 @@ function RightFeatureList({ featureProgress, items }) {
     return () => mediaQuery.removeEventListener?.('change', updateTouchState);
   }, []);
 
-  const touchActiveIndex = isTouchDevice && isVisible
-    ? Math.min(items.length - 1, Math.max(0, Math.floor((featureProgress - 0.24) / 0.075)))
+  const shouldUseScrollHighlight = useScrollHighlight || isTouchDevice;
+  const touchActiveIndex = shouldUseScrollHighlight && isVisible
+    ? Math.min(items.length - 1, Math.max(0, Math.floor(featureProgress * items.length)))
     : null;
 
   return (
@@ -933,41 +950,47 @@ function RightFeatureList({ featureProgress, items }) {
       <div className="mx-auto w-full max-w-[820px] text-left md:max-w-[940px] lg:max-w-[820px]">
         <div className="flex flex-col">
           {items.map((item, index) => {
-            const rowVisible = isVisible && featureProgress > 0.24 + index * 0.075;
+            const rowVisible = shouldUseScrollHighlight ? isVisible : isVisible && featureProgress > 0.12 + index * 0.11;
             const isHovered = hoveredIndex === index;
-            const isTouchHighlighted = touchActiveIndex === index || (isTouchDevice && rowVisible);
+            const isTouchHighlighted = shouldUseScrollHighlight && touchActiveIndex === index;
+            const isHighlighted = isHovered || isTouchHighlighted;
 
             return (
               <div
                 key={item.title}
-                onMouseEnter={() => !isTouchDevice && setHoveredIndex(index)}
-                onMouseLeave={() => !isTouchDevice && setHoveredIndex(null)}
-                className={`feature-reveal-row group relative flex cursor-pointer flex-col justify-between border-b border-zinc-900/40 py-4 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-10 md:py-5 lg:gap-0 ${isTouchHighlighted ? 'feature-reveal-row--touch' : ''}`}
+                onMouseEnter={() => !shouldUseScrollHighlight && setHoveredIndex(index)}
+                onMouseLeave={() => !shouldUseScrollHighlight && setHoveredIndex(null)}
+                className="feature-reveal-row group relative flex cursor-pointer flex-col justify-between border-b border-zinc-900/40 py-4 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-10 md:py-5 lg:gap-0"
                 style={{
-                  '--feature-touch-delay': `${index * 560}ms`,
                   opacity: rowVisible ? 1 : 0,
                   transform: rowVisible ? 'translateY(0)' : 'translateY(18px)',
-                  transition: `opacity 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms, transform 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms`,
+                  transition: shouldUseScrollHighlight
+                    ? `opacity 420ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 80}ms, transform 420ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 80}ms`
+                    : `opacity 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms, transform 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms`,
                 }}
               >
                 <div
                   className={`feature-reveal-row__bg absolute inset-y-0.5 -inset-x-3 -z-10 rounded-lg bg-zinc-900/[0.12] opacity-0 transition-all duration-300 ease-out ${
-                    isHovered ? 'scale-100 opacity-100' : 'scale-[0.98]'
+                    isHighlighted ? 'scale-100 opacity-100' : 'scale-[0.98]'
                   }`}
                 />
 
-                <div className="flex items-center gap-4 transition-transform duration-300 ease-out group-hover:translate-x-1.5 md:min-w-[280px] md:gap-5 lg:min-w-0">
+                <div
+                  className={`flex items-center gap-4 transition-transform duration-300 ease-out md:min-w-[280px] md:gap-5 lg:min-w-0 ${
+                    isHighlighted ? 'translate-x-1.5' : ''
+                  }`}
+                >
                   <div className="relative flex h-3 w-3 items-center justify-center">
                     <span
                       className={`feature-reveal-row__dot absolute h-1.5 w-1.5 rounded-full transition-all duration-300 ease-out ${item.colorClass} ${
-                        isHovered ? `${item.glowClass} scale-110 opacity-100` : 'scale-75 opacity-30'
+                        isHighlighted ? `${item.glowClass} scale-110 opacity-100` : 'scale-75 opacity-30'
                       }`}
                     />
                   </div>
 
                   <div
                     className={`feature-reveal-row__icon flex items-center justify-center overflow-visible transition-all duration-300 ${
-                      isHovered ? 'scale-110 text-white' : 'text-zinc-600'
+                      isHighlighted ? 'scale-110 text-white' : 'text-zinc-600'
                     }`}
                   >
                     {item.icon}
@@ -978,7 +1001,11 @@ function RightFeatureList({ featureProgress, items }) {
                   </div>
                 </div>
 
-                <div className="mt-2 w-full pl-7 transition-transform duration-300 ease-out group-hover:translate-x-1 md:mt-0 md:max-w-[26rem] md:pl-0 lg:max-w-sm">
+                <div
+                  className={`mt-2 w-full pl-7 transition-transform duration-300 ease-out md:mt-0 md:max-w-[26rem] md:pl-0 lg:max-w-sm ${
+                    isHighlighted ? 'translate-x-1' : ''
+                  }`}
+                >
                   <div className="text-xs font-medium leading-relaxed tracking-tight text-zinc-400 md:text-[13px] lg:text-xs">
                     {item.copy}
                   </div>

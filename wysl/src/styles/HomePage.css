@@ -480,49 +480,6 @@ main,
 .feature-reveal-row {
     will-change: opacity, transform;
 }
-@media (hover: none), (pointer: coarse) {
-    .feature-reveal-row--touch .feature-reveal-row__bg {
-        animation: touchFeatureBg 4.2s ease-in-out var(--feature-touch-delay) both;
-    }
-    .feature-reveal-row--touch .feature-reveal-row__dot {
-        animation: touchFeatureDot 4.2s ease-in-out var(--feature-touch-delay) both;
-    }
-    .feature-reveal-row--touch .feature-reveal-row__icon,
-    .feature-reveal-row--touch .feature-reveal-row__title {
-        animation: touchFeatureText 4.2s ease-in-out var(--feature-touch-delay) both;
-    }
-}
-@keyframes touchFeatureBg {
-    0%, 18%, 100% {
-        opacity: 0;
-        transform: scale(0.98);
-    }
-    28%, 72% {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-@keyframes touchFeatureDot {
-    0%, 18%, 100% {
-        opacity: 0.3;
-        transform: scale(0.75);
-    }
-    28%, 72% {
-        opacity: 1;
-        transform: scale(1.1);
-        filter: drop-shadow(0 0 10px currentColor);
-    }
-}
-@keyframes touchFeatureText {
-    0%, 18%, 100% {
-        color: rgb(82 82 91);
-        transform: translateX(0) scale(1);
-    }
-    28%, 72% {
-        color: rgb(255 255 255);
-        transform: translateX(6px) scale(1.04);
-    }
-}
 .content-section-image { margin-top: 60px; max-width: 90%; height: auto; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); }
 .agenda-item {
     opacity: 0;
