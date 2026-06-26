@@ -713,7 +713,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               transform: `translateY(${builderEntered ? -12 : 0}px)`,
             }}
           >
-            <div className="mx-auto max-w-[860px] text-center">
+            <div className="mx-auto max-w-[860px] px-2 text-center sm:px-4">
               {isMonitoringVariant ? (
                 monitoringHeadlineKey !== null ? (
                   <MonitoringHeadline playKey={monitoringHeadlineKey} />
@@ -721,7 +721,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   <div className="min-h-[10rem]" />
                 )
               ) : (
-                <h2 className={`bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl ${isCrmVariant ? 'whitespace-nowrap lg:text-[5.1rem] xl:text-[5.4rem]' : 'lg:text-[5.8rem]'}`}>
+                <h2 className={`bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl ${isCrmVariant ? 'mx-auto max-w-[10ch] text-balance sm:max-w-[12ch] lg:max-w-none lg:text-[5.1rem] xl:text-[5.4rem]' : 'lg:text-[5.8rem]'}`}>
                   {titleLines.map((line, index) => (
                     <React.Fragment key={line}>
                       {line}

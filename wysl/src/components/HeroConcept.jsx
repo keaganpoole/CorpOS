@@ -30,6 +30,14 @@ function pickTraitIcon(traits = [], stereotype = '') {
   return 'sparkles';
 }
 
+function toTitleCase(value = '') {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
 function GradientIcon({ iconKey, colors, className = '' }) {
   const iconMask = TRAIT_ICON_MASKS[iconKey] || TRAIT_ICON_MASKS.sparkles;
 
@@ -208,6 +216,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   const [direction, setDirection] = useState(0);
   const [isPlaying, setIsPlaying] = useState(null);
   const [isHoveringVoice, setIsHoveringVoice] = useState(false);
+  const [mobileTimelineOpacity, setMobileTimelineOpacity] = useState(1);
   const autoPlayRef = useRef(null);
   const audioRef = useRef(null);
   const innerRef = useRef(null);
@@ -245,6 +254,40 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
     audio.onended = () => setIsPlaying(null);
   };
 
+  useEffect(() => {
+    const root = innerRef.current;
+    if (!root) return undefined;
+
+    let frame = null;
+
+    const updateTimelineOpacity = () => {
+      frame = null;
+      if (window.innerWidth >= 768) {
+        setMobileTimelineOpacity(1);
+        return;
+      }
+
+      const rect = root.getBoundingClientRect();
+      const nextOpacity = rect.top >= 0 ? 1 : Math.max(0, Math.min(1, 1 + rect.top / 80));
+      setMobileTimelineOpacity(nextOpacity);
+    };
+
+    const onScroll = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(updateTimelineOpacity);
+    };
+
+    updateTimelineOpacity();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
   const sliderFrame = (
     <motion.div
       className="relative isolate h-full w-full origin-bottom bg-black"
@@ -268,13 +311,13 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                   transition={{ duration: 0.8, ease: [0.19, 1, 0.22, 1] }}
                   className="w-full"
                 >
-                  <div className="flex flex-col items-start gap-6">
-                    <div className="inline-flex max-w-full items-center gap-3 rounded-full border border-white/20 bg-white/[0.04] px-4 py-3 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md">
+                  <div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
+                    <div className="hidden">
                       <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
                       <div className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-white/60">
                         {active.traits.map((trait, i) => (
                           <React.Fragment key={`${active.id}-${trait}-${i}`}>
-                            <span className="truncate">{trait}</span>
+                            <span className="truncate">{toTitleCase(trait)}</span>
                             {i < active.traits.length - 1 && <span className="text-white/30">•</span>}
                           </React.Fragment>
                         ))}
@@ -299,10 +342,16 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                       {active.name}
                     </h1>
 
-                    <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.24em] text-white/44">
-                      <span>{active.role}</span>
-                      <span className="text-white/24">•</span>
-                      <span>{active.stereotype}</span>
+                    <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/20 bg-white/[0.04] px-2.5 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md">
+                      <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
+                      <div className="flex min-w-0 items-center gap-1.5 text-[9px] font-black tracking-[0.16em] text-white/60">
+                        {active.traits.map((trait, i) => (
+                          <React.Fragment key={`${active.id}-${trait}-${i}`}>
+                            <span className="truncate">{toTitleCase(trait)}</span>
+                            {i < active.traits.length - 1 && <span className="text-white/30">&bull;</span>}
+                          </React.Fragment>
+                        ))}
+                      </div>
                     </div>
 
                     {active.description && (
@@ -350,12 +399,32 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                       </button>
                     )}
 
-                    {!embedded && (
-                      <motion.div className="mt-4 flex flex-col items-start gap-2 pointer-events-none">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/30">Scroll</p>
-                        <div className="h-8 w-[1px] animate-pulse bg-gradient-to-b from-white/30 to-transparent" />
-                      </motion.div>
-                    )}
+                    <div className="relative flex h-[18rem] w-full items-end justify-center lg:hidden">
+                      <div
+                        className="absolute left-1/2 top-3 h-[11.75rem] w-[11.75rem] -translate-x-1/2 rounded-full opacity-90 sm:h-[12.75rem] sm:w-[12.75rem]"
+                        style={{
+                          filter: `drop-shadow(0 0 38px ${activeGradient[0]}38) drop-shadow(0 0 90px ${activeGradient[1]}28) drop-shadow(0 0 130px ${activeGradient[2]}1d)`,
+                        }}
+                      >
+                        <MetamorphicFluidAura colors={activeGradient} />
+                      </div>
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={`${active.id}-visual-compact`}
+                          initial={{ opacity: 0, scale: 0.95, y: 28 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 1.03, filter: 'blur(24px)' }}
+                          transition={{ duration: 0.9, ease: [0.19, 1, 0.22, 1] }}
+                          className="relative z-10 flex h-[15.5rem] w-full items-end justify-center sm:h-[16.75rem]"
+                        >
+                          <img
+                            src={active.avatar}
+                            alt={active.name}
+                            className="max-h-full w-auto max-w-[88vw] select-none object-contain object-bottom"
+                          />
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </motion.div>
               </AnimatePresence>
@@ -389,7 +458,10 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
             </div>
           </div>
 
-          <div className="absolute bottom-8 inset-x-8 z-50 mx-auto flex max-w-7xl items-center lg:inset-x-20">
+          <div
+            className="absolute bottom-8 inset-x-8 z-50 mx-auto flex max-w-7xl items-center transition-opacity duration-150 ease-out lg:inset-x-20"
+            style={{ opacity: mobileTimelineOpacity }}
+          >
             <div className="flex items-center gap-2">
               {receptionists.map((_, i) => (
                 <button
