@@ -12,7 +12,6 @@ export const DEFAULT_FIELD_CONFIG = {
   service_id: { name: 'Service', icon: 'briefcase' },
   date: { name: 'Date', icon: 'calendar' },
   time: { name: 'Start Time', icon: 'clock' },
-  end_time: { name: 'End Time', icon: 'clock' },
   duration: { name: 'Duration', icon: 'activity' },
   status: {
     name: 'Status',

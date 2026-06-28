@@ -217,6 +217,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   const [isPlaying, setIsPlaying] = useState(null);
   const [isHoveringVoice, setIsHoveringVoice] = useState(false);
   const [mobileTimelineOpacity, setMobileTimelineOpacity] = useState(1);
+  const [copyVisible, setCopyVisible] = useState(false);
   const autoPlayRef = useRef(null);
   const audioRef = useRef(null);
   const innerRef = useRef(null);
@@ -253,6 +254,27 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
     audio.play();
     audio.onended = () => setIsPlaying(null);
   };
+
+  useEffect(() => {
+    const root = innerRef.current;
+    if (!root || copyVisible) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setCopyVisible(true);
+          observer.disconnect();
+        }
+      },
+      {
+        threshold: 0,
+        rootMargin: '0px 0px -68% 0px',
+      }
+    );
+
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [copyVisible]);
 
   useEffect(() => {
     const root = innerRef.current;
@@ -313,7 +335,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                 >
                   <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:max-w-[34rem] lg:items-start lg:gap-5 lg:text-left">
                     <h1
-                      className="hero-concept-name lg:self-start"
+                      className={`hero-concept-name homepage-copy-reveal lg:self-start ${copyVisible ? 'is-visible' : ''}`}
                       style={{
                         fontSize: 'clamp(5rem, 12vw, 11rem)',
                         lineHeight: 0.8,
@@ -343,7 +365,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                     </div>
 
                     {active.description && (
-                      <p className="max-w-md text-base font-light leading-relaxed text-white/60 md:max-w-[36rem] md:text-[1.22rem] md:leading-[1.75] lg:mx-0 lg:max-w-md lg:text-lg lg:leading-relaxed">
+                      <p className={`homepage-copy-reveal homepage-copy-reveal--delayed max-w-md text-base font-light leading-relaxed text-white/60 md:max-w-[36rem] md:text-[1.22rem] md:leading-[1.75] lg:mx-0 lg:max-w-md lg:text-lg lg:leading-relaxed ${copyVisible ? 'is-visible' : ''}`}>
                         {active.description}
                       </p>
                     )}

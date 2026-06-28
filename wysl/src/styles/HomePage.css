@@ -5,6 +5,27 @@
     --gradient-end: var(--color2);
 }
 
+.homepage-copy-reveal {
+    opacity: 0;
+    transform: translateY(24px) scale(0.985);
+    filter: blur(12px);
+    transition:
+        opacity 900ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 900ms cubic-bezier(0.16, 1, 0.3, 1),
+        filter 900ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform, filter;
+}
+
+.homepage-copy-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+}
+
+.homepage-copy-reveal--delayed {
+    transition-delay: 160ms;
+}
+
 .header, .h1-part, .hero-section .hero-headline, .hero-section .hero-subheadline, .hero-image, .content-section h3:not(.typing-animation-container), .content-section p, .content-section-image, .feature-card, .footer {
     opacity: 0;
     transform: translateY(20px);

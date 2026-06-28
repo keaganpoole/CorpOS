@@ -1,200 +1,124 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 
-// ==========================================
-// UTILS & SHARED LOGIC
-// ==========================================
-const useCanvasResize = (canvasRef, containerRef) => {
-  const [size, setSize] = useState({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const handleResize = () => {
-      const canvas = canvasRef.current;
-      const container = containerRef.current;
-      if (!canvas || !container) return;
-
-      const rect = container.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-
-      setSize({ width: rect.width, height: rect.height });
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [canvasRef, containerRef]);
-
-  return size;
-};
-
-// ==========================================
-// METAMORPHIC FLUID (The Organic Blob)
-// ==========================================
-const MetamorphicFluid = ({ isExpanded }) => {
-  const canvasRef = useRef(null);
-  const containerRef = useRef(null);
-  const size = useCanvasResize(canvasRef, containerRef);
-  const mouseRef = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animationId;
-    let time = 0;
-
-    const render = () => {
-      const dpr = window.devicePixelRatio || 1;
-      const w = canvas.width;
-      const h = canvas.height;
-      const cx = w / 2;
-      const cy = h / 2;
-
-      ctx.fillStyle = '#030108';
-      ctx.fillRect(0, 0, w, h);
-
-      time += 0.008;
-      const mouse = mouseRef.current;
-      mouse.x += (mouse.tx - mouse.x) * 0.08;
-      mouse.y += (mouse.ty - mouse.y) * 0.08;
-
-      const baseRad = Math.min(w, h) * (isExpanded ? 0.28 : 0.22);
-
-      // Helper to generate fluid blob coordinates
-      const getBlobCoords = (rad, speedScale, offsetScale, noiseFreq) => {
-        const coords = [];
-        const steps = 180;
-        for (let i = 0; i <= steps; i++) {
-          const angle = (i / steps) * Math.PI * 2;
-          
-          // Synthesizing fluid noise using layered sines
-          const wave1 = Math.sin(angle * 3 + time * speedScale) * 10;
-          const wave2 = Math.cos(angle * 5 - time * 1.4 * speedScale) * 12;
-          const wave3 = Math.sin(angle * 8 + time * 0.7) * 6;
-          
-          // Interactive morph warp based on mouse
-          const mouseWarp = Math.cos(angle - Math.atan2(mouse.y, mouse.x)) * (Math.sqrt(mouse.x*mouse.x + mouse.y*mouse.y) * 45);
-
-          const r = rad + (wave1 + wave2 + wave3) * offsetScale + mouseWarp;
-          const px = cx + Math.cos(angle) * r;
-          const py = cy + Math.sin(angle) * r;
-          coords.push({ x: px, y: py });
-        }
-        return coords;
-      };
-
-      // 1. Giant Soft Gradient Aura Outer Ring
-      const outerCoords = getBlobCoords(baseRad * 1.35, 0.7, 1.8, 1);
-      ctx.save();
-      ctx.beginPath();
-      outerCoords.forEach((p, idx) => {
-        if (idx === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.closePath();
-      
-      const auraGrad = ctx.createRadialGradient(cx, cy, baseRad * 0.5, cx, cy, baseRad * 1.8);
-      auraGrad.addColorStop(0, 'rgba(236, 72, 153, 0.15)');
-      auraGrad.addColorStop(0.5, 'rgba(168, 85, 247, 0.06)');
-      auraGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = auraGrad;
-      ctx.fill();
-      ctx.restore();
-
-      // 2. Translucent Middle Core Ring
-      const midCoords = getBlobCoords(baseRad * 1.05, 1.2, 1.2, 1.5);
-      ctx.save();
-      ctx.beginPath();
-      midCoords.forEach((p, idx) => {
-        if (idx === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.closePath();
-      const midGrad = ctx.createLinearGradient(0, 0, w, h);
-      midGrad.addColorStop(0, 'rgba(236, 72, 153, 0.2)');
-      midGrad.addColorStop(1, 'rgba(168, 85, 247, 0.25)');
-      ctx.strokeStyle = 'rgba(236, 72, 153, 0.4)';
-      ctx.lineWidth = 1 * dpr;
-      ctx.stroke();
-      ctx.fillStyle = midGrad;
-      ctx.fill();
-      ctx.restore();
-
-      // 3. Central Solid Morphing Core
-      const coreCoords = getBlobCoords(baseRad * 0.85, 1.5, 0.8, 2);
-      ctx.save();
-      ctx.beginPath();
-      coreCoords.forEach((p, idx) => {
-        if (idx === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.closePath();
-
-      const coreGrad = ctx.createLinearGradient(cx - baseRad, cy - baseRad, cx + baseRad, cy + baseRad);
-      coreGrad.addColorStop(0, '#ec4899'); // Neon Pink
-      coreGrad.addColorStop(1, '#6b21a8'); // Ultra Violet Deep
-      
-      ctx.fillStyle = coreGrad;
-      ctx.shadowColor = 'rgba(236, 72, 153, 0.5)';
-      ctx.shadowBlur = 35 * dpr;
-      ctx.fill();
-      ctx.restore();
-
-      animationId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    const handleMouseMove = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-      mouseRef.current.tx = x;
-      mouseRef.current.ty = y;
-    };
-
-    const handleMouseLeave = () => {
-      mouseRef.current.tx = 0;
-      mouseRef.current.ty = 0;
-    };
-
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseleave', handleMouseLeave);
-
-    return () => {
-      cancelAnimationFrame(animationId);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseleave', handleMouseLeave);
-    };
-  }, [size, isExpanded]);
-
-  return (
-    <div ref={containerRef} className="w-full h-full relative overflow-hidden bg-[#030108]">
-      <canvas ref={canvasRef} className="block w-full h-full" />
-      <div className="absolute bottom-6 left-6 font-mono text-[10px] tracking-[0.2em] text-purple-400/50 uppercase select-none pointer-events-none">
-        02 // METAMORPHIC FLUID
-      </div>
-    </div>
-  );
-};
-
-// ==========================================
-// MAIN APP COMPONENT
-// ==========================================
 export default function App() {
   return (
-    <div className="min-h-screen w-full bg-[#020005] overflow-hidden select-none flex flex-col justify-between font-sans relative">
+    <div 
+      className="min-h-screen bg-[#000000] text-neutral-100 canvas-font flex flex-col justify-center items-center p-8 select-none overflow-hidden relative"
+    >
       
-      {/* Absolute faint background ambient noise grid */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(168,85,247,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(168,85,247,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none z-0" />
+      {}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
 
-      {/* Main Single Presentation Layer */}
-      <div className="flex-grow w-full h-full relative z-10">
-        <MetamorphicFluid isExpanded={true} />
+        .canvas-font {
+          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        /* Prism Refraction Channel Separation & Blur - Plays once */
+        @keyframes prismRedMove {
+          0% { transform: translate(-14px, -4px) scale(1.03); opacity: 0; filter: blur(3px); }
+          15% { opacity: 0.95; }
+          55% { transform: translate(-3px, -1px) scale(1.01); opacity: 0.5; }
+          80% { opacity: 0.15; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0; filter: blur(0); }
+        }
+
+        @keyframes prismBlueMove {
+          0% { transform: translate(14px, 4px) scale(1.03); opacity: 0; filter: blur(3px); }
+          15% { opacity: 0.95; }
+          55% { transform: translate(3px, 1px) scale(1.01); opacity: 0.5; }
+          80% { opacity: 0.15; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0; filter: blur(0); }
+        }
+
+        @keyframes prismGreenMove {
+          0% { transform: scale(1.1); opacity: 0; filter: blur(10px); }
+          30% { opacity: 0.7; filter: blur(3px); }
+          100% { transform: scale(1); opacity: 1; filter: blur(0); }
+        }
+
+        /* Brilliant contrast/brightness settling flash - Plays once */
+        @keyframes flashSettle {
+          0% { filter: brightness(4.5) contrast(1.5) drop-shadow(0 0 35px rgba(255,255,255,0.9)); }
+          25% { filter: brightness(1.8) contrast(1.2) drop-shadow(0 0 15px rgba(255,255,255,0.3)); }
+          100% { filter: brightness(1) contrast(1) drop-shadow(0 2px 10px rgba(255,255,255,0.15)); }
+        }
+      `}</style>
+
+      {}
+      <div className="absolute w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-gradient-to-b from-[#111111] via-transparent to-transparent rounded-full filter blur-[120px] pointer-events-none opacity-80 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+      
+      {}
+      <div className="w-full text-center relative z-10 max-w-5xl">
+        
+        {/* Exact Layout matching your reference image: Screenshot 2026-06-23 002655.png */}
+        <h1 className="flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-5 text-[10vw] sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight canvas-font leading-none text-center">
+          
+          {/* "One." */}
+          <span className="bg-gradient-to-b from-white via-neutral-100 to-[#a3a3a3] bg-clip-text text-transparent pb-1">
+            One.
+          </span>
+
+          {/* Isolated Prism Animation Node - No dynamic keys, triggers once on mount */}
+          <span className="relative inline-block mx-1">
+            <span className="relative inline-block">
+              
+              {/* Red refracted slice */}
+              <span
+                className="absolute inset-0 select-none text-[#ff0055] mix-blend-screen pointer-events-none"
+                style={{
+                  animationName: 'prismRedMove',
+                  animationDuration: '1.2s',
+                  animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                  animationIterationCount: 1,
+                  animationFillMode: 'forwards',
+                }}
+              >
+                Stunning.
+              </span>
+              
+              {/* Blue refracted slice */}
+              <span
+                className="absolute inset-0 select-none text-[#00ffcc] mix-blend-screen pointer-events-none"
+                style={{
+                  animationName: 'prismBlueMove',
+                  animationDuration: '1.2s',
+                  animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                  animationIterationCount: 1,
+                  animationFillMode: 'forwards',
+                }}
+              >
+                Stunning.
+              </span>
+              
+              {/* Converged layout gradient lock-in with brightness flash */}
+              <span
+                className="relative inline-block bg-gradient-to-b from-[#ffffff] via-[#e2e8f0] to-[#94a3b8] bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(255,255,255,0.1)]"
+                style={{
+                  animationName: 'prismGreenMove, flashSettle',
+                  animationDuration: '1.2s, 0.9s',
+                  animationDelay: '0s, 0.24s',
+                  animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1), ease-out',
+                  animationIterationCount: '1, 1',
+                  animationFillMode: 'forwards',
+                }}
+              >
+                Stunning.
+              </span>
+              
+            </span>
+          </span>
+
+          {/* "CRM." */}
+          <span className="bg-gradient-to-b from-white via-neutral-100 to-[#a3a3a3] bg-clip-text text-transparent pb-1">
+            CRM.
+          </span>
+        </h1>
+
+        {/* Subtitle Matching Reference Image: Screenshot 2026-06-23 002655.png */}
+        <p className="mt-8 text-neutral-400 text-xs sm:text-sm max-w-lg mx-auto tracking-wide font-normal leading-relaxed text-center px-4 opacity-90">
+          Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.
+        </p>
       </div>
 
     </div>

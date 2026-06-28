@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, Check, ChevronDown, Save, Trash2, X } from 'lucide-react';
 import {
   TABLE_COLUMNS,
-  computeEndTime,
   formatDate,
   formatTime,
   formatTimestamp,
@@ -330,11 +329,6 @@ const AppointmentDetailPanel = ({ appointment, onSave, onDelete, onClose, isNew 
       if (field.key === 'person_id') {
         const personOption = lookupOptions.person_id.find((option) => String(option.value) === String(value || ''));
         next.client_name = personOption?.label || currentAppointment.client_name || null;
-      }
-      if (field.key === 'time' || field.key === 'duration') {
-        const nextTime = field.key === 'time' ? value : (next.time ?? currentAppointment.time);
-        const nextDuration = field.key === 'duration' ? value : (next.duration ?? currentAppointment.duration);
-        next.end_time = computeEndTime(nextTime, nextDuration);
       }
       return next;
     });

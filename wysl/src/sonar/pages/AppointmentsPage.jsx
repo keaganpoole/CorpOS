@@ -43,7 +43,7 @@ const AppointmentsPage = ({ data = null, className = '' }) => {
   };
 
   return (
-    <div className={`flex h-full bg-[#020202] relative overflow-hidden ${className}`.trim()}>
+    <div className={`relative flex h-full overflow-hidden bg-transparent ${className}`.trim()}>
       {error && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-rose-500/10 border-b border-rose-500/20 px-8 py-2 flex items-center gap-3">
           <span className="text-[11px] text-rose-400 font-medium">{error}</span>

@@ -8,7 +8,7 @@ import {
   ToggleLeft,
 } from 'lucide-react';
 import {
-  TABLE_COLUMNS, SOURCE_OPTIONS, computeEndTime, formatDate, formatTime, formatTimestamp, normalizeOptionValue, getFieldDef,
+  TABLE_COLUMNS, SOURCE_OPTIONS, formatDate, formatTime, formatTimestamp, normalizeOptionValue, getFieldDef,
 } from '../lib/appointmentSchema';
 import {
   DEFAULT_FIELD_CONFIG, fetchBusinessFieldConfig, loadFieldConfig, migrateLegacyFieldConfig,
@@ -36,8 +36,10 @@ const FIELD_TYPE_ICONS = {
 
 const ZONE_META_KEY = '__zones';
 const ZONE_SWATCHES = ['#22d3ee', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#f59e0b', '#10b981', '#14b8a6'];
+const REQUIRED_COLUMN_IDS = new Set(['person_id', 'service_id']);
 
 const isZoneEligibleColumn = (col) => Boolean(col?.label) && col.id !== 'select' && col.id !== 'avatar';
+const isColumnLocked = (columnId) => REQUIRED_COLUMN_IDS.has(columnId);
 
 const getSavedZones = (config) => {
   if (!Array.isArray(config?.[ZONE_META_KEY])) return [];
@@ -280,6 +282,51 @@ const InlineDateOnly = ({ value, onSave }) => {
           ref={ref}
           autoFocus
           type="date"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute left-0 top-full mt-1 h-px w-px opacity-0 pointer-events-none focus:outline-none [color-scheme:dark]"
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+      )}
+    </div>
+  );
+};
+
+const InlineTime = ({ value, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!editing) return undefined;
+    const frame = requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.showPicker?.();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editing]);
+
+  const save = () => {
+    setEditing(false);
+    onSave(draft || null);
+  };
+
+  return (
+    <div className="relative block w-full">
+      <span
+        onClick={(e) => { e.stopPropagation(); setDraft(value || ''); setEditing(true); }}
+        className="block w-full cursor-pointer truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 transition-colors hover:text-white"
+      >
+        {formatTime(value)}
+      </span>
+      {editing && (
+        <input
+          ref={ref}
+          type="time"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={save}
@@ -697,7 +744,7 @@ const DraggableHeader = ({
   );
 };
 
-const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], selection = null, lookupOptions = {} }) => {
+const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], selection = null, lookupOptions = {}, receptionistsById = new Map() }) => {
   const getConfiguredOptions = (key, fallbackOptions = []) => fieldConfig[key]?.options || fallbackOptions;
   const customField = customFields.find((field) => field.key === colId);
   if (customField) {
@@ -753,8 +800,27 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
       );
     case 'service_id':
       return <InlineLookupSelect value={appointment.service_id} options={lookupOptions.services || []} placeholder="Select service" onSave={(v) => autoSave(appointment.id, 'service_id', v)} />;
-    case 'receptionist_id':
-      return <InlineLookupSelect value={String(appointment.receptionist_id || '')} options={lookupOptions.receptionists || []} placeholder="Select receptionist" onSave={(v) => autoSave(appointment.id, 'receptionist_id', v ? Number(v) : null)} />;
+    case 'receptionist_id': {
+      const receptionist = receptionistsById.get(String(appointment.receptionist_id || '')) || null;
+      const receptionistName = receptionist?.full_name || appointment._receptionistName || 'Unassigned';
+      const avatarSrc = appointment._receptionistAvatar || receptionist?.avatar || '';
+      const avatarLabel = receptionistName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('') || 'A';
+      return (
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/[0.08] bg-white/[0.04] text-[10px] font-bold text-zinc-300">
+            {avatarSrc ? <img src={avatarSrc} alt="" className="h-full w-full object-cover" /> : avatarLabel}
+          </span>
+          <span className={`truncate text-[11px] font-semibold tracking-[-0.02em] ${receptionist ? 'text-zinc-200' : 'text-zinc-500'}`}>
+            {receptionistName}
+          </span>
+        </div>
+      );
+    }
     case 'source':
       return <InlineSelect value={appointment.source} options={getConfiguredOptions('source', SOURCE_OPTIONS)} onSave={(v) => autoSave(appointment.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
     default: {
@@ -765,8 +831,7 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
       if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(appointment.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 tabular-nums">{value ?? ''}</span>;
       if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(appointment.id, colId, v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTimestamp(value)}</span>;
       if (field.type === 'date') return field.editable ? <InlineDateOnly value={value} onSave={(v) => autoSave(appointment.id, colId, v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatDate(value)}</span>;
-      if (field.type === 'time') return field.editable ? <InlineText value={value} onSave={(v) => autoSave(appointment.id, { time: v, end_time: computeEndTime(v, appointment.duration) })} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTime(value)}</span>;
-      if (field.type === 'computed_time') return <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTime(computeEndTime(appointment.time, appointment.duration))}</span>;
+      if (field.type === 'time') return field.editable ? <InlineTime value={value} onSave={(v) => autoSave(appointment.id, 'time', v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTime(value)}</span>;
       if (field.type === 'select') return <InlineSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(appointment.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
       if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(appointment.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
       return <InlineText value={value} onSave={(v) => autoSave(appointment.id, colId, v)} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
@@ -777,7 +842,7 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
 const buildColumns = (customFields = [], fieldConfig = {}) => [
   { id: 'select', label: '', width: '20px', sortKey: null },
   { id: 'avatar', label: '', width: '24px', sortKey: null },
-  ...TABLE_COLUMNS.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({
+  ...TABLE_COLUMNS.filter((field) => !fieldConfig[field.key]?.hidden || isColumnLocked(field.key)).map((field) => ({
     id: field.key,
     label: field.label,
     width: field.tableWidth || {
@@ -823,6 +888,13 @@ const parseColumnWidth = (width) => {
 };
 
 const getColumnLabel = (column, fieldConfig = {}) => fieldConfig[column.id]?.name || column.label || column.id;
+const ensureRequiredColumnVisibility = (config = {}) => {
+  const next = { ...config };
+  REQUIRED_COLUMN_IDS.forEach((columnId) => {
+    next[columnId] = { ...next[columnId], hidden: false };
+  });
+  return next;
+};
 
 const getAllDataColumns = (customFields = [], fieldConfig = {}) => [
   ...TABLE_COLUMNS.map((field) => ({
@@ -1017,10 +1089,12 @@ const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll
       <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
         {filtered.map((column) => {
           const hidden = !!fieldConfig[column.id]?.hidden;
+          const locked = isColumnLocked(column.id);
           return (
-            <button key={column.id} type="button" onClick={() => onSetHidden(column.id, !hidden)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04]">
+            <button key={column.id} type="button" disabled={locked} onClick={() => onSetHidden(column.id, !hidden)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${locked ? 'cursor-not-allowed opacity-65' : 'hover:bg-white/[0.04]'}`}>
               <span className="w-4">{!hidden && <Check size={12} className="text-cyan-400" />}</span>
               <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${hidden ? 'text-zinc-500' : 'text-zinc-300'}`}>{getColumnLabel(column, fieldConfig)}</span>
+              {locked && <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Locked</span>}
             </button>
           );
         })}
@@ -1087,7 +1161,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   const density = viewSettings.rowHeight ?? 3;
   const [businessId, setBusinessId] = useState(null);
   const [customFields, setCustomFields] = useState([]);
-  const [fieldConfig, setFieldConfig] = useState(() => loadFieldConfig());
+  const [fieldConfig, setFieldConfig] = useState(() => ensureRequiredColumnVisibility(loadFieldConfig()));
   const [columns, setColumns] = useState(() => buildColumns([], DEFAULT_FIELD_CONFIG));
   const [colorbarRules, setColorbarRules] = useState(() => loadColorbarRules());
   const [settingsField, setSettingsField] = useState(null);
@@ -1131,6 +1205,10 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
       label: receptionist.full_name || receptionist.first_name || `Receptionist ${receptionist.id}`,
     })),
   }), [people, receptionists, services]);
+  const receptionistsById = useMemo(
+    () => new Map((receptionists || []).map((receptionist) => [String(receptionist.id), receptionist])),
+    [receptionists],
+  );
 
   const updateViewSettings = useCallback((updates) => {
     setViewSettings((current) => {
@@ -1149,7 +1227,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
           fetchBusinessFieldConfig(nextBusinessId),
           fetchCustomFields(nextBusinessId),
         ]);
-        const nextFieldConfig = await migrateLegacyFieldConfig(nextBusinessId, rawConfig);
+        const nextFieldConfig = ensureRequiredColumnVisibility(await migrateLegacyFieldConfig(nextBusinessId, rawConfig));
         if (!active) return;
         setBusinessId(nextBusinessId);
         setFieldConfig(nextFieldConfig);
@@ -1447,6 +1525,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   }, [customFields, fieldConfig]);
 
   const setColumnHidden = useCallback((key, hidden) => {
+    if (isColumnLocked(key)) return;
     persistFieldConfig({
       ...fieldConfig,
       [key]: { ...fieldConfig[key], hidden },
@@ -1456,6 +1535,10 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   const setAllColumnsHidden = useCallback((hidden) => {
     const next = { ...fieldConfig };
     allDataColumns.forEach((column) => {
+      if (isColumnLocked(column.id)) {
+        next[column.id] = { ...next[column.id], hidden: false };
+        return;
+      }
       next[column.id] = { ...next[column.id], hidden };
     });
     persistFieldConfig(next);
@@ -1737,7 +1820,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
       style={{ width: col.width, minWidth: col.width }}
       className={col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'}
     >
-      <AppointmentCell colId={col.id} appointment={appointment} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(appointment.id), toggle: toggleSelectedId }} lookupOptions={lookupOptions} />
+      <AppointmentCell colId={col.id} appointment={appointment} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(appointment.id), toggle: toggleSelectedId }} lookupOptions={lookupOptions} receptionistsById={receptionistsById} />
     </div>
   );
 

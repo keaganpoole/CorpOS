@@ -301,6 +301,36 @@ const MONITORING_HEADLINE_STYLES = `
   }
 `;
 
+const CRM_STUNNING_STYLES = `
+  @keyframes crm-prism-red-move {
+    0% { transform: translate(-14px, -4px) scale(1.03); opacity: 0; filter: blur(3px); }
+    15% { opacity: 0.95; }
+    55% { transform: translate(-3px, -1px) scale(1.01); opacity: 0.5; }
+    80% { opacity: 0.15; }
+    100% { transform: translate(0, 0) scale(1); opacity: 0; filter: blur(0); }
+  }
+
+  @keyframes crm-prism-blue-move {
+    0% { transform: translate(14px, 4px) scale(1.03); opacity: 0; filter: blur(3px); }
+    15% { opacity: 0.95; }
+    55% { transform: translate(3px, 1px) scale(1.01); opacity: 0.5; }
+    80% { opacity: 0.15; }
+    100% { transform: translate(0, 0) scale(1); opacity: 0; filter: blur(0); }
+  }
+
+  @keyframes crm-prism-green-move {
+    0% { transform: scale(1.1); opacity: 0; filter: blur(10px); }
+    30% { opacity: 0.7; filter: blur(3px); }
+    100% { transform: scale(1); opacity: 1; filter: blur(0); }
+  }
+
+  @keyframes crm-flash-settle {
+    0% { filter: brightness(4.5) contrast(1.5) drop-shadow(0 0 35px rgba(255,255,255,0.9)); }
+    25% { filter: brightness(1.8) contrast(1.2) drop-shadow(0 0 15px rgba(255,255,255,0.3)); }
+    100% { filter: brightness(1) contrast(1) drop-shadow(0 2px 10px rgba(255,255,255,0.15)); }
+  }
+`;
+
 function MonitoringHeadline({ playKey }) {
   return (
     <>
@@ -320,6 +350,58 @@ function MonitoringHeadline({ playKey }) {
           Live Call Monitoring
         </h2>
       </div>
+    </>
+  );
+}
+
+function CrmStunningWord({ shouldAnimate }) {
+  const animatedStyle = shouldAnimate
+    ? {
+        animationDuration: '1.2s',
+        animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        animationIterationCount: 1,
+        animationFillMode: 'forwards',
+      }
+    : null;
+
+  return (
+    <>
+      <style>{CRM_STUNNING_STYLES}</style>
+      <span className="relative mx-[0.08em] inline-block align-baseline">
+        <span className="relative inline-block">
+          <span
+            className="pointer-events-none absolute inset-0 select-none text-[#ff0055] mix-blend-screen"
+            style={shouldAnimate ? { ...animatedStyle, animationName: 'crm-prism-red-move' } : { opacity: 0 }}
+          >
+            Stunning.
+          </span>
+
+          <span
+            className="pointer-events-none absolute inset-0 select-none text-[#00ffcc] mix-blend-screen"
+            style={shouldAnimate ? { ...animatedStyle, animationName: 'crm-prism-blue-move' } : { opacity: 0 }}
+          >
+            Stunning.
+          </span>
+
+          <span
+            className="relative inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(255,255,255,0.1)]"
+            style={
+              shouldAnimate
+                ? {
+                    animationName: 'crm-prism-green-move, crm-flash-settle',
+                    animationDuration: '1.2s, 0.9s',
+                    animationDelay: '0s, 0.24s',
+                    animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1), ease-out',
+                    animationIterationCount: '1, 1',
+                    animationFillMode: 'forwards',
+                  }
+                : undefined
+            }
+          >
+            Stunning.
+          </span>
+        </span>
+      </span>
     </>
   );
 }
@@ -439,6 +521,8 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const [demoInstanceKey, setDemoInstanceKey] = useState(0);
   const [scenarioAwaitingReentry, setScenarioAwaitingReentry] = useState(false);
   const [crmAwaitingReentry, setCrmAwaitingReentry] = useState(false);
+  const [crmHeadlinePlayed, setCrmHeadlinePlayed] = useState(false);
+  const [copyVisible, setCopyVisible] = useState(false);
   const [monitoringHeadlineKey, setMonitoringHeadlineKey] = useState(null);
   const monitoringHeadlinePlayedRef = useRef(false);
   const [compactCalendarCycle, setCompactCalendarCycle] = useState(0);
@@ -457,6 +541,27 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
       : isScenariosVariant
         ? SCENARIO_FEATURE_ITEMS
         : FEATURE_ITEMS;
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || copyVisible) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setCopyVisible(true);
+          observer.disconnect();
+        }
+      },
+      {
+        threshold: 0,
+        rootMargin: '0px 0px -68% 0px',
+      }
+    );
+
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [copyVisible]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -578,10 +683,10 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
 
           <div className="relative z-10 mx-auto w-full max-w-[1300px] px-6 text-center md:px-10 lg:px-12">
             <div className="mx-auto max-w-[1100px]">
-              <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-4xl font-black leading-[0.95] tracking-[-0.06em] text-transparent md:text-7xl lg:text-[6.2rem]">
+              <h2 className={`homepage-copy-reveal bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-4xl font-black leading-[0.95] tracking-[-0.06em] text-transparent md:text-7xl lg:text-[6.2rem] ${copyVisible ? 'is-visible' : ''}`}>
                 One. Stunning. CRM.
               </h2>
-              <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
+              <div className={`homepage-copy-reveal homepage-copy-reveal--delayed mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl ${copyVisible ? 'is-visible' : ''}`}>
                 Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.
               </div>
             </div>
@@ -649,6 +754,29 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   }, [crmAwaitingReentry, isCrmVariant, sectionProgress]);
 
   useEffect(() => {
+    if (!isCrmVariant || crmHeadlinePlayed) return;
+
+    const root = rootRef.current;
+    if (!root) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setCrmHeadlinePlayed(true);
+          observer.disconnect();
+        }
+      },
+      {
+        threshold: 0,
+        rootMargin: '0px 0px -72% 0px',
+      }
+    );
+
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [crmHeadlinePlayed, isCrmVariant]);
+
+  useEffect(() => {
     if (!isMonitoringVariant) return;
 
     const root = rootRef.current;
@@ -700,8 +828,8 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     const titleLines = isMonitoringVariant
       ? ['Live Call Monitoring']
       : isCrmVariant
-      ? ['One. Stunning. CRM.']
-      : ['Scenario Workflow Builder.'];
+      ? ['One.', 'CRM.']
+      : ['Build Custom Workflows'];
     const description = isMonitoringVariant
       ? 'Monitor calls as they happen and review every conversation later with the context, playback, and history your team actually needs.'
       : isCrmVariant
@@ -724,12 +852,26 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             <div className="mx-auto max-w-[860px] px-2 text-center sm:px-4">
               {isMonitoringVariant ? (
                 monitoringHeadlineKey !== null ? (
-                  <MonitoringHeadline playKey={monitoringHeadlineKey} />
+                  <div className={`homepage-copy-reveal ${copyVisible ? 'is-visible' : ''}`}>
+                    <MonitoringHeadline playKey={monitoringHeadlineKey} />
+                  </div>
                 ) : (
                   <div className="min-h-[10rem]" />
                 )
+              ) : isCrmVariant ? (
+                <h2 className={`homepage-copy-reveal mx-auto max-w-[10ch] text-balance pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-white sm:max-w-[12ch] md:text-7xl lg:max-w-none lg:text-[5.1rem] xl:text-[5.4rem] ${copyVisible ? 'is-visible' : ''}`}>
+                  <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent">
+                    One.
+                  </span>
+                  {' '}
+                  <CrmStunningWord shouldAnimate={crmHeadlinePlayed} />
+                  {' '}
+                  <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent">
+                    CRM.
+                  </span>
+                </h2>
               ) : (
-                <h2 className={`bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl ${isCrmVariant ? 'mx-auto max-w-[10ch] text-balance sm:max-w-[12ch] lg:max-w-none lg:text-[5.1rem] xl:text-[5.4rem]' : 'lg:text-[5.8rem]'}`}>
+                <h2 className={`homepage-copy-reveal bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl ${copyVisible ? 'is-visible' : ''} ${isCrmVariant ? 'mx-auto max-w-[10ch] text-balance sm:max-w-[12ch] lg:max-w-none lg:text-[5.1rem] xl:text-[5.4rem]' : 'lg:text-[5.8rem]'}`}>
                   {titleLines.map((line, index) => (
                     <React.Fragment key={line}>
                       {line}
@@ -738,7 +880,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   ))}
                 </h2>
               )}
-              <div className={`mx-auto text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl ${isMonitoringVariant ? 'mt-2 max-w-[820px]' : 'mt-6 max-w-[760px]'}`}>
+              <div className={`homepage-copy-reveal homepage-copy-reveal--delayed mx-auto text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl ${copyVisible ? 'is-visible' : ''} ${isMonitoringVariant ? 'mt-2 max-w-[820px]' : 'mt-6 max-w-[760px]'}`}>
                 {description}
               </div>
               {isMonitoringVariant && (
@@ -853,7 +995,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               }}
             >
               <div className="text-center lg:text-left">
-                <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-1 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[4rem] lg:pb-2">
+                <h2 className={`homepage-copy-reveal bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-1 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[4rem] lg:pb-2 ${copyVisible ? 'is-visible' : ''}`}>
                   {isScenariosVariant ? (
                     <>
                       Scenario
@@ -871,7 +1013,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                     </>
                   )}
                 </h2>
-                <div className="calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:mx-auto md:max-w-[36rem] md:text-center md:text-[1.1rem] md:leading-[1.55] lg:mx-0 lg:max-w-[24rem] lg:text-left lg:text-base lg:leading-[1.45]">
+                <div className={`homepage-copy-reveal homepage-copy-reveal--delayed calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:mx-auto md:max-w-[36rem] md:text-center md:text-[1.1rem] md:leading-[1.55] lg:mx-0 lg:max-w-[24rem] lg:text-left lg:text-base lg:leading-[1.45] ${copyVisible ? 'is-visible' : ''}`}>
                   {isScenariosVariant
                     ? 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.'
                     : 'Turn every conversation into a booked appointment. Your AI receptionist answers every call instantly, checks real-time availability, books, reschedules, and confirms appointments while handling multiple conversations at once. No hold times, no missed opportunities, no smoke breaks — just a calendar that fills itself 24/7.'}

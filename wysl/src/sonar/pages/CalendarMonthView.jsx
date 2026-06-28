@@ -109,6 +109,7 @@ export default function CalendarMonthView({ data = null, className = '' }) {
   const [addError, setAddError] = useState('');
   const [adding, setAdding] = useState(false);
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
+  const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
   const addInputRef = useRef(null);
 
   const servicesById = useMemo(
@@ -138,7 +139,6 @@ export default function CalendarMonthView({ data = null, className = '' }) {
   }, [allAppointments]);
 
   const selectedDateAppointments = selectedDate ? (appointmentsByDate[selectedDate] || []) : [];
-
   useEffect(() => {
     if (hasAnimatedDots) return;
     const timer = window.setTimeout(() => setHasAnimatedDots(true), 120);
@@ -223,8 +223,8 @@ export default function CalendarMonthView({ data = null, className = '' }) {
     : `${MONTHS[month]} 1`;
 
   return (
-    <div className={`relative flex h-full min-h-0 w-full items-center justify-center bg-[#020202] p-3 sm:p-4 md:p-5 ${className}`.trim()}>
-      <div className="relative w-full overflow-hidden rounded-[22px] border border-white/5 bg-[#08080A] p-3 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] sm:p-4 md:rounded-[28px] md:p-5 xl:p-10">
+    <div className={`relative flex h-full min-h-0 w-full items-start justify-center bg-transparent p-3 pt-2 sm:p-4 sm:pt-3 md:p-5 md:pt-4 ${className}`.trim()}>
+      <div className="relative w-full overflow-hidden rounded-[22px] border border-white/[0.05] bg-[#0a0a0a] p-3 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] sm:p-4 md:rounded-[28px] md:p-5 xl:p-10">
         <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/5 pb-3 text-left md:mb-4 md:pb-4 xl:mb-6 xl:pb-6">
           <span className="flex items-center space-x-2 font-bold tracking-tight text-white text-[1rem] md:text-[1.25rem] xl:text-[2rem]">
             <CalendarIcon className="text-zinc-300" size={22} />
@@ -234,25 +234,25 @@ export default function CalendarMonthView({ data = null, className = '' }) {
           <div className="flex items-center gap-1.5">
             <button
               onClick={goToToday}
-              className="rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-white"
+              className="rounded-lg border border-transparent bg-white/[0.04] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-400 transition-all hover:bg-white/[0.08] hover:text-white"
             >
               Today
             </button>
             <button
               onClick={() => openAddModal(selectedDate || todayStr)}
-              className="group flex h-8 w-8 items-center justify-center rounded-lg border border-white bg-white transition-all hover:scale-105 active:scale-95"
+              className="group flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.08] transition-all hover:bg-white/[0.12] hover:scale-105 active:scale-95"
             >
-              <Plus size={14} className="text-black transition-transform duration-300 group-hover:rotate-90" />
+              <Plus size={14} className="text-white transition-transform duration-300 group-hover:rotate-90" />
             </button>
             <button
               onClick={goToPrevMonth}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/8 bg-white/[0.03] text-zinc-500 transition-all hover:bg-white/[0.06] hover:text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white"
             >
               <ChevronLeft size={14} />
             </button>
             <button
               onClick={goToNextMonth}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/8 bg-white/[0.03] text-zinc-500 transition-all hover:bg-white/[0.06] hover:text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white"
             >
               <ChevronRight size={14} />
             </button>
@@ -287,7 +287,7 @@ export default function CalendarMonthView({ data = null, className = '' }) {
                 onClick={() => setSelectedDate(dateStr)}
                 className={`relative flex aspect-square flex-col justify-between overflow-hidden border transition-all duration-300 ${
                   isSelected
-                    ? 'z-10 border-transparent bg-gradient-to-tr from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-[0_0_18px_rgba(139,92,246,0.3)]'
+                    ? 'z-10 border-white/[0.08] bg-white/[0.06] text-white shadow-[0_0_18px_rgba(0,0,0,0.22)]'
                     : 'border-white/5 bg-zinc-950/60 text-zinc-400 hover:border-white/20'
                 } rounded-lg p-1.5 md:rounded-lg md:p-2 xl:rounded-xl xl:p-2`}
               >
@@ -324,7 +324,7 @@ export default function CalendarMonthView({ data = null, className = '' }) {
               {Array.from({ length: 2 }).map((_, index) => (
                 <div
                   key={index}
-                  className="agenda-item rounded-lg border border-white/5 bg-zinc-950 animate-pulse h-[42px] md:h-[46px] xl:h-[52px]"
+                  className="agenda-item rounded-lg border border-white/[0.08] bg-[#070707]/92 animate-pulse h-[42px] md:h-[46px] xl:h-[52px]"
                 />
               ))}
             </div>
@@ -343,48 +343,74 @@ export default function CalendarMonthView({ data = null, className = '' }) {
                   || receptionistCatalogRow?.avatar
                   || (receptionistCatalogRow?.banner_id ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${receptionistCatalogRow.banner_id}.png` : '')
                   || '';
-
+                const isExpanded = expandedAppointmentId === appointment.id;
                 return (
-                  <motion.div
-                    key={appointment.id}
-                    initial={false}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`agenda-item flex items-center justify-between rounded-lg border border-white/5 bg-zinc-950 text-left gap-2 p-2 md:gap-2.5 md:p-2.5 xl:gap-3 xl:p-3`}
-                    style={{ animationDelay: `${index * 90}ms` }}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center space-x-2">
-                      <span className="rounded-full h-1.5 w-1.5 md:h-2 md:w-2 xl:h-2.5 xl:w-2.5" style={{ backgroundColor: tagColor }} />
-                      <span className="truncate font-semibold text-zinc-200 text-[10px] md:text-[11px] xl:text-xs">{title}</span>
-                      <span className="text-[10px] font-medium italic text-zinc-500">via</span>
-                      <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[8px] font-bold text-zinc-300">
-                        {avatarSrc ? (
-                          <img
-                            src={avatarSrc}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          avatarLabel
-                        )}
-                      </span>
-                      <span className="font-medium text-zinc-400 hidden xl:inline text-[10px]">
-                        {receptionist}
-                      </span>
-                    </div>
-                    <div className="flex shrink-0 items-center space-x-1.5">
-                      <span
-                        className="rounded border font-bold uppercase tracking-wider px-1.5 py-0.5 text-[7px] md:text-[8px] xl:px-2 xl:text-[9px]"
-                        style={{
-                          color: tagColor,
-                          borderColor: `${tagColor}33`,
-                          backgroundColor: `${tagColor}14`,
-                        }}
-                      >
-                        {category}
-                      </span>
-                      <span className="font-mono text-zinc-400 text-[8px] md:text-[9px] xl:text-[10px]">{formatTime(appointment.time)}</span>
-                    </div>
-                  </motion.div>
+                  <div key={appointment.id} className="space-y-1">
+                    <motion.button
+                      type="button"
+                      onClick={() => setExpandedAppointmentId((current) => (current === appointment.id ? null : appointment.id))}
+                      initial={false}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="agenda-item flex w-full items-center justify-between rounded-lg border border-white/[0.08] bg-[#070707]/92 text-left gap-2 p-2 md:gap-2.5 md:p-2.5 xl:gap-3 xl:p-3"
+                      style={{ animationDelay: `${index * 90}ms` }}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center space-x-2">
+                        <span className="rounded-full h-1.5 w-1.5 md:h-2 md:w-2 xl:h-2.5 xl:w-2.5" style={{ backgroundColor: tagColor }} />
+                        <span className="truncate font-semibold text-zinc-200 text-[10px] md:text-[11px] xl:text-xs">{title}</span>
+                        <span className="text-[10px] font-medium italic text-zinc-500">via</span>
+                        <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[8px] font-bold text-zinc-300">
+                          {avatarSrc ? (
+                            <img
+                              src={avatarSrc}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            avatarLabel
+                          )}
+                        </span>
+                        <span className="font-medium text-zinc-400 hidden xl:inline text-[10px]">
+                          {receptionist}
+                        </span>
+                      </div>
+                      <div className="flex shrink-0 items-center space-x-1.5">
+                        <span
+                          className="rounded border font-bold uppercase tracking-wider px-1.5 py-0.5 text-[7px] md:text-[8px] xl:px-2 xl:text-[9px]"
+                          style={{
+                            color: tagColor,
+                            borderColor: `${tagColor}33`,
+                            backgroundColor: `${tagColor}14`,
+                          }}
+                        >
+                          {category}
+                        </span>
+                        <span className="font-mono text-zinc-400 text-[8px] md:text-[9px] xl:text-[10px]">{formatTime(appointment.time)}</span>
+                      </div>
+                    </motion.button>
+                    <AnimatePresence initial={false}>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.18, ease: 'easeOut' }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pl-4 pr-2 pt-2">
+                            <div className="relative pl-4">
+                              <span className="absolute left-0 top-0 h-full w-px bg-white/[0.08]" />
+                              <div className="mb-1 text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-600">
+                                Notes
+                              </div>
+                              <div className="text-[11px] leading-5 text-zinc-400">
+                                {appointment.notes || 'No notes added for this appointment.'}
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 );
               })}
             </div>

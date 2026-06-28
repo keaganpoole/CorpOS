@@ -34,10 +34,6 @@ const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
     next.time = next.time.slice(0, 5);
   }
 
-  if ((next.time != null || next.duration != null) && !('end_time' in next)) {
-    next.end_time = computeEndTime(next.time, next.duration);
-  }
-
   return next;
 };
 

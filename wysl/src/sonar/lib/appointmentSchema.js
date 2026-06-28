@@ -40,7 +40,6 @@ export const APPOINTMENT_FIELDS = [
   { key: 'service_id', label: 'Service', type: 'service_lookup', required: false, table: true, tableWidth: '180px', section: 'appointment', editable: true },
   { key: 'date', label: 'Date', type: 'date', required: true, table: true, tableWidth: '150px', section: 'schedule', editable: true },
   { key: 'time', label: 'Start Time', type: 'time', required: true, table: true, tableWidth: '130px', section: 'schedule', editable: true },
-  { key: 'end_time', label: 'End Time', type: 'computed_time', required: false, table: true, tableWidth: '130px', section: 'schedule', editable: false },
   { key: 'duration', label: 'Duration', type: 'number', min: 0, max: 1440, required: false, table: false, tableWidth: '120px', section: 'schedule', editable: true },
   { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS, required: false, table: true, tableWidth: '140px', section: 'appointment', editable: true },
   { key: 'source', label: 'Source', type: 'select', options: SOURCE_OPTIONS, required: false, table: true, tableWidth: '140px', section: 'appointment', editable: true },
