@@ -2,7 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { useAppointments } from '../hooks/useAppointments';
 import AppointmentsTable from './AppointmentsTable';
 
-const AppointmentsPage = () => {
+const AppointmentsPage = ({ data = null, className = '' }) => {
+  const appointmentsData = useAppointments();
   const {
     appointments, allAppointments, people, services, receptionists, lookups, loading, error,
     justAddedAppointmentIds,
@@ -11,7 +12,7 @@ const AppointmentsPage = () => {
     sourceFilter, setSourceFilter,
     sortBy, sortDir, handleSort,
     createAppointment, updateAppointment, deleteAppointment, refresh,
-  } = useAppointments();
+  } = data || appointmentsData;
 
   const [creating, setCreating] = useState(false);
   const [tableSchema, setTableSchema] = useState(null);
@@ -42,7 +43,7 @@ const AppointmentsPage = () => {
   };
 
   return (
-    <div className="flex h-full bg-[#020202] relative overflow-hidden">
+    <div className={`flex h-full bg-[#020202] relative overflow-hidden ${className}`.trim()}>
       {error && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-rose-500/10 border-b border-rose-500/20 px-8 py-2 flex items-center gap-3">
           <span className="text-[11px] text-rose-400 font-medium">{error}</span>

@@ -290,7 +290,11 @@ const AppointmentDetailPanel = ({ appointment, onSave, onDelete, onClose, isNew 
       person,
     })),
     service_id: services.map((service) => ({ value: String(service.id), label: service.name || 'Untitled Service', service })),
-    assigned_receptionist: receptionists.map((receptionist) => ({ value: receptionist.full_name, label: receptionist.full_name || receptionist.first_name || 'Unnamed Receptionist', receptionist })),
+    receptionist_id: receptionists.map((receptionist) => ({
+      value: String(receptionist.id),
+      label: receptionist.full_name || receptionist.first_name || `Receptionist ${receptionist.id}`,
+      receptionist,
+    })),
   }), [people, receptionists, services]);
 
   useEffect(() => {

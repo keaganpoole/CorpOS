@@ -2,9 +2,14 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getCurrentBusinessId } from '../lib/appointmentCustomFields';
 import { computeEndTime, normalizeOptionValue, titleCase } from '../lib/appointmentSchema';
+import { api } from '../lib/api';
+
+const getReceptionistBannerUrl = (bannerId) => (
+  bannerId ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${bannerId}.png` : null
+);
 
 const SINGLE_SELECT_FIELDS = new Set(['status', 'source']);
-const TRIMMED_TEXT_FIELDS = new Set(['client_name', 'assigned_receptionist', 'notes', 'time']);
+const TRIMMED_TEXT_FIELDS = new Set(['client_name', 'notes', 'time']);
 
 const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
   const next = { ...payload };
@@ -41,7 +46,7 @@ const matchesSearch = (appointment, query, lookups) => {
   const q = query.toLowerCase();
   const personName = lookups.peopleById.get(String(appointment.person_id || ''))?.display_name || '';
   const serviceName = lookups.servicesById.get(String(appointment.service_id || ''))?.name || '';
-  const receptionistName = lookups.receptionistsById.get(String(appointment.assigned_receptionist_id || ''))?.full_name || '';
+  const receptionistName = lookups.receptionistsById.get(String(appointment.receptionist_id || ''))?.full_name || '';
   const searchable = [
     appointment.client_name,
     personName,
@@ -51,7 +56,6 @@ const matchesSearch = (appointment, query, lookups) => {
     appointment.status,
     appointment.source,
     appointment.notes,
-    appointment.assigned_receptionist,
     receptionistName,
     appointment.created_at,
     appointment.updated_at,
@@ -62,14 +66,20 @@ const matchesSearch = (appointment, query, lookups) => {
 const decorateAppointment = (appointment, lookups) => {
   const person = lookups.peopleById.get(String(appointment.person_id || ''));
   const service = lookups.servicesById.get(String(appointment.service_id || ''));
-  const receptionist = lookups.receptionistsById.get(String(
-    appointment.assigned_receptionist_id || appointment.receptionist_id || ''
-  ));
+  const receptionistKey = String(appointment.receptionist_id || '');
+  const receptionist =
+    lookups.receptionistsById.get(receptionistKey) ||
+    lookups.receptionistsByCatalogId.get(receptionistKey) ||
+    null;
+  const receptionistCatalog = receptionist?.catalog_id ? lookups.receptionistCatalogById.get(String(receptionist.catalog_id)) : null;
+  const bannerUrl = getReceptionistBannerUrl(receptionistCatalog?.banner_id || receptionist?.banner_id || null);
   return {
     ...appointment,
     _personName: person?.display_name || appointment.client_name || '',
     _serviceName: service?.name || '',
-    _receptionistName: receptionist?.full_name || appointment.assigned_receptionist || '',
+    _receptionistName: receptionist?.full_name || '',
+    _receptionistAvatar: receptionist?.avatar || receptionistCatalog?.avatar || bannerUrl || '',
+    _receptionistCatalogId: receptionist?.catalog_id || null,
     _endTime: computeEndTime(appointment.time, appointment.duration),
   };
 };
@@ -79,6 +89,7 @@ export function useAppointments() {
   const [people, setPeople] = useState([]);
   const [services, setServices] = useState([]);
   const [receptionists, setReceptionists] = useState([]);
+  const [receptionistCatalog, setReceptionistCatalog] = useState([]);
   const [justAddedAppointmentIds, setJustAddedAppointmentIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -99,8 +110,12 @@ export function useAppointments() {
     }));
     const servicesById = new Map((services || []).map((service) => [String(service.id), service]));
     const receptionistsById = new Map((receptionists || []).map((receptionist) => [String(receptionist.id), receptionist]));
-    return { peopleById, servicesById, receptionistsById };
-  }, [people, services, receptionists]);
+    const receptionistsByCatalogId = new Map((receptionists || [])
+      .filter((receptionist) => receptionist.catalog_id != null)
+      .map((receptionist) => [String(receptionist.catalog_id), receptionist]));
+    const receptionistCatalogById = new Map((receptionistCatalog || []).map((entry) => [String(entry.id), entry]));
+    return { peopleById, servicesById, receptionistsById, receptionistsByCatalogId, receptionistCatalogById };
+  }, [people, services, receptionists, receptionistCatalog]);
 
   const markJustAdded = useCallback((appointmentId) => {
     if (!appointmentId) return;
@@ -129,21 +144,78 @@ export function useAppointments() {
     try {
       const businessId = businessIdRef.current || await getCurrentBusinessId();
       businessIdRef.current = businessId;
-      const [{ data: appointmentRows, error: appointmentsError }, { data: peopleRows, error: peopleError }, { data: serviceRows, error: servicesError }, { data: receptionistRows, error: receptionistError }] = await Promise.all([
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData?.user?.id || null;
+
+      const [{ data: appointmentRows, error: appointmentsError }, { data: peopleRows, error: peopleError }, { data: serviceRows, error: servicesError }] = await Promise.all([
         supabase.from('appointments').select('*').eq('business_id', businessId).order(sortBy, { ascending: sortDir === 'asc', nullsFirst: false }),
         supabase.from('people').select('id,first_name,last_name,phone,email').eq('business_id', businessId).order('updated_at', { ascending: false }),
         supabase.from('services').select('id,name,category,is_active').eq('business_id', businessId).order('category', { ascending: true }).order('sort_order', { ascending: true }),
-        supabase.from('hired_receptionists').select('id,full_name,first_name,status').eq('business_id', businessId).order('full_name', { ascending: true }),
       ]);
       if (appointmentsError) throw appointmentsError;
       if (peopleError) throw peopleError;
       if (servicesError) throw servicesError;
-      if (receptionistError) throw receptionistError;
+
+      let receptionistRows = [];
+      const apiAgents = await api.getAgents();
+      if (Array.isArray(apiAgents) && apiAgents.length > 0) {
+        receptionistRows = apiAgents.map((agent) => ({
+          id: agent.id,
+          full_name: agent.full_name || agent.name || '',
+          first_name: agent.first_name || agent.name || '',
+          status: agent.status || null,
+          avatar: agent.avatar || null,
+          catalog_id: agent.catalog_id ?? null,
+          user_id: agent.user_id ?? userId ?? null,
+          business_id: agent.business_id ?? businessId ?? null,
+        }));
+      }
+
+      if (receptionistRows.length === 0) {
+        if (businessId && userId) {
+          const combinedResponse = await supabase
+            .from('hired_receptionists')
+            .select('id,full_name,first_name,status,avatar,catalog_id,user_id,business_id')
+            .or(`business_id.eq.${businessId},user_id.eq.${userId}`)
+            .order('full_name', { ascending: true });
+          if (combinedResponse.error) throw combinedResponse.error;
+          receptionistRows = combinedResponse.data || [];
+        } else if (businessId) {
+          const businessResponse = await supabase
+            .from('hired_receptionists')
+            .select('id,full_name,first_name,status,avatar,catalog_id,user_id,business_id')
+            .eq('business_id', businessId)
+            .order('full_name', { ascending: true });
+          if (businessResponse.error) throw businessResponse.error;
+          receptionistRows = businessResponse.data || [];
+        } else if (userId) {
+          const userResponse = await supabase
+            .from('hired_receptionists')
+            .select('id,full_name,first_name,status,avatar,catalog_id,user_id,business_id')
+            .eq('user_id', userId)
+            .order('full_name', { ascending: true });
+          if (userResponse.error) throw userResponse.error;
+          receptionistRows = userResponse.data || [];
+        }
+      }
+
+      receptionistRows = Array.from(
+        new Map((receptionistRows || []).filter((row) => row?.id != null).map((row) => [String(row.id), row])).values(),
+      );
+
+      const catalogIds = Array.from(new Set((receptionistRows || []).map((row) => row.catalog_id).filter((value) => value != null)));
+      const { data: receptionistCatalogRows, error: receptionistCatalogError } = catalogIds.length
+        ? await supabase.from('receptionist_catalog').select('id,avatar,banner_id').in('id', catalogIds)
+        : { data: [], error: null };
+      if (receptionistCatalogError) throw receptionistCatalogError;
+
       if (!abortRef.current) {
         setAppointments(appointmentRows || []);
         setPeople(peopleRows || []);
         setServices(serviceRows || []);
         setReceptionists(receptionistRows || []);
+        setReceptionistCatalog(receptionistCatalogRows || []);
       }
     } catch (err) {
       if (!abortRef.current) setError(err.message);

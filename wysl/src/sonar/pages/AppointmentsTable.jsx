@@ -753,8 +753,8 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
       );
     case 'service_id':
       return <InlineLookupSelect value={appointment.service_id} options={lookupOptions.services || []} placeholder="Select service" onSave={(v) => autoSave(appointment.id, 'service_id', v)} />;
-    case 'assigned_receptionist':
-      return <InlineLookupSelect value={appointment.assigned_receptionist} options={lookupOptions.receptionists || []} placeholder="Select receptionist" onSave={(v) => autoSave(appointment.id, 'assigned_receptionist', v)} />;
+    case 'receptionist_id':
+      return <InlineLookupSelect value={String(appointment.receptionist_id || '')} options={lookupOptions.receptionists || []} placeholder="Select receptionist" onSave={(v) => autoSave(appointment.id, 'receptionist_id', v ? Number(v) : null)} />;
     case 'source':
       return <InlineSelect value={appointment.source} options={getConfiguredOptions('source', SOURCE_OPTIONS)} onSave={(v) => autoSave(appointment.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
     default: {
@@ -1126,7 +1126,10 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
       label: [person.first_name, person.last_name].filter(Boolean).join(' ').trim() || person.phone || person.email || 'Untitled Person',
     })),
     services: services.map((service) => ({ value: String(service.id), label: service.name || 'Untitled Service' })),
-    receptionists: receptionists.map((receptionist) => ({ value: receptionist.full_name, label: receptionist.full_name || receptionist.first_name || 'Unnamed Receptionist' })),
+    receptionists: receptionists.map((receptionist) => ({
+      value: String(receptionist.id),
+      label: receptionist.full_name || receptionist.first_name || `Receptionist ${receptionist.id}`,
+    })),
   }), [people, receptionists, services]);
 
   const updateViewSettings = useCallback((updates) => {

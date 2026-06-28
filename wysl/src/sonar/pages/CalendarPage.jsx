@@ -1,40 +1,21 @@
-import React, { useState } from 'react';
-import { CalendarFold, Rows3 } from 'lucide-react';
+import React from 'react';
 import CalendarMonthView from './CalendarMonthView';
 import AppointmentsPage from './AppointmentsPage';
-
-const VIEW_OPTIONS = [
-  { key: 'calendar', label: 'Calendar View', icon: CalendarFold },
-  { key: 'crm', label: 'CRM View', icon: Rows3 },
-];
+import { useAppointments } from '../hooks/useAppointments';
 
 export default function CalendarPage() {
-  const [activeView, setActiveView] = useState('calendar');
+  const appointmentsData = useAppointments();
 
   return (
-    <div className="h-full flex flex-col bg-[#020202] overflow-hidden">
-      <div className="shrink-0 px-8 pt-5 pb-3 border-b border-white/[0.04] bg-[#070707]/92 backdrop-blur-xl">
-        <div className="inline-flex items-center gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-1">
-          {VIEW_OPTIONS.map((option) => {
-            const Icon = option.icon;
-            const active = activeView === option.key;
-            return (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => setActiveView(option.key)}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[11px] font-semibold tracking-[-0.02em] transition-all ${active ? 'bg-white text-black shadow-[0_0_18px_rgba(255,255,255,0.08)]' : 'text-zinc-500 hover:text-white hover:bg-white/[0.04]'}`}
-              >
-                <Icon size={13} />
-                {option.label}
-              </button>
-            );
-          })}
+    <div className="h-full bg-[#020202] overflow-hidden">
+      <div className="flex h-full min-h-0 flex-row">
+        <div className="min-h-0 min-w-0 flex-1">
+          <AppointmentsPage data={appointmentsData} />
         </div>
-      </div>
 
-      <div className="flex-1 min-h-0">
-        {activeView === 'calendar' ? <CalendarMonthView /> : <AppointmentsPage />}
+        <div className="min-h-0 w-[38%] min-w-[11.5rem] max-w-[19rem] border-l border-white/[0.04] sm:w-[35%] sm:min-w-[14rem] sm:max-w-[23rem] lg:w-[32%] lg:min-w-[18rem] lg:max-w-[28rem] xl:w-[30%] xl:min-w-[22rem] xl:max-w-[36rem]">
+          <CalendarMonthView data={appointmentsData} />
+        </div>
       </div>
     </div>
   );
