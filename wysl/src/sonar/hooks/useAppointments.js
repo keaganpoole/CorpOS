@@ -9,7 +9,7 @@ const getReceptionistBannerUrl = (bannerId) => (
 );
 
 const SINGLE_SELECT_FIELDS = new Set(['status', 'source']);
-const TRIMMED_TEXT_FIELDS = new Set(['client_name', 'notes', 'time']);
+const TRIMMED_TEXT_FIELDS = new Set(['notes', 'time']);
 
 const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
   const next = { ...payload };
@@ -18,7 +18,10 @@ const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
   if (isCreate && !next.created_at) next.created_at = now;
 
   for (const field of SINGLE_SELECT_FIELDS) {
-    if (field in next && typeof next[field] === 'string') next[field] = normalizeOptionValue(next[field]);
+    if (!(field in next) || typeof next[field] !== 'string') continue;
+    next[field] = field === 'status'
+      ? next[field].trim().toLowerCase()
+      : normalizeOptionValue(next[field]);
   }
 
   for (const field of TRIMMED_TEXT_FIELDS) {

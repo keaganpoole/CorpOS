@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useAppointments } from '../hooks/useAppointments';
 import AppointmentsTable from './AppointmentsTable';
 
@@ -14,19 +14,24 @@ const AppointmentsPage = ({ data = null, className = '' }) => {
     createAppointment, updateAppointment, deleteAppointment, refresh,
   } = data || appointmentsData;
 
-  const [creating, setCreating] = useState(false);
   const [tableSchema, setTableSchema] = useState(null);
+  const [creating, setCreating] = useState(false);
 
-  const handleInlineCreate = async () => {
+  const handleInlineCreate = useCallback(async () => {
+    if (creating) return;
     setCreating(true);
-    setSelectedId(null);
-  };
-
-  const handleSaveNew = async (data) => {
-    const result = await createAppointment(data);
-    setCreating(false);
-    return result;
-  };
+    try {
+      const created = await createAppointment({
+        date: new Date().toISOString().slice(0, 10),
+        time: '09:00',
+        duration: 30,
+        status: 'pending',
+        notes: '',
+      }, { placement: 'end' });
+    } finally {
+      setCreating(false);
+    }
+  }, [createAppointment, creating]);
 
   const handleInlineUpdate = useCallback(async (appointmentId, updates) => {
     try {
@@ -65,6 +70,7 @@ const AppointmentsPage = ({ data = null, className = '' }) => {
         onSort={handleSort}
         totalCount={allAppointments.length}
         onCreateInline={handleInlineCreate}
+        creating={creating}
         onDeleteMany={handleDeleteMany}
         onUpdateAppointment={handleInlineUpdate}
         onSchemaChange={setTableSchema}

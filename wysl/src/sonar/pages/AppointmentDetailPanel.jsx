@@ -305,14 +305,12 @@ const AppointmentDetailPanel = ({ appointment, onSave, onDelete, onClose, isNew 
   const currentAppointment = useMemo(() => {
     const base = isNew ? {} : (appointment || {});
     const merged = { ...base, ...edits, custom_fields: { ...(base.custom_fields || {}), ...(edits.custom_fields || {}) } };
-    const personOption = lookupOptions.person_id.find((option) => String(option.value) === String(merged.person_id || ''));
-    if (personOption && !merged.client_name) merged.client_name = personOption.label;
     return merged;
-  }, [appointment, edits, isNew, lookupOptions.person_id]);
+  }, [appointment, edits, isNew]);
 
   if (!appointment && !isNew) return null;
 
-  const displayName = currentAppointment._personName || currentAppointment.client_name || 'Untitled Appointment';
+  const displayName = currentAppointment._personName || 'Untitled Appointment';
   const contactLine = [formatDate(currentAppointment.date), formatTime(currentAppointment.time)].filter(Boolean).join(' at ') || 'No schedule yet';
   const hasChanges = Object.keys(edits).length > 0;
 
@@ -326,10 +324,6 @@ const AppointmentDetailPanel = ({ appointment, onSave, onDelete, onClose, isNew 
       }
 
       const next = { ...prev, [field.key]: value };
-      if (field.key === 'person_id') {
-        const personOption = lookupOptions.person_id.find((option) => String(option.value) === String(value || ''));
-        next.client_name = personOption?.label || currentAppointment.client_name || null;
-      }
       return next;
     });
     if (errors[field.key]) setErrors((prev) => { const next = { ...prev }; delete next[field.key]; return next; });

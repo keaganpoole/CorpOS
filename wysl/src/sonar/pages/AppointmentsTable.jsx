@@ -789,10 +789,8 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
             options={lookupOptions.people || []}
             placeholder="Select person"
             onSave={(personId) => {
-              const selectedPerson = (lookupOptions.people || []).find((option) => String(option.value) === String(personId || ''));
               autoSave(appointment.id, {
                 person_id: personId,
-                client_name: selectedPerson?.label || appointment.client_name || null,
               });
             }}
           />
@@ -1151,7 +1149,7 @@ const RowHeightPopover = ({ value, onChange }) => {
   );
 };
 
-const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateInline, onDeleteMany, totalCount, onUpdateAppointment, onSchemaChange, people = [], services = [], receptionists = [] }) => {
+const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateInline, creating = false, onDeleteMany, totalCount, onUpdateAppointment, onSchemaChange, people = [], services = [], receptionists = [] }) => {
   const [viewSettings, setViewSettings] = useState(() => ({
     rowHeight: 3,
     sortRules: [],
@@ -1925,7 +1923,6 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
           )}
           <div className="divide-y divide-white/[0.02]">
             {!loading && appointments.length > 0 && sortedAppointments.map((appointment, idx) => {
-              const isJustAdded = justAddedAppointmentIds.includes(appointment.id);
               const isRowSelected = selectedId === appointment.id;
               const isRowBulkSelected = selectedIds.includes(appointment.id);
               return (
@@ -1935,23 +1932,8 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(idx * 0.012, 0.35) }}
                   onContextMenu={(event) => handleContextMenu(event, appointment.id)}
-                  className={`group pl-5 pr-0 ${dc.row} flex items-center gap-3 transition-all duration-150 relative ${isRowSelected ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-cyan-500/[0.04]' : ''}`}
+                  className={`group pl-5 pr-0 ${dc.row} flex items-center gap-3 transition-all duration-150 relative ${isRowSelected ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-white/[0.02]' : ''}`}
                 >
-                  {isJustAdded && (
-                    <motion.div
-                      initial={{ opacity: 0, backgroundPosition: '-140% 0%' }}
-                      animate={{ opacity: [0, 0.6, 0], backgroundPosition: ['-140% 0%', '140% 0%'] }}
-                      transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
-                      className="pointer-events-none absolute inset-0 z-10"
-                      style={{
-                        backgroundImage: 'linear-gradient(102deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 32%, rgba(255,255,255,0.028) 44%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.028) 56%, rgba(255,255,255,0) 68%, rgba(255,255,255,0) 100%)',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '42% 100%',
-                        filter: 'blur(10px)',
-                        mixBlendMode: 'screen',
-                      }}
-                    />
-                  )}
                   {renderColorbar(appointment, 'cb-frozen')}
                   {frozenColumns.map((col) => renderAppointmentColumn(col, appointment))}
                 </motion.div>
@@ -1961,9 +1943,17 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
               <button
                 type="button"
                 onClick={onCreateInline}
+                disabled={creating}
                 className={`w-full pl-5 pr-0 ${dc.row} flex items-center gap-3 text-left transition-all duration-150 hover:bg-white/[0.02]`}
               >
-                {frozenColumns.map((col) => renderCreateColumn(col, columns.findIndex((column) => column.id === col.id)))}
+                {creating ? (
+                  <div className="flex items-center gap-3 px-2 text-zinc-700">
+                    <div className="h-4 w-4 animate-spin rounded-full border border-white/10 border-t-cyan-500/60" />
+                    <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-500">Creating appointment...</span>
+                  </div>
+                ) : (
+                  frozenColumns.map((col) => renderCreateColumn(col, columns.findIndex((column) => column.id === col.id)))
+                )}
               </button>
             )}
           </div>
@@ -2121,7 +2111,6 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
               ) : (
                 <>
                   {sortedAppointments.map((appointment, idx) => {
-                    const isJustAdded = justAddedAppointmentIds.includes(appointment.id);
                     const isRowSelected = selectedId === appointment.id;
                     const isRowBulkSelected = selectedIds.includes(appointment.id);
                     return (
@@ -2131,24 +2120,9 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: Math.min(idx * 0.012, 0.35) }}
                         onContextMenu={(event) => handleContextMenu(event, appointment.id)}
-                        className={`group pr-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${isRowSelected ? 'bg-indigo-500/[0.04]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-cyan-500/[0.04]' : ''}`}
+                        className={`group pr-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${isRowSelected ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-white/[0.02]' : ''}`}
                         style={{ paddingLeft: splitPaneScrollPadding }}
                       >
-                        {isJustAdded && (
-                          <motion.div
-                            initial={{ opacity: 0, backgroundPosition: '-140% 0%' }}
-                            animate={{ opacity: [0, 0.6, 0], backgroundPosition: ['-140% 0%', '140% 0%'] }}
-                            transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
-                            className="pointer-events-none absolute inset-0 z-10"
-                            style={{
-                              backgroundImage: 'linear-gradient(102deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 32%, rgba(255,255,255,0.028) 44%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.028) 56%, rgba(255,255,255,0) 68%, rgba(255,255,255,0) 100%)',
-                              backgroundRepeat: 'no-repeat',
-                              backgroundSize: '42% 100%',
-                              filter: 'blur(10px)',
-                              mixBlendMode: 'screen',
-                            }}
-                          />
-                        )}
                         {frozenCount === 0 && renderColorbar(appointment)}
                         {scrollableColumns.map((col) => renderAppointmentColumn(col, appointment))}
                       </motion.div>
@@ -2157,10 +2131,18 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
                   <button
                     type="button"
                     onClick={onCreateInline}
+                    disabled={creating}
                     className={`w-full pr-5 ${dc.row} flex items-center gap-3 min-w-max text-left transition-all duration-150 hover:bg-white/[0.02]`}
                     style={{ paddingLeft: splitPaneScrollPadding }}
                   >
-                    {scrollableColumns.map((col) => renderCreateColumn(col, columns.findIndex((column) => column.id === col.id)))}
+                    {creating ? (
+                      <div className="flex items-center gap-3 px-2 text-zinc-700">
+                        <div className="h-4 w-4 animate-spin rounded-full border border-white/10 border-t-cyan-500/60" />
+                        <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-500">Creating appointment...</span>
+                      </div>
+                    ) : (
+                      scrollableColumns.map((col) => renderCreateColumn(col, columns.findIndex((column) => column.id === col.id)))
+                    )}
                   </button>
                 </>
               )}
