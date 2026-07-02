@@ -47,7 +47,6 @@ const matchesSearch = (appointment, query, lookups) => {
   const serviceName = lookups.servicesById.get(String(appointment.service_id || ''))?.name || '';
   const receptionistName = lookups.receptionistsById.get(String(appointment.receptionist_id || ''))?.full_name || '';
   const searchable = [
-    appointment.client_name,
     personName,
     serviceName,
     appointment.date,
@@ -74,7 +73,7 @@ const decorateAppointment = (appointment, lookups) => {
   const bannerUrl = getReceptionistBannerUrl(receptionistCatalog?.banner_id || receptionist?.banner_id || null);
   return {
     ...appointment,
-    _personName: person?.display_name || appointment.client_name || '',
+    _personName: person?.display_name || '',
     _serviceName: service?.name || '',
     _receptionistName: receptionist?.full_name || '',
     _receptionistAvatar: receptionist?.avatar || receptionistCatalog?.avatar || bannerUrl || '',

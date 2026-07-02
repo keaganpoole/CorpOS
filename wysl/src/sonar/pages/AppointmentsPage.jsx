@@ -22,7 +22,6 @@ const AppointmentsPage = ({ data = null, className = '' }) => {
     setCreating(true);
     try {
       await createAppointment({
-        client_name: '',
         date: new Date().toISOString().slice(0, 10),
         time: '09:00',
         duration: 30,

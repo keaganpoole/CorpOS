@@ -36,7 +36,6 @@ export const SOURCE_OPTIONS = [
 
 export const APPOINTMENT_FIELDS = [
   { key: 'person_id', label: 'Customer / Person', type: 'person_lookup', required: false, table: true, tableWidth: '220px', section: 'appointment', editable: true },
-  { key: 'client_name', label: 'Customer Name', type: 'text', required: false, table: false, tableWidth: '220px', section: 'appointment', editable: true },
   { key: 'service_id', label: 'Service', type: 'service_lookup', required: false, table: true, tableWidth: '180px', section: 'appointment', editable: true },
   { key: 'date', label: 'Date', type: 'date', required: true, table: true, tableWidth: '150px', section: 'schedule', editable: true },
   { key: 'time', label: 'Start Time', type: 'time', required: true, table: true, tableWidth: '130px', section: 'schedule', editable: true },

@@ -8,7 +8,6 @@ const APPOINTMENTS_FIELD_CONFIG_COLUMN = 'appointments_field_config';
 
 export const DEFAULT_FIELD_CONFIG = {
   person_id: { name: 'Customer / Person', icon: 'user' },
-  client_name: { name: 'Customer Name', icon: 'user' },
   service_id: { name: 'Service', icon: 'briefcase' },
   date: { name: 'Date', icon: 'calendar' },
   time: { name: 'Start Time', icon: 'clock' },
@@ -207,7 +206,6 @@ export const OPERATORS = {
 export const CONDITIONAL_FIELDS = [
   { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS.map((opt) => opt.value) },
   { key: 'source', label: 'Source', type: 'select', options: SOURCE_OPTIONS.map((opt) => opt.value) },
-  { key: 'client_name', label: 'Customer Name', type: 'text' },
   { key: 'receptionist_id', label: 'Assigned Receptionist', type: 'text' },
   { key: 'date', label: 'Date', type: 'date' },
   { key: 'time', label: 'Start Time', type: 'text' },
