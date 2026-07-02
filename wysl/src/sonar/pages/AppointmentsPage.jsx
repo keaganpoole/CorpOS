@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useAppointments } from '../hooks/useAppointments';
 import AppointmentsTable from './AppointmentsTable';
 
-const AppointmentsPage = ({ data = null, className = '' }) => {
+const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate = null }) => {
   const appointmentsData = useAppointments();
   const {
     appointments, allAppointments, people, services, receptionists, lookups, loading, error,
@@ -22,7 +22,7 @@ const AppointmentsPage = ({ data = null, className = '' }) => {
     setCreating(true);
     try {
       await createAppointment({
-        date: new Date().toISOString().slice(0, 10),
+        date: defaultAppointmentDate || new Date().toISOString().slice(0, 10),
         time: '09:00',
         duration: 30,
         status: 'pending',

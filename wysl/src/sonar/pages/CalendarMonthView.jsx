@@ -88,7 +88,7 @@ function getCurrentMonthInitialDate(appointmentsByDate, fallbackDate) {
   return monthDates[0] || fallbackDate;
 }
 
-export default function CalendarMonthView({ data = null, className = '' }) {
+export default function CalendarMonthView({ data = null, className = '', selectedDate: selectedDateProp = null, onSelectedDateChange }) {
   const appointmentsData = useAppointments();
   const {
     allAppointments,
@@ -101,7 +101,6 @@ export default function CalendarMonthView({ data = null, className = '' }) {
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
-  const [selectedDate, setSelectedDate] = useState(toDateStr(today));
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
 
@@ -131,6 +130,8 @@ export default function CalendarMonthView({ data = null, className = '' }) {
     return map;
   }, [allAppointments]);
 
+  const selectedDate = selectedDateProp || toDateStr(today);
+  const setSelectedDate = onSelectedDateChange || (() => {});
   const selectedDateAppointments = selectedDate ? (appointmentsByDate[selectedDate] || []) : [];
   useEffect(() => {
     if (hasAnimatedDots) return;
