@@ -1895,12 +1895,17 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
         <button
           type="button"
           onClick={onCreateInline}
+          disabled={creating}
           className="group flex h-20 w-20 items-center justify-center rounded-[24px] border border-white/[0.08] bg-white/[0.02] text-white shadow-[0_0_30px_rgba(255,255,255,0.08)] transition-transform duration-300 hover:scale-105"
         >
-          <Plus size={40} strokeWidth={1.6} />
+          {creating ? (
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-cyan-500/60" />
+          ) : (
+            <Plus size={40} strokeWidth={1.6} />
+          )}
         </button>
         <div className="mt-5">
-          <p className="text-3xl font-semibold tracking-tight text-neutral-50">Create your first record</p>
+          <p className="text-3xl font-semibold tracking-tight text-neutral-50">Create your first appointment</p>
           <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">Add your first appointment to start building out your schedule database.</p>
         </div>
       </div>
@@ -2102,9 +2107,11 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
 
             <div className="divide-y divide-white/[0.02]">
               {loading ? (
-                <div className="h-full flex flex-col items-center justify-center gap-4 pt-20">
+                <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
+                  <div className="flex flex-col items-center justify-center gap-4">
                   <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-cyan-500/60 animate-spin" />
                   <p className="text-[11px] text-zinc-600 font-medium">Loading appointments...</p>
+                  </div>
                 </div>
               ) : appointments.length === 0 ? (
                 renderNewRecordEmptyState()
