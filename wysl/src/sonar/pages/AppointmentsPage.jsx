@@ -28,7 +28,7 @@ const AppointmentsPage = ({ data = null, className = '' }) => {
         status: 'pending',
         source: 'manual',
         notes: '',
-      }, { placement: 'end' });
+      });
     } catch (err) {
       console.error('[AppointmentsPage] Inline create failed:', err.message);
     } finally {

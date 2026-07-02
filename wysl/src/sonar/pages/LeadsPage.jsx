@@ -18,7 +18,7 @@ const PeoplePage = () => {
 
   const handleInlineCreate = async () => {
     try {
-      await createLead({}, { placement: 'end' });
+      await createLead();
       setCreating(false);
     } catch (err) {
       console.error('[PeoplePage] Inline create failed:', err.message);
