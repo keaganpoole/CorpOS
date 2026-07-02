@@ -49,15 +49,13 @@ const getClampedOverlayPosition = (rect, {
   const availableAbove = rect.top - viewportPadding;
   const openUpward = availableBelow < Math.min(preferredHeight, 180) && availableAbove > availableBelow;
   const maxHeight = Math.max(120, Math.min(preferredHeight, openUpward ? availableAbove - gap : availableBelow - gap));
-  const top = openUpward
-    ? Math.max(viewportPadding, rect.top - maxHeight - gap)
-    : Math.min(rect.bottom + gap, window.innerHeight - maxHeight - viewportPadding);
-
   return {
     left,
-    top,
+    top: openUpward ? undefined : Math.min(rect.bottom + gap, window.innerHeight - maxHeight - viewportPadding),
+    bottom: openUpward ? Math.max(viewportPadding, window.innerHeight - rect.top + gap) : undefined,
     width,
     maxHeight,
+    placement: openUpward ? 'top' : 'bottom',
   };
 };
 
@@ -472,7 +470,8 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{
               left: menuPosition?.left ?? 0,
-              top: menuPosition?.top ?? 0,
+              top: menuPosition?.top,
+              bottom: menuPosition?.bottom,
               width: menuPosition?.width ?? 170,
               maxHeight: menuPosition?.maxHeight ?? 300,
             }}
@@ -574,7 +573,8 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
             transition={{ duration: 0.12 }}
             style={{
               left: menuPosition?.left ?? 0,
-              top: menuPosition?.top ?? 0,
+              top: menuPosition?.top,
+              bottom: menuPosition?.bottom,
               width: Math.min(Math.max(menuPosition?.width ?? 190, 190), 260),
               maxHeight: Math.min(menuPosition?.maxHeight ?? 180, 180),
             }}
@@ -603,7 +603,8 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{
               left: menuPosition?.left ?? 0,
-              top: menuPosition?.top ?? 0,
+              top: menuPosition?.top,
+              bottom: menuPosition?.bottom,
               width: menuPosition?.width ?? 190,
               maxHeight: menuPosition?.maxHeight ?? 320,
             }}
@@ -687,7 +688,8 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
               exit={{ opacity: 0, y: -4, scale: 0.96 }}
               style={{
                 left: menuPosition?.left ?? 0,
-                top: menuPosition?.top ?? 0,
+                top: menuPosition?.top,
+                bottom: menuPosition?.bottom,
                 width: menuPosition?.width ?? 200,
                 maxHeight: menuPosition?.maxHeight ?? 360,
               }}
@@ -987,7 +989,7 @@ const TableControlButton = React.forwardRef(({ active, children, onClick }, ref)
 TableControlButton.displayName = 'TableControlButton';
 
 const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) => {
-  const [position, setPosition] = useState({ top: 0, left: 0, maxHeight: 360 });
+  const [position, setPosition] = useState({ top: 0, bottom: undefined, left: 0, maxHeight: 360 });
   const popoverRef = useRef(null);
 
   const updatePosition = useCallback(() => {
@@ -1023,7 +1025,7 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
           initial={{ opacity: 0, y: -4, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
-          style={{ top: position.top, left: position.left, width, maxHeight: position.maxHeight }}
+          style={{ top: position.top, bottom: position.bottom, left: position.left, width, maxHeight: position.maxHeight }}
           className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d0d]/96 shadow-[0_24px_70px_rgba(0,0,0,0.86)] backdrop-blur-xl"
         >
           <div className="max-h-full overflow-y-auto custom-scrollbar">
@@ -1191,7 +1193,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   const [settingsField, setSettingsField] = useState(null);
   const [showColorbarStudio, setShowColorbarStudio] = useState(false);
   const [showColumnOptions, setShowColumnOptions] = useState(false);
-  const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, left: 0 });
+  const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, bottom: undefined, left: 0 });
   const columnOptionsButtonRef = useRef(null);
   const tableScrollRef = useRef(null);
   const horizontalScrollRef = useRef(null);
@@ -1434,7 +1436,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
     if (!rect) return;
     const next = getClampedOverlayPosition(rect, { minWidth: 168, preferredHeight: 240, gap: 8 });
     if (!next) return;
-    setColumnOptionsPosition({ top: next.top, left: next.left });
+    setColumnOptionsPosition({ top: next.top, bottom: next.bottom, left: next.left });
   }, []);
 
   const toggleColumnOptions = () => {
@@ -2308,7 +2310,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             initial={{ opacity: 0, y: -4, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
-            style={{ top: columnOptionsPosition.top, left: columnOptionsPosition.left }}
+            style={{ top: columnOptionsPosition.top, bottom: columnOptionsPosition.bottom, left: columnOptionsPosition.left }}
             className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d0d0d]/95 shadow-[0_18px_48px_rgba(0,0,0,0.82)] backdrop-blur-xl"
           >
             <div className="py-1">
