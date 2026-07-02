@@ -325,9 +325,6 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'incoming_call', name: 'Incoming Call', description: 'When a new call arrives' },
-        { key: 'call_answered', name: 'Call Answered', description: 'When someone answers a call' },
-        { key: 'missed_call', name: 'Missed Call', description: 'When a call goes unanswered' },
-        { key: 'call_failed', name: 'Call Failed', description: 'When a call cannot connect' },
       ],
     },
     {
@@ -376,19 +373,6 @@ const AUTOMATION_HIERARCHY = {
         { key: 'subscription_created', name: 'Subscription Created', description: 'When a subscription starts' },
         { key: 'subscription_canceled', name: 'Subscription Canceled', description: 'When a subscription is canceled' },
         { key: 'subscription_payment_failed', name: 'Subscription Payment Failed', description: 'When recurring billing fails' },
-      ],
-    },
-    {
-      key: 'time_schedule',
-      option: 'Time & Schedule',
-      description: 'When a scheduled time is reached',
-      accent: '#32f0d9',
-      icon: OPTION_ICONS.time_schedule,
-      sub_options: [
-        { key: 'specific_time', name: 'Specific Time', description: 'Run once at a specific date and time' },
-        { key: 'recurring_daily', name: 'Recurring Daily', description: 'Run every day at a set time' },
-        { key: 'recurring_weekly', name: 'Recurring Weekly', description: 'Run weekly on selected days' },
-        { key: 'appointment_reminder', name: 'Appointment Reminder', description: 'Run before an upcoming appointment' },
       ],
     },
   ],

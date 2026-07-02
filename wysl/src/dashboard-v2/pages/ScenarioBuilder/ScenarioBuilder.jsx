@@ -49,9 +49,6 @@ const AUTOMATION_HIERARCHY = {
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'incoming_call', name: 'Incoming Call', description: 'When a new call arrives' },
-        { key: 'call_answered', name: 'Call Answered', description: 'When someone answers a call' },
-        { key: 'missed_call', name: 'Missed Call', description: 'When a call goes unanswered' },
-        { key: 'call_failed', name: 'Call Failed', description: 'When a call cannot connect' },
         { key: 'voicemail_received', name: 'Voicemail Received', description: 'When a caller leaves a voicemail' },
       ],
     },
