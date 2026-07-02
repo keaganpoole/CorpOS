@@ -1300,6 +1300,11 @@ const DEMO_RECEPTIONIST = {
   banner_url: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/maggie_001.png',
 };
 
+const pickRandomItem = (items = []) => {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return items[Math.floor(Math.random() * items.length)];
+};
+
 const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, onInsertSmartAction, smartActions = [], onTableHover, onClose, style = {}, nodes = [], edges = [], currentNodeId = '', demoMode = false }) => {
   const [records, setRecords] = useState({});
   const [activeIndex, setActiveIndex] = useState({});
@@ -1375,8 +1380,38 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 
   useEffect(() => {
     if (demoMode) {
-      setActiveReceptionist(DEMO_RECEPTIONIST);
-      return undefined;
+      let cancelled = false;
+
+      const loadDemoReceptionist = async () => {
+        try {
+          const { data: catalogRows } = await supabase
+            .from('receptionist_catalog')
+            .select('id, full_name, first_name, avatar, banner_id, age, stereotype, voice, description, is_active')
+            .eq('is_active', true);
+
+          if (cancelled) return;
+
+          const candidates = (catalogRows || []).length > 0 ? catalogRows : [DEMO_RECEPTIONIST];
+          const selected = pickRandomItem(candidates) || DEMO_RECEPTIONIST;
+
+          setActiveReceptionist({
+            ...selected,
+            full_name: selected.full_name || selected.first_name || 'Receptionist',
+            first_name: selected.first_name || selected.full_name || 'Receptionist',
+            banner_url: selected.banner_url || getReceptionistBannerUrl(selected.banner_id) || selected.avatar || null,
+          });
+        } catch (error) {
+          if (!cancelled) {
+            console.warn('[VariablesPane] Failed to load demo receptionist:', error);
+            setActiveReceptionist(DEMO_RECEPTIONIST);
+          }
+        }
+      };
+
+      loadDemoReceptionist();
+      return () => {
+        cancelled = true;
+      };
     }
 
     let cancelled = false;

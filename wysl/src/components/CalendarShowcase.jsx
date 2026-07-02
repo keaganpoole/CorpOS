@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import {
   Activity,
   AudioLines,
@@ -19,13 +20,12 @@ import { Link } from 'react-router-dom';
 import HomepageScenariosDemo from '../sonar/pages/Scenarios/HomepageScenariosDemo';
 import HomepagePeopleCrmDemo from '../sonar/pages/HomepagePeopleCrmDemo';
 
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+);
+
 const HERO_COLORS = ['#818cf8', '#2dd4bf', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#34d399'];
-const AVATAR_URLS = [
-  'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/bonnie2.png',
-  'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/chloe_transparent4.png',
-  'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie.png',
-];
-const RECEPTIONISTS = ['Bonnie', 'Chloe', 'Maggie'];
 const BOOKING_DIAL_REELS = [
   ['05', 'GMT', '12:00', 'MON', 'OCT', '22', 'UTC', '09:45', 'WED', 'DEC', '14', 'EST', '18:30', 'PST', 'B'],
   ['12', 'CET', '15:30', 'TUE', 'JAN', '08', 'JST', '21:15', 'THU', 'APR', '29', 'AST', '11:00', 'MST', 'O'],
@@ -51,6 +51,27 @@ const TAG_COLORS = {
   Haircut: HERO_COLORS[4],
   Blowout: HERO_COLORS[5],
 };
+
+const FALLBACK_RECEPTIONISTS = [
+  {
+    id: 'fallback-bonnie',
+    full_name: 'Bonnie',
+    first_name: 'Bonnie',
+    avatar: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/bonnie2.png',
+  },
+  {
+    id: 'fallback-chloe',
+    full_name: 'Chloe',
+    first_name: 'Chloe',
+    avatar: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/chloe_transparent4.png',
+  },
+  {
+    id: 'fallback-maggie',
+    full_name: 'Maggie',
+    first_name: 'Maggie',
+    avatar: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie.png',
+  },
+];
 const FEATURE_ITEMS = [
   {
     icon: (
@@ -1164,6 +1185,7 @@ function RightFeatureList({ featureProgress, items, useScrollHighlight = false }
 function RightCalendarGrid({ hasAnimatedDots }) {
   const [selectedDay, setSelectedDay] = useState(17);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
+  const [receptionists, setReceptionists] = useState(FALLBACK_RECEPTIONISTS);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -1171,6 +1193,34 @@ function RightCalendarGrid({ hasAnimatedDots }) {
     updateViewportWidth();
     window.addEventListener('resize', updateViewportWidth);
     return () => window.removeEventListener('resize', updateViewportWidth);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadReceptionists = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('receptionist_catalog')
+          .select('id, full_name, first_name, avatar')
+          .order('full_name', { ascending: true });
+
+        if (cancelled) return;
+        if (error) throw error;
+
+        const catalogReceptionists = (data || []).filter((row) => row?.avatar);
+        if (catalogReceptionists.length > 0) {
+          setReceptionists(catalogReceptionists);
+        }
+      } catch (error) {
+        console.warn('[CalendarShowcase] Failed to load receptionist catalog:', error);
+      }
+    };
+
+    loadReceptionists();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const isMobile = viewportWidth < 768;
@@ -1232,6 +1282,34 @@ function RightCalendarGrid({ hasAnimatedDots }) {
     []
   );
 
+  const assignedItemsDatabase = useMemo(() => {
+    const pool = receptionists.length > 0 ? receptionists : FALLBACK_RECEPTIONISTS;
+
+    const hashSeed = (value) => {
+      const text = String(value || '');
+      let hash = 0;
+      for (let i = 0; i < text.length; i += 1) {
+        hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+      }
+      return hash;
+    };
+
+    return Object.fromEntries(
+      Object.entries(itemsDatabase).map(([day, events]) => [
+        day,
+        (events || []).map((event, index) => {
+          const poolIndex = hashSeed(`${day}-${event.title}-${event.time}-${index}`) % pool.length;
+          const receptionist = pool[poolIndex];
+          return {
+            ...event,
+            receptionistName: receptionist?.first_name || receptionist?.full_name || 'Receptionist',
+            receptionistAvatar: receptionist?.avatar || '',
+          };
+        }),
+      ])
+    );
+  }, [itemsDatabase, receptionists]);
+
   return (
     <div className="relative flex h-full w-full items-center">
       <div className={`relative w-full overflow-hidden border border-white/5 bg-[#08080A] shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] ${isCompact ? 'rounded-[22px] p-3 sm:p-4 md:p-5' : 'rounded-[28px] p-10'}`}>
@@ -1258,7 +1336,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
           {Array.from({ length: 28 }).map((_, index) => {
             const dayNum = index + 1;
             const isSelected = selectedDay === dayNum;
-            const eventsList = itemsDatabase[dayNum] || [];
+            const eventsList = assignedItemsDatabase[dayNum] || [];
 
             return (
               <button
@@ -1297,9 +1375,9 @@ function RightCalendarGrid({ hasAnimatedDots }) {
             <Activity size={10} className="text-zinc-300" />
             <span>Appointments for October {selectedDay}</span>
           </span>
-          {itemsDatabase[selectedDay] ? (
+          {assignedItemsDatabase[selectedDay] ? (
             <div className={isMobile ? 'space-y-1.5' : 'space-y-2'}>
-              {itemsDatabase[selectedDay].map((event, index) => (
+              {assignedItemsDatabase[selectedDay].map((event, index) => (
                 <div
                   key={event.title}
                   className={`agenda-item flex items-center justify-between rounded-lg border border-white/5 bg-zinc-950 text-left ${isMobile ? 'gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
@@ -1311,13 +1389,13 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                     {!isMobile && !isCompact && <span className="text-[10px] font-medium italic text-zinc-500">via</span>}
                     <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900">
                       <img
-                        src={AVATAR_URLS[index % AVATAR_URLS.length]}
+                        src={event.receptionistAvatar}
                         alt=""
                         className="h-full w-full object-cover"
                       />
                     </span>
                     <span className={`${isCompact ? 'hidden' : 'text-[10px]'} font-medium text-zinc-400`}>
-                      {RECEPTIONISTS[index % RECEPTIONISTS.length]}
+                      {event.receptionistName}
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center space-x-1.5">

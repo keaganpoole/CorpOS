@@ -227,8 +227,12 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
-          <h3 className="text-xl font-bold text-white tracking-tight leading-none">{agent.name}</h3>
-          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-[0.2em] mt-1">{agent.role}</p>
+          <h3 className="text-2xl font-bold text-white tracking-tight leading-none">{agent.name}</h3>
+          {agent.age && (
+            <p className="mt-1 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
+              🎂 {agent.age} years old
+            </p>
+          )}
         </div>
       </div>
 

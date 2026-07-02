@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Play, Pause, Volume2, Sparkles,
   User, ChevronLeft, ChevronRight, Loader2,
-  Briefcase,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -217,12 +216,6 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                             {person.full_name || 'Unnamed'}
                           </h2>
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {person.stereotype && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/25 text-[10px] font-bold text-indigo-300 uppercase tracking-widest shadow-[0_0_12px_rgba(99,102,241,0.1)]">
-                                <Briefcase size={10} className="text-indigo-400/70" />
-                                {person.stereotype}
-                              </span>
-                            )}
                             {person.age && (
                               <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-white/50 tracking-wide">
                                 🎂 {person.age} years old
