@@ -177,7 +177,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
 
   return (
     <div className={`relative flex h-full min-h-0 w-full items-start justify-center bg-transparent p-3 pt-2 sm:p-4 sm:pt-3 md:p-5 md:pt-4 ${className}`.trim()}>
-      <div className="relative w-full overflow-hidden rounded-[22px] border border-white/[0.05] bg-[#0a0a0a] p-3 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] sm:p-4 md:rounded-[28px] md:p-5 xl:p-10">
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[22px] border border-white/[0.05] bg-[#0a0a0a] p-3 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] sm:p-4 md:rounded-[28px] md:p-5 xl:p-10">
         <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/5 pb-3 text-left md:mb-4 md:pb-4 xl:mb-6 xl:pb-6">
           <span className="flex items-center space-x-2 font-bold tracking-tight text-white text-[1rem] md:text-[1.25rem] xl:text-[2rem]">
             <CalendarIcon className="text-zinc-300" size={22} />
@@ -260,14 +260,14 @@ export default function CalendarMonthView({ data = null, className = '', selecte
           })}
         </div>
 
-        <div className="mt-3 min-h-[118px] border-t border-white/5 pt-3 md:mt-4 md:min-h-[138px] md:pt-4 xl:mt-8 xl:min-h-[170px] xl:pt-5">
+        <div className="mt-3 flex min-h-0 flex-1 flex-col border-t border-white/5 pt-3 md:mt-4 md:pt-4 xl:mt-8 xl:pt-5">
           <span className="mb-3 flex items-center space-x-1.5 font-bold tracking-widest text-zinc-400 text-[8px] md:text-[9px]">
             <Activity size={10} className="text-zinc-300" />
             <span>Appointments for {selectedDateLabel}</span>
           </span>
 
           {loading ? (
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-y-auto custom-scrollbar">
               {Array.from({ length: 2 }).map((_, index) => (
                 <div
                   key={index}
@@ -276,7 +276,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
               ))}
             </div>
           ) : selectedDateAppointments.length > 0 ? (
-            <div className="space-y-1.5 md:space-y-2">
+            <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-1.5 md:space-y-2">
               {selectedDateAppointments.map((appointment, index) => {
                 const tagColor = getAppointmentColor(appointment, servicesById);
                 const category = getAppointmentCategory(appointment, servicesById);

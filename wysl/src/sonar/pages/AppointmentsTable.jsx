@@ -34,6 +34,33 @@ const FIELD_TYPE_ICONS = {
   date: CalendarDays,
 };
 
+const getClampedOverlayPosition = (rect, {
+  minWidth = 170,
+  preferredHeight = 280,
+  gap = 6,
+  sidePadding = 12,
+  viewportPadding = 12,
+} = {}) => {
+  if (!rect) return null;
+  const width = Math.max(rect.width, minWidth);
+  const maxLeft = window.innerWidth - width - sidePadding;
+  const left = Math.max(sidePadding, Math.min(rect.left, maxLeft));
+  const availableBelow = window.innerHeight - rect.bottom - viewportPadding;
+  const availableAbove = rect.top - viewportPadding;
+  const openUpward = availableBelow < Math.min(preferredHeight, 180) && availableAbove > availableBelow;
+  const maxHeight = Math.max(120, Math.min(preferredHeight, openUpward ? availableAbove - gap : availableBelow - gap));
+  const top = openUpward
+    ? Math.max(viewportPadding, rect.top - maxHeight - gap)
+    : Math.min(rect.bottom + gap, window.innerHeight - maxHeight - viewportPadding);
+
+  return {
+    left,
+    top,
+    width,
+    maxHeight,
+  };
+};
+
 const ZONE_META_KEY = '__zones';
 const ZONE_SWATCHES = ['#22d3ee', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#f59e0b', '#10b981', '#14b8a6'];
 const REQUIRED_COLUMN_IDS = new Set(['person_id', 'service_id']);
@@ -381,11 +408,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
   const updateMenuPosition = useCallback(() => {
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    setMenuPosition({
-      left: rect.left,
-      top: rect.bottom + 6,
-      width: Math.max(rect.width, 170),
-    });
+    setMenuPosition(getClampedOverlayPosition(rect, { minWidth: 170, preferredHeight: 300 }));
   }, []);
   useEffect(() => {
     if (!open) return;
@@ -451,30 +474,33 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
               left: menuPosition?.left ?? 0,
               top: menuPosition?.top ?? 0,
               width: menuPosition?.width ?? 170,
+              maxHeight: menuPosition?.maxHeight ?? 300,
             }}
             className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
-            <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
-              onClick={() => { setOpen(false); onSave(null); }}
-              className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${current == null || current === '' ? 'text-white' : 'text-zinc-400'}`}>
-              <div className="w-2 h-2 rounded-full bg-zinc-700" />
-              <span className="invisible">.</span>
-              {(current == null || current === '') && <Check size={11} className="text-cyan-400 ml-auto" />}
-            </motion.button>
-            {options.map((opt, idx) => {
-              const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
-              const valueKey = typeof val === 'string' ? val.toLowerCase() : '';
-              const isActive = valueKey !== '' && valueKey === currentKey;
-              return (
-                <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: (idx + 1) * 0.02 }}
-                  onClick={() => { setOpen(false); if (!isActive) onSave(val); }}
-                  className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
-                  {val}
-                  {isActive && <Check size={11} className="text-cyan-400 ml-auto" />}
-                </motion.button>
-              );
-            })}
+            <div className="max-h-full overflow-y-auto custom-scrollbar py-1">
+              <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
+                onClick={() => { setOpen(false); onSave(null); }}
+                className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${current == null || current === '' ? 'text-white' : 'text-zinc-400'}`}>
+                <div className="w-2 h-2 rounded-full bg-zinc-700" />
+                <span className="invisible">.</span>
+                {(current == null || current === '') && <Check size={11} className="text-cyan-400 ml-auto" />}
+              </motion.button>
+              {options.map((opt, idx) => {
+                const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
+                const valueKey = typeof val === 'string' ? val.toLowerCase() : '';
+                const isActive = valueKey !== '' && valueKey === currentKey;
+                return (
+                  <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: (idx + 1) * 0.02 }}
+                    onClick={() => { setOpen(false); if (!isActive) onSave(val); }}
+                    className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
+                    {val}
+                    {isActive && <Check size={11} className="text-cyan-400 ml-auto" />}
+                  </motion.button>
+                );
+              })}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>,
@@ -495,11 +521,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
   const updateMenuPosition = useCallback(() => {
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    setMenuPosition({
-      left: rect.left,
-      top: rect.bottom + 6,
-      width: Math.max(rect.width, 190),
-    });
+    setMenuPosition(getClampedOverlayPosition(rect, { minWidth: 190, preferredHeight: 320 }));
   }, []);
   useEffect(() => {
     if (!open && !hovering) return;
@@ -554,6 +576,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               left: menuPosition?.left ?? 0,
               top: menuPosition?.top ?? 0,
               width: Math.min(Math.max(menuPosition?.width ?? 190, 190), 260),
+              maxHeight: Math.min(menuPosition?.maxHeight ?? 180, 180),
             }}
             className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#111] px-2 py-2 shadow-[0_12px_36px_rgba(0,0,0,0.72)]"
           >
@@ -582,23 +605,26 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               left: menuPosition?.left ?? 0,
               top: menuPosition?.top ?? 0,
               width: menuPosition?.width ?? 190,
+              maxHeight: menuPosition?.maxHeight ?? 320,
             }}
             className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
-            {options.map((opt, idx) => {
-              const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
-              const valueKey = typeof val === 'string' ? val.toLowerCase() : '';
-              const active = valueKey !== '' && selected.some((s) => s.toLowerCase() === valueKey);
-              return (
-                <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }}
-                  onClick={() => toggle(val)}
-                  className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(val) }} />
-                  {val}
-                  {active && <Check size={11} className="text-cyan-400 ml-auto" />}
-                </motion.button>
-              );
-            })}
+            <div className="max-h-full overflow-y-auto custom-scrollbar py-1">
+              {options.map((opt, idx) => {
+                const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
+                const valueKey = typeof val === 'string' ? val.toLowerCase() : '';
+                const active = valueKey !== '' && selected.some((s) => s.toLowerCase() === valueKey);
+                return (
+                  <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }}
+                    onClick={() => toggle(val)}
+                    className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(val) }} />
+                    {val}
+                    {active && <Check size={11} className="text-cyan-400 ml-auto" />}
+                  </motion.button>
+                );
+              })}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>,
@@ -620,11 +646,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
   const updateMenuPosition = useCallback(() => {
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    setMenuPosition({
-      left: rect.left,
-      top: rect.bottom + 6,
-      width: Math.max(rect.width, 200),
-    });
+    setMenuPosition(getClampedOverlayPosition(rect, { minWidth: 200, preferredHeight: 360 }));
   }, []);
 
   useEffect(() => {
@@ -667,6 +689,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
                 left: menuPosition?.left ?? 0,
                 top: menuPosition?.top ?? 0,
                 width: menuPosition?.width ?? 200,
+                maxHeight: menuPosition?.maxHeight ?? 360,
               }}
               className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden"
               onClick={(event) => event.stopPropagation()}
@@ -679,7 +702,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
                   className="w-full rounded-lg border border-white/[0.06] bg-black/35 px-2.5 py-2 text-[11px] text-white outline-none placeholder:text-zinc-700 focus:border-white/15"
                 />
               </div>
-              <div className="max-h-64 overflow-y-auto py-1">
+              <div className="max-h-full overflow-y-auto custom-scrollbar py-1">
                 <button
                   type="button"
                   onClick={() => { setOpen(false); onSave(null); }}
@@ -964,14 +987,15 @@ const TableControlButton = React.forwardRef(({ active, children, onClick }, ref)
 TableControlButton.displayName = 'TableControlButton';
 
 const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) => {
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState({ top: 0, left: 0, maxHeight: 360 });
   const popoverRef = useRef(null);
 
   const updatePosition = useCallback(() => {
     const rect = anchorRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const left = Math.min(rect.left, window.innerWidth - width - 14);
-    setPosition({ top: rect.bottom + 8, left: Math.max(14, left) });
+    const next = getClampedOverlayPosition(rect, { minWidth: width, preferredHeight: 360, gap: 8, sidePadding: 14, viewportPadding: 14 });
+    if (!next) return;
+    setPosition(next);
   }, [anchorRef, width]);
 
   useEffect(() => {
@@ -999,10 +1023,12 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
           initial={{ opacity: 0, y: -4, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
-          style={{ top: position.top, left: position.left, width }}
+          style={{ top: position.top, left: position.left, width, maxHeight: position.maxHeight }}
           className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d0d]/96 shadow-[0_24px_70px_rgba(0,0,0,0.86)] backdrop-blur-xl"
         >
-          {children}
+          <div className="max-h-full overflow-y-auto custom-scrollbar">
+            {children}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
@@ -1406,9 +1432,9 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   const updateColumnOptionsPosition = useCallback(() => {
     const rect = columnOptionsButtonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const menuWidth = 168;
-    const left = Math.min(rect.left, window.innerWidth - menuWidth - 12);
-    setColumnOptionsPosition({ top: rect.bottom + 8, left: Math.max(12, left) });
+    const next = getClampedOverlayPosition(rect, { minWidth: 168, preferredHeight: 240, gap: 8 });
+    if (!next) return;
+    setColumnOptionsPosition({ top: next.top, left: next.left });
   }, []);
 
   const toggleColumnOptions = () => {
