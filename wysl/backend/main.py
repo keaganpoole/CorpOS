@@ -3229,6 +3229,10 @@ def emit_appointment_change_triggers(
 
     payload = {
         "appointment": current_appointment,
+        "appointment_id": current_appointment.get("id"),
+        "person_id": current_appointment.get("person_id"),
+        "service_id": current_appointment.get("service_id"),
+        "staff_id": current_appointment.get("staff_id"),
         "business_id": resolved_business_id,
     }
 
@@ -3938,6 +3942,179 @@ def safe_appointment_service_id(value):
         return parsed if response.data else None
     except Exception:
         return None
+
+
+def load_staff_record(value, *, business_id=None, require_active: bool = False):
+    parsed = uuid_or_none(value)
+    if not parsed:
+        return None
+    try:
+        query = supabase.table("staff").select("*").eq("id", parsed)
+        if business_id is not None:
+            query = query.eq("business_id", business_id)
+        response = query.limit(1).execute()
+        if not response.data:
+            return None
+        staff = response.data[0]
+        if require_active and staff.get("is_active") is False:
+            return None
+        return staff
+    except Exception:
+        return None
+
+
+def safe_appointment_staff_id(value, *, business_id=None, require_active: bool = False):
+    staff = load_staff_record(value, business_id=business_id, require_active=require_active)
+    return staff.get("id") if staff else None
+
+
+def appointment_time_to_minutes(value) -> Optional[int]:
+    normalized = normalize_appointment_time_value(value, fallback="")
+    if not normalized:
+        return None
+    parts = str(normalized).split(":")
+    if len(parts) < 2:
+        return None
+    try:
+        hour = int(parts[0])
+        minute = int(parts[1])
+    except (TypeError, ValueError):
+        return None
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return None
+    return (hour * 60) + minute
+
+
+def normalize_working_hours_key(value: str) -> str:
+    return "".join(ch for ch in str(value or "").strip().lower() if ch.isalpha())
+
+
+def tokenize_search_terms(*values) -> list[str]:
+    terms: list[str] = []
+    for value in values:
+        raw = str(value or "").strip().lower()
+        if not raw:
+            continue
+        pieces = [piece for piece in re.split(r"[^a-z0-9]+", raw) if piece]
+        terms.extend(pieces or [raw])
+    seen = set()
+    ordered = []
+    for term in terms:
+        if term in seen:
+            continue
+        seen.add(term)
+        ordered.append(term)
+    return ordered
+
+
+def score_staff_match(staff: dict, search_terms: list[str]) -> int:
+    if not search_terms:
+        return 1
+    haystacks = [
+        str(staff.get("full_name") or "").lower(),
+        str(staff.get("first_name") or "").lower(),
+        str(staff.get("last_name") or "").lower(),
+        str(staff.get("role") or "").lower(),
+        str(staff.get("notes") or "").lower(),
+    ]
+    score = 0
+    for term in search_terms:
+        for haystack in haystacks:
+            if not haystack:
+                continue
+            if term == haystack:
+                score += 6
+            elif term in haystack:
+                score += 3
+    return score
+
+
+def get_staff_schedule_for_date(working_hours, appointment_date: Optional[str]):
+    if not isinstance(working_hours, dict) or not appointment_date:
+        return None
+    try:
+        weekday_name = datetime.fromisoformat(str(appointment_date)).strftime("%A").lower()
+    except ValueError:
+        return None
+
+    candidate_keys = {
+        weekday_name,
+        weekday_name[:3],
+        normalize_working_hours_key(weekday_name),
+        normalize_working_hours_key(weekday_name[:3]),
+    }
+
+    for key, value in working_hours.items():
+        if normalize_working_hours_key(key) in candidate_keys and isinstance(value, dict):
+            return value
+    return None
+
+
+def is_staff_available_during_hours(staff: Optional[dict], appointment_date: Optional[str], appointment_time: Optional[str], duration: int):
+    if not isinstance(staff, dict):
+        return False, "Staff record not found"
+    if staff.get("is_active") is False:
+        return False, "Staff member is inactive"
+
+    schedule = get_staff_schedule_for_date(staff.get("working_hours"), appointment_date)
+    if schedule is None:
+        return True, None
+
+    enabled = schedule.get("enabled")
+    if enabled is False:
+        return False, "Staff member is not working that day"
+
+    start_minutes = appointment_time_to_minutes(appointment_time)
+    open_minutes = appointment_time_to_minutes(schedule.get("open"))
+    close_minutes = appointment_time_to_minutes(schedule.get("close"))
+    duration_minutes = normalize_appointment_duration(duration)
+
+    if start_minutes is None or open_minutes is None or close_minutes is None:
+        return True, None
+
+    end_minutes = start_minutes + duration_minutes
+    if start_minutes < open_minutes or end_minutes > close_minutes:
+        return False, "Requested time is outside staff working hours"
+
+    return True, None
+
+
+def appointments_conflict(start_a: Optional[int], duration_a: int, start_b: Optional[int], duration_b: int) -> bool:
+    if start_a is None or start_b is None:
+        return False
+    end_a = start_a + normalize_appointment_duration(duration_a)
+    end_b = start_b + normalize_appointment_duration(duration_b)
+    return start_a < end_b and start_b < end_a
+
+
+def list_staff_conflicts(*, business_id, appointment_date, appointment_time, duration, staff_id=None, exclude_appointment_id=None):
+    query = supabase.table("appointments").select("*")
+    if business_id is not None:
+        query = query.eq("business_id", business_id)
+    if appointment_date:
+        query = query.eq("date", appointment_date)
+    if staff_id:
+        query = query.eq("staff_id", staff_id)
+    rows = query.limit(500).execute().data or []
+    normalized_target_start = appointment_time_to_minutes(appointment_time)
+    normalized_target_duration = normalize_appointment_duration(duration)
+    blocked_statuses = {"cancelled", "completed", "missed"}
+    conflicts = []
+    for row in rows:
+        if exclude_appointment_id and str(row.get("id")) == str(exclude_appointment_id):
+            continue
+        if str(row.get("status") or "").strip().lower() in blocked_statuses:
+            continue
+        if staff_id and str(row.get("staff_id") or "") != str(staff_id):
+            continue
+        if appointments_conflict(
+            normalized_target_start,
+            normalized_target_duration,
+            appointment_time_to_minutes(row.get("time")),
+            row.get("duration"),
+        ):
+            conflicts.append(row)
+    return conflicts
 
 def parse_optional_datetime(value):
     if value is None or value == "":
@@ -4967,6 +5144,71 @@ async def legacy_server_tool(tool_name: str, request: Request):
         data = query.order("category").order("sort_order").execute().data or []
         return {"ok": True, "services": data, "count": len(data)}
 
+    if normalized_tool == "get-staff":
+        query = supabase.table("staff").select("*")
+        if business and business.get("id"):
+            try:
+                query = query.eq("business_id", business["id"])
+            except Exception:
+                pass
+        is_active_value = first_present(payload, "is_active", "active_only")
+        if is_active_value is None:
+            query = query.eq("is_active", True)
+        elif str(is_active_value).strip().lower() in {"true", "1", "yes"}:
+            query = query.eq("is_active", True)
+        role_value = str(first_present(payload, "role") or "").strip()
+        if role_value:
+            query = query.ilike("role", f"%{role_value}%")
+        raw_rows = query.order("full_name").limit(200).execute().data or []
+
+        search_terms = tokenize_search_terms(
+            first_present(payload, "query", "search", "specialty", "service", "service_name"),
+            role_value,
+        )
+        matched_rows = []
+        for row in raw_rows:
+            score = score_staff_match(row, search_terms)
+            if search_terms and score <= 0:
+                continue
+            matched_rows.append({**row, "_match_score": score})
+
+        matched_rows.sort(key=lambda row: (-int(row.get("_match_score") or 0), str(row.get("full_name") or "")))
+
+        appointment_date = first_present(payload, "date", "appointment_date")
+        appointment_time = first_present(payload, "time", "appointment_time")
+        appointment_duration = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
+        include_availability = bool(appointment_date and appointment_time)
+
+        staff_results = []
+        for row in matched_rows:
+            next_row = {key: value for key, value in row.items() if key != "_match_score"}
+            if include_availability:
+                within_hours, availability_reason = is_staff_available_during_hours(
+                    row,
+                    appointment_date,
+                    appointment_time,
+                    appointment_duration,
+                )
+                conflicts = [] if not within_hours else list_staff_conflicts(
+                    business_id=business.get("id") if business else None,
+                    appointment_date=appointment_date,
+                    appointment_time=appointment_time,
+                    duration=appointment_duration,
+                    staff_id=row.get("id"),
+                )
+                next_row["available"] = within_hours and len(conflicts) == 0
+                next_row["availability_reason"] = availability_reason
+                next_row["conflicts"] = conflicts
+            staff_results.append(next_row)
+
+        return {
+            "ok": True,
+            "staff": staff_results,
+            "count": len(staff_results),
+            "matched": len(staff_results) > 0,
+            "query": first_present(payload, "query", "search", "specialty", "service", "service_name") or role_value or None,
+        }
+
     if normalized_tool in {"get-business-info", "inbound-get-business-info"}:
         if not business:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
@@ -4979,29 +5221,92 @@ async def legacy_server_tool(tool_name: str, request: Request):
     if normalized_tool == "check-availability":
         appointment_date = first_present(payload, "date", "appointment_date")
         appointment_time = first_present(payload, "time", "appointment_time")
-        query = supabase.table("appointments").select("*")
-        if business and business.get("id"):
-            try:
-                query = query.eq("business_id", business["id"])
-            except Exception:
-                pass
-        if appointment_date:
-            query = query.eq("date", appointment_date)
-        rows = query.limit(200).execute().data or []
-        conflicts = [
-            row for row in rows
-            if appointment_time and str(row.get("time") or "") == str(appointment_time)
-            and str(row.get("status") or "").lower() not in {"cancelled", "completed"}
-        ]
+        appointment_duration = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
+        business_id = business.get("id") if business else None
+        requested_staff = load_staff_record(
+            first_present(payload, "staff_id"),
+            business_id=business_id,
+            require_active=False,
+        )
+        if first_present(payload, "staff_id") is not None and not requested_staff:
+            return {
+                "ok": True,
+                "available": False,
+                "requested": {"date": appointment_date, "time": appointment_time, "duration": appointment_duration, "staff_id": first_present(payload, "staff_id")},
+                "reason": "Staff member not found",
+                "conflicts": [],
+                "available_staff": [],
+            }
+        if requested_staff:
+            within_hours, reason = is_staff_available_during_hours(
+                requested_staff,
+                appointment_date,
+                appointment_time,
+                appointment_duration,
+            )
+            conflicts = [] if not within_hours else list_staff_conflicts(
+                business_id=business_id,
+                appointment_date=appointment_date,
+                appointment_time=appointment_time,
+                duration=appointment_duration,
+                staff_id=requested_staff.get("id"),
+            )
+            return {
+                "ok": True,
+                "available": within_hours and len(conflicts) == 0,
+                "requested": {
+                    "date": appointment_date,
+                    "time": appointment_time,
+                    "duration": appointment_duration,
+                    "staff_id": requested_staff.get("id"),
+                },
+                "reason": reason,
+                "conflicts": conflicts,
+                "staff": requested_staff,
+                "available_staff": [requested_staff] if within_hours and len(conflicts) == 0 else [],
+            }
+
+        staff_query = supabase.table("staff").select("*")
+        if business_id is not None:
+            staff_query = staff_query.eq("business_id", business_id)
+        staff_rows = staff_query.eq("is_active", True).limit(200).execute().data or []
+        available_staff = []
+        aggregated_conflicts = []
+        for staff_row in staff_rows:
+            within_hours, _reason = is_staff_available_during_hours(
+                staff_row,
+                appointment_date,
+                appointment_time,
+                appointment_duration,
+            )
+            if not within_hours:
+                continue
+            staff_conflicts = list_staff_conflicts(
+                business_id=business_id,
+                appointment_date=appointment_date,
+                appointment_time=appointment_time,
+                duration=appointment_duration,
+                staff_id=staff_row.get("id"),
+            )
+            if staff_conflicts:
+                aggregated_conflicts.extend(staff_conflicts)
+                continue
+            available_staff.append(staff_row)
         return {
             "ok": True,
-            "available": len(conflicts) == 0,
-            "requested": {"date": appointment_date, "time": appointment_time},
-            "conflicts": conflicts,
+            "available": len(available_staff) > 0,
+            "requested": {"date": appointment_date, "time": appointment_time, "duration": appointment_duration},
+            "conflicts": aggregated_conflicts,
+            "available_staff": available_staff,
         }
 
     if normalized_tool == "create-appointment":
         person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+        staff_id = safe_appointment_staff_id(
+            first_present(payload, "staff_id"),
+            business_id=business.get("id") if business else None,
+            require_active=False,
+        )
         appointment_row = {
             "date": normalize_appointment_date_value(first_present(payload, "date", "appointment_date")),
             "time": normalize_appointment_time_value(first_present(payload, "time", "appointment_time")),
@@ -5011,12 +5316,24 @@ async def legacy_server_tool(tool_name: str, request: Request):
             "notes": first_present(payload, "notes"),
             "person_id": person_id,
             "service_id": safe_appointment_service_id(first_present(payload, "service_id")),
+            "staff_id": staff_id,
             "business_id": business.get("id") if business else None,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         response = supabase.table("appointments").insert(appointment_row).execute()
         created = response.data[0] if response.data else appointment_row
-        emit_scenario_trigger("appointment_created", {"appointment": created, "business_id": business.get("id") if business else None})
+        created = {"action": "create_appointment", "table": "appointments", **created}
+        emit_scenario_trigger(
+            "appointment_created",
+            {
+                "appointment": created,
+                "appointment_id": created.get("id"),
+                "person_id": created.get("person_id"),
+                "service_id": created.get("service_id"),
+                "staff_id": created.get("staff_id"),
+                "business_id": business.get("id") if business else None,
+            },
+        )
         emit_appointment_change_triggers(None, created, business_id=business.get("id") if business else None, include_updated=False)
         return {"ok": True, "appointment": created}
 
@@ -5049,11 +5366,20 @@ async def legacy_server_tool(tool_name: str, request: Request):
             safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"))
             if safe_service_id is not None:
                 updates["service_id"] = safe_service_id
+        if first_present(payload, "staff_id") is not None:
+            safe_staff_id = safe_appointment_staff_id(
+                first_present(payload, "staff_id"),
+                business_id=business.get("id") if business else existing.get("business_id"),
+                require_active=False,
+            )
+            if safe_staff_id is not None:
+                updates["staff_id"] = safe_staff_id
         if not updates:
             return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()
         response = supabase.table("appointments").update(updates).eq("id", appointment_id).execute()
         updated = response.data[0] if response.data else {**existing, **updates}
+        updated = {"action": "update_appointment", "table": "appointments", **updated}
         emit_appointment_change_triggers(existing, updated, business_id=business.get("id") if business else None)
         return {"ok": True, "appointment": updated}
 
@@ -5070,6 +5396,7 @@ async def legacy_server_tool(tool_name: str, request: Request):
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", appointment_id).execute()
         cancelled = response.data[0] if response.data else {**existing, "status": "cancelled", "updated_at": datetime.now(timezone.utc).isoformat()}
+        cancelled = {"action": "cancel_appointment", "table": "appointments", **cancelled}
         emit_appointment_change_triggers(existing, cancelled, business_id=business.get("id") if business else None)
         return {"ok": True, "appointment": cancelled}
 
@@ -5786,6 +6113,21 @@ async def list_sonar_services(current_user: dict = Depends(get_current_user)):
     response = query.order("category").order("sort_order").execute()
     return response.data or []
 
+
+@app.get("/api/sonar/staff", tags=["Sonar Staff"])
+async def list_sonar_staff(active_only: bool = True, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    query = supabase.table("staff").select("*")
+    if business:
+        try:
+            query = query.eq("business_id", business["id"])
+        except Exception:
+            pass
+    if active_only:
+        query = query.eq("is_active", True)
+    response = query.order("full_name").limit(200).execute()
+    return response.data or []
+
 @app.post("/api/sonar/services", tags=["Sonar Services"])
 async def create_sonar_service(payload: dict, current_user: dict = Depends(get_current_user)):
     business = load_business_by_user_id(str(current_user.id))
@@ -5843,6 +6185,14 @@ async def update_sonar_appointment(appointment_id: str, payload: dict, current_u
         safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"))
         if safe_service_id is not None:
             updates["service_id"] = safe_service_id
+    if first_present(payload, "staff_id") is not None:
+        safe_staff_id = safe_appointment_staff_id(
+            first_present(payload, "staff_id"),
+            business_id=(business or {}).get("id") or existing_response.data[0].get("business_id"),
+            require_active=False,
+        )
+        if safe_staff_id is not None:
+            updates["staff_id"] = safe_staff_id
     if not updates:
         return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
 

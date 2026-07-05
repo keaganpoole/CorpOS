@@ -24,14 +24,22 @@ BASE_TABLE_LABELS = {
         "time": "Time",
         "duration": "Duration",
         "status": "Status",
+        "staff_id": "Staff ID",
         "assigned_receptionist": "Assigned Receptionist",
         "notes": "Appointment Notes",
+    },
+    "staff": {
+        "full_name": "Full Name",
+        "role": "Role",
+        "email": "Email",
+        "phone": "Phone",
     },
 }
 
 TABLE_CONTEXT_ALIASES = {
     "people": ("people", "person"),
     "appointments": ("appointments", "appointment"),
+    "staff": ("staff",),
 }
 
 AGENT_REF_PREFIXES = {"rec", "agent", "receptionist"}
@@ -117,6 +125,7 @@ TABLE_REF_ALIASES = {
     "invoice": "invoices",
     "appointment": "appointments",
     "service": "services",
+    "staff": "staff",
     "receptionist": "hired_receptionists",
     "business": "businesses",
 }
@@ -1061,6 +1070,22 @@ class ScenarioActionExecutor:
         except Exception:
             return None
 
+    async def _safe_appointment_staff_id(self, raw_value: Any, business_id: Any = None):
+        parsed = uuid_or_none(raw_value)
+        if not parsed:
+            return None, None
+        try:
+            query = self.supabase.table("staff").select("*").eq("id", parsed)
+            if business_id is not None:
+                query = query.eq("business_id", business_id)
+            response = query.limit(1).execute()
+            if not response.data:
+                return None, None
+            staff = response.data[0]
+            return parsed, staff
+        except Exception:
+            return None, None
+
     async def _create_appointment(self, node: dict, context: dict):
         try:
             config = node.get("appointmentConfig") or node.get("actionConfig") or {}
@@ -1073,9 +1098,14 @@ class ScenarioActionExecutor:
             resolved_service_id = await self._safe_appointment_service_id(
                 self._resolve_variables(config.get("service_id") or config.get("field_service_id") or "", context)
             )
+            resolved_staff_id, _resolved_staff = await self._safe_appointment_staff_id(
+                self._resolve_variables(config.get("staff_id") or config.get("field_staff_id") or "", context),
+                business.get("id"),
+            )
             row = {
                 "person_id": resolved_person_id,
                 "service_id": resolved_service_id,
+                "staff_id": resolved_staff_id,
                 "date": normalize_appointment_date_value(resolved_date),
                 "time": normalize_appointment_time_value(resolved_time),
                 "duration": normalize_appointment_duration(
@@ -1092,7 +1122,7 @@ class ScenarioActionExecutor:
             response = self.supabase.table("appointments").insert(row).execute()
             created = response.data[0] if response.data else row
             logging.info("📅 Appointment created")
-            return {"success": True, "data": created}
+            return {"success": True, "data": {"action": "create_appointment", "table": "appointments", **created}}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
@@ -1106,7 +1136,7 @@ class ScenarioActionExecutor:
             if not appointment_id:
                 return {"success": True, "data": {"action": "update_appointment", "skipped": True, "reason": "Invalid appointment ID"}}
             updates = {}
-            for key in ("date", "time", "duration", "status", "assigned_receptionist", "notes", "person_id", "service_id"):
+            for key in ("date", "time", "duration", "status", "assigned_receptionist", "notes", "person_id", "service_id", "staff_id"):
                 raw = config.get(key) or config.get(f"field_{key}")
                 if raw not in (None, ""):
                     resolved = self._resolve_variables(raw, context)
@@ -1128,6 +1158,13 @@ class ScenarioActionExecutor:
                         safe_service_id = await self._safe_appointment_service_id(resolved)
                         if safe_service_id is not None:
                             updates[key] = safe_service_id
+                    elif key == "staff_id":
+                        safe_staff_id, _safe_staff = await self._safe_appointment_staff_id(
+                            resolved,
+                            (context.get("business") or {}).get("id") or context.get("business_id"),
+                        )
+                        if safe_staff_id is not None:
+                            updates[key] = safe_staff_id
                     else:
                         updates[key] = resolved
             if not updates:
@@ -1136,7 +1173,7 @@ class ScenarioActionExecutor:
             response = self.supabase.table("appointments").update(updates).eq("id", str(appointment_id)).execute()
             row = response.data[0] if response.data else {"id": appointment_id, **updates}
             logging.info("📅 Appointment updated")
-            return {"success": True, "data": row}
+            return {"success": True, "data": {"action": "update_appointment", "table": "appointments", **row}}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
@@ -1155,7 +1192,7 @@ class ScenarioActionExecutor:
             }).eq("id", str(appointment_id)).execute()
             row = response.data[0] if response.data else {"id": appointment_id, "status": "cancelled"}
             logging.info("📅 Appointment cancelled")
-            return {"success": True, "data": row}
+            return {"success": True, "data": {"action": "cancel_appointment", "table": "appointments", **row}}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
@@ -1789,6 +1826,17 @@ class ScenarioFlowExecutor:
                     alias = next((k for k, v in TABLE_REF_ALIASES.items() if v == table), None)
                     if alias:
                         context[alias] = data
+                if table == "appointments":
+                    context["appointment"] = data
+                    context["appointments"] = data
+                    if data.get("staff_id"):
+                        try:
+                            staff_response = self.supabase.table("staff").select("*").eq("id", data.get("staff_id")).limit(1).execute()
+                            if staff_response.data:
+                                context["staff"] = staff_response.data[0]
+                                context["staff_id"] = staff_response.data[0].get("id")
+                        except Exception as exc:
+                            logging.warning("[ScenarioEngine] Could not hydrate staff from appointment result: %s", exc)
 
             if node.get("categoryType") == "UTILITIES" and node_key == "iterator":
                 iterator_context = result.get("context")
@@ -2370,6 +2418,12 @@ class ScenarioEngine:
             "event_type": event_type,
         }
 
+        if isinstance(payload.get("appointment"), dict):
+            context["appointment"] = payload["appointment"]
+            context["appointments"] = payload["appointment"]
+            context.setdefault("person_id", payload["appointment"].get("person_id"))
+            context.setdefault("staff_id", payload["appointment"].get("staff_id"))
+
         appointment_id = payload.get("appointment_id")
         if appointment_id:
             try:
@@ -2378,8 +2432,22 @@ class ScenarioEngine:
                     context["appointment"] = response.data[0]
                     context["appointments"] = response.data[0]
                     context.setdefault("person_id", response.data[0].get("person_id"))
+                    context.setdefault("staff_id", response.data[0].get("staff_id"))
             except Exception as exc:
                 logging.warning("[ScenarioEngine] Could not fetch appointment: %s", exc)
+
+        staff_id = payload.get("staff_id")
+        if not staff_id and isinstance(context.get("appointment"), dict):
+            staff_id = context["appointment"].get("staff_id")
+        if staff_id:
+            try:
+                response = self.supabase.table("staff").select("*").eq("id", staff_id).limit(1).execute()
+                if response.data:
+                    context["staff"] = response.data[0]
+                    context["staff_id"] = response.data[0].get("id")
+                    context.setdefault("business_id", response.data[0].get("business_id"))
+            except Exception as exc:
+                logging.warning("[ScenarioEngine] Could not fetch staff: %s", exc)
 
         person_id = payload.get("person_id") or payload.get("record_id") or payload.get("id")
         if person_id:

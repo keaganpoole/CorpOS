@@ -6,7 +6,8 @@ import {
   BookOpen, FileText, Shield, HelpCircle, Sparkles,
   Eye, EyeOff, Lightbulb, Zap, Star, Info,
   Plus, Trash2, GripVertical, Tag, DollarSign,
-  ChevronRight, ArrowRight, X, MessageSquareText,
+  ChevronRight, ArrowRight, X, MessageSquareText, Users,
+  CalendarClock, Mail, PhoneCall, ListChecks,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -253,6 +254,84 @@ const createServiceFormState = (service) => ({
   is_active: service?.is_active !== false,
 });
 
+const createDefaultHours = (baseHours = null) => (
+  DAYS.reduce((acc, day) => {
+    const hours = baseHours?.[day] || {};
+    acc[day] = {
+      enabled: typeof hours.enabled === 'boolean' ? hours.enabled : !['Saturday', 'Sunday'].includes(day),
+      open: hours.open || '09:00',
+      close: hours.close || '17:00',
+    };
+    return acc;
+  }, {})
+);
+
+const createStaffFormState = (staff, baseHours = null) => ({
+  id: staff?.id || null,
+  full_name: staff?.full_name || '',
+  first_name: staff?.first_name || '',
+  last_name: staff?.last_name || '',
+  role: staff?.role || '',
+  email: staff?.email || '',
+  phone: staff?.phone || '',
+  avatar: staff?.avatar || '',
+  is_active: staff?.is_active !== false,
+  notes: staff?.notes || '',
+  working_hours: createDefaultHours(staff?.working_hours || baseHours),
+});
+
+const normalizeStaffPayload = (form, businessId) => {
+  const derivedFullName = String(form.full_name || '').trim()
+    || [form.first_name, form.last_name].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+
+  return {
+    business_id: businessId,
+    full_name: derivedFullName,
+    first_name: String(form.first_name || '').trim() || null,
+    last_name: String(form.last_name || '').trim() || null,
+    role: String(form.role || '').trim() || null,
+    email: String(form.email || '').trim() || null,
+    phone: String(form.phone || '').trim() || null,
+    avatar: String(form.avatar || '').trim() || null,
+    is_active: form.is_active !== false,
+    working_hours: createDefaultHours(form.working_hours),
+    notes: String(form.notes || '').trim() || null,
+  };
+};
+
+const formatHourLabel = (value) => {
+  if (!value || typeof value !== 'string' || !value.includes(':')) return 'N/A';
+  const [rawHour, rawMinute] = value.split(':');
+  const hour = Number(rawHour);
+  const minute = Number(rawMinute);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value;
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const normalizedHour = hour % 12 || 12;
+  return `${normalizedHour}:${String(minute).padStart(2, '0')} ${period}`;
+};
+
+const getStaffAvailabilitySummary = (workingHours) => {
+  const normalizedHours = createDefaultHours(workingHours);
+  const enabledEntries = Object.entries(normalizedHours).filter(([, hours]) => hours?.enabled);
+  const opens = enabledEntries
+    .map(([, hours]) => hours.open)
+    .filter(Boolean)
+    .sort();
+  const closes = enabledEntries
+    .map(([, hours]) => hours.close)
+    .filter(Boolean)
+    .sort();
+
+  return {
+    activeDays: enabledEntries.length,
+    firstOpen: opens[0] || null,
+    lastClose: closes[closes.length - 1] || null,
+    scheduleLabel: enabledEntries.length > 0
+      ? enabledEntries.map(([day]) => day.slice(0, 3)).join(' • ')
+      : 'No hours configured',
+  };
+};
+
 // ─── Section Card ───────────────────────────────────────────────────────────
 const Section = ({ title, icon: Icon, color, children, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
@@ -341,7 +420,7 @@ const Toggle = ({ value, onChange, color = 'indigo' }) => {
     },
     cyan: {
       bg: 'bg-cyan-500',
-      glow: 'shadow-[0_0_12px_rgba(34,211,238,0.4)]',
+      glow: 'shadow-[0_0_6px_rgba(34,211,238,0.22)]',
     },
     amber: {
       bg: 'bg-amber-500',
@@ -355,11 +434,11 @@ const Toggle = ({ value, onChange, color = 'indigo' }) => {
     <button
       type="button"
       onClick={() => onChange(!value)}
-      className={`relative w-11 h-6 rounded-full transition-all ${value ? activeColor + ' ' + glowColor : 'bg-zinc-800 border border-white/[0.06]'}`}
+      className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-all ${value ? activeColor + ' ' + glowColor : 'bg-zinc-800 border border-white/[0.06]'}`}
       aria-pressed={value}
     >
       <div
-        className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+        className="h-5 w-5 rounded-full bg-white transition-transform"
         style={{ transform: value ? 'translateX(20px)' : 'translateX(0px)' }}
       />
     </button>
@@ -390,20 +469,223 @@ const DayHoursRow = ({ day, settings, onChange }) => {
             type="time"
             value={hours.open}
             onChange={(e) => update('open', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 focus:outline-none focus:border-cyan-500/40 transition-all appearance-none"
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none focus:outline-none focus-visible:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 transition-all appearance-none"
           />
           <span className="text-[11px] text-zinc-600">to</span>
           <input
             type="time"
             value={hours.close}
             onChange={(e) => update('close', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 focus:outline-none focus:border-cyan-500/40 transition-all appearance-none"
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none focus:outline-none focus-visible:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 transition-all appearance-none"
           />
         </div>
       ) : (
         <span className="text-[11px] text-zinc-700 ml-auto italic">Closed</span>
       )}
     </div>
+  );
+};
+
+const StaffHoursRow = ({ day, hours, onChange }) => {
+  const value = hours?.[day] || { enabled: false, open: '09:00', close: '17:00' };
+
+  const update = (field, nextValue) => {
+    onChange({
+      ...hours,
+      [day]: { ...value, [field]: nextValue },
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-4 py-2.5 border-b border-white/[0.02] last:border-0">
+      <button
+        type="button"
+        onClick={() => update('enabled', !value.enabled)}
+        className={`flex h-6 w-10 items-center rounded-full border p-0.5 transition-all ${
+          value.enabled
+            ? 'border-emerald-400/30 bg-emerald-400/15'
+            : 'border-white/[0.08] bg-black/30'
+        }`}
+        aria-label={value.enabled ? `Disable ${day}` : `Enable ${day}`}
+      >
+        <div
+          className={`h-4 w-4 rounded-full transition-transform ${
+            value.enabled
+              ? 'translate-x-4 bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.35)]'
+              : 'translate-x-0 bg-zinc-200'
+          }`}
+        />
+      </button>
+      <span className="w-24 text-[12px] font-medium text-zinc-300">{day}</span>
+      {value.enabled ? (
+        <div className="ml-auto flex items-center gap-2">
+          <input
+            type="time"
+            value={value.open}
+            onChange={(e) => update('open', e.target.value)}
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none focus:outline-none focus-visible:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 transition-all appearance-none"
+          />
+          <span className="text-[11px] text-zinc-600">to</span>
+          <input
+            type="time"
+            value={value.close}
+            onChange={(e) => update('close', e.target.value)}
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none focus:outline-none focus-visible:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 transition-all appearance-none"
+          />
+        </div>
+      ) : (
+        <span className="text-[11px] text-zinc-700 ml-auto italic">Closed</span>
+      )}
+    </div>
+  );
+};
+
+const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActive }) => {
+  const availability = getStaffAvailabilitySummary(staff.working_hours);
+  const borderClass = isSelected ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      onClick={() => onSelect?.(staff)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect?.(staff);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className={`group relative flex w-full max-w-[380px] flex-col overflow-visible rounded-[28px] border bg-[#0A0A0A] text-left shadow-[0_24px_80px_rgba(0,0,0,0.42)] transition-all duration-500 hover:border-white/10 ${borderClass}`}
+    >
+      <div className="relative h-[280px] overflow-hidden rounded-t-[28px]">
+        {staff.avatar ? (
+          <img
+            src={staff.avatar}
+            alt={staff.full_name}
+            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
+            }}
+          />
+        ) : null}
+        {!staff.avatar && (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-950">
+            <Users size={62} className="text-white/15" />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/40 to-transparent" />
+
+        <div className="absolute top-4 left-4 flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-black/60 px-2.5 py-1 backdrop-blur-xl">
+          <div className={`h-1.5 w-1.5 rounded-full ${staff.is_active ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-600'}`}>
+            {staff.is_active && <div className="absolute h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping opacity-40" />}
+          </div>
+          <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-400">
+            {staff.is_active ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect?.(staff);
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-black/60 text-zinc-200 opacity-0 backdrop-blur-xl transition-all group-hover:opacity-100 hover:border-white/15 hover:bg-white/10"
+          >
+            <ChevronRight size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(staff);
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-rose-500/20 bg-black/60 text-rose-500 opacity-0 backdrop-blur-xl transition-all group-hover:opacity-100 hover:border-rose-500/40 hover:bg-rose-500/20"
+          >
+            <X size={13} />
+          </button>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
+          <h3 className="text-2xl font-bold leading-none tracking-tight text-white">{staff.full_name}</h3>
+          <p className="mt-1 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
+            {staff.role || 'Staff Member'}
+          </p>
+        </div>
+      </div>
+
+      <div className="p-6 space-y-3.5">
+        <div className="flex items-center justify-between px-0.5 py-1">
+          <div className="min-w-0">
+            <p className="text-[8px] font-black uppercase tracking-[0.24em] text-zinc-600">Staff Member</p>
+            <p className={`mt-1 text-[11px] font-bold ${staff.is_active ? 'text-zinc-200' : 'text-zinc-500'}`}>
+              {staff.is_active ? 'Accepting appointments' : 'Unavailable for booking'}
+            </p>
+          </div>
+          <div onClick={(e) => e.stopPropagation()}>
+            <Toggle
+              value={staff.is_active}
+              onChange={(nextValue) => onToggleActive?.(staff, nextValue)}
+              color="cyan"
+            />
+          </div>
+        </div>
+
+        <div className="border-t border-white/[0.04] pt-3.5 space-y-3">
+          <div className="min-w-0">
+            <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
+              <CalendarClock size={10} className="text-amber-400/70" />
+              Availability Window
+            </p>
+            <div className="flex items-baseline gap-2">
+              <span className="truncate text-[11px] font-bold text-zinc-300">
+                {formatHourLabel(availability.firstOpen)} - {formatHourLabel(availability.lastClose)}
+              </span>
+            </div>
+          </div>
+          <div className="min-w-0">
+            <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
+              <Mail size={10} className="text-amber-400/70" />
+              Email
+            </p>
+            <div className="flex items-baseline gap-2">
+              <span className="truncate text-[11px] font-bold text-zinc-300">{staff.email || 'No email set'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-white/[0.04] pt-3">
+          <p className="mb-1 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
+            <PhoneCall size={10} className="text-amber-400/70" />
+            Phone Number
+          </p>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 text-[11px] font-bold text-zinc-500">
+              <span className="truncate">{staff.phone || 'No phone set'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-white/[0.04] pt-3">
+          <p className="mb-1 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
+            <ListChecks size={10} className="text-amber-400/70" />
+            Working Hours
+          </p>
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            {availability.scheduleLabel}
+          </p>
+          {staff.notes && (
+            <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-zinc-600">
+              {staff.notes}
+            </p>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 };
 
@@ -719,6 +1001,423 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked })
           ))
         )}
       </div>
+    </div>
+  );
+};
+
+const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defaultHours }) => {
+  const [staffMembers, setStaffMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState(createStaffFormState(null, defaultHours));
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState(null);
+
+  useEffect(() => {
+    loadStaff();
+  }, [businessId]);
+
+  const loadStaff = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      let resolvedBusinessId = businessId;
+      if (!resolvedBusinessId) {
+        const business = await ensureBusinessRecord({ createIfMissing: false });
+        resolvedBusinessId = business?.id || null;
+        if (business?.id) onBusinessLinked?.(business.id);
+      }
+
+      if (!resolvedBusinessId) return;
+
+      const { data, error: loadError } = await supabase
+        .from('staff')
+        .select('*')
+        .eq('business_id', resolvedBusinessId)
+        .order('created_at', { ascending: false });
+      if (loadError) throw loadError;
+      setStaffMembers(data || []);
+    } catch (err) {
+      console.error('[StaffManager] Failed to load:', err);
+      setError(err.message || 'Failed to load staff');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openCreateModal = () => {
+    setEditingStaffId(null);
+    setForm(createStaffFormState(null, defaultHours));
+    setError('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (staff) => {
+    setEditingStaffId(staff.id);
+    setForm(createStaffFormState(staff, defaultHours));
+    setError('');
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    if (saving) return;
+    setIsModalOpen(false);
+    setEditingStaffId(null);
+    setForm(createStaffFormState(null, defaultHours));
+    setError('');
+  };
+
+  const saveStaff = async () => {
+    const fullName = String(form.full_name || '').trim()
+      || [form.first_name, form.last_name].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+
+    if (!fullName) {
+      setError('Full name is required.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      const business = await ensureBusinessRecord({ createIfMissing: true });
+      const resolvedBusinessId = business?.id || businessId || null;
+      if (!resolvedBusinessId) throw new Error('Save business info before adding staff.');
+      onBusinessLinked?.(resolvedBusinessId);
+
+      const payload = normalizeStaffPayload({ ...form, full_name: fullName }, resolvedBusinessId);
+
+      if (!editingStaffId) {
+        const { data, error: insertError } = await supabase
+          .from('staff')
+          .insert(payload)
+          .select('*')
+          .single();
+        if (insertError) throw insertError;
+        setStaffMembers((prev) => [data, ...prev]);
+      } else {
+        const { data, error: updateError } = await supabase
+          .from('staff')
+          .update(payload)
+          .eq('id', editingStaffId)
+          .eq('business_id', resolvedBusinessId)
+          .select('*')
+          .single();
+        if (updateError) throw updateError;
+        setStaffMembers((prev) => prev.map((member) => (member.id === data.id ? data : member)));
+      }
+      closeModal();
+    } catch (err) {
+      console.error('[StaffManager] Failed to save:', err);
+      setError(err.message || 'Failed to save staff member');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteStaff = async (staff) => {
+    if (!staff?.id) return;
+    try {
+      let resolvedBusinessId = businessId;
+      if (!resolvedBusinessId) {
+        const business = await ensureBusinessRecord({ createIfMissing: false });
+        resolvedBusinessId = business?.id || null;
+      }
+
+      let query = supabase.from('staff').delete().eq('id', staff.id);
+      if (resolvedBusinessId) query = query.eq('business_id', resolvedBusinessId);
+      const { error: deleteError } = await query;
+      if (deleteError) throw deleteError;
+
+      setStaffMembers((prev) => prev.filter((member) => member.id !== staff.id));
+      if (editingStaffId === staff.id) closeModal();
+    } catch (err) {
+      console.error('[StaffManager] Failed to delete:', err);
+      setError(err.message || 'Failed to delete staff member');
+    }
+  };
+
+  const toggleStaffActive = async (staff, nextIsActive) => {
+    try {
+      let resolvedBusinessId = businessId;
+      if (!resolvedBusinessId) {
+        const business = await ensureBusinessRecord({ createIfMissing: false });
+        resolvedBusinessId = business?.id || null;
+      }
+
+      let query = supabase
+        .from('staff')
+        .update({ is_active: nextIsActive })
+        .eq('id', staff.id);
+      if (resolvedBusinessId) query = query.eq('business_id', resolvedBusinessId);
+      const { data, error: toggleError } = await query.select('*').single();
+      if (toggleError) throw toggleError;
+
+      setStaffMembers((prev) => prev.map((member) => (member.id === data.id ? data : member)));
+      if (editingStaffId === data.id) {
+        setForm((prev) => ({ ...prev, is_active: data.is_active }));
+      }
+    } catch (err) {
+      console.error('[StaffManager] Failed to toggle:', err);
+      setError(err.message || 'Failed to update staff status');
+    }
+  };
+
+  const activeCount = staffMembers.filter((member) => member.is_active !== false).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="mb-4">
+        <p className="text-[12px] leading-relaxed text-zinc-500">
+          Add the real people your receptionist can book appointments for. Each staff record carries its own availability window so scheduling decisions are tied to actual staff hours, not just business hours.
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-[11px] font-medium text-rose-300">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between rounded-[24px] border border-white/[0.05] bg-zinc-950/30 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <Users size={14} className="text-cyan-400/60" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+              {staffMembers.length} staff member{staffMembers.length !== 1 ? 's' : ''} configured
+            </span>
+            <span className="text-[10px] text-zinc-700">·</span>
+            <span className="text-[10px] text-zinc-600">{activeCount} active</span>
+          </div>
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-black transition hover:bg-zinc-200"
+          >
+            <Plus size={11} />
+            Add Staff
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-700 animate-pulse">Loading staff</span>
+          </div>
+        ) : staffMembers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-[28px] border border-white/[0.04] bg-gradient-to-b from-zinc-950/20 to-transparent py-16 opacity-50">
+            <Users size={36} className="mb-3 text-zinc-800" />
+            <p className="text-[11px] font-black uppercase tracking-[0.4em] text-zinc-800">No staff yet</p>
+            <p className="mt-1 text-[10px] text-zinc-900">Add your first bookable staff member</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {staffMembers.map((staff) => (
+              <StaffCard
+                key={staff.id}
+                staff={staff}
+                onSelect={openEditModal}
+                onDelete={deleteStaff}
+                onToggleActive={toggleStaffActive}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/80 p-6 backdrop-blur-xl"
+            onClick={closeModal}
+          >
+            <motion.section
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/92 p-5 shadow-[0_28px_90px_rgba(0,0,0,0.5)] backdrop-blur-xl sm:p-7"
+            >
+              <div className="mb-8 flex items-start justify-between gap-5">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-normal text-orange-300">
+                    {editingStaffId ? 'Update team member' : 'Add team member'}
+                  </p>
+                  <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+                    {editingStaffId ? 'Edit staff profile' : 'Create staff profile'}
+                  </h2>
+                  <p className="mt-3 max-w-md text-sm leading-6 text-zinc-500">
+                    Add the staff details your receptionist should use when checking appointment availability and routing bookings.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="shrink-0 rounded-full border border-white/[0.08] px-3 py-2 text-xs font-normal text-zinc-500 transition hover:border-white/[0.16] hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="custom-scrollbar max-h-[68vh] overflow-auto pr-2">
+                <div className="space-y-5">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block space-y-2 md:col-span-2">
+                      <span className="text-[13px] font-normal text-zinc-400">Full Name</span>
+                      <input
+                        type="text"
+                        value={form.full_name}
+                        onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))}
+                        placeholder="e.g. Olivia Hart"
+                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                      />
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className="text-[13px] font-normal text-zinc-400">First Name</span>
+                      <input
+                        type="text"
+                        value={form.first_name}
+                        onChange={(e) => setForm((prev) => ({ ...prev, first_name: e.target.value }))}
+                        placeholder="Olivia"
+                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                      />
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className="text-[13px] font-normal text-zinc-400">Last Name</span>
+                      <input
+                        type="text"
+                        value={form.last_name}
+                        onChange={(e) => setForm((prev) => ({ ...prev, last_name: e.target.value }))}
+                        placeholder="Hart"
+                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                      />
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className="text-[13px] font-normal text-zinc-400">Role</span>
+                      <input
+                        type="text"
+                        value={form.role}
+                        onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
+                        placeholder="Senior Stylist"
+                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                      />
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className="text-[13px] font-normal text-zinc-400">Phone</span>
+                      <input
+                        type="text"
+                        value={form.phone}
+                        onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                        placeholder="(555) 000-0000"
+                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                      />
+                    </label>
+
+                    <label className="block space-y-2 md:col-span-2">
+                      <span className="text-[13px] font-normal text-zinc-400">Email</span>
+                      <input
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                        placeholder="olivia@business.com"
+                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                      />
+                    </label>
+
+                    <label className="block space-y-2 md:col-span-2">
+                      <span className="text-[13px] font-normal text-zinc-400">Avatar URL</span>
+                      <input
+                        type="text"
+                        value={form.avatar}
+                        onChange={(e) => setForm((prev) => ({ ...prev, avatar: e.target.value }))}
+                        placeholder="https://..."
+                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.025] p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-[13px] font-normal text-zinc-400">Availability</p>
+                        <p className="mt-1 text-xs leading-5 text-zinc-600">These are the hours the receptionist can use when placing appointments on this staff member's calendar.</p>
+                      </div>
+                      <Toggle
+                        value={form.is_active}
+                        onChange={(nextValue) => setForm((prev) => ({ ...prev, is_active: nextValue }))}
+                        color="cyan"
+                      />
+                    </div>
+                    <div className="rounded-[22px] border border-white/[0.06] bg-black/20 p-4">
+                      {DAYS.map((day) => (
+                        <StaffHoursRow
+                          key={day}
+                          day={day}
+                          hours={form.working_hours}
+                          onChange={(nextHours) => setForm((prev) => ({ ...prev, working_hours: nextHours }))}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <label className="block space-y-2">
+                    <span className="text-[13px] font-normal text-zinc-400">Notes</span>
+                    <textarea
+                      value={form.notes}
+                      onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+                      rows={4}
+                      placeholder="Specialties, internal scheduling notes, days this person prefers, or anything the receptionist should factor in."
+                      className="min-h-[160px] w-full resize-none rounded-[22px] border border-white/[0.08] bg-white/[0.035] px-4 py-4 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  {editingStaffId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const selected = staffMembers.find((member) => member.id === editingStaffId);
+                        if (selected) deleteStaff(selected);
+                      }}
+                      className="rounded-full border border-white/[0.08] px-4 py-2 text-xs font-normal text-zinc-500 transition hover:border-rose-500/40 hover:text-rose-300"
+                    >
+                      Delete staff member
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-3 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    disabled={saving}
+                    className="h-11 rounded-full px-5 text-sm font-normal text-zinc-500 transition hover:text-white disabled:opacity-40"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveStaff}
+                    disabled={saving}
+                    className="h-12 rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {saving ? 'Saving...' : editingStaffId ? 'Update staff' : 'Add staff'}
+                  </button>
+                </div>
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -1271,6 +1970,7 @@ const SettingsPage = () => {
     { id: 'business', title: 'Business Info', icon: Building2, color: 'text-indigo-400', hint: 'Name, contact, and location' },
     { id: 'intro', title: 'Intro Message', icon: MessageSquareText, color: 'text-indigo-400', hint: 'Opening call greeting' },
     { id: 'appointments', title: 'Hours', icon: Calendar, color: 'text-cyan-400', hint: 'Business availability' },
+    { id: 'staff', title: 'Staff', icon: Users, color: 'text-cyan-400', hint: 'Bookable team members and hours' },
     { id: 'services', title: 'Services & Pricing', icon: Tag, color: 'text-amber-400', hint: 'Offer catalog and rates' },
     { id: 'knowledge', title: 'Knowledge Base', icon: BookOpen, color: 'text-amber-400', hint: 'Policies, FAQs, and context' },
   ];
@@ -1326,6 +2026,15 @@ const SettingsPage = () => {
               onBusinessLinked={syncBusinessId}
             />
           </>
+        );
+      case 'staff':
+        return (
+          <StaffManager
+            businessId={settings._business_id}
+            ensureBusinessRecord={ensureBusinessRecord}
+            onBusinessLinked={syncBusinessId}
+            defaultHours={settings.business_hours}
+          />
         );
       case 'knowledge':
         return (

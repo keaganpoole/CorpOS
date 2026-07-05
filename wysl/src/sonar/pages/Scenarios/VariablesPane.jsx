@@ -36,6 +36,7 @@ const TABLE_REF_ALIASES = {
   invoices: 'invoice',
   appointments: 'appointment',
   services: 'service',
+  staff: 'staff',
   hired_receptionists: 'receptionist',
   businesses: 'business',
 };
@@ -101,6 +102,7 @@ const SEARCH_FIELDS = {
   payments: ['description', 'status', 'payment_method'],
   appointments: ['notes', 'status', 'date'],
   services: ['name', 'description', 'category'],
+  staff: ['full_name', 'role', 'email', 'phone'],
   hired_receptionists: ['full_name', 'stereotype', 'phone_number'],
   businesses: ['name', 'email', 'phone', 'address', 'city', 'state'],
 };
@@ -263,14 +265,14 @@ export const getFieldDisplayLabel = (tableKey, fieldKey) => {
 // Maps trigger keys to the tables that will have data at runtime.
 // Based on ScenarioEngine._buildFlowContext FK relationships.
 const TRIGGER_TABLE_MAP = {
-  appointment_created: ['appointments', 'people', 'services', 'businesses'],
-  appointment_updated: ['appointments', 'people', 'services', 'businesses'],
-  appointment_cancelled: ['appointments', 'people', 'services', 'businesses'],
-  appointment_rescheduled: ['appointments', 'people', 'services', 'businesses'],
-  appointment_confirmed: ['appointments', 'people', 'services', 'businesses'],
-  appointment_soon: ['appointments', 'people', 'services', 'businesses'],
-  appointment_completed: ['appointments', 'people', 'services', 'businesses'],
-  appointment_missed: ['appointments', 'people', 'services', 'businesses'],
+  appointment_created: ['appointments', 'people', 'services', 'staff', 'businesses'],
+  appointment_updated: ['appointments', 'people', 'services', 'staff', 'businesses'],
+  appointment_cancelled: ['appointments', 'people', 'services', 'staff', 'businesses'],
+  appointment_rescheduled: ['appointments', 'people', 'services', 'staff', 'businesses'],
+  appointment_confirmed: ['appointments', 'people', 'services', 'staff', 'businesses'],
+  appointment_soon: ['appointments', 'people', 'services', 'staff', 'businesses'],
+  appointment_completed: ['appointments', 'people', 'services', 'staff', 'businesses'],
+  appointment_missed: ['appointments', 'people', 'services', 'staff', 'businesses'],
   record_created: ['people', 'businesses'],
   record_updated: ['people', 'businesses'],
   record_deleted: ['people', 'businesses'],
@@ -293,7 +295,7 @@ const TRIGGER_TABLE_MAP = {
   subscription_created: ['invoices', 'payments', 'people', 'businesses'],
   subscription_canceled: ['invoices', 'payments', 'people', 'businesses'],
   subscription_payment_failed: ['invoices', 'payments', 'people', 'businesses'],
-  manual_trigger: ['people', 'payments', 'appointments', 'services', 'hired_receptionists', 'businesses'],
+  manual_trigger: ['people', 'payments', 'appointments', 'services', 'staff', 'hired_receptionists', 'businesses'],
 };
 
 // Fetch order from ScenarioEngine._buildFlowContext (first fetched = bottom, last fetched = top)
@@ -301,6 +303,7 @@ const TRIGGER_TABLE_MAP = {
 // After reverse render: array must be [businesses, services, people, ...rest]
 const FETCH_ORDER = {
   businesses: 1,
+  staff: 1.5,
   services: 2,
   people: 3,
   appointments: 10,
@@ -353,7 +356,7 @@ const getAvailableTables = (triggerKey, currentNode = null) => {
     if (!availableKeys) {
       tables = [...TABLE_DEFS];
     } else {
-      const visibleKeys = new Set([...availableKeys, 'services']);
+      const visibleKeys = new Set([...availableKeys, 'services', 'staff']);
       tables = TABLE_DEFS.filter(t => visibleKeys.has(t.key));
     }
   }
@@ -374,6 +377,20 @@ const getAvailableTables = (triggerKey, currentNode = null) => {
   });
 
   return tables.map(withCustomFields);
+};
+
+const orderDisplayedTables = (tables) => {
+  const reversed = tables.slice().reverse();
+  const businessIndex = reversed.findIndex((table) => table.key === 'businesses');
+  const staffIndex = reversed.findIndex((table) => table.key === 'staff');
+
+  if (businessIndex === -1 || staffIndex === -1) return reversed;
+
+  const next = reversed.slice();
+  const [staffTable] = next.splice(staffIndex, 1);
+  const targetIndex = next.findIndex((table) => table.key === 'businesses');
+  next.splice(targetIndex, 0, staffTable);
+  return next;
 };
 
 const TABLE_DEFS = [
@@ -603,6 +620,41 @@ const TABLE_DEFS = [
       } catch { return []; }
     },
   },
+  {
+    key: 'staff',
+    label: 'Staff',
+    color: '#60a5fa',
+    colorBg: 'rgba(96,165,250,0.08)',
+    colorBorder: 'rgba(96,165,250,0.2)',
+    icon: User,
+    fields: [
+      { key: 'id', label: 'Record ID', type: 'text' },
+      { key: 'business_id', label: 'Business ID', type: 'number' },
+      { key: 'full_name', label: 'Full Name', type: 'text' },
+      { key: 'first_name', label: 'First Name', type: 'text' },
+      { key: 'last_name', label: 'Last Name', type: 'text' },
+      { key: 'role', label: 'Role', type: 'text' },
+      { key: 'email', label: 'Email', type: 'email' },
+      { key: 'phone', label: 'Phone', type: 'phone' },
+      { key: 'avatar', label: 'Avatar', type: 'text' },
+      { key: 'is_active', label: 'Is Active', type: 'boolean' },
+      { key: 'working_hours', label: 'Working Hours', type: 'text' },
+      { key: 'notes', label: 'Notes', type: 'text' },
+      { key: 'created_at', label: 'Created At', type: 'timestamp' },
+      { key: 'updated_at', label: 'Updated At', type: 'timestamp' },
+    ],
+    fetch: async () => {
+      try {
+        const businessId = await getCurrentBusinessId();
+        const { data } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('business_id', businessId)
+          .limit(20);
+        return data || [];
+      } catch { return []; }
+    },
+  },
 ];
 
 export const TABLE_COLORS = {
@@ -611,6 +663,7 @@ export const TABLE_COLORS = {
   invoices: '#f59e0b',
   appointments: '#38bdf8',
   services: '#fb923c',
+  staff: '#60a5fa',
   hired_receptionists: '#f472b6',
   businesses: '#a1a1aa',
 };
@@ -626,6 +679,7 @@ export const TABLE_LABELS = {
   appointment: 'Appointment',
   services: 'Services',
   service: 'Service',
+  staff: 'Staff',
   hired_receptionists: 'Receptionists',
   receptionist: 'Receptionist',
   businesses: 'Businesses',
@@ -1403,7 +1457,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   useEffect(() => {
     if (!visible || !customFieldsReady) return;
     const currentTriggerKey = findTriggerKeyForNode(currentNodeId, nodes, edges);
-    const tables = getAvailableTables(currentTriggerKey).slice().reverse();
+    const tables = orderDisplayedTables(getAvailableTables(currentTriggerKey));
     const hasCallNodeBeforeLocal = (() => {
       if (!currentNodeId || !nodes.length) return false;
       const callNodeIds = nodes
@@ -1633,7 +1687,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     return matched;
   };
 
-  const availableTables = getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges), currentNode || null).slice().reverse();
+  const availableTables = orderDisplayedTables(getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges), currentNode || null));
   const sourceStateKey = (tableKey) => `${currentNodeId || 'none'}::${tableKey}`;
 
   const getSourceCycleOrder = (tableKey) => {

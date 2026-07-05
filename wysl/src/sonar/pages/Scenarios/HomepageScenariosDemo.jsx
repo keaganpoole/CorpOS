@@ -437,11 +437,13 @@ const AUTOMATION_HIERARCHY = {
         { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment', configFields: [
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'service_id', label: 'Service ID', type: 'service_id' },
+          { key: 'staff_id', label: 'Staff ID', type: 'staff_id' },
         ] },
         { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment', configFields: [
           { key: 'appointment_id', label: 'Appointment ID', type: 'record_id' },
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'service_id', label: 'Service ID', type: 'service_id' },
+          { key: 'staff_id', label: 'Staff ID', type: 'staff_id' },
           { key: 'status', label: 'Status', type: 'select', options: ['pending', 'confirmed', 'cancelled', 'completed', 'missed'] },
           { key: 'date', label: 'Date', type: 'date' },
           { key: 'time', label: 'Time', type: 'time' },
@@ -5478,6 +5480,46 @@ export default function ScenariosPage({
                           </div>
                         </div>
                       )}
+                      {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
+                        <div className="sb-record-field" style={{ order: appointmentConfig.key === 'update_appointment' ? 3 : 2 }}>
+                          <label className="sb-record-label">Staff ID</label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="text"
+                              className="sb-input-field"
+                              value={appointmentConfig.staff_id || ''}
+                              onChange={e => setAppointmentConfig({ ...appointmentConfig, staff_id: e.target.value })}
+                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'staff_id', fieldLabel: 'Staff ID', fieldType: 'staff_id' })}
+                              style={{
+                                ...(appointmentConfig.staff_id?.includes('{{') ? { color: 'transparent' } : {}),
+                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'staff_id' ? {
+                                  borderColor: hoveredTableColor,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                } : {}),
+                              }}
+                            />
+                            {(appointmentConfig.staff_id || '').includes('{{') && (
+                              <div
+                                className="sb-var-chip-overlay"
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  pointerEvents: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '0 10px',
+                                  fontSize: 12,
+                                  color: '#e4e4e7',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  fontFamily: 'Inter, sans-serif',
+                                }}
+                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.staff_id) }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )}
                       {/* Appointment ID — for update/delete_appointment (first field) */}
                       {(appointmentConfig.key === 'update_appointment' || appointmentConfig.key === 'delete_appointment') && (
                         <div className="sb-record-field" style={{ order: 0 }}>
@@ -5507,7 +5549,7 @@ export default function ScenariosPage({
                       )}
                       {/* Status — for update_appointment (second field) */}
                       {appointmentConfig.key === 'update_appointment' && (
-                        <div className="sb-record-field" style={{ order: 3 }}>
+                        <div className="sb-record-field" style={{ order: 4 }}>
                           <label className="sb-record-label">Status</label>
                           <select className="sb-input-field sb-select-field" value={appointmentConfig.status || ''}
                             onChange={e => setAppointmentConfig({ ...appointmentConfig, status: e.target.value })}>
@@ -5520,7 +5562,7 @@ export default function ScenariosPage({
                       )}
                       {/* Date — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 4 } : appointmentConfig.key === 'create_appointment' ? { order: 2 } : undefined}>
+                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 5 } : appointmentConfig.key === 'create_appointment' ? { order: 3 } : undefined}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
                             <label className="sb-record-label" style={{ marginBottom: 0 }}>Date</label>
                             <button
@@ -5576,7 +5618,7 @@ export default function ScenariosPage({
                       )}
                       {/* Time — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 5 } : appointmentConfig.key === 'create_appointment' ? { order: 3 } : undefined}>
+                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 6 } : appointmentConfig.key === 'create_appointment' ? { order: 4 } : undefined}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
                             <label className="sb-record-label" style={{ marginBottom: 0 }}>Time</label>
                             <button
@@ -5632,7 +5674,7 @@ export default function ScenariosPage({
                       )}
                       {/* Duration */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 6 } : appointmentConfig.key === 'create_appointment' ? { order: 4 } : undefined}>
+                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 7 } : appointmentConfig.key === 'create_appointment' ? { order: 5 } : undefined}>
                           <label className="sb-record-label">Duration</label>
                           {(() => {
                             const durationValue = appointmentConfig.duration == null ? '' : String(appointmentConfig.duration);
@@ -5674,7 +5716,7 @@ export default function ScenariosPage({
                       )}
                       {/* Notes */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 7 } : appointmentConfig.key === 'create_appointment' ? { order: 5 } : undefined}>
+                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 8 } : appointmentConfig.key === 'create_appointment' ? { order: 6 } : undefined}>
                           <label className="sb-record-label">Notes</label>
                           <div style={{ position: 'relative' }}>
                             <textarea

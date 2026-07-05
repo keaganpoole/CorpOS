@@ -1196,7 +1196,6 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, bottom: undefined, left: 0 });
   const columnOptionsButtonRef = useRef(null);
   const tableScrollRef = useRef(null);
-  const horizontalScrollRef = useRef(null);
   const headerStickyRef = useRef(null);
   const headerRowRef = useRef(null);
   const headerRefs = useRef({});
@@ -1424,7 +1423,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
     setSettingsField(nextField.key);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const scroller = horizontalScrollRef.current;
+        const scroller = tableScrollRef.current;
         if (!scroller) return;
         scroller.scrollTo({ left: scroller.scrollWidth, behavior: 'smooth' });
       });
@@ -1941,7 +1940,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   );
 
   const renderSplitTable = () => (
-    <div ref={tableScrollRef} className="relative flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
+    <div ref={tableScrollRef} className="relative flex-1 overflow-auto custom-scrollbar">
       <div ref={headerRowRef} className="relative flex min-w-0">
         <div
           className="shrink-0 overflow-hidden border-r border-white/[0.04] bg-[#0a0a0a]"
@@ -2007,181 +2006,179 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             <GripVertical size={10} />
           </button>
         </div>
-        <div ref={horizontalScrollRef} className="min-w-0 flex-1 overflow-x-auto overflow-y-visible custom-scrollbar">
-          <div className="min-w-max">
-            <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
-              <div className="relative">
-                <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
-                  {isDraggingFrozenDivider && <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-cyan-300/30" />}
-                </div>
-                <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
+        <div className="min-w-0 flex-1 overflow-visible">
+          <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
+            <div className="relative">
+              <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
+                {isDraggingFrozenDivider && <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-cyan-300/30" />}
+              </div>
+              <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
+                <button
+                  type="button"
+                  onPointerDown={handleFrozenPointerDown}
+                  className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-cyan-300/70 transition-colors hover:border-cyan-400/30 hover:text-white"
+                  aria-label="Drag frozen column divider"
+                >
+                  <GripVertical size={10} />
+                </button>
+              </div>
+              <div className="absolute inset-x-0 top-0 h-6">
+                {headerMetrics.filter((metric) => metric.eligible).map((metric) => (
                   <button
+                    key={`zone-hit-${metric.id}`}
                     type="button"
-                    onPointerDown={handleFrozenPointerDown}
-                    className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-cyan-300/70 transition-colors hover:border-cyan-400/30 hover:text-white"
-                    aria-label="Drag frozen column divider"
+                    onPointerDown={(event) => handleZonePointerDown(event, metric.index)}
+                    onMouseEnter={() => setHoveredZoneColumnId(metric.id)}
+                    onMouseLeave={() => setHoveredZoneColumnId((current) => (current === metric.id ? null : current))}
+                    className="absolute top-[1px] h-4 z-20"
+                    style={{ left: metric.left + 4, width: Math.max(metric.width - 8, 0) }}
+                    aria-label={`Create zone from ${fieldConfig[metric.id]?.name || columns[metric.index]?.label || metric.id}`}
+                  />
+                ))}
+                {draftSpan?.metrics.map((metric) => (
+                  <motion.div
+                    key={`draft-glow-${metric.id}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="pointer-events-none absolute top-0 bottom-1 rounded-b-xl"
+                    style={{
+                      left: metric.left + 2,
+                      width: Math.max(metric.width - 4, 0),
+                      background: 'linear-gradient(180deg, rgba(125,211,252,0.14), rgba(125,211,252,0.04) 55%, transparent 100%)',
+                    }}
+                  />
+                ))}
+                {zoneLayouts.map((zone) => (
+                  <button
+                    key={zone.id}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setZonePaletteId(zone.id);
+                    }}
+                    className="absolute z-10 rounded-full pointer-events-auto"
+                    style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 8, 0), height: 16 }}
+                    aria-label="Edit zone color"
                   >
-                    <GripVertical size={10} />
+                    <span
+                      className="absolute blur-[9px] opacity-26"
+                      style={{
+                        left: '2%',
+                        width: '96%',
+                        top: zone.top - Math.max(zone.top - 6, 0) + 1,
+                        height: 8,
+                        background: `radial-gradient(ellipse at center top, ${zone.displayColor}14 0%, ${zone.displayColor}10 34%, ${zone.displayColor}00 78%), linear-gradient(90deg, transparent 0%, ${zone.displayColor}14 10%, ${zone.displayColor}30 50%, ${zone.displayColor}14 90%, transparent 100%)`,
+                      }}
+                    />
+                    <span
+                      className="absolute inset-x-0 h-px rounded-full"
+                      style={{
+                        top: zone.top - Math.max(zone.top - 6, 0),
+                        background: `linear-gradient(90deg, ${zone.displayColor}AA 0%, ${zone.displayColor} 12%, ${zone.displayColor} 88%, ${zone.displayColor}AA 100%)`,
+                        boxShadow: zonePaletteId === zone.id ? `0 0 0 1px ${zone.displayColor}44, 0 0 18px ${zone.displayColor}55` : `0 0 12px ${zone.displayColor}35`,
+                      }}
+                    />
+                  </button>
+                ))}
+                {draftSpan && (
+                  <motion.div
+                    initial={{ opacity: 0, scaleX: 0.98 }}
+                    animate={{ opacity: 1, scaleX: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="pointer-events-none absolute h-4"
+                    style={{ left: draftSpan.left, width: draftSpan.width, top: 0 }}
+                  >
+                    <span
+                      className="absolute h-[8px] blur-[9px]"
+                      style={{
+                        left: '2%',
+                        top: '3px',
+                        width: '96%',
+                        background: 'radial-gradient(ellipse at center top, rgba(125,211,252,0.12) 0%, rgba(125,211,252,0.09) 34%, rgba(125,211,252,0) 78%), linear-gradient(90deg, transparent 0%, rgba(125,211,252,0.1) 10%, rgba(125,211,252,0.22) 50%, rgba(125,211,252,0.1) 90%, transparent 100%)',
+                      }}
+                    />
+                    <span className="absolute inset-x-0 top-[3px] h-px rounded-full bg-cyan-200 shadow-[0_0_16px_rgba(125,211,252,0.55)]" />
+                  </motion.div>
+                )}
+                {!zoneDraft && hoveredZoneMetric && (
+                  <motion.div
+                    initial={{ opacity: 0, scaleX: 0.94 }}
+                    animate={{ opacity: 1, scaleX: 1 }}
+                    exit={{ opacity: 0, scaleX: 0.94 }}
+                    className="absolute h-4"
+                    style={{ left: hoveredZoneMetric.left, width: hoveredZoneMetric.width, top: 0 }}
+                  >
+                    <span className="absolute inset-x-1 top-[3px] h-px rounded-full bg-white/20 shadow-[0_0_10px_rgba(255,255,255,0.08)]" />
+                  </motion.div>
+                )}
+              </div>
+              <div className="flex items-center gap-3 py-2 pr-5 group" style={{ paddingTop: '15px', paddingLeft: splitPaneScrollPadding }}>
+                {scrollableColumns.map((col) => renderHeaderColumn(col, columns.findIndex((column) => column.id === col.id)))}
+                <div className="shrink-0 pl-1">
+                  <button
+                    ref={columnOptionsButtonRef}
+                    type="button"
+                    onClick={toggleColumnOptions}
+                    className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-cyan-500/25 hover:bg-cyan-500/10 transition-all flex items-center justify-center"
+                    aria-label="Add column"
+                  >
+                    <Plus size={13} />
                   </button>
                 </div>
-                <div className="absolute inset-x-0 top-0 h-6">
-                  {headerMetrics.filter((metric) => metric.eligible).map((metric) => (
-                    <button
-                      key={`zone-hit-${metric.id}`}
-                      type="button"
-                      onPointerDown={(event) => handleZonePointerDown(event, metric.index)}
-                      onMouseEnter={() => setHoveredZoneColumnId(metric.id)}
-                      onMouseLeave={() => setHoveredZoneColumnId((current) => (current === metric.id ? null : current))}
-                      className="absolute top-[1px] h-4 z-20"
-                      style={{ left: metric.left + 4, width: Math.max(metric.width - 8, 0) }}
-                      aria-label={`Create zone from ${fieldConfig[metric.id]?.name || columns[metric.index]?.label || metric.id}`}
-                    />
-                  ))}
-                  {draftSpan?.metrics.map((metric) => (
-                    <motion.div
-                      key={`draft-glow-${metric.id}`}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="pointer-events-none absolute top-0 bottom-1 rounded-b-xl"
-                      style={{
-                        left: metric.left + 2,
-                        width: Math.max(metric.width - 4, 0),
-                        background: 'linear-gradient(180deg, rgba(125,211,252,0.14), rgba(125,211,252,0.04) 55%, transparent 100%)',
-                      }}
-                    />
-                  ))}
-                  {zoneLayouts.map((zone) => (
-                    <button
-                      key={zone.id}
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setZonePaletteId(zone.id);
-                      }}
-                      className="absolute z-10 rounded-full pointer-events-auto"
-                      style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 8, 0), height: 16 }}
-                      aria-label="Edit zone color"
-                    >
-                      <span
-                        className="absolute blur-[9px] opacity-26"
-                        style={{
-                          left: '2%',
-                          width: '96%',
-                          top: zone.top - Math.max(zone.top - 6, 0) + 1,
-                          height: 8,
-                          background: `radial-gradient(ellipse at center top, ${zone.displayColor}14 0%, ${zone.displayColor}10 34%, ${zone.displayColor}00 78%), linear-gradient(90deg, transparent 0%, ${zone.displayColor}14 10%, ${zone.displayColor}30 50%, ${zone.displayColor}14 90%, transparent 100%)`,
-                        }}
-                      />
-                      <span
-                        className="absolute inset-x-0 h-px rounded-full"
-                        style={{
-                          top: zone.top - Math.max(zone.top - 6, 0),
-                          background: `linear-gradient(90deg, ${zone.displayColor}AA 0%, ${zone.displayColor} 12%, ${zone.displayColor} 88%, ${zone.displayColor}AA 100%)`,
-                          boxShadow: zonePaletteId === zone.id ? `0 0 0 1px ${zone.displayColor}44, 0 0 18px ${zone.displayColor}55` : `0 0 12px ${zone.displayColor}35`,
-                        }}
-                      />
-                    </button>
-                  ))}
-                  {draftSpan && (
-                    <motion.div
-                      initial={{ opacity: 0, scaleX: 0.98 }}
-                      animate={{ opacity: 1, scaleX: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="pointer-events-none absolute h-4"
-                      style={{ left: draftSpan.left, width: draftSpan.width, top: 0 }}
-                    >
-                      <span
-                        className="absolute h-[8px] blur-[9px]"
-                        style={{
-                          left: '2%',
-                          top: '3px',
-                          width: '96%',
-                          background: 'radial-gradient(ellipse at center top, rgba(125,211,252,0.12) 0%, rgba(125,211,252,0.09) 34%, rgba(125,211,252,0) 78%), linear-gradient(90deg, transparent 0%, rgba(125,211,252,0.1) 10%, rgba(125,211,252,0.22) 50%, rgba(125,211,252,0.1) 90%, transparent 100%)',
-                        }}
-                      />
-                      <span className="absolute inset-x-0 top-[3px] h-px rounded-full bg-cyan-200 shadow-[0_0_16px_rgba(125,211,252,0.55)]" />
-                    </motion.div>
-                  )}
-                  {!zoneDraft && hoveredZoneMetric && (
-                    <motion.div
-                      initial={{ opacity: 0, scaleX: 0.94 }}
-                      animate={{ opacity: 1, scaleX: 1 }}
-                      exit={{ opacity: 0, scaleX: 0.94 }}
-                      className="absolute h-4"
-                      style={{ left: hoveredZoneMetric.left, width: hoveredZoneMetric.width, top: 0 }}
-                    >
-                      <span className="absolute inset-x-1 top-[3px] h-px rounded-full bg-white/20 shadow-[0_0_10px_rgba(255,255,255,0.08)]" />
-                    </motion.div>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 py-2 pr-5 group" style={{ paddingTop: '15px', paddingLeft: splitPaneScrollPadding }}>
-                  {scrollableColumns.map((col) => renderHeaderColumn(col, columns.findIndex((column) => column.id === col.id)))}
-                  <div className="shrink-0 pl-1">
-                    <button
-                      ref={columnOptionsButtonRef}
-                      type="button"
-                      onClick={toggleColumnOptions}
-                      className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-cyan-500/25 hover:bg-cyan-500/10 transition-all flex items-center justify-center"
-                      aria-label="Add column"
-                    >
-                      <Plus size={13} />
-                    </button>
-                  </div>
-                  {showColumnOptions && <div className="w-[190px] shrink-0" />}
-                </div>
+                {showColumnOptions && <div className="w-[190px] shrink-0" />}
               </div>
             </div>
+          </div>
 
-            <div className="divide-y divide-white/[0.02]">
-              {loading ? (
-                <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
-                  <div className="flex flex-col items-center justify-center gap-4">
-                  <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-cyan-500/60 animate-spin" />
-                  <p className="text-[11px] text-zinc-600 font-medium">Loading appointments...</p>
-                  </div>
+          <div className="divide-y divide-white/[0.02]">
+            {loading ? (
+              <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
+                <div className="flex flex-col items-center justify-center gap-4">
+                <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-cyan-500/60 animate-spin" />
+                <p className="text-[11px] text-zinc-600 font-medium">Loading appointments...</p>
                 </div>
-              ) : appointments.length === 0 ? (
-                renderNewRecordEmptyState()
-              ) : (
-                <>
-                  {sortedAppointments.map((appointment, idx) => {
-                    const isRowSelected = selectedId === appointment.id;
-                    const isRowBulkSelected = selectedIds.includes(appointment.id);
-                    return (
-                      <motion.div
-                        key={appointment.id}
-                        initial={{ opacity: 0, y: 3 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: Math.min(idx * 0.012, 0.35) }}
-                        onContextMenu={(event) => handleContextMenu(event, appointment.id)}
-                        className={`group pr-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${isRowSelected ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-white/[0.02]' : ''}`}
-                        style={{ paddingLeft: splitPaneScrollPadding }}
-                      >
-                        {frozenCount === 0 && renderColorbar(appointment)}
-                        {scrollableColumns.map((col) => renderAppointmentColumn(col, appointment))}
-                      </motion.div>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={onCreateInline}
-                    disabled={creating}
-                    className={`w-full pr-5 ${dc.row} flex items-center gap-3 min-w-max text-left transition-all duration-150 hover:bg-white/[0.02]`}
-                    style={{ paddingLeft: splitPaneScrollPadding }}
-                  >
-                    {creating ? (
-                      <div className="flex items-center gap-3 px-2 text-zinc-700">
-                        <div className="h-4 w-4 animate-spin rounded-full border border-white/10 border-t-cyan-500/60" />
-                        <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-500">Creating appointment...</span>
-                      </div>
-                    ) : (
-                      scrollableColumns.map((col) => renderCreateColumn(col, columns.findIndex((column) => column.id === col.id)))
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
+              </div>
+            ) : appointments.length === 0 ? (
+              renderNewRecordEmptyState()
+            ) : (
+              <>
+                {sortedAppointments.map((appointment, idx) => {
+                  const isRowSelected = selectedId === appointment.id;
+                  const isRowBulkSelected = selectedIds.includes(appointment.id);
+                  return (
+                    <motion.div
+                      key={appointment.id}
+                      initial={{ opacity: 0, y: 3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(idx * 0.012, 0.35) }}
+                      onContextMenu={(event) => handleContextMenu(event, appointment.id)}
+                      className={`group pr-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${isRowSelected ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-white/[0.02]' : ''}`}
+                      style={{ paddingLeft: splitPaneScrollPadding }}
+                    >
+                      {frozenCount === 0 && renderColorbar(appointment)}
+                      {scrollableColumns.map((col) => renderAppointmentColumn(col, appointment))}
+                    </motion.div>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={onCreateInline}
+                  disabled={creating}
+                  className={`w-full pr-5 ${dc.row} flex items-center gap-3 min-w-max text-left transition-all duration-150 hover:bg-white/[0.02]`}
+                  style={{ paddingLeft: splitPaneScrollPadding }}
+                >
+                  {creating ? (
+                    <div className="flex items-center gap-3 px-2 text-zinc-700">
+                      <div className="h-4 w-4 animate-spin rounded-full border border-white/10 border-t-cyan-500/60" />
+                      <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-500">Creating appointment...</span>
+                    </div>
+                  ) : (
+                    scrollableColumns.map((col) => renderCreateColumn(col, columns.findIndex((column) => column.id === col.id)))
+                  )}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
