@@ -781,6 +781,9 @@ class ScenarioActionExecutor:
         key = re.sub(r"[^a-z0-9]+", "_", str(label).strip().lower()).strip("_")
         return key or None
 
+    def _has_unresolved_template(self, value: Any) -> bool:
+        return isinstance(value, str) and re.search(r"\{\{[^}]+\}\}", value) is not None
+
     def _add_person_custom_dynamic_variables(self, dynamic_vars: dict, context: dict):
         person = context.get("person") or context.get("customer") or {}
         custom_fields = person.get("custom_fields") if isinstance(person, dict) else None
@@ -1092,20 +1095,37 @@ class ScenarioActionExecutor:
             business = context.get("business") or {}
             resolved_date = self._resolve_variables(config.get("date") or config.get("field_date") or "", context)
             resolved_time = self._resolve_variables(config.get("time") or config.get("field_time") or "", context)
+            if self._has_unresolved_template(resolved_date):
+                return {"success": False, "error": f"Unresolved appointment date template: {resolved_date}"}
+            if self._has_unresolved_template(resolved_time):
+                return {"success": False, "error": f"Unresolved appointment time template: {resolved_time}"}
+            raw_person_ref = self._resolve_variables(
+                config.get("person_id") or config.get("field_person_id") or "", context
+            )
+            if self._has_unresolved_template(raw_person_ref):
+                return {"success": False, "error": f"Unresolved appointment person_id template: {raw_person_ref}"}
             resolved_person_id, _resolved_person = await self._safe_appointment_person(
-                context.get("person", {}).get("id") or context.get("person_id")
+                raw_person_ref or context.get("person", {}).get("id") or context.get("person_id")
             )
-            resolved_service_id = await self._safe_appointment_service_id(
-                self._resolve_variables(config.get("service_id") or config.get("field_service_id") or "", context)
-            )
-            resolved_staff_id, _resolved_staff = await self._safe_appointment_staff_id(
-                self._resolve_variables(config.get("staff_id") or config.get("field_staff_id") or "", context),
-                business.get("id"),
-            )
+            raw_service_id = self._resolve_variables(config.get("service_id") or config.get("field_service_id") or "", context)
+            if self._has_unresolved_template(raw_service_id):
+                return {"success": False, "error": f"Unresolved appointment service_id template: {raw_service_id}"}
+            resolved_service_id = await self._safe_appointment_service_id(raw_service_id)
+            raw_staff_id = self._resolve_variables(config.get("staff_id") or config.get("field_staff_id") or "", context)
+            if self._has_unresolved_template(raw_staff_id):
+                return {"success": False, "error": f"Unresolved appointment staff_id template: {raw_staff_id}"}
+            resolved_staff_id, _resolved_staff = await self._safe_appointment_staff_id(raw_staff_id, business.get("id"))
+            if raw_person_ref not in (None, "") and resolved_person_id is None:
+                return {"success": False, "error": f"Invalid appointment person_id: {raw_person_ref}"}
+            if raw_service_id not in (None, "") and resolved_service_id is None:
+                return {"success": False, "error": f"Invalid appointment service_id: {raw_service_id}"}
+            if raw_staff_id not in (None, "") and resolved_staff_id is None:
+                return {"success": False, "error": f"Invalid appointment staff_id: {raw_staff_id}"}
             row = {
                 "person_id": resolved_person_id,
                 "service_id": resolved_service_id,
                 "staff_id": resolved_staff_id,
+                "receptionist_id": (context.get("receptionist") or {}).get("id"),
                 "date": normalize_appointment_date_value(resolved_date),
                 "time": normalize_appointment_time_value(resolved_time),
                 "duration": normalize_appointment_duration(
@@ -1114,7 +1134,6 @@ class ScenarioActionExecutor:
                 "status": normalize_appointment_status(
                     self._resolve_variables(config.get("status") or "pending", context)
                 ),
-                "assigned_receptionist": self._resolve_variables(config.get("assigned_receptionist") or "", context),
                 "notes": self._resolve_variables(config.get("notes") or "", context),
                 "business_id": business.get("id"),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -1136,7 +1155,7 @@ class ScenarioActionExecutor:
             if not appointment_id:
                 return {"success": True, "data": {"action": "update_appointment", "skipped": True, "reason": "Invalid appointment ID"}}
             updates = {}
-            for key in ("date", "time", "duration", "status", "assigned_receptionist", "notes", "person_id", "service_id", "staff_id"):
+            for key in ("date", "time", "duration", "status", "notes", "person_id", "service_id", "staff_id", "receptionist_id"):
                 raw = config.get(key) or config.get(f"field_{key}")
                 if raw not in (None, ""):
                     resolved = self._resolve_variables(raw, context)
@@ -1165,6 +1184,8 @@ class ScenarioActionExecutor:
                         )
                         if safe_staff_id is not None:
                             updates[key] = safe_staff_id
+                    elif key == "receptionist_id":
+                        updates[key] = resolved
                     else:
                         updates[key] = resolved
             if not updates:
@@ -1240,7 +1261,20 @@ class ScenarioActionExecutor:
                 "flow_execution_id": context.get("_executionId") or "",
                 "scenario_id": (context.get("_scenario") or {}).get("id") or "",
                 "mission": mission_text,
+                "collection_required_fields": False,
+                "collection_service_id": False,
+                "collection_date": False,
+                "collection_time": False,
+                "collection_person_id": False,
+                "appointment_ready_to_create": False,
             }
+            customer_record = context.get("customer") or context.get("person") or {}
+            customer_phone = normalize_phone_number(
+                customer_record.get("phone") or customer_record.get("phone_number") or to_number
+            )
+            if customer_phone:
+                dynamic_vars["phone"] = customer_phone
+                dynamic_vars["customer_phone"] = customer_phone
             self._add_person_custom_dynamic_variables(dynamic_vars, context)
             if required_agent_fields:
                 dynamic_vars["required_fields"] = json.dumps([

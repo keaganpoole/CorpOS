@@ -911,6 +911,12 @@ def start_number_quality_test_call(phone_number_id: str, label: str) -> dict:
                     "autonomy_index": 1,
                     "direction": "outgoing",
                     "mission": "Outbound deliverability quality check",
+                    "collection_required_fields": False,
+                    "collection_service_id": False,
+                    "collection_date": False,
+                    "collection_time": False,
+                    "collection_person_id": False,
+                    "appointment_ready_to_create": False,
                 },
             },
         },
@@ -5312,7 +5318,7 @@ async def legacy_server_tool(tool_name: str, request: Request):
             "time": normalize_appointment_time_value(first_present(payload, "time", "appointment_time")),
             "duration": normalize_appointment_duration(first_present(payload, "duration", "appointment_duration")),
             "status": normalize_appointment_status(first_present(payload, "status")),
-            "assigned_receptionist": first_present(payload, "assigned_receptionist", "receptionist_name") or (receptionist or {}).get("full_name"),
+            "receptionist_id": int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id")) or (receptionist or {}).get("id"),
             "notes": first_present(payload, "notes"),
             "person_id": person_id,
             "service_id": safe_appointment_service_id(first_present(payload, "service_id")),
@@ -5354,8 +5360,8 @@ async def legacy_server_tool(tool_name: str, request: Request):
             updates["duration"] = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
         if first_present(payload, "status") is not None:
             updates["status"] = normalize_appointment_status(first_present(payload, "status"))
-        if first_present(payload, "assigned_receptionist", "receptionist_name") is not None:
-            updates["assigned_receptionist"] = first_present(payload, "assigned_receptionist", "receptionist_name")
+        if first_present(payload, "receptionist_id", "hired_receptionist_id") is not None:
+            updates["receptionist_id"] = int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id"))
         if first_present(payload, "notes") is not None:
             updates["notes"] = first_present(payload, "notes")
         if first_present(payload, "person_id") is not None:
@@ -6173,8 +6179,8 @@ async def update_sonar_appointment(appointment_id: str, payload: dict, current_u
         updates["duration"] = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
     if first_present(payload, "status") is not None:
         updates["status"] = normalize_appointment_status(first_present(payload, "status"))
-    if first_present(payload, "assigned_receptionist", "receptionist_name") is not None:
-        updates["assigned_receptionist"] = first_present(payload, "assigned_receptionist", "receptionist_name")
+    if first_present(payload, "receptionist_id", "hired_receptionist_id") is not None:
+        updates["receptionist_id"] = int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id"))
     if first_present(payload, "notes") is not None:
         updates["notes"] = first_present(payload, "notes")
     if first_present(payload, "person_id") is not None:
