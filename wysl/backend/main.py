@@ -3368,6 +3368,24 @@ def load_people_schema_labels(business_id: Optional[str]) -> dict:
         return {}
 
 
+def load_people_schema_rows(business_id: Optional[str]) -> list[dict]:
+    if not business_id:
+        return []
+    try:
+        return (
+            supabase.table("people_schema")
+            .select("field_key,label,field_type,description,config,is_active")
+            .eq("business_id", str(business_id))
+            .eq("is_active", True)
+            .execute()
+            .data
+            or []
+        )
+    except Exception as exc:
+        logging.warning("Failed to load people schema rows: %s", exc)
+        return []
+
+
 def load_people_schema_types(business_id: Optional[str]) -> dict:
     if not business_id:
         return {}
@@ -3438,6 +3456,112 @@ def add_person_custom_dynamic_variables(dynamic_variables: dict, person: Optiona
         label_key = custom_dynamic_variable_name(labels.get(field_key))
         if label_key and label_key not in dynamic_variables:
             dynamic_variables[label_key] = value
+    return dynamic_variables
+
+
+PEOPLE_INTAKE_BASE_FIELDS = {
+    "first_name": {"label": "First Name", "type": "text"},
+    "last_name": {"label": "Last Name", "type": "text"},
+    "phone": {"label": "Phone", "type": "phone"},
+    "email": {"label": "Email", "type": "email"},
+    "street_address": {"label": "Street Address", "type": "text"},
+    "city": {"label": "City", "type": "text"},
+    "state": {"label": "State", "type": "text"},
+    "zip_code": {"label": "Zip Code", "type": "text"},
+    "preferred_contact_method": {"label": "Preferred Contact Method", "type": "select"},
+    "preferred_language": {"label": "Preferred Language", "type": "text"},
+    "best_time_to_contact": {"label": "Best Time To Contact", "type": "text"},
+    "consent_sms": {"label": "Consent SMS", "type": "boolean"},
+    "consent_call": {"label": "Consent Call", "type": "boolean"},
+    "do_not_call": {"label": "Do Not Call", "type": "boolean"},
+    "do_not_text": {"label": "Do Not Text", "type": "boolean"},
+    "source": {"label": "Source", "type": "select"},
+    "lead_source_detail": {"label": "Source Detail", "type": "text"},
+    "special_instructions": {"label": "Special Instructions", "type": "textarea"},
+}
+
+
+def build_people_intake_fields(business: Optional[dict]) -> list[dict]:
+    if not business:
+        return []
+
+    business_id = business.get("id")
+    raw_config = business.get("people_field_config")
+    config = raw_config if isinstance(raw_config, dict) else {}
+    enabled_keys = [
+        str(field_key)
+        for field_key, field_settings in config.items()
+        if isinstance(field_settings, dict) and field_settings.get("intakeEnabled") is True
+    ]
+    if not enabled_keys:
+        return []
+
+    custom_schema_rows = load_people_schema_rows(str(business_id) if business_id is not None else None)
+    custom_schema_by_key = {
+        str(row.get("field_key")): row
+        for row in custom_schema_rows
+        if row.get("field_key")
+    }
+
+    intake_fields = []
+    for field_key in enabled_keys:
+        field_settings = config.get(field_key) if isinstance(config.get(field_key), dict) else {}
+        custom_row = custom_schema_by_key.get(field_key, {})
+        config_blob = custom_row.get("config") if isinstance(custom_row.get("config"), dict) else {}
+        fallback_meta = PEOPLE_INTAKE_BASE_FIELDS.get(field_key, {})
+        label = (
+            field_settings.get("name")
+            or custom_row.get("label")
+            or fallback_meta.get("label")
+            or field_key
+        )
+        field_type = (
+            custom_row.get("field_type")
+            or config_blob.get("field_type")
+            or fallback_meta.get("type")
+            or "text"
+        )
+        description = (
+            field_settings.get("description")
+            or custom_row.get("description")
+            or config_blob.get("description")
+            or ""
+        )
+
+        intake_fields.append({
+            "key": field_key,
+            "label": label,
+            "type": field_type,
+            "description": description,
+            "required": True,
+            "custom": field_key.startswith("custom_"),
+        })
+
+    return intake_fields
+
+
+def add_people_intake_dynamic_variables(dynamic_variables: dict, business: Optional[dict]):
+    intake_fields = build_people_intake_fields(business)
+    dynamic_variables["intake_fields_enabled_count"] = len(intake_fields)
+
+    if not intake_fields:
+        dynamic_variables["intake_fields"] = "[]"
+        dynamic_variables["intake_fields_summary"] = ""
+        dynamic_variables["intake_collection_guidance"] = ""
+        return dynamic_variables
+
+    summary_parts = []
+    for field in intake_fields:
+        label = str(field.get("label") or field.get("key") or "").strip()
+        description = str(field.get("description") or "").strip()
+        summary_parts.append(f"{label}: {description}" if description else label)
+
+    dynamic_variables["intake_fields"] = json.dumps(intake_fields, ensure_ascii=True)
+    dynamic_variables["intake_fields_summary"] = " | ".join(summary_parts)
+    dynamic_variables["intake_collection_guidance"] = (
+        "When creating a new person record, prioritize collecting every field in intake_fields. "
+        "Treat them as required before the record is considered complete."
+    )
     return dynamic_variables
 
 
@@ -4927,6 +5051,10 @@ async def twilio_inbound_webhook(request: Request):
             }
         },
     }
+    add_people_intake_dynamic_variables(
+        register_payload["conversation_initiation_client_data"]["scenario_context"],
+        business,
+    )
     matched_person = lookup_person_record(
         phone_number=from_number,
         business_id=str(business.get("id")) if business and business.get("id") is not None else None,

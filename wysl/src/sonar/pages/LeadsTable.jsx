@@ -726,6 +726,27 @@ const parseColumnWidth = (width) => {
 
 const getColumnLabel = (column, fieldConfig = {}) => fieldConfig[column.id]?.name || column.label || column.id;
 
+const isIntakeEnabled = (fieldConfig, key) => Boolean(fieldConfig?.[key]?.intakeEnabled);
+
+const getIntakeTone = (count) => {
+  if (count >= 8) {
+    return {
+      text: 'text-rose-300',
+      badge: 'border-rose-500/30 bg-rose-500/12 text-rose-300',
+    };
+  }
+  if (count >= 6) {
+    return {
+      text: 'text-amber-200',
+      badge: 'border-amber-500/30 bg-amber-500/12 text-amber-200',
+    };
+  }
+  return {
+    text: 'text-emerald-300',
+    badge: 'border-emerald-500/30 bg-emerald-500/12 text-emerald-300',
+  };
+};
+
 const getAllDataColumns = (customFields = [], fieldConfig = {}) => [
   ...TABLE_COLUMNS.map((field) => ({
     id: field.key,
@@ -926,6 +947,52 @@ const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll
   );
 };
 
+const IntakeFieldsPopover = ({ columns, fieldConfig, onToggleField, onEnableAll, onDisableAll }) => {
+  const [query, setQuery] = useState('');
+  const filtered = columns.filter((column) => getColumnLabel(column, fieldConfig).toLowerCase().includes(query.toLowerCase()));
+  const enabledCount = columns.filter((column) => isIntakeEnabled(fieldConfig, column.id)).length;
+  const tone = getIntakeTone(enabledCount);
+
+  return (
+    <div>
+      <ControlPopoverHeader title="Intake" caption="Choose which fields the inbound agent should prioritize." />
+      <div className="border-b border-white/[0.05] p-3">
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
+          <div>
+            <div className="text-[10px] font-semibold tracking-[-0.02em] text-zinc-500">Enabled for intake</div>
+            <div className={`mt-1 text-[18px] font-semibold tracking-[-0.04em] ${tone.text}`}>{enabledCount}</div>
+          </div>
+          <div className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-[-0.02em] ${tone.badge}`}>
+            {enabledCount >= 8 ? 'Too many' : enabledCount >= 6 ? 'Watch count' : 'In range'}
+          </div>
+        </div>
+        <div className="relative">
+          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search intake fields..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:border-white/15" />
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">
+          Leaner intake usually performs better. Keeping this list under six fields helps the agent stay focused and keeps token usage tighter.
+        </p>
+        <div className="mt-2 flex gap-2">
+          <button type="button" onClick={onEnableAll} className="flex-1 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 hover:text-white">Enable All</button>
+          <button type="button" onClick={onDisableAll} className="flex-1 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 hover:text-white">Clear All</button>
+        </div>
+      </div>
+      <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
+        {filtered.map((column) => {
+          const enabled = isIntakeEnabled(fieldConfig, column.id);
+          return (
+            <button key={column.id} type="button" onClick={() => onToggleField(column.id, !enabled)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04]">
+              <span className="w-4">{enabled && <Check size={12} className="text-cyan-400" />}</span>
+              <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${enabled ? 'text-zinc-300' : 'text-zinc-500'}`}>{getColumnLabel(column, fieldConfig)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const ColumnOrderPopover = ({ columns, fieldConfig, onMove, onReset }) => {
   const [query, setQuery] = useState('');
   const filtered = columns.filter((column) => getColumnLabel(column, fieldConfig).toLowerCase().includes(query.toLowerCase()));
@@ -1038,11 +1105,16 @@ const LeadsTable = ({
   const visibilityButtonRef = useRef(null);
   const orderButtonRef = useRef(null);
   const rowHeightButtonRef = useRef(null);
+  const intakeButtonRef = useRef(null);
 
   const column_options = CUSTOM_FIELD_TYPES;
   const anySelected = selectedIds.length > 0;
   const zones = useMemo(() => getSavedZones(fieldConfig), [fieldConfig]);
   const allDataColumns = useMemo(() => getAllDataColumns(customFields, fieldConfig), [customFields, fieldConfig]);
+  const intakeEnabledCount = useMemo(
+    () => allDataColumns.filter((column) => isIntakeEnabled(fieldConfig, column.id)).length,
+    [allDataColumns, fieldConfig],
+  );
 
   const updateViewSettings = useCallback((updates) => {
     setViewSettings((current) => {
@@ -1399,6 +1471,21 @@ const LeadsTable = ({
     persistFieldConfig(next);
     updateViewSettings({ frozenCount: 0 });
   }, [allDataColumns, fieldConfig, updateViewSettings]);
+
+  const setFieldIntakeEnabled = useCallback((key, intakeEnabled) => {
+    persistFieldConfig({
+      ...fieldConfig,
+      [key]: { ...fieldConfig[key], intakeEnabled },
+    });
+  }, [fieldConfig]);
+
+  const setAllFieldsIntakeEnabled = useCallback((intakeEnabled) => {
+    const next = { ...fieldConfig };
+    allDataColumns.forEach((column) => {
+      next[column.id] = { ...next[column.id], intakeEnabled };
+    });
+    persistFieldConfig(next);
+  }, [allDataColumns, fieldConfig]);
 
   const sortedLeads = useMemo(() => {
     const rules = (viewSettings.sortRules || []).filter((rule) => rule.field);
@@ -2071,6 +2158,9 @@ const LeadsTable = ({
             <TableControlButton ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
               Row Height
             </TableControlButton>
+            <TableControlButton ref={intakeButtonRef} active={activeControl === 'intake' || intakeEnabledCount > 0} onClick={() => setActiveControl((current) => (current === 'intake' ? null : 'intake'))}>
+              Intake
+            </TableControlButton>
           </div>
           <div className="relative bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/[0.06] rounded-[1.5rem] flex flex-col h-full overflow-hidden">
             <div className="flex-1 flex flex-col overflow-hidden">
@@ -2107,6 +2197,15 @@ const LeadsTable = ({
       </FloatingPopover>
       <FloatingPopover anchorRef={rowHeightButtonRef} open={activeControl === 'height'} onClose={() => setActiveControl(null)} width={190}>
         <RowHeightPopover value={density} onChange={(rowHeight) => updateViewSettings({ rowHeight })} />
+      </FloatingPopover>
+      <FloatingPopover anchorRef={intakeButtonRef} open={activeControl === 'intake'} onClose={() => setActiveControl(null)} width={320}>
+        <IntakeFieldsPopover
+          columns={allDataColumns}
+          fieldConfig={fieldConfig}
+          onToggleField={setFieldIntakeEnabled}
+          onEnableAll={() => setAllFieldsIntakeEnabled(true)}
+          onDisableAll={() => setAllFieldsIntakeEnabled(false)}
+        />
       </FloatingPopover>
 
       <AnimatePresence>
@@ -2177,7 +2276,7 @@ const LeadsTable = ({
           </motion.div>
         )}
         {settingsField && (
-          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={handleFieldHide} onClose={() => setSettingsField(null)} />
+          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={handleFieldHide} onClose={() => setSettingsField(null)} intakeEnabledCount={intakeEnabledCount} />
         )}
         {showColorbarStudio && (
           <ColorbarConfigModal

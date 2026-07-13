@@ -11,7 +11,7 @@ import {
   Calendar, Clock, MessageSquare, Search, FileText, Gauge,
   Star, Heart, Zap, Shield, Award, Bookmark, Tag, Layers, Plus,
   Database, Cpu, Settings, Wrench, Package, Truck, Users, ChevronDown, GripVertical, Repeat, Navigation,
-  BarChart3, PieChart, Activity, Wifi, Anchor, Aperture,
+  BarChart3, PieChart, Activity, Wifi, Anchor, Aperture, ClipboardList,
 } from 'lucide-react';
 import { AVAILABLE_ICONS } from '../lib/fieldConfig';
 import { normalizeOptionValue } from '../lib/leadSchema';
@@ -49,6 +49,31 @@ const hexToRgba = (hex, alpha = 0.15) => {
 const getOptionValue = (option) => {
   if (option && typeof option === 'object') return option.value || option.label || '';
   return option;
+};
+
+const getIntakeBadgeStyles = (count) => {
+  if (count >= 8) {
+    return {
+      pill: 'border-rose-500/30 bg-rose-500/12 text-rose-300',
+      dot: 'bg-rose-400',
+      panel: 'border-rose-500/20 bg-rose-500/[0.07]',
+      accent: 'text-rose-300',
+    };
+  }
+  if (count >= 6) {
+    return {
+      pill: 'border-amber-500/30 bg-amber-500/12 text-amber-200',
+      dot: 'bg-amber-400',
+      panel: 'border-amber-500/20 bg-amber-500/[0.06]',
+      accent: 'text-amber-200',
+    };
+  }
+  return {
+    pill: 'border-emerald-500/30 bg-emerald-500/12 text-emerald-300',
+    dot: 'bg-emerald-400',
+    panel: 'border-emerald-500/20 bg-emerald-500/[0.06]',
+    accent: 'text-emerald-300',
+  };
 };
 
 const buildOptionDrafts = (options, colors = {}) => (
@@ -272,10 +297,19 @@ const SortableOptionRow = ({
   );
 };
 
-const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, onClose }) => {
+const FieldSettingsModal = ({
+  fieldKey,
+  fieldConfig,
+  fieldMeta,
+  onSave,
+  onHide,
+  onClose,
+  intakeEnabledCount = 0,
+}) => {
   const [name, setName] = useState(fieldConfig?.name || fieldKey);
   const [icon, setIcon] = useState(fieldConfig?.icon || 'tag');
   const [description, setDescription] = useState(fieldMeta?.description || fieldConfig?.description || '');
+  const [intakeEnabled, setIntakeEnabled] = useState(Boolean(fieldConfig?.intakeEnabled));
   const [optionColors, setOptionColors] = useState(fieldConfig?.optionColors || {});
   const [optionDrafts, setOptionDrafts] = useState([]);
   const [activeColorOption, setActiveColorOption] = useState('');
@@ -296,10 +330,11 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
     setName(fieldConfig?.name || fieldKey);
     setIcon(fieldConfig?.icon || 'tag');
     setDescription(fieldMeta?.description || fieldConfig?.description || '');
+    setIntakeEnabled(Boolean(fieldConfig?.intakeEnabled));
     setOptionColors(fieldConfig?.optionColors || {});
     setOptionDrafts(buildOptionDrafts(normalizedOptions, fieldConfig?.optionColors || {}));
     setActiveColorOption('');
-  }, [fieldKey, normalizedOptions, fieldConfig?.optionColors, fieldMeta?.description, fieldConfig?.description, fieldConfig?.icon]);
+  }, [fieldKey, normalizedOptions, fieldConfig?.optionColors, fieldMeta?.description, fieldConfig?.description, fieldConfig?.icon, fieldConfig?.intakeEnabled]);
 
   useEffect(() => {
     if (!activeColorOption) return undefined;
@@ -331,6 +366,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
       name,
       icon,
       description,
+      intakeEnabled,
       optionColors: nextOptionColors,
       ...(isOptionsField ? {
         options: nextOptions,
@@ -344,6 +380,7 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
     setName(fieldKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
     setIcon('tag');
     setDescription('');
+    setIntakeEnabled(false);
     setOptionColors({});
     setOptionDrafts(buildOptionDrafts(normalizedOptions));
     setActiveColorOption('');
@@ -351,8 +388,10 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
 
   const tabs = [
     { key: 'name', label: 'Name & Icon', icon: <Type size={12} /> },
+    { key: 'intake', label: 'Intake', icon: <ClipboardList size={12} /> },
     ...(hasOptions ? [{ key: 'colors', label: 'Options', icon: <Palette size={12} /> }] : []),
   ];
+  const intakeStyles = getIntakeBadgeStyles(intakeEnabledCount);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -485,6 +524,59 @@ const FieldSettingsModal = ({ fieldKey, fieldConfig, fieldMeta, onSave, onHide, 
               </div>
 
             </>
+          )}
+
+          {activeTab === 'intake' && (
+            <div className="space-y-5">
+              <div className={`rounded-2xl border px-4 py-4 ${intakeStyles.panel}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Intake Fields Enabled</div>
+                    <div className="mt-2 flex items-end gap-2">
+                      <span className={`text-[28px] font-semibold leading-none tracking-[-0.05em] ${intakeStyles.accent}`}>{intakeEnabledCount}</span>
+                      <span className="pb-1 text-[11px] font-medium text-zinc-500">recommended under 6</span>
+                    </div>
+                  </div>
+                  <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-semibold tracking-[-0.02em] ${intakeStyles.pill}`}>
+                    <span className={`h-2 w-2 rounded-full ${intakeStyles.dot}`} />
+                    {intakeEnabledCount >= 8 ? 'Heavy' : intakeEnabledCount >= 6 ? 'Balanced' : 'Lean'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="pr-2">
+                    <label className="block text-[12px] font-semibold tracking-[-0.02em] text-white">Prioritize this field during intake</label>
+                    <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
+                      When enabled, this field can be treated as required context for the inbound agent when creating a new person record.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIntakeEnabled((current) => !current)}
+                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
+                      intakeEnabled
+                        ? 'border-cyan-400/35 bg-cyan-500/20'
+                        : 'border-white/[0.08] bg-black/35'
+                    }`}
+                    aria-pressed={intakeEnabled}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 rounded-full transition-transform ${
+                        intakeEnabled ? 'translate-x-6 bg-cyan-300' : 'translate-x-1 bg-zinc-500'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/[0.06] bg-black/30 px-4 py-3.5">
+                <p className="text-[10px] leading-relaxed text-zinc-500">
+                  A smaller intake list usually gives the agent a cleaner path through new-record creation. Keeping the total under six helps reduce prompt size and token usage without stripping out the fields that actually matter.
+                </p>
+              </div>
+            </div>
           )}
 
           {activeTab === 'colors' && hasOptions && (
