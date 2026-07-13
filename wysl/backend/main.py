@@ -4227,8 +4227,14 @@ def extract_transcript_turns(value):
     return turns
 
 def extract_dynamic_variables(data: dict) -> dict:
-    candidate = deep_get(data, "conversation_initiation_client_data.dynamic_variables")
-    return candidate if isinstance(candidate, dict) else {}
+    dynamic_variables = deep_get(data, "conversation_initiation_client_data.dynamic_variables")
+    scenario_context = deep_get(data, "conversation_initiation_client_data.scenario_context")
+    merged = {}
+    if isinstance(dynamic_variables, dict):
+        merged.update(dynamic_variables)
+    if isinstance(scenario_context, dict):
+        merged.update(scenario_context)
+    return merged
 
 def storage_signed_url(path: Optional[str], expires_in: int = 3600) -> Optional[str]:
     if not path:
@@ -4317,6 +4323,32 @@ def build_agent_update_map(key: Optional[str], value):
         return {}
 
     updates = {normalized_key: value}
+    # ElevenLabs may submit the UI display label instead of the canonical
+    # workflow path. Keep the original key, but add the canonical alias so
+    # resumed actions can resolve the same value reliably.
+    compact_key = re.sub(r"[^a-z0-9]+", "", normalized_key.lower())
+    canonical_aliases = {
+        "recservicerecordid": "rec.service.id",
+        "servicerecordid": "rec.service.id",
+        "recserviceid": "rec.service.id",
+        "serviceid": "rec.service.id",
+        "recappointmentservice": "rec.service.id",
+        "appointmentservice": "rec.service.id",
+        "recappointmentserviceid": "rec.appointment.service_id",
+        "appointmentserviceid": "rec.appointment.service_id",
+        "recstaffrecordid": "rec.staff.id",
+        "staffrecordid": "rec.staff.id",
+        "recstaffid": "rec.staff.id",
+        "staffid": "rec.staff.id",
+        "recpersonrecordid": "rec.person.id",
+        "personrecordid": "rec.person.id",
+        "recpersonid": "rec.person.id",
+        "personid": "rec.person.id",
+    }
+    canonical_key = canonical_aliases.get(compact_key)
+    if canonical_key and canonical_key != normalized_key:
+        updates.update(build_agent_update_map(canonical_key, value))
+
     cursor = nested_root = {}
     parts = [part.strip() for part in normalized_key.split(".") if part.strip()]
     if not parts:
@@ -4691,6 +4723,56 @@ async def trigger_specific_scenario(scenario_id: str, payload: dict):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result.get("error") or "Scenario not found")
     return result
 
+@app.post("/api/scenarios/run-builder", tags=["Scenarios"])
+async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_current_user)):
+    if not scenario_engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
+
+    scenario = payload.get("scenario")
+    if not isinstance(scenario, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="scenario payload required")
+
+    nodes_data = scenario.get("nodes_data")
+    if isinstance(nodes_data, str):
+        try:
+            nodes_data = json.loads(nodes_data)
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid nodes_data: {exc}") from exc
+    if not isinstance(nodes_data, list) or not nodes_data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="scenario.nodes_data required")
+
+    user_id = str(current_user.id)
+    business = load_business_by_user_id(user_id)
+    scenario["user_id"] = scenario.get("user_id") or user_id
+    scenario["created_by"] = scenario.get("created_by") or user_id
+    if business and not scenario.get("business_id"):
+        scenario["business_id"] = business.get("id")
+
+    event_type = str(payload.get("event_type") or "manual_trigger")
+    event_payload = payload.get("payload") if isinstance(payload.get("payload"), dict) else {}
+    event_payload.setdefault("user_id", user_id)
+    if business and business.get("id") is not None:
+        event_payload.setdefault("business_id", business.get("id"))
+
+    trigger_node = next((node for node in nodes_data if (node or {}).get("categoryType") == "TRIGGERS"), None)
+    if not trigger_node:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Scenario must contain a trigger node")
+
+    flow_context = await scenario_engine._build_flow_context(scenario, event_type, event_payload)
+    result = await scenario_engine.flow_executor.start(
+        scenario,
+        {"event_type": event_type, "payload": event_payload},
+        flow_context=flow_context,
+        trigger_node_id=trigger_node.get("id"),
+    )
+    execution_id = (
+        result.get("executionId")
+        or result.get("execution_id")
+        or ((result.get("context") or {}).get("_executionId") if isinstance(result.get("context"), dict) else None)
+        or flow_context.get("_executionId")
+    )
+    return {"ok": True, "execution_id": execution_id, "result": result}
+
 @app.post("/api/scenarios/resume", tags=["Scenarios"])
 async def resume_scenario_execution(payload: dict):
     if not scenario_engine:
@@ -4829,7 +4911,7 @@ async def twilio_inbound_webhook(request: Request):
         "to_number": to_number,
         "direction": "inbound",
         "conversation_initiation_client_data": {
-            "dynamic_variables": {
+            "scenario_context": {
                 "autonomy_index": get_account_autonomy_index_for_user(context.get("user_id") or (business or {}).get("user_id")),
                 "caller_number": from_number,
                 "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
@@ -4847,17 +4929,22 @@ async def twilio_inbound_webhook(request: Request):
         user_id=context.get("user_id") or (business or {}).get("user_id"),
     )
     if matched_person:
-        dynamic_variables = register_payload["conversation_initiation_client_data"]["dynamic_variables"]
-        dynamic_variables["person_id"] = str(matched_person.get("id")) if matched_person.get("id") is not None else None
-        dynamic_variables["customer_name"] = format_person_display_name(matched_person)
+        scenario_context = register_payload["conversation_initiation_client_data"]["scenario_context"]
+        scenario_context["person_id"] = str(matched_person.get("id")) if matched_person.get("id") is not None else None
+        scenario_context["customer_name"] = format_person_display_name(matched_person)
         add_person_custom_dynamic_variables(
-            dynamic_variables,
+            scenario_context,
             matched_person,
             str(business.get("id")) if business and business.get("id") is not None else None,
         )
+    register_payload["conversation_initiation_client_data"]["scenario_context"] = {
+        key: value
+        for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
+        if value is not None
+    }
     register_payload["conversation_initiation_client_data"]["dynamic_variables"] = {
         key: value
-        for key, value in register_payload["conversation_initiation_client_data"]["dynamic_variables"].items()
+        for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
         if value is not None
     }
 
@@ -6795,6 +6882,62 @@ async def create_customer(
     current_user: dict = Depends(get_current_user),
 ):
     return await _create_customer_for_user(request, str(current_user.id))
+
+
+@app.post("/api/sonar/call-customer", tags=["Sonar Calls"])
+async def call_customer(payload: dict, current_user: dict = Depends(get_current_user)):
+    ensure_no_unresolved_templates(
+        payload.get("person_id"),
+        payload.get("to_phone"),
+        payload.get("main_content"),
+        payload.get("first_message"),
+    )
+
+    user_id = str(current_user.id)
+    business = load_business_by_user_id(user_id)
+    receptionist = find_inbound_receptionist_for_business(
+        (business or {}).get("id"),
+        user_id,
+    )
+
+    person = None
+    person_id = payload.get("person_id")
+    if person_id:
+        person_response = (
+            supabase.table("people")
+            .select("*")
+            .eq("id", str(person_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        person = (person_response.data or [None])[0]
+        if not person:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+
+    node = {
+        "id": "builder-call-customer",
+        "actionConfig": {
+            "_key": "call_customer",
+            "to_phone": payload.get("to_phone") or "",
+            "main_content": payload.get("main_content") or "",
+            "first_message": payload.get("first_message") or "",
+        },
+    }
+    context = {
+        "user_id": user_id,
+        "business": business or {},
+        "business_id": (business or {}).get("id"),
+        "receptionist": receptionist or {},
+        "person": person or {},
+        "customer": person or {},
+        "_scenario": {},
+    }
+
+    result = await scenario_engine.action_executor._call_customer(node, context)
+    if not result.get("success"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.get("error") or "Call failed")
+    return result.get("data") or {}
 
 
 async def _create_customer_for_user(request: CustomerCreateRequest, user_id: str):

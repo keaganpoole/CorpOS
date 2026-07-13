@@ -147,6 +147,13 @@ def deep_get(data: Any, dotted_key: str):
                 value = custom_value if custom_value is not None else value.get(part)
             else:
                 value = value.get(part)
+        elif isinstance(value, list):
+            if not part.isdigit():
+                return None
+            idx = int(part)
+            if idx < 0 or idx >= len(value):
+                return None
+            value = value[idx]
         else:
             return None
     return value
@@ -206,6 +213,8 @@ def coerce_number(value: Any) -> Optional[float]:
 
 
 def coerce_datetime(value: Any) -> Optional[datetime]:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return datetime.combine(value, time.min, tzinfo=timezone.utc)
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if not isinstance(value, str):
@@ -392,6 +401,12 @@ def evaluate_rule(rule: dict, context: dict) -> bool:
     if operator == "after":
         comparison = compare_ordered_values(value, expected)
         return comparison is not None and comparison > 0
+    if operator == "on_or_before":
+        comparison = compare_ordered_values(value, expected)
+        return comparison is not None and comparison <= 0
+    if operator == "on_or_after":
+        comparison = compare_ordered_values(value, expected)
+        return comparison is not None and comparison >= 0
 
     logging.warning("[ConditionEvaluator] Unknown operator: %s", operator)
     return False
@@ -491,6 +506,40 @@ class ScenarioActionExecutor:
                 seen.add(token)
         return refs
 
+    def _extract_template_refs_from_string(self, value: str):
+        refs = []
+        if not isinstance(value, str) or not value:
+            return refs
+
+        seen = set()
+        template_regex = re.compile(r"\{\{([^}]+)\}\}")
+        for match in template_regex.finditer(value):
+            ref = match.group(1).strip()
+            if not ref:
+                continue
+            parts = [part.strip() for part in ref.split(".") if part.strip()]
+            if len(parts) >= 3 and parts[0].lower() in AGENT_REF_PREFIXES:
+                prefix = parts[0].lower()
+                table_key = self._normalize_table_key(parts[1])
+                field_key = ".".join(parts[2:])
+            elif len(parts) >= 2:
+                prefix = None
+                table_key = self._normalize_table_key(parts[0])
+                field_key = ".".join(parts[1:])
+            else:
+                continue
+            token = (prefix, table_key, field_key)
+            if token in seen:
+                continue
+            seen.add(token)
+            refs.append({
+                "prefix": prefix,
+                "table": table_key,
+                "field": field_key,
+                "raw_ref": ref,
+            })
+        return refs
+
     def _get_node_descendants(self, scenario: dict, start_node_id: str):
         edges = scenario.get("edges_data")
         if isinstance(edges, str):
@@ -525,6 +574,17 @@ class ScenarioActionExecutor:
         base_label = ((BASE_TABLE_LABELS.get(table_key) or {}).get(field_key))
         if base_label:
             return base_label
+        if field_key == "id":
+            table_label = {
+                "people": "Person",
+                "person": "Person",
+                "appointments": "Appointment",
+                "appointment": "Appointment",
+                "staff": "Staff",
+                "services": "Service",
+                "service": "Service",
+            }.get(table_key, table_key.rstrip("s").replace("_", " ").title())
+            return f"{table_label} ID"
         return field_key.replace("_", " ").replace(".", " ").title()
 
     def _format_field_description(self, table_key: str, field_key: str, context: dict) -> str:
@@ -545,7 +605,11 @@ class ScenarioActionExecutor:
         label_key = self._custom_dynamic_variable_name(schema_label or label)
 
         return_keys = []
-        for candidate in [label_key, field_key]:
+        priority_keys = [label_key, f"rec.{ref_table}.{field_key}", f"{table_key}.{field_key}", field_key]
+        if table_key != "people" or not str(field_key).startswith("custom_"):
+            priority_keys = [f"rec.{ref_table}.{field_key}", f"{table_key}.{field_key}", label_key, field_key]
+
+        for candidate in priority_keys:
             if candidate and candidate not in return_keys:
                 return_keys.append(candidate)
 
@@ -657,6 +721,126 @@ class ScenarioActionExecutor:
             if candidate not in (None, ""):
                 return candidate
         return None
+
+    def _resolve_downstream_ref_value(self, context: dict, raw_ref: str):
+        resolved = self._resolve_variables(f"{{{{{raw_ref}}}}}", context)
+        if self._has_unresolved_template(resolved):
+            return None
+        return resolved
+
+    def _format_downstream_return_key(self, prefix: Optional[str], table_key: str, field_key: str, label: str, context: dict):
+        if prefix in AGENT_REF_PREFIXES:
+            ref_table = self._preferred_table_ref(table_key)
+            schema = self._get_people_custom_schema(context) if table_key == "people" else {}
+            schema_label = (schema.get(field_key) or {}).get("label")
+            label_key = self._custom_dynamic_variable_name(schema_label or label)
+            if table_key == "people" and str(field_key).startswith("custom_") and label_key:
+                return label_key
+            return f"rec.{ref_table}.{field_key}"
+        if field_key == "id":
+            return f"{self._preferred_table_ref(table_key)}_id"
+        return field_key
+
+    def _build_downstream_data(self, scenario: Optional[dict], call_node_id: str, context: dict, requirements: Optional[list[dict]] = None):
+        if not scenario or not call_node_id:
+            return []
+
+        nodes = scenario.get("nodes_data")
+        if isinstance(nodes, str):
+            nodes = json.loads(nodes)
+        node_map = {
+            node.get("id"): node
+            for node in (nodes or [])
+            if isinstance(node, dict) and node.get("id")
+        }
+
+        downstream = []
+        seen = set()
+
+        for requirement in requirements or []:
+            return_key = requirement.get("preferred_return_key") or requirement.get("field")
+            if not return_key or return_key in seen:
+                continue
+            seen.add(return_key)
+            current_value = self._resolve_agent_requirement_value(context.get("agent") or {}, requirement)
+            if current_value in (None, ""):
+                current_value = self._resolve_downstream_ref_value(context, requirement.get("ref_path") or return_key)
+            downstream.append({
+                "label": requirement.get("label"),
+                "description": requirement.get("description") or "",
+                "return_key": return_key,
+                "current_value": current_value,
+            })
+
+        for node_id in self._get_node_descendants(scenario, call_node_id):
+            node = node_map.get(node_id) or {}
+            for text_value in self._iter_string_values(node):
+                for ref in self._extract_template_refs_from_string(text_value):
+                    if ref.get("prefix") in AGENT_REF_PREFIXES:
+                        continue
+                    value = self._resolve_downstream_ref_value(context, ref["raw_ref"])
+                    if value in (None, ""):
+                        continue
+                    label = self._format_field_label(ref["table"], ref["field"], context)
+                    return_key = self._format_downstream_return_key(ref.get("prefix"), ref["table"], ref["field"], label, context)
+                    if not return_key or return_key in seen:
+                        continue
+                    seen.add(return_key)
+                    downstream.append({
+                        "label": label,
+                        "description": self._format_field_description(ref["table"], ref["field"], context),
+                        "return_key": return_key,
+                        "current_value": value,
+                    })
+
+        return downstream
+
+    def _deep_get_any(self, data: Any, paths: list[str]):
+        for path in paths:
+            value = deep_get(data, path)
+            if value not in (None, ""):
+                return value
+        return None
+
+    def _get_agent_value_any(self, context: dict, paths: list[str]):
+        agent_data = context.get("agent") if isinstance(context.get("agent"), dict) else {}
+        for path in paths:
+            candidates = [
+                deep_get(context, path),
+                deep_get(agent_data, path),
+                agent_data.get(path) if isinstance(agent_data, dict) else None,
+            ]
+            if path.startswith("agent."):
+                candidates.append(deep_get(agent_data, path[6:]))
+            for value in candidates:
+                if value not in (None, ""):
+                    return value
+        return None
+
+    def _hydrate_agent_appointment_context(self, context: dict):
+        if not isinstance(context.get("agent"), dict):
+            return
+
+        mappings = [
+            ("appointment", "date", ["rec.appointment.date", "appointment.date", "rec.appointment_date"]),
+            ("appointment", "time", ["rec.appointment.time", "appointment.time", "rec.appointment_time"]),
+            ("appointment", "service_id", ["rec.appointment.service_id", "rec.appointment.service", "rec.service.id", "rec.Service.Record ID", "service.id", "service_id"]),
+            ("appointment", "staff_id", ["rec.staff.id", "rec.Staff.Record ID", "rec.appointment.staff_id", "staff.id", "staff_id"]),
+            ("appointment", "person_id", ["rec.person.id", "rec.Person.Record ID", "rec.appointment.person_id", "person.id", "person_id"]),
+            ("service", "id", ["rec.service.id", "rec.appointment.service", "rec.Service.Record ID", "rec.appointment.service_id", "service.id", "service_id"]),
+            ("staff", "id", ["rec.staff.id", "rec.Staff.Record ID", "rec.appointment.staff_id", "staff.id", "staff_id"]),
+            ("person", "id", ["rec.person.id", "rec.Person.Record ID", "rec.appointment.person_id", "person.id", "person_id"]),
+        ]
+
+        for context_key, field_key, paths in mappings:
+            value = self._get_agent_value_any(context, paths)
+            if value in (None, ""):
+                continue
+            target = context.get(context_key)
+            if not isinstance(target, dict):
+                target = {}
+            target[field_key] = value
+            context[context_key] = target
 
     def _project_agent_requirements_into_context(self, context: dict, agent_data: dict, requirements: list[dict]):
         if not isinstance(agent_data, dict):
@@ -1055,7 +1239,7 @@ class ScenarioActionExecutor:
         except Exception:
             return None, None
         try:
-            response = self.supabase.table("people").select("id,first_name,last_name,name,full_name").eq("id", parsed).limit(1).execute()
+            response = self.supabase.table("people").select("id,first_name,last_name").eq("id", parsed).limit(1).execute()
             if not response.data:
                 return None, None
             person = response.data[0]
@@ -1091,10 +1275,25 @@ class ScenarioActionExecutor:
 
     async def _create_appointment(self, node: dict, context: dict):
         try:
+            self._hydrate_agent_appointment_context(context)
             config = node.get("appointmentConfig") or node.get("actionConfig") or {}
             business = context.get("business") or {}
             resolved_date = self._resolve_variables(config.get("date") or config.get("field_date") or "", context)
             resolved_time = self._resolve_variables(config.get("time") or config.get("field_time") or "", context)
+            if self._has_unresolved_template(resolved_date):
+                resolved_date = self._deep_get_any(context, [
+                    "agent.rec.appointment.date",
+                    "agent.rec.appointment_date",
+                    "appointment.date",
+                    "rec.appointment.date",
+                ]) or resolved_date
+            if self._has_unresolved_template(resolved_time):
+                resolved_time = self._deep_get_any(context, [
+                    "agent.rec.appointment.time",
+                    "agent.rec.appointment_time",
+                    "appointment.time",
+                    "rec.appointment.time",
+                ]) or resolved_time
             if self._has_unresolved_template(resolved_date):
                 return {"success": False, "error": f"Unresolved appointment date template: {resolved_date}"}
             if self._has_unresolved_template(resolved_time):
@@ -1103,15 +1302,68 @@ class ScenarioActionExecutor:
                 config.get("person_id") or config.get("field_person_id") or "", context
             )
             if self._has_unresolved_template(raw_person_ref):
+                raw_person_ref = self._deep_get_any(context, [
+                    "agent.rec.person.id",
+                    "agent.rec.appointment.person_id",
+                    "appointment.person_id",
+                    "person.id",
+                    "person_id",
+                ]) or raw_person_ref
+            if self._has_unresolved_template(raw_person_ref):
                 return {"success": False, "error": f"Unresolved appointment person_id template: {raw_person_ref}"}
             resolved_person_id, _resolved_person = await self._safe_appointment_person(
                 raw_person_ref or context.get("person", {}).get("id") or context.get("person_id")
             )
-            raw_service_id = self._resolve_variables(config.get("service_id") or config.get("field_service_id") or "", context)
+            raw_service_id = self._resolve_variables(
+                config.get("service_id") or config.get("field_service_id") or "",
+                context,
+            )
             if self._has_unresolved_template(raw_service_id):
+                service_candidates = [
+                    self._get_agent_value_any(context, [
+                        "agent.rec.appointment.service_id",
+                        "rec.appointment.service_id",
+                        "agent.rec.appointment.service",
+                        "rec.appointment.service",
+                        "agent.rec.service.id",
+                        "rec.service.id",
+                        "agent.rec.Service.Record ID",
+                        "rec.Service.Record ID",
+                        "appointment.service_id",
+                        "service.id",
+                        "service_id",
+                        # Some ElevenLabs missions return only `id`.
+                        "agent.id",
+                        "id",
+                    ]),
+                    context.get("appointment", {}).get("service_id"),
+                    context.get("service_id"),
+                    context.get("service", {}).get("id"),
+                ]
+                raw_service_id = next(
+                    (candidate for candidate in service_candidates if candidate not in (None, "") and not self._has_unresolved_template(candidate)),
+                    raw_service_id,
+                )
+            if self._has_unresolved_template(raw_service_id):
+                logging.error(
+                    "[ActionExecutor] unresolved appointment service_id raw=%s config_service_id=%s context_service=%s context_appointment=%s agent_keys=%s",
+                    raw_service_id,
+                    config.get("service_id") or config.get("field_service_id"),
+                    json.dumps(context.get("service") or {}, default=str),
+                    json.dumps(context.get("appointment") or {}, default=str),
+                    sorted((context.get("agent") or {}).keys()) if isinstance(context.get("agent"), dict) else [],
+                )
                 return {"success": False, "error": f"Unresolved appointment service_id template: {raw_service_id}"}
             resolved_service_id = await self._safe_appointment_service_id(raw_service_id)
             raw_staff_id = self._resolve_variables(config.get("staff_id") or config.get("field_staff_id") or "", context)
+            if self._has_unresolved_template(raw_staff_id):
+                raw_staff_id = self._deep_get_any(context, [
+                    "agent.rec.staff.id",
+                    "agent.rec.appointment.staff_id",
+                    "appointment.staff_id",
+                    "staff.id",
+                    "staff_id",
+                ]) or raw_staff_id
             if self._has_unresolved_template(raw_staff_id):
                 return {"success": False, "error": f"Unresolved appointment staff_id template: {raw_staff_id}"}
             resolved_staff_id, _resolved_staff = await self._safe_appointment_staff_id(raw_staff_id, business.get("id"))
@@ -1220,7 +1472,33 @@ class ScenarioActionExecutor:
     async def _call_customer(self, node: dict, context: dict):
         try:
             config = node.get("actionConfig") or {}
-            to_number = self._resolve_variables(config.get("to_phone") or "", context) or context.get("customer", {}).get("phone") or context.get("person", {}).get("phone")
+            to_number = (
+                self._resolve_variables(config.get("to_phone") or "", context)
+                or context.get("customer", {}).get("phone")
+                or context.get("person", {}).get("phone")
+            )
+            if not to_number:
+                resolved_person_id = (
+                    self._resolve_variables(config.get("person_id") or "", context)
+                    or context.get("person", {}).get("id")
+                    or context.get("person_id")
+                )
+                if resolved_person_id:
+                    try:
+                        person_response = (
+                            self.supabase.table("people")
+                            .select("*")
+                            .eq("id", str(resolved_person_id))
+                            .limit(1)
+                            .execute()
+                        )
+                        person_row = (person_response.data or [None])[0] or {}
+                        if person_row:
+                            context["person"] = {**(context.get("person") or {}), **person_row}
+                            context["customer"] = {**(context.get("customer") or {}), **person_row}
+                            to_number = person_row.get("phone") or person_row.get("phone_number") or to_number
+                    except Exception as exc:
+                        logging.warning("[ActionExecutor] Failed to resolve person phone for call_customer: %s", exc)
             if not to_number:
                 return {"success": False, "error": "No phone number for call"}
 
@@ -1248,9 +1526,10 @@ class ScenarioActionExecutor:
                 return {"success": False, "error": "No outbound business phone number is configured"}
 
             required_agent_fields = self._infer_required_agent_fields(context.get("_scenario"), node.get("id"), context)
+            downstream_data = self._build_downstream_data(context.get("_scenario"), node.get("id"), context, required_agent_fields)
             mission_text = self._resolve_variables(config.get("main_content") or "", context)
 
-            dynamic_vars = {
+            scenario_context = {
                 "user_id": str((context.get("business") or {}).get("user_id") or context.get("user_id") or ""),
                 "company_name": (context.get("business") or {}).get("name") or "",
                 "autonomy_index": self._get_account_autonomy_index(context),
@@ -1261,47 +1540,40 @@ class ScenarioActionExecutor:
                 "flow_execution_id": context.get("_executionId") or "",
                 "scenario_id": (context.get("_scenario") or {}).get("id") or "",
                 "mission": mission_text,
-                "collection_required_fields": False,
-                "collection_service_id": False,
-                "collection_date": False,
-                "collection_time": False,
-                "collection_person_id": False,
-                "appointment_ready_to_create": False,
             }
             customer_record = context.get("customer") or context.get("person") or {}
             customer_phone = normalize_phone_number(
                 customer_record.get("phone") or customer_record.get("phone_number") or to_number
             )
             if customer_phone:
-                dynamic_vars["phone"] = customer_phone
-                dynamic_vars["customer_phone"] = customer_phone
-            self._add_person_custom_dynamic_variables(dynamic_vars, context)
-            if required_agent_fields:
-                dynamic_vars["required_fields"] = json.dumps([
-                    {
-                        "label": field["label"],
-                        "description": field.get("description") or "",
-                        "return_key": field["preferred_return_key"],
-                        "current_value": self._resolve_agent_requirement_value(dynamic_vars, field),
-                    }
-                    for field in required_agent_fields
-                ])
+                scenario_context["phone"] = customer_phone
+                scenario_context["customer_phone"] = customer_phone
+            self._add_person_custom_dynamic_variables(scenario_context, context)
+            if downstream_data:
+                scenario_context["downstream_data"] = json.dumps(downstream_data, default=str)
+            # ElevenLabs exposes the values inside dynamic_variables as the
+            # agent's variable namespace. Keep the flattened fields for
+            # existing prompts and expose only the non-duplicated extras under
+            # the explicit scenario_context variable.
+            scenario_context_payload = {}
+            if downstream_data:
+                scenario_context_payload["downstream_data"] = downstream_data
+            elevenlabs_dynamic_variables = dict(scenario_context)
+            elevenlabs_dynamic_variables["scenario_context"] = json.dumps(
+                scenario_context_payload,
+                default=str,
+                separators=(",", ":"),
+            )
             logging.info("[ActionExecutor] outbound call dynamic variables: %s", json.dumps({
-                "user_id": dynamic_vars["user_id"],
-                "receptionist_name": dynamic_vars["receptionist_name"],
-                "receptionist_id": dynamic_vars["receptionist_id"],
-                "direction": dynamic_vars["direction"],
-                "scenario_id": dynamic_vars["scenario_id"],
-                "flow_execution_id": dynamic_vars["flow_execution_id"],
+                "user_id": scenario_context["user_id"],
+                "receptionist_name": scenario_context["receptionist_name"],
+                "receptionist_id": scenario_context["receptionist_id"],
+                "direction": scenario_context["direction"],
+                "scenario_id": scenario_context["scenario_id"],
+                "flow_execution_id": scenario_context["flow_execution_id"],
                 "agent_phone_number_id": phone_number_id,
                 "to_number": normalize_phone_number(to_number),
-                "required_fields": [
-                    {
-                        "label": field.get("label"),
-                        "return_key": field.get("preferred_return_key"),
-                    }
-                    for field in required_agent_fields
-                ],
+                "downstream_data": downstream_data,
             }))
 
             response = requests.post(
@@ -1315,7 +1587,8 @@ class ScenarioActionExecutor:
                     "agent_phone_number_id": phone_number_id,
                     "to_number": to_number,
                     "conversation_initiation_client_data": {
-                        "dynamic_variables": dynamic_vars,
+                        "scenario_context": scenario_context,
+                        "dynamic_variables": elevenlabs_dynamic_variables,
                     },
                 },
                 timeout=30,
@@ -1533,15 +1806,31 @@ class ScenarioFlowExecutor:
                 if resolved is not None:
                     collection_path = normalized
 
+        if resolved is None and collection_path.endswith(".records"):
+            parent = deep_get(context, collection_path[: -len(".records")])
+            if isinstance(parent, list):
+                resolved = parent
+        if resolved is None and collection_path.endswith(".results"):
+            parent = deep_get(context, collection_path[: -len(".results")])
+            if isinstance(parent, list):
+                resolved = parent
+
         source_table = ""
         if isinstance(resolved, dict) and isinstance(resolved.get("records"), list):
             items = resolved.get("records") or []
+            source_table = self.action_executor._normalize_table_key(resolved.get("table") or collection_path.split(".")[0] if collection_path else "")
+        elif isinstance(resolved, dict) and isinstance(resolved.get("results"), list):
+            items = resolved.get("results") or []
             source_table = self.action_executor._normalize_table_key(resolved.get("table") or collection_path.split(".")[0] if collection_path else "")
         elif isinstance(resolved, list):
             items = resolved
             source_table = self.action_executor._normalize_table_key(collection_path.split(".")[0] if collection_path else "")
             if collection_path.endswith(".records"):
                 parent = deep_get(context, collection_path[: -len(".records")])
+                if isinstance(parent, dict) and parent.get("table"):
+                    source_table = self.action_executor._normalize_table_key(parent.get("table"))
+            if collection_path.endswith(".results"):
+                parent = deep_get(context, collection_path[: -len(".results")])
                 if isinstance(parent, dict) and parent.get("table"):
                     source_table = self.action_executor._normalize_table_key(parent.get("table"))
         else:
@@ -1728,6 +2017,7 @@ class ScenarioFlowExecutor:
                     requirements,
                     (pause_data or {}).get("paused_node_id"),
                 )
+            self.action_executor._hydrate_agent_appointment_context(context)
             context.update({k: v for k, v in resume_data.items() if k != "agent"})
 
             self.supabase.table("flow_executions").update({
@@ -1816,6 +2106,17 @@ class ScenarioFlowExecutor:
         steps = 0
         max_steps = 100
 
+        def append_execution_trace(node_id: str, status: str):
+            trace = context.setdefault("_execution_trace", [])
+            if not isinstance(trace, list):
+                trace = []
+                context["_execution_trace"] = trace
+            trace.append({
+                "node_id": node_id,
+                "status": status,
+                "at": datetime.now(timezone.utc).isoformat(),
+            })
+
         while current_node_id and steps < max_steps:
             steps += 1
             node = node_map.get(current_node_id)
@@ -1834,8 +2135,10 @@ class ScenarioFlowExecutor:
             else:
                 result = await self.action_executor.execute(node, context)
             if result.get("paused"):
+                append_execution_trace(current_node_id, "paused")
                 return result
             if not result.get("success"):
+                append_execution_trace(current_node_id, "failed")
                 logging.error("❌ %s: %s", node.get("label"), result.get("error"))
                 await self._update_execution(execution_id, "failed", current_node_id, context, result.get("error"))
                 return {"success": False, "error": result.get("error"), "failed_at": current_node_id}
@@ -1893,6 +2196,7 @@ class ScenarioFlowExecutor:
                 await self._update_execution(execution_id, "paused", current_node_id, context, None, pause_data)
                 return {"success": True, "paused": True, "executionId": execution_id, "at_node": current_node_id, "resume_node_id": next_node_id}
 
+            append_execution_trace(current_node_id, "success")
             current_node_id = self._get_next_node(current_node_id, edge_map, context)
 
         if steps >= max_steps:
