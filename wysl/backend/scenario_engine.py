@@ -2868,12 +2868,20 @@ class ScenarioEngine:
         elif payload.get("subscription_id"):
             context.setdefault("subscription_id", payload.get("subscription_id"))
 
+        business_payload = payload.get("business")
+        if isinstance(business_payload, dict) and business_payload.get("id") is not None:
+            context["business"] = business_payload
+            context["business_id"] = business_payload.get("id")
+            context.setdefault("user_id", business_payload.get("user_id"))
+
         business_id = payload.get("business_id") or context.get("business_id")
         user_id = payload.get("user_id") or context.get("user_id") or scenario.get("user_id") or scenario.get("created_by")
         if user_id:
             context.setdefault("user_id", user_id)
         try:
-            if business_id:
+            if context.get("business"):
+                response = None
+            elif business_id:
                 response = self.supabase.table("businesses").select("*").eq("id", business_id).limit(1).execute()
             elif user_id:
                 response = self.supabase.table("businesses").select("*").eq("user_id", user_id).limit(1).execute()

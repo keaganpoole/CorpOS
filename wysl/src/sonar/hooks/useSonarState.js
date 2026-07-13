@@ -30,13 +30,22 @@ const [reactions, setReactions] = useState([]);
 
   // Load initial data via REST
   const loadInitialData = useCallback(async () => {
-    const [agentsData, controlData, sessionData, pulseData, logsData, summaryData, pipelineData, cronData, reactionsData, settingsResponse] = await Promise.all([
-      api.getAgents(),
+    // Receptionist cards are the primary content on this screen. Resolve that
+    // request independently so a slow, unrelated dashboard widget cannot hold
+    // the whole page behind one Promise.all barrier.
+    const agentsRequest = api.getAgents();
+    agentsRequest.then((agentsData) => {
+      if (!Array.isArray(agentsData)) return;
+      setAgents(agentsData);
+      const activeAgents = agentsData.filter((agent) => agent?.is_active !== false).length;
+      setSummary({ ok: activeAgents, warnings: 0, errors: 0, activeAgents, totalAgents: agentsData.length });
+    }).catch(() => {});
+
+    const [controlData, sessionData, pulseData, logsData, pipelineData, cronData, reactionsData, settingsResponse] = await Promise.all([
       api.getControlState(),
       api.getSession(),
       api.getLivePulse(30),
       api.getLogs(50),
-      api.getSystemSummary(),
       api.getPipeline(),
       api.getCronJobs(),
       api.getReactions(),
@@ -44,7 +53,6 @@ const [reactions, setReactions] = useState([]);
     ]);
 
     // Note: tasksData removed - Sonar no longer uses tasks
-    if (agentsData) setAgents(agentsData);
     if (controlData) {
       setControlState(prev => ({ ...prev, ...controlData, calls_filter: prev.calls_filter || 'all' }));
       setIsPaused(controlData.runtime_mode === 'paused');
@@ -60,7 +68,8 @@ const [reactions, setReactions] = useState([]);
     if (sessionData) setSession(sessionData);
     if (pulseData) setLivePulse(pulseData);
     if (logsData) setSystemLogs(logsData);
-    if (summaryData) setSummary(summaryData);
+    // Derive these counters from the agent snapshot instead of issuing a
+    // second authenticated request that repeats the same database query.
     if (pipelineData) setPipeline(pipelineData);
     if (cronData) setCronJobs(cronData);
     if (reactionsData) setReactions(reactionsData);

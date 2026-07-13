@@ -4753,6 +4753,10 @@ async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_c
     event_payload.setdefault("user_id", user_id)
     if business and business.get("id") is not None:
         event_payload.setdefault("business_id", business.get("id"))
+        # _build_flow_context can reuse this already-resolved tenant row. The
+        # previous path queried businesses once here and again immediately
+        # inside the flow context builder before doing any scenario work.
+        event_payload.setdefault("business", business)
 
     trigger_node = next((node for node in nodes_data if (node or {}).get("categoryType") == "TRIGGERS"), None)
     if not trigger_node:
@@ -5697,7 +5701,12 @@ async def elevenlabs_post_call_webhook(
         "flow_execution_id",
         "metadata.flow_execution_id",
         "dynamic_variables.flow_execution_id",
+        "conversation_initiation_client_data.scenario_context.flow_execution_id",
+        "conversation_initiation_client_data.scenario_context.execution_id",
         "conversation_initiation_client_data.dynamic_variables.flow_execution_id",
+        "conversation_initiation_client_data.dynamic_variables.execution_id",
+        "raw_payload.conversation_initiation_client_data.scenario_context.flow_execution_id",
+        "raw_payload.conversation_initiation_client_data.dynamic_variables.flow_execution_id",
     )
     agent_data = (
         deep_get(event_data, "agent_data")

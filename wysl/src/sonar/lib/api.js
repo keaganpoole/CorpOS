@@ -6,9 +6,22 @@
 const API_BASE = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
 const WS_URL = window.sonar?.wsUrl || import.meta.env.VITE_WS_URL || null;
 
+let authSessionRequest = null;
+
+// All initial dashboard requests start together. Supabase already keeps the
+// session in memory, but calling getSession once per request still creates a
+// burst of redundant auth work. Share the in-flight lookup across callers.
+async function getAuthSession() {
+  if (!authSessionRequest) {
+    authSessionRequest = import('./supabase')
+      .then(({ supabase }) => supabase.auth.getSession())
+      .finally(() => { authSessionRequest = null; });
+  }
+  return authSessionRequest;
+}
+
 async function buildAuthHeaders(extraHeaders = {}) {
-  const { supabase } = await import('./supabase');
-  const { data } = await supabase.auth.getSession();
+  const { data } = await getAuthSession();
   const token = data?.session?.access_token;
   return {
     ...extraHeaders,

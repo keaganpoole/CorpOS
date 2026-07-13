@@ -19,7 +19,12 @@ const titleCase = (value) => String(value || '')
 
 export const isCustomFieldKey = (key) => typeof key === 'string' && key.startsWith(CUSTOM_FIELD_PREFIX);
 
+let businessIdRequest = null;
+
 export const getCurrentBusinessId = async () => {
+  if (businessIdRequest) return businessIdRequest;
+
+  businessIdRequest = (async () => {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (!user) throw new Error('User not found');
@@ -35,6 +40,9 @@ export const getCurrentBusinessId = async () => {
   if (error) throw error;
   if (!data?.id) throw new Error('Business not found');
   return data.id;
+  })().finally(() => { businessIdRequest = null; });
+
+  return businessIdRequest;
 };
 
 export const fetchCustomFields = async (businessId) => {
