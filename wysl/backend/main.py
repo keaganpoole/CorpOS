@@ -29,6 +29,7 @@ SUPPRESSED_ACCESS_LOG_PATHS = {
     "/api/reactions",
     "/businesses/me/forwarding",
 }
+APPOINTMENT_ALLOWED_STATUSES = {"pending", "confirmed", "cancelled", "completed", "missed"}
 
 
 class UvicornAccessFilter(logging.Filter):
@@ -63,6 +64,7 @@ from fastapi import BackgroundTasks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from jose import JWTError, jwt
+from postgrest.exceptions import APIError
 from config import (
     supabase,
     supabase_admin,
@@ -72,6 +74,8 @@ from config import (
     TEST_MODE,
     STRIPE_LIVE_SECRET_KEY,
     STRIPE_TEST_SECRET_KEY,
+    stripe_connect_client_id,
+    stripe_connect_redirect_uri,
     elevenlabs_webhook_secret,
     elevenlabs_api_key,
     elevenlabs_agent_id_inbound,
@@ -85,6 +89,12 @@ from config import (
     google_client_id,
     google_client_secret,
     google_oauth_redirect_uri,
+    outlook_client_id,
+    outlook_client_secret,
+    outlook_authority,
+    outlook_redirect_uri,
+    outlook_scopes,
+    microsoft_graph_base_url,
     frontend_base_url,
 )
 
@@ -434,17 +444,84 @@ def deactivate_other_purchased_numbers(business_id: int, keep_id: Optional[str],
         logging.warning("Failed to deactivate purchased numbers for business %s: %s", business_id, exc)
 
 
+def get_account_call_routing() -> str:
+    try:
+        response = (
+            supabase
+            .table("account_settings")
+            .select("call_routing")
+            .limit(1)
+            .execute()
+        )
+        row = (response.data or [None])[0]
+        normalized = str((row or {}).get("call_routing") or "all").strip().lower()
+        return normalized if normalized in {"inbound", "outbound", "all"} else "all"
+    except Exception as exc:
+        logging.warning("Failed to load account call routing: %s", exc)
+        return "all"
+
+
+def get_account_call_routing_for_user(user_id: Optional[str]) -> str:
+    if not user_id:
+        return get_account_call_routing()
+    try:
+        response = (
+            supabase
+            .table("account_settings")
+            .select("call_routing")
+            .eq("user_id", str(user_id))
+            .limit(1)
+            .execute()
+        )
+        row = (response.data or [None])[0]
+        normalized = str((row or {}).get("call_routing") or "all").strip().lower()
+        return normalized if normalized in {"inbound", "outbound", "all"} else "all"
+    except Exception as exc:
+        logging.warning("Failed to load account call routing for user %s: %s", user_id, exc)
+        return "all"
+
+
+def get_account_autonomy_index_for_user(user_id: Optional[str] = None) -> int:
+    try:
+        query = (
+            supabase
+            .table("account_settings")
+            .select("autonomy_index")
+        )
+        if user_id:
+            query = query.eq("user_id", str(user_id))
+        response = query.limit(1).execute()
+        row = (response.data or [None])[0]
+        parsed = int((row or {}).get("autonomy_index") or 1)
+        return min(5, max(1, parsed))
+    except Exception as exc:
+        logging.warning("Failed to load account autonomy index for user %s: %s", user_id, exc)
+        return 1
+
+
+def call_routing_allows(direction: str, call_routing: Optional[str] = None) -> bool:
+    normalized_direction = str(direction or "").strip().lower()
+    normalized_routing = str(call_routing or get_account_call_routing()).strip().lower()
+    if normalized_direction == "inbound":
+        return normalized_routing in {"inbound", "all"}
+    if normalized_direction in {"outbound", "outgoing"}:
+        return normalized_routing in {"outbound", "all"}
+    return False
+
+
 def derive_receptionist_status(
-    call_types: Optional[str],
     current_status: Optional[str] = None,
     *,
     preserve_offline: bool = True,
+    call_routing: Optional[str] = None,
+    is_active: bool = True,
 ) -> str:
+    if not is_active:
+        return "Offline"
     normalized_current = str(current_status or "").strip().lower()
     if preserve_offline and normalized_current == "offline":
         return "Offline"
-    normalized_call_types = str(call_types or "none").strip().lower()
-    return "Idle" if normalized_call_types in {"", "none", "off"} else "Online"
+    return "Online" if call_routing_allows("inbound", call_routing) or call_routing_allows("outbound", call_routing) else "Idle"
 
 
 def maybe_auto_verify_business_forwarding(
@@ -490,7 +567,7 @@ def maybe_auto_verify_business_forwarding(
         agent_lookup = (
             supabase
             .table("hired_receptionists")
-            .select("id,call_types,status")
+            .select("id,status,is_active")
             .eq("id", str(agent_id))
             .limit(1)
             .execute()
@@ -498,9 +575,9 @@ def maybe_auto_verify_business_forwarding(
         agent_row = (agent_lookup.data or [None])[0]
         if agent_row:
             next_status = derive_receptionist_status(
-                agent_row.get("call_types"),
                 agent_row.get("status"),
                 preserve_offline=False,
+                is_active=bool(agent_row.get("is_active", True)),
             )
             supabase.table("hired_receptionists").update({"status": next_status}).eq("id", str(agent_id)).execute()
 
@@ -831,8 +908,15 @@ def start_number_quality_test_call(phone_number_id: str, label: str) -> dict:
             "conversation_initiation_client_data": {
                 "dynamic_variables": {
                     "company_name": label,
+                    "autonomy_index": 1,
                     "direction": "outgoing",
                     "mission": "Outbound deliverability quality check",
+                    "collection_required_fields": False,
+                    "collection_service_id": False,
+                    "collection_date": False,
+                    "collection_time": False,
+                    "collection_person_id": False,
+                    "appointment_ready_to_create": False,
                 },
             },
         },
@@ -1125,23 +1209,39 @@ def maybe_sync_business_caller_id_verification_from_twilio(business: Optional[di
         return None
     if str(active_entry.get("caller_id_verification_status") or "").lower() == "verified":
         return None
+    last_checked_at_raw = active_entry.get("caller_id_last_checked_at")
+    if last_checked_at_raw:
+        try:
+            last_checked_at = datetime.fromisoformat(str(last_checked_at_raw).replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - last_checked_at < timedelta(minutes=5):
+                return None
+        except Exception:
+            pass
     source_number = normalize_phone_number(active_entry.get("source_number"))
     if not source_number:
         return None
     verified_caller_id = find_twilio_outgoing_caller_id(source_number)
+    now = datetime.now(timezone.utc).isoformat()
     if not verified_caller_id:
+        numbers[active_index] = {
+            **active_entry,
+            "caller_id_last_checked_at": now,
+            "updated_at": now,
+        }
+        config["numbers"] = numbers
+        persist_business_forwarding_config(business["id"], config)
         return None
     phone_number_id = ensure_elevenlabs_outbound_caller_id(
         source_number,
         active_entry.get("source_label") or business.get("name") or "Verified Caller ID",
     )
-    now = datetime.now(timezone.utc).isoformat()
     numbers[active_index] = {
         **active_entry,
         "caller_id_verification_status": "verified",
         "caller_id_phone_number": source_number,
         "caller_id_outgoing_caller_id_sid": verified_caller_id.get("sid"),
         "caller_id_verified_at": active_entry.get("caller_id_verified_at") or now,
+        "caller_id_last_checked_at": now,
         "caller_id_validation_code": None,
         "caller_id_failure_reason": None,
         "caller_id_elevenlabs_phone_number_id": phone_number_id,
@@ -1487,11 +1587,18 @@ def provision_twilio_number_for_business(business: dict):
 def schedule_backend_scenario_execution(event_type: str, payload: Optional[dict] = None):
     global scenario_engine
     if not scenario_engine:
+        logging.warning("[ScenarioEngine] Skipping event %s because scenario_engine is not initialized", event_type)
         return
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
+        logging.warning("[ScenarioEngine] Skipping event %s because no running event loop was found", event_type)
         return
+    logging.info(
+        "[ScenarioEngine] Queueing event type=%s payload_keys=%s",
+        event_type,
+        sorted((payload or {}).keys()),
+    )
     loop.create_task(scenario_engine.handle_event(event_type, payload or {}))
 
 
@@ -1504,8 +1611,19 @@ async def startup_scenario_engine():
     try:
         if scenario_engine:
             await scenario_engine.start()
+            scenario_engine.start_scheduler()
     except Exception as exc:
         logging.error("Failed to start scenario engine: %s", exc, exc_info=True)
+
+
+@app.on_event("shutdown")
+async def shutdown_scenario_engine():
+    global scenario_engine
+    try:
+        if scenario_engine:
+            await scenario_engine.stop_scheduler()
+    except Exception as exc:
+        logging.error("Failed to stop scenario scheduler: %s", exc, exc_info=True)
 
 
 # --------------------------------------------------------------------------
@@ -1548,7 +1666,8 @@ class LoginStatusUpdate(BaseModel):
     is_logged_in: bool
 
 
-SUPPORTED_EMAIL_INTEGRATION_PROVIDERS = {"gmail"}
+SUPPORTED_EMAIL_INTEGRATION_PROVIDERS = {"gmail", "outlook"}
+SUPPORTED_INTEGRATION_PROVIDERS = {*SUPPORTED_EMAIL_INTEGRATION_PROVIDERS, "stripe"}
 GMAIL_SCOPES = [
     "openid",
     "email",
@@ -1560,6 +1679,19 @@ GMAIL_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GMAIL_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 GMAIL_MESSAGES_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
+
+# --- Outlook / Microsoft Graph Constants ---
+OUTLOOK_AUTHORITY = outlook_authority
+OUTLOOK_AUTH_URL = f"{OUTLOOK_AUTHORITY}/oauth2/v2.0/authorize"
+OUTLOOK_TOKEN_URL = f"{OUTLOOK_AUTHORITY}/oauth2/v2.0/token"
+OUTLOOK_REDIRECT_URI = outlook_redirect_uri
+OUTLOOK_SCOPES_LIST = [s.strip() for s in outlook_scopes.split(" ") if s.strip()]
+GRAPH_BASE_URL = microsoft_graph_base_url
+GRAPH_USERINFO_URL = f"{GRAPH_BASE_URL}/me"
+GRAPH_MESSAGES_URL = f"{GRAPH_BASE_URL}/me/messages"
+GRAPH_SEND_MAIL_URL = f"{GRAPH_BASE_URL}/me/sendMail"
+STRIPE_CONNECT_AUTH_URL = "https://connect.stripe.com/oauth/authorize"
+STRIPE_CONNECT_SCOPE = "read_write"
 
 
 class IntegrationAuthorizeResponse(BaseModel):
@@ -1632,6 +1764,11 @@ def _serialize_public_integration(row: dict, user_id: str) -> dict:
     return safe_row
 
 
+CALL_COMPLETED_STATUSES = {"completed", "done", "success"}
+CALL_FAILED_STATUSES = {"failed", "error", "canceled"}
+CALL_MISSED_STATUSES = {"missed", "no-answer", "no_answer", "busy"}
+
+
 def _get_google_redirect_uri(request: Optional[Request] = None) -> str:
     if google_oauth_redirect_uri:
         return google_oauth_redirect_uri
@@ -1640,6 +1777,17 @@ def _get_google_redirect_uri(request: Optional[Request] = None) -> str:
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="GOOGLE_OAUTH_REDIRECT_URI is not configured.",
+    )
+
+
+def _get_stripe_redirect_uri(request: Optional[Request] = None) -> str:
+    if stripe_connect_redirect_uri:
+        return stripe_connect_redirect_uri
+    if request is not None:
+        return str(request.url_for("stripe_integration_callback"))
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="STRIPE_CONNECT_REDIRECT_URI is not configured.",
     )
 
 
@@ -1657,7 +1805,7 @@ def _build_integration_state(user_id: str, provider: str, return_to: Optional[st
 def _decode_integration_state(state_token: str) -> dict:
     try:
         payload = jwt.decode(state_token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("provider") not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+        if payload.get("provider") not in SUPPORTED_INTEGRATION_PROVIDERS:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider state.")
         return payload
     except JWTError as exc:
@@ -1688,6 +1836,172 @@ def _decode_gmail_parts(parts: List[dict]) -> str:
             if nested_text:
                 chunks.append(nested_text)
     return "\n".join(chunk for chunk in chunks if chunk).strip()
+
+
+def _extract_call_direction(row: dict) -> Optional[str]:
+    raw_payload = row.get("raw_payload") if isinstance(row.get("raw_payload"), dict) else {}
+    conversation_data = row.get("conversation_initiation_data") if isinstance(row.get("conversation_initiation_data"), dict) else {}
+    metadata = row.get("conversation_metadata") if isinstance(row.get("conversation_metadata"), dict) else {}
+    direction = str(
+        first_present(
+            row,
+            "direction",
+        )
+        or first_present(
+            raw_payload,
+            "direction",
+            "metadata.direction",
+            "metadata.phone_call.direction",
+            "conversation_initiation_client_data.dynamic_variables.direction",
+            "conversation_initiation_client_data.dynamic_variables.call_direction",
+        )
+        or first_present(
+            conversation_data,
+            "dynamic_variables.direction",
+            "dynamic_variables.call_direction",
+        )
+        or first_present(
+            metadata,
+            "direction",
+            "phone_call.direction",
+        )
+        or ""
+    ).strip().lower()
+    return direction or None
+
+
+def _classify_call_status(row: dict) -> str:
+    status_value = str(row.get("status") or "").strip().lower()
+    outcome_value = str(row.get("outcome") or "").strip().lower()
+    success_value = str(row.get("call_successful") or "").strip().lower()
+    failure_reason = str(row.get("failure_reason") or "").strip().lower()
+
+    if status_value in CALL_MISSED_STATUSES or outcome_value in CALL_MISSED_STATUSES:
+        return "missed"
+    if status_value in CALL_FAILED_STATUSES or outcome_value in CALL_FAILED_STATUSES or failure_reason:
+        return "failed"
+    if success_value in {"true", "yes"}:
+        return "completed"
+    if status_value in CALL_COMPLETED_STATUSES or outcome_value in CALL_COMPLETED_STATUSES:
+        return "completed"
+    return "other"
+
+
+def _empty_receptionist_metrics() -> dict:
+    return {
+        "total_calls": 0,
+        "inbound_calls_count": 0,
+        "outbound_calls_count": 0,
+        "completed_calls_count": 0,
+        "failed_calls_count": 0,
+        "missed_calls_count": 0,
+        "unknown_direction_calls_count": 0,
+        "total_duration_seconds": 0,
+        "average_call_duration_seconds": 0,
+        "last_call_at": None,
+        "success_rate": 0,
+    }
+
+
+def _accumulate_receptionist_metrics(rows: List[dict]) -> dict:
+    metrics = _empty_receptionist_metrics()
+    durations_with_values = 0
+
+    for row in rows:
+        metrics["total_calls"] += 1
+
+        direction = _extract_call_direction(row)
+        if direction == "inbound":
+            metrics["inbound_calls_count"] += 1
+        elif direction in {"outbound", "outgoing"}:
+            metrics["outbound_calls_count"] += 1
+        else:
+            metrics["unknown_direction_calls_count"] += 1
+
+        classification = _classify_call_status(row)
+        if classification == "completed":
+            metrics["completed_calls_count"] += 1
+        elif classification == "failed":
+            metrics["failed_calls_count"] += 1
+        elif classification == "missed":
+            metrics["missed_calls_count"] += 1
+
+        duration_seconds = row.get("duration_seconds")
+        if duration_seconds is not None:
+            try:
+                metrics["total_duration_seconds"] += int(duration_seconds)
+                durations_with_values += 1
+            except (TypeError, ValueError):
+                pass
+
+        created_at_value = row.get("created_at")
+        if created_at_value and (metrics["last_call_at"] is None or str(created_at_value) > str(metrics["last_call_at"])):
+            metrics["last_call_at"] = created_at_value
+
+    if durations_with_values:
+        metrics["average_call_duration_seconds"] = round(
+            metrics["total_duration_seconds"] / durations_with_values,
+            2,
+        )
+    if metrics["total_calls"]:
+        metrics["success_rate"] = round(
+            (metrics["completed_calls_count"] / metrics["total_calls"]) * 100,
+            2,
+        )
+    return metrics
+
+
+def _fetch_call_log_rows(*, user_id: Optional[str] = None, receptionist_id: Optional[str] = None, limit: int = 5000) -> List[dict]:
+    rows: List[dict] = []
+    page_size = 1000
+    start = 0
+
+    while start < limit:
+        end = min(start + page_size - 1, limit - 1)
+        query = (
+            supabase.table("call_logs")
+            .select(
+                "id,hired_receptionist_id,receptionist_name,duration_seconds,status,outcome,created_at,call_successful,failure_reason,raw_payload,conversation_initiation_data,conversation_metadata"
+            )
+            .order("created_at", desc=True)
+            .range(start, end)
+        )
+        if user_id:
+            query = query.eq("user_id", str(user_id))
+        if receptionist_id:
+            query = query.eq("hired_receptionist_id", int_or_none(receptionist_id))
+
+        page_rows = query.execute().data or []
+        rows.extend(page_rows)
+        if len(page_rows) < page_size:
+            break
+        start += page_size
+
+    return rows
+
+
+def refresh_receptionist_call_metrics(receptionist_id: Optional[str]) -> Optional[dict]:
+    receptionist_id_value = int_or_none(receptionist_id)
+    if receptionist_id_value is None:
+        return None
+
+    rows = _fetch_call_log_rows(receptionist_id=str(receptionist_id_value))
+    metrics = _accumulate_receptionist_metrics(rows)
+    updates = {
+        "total_calls": metrics["total_calls"],
+        "inbound_calls_count": metrics["inbound_calls_count"],
+        "outbound_calls_count": metrics["outbound_calls_count"],
+        "completed_calls_count": metrics["completed_calls_count"],
+        "failed_calls_count": metrics["failed_calls_count"],
+        "missed_calls_count": metrics["missed_calls_count"],
+        "average_call_duration_seconds": metrics["average_call_duration_seconds"],
+        "last_call_at": metrics["last_call_at"],
+    }
+    try:
+        supabase.table("hired_receptionists").update(updates).eq("id", receptionist_id_value).execute()
+    except Exception as exc:
+        logging.warning("Failed to refresh receptionist metrics for %s: %s", receptionist_id_value, exc)
+    return metrics
 
 
 def _parse_gmail_message(message: dict) -> dict:
@@ -1752,27 +2066,112 @@ def _upsert_integration_row(user_id: str, provider: str, updates: dict) -> dict:
     if "scopes" not in merged or merged["scopes"] is None:
         merged["scopes"] = []
 
-    if existing_row:
-        response = (
-            supabase_admin.table("integrations")
-            .update({
-                "status": merged["status"],
-                "selected": merged["selected"],
-                "connected_email": merged["connected_email"],
-                "scopes": merged["scopes"],
-                "provider_metadata": merged["provider_metadata"],
-                "credentials": merged["credentials"],
-                "updated_at": merged["updated_at"],
-            })
-            .eq("id", existing_row["id"])
-            .execute()
-        )
-    else:
-        response = supabase_admin.table("integrations").insert(merged).execute()
+    try:
+        if existing_row:
+            response = (
+                supabase_admin.table("integrations")
+                .update({
+                    "status": merged["status"],
+                    "selected": merged["selected"],
+                    "connected_email": merged["connected_email"],
+                    "scopes": merged["scopes"],
+                    "provider_metadata": merged["provider_metadata"],
+                    "credentials": merged["credentials"],
+                    "updated_at": merged["updated_at"],
+                })
+                .eq("id", existing_row["id"])
+                .execute()
+            )
+        else:
+            response = supabase_admin.table("integrations").insert(merged).execute()
+    except APIError as exc:
+        raw_error = getattr(exc, "args", [None])[0]
+        if isinstance(raw_error, dict):
+            error_message = str(raw_error.get("message") or exc)
+        else:
+            error_message = str(raw_error or exc)
+        if "integrations_provider_check" in error_message and provider == "stripe":
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database migration missing: run `sql/add_stripe_integration_provider.sql` in Supabase before using Stripe integrations.",
+            ) from exc
+        raise
 
     if not response.data:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save integration.")
     return _normalize_user_integration_row(response.data[0], user_id)
+
+
+def _stripe_platform_api_key(livemode: Optional[bool] = None) -> str:
+    use_live_key = (not PAYMENT_TEST_MODE) if livemode is None else livemode
+    api_key = STRIPE_LIVE_SECRET_KEY if use_live_key else STRIPE_TEST_SECRET_KEY
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Stripe Connect {get_payment_mode_label()} platform key is not configured.",
+        )
+    return api_key
+
+
+def _stripe_object_to_dict(value) -> dict:
+    if hasattr(value, "to_dict_recursive"):
+        return value.to_dict_recursive()
+    return dict(value or {})
+
+
+def _exchange_stripe_code(code: str) -> dict:
+    if not stripe_connect_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe Connect is not configured.",
+        )
+    try:
+        token = stripe.OAuth.token(
+            api_key=_stripe_platform_api_key(),
+            grant_type="authorization_code",
+            code=code,
+        )
+        return _stripe_object_to_dict(token)
+    except Exception as exc:
+        logging.error("Stripe OAuth token exchange failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Stripe account authorization failed.",
+        ) from exc
+
+
+def _get_connected_stripe_request_options(user_id: str) -> dict:
+    integration = _fetch_integration_row(user_id, "stripe")
+    credentials = (integration or {}).get("credentials") or {}
+    provider_metadata = (integration or {}).get("provider_metadata") or {}
+    stripe_user_id = credentials.get("stripe_user_id") or provider_metadata.get("account_id")
+    livemode = credentials.get("livemode")
+    if livemode is None:
+        livemode = provider_metadata.get("livemode")
+    if not integration or integration.get("status") != "connected" or not stripe_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Stripe is not connected. Connect Stripe in Integrations before running payment actions.",
+        )
+    return {
+        "api_key": _stripe_platform_api_key(bool(livemode)),
+        "stripe_account": stripe_user_id,
+    }
+
+
+def _deauthorize_stripe_integration(integration: Optional[dict]) -> None:
+    credentials = (integration or {}).get("credentials") or {}
+    stripe_user_id = credentials.get("stripe_user_id") or (integration or {}).get("provider_metadata", {}).get("account_id")
+    if not stripe_user_id or not stripe_connect_client_id:
+        return
+    try:
+        stripe.OAuth.deauthorize(
+            api_key=_stripe_platform_api_key(credentials.get("livemode")),
+            client_id=stripe_connect_client_id,
+            stripe_user_id=stripe_user_id,
+        )
+    except Exception as exc:
+        logging.warning("Stripe deauthorization failed for %s: %s", stripe_user_id, exc)
 
 
 def _exchange_google_code(code: str, redirect_uri: str) -> dict:
@@ -1899,6 +2298,188 @@ def _send_gmail_email_for_user(user_id: str, to: str, subject: str, body: str) -
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to send message.")
     return response.json()
 
+
+# =============================================================================
+# Outlook / Microsoft Graph Integration Helpers
+# =============================================================================
+
+
+def _get_outlook_redirect_uri(request: Optional[Request] = None) -> str:
+    if OUTLOOK_REDIRECT_URI:
+        return OUTLOOK_REDIRECT_URI
+    if request is not None:
+        return str(request.url_for("outlook_integration_callback"))
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="OUTLOOK_REDIRECT_URI is not configured.",
+    )
+
+
+def _exchange_outlook_code(code: str, redirect_uri: str) -> dict:
+    if not outlook_client_id or not outlook_client_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Outlook OAuth is not configured.",
+        )
+    token_response = requests.post(
+        OUTLOOK_TOKEN_URL,
+        data={
+            "client_id": outlook_client_id,
+            "client_secret": outlook_client_secret,
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+            "scope": outlook_scopes,
+        },
+        timeout=30,
+    )
+    if not token_response.ok:
+        logging.error("Outlook token exchange failed: %s", token_response.text)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook token exchange failed.")
+    return token_response.json()
+
+
+def _refresh_outlook_credentials(credentials: dict) -> dict:
+    refresh_token = (credentials or {}).get("refresh_token")
+    if not refresh_token or not outlook_client_id or not outlook_client_secret:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook refresh token is missing.")
+    token_response = requests.post(
+        OUTLOOK_TOKEN_URL,
+        data={
+            "client_id": outlook_client_id,
+            "client_secret": outlook_client_secret,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+            "scope": outlook_scopes,
+        },
+        timeout=30,
+    )
+    if not token_response.ok:
+        logging.error("Outlook token refresh failed: %s", token_response.text)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook token refresh failed.")
+    refreshed = token_response.json()
+    next_credentials = dict(credentials or {})
+    next_credentials["access_token"] = refreshed.get("access_token")
+    next_credentials["token_type"] = refreshed.get("token_type", "Bearer")
+    expires_in = refreshed.get("expires_in") or 3600
+    next_credentials["expires_at"] = (
+        datetime.now(timezone.utc) + timedelta(seconds=int(expires_in) - 60)
+    ).isoformat()
+    return next_credentials
+
+
+def _get_valid_outlook_integration(user_id: str) -> dict:
+    integration = _fetch_integration_row(user_id, "outlook")
+    if not integration:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Outlook is not connected.")
+    credentials = integration.get("credentials") or {}
+    access_token = credentials.get("access_token")
+    expires_at = credentials.get("expires_at")
+    is_expired = True
+    if access_token and expires_at:
+        try:
+            is_expired = datetime.fromisoformat(expires_at) <= datetime.now(timezone.utc)
+        except Exception:
+            is_expired = True
+    if not access_token or is_expired:
+        credentials = _refresh_outlook_credentials(credentials)
+        integration = _upsert_integration_row(
+            user_id,
+            "outlook",
+            {
+                "credentials": credentials,
+                "status": "connected",
+                "selected": True,
+            },
+        )
+    return integration
+
+
+def _outlook_api_request(user_id: str, method: str, url: str, **kwargs) -> requests.Response:
+    integration = _get_valid_outlook_integration(user_id)
+    credentials = integration.get("credentials") or {}
+    access_token = credentials.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook access token is missing.")
+    headers = kwargs.pop("headers", {})
+    headers["Authorization"] = f"Bearer {access_token}"
+    response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+    if response.status_code == 401:
+        refreshed = _refresh_outlook_credentials(credentials)
+        integration = _upsert_integration_row(
+            user_id,
+            "outlook",
+            {
+                "credentials": refreshed,
+                "status": "connected",
+                "selected": True,
+            },
+        )
+        headers["Authorization"] = f"Bearer {(integration.get('credentials') or {}).get('access_token')}"
+        response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+    return response
+
+
+def _parse_outlook_message(message: dict) -> dict:
+    return {
+        "id": message.get("id"),
+        "thread_id": message.get("conversationId") or message.get("threadId"),
+        "subject": message.get("subject"),
+        "from_email": (message.get("from") or {}).get("emailAddress", {}).get("address") if message.get("from") else None,
+        "to_email": ", ".join(
+            r.get("emailAddress", {}).get("address", "")
+            for r in (message.get("toRecipients") or [])
+            if r.get("emailAddress", {}).get("address")
+        ) or None,
+        "snippet": message.get("bodyPreview") or message.get("snippet"),
+        "received_at": message.get("receivedDateTime"),
+        "body_text": (message.get("body") or {}).get("content") if (message.get("body") or {}).get("contentType") == "text" else None,
+    }
+
+
+def _send_outlook_email_for_user(user_id: str, to: str, subject: str, body: str) -> dict:
+    integration = _get_valid_outlook_integration(user_id)
+    connected_email = integration.get("connected_email")
+    payload = {
+        "message": {
+            "subject": subject,
+            "body": {
+                "contentType": "Text",
+                "content": body,
+            },
+            "toRecipients": [
+                {"emailAddress": {"address": to}}
+            ],
+        },
+        "saveToSentItems": True,
+    }
+    response = _outlook_api_request(
+        user_id,
+        "POST",
+        GRAPH_SEND_MAIL_URL,
+        headers={"Content-Type": "application/json"},
+        json=payload,
+    )
+    if not response.ok:
+        logging.error("Outlook send failed: %s", response.text)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to send message via Outlook.")
+    return {"id": "sent", "status": "sent", "provider": "outlook"}
+
+
+def _send_email_for_user(user_id: str, to: str, subject: str, body: str, provider: Optional[str] = None) -> dict:
+    """Route email sending through the connected integration provider."""
+    if not provider:
+        integration = _fetch_integration_row(user_id, "outlook")
+        if integration and integration.get("status") == "connected":
+            provider = "outlook"
+        else:
+            provider = "gmail"
+
+    if provider == "outlook":
+        return _send_outlook_email_for_user(user_id, to, subject, body)
+    return _send_gmail_email_for_user(user_id, to, subject, body)
+
+
 class RuntimeModeRequest(BaseModel):
     mode: str
 
@@ -1948,7 +2529,10 @@ class PaymentCreateRequest(BaseModel):
     description: Optional[str] = None
     person_id: Optional[str] = None
     appointment_id: Optional[str] = None
+    customer_id: Optional[str] = None
     customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
 
 class OnboardingRequest(BaseModel):
     business_name: str
@@ -2003,11 +2587,25 @@ class ScenarioTriggerRequest(BaseModel):
     payload: Optional[dict] = None
     created_at: Optional[datetime] = None
 
-class PaymentProfileCreateRequest(BaseModel):
+class CustomerCreateRequest(BaseModel):
+    person_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+class CustomerUpdateRequest(BaseModel):
+    customer_id: Optional[str] = None
+    person_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+class PaymentLinkCreateRequest(BaseModel):
     amount: int
     currency: str = "usd"
     description: Optional[str] = None
     person_id: Optional[str] = None
+    customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
@@ -2017,6 +2615,7 @@ class InvoiceCreateRequest(BaseModel):
     currency: str = "usd"
     description: Optional[str] = None
     person_id: Optional[str] = None
+    customer_id: Optional[str] = None
     appointment_id: Optional[str] = None
     service_id: Optional[str] = None
     customer_name: Optional[str] = None
@@ -2027,11 +2626,22 @@ class InvoiceCreateRequest(BaseModel):
 class InvoiceSendRequest(BaseModel):
     invoice_id: str
 
+class RefundPaymentRequest(BaseModel):
+    payment_id: str
+    amount: Optional[int] = None
+    refund_reason: Optional[str] = None
+
+class CancelSubscriptionRequest(BaseModel):
+    subscription_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    person_id: Optional[str] = None
+
 
 class ScenarioSendEmailRequest(BaseModel):
     to: str
     subject: str
     body: str
+    provider: Optional[str] = None
 
 class PaymentUpdateRequest(BaseModel):
     payment_id: str
@@ -2054,23 +2664,44 @@ INTENT_KEY_ALIASES = {
     "intent_appointment_created": "appointment_created",
     "intent_appointment_updated": "appointment_updated",
     "intent_appointment_cancelled": "appointment_cancelled",
+    "intent_appointment_rescheduled": "appointment_rescheduled",
+    "intent_appointment_confirmed": "appointment_confirmed",
+    "intent_appointment_completed": "appointment_completed",
+    "intent_appointment_missed": "appointment_missed",
     "appointment_create": "appointment_created",
     "appointment_update": "appointment_updated",
     "appointment_cancel": "appointment_cancelled",
+    "appointment_reschedule": "appointment_rescheduled",
+    "appointment_confirm": "appointment_confirmed",
+    "appointment_complete": "appointment_completed",
+    "appointment_mark_missed": "appointment_missed",
     "create_appointment": "appointment_created",
     "update_appointment": "appointment_updated",
-    "delete_appointment": "cancel_appointment",
+    "delete_appointment": "appointment_cancelled",
     "cancel_appointment": "appointment_cancelled",
+    "reschedule_appointment": "appointment_rescheduled",
+    "confirm_appointment": "appointment_confirmed",
+    "complete_appointment": "appointment_completed",
+    "miss_appointment": "appointment_missed",
     "intent_record_created": "record_created",
     "intent_record_updated": "record_updated",
     "create_record": "record_created",
     "update_record": "record_updated",
     "intent_payment_received": "payment_received",
     "intent_invoice_sent": "invoice_sent",
+    "intent_refund_issued": "refund_issued",
+    "intent_customer_created": "customer_created",
+    "intent_subscription_created": "subscription_created",
+    "intent_subscription_canceled": "subscription_canceled",
+    "intent_subscription_payment_failed": "subscription_payment_failed",
+    "create_customer": "customer_created",
+    "update_customer": "customer_created",
     "create_payment": "payment_received",
-    "update_payment": "payment_received",
+    "send_payment_link": "invoice_sent",
     "create_invoice": "invoice_sent",
     "send_invoice": "invoice_sent",
+    "refund_payment": "refund_issued",
+    "cancel_subscription": "subscription_canceled",
     "intent_neutral_entered": "neutral",
     "neutral_entered": "neutral",
     "send_to_phone_number": "send_sms",
@@ -2090,20 +2721,30 @@ SUPPORTED_INTENT_KEYS = {
     "appointment_created",
     "appointment_updated",
     "appointment_cancelled",
+    "appointment_rescheduled",
+    "appointment_confirmed",
+    "appointment_completed",
+    "appointment_missed",
     "create_appointment",
     "update_appointment",
     "cancel_appointment",
     "record_created",
     "record_updated",
+    "customer_created",
     "payment_received",
+    "refund_issued",
     "invoice_sent",
+    "subscription_created",
+    "subscription_canceled",
+    "subscription_payment_failed",
+    "create_customer",
+    "update_customer",
     "create_payment",
-    "create_payment_profile",
+    "send_payment_link",
     "create_invoice",
     "send_invoice",
-    "update_payment",
-    "check_payment_status",
-    "issue_refund",
+    "refund_payment",
+    "cancel_subscription",
     "send_email",
     "add_tag",
     "search_tags",
@@ -2331,6 +2972,21 @@ def build_invoice_metadata(*, person_id: Optional[str] = None, appointment_id: O
         metadata["service_id"] = str(service_id)
     return metadata
 
+def serialize_stripe_customer(customer):
+    if not customer:
+        return {}
+    return {
+        "id": customer.get("id"),
+        "customer_id": customer.get("id"),
+        "object": customer.get("object"),
+        "name": customer.get("name"),
+        "email": customer.get("email"),
+        "phone": customer.get("phone"),
+        "metadata": customer.get("metadata"),
+        "created": customer.get("created"),
+        "status": "created",
+    }
+
 def serialize_stripe_invoice(invoice):
     if not invoice:
         return {}
@@ -2351,6 +3007,166 @@ def serialize_stripe_invoice(invoice):
         "created": invoice.get("created"),
         "metadata": invoice.get("metadata"),
     }
+
+def serialize_stripe_subscription(subscription):
+    if not subscription:
+        return {}
+    return {
+        "id": subscription.get("id"),
+        "subscription_id": subscription.get("id"),
+        "object": subscription.get("object"),
+        "customer_id": subscription.get("customer"),
+        "status": subscription.get("status"),
+        "cancel_at_period_end": subscription.get("cancel_at_period_end"),
+        "canceled_at": subscription.get("canceled_at"),
+        "current_period_end": subscription.get("current_period_end"),
+        "metadata": subscription.get("metadata"),
+        "created": subscription.get("created"),
+    }
+
+def serialize_stripe_refund(refund):
+    if not refund:
+        return {}
+    return {
+        "id": refund.get("id"),
+        "refund_id": refund.get("id"),
+        "object": refund.get("object"),
+        "payment_intent": refund.get("payment_intent"),
+        "charge": refund.get("charge"),
+        "amount": refund.get("amount"),
+        "currency": refund.get("currency"),
+        "reason": refund.get("reason"),
+        "status": refund.get("status"),
+        "created": refund.get("created"),
+        "metadata": refund.get("metadata"),
+    }
+
+def load_person_by_id_for_user(user_id: str, person_id: Optional[str]) -> Optional[dict]:
+    if not user_id or not person_id:
+        return None
+    try:
+        response = (
+            supabase.table("people")
+            .select("*")
+            .eq("id", str(person_id))
+            .eq("user_id", str(user_id))
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+    except Exception as exc:
+        logging.warning("Failed to load person %s for user %s: %s", person_id, user_id, exc)
+        return None
+
+def persist_person_stripe_customer_id(user_id: str, person_id: Optional[str], customer_id: Optional[str]) -> None:
+    if not user_id or not person_id or not customer_id:
+        return
+    try:
+        supabase.table("people").update({
+            "stripe_customer_id": customer_id,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", str(person_id)).eq("user_id", str(user_id)).execute()
+    except Exception as exc:
+        logging.debug("Could not persist stripe_customer_id for person %s: %s", person_id, exc)
+
+def resolve_connected_account_user_id(stripe_account_id: Optional[str]) -> Optional[str]:
+    if not stripe_account_id:
+        return None
+    try:
+        rows = supabase.table("integrations").select("user_id,provider_metadata,credentials").eq("provider", "stripe").execute().data or []
+        for row in rows:
+            provider_metadata = row.get("provider_metadata") or {}
+            credentials = row.get("credentials") or {}
+            account_id = provider_metadata.get("account_id") or credentials.get("stripe_user_id")
+            if str(account_id or "").strip() == str(stripe_account_id).strip():
+                return row.get("user_id")
+    except Exception as exc:
+        logging.warning("Failed to resolve connected Stripe account %s: %s", stripe_account_id, exc)
+    return None
+
+def build_scenario_customer_metadata(*, user_id: str, person_id: Optional[str] = None, appointment_id: Optional[str] = None, service_id: Optional[str] = None) -> dict:
+    metadata = build_invoice_metadata(person_id=person_id, appointment_id=appointment_id, service_id=service_id)
+    metadata["user_id"] = str(user_id)
+    return metadata
+
+def create_or_update_stripe_customer_for_user(
+    *,
+    user_id: str,
+    customer_id: Optional[str] = None,
+    person_id: Optional[str] = None,
+    customer_name: Optional[str] = None,
+    customer_email: Optional[str] = None,
+    customer_phone: Optional[str] = None,
+    create_if_missing: bool = True,
+    appointment_id: Optional[str] = None,
+    service_id: Optional[str] = None,
+):
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
+    person = load_person_by_id_for_user(user_id, person_id)
+    resolved_customer_id = (
+        str(customer_id).strip()
+        if customer_id
+        else str(person.get("stripe_customer_id") or "").strip() if person else ""
+    ) or None
+
+    resolved_name = customer_name or (format_person_display_name(person) if person else None)
+    resolved_email = customer_email or (person.get("email") if person else None)
+    resolved_phone = customer_phone or (person.get("phone") if person else None)
+    metadata = build_scenario_customer_metadata(
+        user_id=user_id,
+        person_id=person_id or (str(person.get("id")) if person and person.get("id") is not None else None),
+        appointment_id=appointment_id,
+        service_id=service_id,
+    )
+
+    if resolved_customer_id:
+        try:
+            customer = _stripe_object_to_dict(stripe.Customer.retrieve(resolved_customer_id, **stripe_request_options))
+            updates = {}
+            if resolved_name and resolved_name != customer.get("name"):
+                updates["name"] = resolved_name
+            if resolved_email and resolved_email != customer.get("email"):
+                updates["email"] = resolved_email
+            if resolved_phone and resolved_phone != customer.get("phone"):
+                updates["phone"] = resolved_phone
+            merged_metadata = {**(customer.get("metadata") or {}), **metadata}
+            if merged_metadata != (customer.get("metadata") or {}):
+                updates["metadata"] = merged_metadata
+            if updates:
+                customer = _stripe_object_to_dict(
+                    stripe.Customer.modify(resolved_customer_id, **stripe_request_options, **updates)
+                )
+            persist_person_stripe_customer_id(user_id, person_id, customer.get("id"))
+            return customer, person
+        except Exception as exc:
+            if not create_if_missing:
+                raise HTTPException(status_code=404, detail=f"Stripe customer not found: {resolved_customer_id}") from exc
+            logging.warning("Existing Stripe customer lookup failed for %s, creating a new one: %s", resolved_customer_id, exc)
+
+    if not create_if_missing:
+        raise HTTPException(status_code=400, detail="No Stripe customer could be resolved.")
+
+    create_payload = {
+        "metadata": metadata,
+    }
+    if resolved_name:
+        create_payload["name"] = resolved_name
+    if resolved_email:
+        create_payload["email"] = resolved_email
+    if resolved_phone:
+        create_payload["phone"] = resolved_phone
+    customer = _stripe_object_to_dict(stripe.Customer.create(**stripe_request_options, **create_payload))
+    persist_person_stripe_customer_id(user_id, person_id, customer.get("id"))
+    return customer, person
+
+
+def resolve_scenario_user_id_from_stripe_event(event: dict, metadata: Optional[dict] = None) -> Optional[str]:
+    metadata = metadata or {}
+    return (
+        str(metadata.get("user_id")).strip()
+        if metadata.get("user_id")
+        else resolve_connected_account_user_id(event.get("account"))
+    ) or None
 
 def emit_payment_trigger(trigger_key: str, payload: dict):
     trigger_payload = {
@@ -2395,6 +3211,59 @@ def emit_scenario_trigger(trigger_key: str, payload: Optional[dict] = None, crea
 
     schedule_backend_scenario_execution(normalized_trigger_key, payload or {})
     return {"ok": True, "event": saved_event, "persisted": persisted}
+
+
+def emit_appointment_change_triggers(
+    previous_appointment: Optional[dict],
+    current_appointment: Optional[dict],
+    *,
+    business_id=None,
+    include_updated: bool = True,
+):
+    if not isinstance(current_appointment, dict) or not current_appointment:
+        return
+
+    resolved_business_id = (
+        current_appointment.get("business_id")
+        if isinstance(current_appointment, dict)
+        else None
+    ) or (
+        previous_appointment.get("business_id")
+        if isinstance(previous_appointment, dict)
+        else None
+    ) or business_id
+
+    payload = {
+        "appointment": current_appointment,
+        "appointment_id": current_appointment.get("id"),
+        "person_id": current_appointment.get("person_id"),
+        "service_id": current_appointment.get("service_id"),
+        "staff_id": current_appointment.get("staff_id"),
+        "business_id": resolved_business_id,
+    }
+
+    if include_updated:
+        emit_scenario_trigger("appointment_updated", payload)
+
+    previous_status = str((previous_appointment or {}).get("status") or "").strip().lower()
+    current_status = str((current_appointment or {}).get("status") or "").strip().lower()
+    if current_status != previous_status:
+        if current_status == "cancelled":
+            emit_scenario_trigger("appointment_cancelled", payload)
+        elif current_status == "confirmed":
+            emit_scenario_trigger("appointment_confirmed", payload)
+        elif current_status == "completed":
+            emit_scenario_trigger("appointment_completed", payload)
+        elif current_status == "missed":
+            emit_scenario_trigger("appointment_missed", payload)
+
+    if previous_appointment:
+        previous_date = str(previous_appointment.get("date") or "").strip()
+        current_date = str(current_appointment.get("date") or "").strip()
+        previous_time = str(previous_appointment.get("time") or "").strip()
+        current_time = str(current_appointment.get("time") or "").strip()
+        if previous_date != current_date or previous_time != current_time:
+            emit_scenario_trigger("appointment_rescheduled", payload)
 
 def normalize_phone_number(value) -> Optional[str]:
     if value is None:
@@ -2497,6 +3366,65 @@ def load_people_schema_labels(business_id: Optional[str]) -> dict:
     except Exception as exc:
         logging.warning("Failed to load people schema labels: %s", exc)
         return {}
+
+
+def load_people_schema_types(business_id: Optional[str]) -> dict:
+    if not business_id:
+        return {}
+    try:
+        rows = (
+            supabase.table("people_schema")
+            .select("field_key,field_type")
+            .eq("business_id", str(business_id))
+            .eq("is_active", True)
+            .execute()
+            .data
+            or []
+        )
+        return {row.get("field_key"): row.get("field_type") for row in rows if row.get("field_key")}
+    except Exception as exc:
+        logging.warning("Failed to load people schema field types: %s", exc)
+        return {}
+
+
+def coerce_people_custom_field_value(value, field_type: Optional[str]):
+    if value in (None, ""):
+        return value
+    if field_type == "boolean":
+        if isinstance(value, bool):
+            return value
+        normalized = str(value).strip().lower()
+        if normalized in {"true", "yes", "1", "on"}:
+            return True
+        if normalized in {"false", "no", "0", "off"}:
+            return False
+    if field_type == "number":
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return value
+    return value
+
+
+def normalize_people_payload_custom_fields(payload: dict, business_id: Optional[str], existing_custom_fields: Optional[dict] = None) -> dict:
+    normalized = {**(payload or {})}
+    custom_field_types = load_people_schema_types(business_id)
+    merged_custom_fields = {
+        **((existing_custom_fields or {}) if isinstance(existing_custom_fields, dict) else {}),
+        **((normalized.get("custom_fields") or {}) if isinstance(normalized.get("custom_fields"), dict) else {}),
+    }
+
+    for key in list(normalized.keys()):
+        if not str(key).startswith("custom_"):
+            continue
+        merged_custom_fields[key] = coerce_people_custom_field_value(normalized.pop(key), custom_field_types.get(key))
+
+    if merged_custom_fields:
+        normalized["custom_fields"] = merged_custom_fields
+    elif "custom_fields" in normalized and not isinstance(normalized.get("custom_fields"), dict):
+        normalized.pop("custom_fields", None)
+
+    return normalized
 
 
 def add_person_custom_dynamic_variables(dynamic_variables: dict, person: Optional[dict], business_id: Optional[str]):
@@ -2617,11 +3545,19 @@ def get_receptionist_display_name(receptionist: Optional[dict]) -> Optional[str]
 def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: Optional[str] = None):
     business_id_value = int_or_none(business_id)
     user_id_value = str(user_id).strip() if user_id else None
+    call_routing = get_account_call_routing()
     if not business_id_value and not user_id_value:
         logging.info(
             "Inbound receptionist lookup skipped: missing business_id and user_id. business_id=%s user_id=%s",
             business_id,
             user_id,
+        )
+        return None
+
+    if not call_routing_allows("inbound", call_routing):
+        logging.info(
+            "Inbound receptionist lookup skipped because account call routing does not allow inbound calls. call_routing=%s",
+            call_routing,
         )
         return None
 
@@ -2657,16 +3593,11 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
         )
         return None
 
-    candidates = []
-    for row in rows_by_id.values():
-        call_types = str(row.get("call_types") or "").strip().lower()
-        if call_types not in {"inbound", "both"}:
-            continue
-        candidates.append(row)
+    candidates = [row for row in rows_by_id.values() if bool(row.get("is_active", True))]
 
     if not candidates:
         logging.info(
-            "Inbound receptionist lookup found no inbound-capable candidates: business_id=%s user_id=%s rows=%s",
+            "Inbound receptionist lookup found no active candidates: business_id=%s user_id=%s rows=%s",
             business_id_value,
             user_id_value,
             len(rows_by_id),
@@ -2674,20 +3605,23 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
         return None
 
     def sort_key(row: dict):
-        is_active = bool(row.get("is_active", True))
-        status_value = str(row.get("status") or "").strip().lower()
+        status_value = str(derive_receptionist_status(
+            row.get("status"),
+            call_routing=call_routing,
+            is_active=bool(row.get("is_active", True)),
+        )).strip().lower()
         is_online = status_value not in {"offline", "disabled", "inactive"}
         hired_at = str(row.get("hired_at") or "")
-        return (is_active, is_online, hired_at)
+        return (is_online, hired_at)
 
     selected = sorted(candidates, key=sort_key, reverse=True)[0]
     logging.info(
-        "Inbound receptionist resolved: business_id=%s user_id=%s receptionist_id=%s receptionist_name=%s call_types=%s candidates=%s",
+        "Inbound receptionist resolved: business_id=%s user_id=%s receptionist_id=%s receptionist_name=%s call_routing=%s candidates=%s",
         business_id_value,
         user_id_value,
         selected.get("id"),
         get_receptionist_display_name(selected),
-        selected.get("call_types"),
+        call_routing,
         len(candidates),
     )
     return selected
@@ -2929,6 +3863,265 @@ def first_present(data, *paths):
             return value
     return None
 
+
+def blank_to_none(value):
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped if stripped else None
+    return value
+
+
+def normalize_appointment_status(value, fallback: str = "pending") -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in APPOINTMENT_ALLOWED_STATUSES:
+        return normalized
+    return fallback
+
+
+def normalize_appointment_duration(value, fallback: int = 30) -> int:
+    try:
+        parsed = int(value)
+    except Exception:
+        return fallback
+    if parsed <= 0:
+        return fallback
+    return min(parsed, 1440)
+
+
+def normalize_appointment_date_value(value, fallback: str | None = None) -> str:
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped:
+            candidate = stripped.replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(candidate).date().isoformat()
+            except ValueError:
+                pass
+            for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%m/%d/%y", "%m-%d-%y"):
+                try:
+                    return datetime.strptime(stripped, fmt).date().isoformat()
+                except ValueError:
+                    continue
+    return fallback or datetime.now().date().isoformat()
+
+
+def normalize_appointment_time_value(value, fallback: str = "09:00") -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%H:%M")
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped:
+            try:
+                return datetime.strptime(stripped, "%H:%M").strftime("%H:%M")
+            except ValueError:
+                pass
+            for fmt in ("%I:%M %p", "%I:%M%p", "%I %p", "%I%p"):
+                try:
+                    return datetime.strptime(stripped.upper(), fmt).strftime("%H:%M")
+                except ValueError:
+                    continue
+            return stripped
+    return fallback
+
+
+def safe_appointment_person_id(value):
+    parsed = int_or_none(value)
+    if parsed is None:
+        return None
+    try:
+        response = supabase.table("people").select("id").eq("id", parsed).limit(1).execute()
+        return parsed if response.data else None
+    except Exception:
+        return None
+
+
+def safe_appointment_service_id(value):
+    parsed = uuid_or_none(value)
+    if not parsed:
+        return None
+    try:
+        response = supabase.table("services").select("id").eq("id", parsed).limit(1).execute()
+        return parsed if response.data else None
+    except Exception:
+        return None
+
+
+def load_staff_record(value, *, business_id=None, require_active: bool = False):
+    parsed = uuid_or_none(value)
+    if not parsed:
+        return None
+    try:
+        query = supabase.table("staff").select("*").eq("id", parsed)
+        if business_id is not None:
+            query = query.eq("business_id", business_id)
+        response = query.limit(1).execute()
+        if not response.data:
+            return None
+        staff = response.data[0]
+        if require_active and staff.get("is_active") is False:
+            return None
+        return staff
+    except Exception:
+        return None
+
+
+def safe_appointment_staff_id(value, *, business_id=None, require_active: bool = False):
+    staff = load_staff_record(value, business_id=business_id, require_active=require_active)
+    return staff.get("id") if staff else None
+
+
+def appointment_time_to_minutes(value) -> Optional[int]:
+    normalized = normalize_appointment_time_value(value, fallback="")
+    if not normalized:
+        return None
+    parts = str(normalized).split(":")
+    if len(parts) < 2:
+        return None
+    try:
+        hour = int(parts[0])
+        minute = int(parts[1])
+    except (TypeError, ValueError):
+        return None
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return None
+    return (hour * 60) + minute
+
+
+def normalize_working_hours_key(value: str) -> str:
+    return "".join(ch for ch in str(value or "").strip().lower() if ch.isalpha())
+
+
+def tokenize_search_terms(*values) -> list[str]:
+    terms: list[str] = []
+    for value in values:
+        raw = str(value or "").strip().lower()
+        if not raw:
+            continue
+        pieces = [piece for piece in re.split(r"[^a-z0-9]+", raw) if piece]
+        terms.extend(pieces or [raw])
+    seen = set()
+    ordered = []
+    for term in terms:
+        if term in seen:
+            continue
+        seen.add(term)
+        ordered.append(term)
+    return ordered
+
+
+def score_staff_match(staff: dict, search_terms: list[str]) -> int:
+    if not search_terms:
+        return 1
+    haystacks = [
+        str(staff.get("full_name") or "").lower(),
+        str(staff.get("first_name") or "").lower(),
+        str(staff.get("last_name") or "").lower(),
+        str(staff.get("role") or "").lower(),
+        str(staff.get("notes") or "").lower(),
+    ]
+    score = 0
+    for term in search_terms:
+        for haystack in haystacks:
+            if not haystack:
+                continue
+            if term == haystack:
+                score += 6
+            elif term in haystack:
+                score += 3
+    return score
+
+
+def get_staff_schedule_for_date(working_hours, appointment_date: Optional[str]):
+    if not isinstance(working_hours, dict) or not appointment_date:
+        return None
+    try:
+        weekday_name = datetime.fromisoformat(str(appointment_date)).strftime("%A").lower()
+    except ValueError:
+        return None
+
+    candidate_keys = {
+        weekday_name,
+        weekday_name[:3],
+        normalize_working_hours_key(weekday_name),
+        normalize_working_hours_key(weekday_name[:3]),
+    }
+
+    for key, value in working_hours.items():
+        if normalize_working_hours_key(key) in candidate_keys and isinstance(value, dict):
+            return value
+    return None
+
+
+def is_staff_available_during_hours(staff: Optional[dict], appointment_date: Optional[str], appointment_time: Optional[str], duration: int):
+    if not isinstance(staff, dict):
+        return False, "Staff record not found"
+    if staff.get("is_active") is False:
+        return False, "Staff member is inactive"
+
+    schedule = get_staff_schedule_for_date(staff.get("working_hours"), appointment_date)
+    if schedule is None:
+        return True, None
+
+    enabled = schedule.get("enabled")
+    if enabled is False:
+        return False, "Staff member is not working that day"
+
+    start_minutes = appointment_time_to_minutes(appointment_time)
+    open_minutes = appointment_time_to_minutes(schedule.get("open"))
+    close_minutes = appointment_time_to_minutes(schedule.get("close"))
+    duration_minutes = normalize_appointment_duration(duration)
+
+    if start_minutes is None or open_minutes is None or close_minutes is None:
+        return True, None
+
+    end_minutes = start_minutes + duration_minutes
+    if start_minutes < open_minutes or end_minutes > close_minutes:
+        return False, "Requested time is outside staff working hours"
+
+    return True, None
+
+
+def appointments_conflict(start_a: Optional[int], duration_a: int, start_b: Optional[int], duration_b: int) -> bool:
+    if start_a is None or start_b is None:
+        return False
+    end_a = start_a + normalize_appointment_duration(duration_a)
+    end_b = start_b + normalize_appointment_duration(duration_b)
+    return start_a < end_b and start_b < end_a
+
+
+def list_staff_conflicts(*, business_id, appointment_date, appointment_time, duration, staff_id=None, exclude_appointment_id=None):
+    query = supabase.table("appointments").select("*")
+    if business_id is not None:
+        query = query.eq("business_id", business_id)
+    if appointment_date:
+        query = query.eq("date", appointment_date)
+    if staff_id:
+        query = query.eq("staff_id", staff_id)
+    rows = query.limit(500).execute().data or []
+    normalized_target_start = appointment_time_to_minutes(appointment_time)
+    normalized_target_duration = normalize_appointment_duration(duration)
+    blocked_statuses = {"cancelled", "completed", "missed"}
+    conflicts = []
+    for row in rows:
+        if exclude_appointment_id and str(row.get("id")) == str(exclude_appointment_id):
+            continue
+        if str(row.get("status") or "").strip().lower() in blocked_statuses:
+            continue
+        if staff_id and str(row.get("staff_id") or "") != str(staff_id):
+            continue
+        if appointments_conflict(
+            normalized_target_start,
+            normalized_target_duration,
+            appointment_time_to_minutes(row.get("time")),
+            row.get("duration"),
+        ):
+            conflicts.append(row)
+    return conflicts
+
 def parse_optional_datetime(value):
     if value is None or value == "":
         return None
@@ -3034,8 +4227,14 @@ def extract_transcript_turns(value):
     return turns
 
 def extract_dynamic_variables(data: dict) -> dict:
-    candidate = deep_get(data, "conversation_initiation_client_data.dynamic_variables")
-    return candidate if isinstance(candidate, dict) else {}
+    dynamic_variables = deep_get(data, "conversation_initiation_client_data.dynamic_variables")
+    scenario_context = deep_get(data, "conversation_initiation_client_data.scenario_context")
+    merged = {}
+    if isinstance(dynamic_variables, dict):
+        merged.update(dynamic_variables)
+    if isinstance(scenario_context, dict):
+        merged.update(scenario_context)
+    return merged
 
 def storage_signed_url(path: Optional[str], expires_in: int = 3600) -> Optional[str]:
     if not path:
@@ -3124,6 +4323,32 @@ def build_agent_update_map(key: Optional[str], value):
         return {}
 
     updates = {normalized_key: value}
+    # ElevenLabs may submit the UI display label instead of the canonical
+    # workflow path. Keep the original key, but add the canonical alias so
+    # resumed actions can resolve the same value reliably.
+    compact_key = re.sub(r"[^a-z0-9]+", "", normalized_key.lower())
+    canonical_aliases = {
+        "recservicerecordid": "rec.service.id",
+        "servicerecordid": "rec.service.id",
+        "recserviceid": "rec.service.id",
+        "serviceid": "rec.service.id",
+        "recappointmentservice": "rec.service.id",
+        "appointmentservice": "rec.service.id",
+        "recappointmentserviceid": "rec.appointment.service_id",
+        "appointmentserviceid": "rec.appointment.service_id",
+        "recstaffrecordid": "rec.staff.id",
+        "staffrecordid": "rec.staff.id",
+        "recstaffid": "rec.staff.id",
+        "staffid": "rec.staff.id",
+        "recpersonrecordid": "rec.person.id",
+        "personrecordid": "rec.person.id",
+        "recpersonid": "rec.person.id",
+        "personid": "rec.person.id",
+    }
+    canonical_key = canonical_aliases.get(compact_key)
+    if canonical_key and canonical_key != normalized_key:
+        updates.update(build_agent_update_map(canonical_key, value))
+
     cursor = nested_root = {}
     parts = [part.strip() for part in normalized_key.split(".") if part.strip()]
     if not parts:
@@ -3410,6 +4635,28 @@ def update_payment_record(match_field: str, match_value: str, update_data: dict)
     response = supabase.table("payments").update(update_data).eq(match_field, match_value).execute()
     return response.data[0] if response.data else None
 
+
+def normalize_payment_record_status(value: Optional[str], fallback: str = "pending") -> str:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return fallback
+    status_map = {
+        "paid": "succeeded",
+        "complete": "succeeded",
+        "completed": "succeeded",
+        "succeeded": "succeeded",
+        "pending": "pending",
+        "unpaid": "pending",
+        "open": "pending",
+        "failed": "failed",
+        "error": "failed",
+        "declined": "failed",
+        "refunded": "refunded",
+        "partial_refund": "partial_refund",
+        "partial_refunded": "partial_refund",
+    }
+    return status_map.get(normalized, normalized)
+
 def upsert_payment_from_stripe(
     *,
     payment_intent_id: Optional[str] = None,
@@ -3432,7 +4679,7 @@ def upsert_payment_from_stripe(
 
     update_data = {}
     if status is not None:
-        update_data["status"] = status
+        update_data["status"] = normalize_payment_record_status(status)
     if receipt_url is not None:
         update_data["receipt_url"] = receipt_url
     if error_message is not None:
@@ -3475,6 +4722,56 @@ async def trigger_specific_scenario(scenario_id: str, payload: dict):
     if not result.get("ok"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result.get("error") or "Scenario not found")
     return result
+
+@app.post("/api/scenarios/run-builder", tags=["Scenarios"])
+async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_current_user)):
+    if not scenario_engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
+
+    scenario = payload.get("scenario")
+    if not isinstance(scenario, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="scenario payload required")
+
+    nodes_data = scenario.get("nodes_data")
+    if isinstance(nodes_data, str):
+        try:
+            nodes_data = json.loads(nodes_data)
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid nodes_data: {exc}") from exc
+    if not isinstance(nodes_data, list) or not nodes_data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="scenario.nodes_data required")
+
+    user_id = str(current_user.id)
+    business = load_business_by_user_id(user_id)
+    scenario["user_id"] = scenario.get("user_id") or user_id
+    scenario["created_by"] = scenario.get("created_by") or user_id
+    if business and not scenario.get("business_id"):
+        scenario["business_id"] = business.get("id")
+
+    event_type = str(payload.get("event_type") or "manual_trigger")
+    event_payload = payload.get("payload") if isinstance(payload.get("payload"), dict) else {}
+    event_payload.setdefault("user_id", user_id)
+    if business and business.get("id") is not None:
+        event_payload.setdefault("business_id", business.get("id"))
+
+    trigger_node = next((node for node in nodes_data if (node or {}).get("categoryType") == "TRIGGERS"), None)
+    if not trigger_node:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Scenario must contain a trigger node")
+
+    flow_context = await scenario_engine._build_flow_context(scenario, event_type, event_payload)
+    result = await scenario_engine.flow_executor.start(
+        scenario,
+        {"event_type": event_type, "payload": event_payload},
+        flow_context=flow_context,
+        trigger_node_id=trigger_node.get("id"),
+    )
+    execution_id = (
+        result.get("executionId")
+        or result.get("execution_id")
+        or ((result.get("context") or {}).get("_executionId") if isinstance(result.get("context"), dict) else None)
+        or flow_context.get("_executionId")
+    )
+    return {"ok": True, "execution_id": execution_id, "result": result}
 
 @app.post("/api/scenarios/resume", tags=["Scenarios"])
 async def resume_scenario_execution(payload: dict):
@@ -3614,7 +4911,8 @@ async def twilio_inbound_webhook(request: Request):
         "to_number": to_number,
         "direction": "inbound",
         "conversation_initiation_client_data": {
-            "dynamic_variables": {
+            "scenario_context": {
+                "autonomy_index": get_account_autonomy_index_for_user(context.get("user_id") or (business or {}).get("user_id")),
                 "caller_number": from_number,
                 "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
                 "business_name": business.get("name") if business else None,
@@ -3631,17 +4929,22 @@ async def twilio_inbound_webhook(request: Request):
         user_id=context.get("user_id") or (business or {}).get("user_id"),
     )
     if matched_person:
-        dynamic_variables = register_payload["conversation_initiation_client_data"]["dynamic_variables"]
-        dynamic_variables["person_id"] = str(matched_person.get("id")) if matched_person.get("id") is not None else None
-        dynamic_variables["customer_name"] = format_person_display_name(matched_person)
+        scenario_context = register_payload["conversation_initiation_client_data"]["scenario_context"]
+        scenario_context["person_id"] = str(matched_person.get("id")) if matched_person.get("id") is not None else None
+        scenario_context["customer_name"] = format_person_display_name(matched_person)
         add_person_custom_dynamic_variables(
-            dynamic_variables,
+            scenario_context,
             matched_person,
             str(business.get("id")) if business and business.get("id") is not None else None,
         )
+    register_payload["conversation_initiation_client_data"]["scenario_context"] = {
+        key: value
+        for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
+        if value is not None
+    }
     register_payload["conversation_initiation_client_data"]["dynamic_variables"] = {
         key: value
-        for key, value in register_payload["conversation_initiation_client_data"]["dynamic_variables"].items()
+        for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
         if value is not None
     }
 
@@ -3675,7 +4978,7 @@ async def route_call_compat(request: Request):
     context = resolve_business_context(call_payload)
     business = context.get("business")
     receptionist = (
-        context.get("receptionist")
+        (context.get("receptionist") if (context.get("receptionist") or {}).get("is_active") else None)
         or find_inbound_receptionist_for_business(
             (business or {}).get("id"),
             context.get("user_id") or (business or {}).get("user_id"),
@@ -3706,6 +5009,7 @@ async def route_call_compat(request: Request):
     )
 
     dynamic_variables = {
+        "autonomy_index": get_account_autonomy_index_for_user(context.get("user_id") or (business or {}).get("user_id")),
         "caller_number": call_payload.get("from_number"),
         "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
         "business_name": business.get("name") if business else None,
@@ -3933,6 +5237,71 @@ async def legacy_server_tool(tool_name: str, request: Request):
         data = query.order("category").order("sort_order").execute().data or []
         return {"ok": True, "services": data, "count": len(data)}
 
+    if normalized_tool == "get-staff":
+        query = supabase.table("staff").select("*")
+        if business and business.get("id"):
+            try:
+                query = query.eq("business_id", business["id"])
+            except Exception:
+                pass
+        is_active_value = first_present(payload, "is_active", "active_only")
+        if is_active_value is None:
+            query = query.eq("is_active", True)
+        elif str(is_active_value).strip().lower() in {"true", "1", "yes"}:
+            query = query.eq("is_active", True)
+        role_value = str(first_present(payload, "role") or "").strip()
+        if role_value:
+            query = query.ilike("role", f"%{role_value}%")
+        raw_rows = query.order("full_name").limit(200).execute().data or []
+
+        search_terms = tokenize_search_terms(
+            first_present(payload, "query", "search", "specialty", "service", "service_name"),
+            role_value,
+        )
+        matched_rows = []
+        for row in raw_rows:
+            score = score_staff_match(row, search_terms)
+            if search_terms and score <= 0:
+                continue
+            matched_rows.append({**row, "_match_score": score})
+
+        matched_rows.sort(key=lambda row: (-int(row.get("_match_score") or 0), str(row.get("full_name") or "")))
+
+        appointment_date = first_present(payload, "date", "appointment_date")
+        appointment_time = first_present(payload, "time", "appointment_time")
+        appointment_duration = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
+        include_availability = bool(appointment_date and appointment_time)
+
+        staff_results = []
+        for row in matched_rows:
+            next_row = {key: value for key, value in row.items() if key != "_match_score"}
+            if include_availability:
+                within_hours, availability_reason = is_staff_available_during_hours(
+                    row,
+                    appointment_date,
+                    appointment_time,
+                    appointment_duration,
+                )
+                conflicts = [] if not within_hours else list_staff_conflicts(
+                    business_id=business.get("id") if business else None,
+                    appointment_date=appointment_date,
+                    appointment_time=appointment_time,
+                    duration=appointment_duration,
+                    staff_id=row.get("id"),
+                )
+                next_row["available"] = within_hours and len(conflicts) == 0
+                next_row["availability_reason"] = availability_reason
+                next_row["conflicts"] = conflicts
+            staff_results.append(next_row)
+
+        return {
+            "ok": True,
+            "staff": staff_results,
+            "count": len(staff_results),
+            "matched": len(staff_results) > 0,
+            "query": first_present(payload, "query", "search", "specialty", "service", "service_name") or role_value or None,
+        }
+
     if normalized_tool in {"get-business-info", "inbound-get-business-info"}:
         if not business:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
@@ -3945,74 +5314,183 @@ async def legacy_server_tool(tool_name: str, request: Request):
     if normalized_tool == "check-availability":
         appointment_date = first_present(payload, "date", "appointment_date")
         appointment_time = first_present(payload, "time", "appointment_time")
-        query = supabase.table("appointments").select("*")
-        if business and business.get("id"):
-            try:
-                query = query.eq("business_id", business["id"])
-            except Exception:
-                pass
-        if appointment_date:
-            query = query.eq("date", appointment_date)
-        rows = query.limit(200).execute().data or []
-        conflicts = [
-            row for row in rows
-            if appointment_time and str(row.get("time") or "") == str(appointment_time)
-            and str(row.get("status") or "").lower() not in {"cancelled", "completed"}
-        ]
+        appointment_duration = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
+        business_id = business.get("id") if business else None
+        requested_staff = load_staff_record(
+            first_present(payload, "staff_id"),
+            business_id=business_id,
+            require_active=False,
+        )
+        if first_present(payload, "staff_id") is not None and not requested_staff:
+            return {
+                "ok": True,
+                "available": False,
+                "requested": {"date": appointment_date, "time": appointment_time, "duration": appointment_duration, "staff_id": first_present(payload, "staff_id")},
+                "reason": "Staff member not found",
+                "conflicts": [],
+                "available_staff": [],
+            }
+        if requested_staff:
+            within_hours, reason = is_staff_available_during_hours(
+                requested_staff,
+                appointment_date,
+                appointment_time,
+                appointment_duration,
+            )
+            conflicts = [] if not within_hours else list_staff_conflicts(
+                business_id=business_id,
+                appointment_date=appointment_date,
+                appointment_time=appointment_time,
+                duration=appointment_duration,
+                staff_id=requested_staff.get("id"),
+            )
+            return {
+                "ok": True,
+                "available": within_hours and len(conflicts) == 0,
+                "requested": {
+                    "date": appointment_date,
+                    "time": appointment_time,
+                    "duration": appointment_duration,
+                    "staff_id": requested_staff.get("id"),
+                },
+                "reason": reason,
+                "conflicts": conflicts,
+                "staff": requested_staff,
+                "available_staff": [requested_staff] if within_hours and len(conflicts) == 0 else [],
+            }
+
+        staff_query = supabase.table("staff").select("*")
+        if business_id is not None:
+            staff_query = staff_query.eq("business_id", business_id)
+        staff_rows = staff_query.eq("is_active", True).limit(200).execute().data or []
+        available_staff = []
+        aggregated_conflicts = []
+        for staff_row in staff_rows:
+            within_hours, _reason = is_staff_available_during_hours(
+                staff_row,
+                appointment_date,
+                appointment_time,
+                appointment_duration,
+            )
+            if not within_hours:
+                continue
+            staff_conflicts = list_staff_conflicts(
+                business_id=business_id,
+                appointment_date=appointment_date,
+                appointment_time=appointment_time,
+                duration=appointment_duration,
+                staff_id=staff_row.get("id"),
+            )
+            if staff_conflicts:
+                aggregated_conflicts.extend(staff_conflicts)
+                continue
+            available_staff.append(staff_row)
         return {
             "ok": True,
-            "available": len(conflicts) == 0,
-            "requested": {"date": appointment_date, "time": appointment_time},
-            "conflicts": conflicts,
+            "available": len(available_staff) > 0,
+            "requested": {"date": appointment_date, "time": appointment_time, "duration": appointment_duration},
+            "conflicts": aggregated_conflicts,
+            "available_staff": available_staff,
         }
 
     if normalized_tool == "create-appointment":
+        person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+        staff_id = safe_appointment_staff_id(
+            first_present(payload, "staff_id"),
+            business_id=business.get("id") if business else None,
+            require_active=False,
+        )
         appointment_row = {
-            "client_name": first_present(payload, "client_name", "name", "customer_name"),
-            "date": first_present(payload, "date", "appointment_date"),
-            "time": first_present(payload, "time", "appointment_time"),
-            "duration": first_present(payload, "duration", "appointment_duration") or 30,
-            "status": first_present(payload, "status") or "pending",
-            "assigned_receptionist": first_present(payload, "assigned_receptionist", "receptionist_name") or (receptionist or {}).get("full_name"),
+            "date": normalize_appointment_date_value(first_present(payload, "date", "appointment_date")),
+            "time": normalize_appointment_time_value(first_present(payload, "time", "appointment_time")),
+            "duration": normalize_appointment_duration(first_present(payload, "duration", "appointment_duration")),
+            "status": normalize_appointment_status(first_present(payload, "status")),
+            "receptionist_id": int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id")) or (receptionist or {}).get("id"),
             "notes": first_present(payload, "notes"),
-            "person_id": first_present(payload, "person_id"),
-            "service_id": first_present(payload, "service_id"),
+            "person_id": person_id,
+            "service_id": safe_appointment_service_id(first_present(payload, "service_id")),
+            "staff_id": staff_id,
             "business_id": business.get("id") if business else None,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         response = supabase.table("appointments").insert(appointment_row).execute()
         created = response.data[0] if response.data else appointment_row
-        emit_scenario_trigger("appointment_created", {"appointment": created, "business_id": business.get("id") if business else None})
+        created = {"action": "create_appointment", "table": "appointments", **created}
+        emit_scenario_trigger(
+            "appointment_created",
+            {
+                "appointment": created,
+                "appointment_id": created.get("id"),
+                "person_id": created.get("person_id"),
+                "service_id": created.get("service_id"),
+                "staff_id": created.get("staff_id"),
+                "business_id": business.get("id") if business else None,
+            },
+        )
+        emit_appointment_change_triggers(None, created, business_id=business.get("id") if business else None, include_updated=False)
         return {"ok": True, "appointment": created}
 
     if normalized_tool == "update-appointment":
-        appointment_id = first_present(payload, "appointment_id", "id")
+        appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
         if not appointment_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="appointment_id is required")
-        updates = {
-            key: value for key, value in {
-                "client_name": first_present(payload, "client_name", "name", "customer_name"),
-                "date": first_present(payload, "date", "appointment_date"),
-                "time": first_present(payload, "time", "appointment_time"),
-                "duration": first_present(payload, "duration", "appointment_duration"),
-                "status": first_present(payload, "status"),
-                "assigned_receptionist": first_present(payload, "assigned_receptionist", "receptionist_name"),
-                "notes": first_present(payload, "notes"),
-                "person_id": first_present(payload, "person_id"),
-                "service_id": first_present(payload, "service_id"),
-            }.items() if value is not None
-        }
+            return {"ok": True, "appointment": {"action": "update_appointment", "skipped": True, "reason": "appointment_id is required"}}
+        existing_response = supabase.table("appointments").select("*").eq("id", appointment_id).limit(1).execute()
+        existing = existing_response.data[0] if existing_response.data else None
+        if not existing:
+            return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "Appointment not found"}}
+        updates = {}
+        if first_present(payload, "date", "appointment_date") is not None:
+            updates["date"] = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
+        if first_present(payload, "time", "appointment_time") is not None:
+            updates["time"] = normalize_appointment_time_value(first_present(payload, "time", "appointment_time"))
+        if first_present(payload, "duration", "appointment_duration") is not None:
+            updates["duration"] = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
+        if first_present(payload, "status") is not None:
+            updates["status"] = normalize_appointment_status(first_present(payload, "status"))
+        if first_present(payload, "receptionist_id", "hired_receptionist_id") is not None:
+            updates["receptionist_id"] = int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id"))
+        if first_present(payload, "notes") is not None:
+            updates["notes"] = first_present(payload, "notes")
+        if first_present(payload, "person_id") is not None:
+            safe_person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+            if safe_person_id is not None:
+                updates["person_id"] = safe_person_id
+        if first_present(payload, "service_id") is not None:
+            safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"))
+            if safe_service_id is not None:
+                updates["service_id"] = safe_service_id
+        if first_present(payload, "staff_id") is not None:
+            safe_staff_id = safe_appointment_staff_id(
+                first_present(payload, "staff_id"),
+                business_id=business.get("id") if business else existing.get("business_id"),
+                require_active=False,
+            )
+            if safe_staff_id is not None:
+                updates["staff_id"] = safe_staff_id
+        if not updates:
+            return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
         response = supabase.table("appointments").update(updates).eq("id", appointment_id).execute()
-        updated = response.data[0] if response.data else {"id": appointment_id, **updates}
-        emit_scenario_trigger("appointment_updated", {"appointment": updated, "business_id": business.get("id") if business else None})
+        updated = response.data[0] if response.data else {**existing, **updates}
+        updated = {"action": "update_appointment", "table": "appointments", **updated}
+        emit_appointment_change_triggers(existing, updated, business_id=business.get("id") if business else None)
         return {"ok": True, "appointment": updated}
 
     if normalized_tool == "cancel-appointment":
-        appointment_id = first_present(payload, "appointment_id", "id")
+        appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
         if not appointment_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="appointment_id is required")
-        response = supabase.table("appointments").update({"status": "cancelled"}).eq("id", appointment_id).execute()
-        cancelled = response.data[0] if response.data else {"id": appointment_id, "status": "cancelled"}
-        emit_scenario_trigger("appointment_cancelled", {"appointment": cancelled, "business_id": business.get("id") if business else None})
+            return {"ok": True, "appointment": {"action": "cancel_appointment", "skipped": True, "reason": "appointment_id is required"}}
+        existing_response = supabase.table("appointments").select("*").eq("id", appointment_id).limit(1).execute()
+        existing = existing_response.data[0] if existing_response.data else None
+        if not existing:
+            return {"ok": True, "appointment": {"id": appointment_id, "action": "cancel_appointment", "skipped": True, "reason": "Appointment not found"}}
+        response = supabase.table("appointments").update({
+            "status": "cancelled",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", appointment_id).execute()
+        cancelled = response.data[0] if response.data else {**existing, "status": "cancelled", "updated_at": datetime.now(timezone.utc).isoformat()}
+        cancelled = {"action": "cancel_appointment", "table": "appointments", **cancelled}
+        emit_appointment_change_triggers(existing, cancelled, business_id=business.get("id") if business else None)
         return {"ok": True, "appointment": cancelled}
 
     if normalized_tool == "log-call-outcome":
@@ -4211,6 +5689,8 @@ async def elevenlabs_post_call_webhook(
         ) from exc
 
     saved = response.data[0] if getattr(response, "data", None) else call_log
+    if call_log.get("hired_receptionist_id"):
+        refresh_receptionist_call_metrics(call_log.get("hired_receptionist_id"))
 
     flow_execution_id = first_present(
         event_data,
@@ -4260,16 +5740,29 @@ async def elevenlabs_post_call_webhook(
     return {"ok": True, "call_log": saved}
 
 @app.get("/api/agents", tags=["Sonar Controller Compat"])
-async def get_sonar_agents():
+async def get_sonar_agents(current_user: dict = Depends(get_current_user)):
     try:
-        response = supabase.table('hired_receptionists').select('*').execute()
+        current_user_id = str(current_user.id)
+        response = (
+            supabase
+            .table('hired_receptionists')
+            .select('*')
+            .eq('user_id', current_user_id)
+            .order('hired_at', desc=True)
+            .execute()
+        )
+        call_routing = get_account_call_routing_for_user(current_user_id)
         agents = []
         for row in response.data or []:
             agents.append({
                 **row,
                 "name": row.get("full_name") or row.get("first_name") or "Receptionist",
                 "role": row.get("stereotype") or "Receptionist",
-                "status": row.get("status") or "Offline",
+                "status": derive_receptionist_status(
+                    row.get("status"),
+                    call_routing=call_routing,
+                    is_active=bool(row.get("is_active", True)),
+                ),
                 "current_activity": row.get("current_activity") or "Idle",
                 "model": row.get("model"),
             })
@@ -4279,9 +5772,17 @@ async def get_sonar_agents():
         return []
 
 @app.get("/api/system/summary", tags=["Sonar Controller Compat"])
-async def get_sonar_system_summary():
+async def get_sonar_system_summary(current_user: dict = Depends(get_current_user)):
     try:
-        agents = supabase.table('hired_receptionists').select('id,is_active').execute().data or []
+        agents = (
+            supabase
+            .table('hired_receptionists')
+            .select('id,is_active')
+            .eq('user_id', str(current_user.id))
+            .execute()
+            .data
+            or []
+        )
         active_agents = len([agent for agent in agents if agent.get('is_active', True)])
         total_agents = len(agents)
         return {
@@ -4398,13 +5899,12 @@ async def clear_pending_restart(restart_id: str):
 async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest):
     existing_response = supabase.table('hired_receptionists').select('id,status').eq('id', agent_id).limit(1).execute()
     existing_agent = (existing_response.data or [{}])[0]
-    next_status = derive_receptionist_status(payload.call_types, existing_agent.get('status'))
+    next_status = derive_receptionist_status(existing_agent.get('status'))
     response = supabase.table('hired_receptionists').update({
-        'call_types': payload.call_types,
         'status': next_status,
     }).eq('id', agent_id).execute()
-    push_live_event("Agent call handling updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "call_types": payload.call_types})
-    return response.data[0] if response.data else {"id": agent_id, "call_types": payload.call_types, "status": next_status}
+    push_live_event("Agent call handling updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "call_routing": get_account_call_routing()})
+    return response.data[0] if response.data else {"id": agent_id, "status": next_status}
 
 @app.post("/api/agents/{agent_id}/model", tags=["Sonar Controller Compat"])
 async def update_agent_model(agent_id: str, payload: AgentModelRequest):
@@ -4418,9 +5918,68 @@ async def update_agent_model(agent_id: str, payload: AgentModelRequest):
 
 @app.patch("/api/agents/{agent_id}", tags=["Sonar Controller Compat"])
 async def patch_agent(agent_id: str, payload: dict):
-    response = supabase.table('hired_receptionists').update(payload).eq('id', agent_id).execute()
-    push_live_event("Agent updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, **payload})
-    return response.data[0] if response.data else {"id": agent_id, **payload}
+    existing_response = (
+        supabase
+        .table('hired_receptionists')
+        .select('id,user_id,is_active,status')
+        .eq('id', agent_id)
+        .limit(1)
+        .execute()
+    )
+    existing_agent = (existing_response.data or [None])[0]
+    if not existing_agent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    update_payload = dict(payload)
+    next_is_active = update_payload.get('is_active')
+    if next_is_active is not None:
+        next_is_active = bool(next_is_active)
+        update_payload['is_active'] = next_is_active
+        update_payload['status'] = derive_receptionist_status(
+            existing_agent.get('status'),
+            preserve_offline=False,
+            is_active=next_is_active,
+        )
+
+        if next_is_active and existing_agent.get('user_id'):
+            supabase.table('hired_receptionists').update({
+                'is_active': False,
+                'status': 'Offline',
+            }).eq('user_id', existing_agent.get('user_id')).neq('id', agent_id).execute()
+
+    response = supabase.table('hired_receptionists').update(update_payload).eq('id', agent_id).execute()
+    push_live_event("Agent updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, **update_payload})
+    return response.data[0] if response.data else {"id": agent_id, **update_payload}
+
+@app.delete("/api/agents/{agent_id}", tags=["Sonar Controller Compat"])
+async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_user)):
+    current_user_id = str(current_user.id)
+    existing_response = (
+        supabase
+        .table('hired_receptionists')
+        .select('id,user_id,full_name,first_name')
+        .eq('id', agent_id)
+        .eq('user_id', current_user_id)
+        .limit(1)
+        .execute()
+    )
+    existing_agent = (existing_response.data or [None])[0]
+    if not existing_agent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    supabase.table('hired_receptionists').delete().eq('id', agent_id).eq('user_id', current_user_id).execute()
+    push_live_event(
+        "Agent deleted.",
+        actor="system",
+        severity="info",
+        event_type="agent_deleted",
+        payload={
+            "agent_id": agent_id,
+            "user_id": current_user_id,
+            "name": existing_agent.get('full_name') or existing_agent.get('first_name') or "Receptionist",
+        },
+    )
+    return {"ok": True, "id": agent_id}
 
 @app.post("/api/control/runtime", tags=["Sonar Controller Compat"])
 async def set_runtime_mode(payload: RuntimeModeRequest):
@@ -4538,6 +6097,10 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
     insert_payload["user_id"] = insert_payload.get("user_id") or str(current_user.id)
     if business and "business_id" not in insert_payload:
         insert_payload["business_id"] = business["id"]
+    insert_payload = normalize_people_payload_custom_fields(
+        insert_payload,
+        (business or {}).get("id") or insert_payload.get("business_id"),
+    )
     response = supabase.table("people").insert(insert_payload).execute()
     created = response.data[0] if response.data else insert_payload
     schedule_backend_scenario_execution("record_created", {
@@ -4552,29 +6115,59 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
 
 @app.put("/api/sonar/people/{person_id}", tags=["Sonar People"])
 async def update_sonar_person(person_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
-    existing_query = supabase.table("people").select("*").eq("id", person_id)
-    if business:
-        existing_query = existing_query.eq("business_id", business["id"])
-    else:
-        existing_query = existing_query.eq("user_id", str(current_user.id))
-    existing_response = existing_query.limit(1).execute()
-    if not existing_response.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+    try:
+        business = load_business_by_user_id(str(current_user.id))
+        existing_query = supabase.table("people").select("*").eq("id", person_id)
+        if business:
+            existing_query = existing_query.eq("business_id", business["id"])
+        else:
+            existing_query = existing_query.eq("user_id", str(current_user.id))
+        existing_response = existing_query.limit(1).execute()
+        if not existing_response.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
 
-    updates = {key: value for key, value in payload.items() if key not in {"id", "user_id", "business_id", "created_at"}}
-    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+        updates = {
+            key: value
+            for key, value in payload.items()
+            if key not in {"id", "user_id", "business_id", "created_at"}
+        }
+        updates = normalize_people_payload_custom_fields(
+            updates,
+            (business or {}).get("id") or existing_response.data[0].get("business_id"),
+            existing_response.data[0].get("custom_fields"),
+        )
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    response = supabase.table("people").update(updates).eq("id", person_id).execute()
-    updated = response.data[0] if response.data else {**existing_response.data[0], **updates}
-    schedule_backend_scenario_execution("record_updated", {
-        "record_id": updated.get("id") or person_id,
-        "person_id": updated.get("id") or person_id,
-        "user_id": updated.get("user_id") or existing_response.data[0].get("user_id") or str(current_user.id),
-        "business_id": updated.get("business_id") or existing_response.data[0].get("business_id") or (business or {}).get("id"),
-        "person": updated,
-        "record": updated,
-    })
+        supabase.table("people").update(updates).eq("id", person_id).execute()
+
+        refreshed_query = supabase.table("people").select("*").eq("id", person_id)
+        if business:
+            refreshed_query = refreshed_query.eq("business_id", business["id"])
+        else:
+            refreshed_query = refreshed_query.eq("user_id", str(current_user.id))
+        refreshed_response = refreshed_query.limit(1).execute()
+        updated = refreshed_response.data[0] if refreshed_response.data else {**existing_response.data[0], **updates}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to update person %s with payload %s: %s", person_id, payload, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc) or "Failed to update person",
+        ) from exc
+
+    try:
+        schedule_backend_scenario_execution("record_updated", {
+            "record_id": updated.get("id") or person_id,
+            "person_id": updated.get("id") or person_id,
+            "user_id": updated.get("user_id") or existing_response.data[0].get("user_id") or str(current_user.id),
+            "business_id": updated.get("business_id") or existing_response.data[0].get("business_id") or (business or {}).get("id"),
+            "person": updated,
+            "record": updated,
+        })
+    except Exception as exc:
+        logging.error("Failed to emit record_updated scenario event for person %s: %s", person_id, exc, exc_info=True)
+
     return updated
 
 @app.delete("/api/sonar/people/{person_id}", tags=["Sonar People"])
@@ -4613,6 +6206,21 @@ async def list_sonar_services(current_user: dict = Depends(get_current_user)):
     response = query.order("category").order("sort_order").execute()
     return response.data or []
 
+
+@app.get("/api/sonar/staff", tags=["Sonar Staff"])
+async def list_sonar_staff(active_only: bool = True, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    query = supabase.table("staff").select("*")
+    if business:
+        try:
+            query = query.eq("business_id", business["id"])
+        except Exception:
+            pass
+    if active_only:
+        query = query.eq("is_active", True)
+    response = query.order("full_name").limit(200).execute()
+    return response.data or []
+
 @app.post("/api/sonar/services", tags=["Sonar Services"])
 async def create_sonar_service(payload: dict, current_user: dict = Depends(get_current_user)):
     business = load_business_by_user_id(str(current_user.id))
@@ -4633,6 +6241,63 @@ async def list_sonar_appointments(limit: int = 100, current_user: dict = Depends
             pass
     response = query.order("date").order("time").limit(max(1, min(limit, 500))).execute()
     return response.data or []
+
+
+@app.put("/api/sonar/appointments/{appointment_id}", tags=["Sonar Appointments"])
+async def update_sonar_appointment(appointment_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
+    appointment_id = uuid_or_none(appointment_id)
+    if not appointment_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid appointment ID")
+
+    business = load_business_by_user_id(str(current_user.id))
+    existing_query = supabase.table("appointments").select("*").eq("id", appointment_id)
+    if business:
+        existing_query = existing_query.eq("business_id", business["id"])
+    existing_response = existing_query.limit(1).execute()
+    if not existing_response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    updates = {}
+    if first_present(payload, "date", "appointment_date") is not None:
+        updates["date"] = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
+    if first_present(payload, "time", "appointment_time") is not None:
+        updates["time"] = normalize_appointment_time_value(first_present(payload, "time", "appointment_time"))
+    if first_present(payload, "duration", "appointment_duration") is not None:
+        updates["duration"] = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
+    if first_present(payload, "status") is not None:
+        updates["status"] = normalize_appointment_status(first_present(payload, "status"))
+    if first_present(payload, "receptionist_id", "hired_receptionist_id") is not None:
+        updates["receptionist_id"] = int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id"))
+    if first_present(payload, "notes") is not None:
+        updates["notes"] = first_present(payload, "notes")
+    if first_present(payload, "person_id") is not None:
+        safe_person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+        if safe_person_id is not None:
+            updates["person_id"] = safe_person_id
+    if first_present(payload, "service_id") is not None:
+        safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"))
+        if safe_service_id is not None:
+            updates["service_id"] = safe_service_id
+    if first_present(payload, "staff_id") is not None:
+        safe_staff_id = safe_appointment_staff_id(
+            first_present(payload, "staff_id"),
+            business_id=(business or {}).get("id") or existing_response.data[0].get("business_id"),
+            require_active=False,
+        )
+        if safe_staff_id is not None:
+            updates["staff_id"] = safe_staff_id
+    if not updates:
+        return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
+
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    response = supabase.table("appointments").update(updates).eq("id", appointment_id).execute()
+    updated = response.data[0] if response.data else {**existing_response.data[0], **updates}
+    emit_appointment_change_triggers(
+        existing_response.data[0],
+        updated,
+        business_id=updated.get("business_id") or (business or {}).get("id"),
+    )
+    return updated
 
 @app.get("/api/sonar/appointments/stats", tags=["Sonar Appointments"])
 async def get_sonar_appointment_stats(current_user: dict = Depends(get_current_user)):
@@ -4655,6 +6320,77 @@ async def list_hired_receptionists(current_user: dict = Depends(get_current_user
         .execute()
     )
     return response.data or []
+
+@app.post("/api/sonar/receptionists/hire", tags=["Sonar Receptionists"])
+async def hire_receptionist(payload: dict, current_user: dict = Depends(get_current_user)):
+    catalog_id = payload.get("catalog_id") or payload.get("id")
+    if not catalog_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="catalog_id is required")
+
+    current_user_id = str(current_user.id)
+    try:
+        catalog_response = (
+            supabase.table("receptionist_catalog")
+            .select("*")
+            .eq("id", str(catalog_id))
+            .limit(1)
+            .execute()
+        )
+        catalog_row = (catalog_response.data or [None])[0]
+        if not catalog_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catalog receptionist not found")
+
+        business_response = (
+            supabase.table("businesses")
+            .select("id,phone")
+            .eq("user_id", current_user_id)
+            .limit(1)
+            .execute()
+        )
+        business_row = (business_response.data or [None])[0]
+
+        active_response = (
+            supabase.table("hired_receptionists")
+            .select("id")
+            .eq("user_id", current_user_id)
+            .eq("is_active", True)
+            .limit(1)
+            .execute()
+        )
+        active_row = (active_response.data or [None])[0]
+
+        insert_payload = {
+            "catalog_id": catalog_row.get("id"),
+            "full_name": catalog_row.get("full_name"),
+            "description": catalog_row.get("description"),
+            "stereotype": catalog_row.get("stereotype"),
+            "avatar": catalog_row.get("avatar"),
+            "traits": catalog_row.get("traits"),
+            "voice": catalog_row.get("voice"),
+            "age": catalog_row.get("age"),
+            "first_name": catalog_row.get("first_name"),
+            "gender": catalog_row.get("gender"),
+            "is_active": not bool(active_row and active_row.get("id")),
+            "user_id": current_user_id,
+            "business_id": business_row.get("id") if business_row else None,
+            "phone_number": business_row.get("phone") if business_row else None,
+            "elevenlabs_voice_id": catalog_row.get("elevenlabs_voice_id") or catalog_row.get("elevenlabs_agent_id"),
+        }
+        response = supabase.table("hired_receptionists").insert(insert_payload).execute()
+        created = response.data[0] if response.data else insert_payload
+        push_live_event(
+            "Agent hired.",
+            actor="system",
+            severity="info",
+            event_type="agent_created",
+            payload={"agent_id": created.get("id"), "user_id": current_user_id},
+        )
+        return created
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to hire receptionist %s for user %s: %s", catalog_id, current_user_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to hire receptionist")
 
 @app.get("/api/sonar/receptionists/catalog", tags=["Sonar Receptionists"])
 async def list_receptionist_catalog():
@@ -4747,48 +6483,41 @@ async def update_call_log_favorite(call_log_id: str, payload: dict, current_user
 
 @app.get("/api/sonar/call-logs/stats", tags=["Sonar Calls"])
 async def get_call_log_stats(current_user: dict = Depends(get_current_user)):
-    response = (
-        supabase.table("call_logs")
-        .select("id,hired_receptionist_id,receptionist_name,duration_seconds,status,outcome,created_at")
-        .eq("user_id", str(current_user.id))
-        .order("created_at", desc=True)
-        .limit(1000)
-        .execute()
-    )
-    rows = response.data or []
-
-    total_calls = len(rows)
-    completed_calls = sum(1 for row in rows if (row.get("status") or "").lower() in {"completed", "done", "success"})
-    failed_calls = sum(1 for row in rows if (row.get("status") or "").lower() in {"failed", "error"})
-    total_duration = sum(int(row.get("duration_seconds") or 0) for row in rows)
+    rows = _fetch_call_log_rows(user_id=str(current_user.id))
+    overall_metrics = _accumulate_receptionist_metrics(rows)
 
     by_receptionist = {}
     for row in rows:
         receptionist_key = row.get("hired_receptionist_id") or row.get("receptionist_name") or "unknown"
-        if receptionist_key not in by_receptionist:
-            by_receptionist[receptionist_key] = {
+        bucket = by_receptionist.setdefault(
+            receptionist_key,
+            {
                 "hired_receptionist_id": row.get("hired_receptionist_id"),
                 "receptionist_name": row.get("receptionist_name"),
-                "total_calls": 0,
-                "completed_calls": 0,
-                "failed_calls": 0,
-                "total_duration_seconds": 0,
+                "rows": [],
+            },
+        )
+        bucket["rows"].append(row)
+
+    receptionist_metrics = []
+    for bucket in by_receptionist.values():
+        metrics = _accumulate_receptionist_metrics(bucket["rows"])
+        receptionist_metrics.append(
+            {
+                "hired_receptionist_id": bucket["hired_receptionist_id"],
+                "receptionist_name": bucket["receptionist_name"],
+                **metrics,
             }
-        bucket = by_receptionist[receptionist_key]
-        bucket["total_calls"] += 1
-        bucket["total_duration_seconds"] += int(row.get("duration_seconds") or 0)
-        status_value = (row.get("status") or "").lower()
-        if status_value in {"completed", "done", "success"}:
-            bucket["completed_calls"] += 1
-        if status_value in {"failed", "error"}:
-            bucket["failed_calls"] += 1
+        )
 
     return {
-        "total_calls": total_calls,
-        "completed_calls": completed_calls,
-        "failed_calls": failed_calls,
-        "average_duration_seconds": round(total_duration / total_calls, 2) if total_calls else 0,
-        "by_receptionist": list(by_receptionist.values()),
+        **overall_metrics,
+        "completed_calls": overall_metrics["completed_calls_count"],
+        "failed_calls": overall_metrics["failed_calls_count"],
+        "missed_calls": overall_metrics["missed_calls_count"],
+        "inbound_calls": overall_metrics["inbound_calls_count"],
+        "outbound_calls": overall_metrics["outbound_calls_count"],
+        "by_receptionist": receptionist_metrics,
     }
 
 # --- Messages Endpoint for Queue ---
@@ -5140,33 +6869,156 @@ async def set_sonar_payment_test_mode(request: PaymentTestModeRequest):
     }
 
 @app.post("/api/sonar/create-payment", tags=["Sonar Payments"])
-async def create_payment(request: PaymentCreateRequest):
+async def create_payment(
+    request: PaymentCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _create_payment_for_user(request, str(current_user.id))
+
+
+@app.post("/api/sonar/create-customer", tags=["Sonar Payments"])
+async def create_customer(
+    request: CustomerCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _create_customer_for_user(request, str(current_user.id))
+
+
+@app.post("/api/sonar/call-customer", tags=["Sonar Calls"])
+async def call_customer(payload: dict, current_user: dict = Depends(get_current_user)):
+    ensure_no_unresolved_templates(
+        payload.get("person_id"),
+        payload.get("to_phone"),
+        payload.get("main_content"),
+        payload.get("first_message"),
+    )
+
+    user_id = str(current_user.id)
+    business = load_business_by_user_id(user_id)
+    receptionist = find_inbound_receptionist_for_business(
+        (business or {}).get("id"),
+        user_id,
+    )
+
+    person = None
+    person_id = payload.get("person_id")
+    if person_id:
+        person_response = (
+            supabase.table("people")
+            .select("*")
+            .eq("id", str(person_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        person = (person_response.data or [None])[0]
+        if not person:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+
+    node = {
+        "id": "builder-call-customer",
+        "actionConfig": {
+            "_key": "call_customer",
+            "to_phone": payload.get("to_phone") or "",
+            "main_content": payload.get("main_content") or "",
+            "first_message": payload.get("first_message") or "",
+        },
+    }
+    context = {
+        "user_id": user_id,
+        "business": business or {},
+        "business_id": (business or {}).get("id"),
+        "receptionist": receptionist or {},
+        "person": person or {},
+        "customer": person or {},
+        "_scenario": {},
+    }
+
+    result = await scenario_engine.action_executor._call_customer(node, context)
+    if not result.get("success"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.get("error") or "Call failed")
+    return result.get("data") or {}
+
+
+async def _create_customer_for_user(request: CustomerCreateRequest, user_id: str):
+    ensure_no_unresolved_templates(request.person_id, request.customer_name, request.customer_email, request.customer_phone)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=True,
+    )
+    return serialize_stripe_customer(customer)
+
+
+@app.post("/api/sonar/update-customer", tags=["Sonar Payments"])
+async def update_customer(
+    request: CustomerUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _update_customer_for_user(request, str(current_user.id))
+
+
+async def _update_customer_for_user(request: CustomerUpdateRequest, user_id: str):
+    ensure_no_unresolved_templates(request.customer_id, request.person_id, request.customer_name, request.customer_email, request.customer_phone)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=False,
+    )
+    return serialize_stripe_customer(customer)
+
+
+async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
     description = request.description or ""
     payment_method_type = (request.payment_method_type or "card").lower()
     payment_method = "us_bank_account" if payment_method_type == "ach" else payment_method_type
-    ensure_no_unresolved_templates(request.person_id, request.appointment_id, description)
+    ensure_no_unresolved_templates(
+        request.person_id,
+        request.appointment_id,
+        request.customer_id,
+        request.customer_name,
+        request.customer_email,
+        request.customer_phone,
+        description,
+    )
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=True,
+        appointment_id=request.appointment_id,
+    )
 
     stripe_payment_intent = None
-    stripe_error = None
     try:
-        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
-        if payment_method_type != "link":
-            payment_intent_payload = {
-                "amount": request.amount,
-                "currency": request.currency,
-                "description": description,
-                "payment_method_types": [payment_method],
-                "automatic_payment_methods": {"enabled": False},
-                "metadata": {
-                    "person_id": request.person_id or "",
-                    "appointment_id": request.appointment_id or "",
-                    "source": "wysl_scenarios",
-                },
-            }
-            stripe_payment_intent = stripe.PaymentIntent.create(**payment_intent_payload)
+        payment_intent_payload = {
+            "amount": request.amount,
+            "currency": request.currency,
+            "description": description,
+            "payment_method_types": [payment_method],
+            "automatic_payment_methods": {"enabled": False},
+            "customer": customer.get("id"),
+            "metadata": build_scenario_customer_metadata(
+                user_id=user_id,
+                person_id=request.person_id,
+                appointment_id=request.appointment_id,
+            ),
+        }
+        stripe_payment_intent = stripe.PaymentIntent.create(**stripe_request_options, **payment_intent_payload)
     except Exception as exc:
-        stripe_error = str(exc)
-        logging.warning("Stripe payment intent creation failed, falling back to local payment row: %s", exc)
+        logging.error("Stripe payment intent creation failed for user %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe payment creation failed: {exc}") from exc
 
     payment_row = build_payment_row(
         amount=request.amount,
@@ -5176,13 +7028,9 @@ async def create_payment(request: PaymentCreateRequest):
         status=(stripe_payment_intent.status if stripe_payment_intent else "created"),
         stripe_payment_intent_id=(stripe_payment_intent.id if stripe_payment_intent else None),
         receipt_url=None,
-        error_message=stripe_error,
+        error_message=None,
     )
     saved_payment = insert_payment_record(payment_row)
-    emit_payment_trigger("invoice_created", {
-        "payment": saved_payment,
-        "stripe_payment_intent_id": stripe_payment_intent.id if stripe_payment_intent else None,
-    })
 
     response_payload = dict(saved_payment)
     if stripe_payment_intent:
@@ -5197,58 +7045,71 @@ async def create_payment(request: PaymentCreateRequest):
             "created": stripe_payment_intent.created,
             "latest_charge": stripe_payment_intent.latest_charge,
             "metadata": stripe_payment_intent.metadata,
+            "customer_id": customer.get("id"),
         })
     else:
         response_payload.update({
             "client_secret": None,
             "id": saved_payment.get("stripe_payment_intent_id") or saved_payment.get("id"),
             "object": "payment_record",
+            "customer_id": customer.get("id"),
         })
     return response_payload
 
+@app.post("/api/sonar/send-payment-link", tags=["Sonar Payments"])
+async def send_payment_link(
+    request: PaymentLinkCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _send_payment_link_for_user(request, str(current_user.id))
+
+
 @app.post("/api/sonar/create-payment-profile", tags=["Sonar Payments"])
-async def create_payment_profile(request: PaymentProfileCreateRequest):
+async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id: str):
     description = request.description or ""
     payment_mode_base_url = get_payment_frontend_base_url()
-    ensure_no_unresolved_templates(request.person_id, request.customer_name, request.customer_email, request.customer_phone, description)
+    ensure_no_unresolved_templates(
+        request.person_id,
+        request.customer_id,
+        request.customer_name,
+        request.customer_email,
+        request.customer_phone,
+        description,
+    )
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=True,
+    )
+    payment_metadata = build_scenario_customer_metadata(user_id=user_id, person_id=request.person_id)
     try:
-        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
-        customer_payload = {}
-        if request.customer_email:
-            customer_payload["email"] = request.customer_email
-        if request.customer_name:
-            customer_payload["name"] = request.customer_name
-        if request.customer_phone:
-            customer_payload["phone"] = request.customer_phone
-
-        customer = stripe.Customer.create(
-            **customer_payload,
-            metadata={
-                "person_id": request.person_id or "",
-                "source": "wysl_scenarios",
-            },
-        )
 
         checkout_session = stripe.checkout.Session.create(
+            **stripe_request_options,
             mode="payment",
-            customer=customer.id,
+            customer=customer.get("id"),
             line_items=[{
                 "price_data": {
                     "currency": request.currency,
                     "product_data": {
-                        **({"name": request.customer_name} if request.customer_name else {"name": "Payment Profile"}),
+                        **({"name": request.customer_name} if request.customer_name else {"name": "Payment Link"}),
                         **({"description": description} if description else {}),
                     },
                     "unit_amount": request.amount,
                 },
-                "quantity": 1,
+                        "quantity": 1,
             }],
+            payment_intent_data={
+                "metadata": payment_metadata,
+            },
             success_url=f"{payment_mode_base_url}/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{payment_mode_base_url}/dashboard?payment=cancelled",
-            metadata={
-                "person_id": request.person_id or "",
-                "source": "wysl_scenarios",
-            },
+            metadata=payment_metadata,
         )
 
         payment_row = build_payment_row(
@@ -5256,43 +7117,50 @@ async def create_payment_profile(request: PaymentProfileCreateRequest):
             currency=request.currency,
             payment_method="link",
             description=description,
-            status="sent",
+            status="pending",
             stripe_session_id=checkout_session.id,
         )
         saved_payment = insert_payment_record(payment_row)
-        emit_payment_trigger("payment_link_sent", {
-            "payment": saved_payment,
-            "payment_id": saved_payment.get("id"),
-            "payment_url": checkout_session.url,
-            "stripe_session_id": checkout_session.id,
-            "customer_id": customer.id,
-            "amount": request.amount,
-            "currency": request.currency,
-        })
-
-        return {
-            "customer_id": customer.id,
-            "setup_intent_id": None,
-            "client_secret": None,
+        response_payload = {
+            "customer_id": customer.get("id"),
             "payment_url": checkout_session.url,
             "amount": request.amount,
             "currency": request.currency,
-            "status": "sent",
+            "status": "pending",
             "customer_name": request.customer_name,
             "customer_email": request.customer_email,
             "customer_phone": request.customer_phone,
             "stripe_session_id": checkout_session.id,
             "payment_id": saved_payment.get("id"),
         }
+        emit_payment_trigger("payment_link_sent", {
+            "payment": saved_payment,
+            "payment_id": saved_payment.get("id"),
+            "stripe_session_id": checkout_session.id,
+            "payment_url": checkout_session.url,
+            "customer_id": customer.get("id"),
+            "amount": request.amount,
+            "currency": request.currency,
+            "status": "pending",
+        })
+        return response_payload
     except Exception as exc:
-        logging.error("Error creating payment profile: %s", exc, exc_info=True)
+        logging.error("Error creating payment link: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 @app.post("/api/sonar/create-invoice", tags=["Sonar Payments"])
-async def create_invoice(request: InvoiceCreateRequest):
+async def create_invoice(
+    request: InvoiceCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _create_invoice_for_user(request, str(current_user.id))
+
+
+async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
     description = request.description or ""
     ensure_no_unresolved_templates(
         request.person_id,
+        request.customer_id,
         request.appointment_id,
         request.service_id,
         request.customer_name,
@@ -5300,30 +7168,28 @@ async def create_invoice(request: InvoiceCreateRequest):
         request.customer_phone,
         description,
     )
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
+        create_if_missing=True,
+        appointment_id=request.appointment_id,
+        service_id=request.service_id,
+    )
     try:
-        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
-
-        customer_payload = {}
-        if request.customer_email:
-            customer_payload["email"] = request.customer_email
-        if request.customer_name:
-            customer_payload["name"] = request.customer_name
-        if request.customer_phone:
-            customer_payload["phone"] = request.customer_phone
-
         invoice_metadata = build_invoice_metadata(
             person_id=request.person_id,
             appointment_id=request.appointment_id,
             service_id=request.service_id,
         )
 
-        customer = stripe.Customer.create(
-            **customer_payload,
-            metadata=invoice_metadata,
-        )
-
         stripe.InvoiceItem.create(
-            customer=customer.id,
+            **stripe_request_options,
+            customer=customer.get("id"),
             amount=request.amount,
             currency=request.currency,
             description=description or "Invoice",
@@ -5331,36 +7197,167 @@ async def create_invoice(request: InvoiceCreateRequest):
         )
 
         invoice = stripe.Invoice.create(
-            customer=customer.id,
+            **stripe_request_options,
+            customer=customer.get("id"),
             collection_method="send_invoice",
             days_until_due=max(int(request.due_days or 7), 1),
             auto_advance=False,
             description=description or None,
             metadata=invoice_metadata,
         )
-
-        return serialize_stripe_invoice(invoice)
+        payload = serialize_stripe_invoice(invoice)
+        payload["customer_id"] = customer.get("id")
+        return payload
     except Exception as exc:
         logging.error("Error creating invoice: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 @app.post("/api/sonar/send-invoice", tags=["Sonar Payments"])
-async def send_invoice(request: InvoiceSendRequest):
+async def send_invoice(
+    request: InvoiceSendRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _send_invoice_for_user(request, str(current_user.id))
+
+
+async def _send_invoice_for_user(request: InvoiceSendRequest, user_id: str):
     ensure_no_unresolved_templates(request.invoice_id)
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
     try:
-        stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
-
-        invoice = stripe.Invoice.retrieve(request.invoice_id)
+        invoice = stripe.Invoice.retrieve(request.invoice_id, **stripe_request_options)
         if invoice.get("status") == "draft":
-            invoice = stripe.Invoice.finalize_invoice(request.invoice_id)
+            invoice = stripe.Invoice.finalize_invoice(request.invoice_id, **stripe_request_options)
 
-        sent_invoice = stripe.Invoice.send_invoice(request.invoice_id)
+        stripe.Invoice.send_invoice(request.invoice_id, **stripe_request_options)
 
-        fresh_invoice = stripe.Invoice.retrieve(request.invoice_id)
+        fresh_invoice = stripe.Invoice.retrieve(request.invoice_id, **stripe_request_options)
         return serialize_stripe_invoice(fresh_invoice)
     except Exception as exc:
         logging.error("Error sending invoice: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/sonar/refund-payment", tags=["Sonar Payments"])
+async def refund_payment(
+    request: RefundPaymentRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _refund_payment_for_user(request, str(current_user.id))
+
+
+async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
+    ensure_no_unresolved_templates(request.payment_id, request.refund_reason)
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
+
+    payment_record = None
+    if request.payment_id:
+        existing = supabase.table("payments").select("*").eq("stripe_payment_intent_id", request.payment_id).limit(1).execute()
+        if existing.data:
+            payment_record = existing.data[0]
+        else:
+            existing = supabase.table("payments").select("*").eq("id", request.payment_id).limit(1).execute()
+            if existing.data:
+                payment_record = existing.data[0]
+
+    payment_intent_id = (
+        (payment_record or {}).get("stripe_payment_intent_id")
+        or request.payment_id
+    )
+    if not payment_intent_id:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    try:
+        refund = _stripe_object_to_dict(
+            stripe.Refund.create(
+                **stripe_request_options,
+                payment_intent=payment_intent_id,
+                **({"amount": request.amount} if request.amount else {}),
+                **({"reason": "requested_by_customer"} if request.refund_reason else {}),
+                metadata={"user_id": user_id, "source": "wysl_scenarios"},
+            )
+        )
+    except Exception as exc:
+        logging.error("Refund creation failed for user %s payment %s: %s", user_id, payment_intent_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe refund failed: {exc}") from exc
+
+    refunded_amount = int(refund.get("amount") or 0)
+    current_amount = int((payment_record or {}).get("amount") or 0)
+    next_status = "partial_refund" if current_amount and refunded_amount < current_amount else "refunded"
+    customer_id = refund.get("customer")
+    if not customer_id and payment_intent_id:
+        try:
+            customer_id = _stripe_object_to_dict(
+                stripe.PaymentIntent.retrieve(payment_intent_id, **stripe_request_options)
+            ).get("customer")
+        except Exception:
+            customer_id = None
+    updated_payment = update_payment_record(
+        "stripe_payment_intent_id",
+        payment_intent_id,
+        {
+            "status": next_status,
+            "refunded_amount": refunded_amount,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    ) or payment_record or {}
+
+    result = {
+        **serialize_stripe_refund(refund),
+        "payment_id": updated_payment.get("id") or request.payment_id,
+        "customer_id": customer_id,
+    }
+    return result
+
+
+@app.post("/api/sonar/cancel-subscription", tags=["Sonar Payments"])
+async def cancel_subscription(
+    request: CancelSubscriptionRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _cancel_subscription_for_user(request, str(current_user.id))
+
+
+async def _cancel_subscription_for_user(request: CancelSubscriptionRequest, user_id: str):
+    ensure_no_unresolved_templates(request.subscription_id, request.customer_id, request.person_id)
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
+    customer, _person = create_or_update_stripe_customer_for_user(
+        user_id=user_id,
+        customer_id=request.customer_id,
+        person_id=request.person_id,
+        create_if_missing=False,
+    )
+
+    subscription_id = request.subscription_id
+    if not subscription_id:
+        subscriptions = stripe.Subscription.list(
+            **stripe_request_options,
+            customer=customer.get("id"),
+            status="all",
+            limit=10,
+        )
+        match = next(
+            (
+                item for item in list(subscriptions.get("data") or [])
+                if str(item.get("status") or "").lower() not in {"canceled", "incomplete_expired"}
+            ),
+            None,
+        )
+        subscription_id = match.get("id") if match else None
+
+    if not subscription_id:
+        raise HTTPException(status_code=404, detail="No active subscription found for this customer.")
+
+    try:
+        subscription = _stripe_object_to_dict(
+            stripe.Subscription.cancel(subscription_id, **stripe_request_options)
+        )
+    except Exception as exc:
+        logging.error("Subscription cancel failed for user %s subscription %s: %s", user_id, subscription_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe subscription cancel failed: {exc}") from exc
+
+    result = serialize_stripe_subscription(subscription)
+    result["customer_id"] = subscription.get("customer")
+    return result
 
 
 @app.post("/api/sonar/send-email", tags=["Sonar Integrations"])
@@ -5371,57 +7368,110 @@ async def send_scenario_email(
     ensure_no_unresolved_templates(request.to, request.subject, request.body)
     if not request.to or not request.subject:
         raise HTTPException(status_code=400, detail="Email recipient and subject are required.")
-    result = _send_gmail_email_for_user(str(current_user.id), request.to, request.subject, request.body or "")
+    result = _send_email_for_user(str(current_user.id), request.to, request.subject, request.body or "")
     return {
+        **result,
         "id": result.get("id"),
-        "thread_id": result.get("threadId"),
+        "thread_id": result.get("thread_id") or result.get("threadId"),
         "label_ids": result.get("labelIds") or [],
-        "status": "sent",
-        "provider": "gmail",
     }
 
 
 async def scenario_create_payment_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
     request = PaymentCreateRequest(**payload)
-    return await create_payment(request)
+    return await _create_payment_for_user(request, user_id)
 
 
-async def scenario_create_payment_profile_callback(payload: dict):
-    request = PaymentProfileCreateRequest(**payload)
-    return await create_payment_profile(request)
+async def scenario_create_customer_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
+    request = CustomerCreateRequest(**payload)
+    return await _create_customer_for_user(request, user_id)
+
+
+async def scenario_update_customer_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
+    request = CustomerUpdateRequest(**payload)
+    return await _update_customer_for_user(request, user_id)
+
+
+async def scenario_send_payment_link_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
+    request = PaymentLinkCreateRequest(**payload)
+    return await _send_payment_link_for_user(request, user_id)
 
 
 async def scenario_create_invoice_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
     request = InvoiceCreateRequest(**payload)
-    return await create_invoice(request)
+    return await _create_invoice_for_user(request, user_id)
 
 
 async def scenario_send_invoice_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
     request = InvoiceSendRequest(**payload)
-    return await send_invoice(request)
+    return await _send_invoice_for_user(request, user_id)
+
+
+async def scenario_refund_payment_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
+    request = RefundPaymentRequest(**payload)
+    return await _refund_payment_for_user(request, user_id)
+
+
+async def scenario_cancel_subscription_callback(payload: dict):
+    user_id = str(payload.pop("user_id", "") or "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for scenario payments.")
+    request = CancelSubscriptionRequest(**payload)
+    return await _cancel_subscription_for_user(request, user_id)
 
 
 async def scenario_send_email_callback(payload: dict):
     user_id = str(payload.get("user_id") or "")
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID is required for scenario email.")
-    result = _send_gmail_email_for_user(user_id, payload.get("to") or "", payload.get("subject") or "", payload.get("body") or "")
+    provider = payload.get("provider") or None
+    result = _send_email_for_user(
+        user_id,
+        payload.get("to") or "",
+        payload.get("subject") or "",
+        payload.get("body") or "",
+        provider=provider,
+    )
     return {
+        **result,
         "id": result.get("id"),
-        "thread_id": result.get("threadId"),
+        "thread_id": result.get("thread_id") or result.get("threadId"),
         "label_ids": result.get("labelIds") or [],
-        "status": "sent",
-        "provider": "gmail",
     }
 
 
 scenario_engine = ScenarioEngine(
     supabase=supabase,
     callbacks={
+        "create_customer": scenario_create_customer_callback,
+        "update_customer": scenario_update_customer_callback,
         "create_payment": scenario_create_payment_callback,
-        "create_payment_profile": scenario_create_payment_profile_callback,
+        "send_payment_link": scenario_send_payment_link_callback,
         "create_invoice": scenario_create_invoice_callback,
         "send_invoice": scenario_send_invoice_callback,
+        "refund_payment": scenario_refund_payment_callback,
+        "cancel_subscription": scenario_cancel_subscription_callback,
         "send_email": scenario_send_email_callback,
     },
     base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
@@ -5456,10 +7506,18 @@ async def update_payment(request: PaymentUpdateRequest):
     updated_payment = update_payment_record(match_field, match_value, update_data) or payment_record
 
     if request.status in {"succeeded", "paid"}:
-        emit_payment_trigger("invoice_paid", {
+        emit_payment_trigger("payment_received", {
             "payment": updated_payment,
             "payment_id": request.payment_id,
             "amount": updated_payment.get("amount"),
+            "currency": updated_payment.get("currency"),
+            "status": updated_payment.get("status"),
+        })
+    elif request.status in {"refunded", "partial_refund"}:
+        emit_payment_trigger("refund_issued", {
+            "payment": updated_payment,
+            "payment_id": request.payment_id,
+            "amount": updated_payment.get("refunded_amount") or updated_payment.get("amount"),
             "currency": updated_payment.get("currency"),
             "status": updated_payment.get("status"),
         })
@@ -5475,21 +7533,70 @@ async def update_payment(request: PaymentUpdateRequest):
 
 @app.post("/stripe-webhook", tags=["Billing"])
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+    raw_body = await request.body()
+    logging.info(
+        "[Stripe Webhook] Incoming request signature_present=%s body_bytes=%s",
+        bool(stripe_signature),
+        len(raw_body or b""),
+    )
     try:
-        event = stripe.Webhook.construct_event(payload=await request.body(), sig_header=stripe_signature, secret=stripe_webhook_secret)
+        event = stripe.Webhook.construct_event(payload=raw_body, sig_header=stripe_signature, secret=stripe_webhook_secret)
     except ValueError:
+        logging.warning("[Stripe Webhook] Invalid payload")
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError:
+        logging.warning("[Stripe Webhook] Invalid signature")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    if event['type'] == 'checkout.session.completed':
+    event_type = event["type"]
+    connected_account_id = event.get("account")
+    is_connected_account_event = bool(connected_account_id)
+    logging.info(
+        "[Stripe Webhook] Event accepted type=%s connected_account=%s livemode=%s",
+        event_type,
+        connected_account_id,
+        event.get("livemode"),
+    )
+
+    if event_type == 'checkout.session.completed':
         session = event['data']['object']
         if session.get("mode") == "payment":
             payment_status = session.get("payment_status")
-            upsert_payment_from_stripe(
+            payment_record = upsert_payment_from_stripe(
                 session_id=session.get("id"),
-                status="paid" if payment_status == "paid" else payment_status or "completed",
+                status="succeeded" if payment_status == "paid" else payment_status or "succeeded",
             )
+            logging.info(
+                "[Stripe Webhook] checkout.session.completed id=%s connected=%s payment_status=%s metadata_keys=%s",
+                session.get("id"),
+                is_connected_account_event,
+                payment_status,
+                sorted((session.get("metadata") or {}).keys()),
+            )
+            if is_connected_account_event and payment_status == "paid":
+                metadata = session.get("metadata") or {}
+                user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+                logging.info(
+                    "[Stripe Webhook] checkout.session.completed resolved user_id=%s person_id=%s",
+                    user_id,
+                    metadata.get("person_id"),
+                )
+                if user_id:
+                    emit_payment_trigger("payment_received", {
+                        "checkout_session": session,
+                        "payment": payment_record,
+                        "payment_id": (payment_record or {}).get("id"),
+                        "stripe_session_id": session.get("id"),
+                        "customer_id": session.get("customer"),
+                        "amount": session.get("amount_total") or session.get("amount_subtotal"),
+                        "currency": session.get("currency"),
+                        "status": payment_status,
+                        "user_id": user_id,
+                        "person_id": metadata.get("person_id"),
+                    })
+            return {"status": "success"}
+
+        if is_connected_account_event:
             return {"status": "success"}
 
         customer_id = session.get('customer')
@@ -5552,28 +7659,59 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         supabase.table('users').update(update_data).eq('stripe_customer_id', customer_id).execute()
         logging.info(f"Checkout session completed for user with customer ID: {customer_id}. Plan changed: {current_plan} -> {plan_name}")
 
-    elif event['type'] == 'invoice.created':
+    elif event_type == 'invoice.created':
         invoice = event['data']['object']
-        emit_payment_trigger("invoice_created", {
-            "invoice": invoice,
-            "customer_id": invoice.get("customer"),
-            "invoice_id": invoice.get("id"),
-            "amount_due": invoice.get("amount_due"),
-            "currency": invoice.get("currency"),
-            "status": invoice.get("status"),
-        })
-    elif event['type'] == 'invoice.sent':
+        if is_connected_account_event:
+            metadata = invoice.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("invoice_created", {
+                    "invoice": invoice,
+                    "customer_id": invoice.get("customer"),
+                    "invoice_id": invoice.get("id"),
+                    "amount_due": invoice.get("amount_due"),
+                    "currency": invoice.get("currency"),
+                    "status": invoice.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                    "subscription_id": invoice.get("subscription"),
+                })
+    elif event_type == 'invoice.sent':
         invoice = event['data']['object']
-        emit_payment_trigger("invoice_sent", {
-            "invoice": invoice,
-            "customer_id": invoice.get("customer"),
-            "invoice_id": invoice.get("id"),
-            "amount_due": invoice.get("amount_due"),
-            "currency": invoice.get("currency"),
-            "hosted_invoice_url": invoice.get("hosted_invoice_url"),
-        })
-    elif event['type'] == 'invoice.paid':
+        if is_connected_account_event:
+            metadata = invoice.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("invoice_sent", {
+                    "invoice": invoice,
+                    "customer_id": invoice.get("customer"),
+                    "invoice_id": invoice.get("id"),
+                    "amount_due": invoice.get("amount_due"),
+                    "currency": invoice.get("currency"),
+                    "hosted_invoice_url": invoice.get("hosted_invoice_url"),
+                    "status": invoice.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                    "subscription_id": invoice.get("subscription"),
+                })
+    elif event_type == 'invoice.paid':
         invoice = event['data']['object']
+        if is_connected_account_event:
+            metadata = invoice.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("invoice_paid", {
+                    "invoice": invoice,
+                    "customer_id": invoice.get("customer"),
+                    "invoice_id": invoice.get("id"),
+                    "amount_paid": invoice.get("amount_paid"),
+                    "currency": invoice.get("currency"),
+                    "status": invoice.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                    "subscription_id": invoice.get("subscription"),
+                })
+            return {"status": "success"}
         try:
             customer_id = invoice.get('customer')
             amount_paid = invoice.get('amount_paid') # amount_paid is in cents
@@ -5695,8 +7833,25 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             logging.error(f"An unexpected error occurred during invoice.paid event processing for customer {customer_id}: {e}", exc_info=True)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An internal error occurred during invoice.paid processing: {str(e)}")
 
-    elif event['type'] == 'invoice.payment_failed':
+    elif event_type == 'invoice.payment_failed':
         invoice = event['data']['object']
+        if is_connected_account_event:
+            metadata = invoice.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                trigger_key = "subscription_payment_failed" if invoice.get("subscription") else "payment_failed"
+                emit_payment_trigger(trigger_key, {
+                    "invoice": invoice,
+                    "customer_id": invoice.get("customer"),
+                    "invoice_id": invoice.get("id"),
+                    "subscription_id": invoice.get("subscription"),
+                    "failure_reason": invoice.get("last_payment_error", {}).get("message"),
+                    "currency": invoice.get("currency"),
+                    "status": invoice.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                })
+            return {"status": "success"}
         customer_id = invoice.get('customer')
         # next_payment_attempt is a timestamp, convert to datetime for logging
         latest_attempt_date = datetime.fromtimestamp(invoice.get('next_payment_attempt')).isoformat() if invoice.get('next_payment_attempt') else datetime.now(timezone.utc).isoformat()
@@ -5727,21 +7882,36 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 logging.error(f"User not found for stripe_customer_id {customer_id} during payment_failed event.")
         else:
             logging.error(f"Customer ID missing in invoice.payment_failed event.")
-    elif event['type'] == 'payment_intent.succeeded':
+    elif event_type == 'payment_intent.succeeded':
         payment_intent = event['data']['object']
         updated_payment = upsert_payment_from_stripe(
             payment_intent_id=payment_intent.get("id"),
             status="succeeded",
             receipt_url=payment_intent.get("charges", {}).get("data", [{}])[0].get("receipt_url") if payment_intent.get("charges", {}).get("data") else None,
         )
-        emit_payment_trigger("invoice_paid", {
-            "payment_intent": payment_intent,
-            "payment": updated_payment,
-            "amount": payment_intent.get("amount"),
-            "currency": payment_intent.get("currency"),
-            "status": payment_intent.get("status"),
-        })
-    elif event['type'] == 'payment_intent.payment_failed':
+        metadata = payment_intent.get("metadata") or {}
+        user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+        logging.info(
+            "[Stripe Webhook] payment_intent.succeeded id=%s connected=%s resolved_user_id=%s person_id=%s metadata_keys=%s",
+            payment_intent.get("id"),
+            is_connected_account_event,
+            user_id,
+            metadata.get("person_id"),
+            sorted(metadata.keys()),
+        )
+        if user_id:
+            emit_payment_trigger("payment_received", {
+                "payment_intent": payment_intent,
+                "payment": updated_payment,
+                "payment_id": (updated_payment or {}).get("id"),
+                "customer_id": payment_intent.get("customer"),
+                "amount": payment_intent.get("amount_received") or payment_intent.get("amount"),
+                "currency": payment_intent.get("currency"),
+                "status": payment_intent.get("status"),
+                "user_id": user_id,
+                "person_id": metadata.get("person_id"),
+            })
+    elif event_type == 'payment_intent.payment_failed':
         payment_intent = event['data']['object']
         last_error = payment_intent.get("last_payment_error", {})
         updated_payment = upsert_payment_from_stripe(
@@ -5749,17 +7919,104 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             status="failed",
             error_message=last_error.get("message"),
         )
-        emit_payment_trigger("payment_failed", {
-            "payment_intent": payment_intent,
-            "payment": updated_payment,
-            "failure_reason": last_error.get("message"),
-            "amount": payment_intent.get("amount"),
-            "currency": payment_intent.get("currency"),
-            "status": payment_intent.get("status"),
-        })
-
-    elif event['type'] == 'customer.subscription.deleted':
+        metadata = payment_intent.get("metadata") or {}
+        user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+        if user_id:
+            emit_payment_trigger("payment_failed", {
+                "payment_intent": payment_intent,
+                "payment": updated_payment,
+                "payment_id": (updated_payment or {}).get("id"),
+                "customer_id": payment_intent.get("customer"),
+                "failure_reason": last_error.get("message"),
+                "amount": payment_intent.get("amount"),
+                "currency": payment_intent.get("currency"),
+                "status": payment_intent.get("status"),
+                "user_id": user_id,
+                "person_id": metadata.get("person_id"),
+            })
+    elif event_type == 'refund.created':
+        refund = event['data']['object']
+        metadata = refund.get("metadata") or {}
+        user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+        payment_intent_id = refund.get("payment_intent")
+        customer_id = refund.get("customer")
+        payment_record = None
+        if payment_intent_id:
+            payment_record = update_payment_record(
+                "stripe_payment_intent_id",
+                payment_intent_id,
+                {
+                    "status": "refunded",
+                    "refunded_amount": refund.get("amount"),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            if not customer_id and user_id:
+                try:
+                    customer_id = _stripe_object_to_dict(
+                        stripe.PaymentIntent.retrieve(payment_intent_id, **_get_connected_stripe_request_options(user_id))
+                    ).get("customer")
+                except Exception:
+                    customer_id = None
+        if user_id:
+            emit_payment_trigger("refund_issued", {
+                "refund": refund,
+                "payment": payment_record,
+                "refund_id": refund.get("id"),
+                "payment_id": (payment_record or {}).get("id"),
+                "customer_id": customer_id,
+                "amount": refund.get("amount"),
+                "currency": refund.get("currency"),
+                "status": refund.get("status"),
+                "user_id": user_id,
+                "person_id": metadata.get("person_id"),
+            })
+    elif event_type == 'customer.created':
+        customer = event['data']['object']
+        if is_connected_account_event:
+            metadata = customer.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("customer_created", {
+                    "customer": customer,
+                    "customer_id": customer.get("id"),
+                    "customer_name": customer.get("name"),
+                    "customer_email": customer.get("email"),
+                    "customer_phone": customer.get("phone"),
+                    "status": "created",
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                })
+    elif event_type == 'customer.subscription.created':
         subscription = event['data']['object']
+        if is_connected_account_event:
+            metadata = subscription.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("subscription_created", {
+                    "subscription": subscription,
+                    "subscription_id": subscription.get("id"),
+                    "customer_id": subscription.get("customer"),
+                    "status": subscription.get("status"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                })
+    elif event_type == 'customer.subscription.deleted':
+        subscription = event['data']['object']
+        if is_connected_account_event:
+            metadata = subscription.get("metadata") or {}
+            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
+            if user_id:
+                emit_payment_trigger("subscription_canceled", {
+                    "subscription": subscription,
+                    "subscription_id": subscription.get("id"),
+                    "customer_id": subscription.get("customer"),
+                    "status": subscription.get("status"),
+                    "canceled_at": subscription.get("ended_at") or subscription.get("canceled_at"),
+                    "user_id": user_id,
+                    "person_id": metadata.get("person_id"),
+                })
+            return {"status": "success"}
         customer_id = subscription.get('customer')
         subscription_id = subscription.get('id')
         
@@ -5887,7 +8144,7 @@ async def list_user_integrations(current_user: dict = Depends(get_current_user))
                     current_user_id,
                 )
             )
-            for provider in sorted(SUPPORTED_EMAIL_INTEGRATION_PROVIDERS)
+            for provider in sorted(SUPPORTED_INTEGRATION_PROVIDERS)
         ]
         return [integration.model_dump() for integration in integrations]
     except Exception as e:
@@ -5901,7 +8158,7 @@ async def upsert_user_integration(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+    if provider not in SUPPORTED_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
 
     current_user_id = str(current_user.id)
@@ -5934,26 +8191,59 @@ async def authorize_user_integration(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+    if provider not in SUPPORTED_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
-    if provider != "gmail":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provider authorization not implemented.")
-    if not google_client_id or not google_client_secret:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Google OAuth is not configured.")
 
-    redirect_uri = _get_google_redirect_uri(request)
-    state_token = _build_integration_state(str(current_user.id), provider, return_to)
-    params = {
-        "client_id": google_client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": " ".join(GMAIL_SCOPES),
-        "access_type": "offline",
-        "prompt": "consent",
-        "include_granted_scopes": "true",
-        "state": state_token,
-    }
-    authorization_url = requests.Request("GET", GMAIL_AUTH_URL, params=params).prepare().url
+    if provider == "gmail":
+        if not google_client_id or not google_client_secret:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Google OAuth is not configured.")
+
+        redirect_uri = _get_google_redirect_uri(request)
+        state_token = _build_integration_state(str(current_user.id), provider, return_to)
+        params = {
+            "client_id": google_client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": " ".join(GMAIL_SCOPES),
+            "access_type": "offline",
+            "prompt": "consent",
+            "include_granted_scopes": "true",
+            "state": state_token,
+        }
+        authorization_url = requests.Request("GET", GMAIL_AUTH_URL, params=params).prepare().url
+    elif provider == "outlook":
+        if not outlook_client_id or not outlook_client_secret:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Outlook OAuth is not configured.")
+
+        redirect_uri = _get_outlook_redirect_uri(request)
+        state_token = _build_integration_state(str(current_user.id), provider, return_to)
+        params = {
+            "client_id": outlook_client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "response_mode": "query",
+            "scope": outlook_scopes,
+            "prompt": "consent",
+            "state": state_token,
+        }
+        authorization_url = requests.Request("GET", OUTLOOK_AUTH_URL, params=params).prepare().url
+    elif provider == "stripe":
+        if not stripe_connect_client_id:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe Connect is not configured.")
+        _stripe_platform_api_key()
+
+        redirect_uri = _get_stripe_redirect_uri(request)
+        state_token = _build_integration_state(str(current_user.id), provider, return_to)
+        params = {
+            "client_id": stripe_connect_client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": STRIPE_CONNECT_SCOPE,
+            "state": state_token,
+        }
+        authorization_url = requests.Request("GET", STRIPE_CONNECT_AUTH_URL, params=params).prepare().url
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provider authorization not implemented.")
     if not authorization_url:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create authorization URL.")
     _upsert_integration_row(
@@ -6082,12 +8372,233 @@ async def gmail_integration_callback(
     return HTMLResponse(content=html)
 
 
+@app.get("/users/me/integrations/outlook/callback", response_class=HTMLResponse, name="outlook_integration_callback", tags=["Users"])
+async def outlook_integration_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+):
+    frontend_target = frontend_base_url or "/"
+    success = False
+    message = "Outlook could not be connected."
+
+    try:
+        if error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+        if not code or not state:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth callback parameters.")
+
+        state_payload = _decode_integration_state(state)
+        user_id = str(state_payload["sub"])
+        frontend_target = state_payload.get("return_to") or frontend_target
+        redirect_uri = _get_outlook_redirect_uri(request)
+        token_data = _exchange_outlook_code(code, redirect_uri)
+
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
+        expires_in = int(token_data.get("expires_in") or 3600)
+        scope_string = token_data.get("scope") or ""
+        scopes = [scope for scope in scope_string.split(" ") if scope]
+
+        userinfo_response = requests.get(
+            GRAPH_USERINFO_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        if not userinfo_response.ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to fetch Microsoft account details.")
+        userinfo = userinfo_response.json()
+        connected_email = userinfo.get("mail") or userinfo.get("userPrincipalName") or userinfo.get("email")
+
+        existing_row = _fetch_integration_row(user_id, "outlook") or _default_user_integration("outlook", user_id)
+        existing_credentials = existing_row.get("credentials") or {}
+        credentials = {
+            **existing_credentials,
+            "access_token": access_token,
+            "refresh_token": refresh_token or existing_credentials.get("refresh_token"),
+            "token_type": token_data.get("token_type", "Bearer"),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=expires_in - 60)).isoformat(),
+        }
+
+        _upsert_integration_row(
+            user_id,
+            "outlook",
+            {
+                "selected": True,
+                "status": "connected",
+                "connected_email": connected_email,
+                "scopes": scopes,
+                "provider_metadata": {
+                    "display_name": userinfo.get("displayName"),
+                    "connected_at": datetime.now(timezone.utc).isoformat(),
+                    "supports_send": True,
+                    "supports_read": True,
+                },
+                "credentials": credentials,
+            },
+        )
+        success = True
+        message = "Outlook connected."
+    except HTTPException as exc:
+        message = exc.detail
+    except Exception as exc:
+        logging.error(f"Failed Outlook OAuth callback: {exc}", exc_info=True)
+        message = "Outlook could not be connected."
+
+    callback_payload = json.dumps({
+        "type": "sonar.integration.oauth_complete",
+        "provider": "outlook",
+        "success": success,
+        "message": message,
+    })
+    safe_target = json.dumps(frontend_target)
+    html = f"""
+    <!doctype html>
+    <html>
+      <body style="font-family: Inter, sans-serif; background:#09090b; color:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;">
+        <div style="text-align:center;">
+          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{message}</div>
+          <div style="font-size:13px; color:rgba(255,255,255,0.6);">You can close this window.</div>
+        </div>
+        <script>
+          (function() {{
+            const payload = {callback_payload};
+            const targetOrigin = (function() {{
+              try {{
+                return new URL({safe_target}, window.location.origin).origin;
+              }} catch (e) {{
+                return window.location.origin;
+              }}
+            }})();
+            if (window.opener && !window.opener.closed) {{
+              window.opener.postMessage(payload, targetOrigin);
+            }}
+            setTimeout(function() {{ window.close(); }}, 350);
+          }})();
+        </script>
+      </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+@app.get("/users/me/integrations/stripe/callback", response_class=HTMLResponse, name="stripe_integration_callback", tags=["Users"])
+async def stripe_integration_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None,
+):
+    frontend_target = frontend_base_url or "/"
+    success = False
+    message = "Stripe could not be connected."
+
+    try:
+        if error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_description or error)
+        if not code or not state:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth callback parameters.")
+
+        state_payload = _decode_integration_state(state)
+        user_id = str(state_payload["sub"])
+        frontend_target = state_payload.get("return_to") or frontend_target
+        token_data = _exchange_stripe_code(code)
+        stripe_user_id = token_data.get("stripe_user_id")
+        if not stripe_user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stripe did not return a connected account ID.")
+
+        livemode = bool(token_data.get("livemode"))
+        account = _stripe_object_to_dict(
+            stripe.Account.retrieve(
+                stripe_user_id,
+                api_key=_stripe_platform_api_key(livemode),
+            )
+        )
+        business_profile = account.get("business_profile") or {}
+        settings = account.get("settings") or {}
+        dashboard = settings.get("dashboard") or {}
+        connected_email = account.get("email")
+        display_name = business_profile.get("name") or dashboard.get("display_name") or stripe_user_id
+
+        _upsert_integration_row(
+            user_id,
+            "stripe",
+            {
+                "selected": True,
+                "status": "connected",
+                "connected_email": connected_email,
+                "scopes": [token_data.get("scope") or STRIPE_CONNECT_SCOPE],
+                "provider_metadata": {
+                    "account_id": stripe_user_id,
+                    "display_name": display_name,
+                    "business_url": business_profile.get("url"),
+                    "charges_enabled": bool(account.get("charges_enabled")),
+                    "payouts_enabled": bool(account.get("payouts_enabled")),
+                    "details_submitted": bool(account.get("details_submitted")),
+                    "livemode": livemode,
+                    "connected_at": datetime.now(timezone.utc).isoformat(),
+                },
+                "credentials": {
+                    "stripe_user_id": stripe_user_id,
+                    "livemode": livemode,
+                },
+            },
+        )
+        success = True
+        message = "Stripe connected."
+    except HTTPException as exc:
+        message = exc.detail
+    except Exception as exc:
+        logging.error("Failed Stripe OAuth callback: %s", exc, exc_info=True)
+        message = "Stripe could not be connected."
+
+    callback_payload = json.dumps({
+        "type": "sonar.integration.oauth_complete",
+        "provider": "stripe",
+        "success": success,
+        "message": message,
+    })
+    safe_target = json.dumps(frontend_target)
+    html = f"""
+    <!doctype html>
+    <html>
+      <body style="font-family: Inter, sans-serif; background:#09090b; color:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;">
+        <div style="text-align:center;">
+          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{message}</div>
+          <div style="font-size:13px; color:rgba(255,255,255,0.6);">You can close this window.</div>
+        </div>
+        <script>
+          (function() {{
+            const payload = {callback_payload};
+            const targetOrigin = (function() {{
+              try {{
+                return new URL({safe_target}, window.location.origin).origin;
+              }} catch (e) {{
+                return window.location.origin;
+              }}
+            }})();
+            if (window.opener && !window.opener.closed) {{
+              window.opener.postMessage(payload, targetOrigin);
+            }}
+            setTimeout(function() {{ window.close(); }}, 350);
+          }})();
+        </script>
+      </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
 @app.post("/users/me/integrations/{provider}/disconnect", response_model=IntegrationDisconnectResponse, tags=["Users"])
 async def disconnect_user_integration(provider: str, current_user: dict = Depends(get_current_user)):
     provider = provider.lower().strip()
-    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+    if provider not in SUPPORTED_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
     current_user_id = str(current_user.id)
+    if provider == "stripe":
+        _deauthorize_stripe_integration(_fetch_integration_row(current_user_id, provider))
     _upsert_integration_row(
         current_user_id,
         provider,
@@ -6110,24 +8621,33 @@ async def list_integration_messages(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider != "gmail":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message listing is not available for this provider.")
+    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
     limit = max(1, min(limit, 50))
-    response = _gmail_api_request(str(current_user.id), "GET", GMAIL_MESSAGES_URL, params={"maxResults": limit})
-    if not response.ok:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Gmail messages.")
-    message_refs = response.json().get("messages") or []
-    messages = []
-    for ref in message_refs:
-        msg_response = _gmail_api_request(
-            str(current_user.id),
-            "GET",
-            f"{GMAIL_MESSAGES_URL}/{ref.get('id')}",
-            params={"format": "full"},
-        )
-        if not msg_response.ok:
-            continue
-        messages.append(IntegrationEmailListItem.model_validate(_parse_gmail_message(msg_response.json())).model_dump())
+
+    if provider == "outlook":
+        params = {"$top": limit, "$select": "id,conversationId,subject,from,toRecipients,bodyPreview,receivedDateTime,body", "$orderby": "receivedDateTime desc"}
+        response = _outlook_api_request(str(current_user.id), "GET", GRAPH_MESSAGES_URL, params=params)
+        if not response.ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Outlook messages.")
+        values = response.json().get("value") or []
+        messages = [IntegrationEmailListItem.model_validate(_parse_outlook_message(msg)).model_dump() for msg in values]
+    else:
+        response = _gmail_api_request(str(current_user.id), "GET", GMAIL_MESSAGES_URL, params={"maxResults": limit})
+        if not response.ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Gmail messages.")
+        message_refs = response.json().get("messages") or []
+        messages = []
+        for ref in message_refs:
+            msg_response = _gmail_api_request(
+                str(current_user.id),
+                "GET",
+                f"{GMAIL_MESSAGES_URL}/{ref.get('id')}",
+                params={"format": "full"},
+            )
+            if not msg_response.ok:
+                continue
+            messages.append(IntegrationEmailListItem.model_validate(_parse_gmail_message(msg_response.json())).model_dump())
     return messages
 
 
@@ -6138,14 +8658,37 @@ async def get_integration_message(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider != "gmail":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message lookup is not available for this provider.")
-    response = _gmail_api_request(
-        str(current_user.id),
-        "GET",
-        f"{GMAIL_MESSAGES_URL}/{message_id}",
-        params={"format": "full"},
-    )
+    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
+
+    if provider == "outlook":
+        response = _outlook_api_request(
+            str(current_user.id),
+            "GET",
+            f"{GRAPH_MESSAGES_URL}/{message_id}",
+        )
+        if not response.ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Outlook message.")
+        result = response.json()
+        # Fetch full body if truncated
+        if (result.get("body") or {}).get("contentType") != "text":
+            body_response = _outlook_api_request(
+                str(current_user.id),
+                "GET",
+                f"{GRAPH_MESSAGES_URL}/{message_id}?$select=id,body",
+            )
+            if body_response.ok:
+                body_data = body_response.json().get("body") or {}
+                if body_data.get("contentType") == "text":
+                    result["body"] = body_data
+        return IntegrationEmailMessageResponse.model_validate(_parse_outlook_message(result)).model_dump()
+    else:
+        response = _gmail_api_request(
+            str(current_user.id),
+            "GET",
+            f"{GMAIL_MESSAGES_URL}/{message_id}",
+            params={"format": "full"},
+        )
     if not response.ok:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Gmail message.")
     return IntegrationEmailMessageResponse.model_validate(_parse_gmail_message(response.json())).model_dump()
@@ -6158,12 +8701,16 @@ async def send_integration_email(
     current_user: dict = Depends(get_current_user),
 ):
     provider = provider.lower().strip()
-    if provider != "gmail":
+    if provider not in SUPPORTED_EMAIL_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email sending is not available for this provider.")
-    result = _send_gmail_email_for_user(str(current_user.id), payload.to, payload.subject, payload.body)
+
+    if provider == "outlook":
+        result = _send_outlook_email_for_user(str(current_user.id), payload.to, payload.subject, payload.body)
+    else:
+        result = _send_gmail_email_for_user(str(current_user.id), payload.to, payload.subject, payload.body)
     return {
         "id": result.get("id"),
-        "thread_id": result.get("threadId"),
+        "thread_id": result.get("thread_id") or result.get("threadId"),
         "label_ids": result.get("labelIds") or [],
     }
 
@@ -6856,7 +9403,7 @@ async def update_business_forwarding(
             agent_lookup = (
                 supabase
                 .table('hired_receptionists')
-                .select('id,call_types,status')
+                .select('id,status,is_active')
                 .eq('id', payload.agent_id)
                 .eq('user_id', current_user_id)
                 .limit(1)
@@ -6865,9 +9412,9 @@ async def update_business_forwarding(
             agent_row = (agent_lookup.data or [None])[0]
             if agent_row:
                 next_agent_status = derive_receptionist_status(
-                    agent_row.get('call_types'),
                     agent_row.get('status'),
                     preserve_offline=False,
+                    is_active=bool(agent_row.get('is_active', True)),
                 )
                 supabase.table('hired_receptionists').update({
                     'status': next_agent_status,
