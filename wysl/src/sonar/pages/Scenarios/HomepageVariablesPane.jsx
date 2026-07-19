@@ -502,7 +502,7 @@ const TABLE_DEFS = [
     icon: Calendar,
     fields: [
       { key: 'id', label: 'Record ID', type: 'text' },
-      { key: 'date', label: 'Date', type: 'text' },
+      { key: 'date', label: 'Date', type: 'date' },
       { key: 'time', label: 'Time', type: 'text' },
       { key: 'duration', label: 'Duration', type: 'number' },
       { key: 'status', label: 'Status', type: 'text' },
@@ -686,7 +686,7 @@ export const TABLE_LABELS = {
   business: 'Business',
 };
 
-const AGENT_SOURCE_TABLES = new Set(['people', 'appointments']);
+const AGENT_SOURCE_TABLES = new Set(TABLE_DEFS.map((table) => table.key));
 
 export const getAgentFieldsForTable = (tableKey) => {
   if (!AGENT_SOURCE_TABLES.has(tableKey)) return [];

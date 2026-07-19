@@ -325,6 +325,7 @@ const FieldSettingsModal = ({
         : []
   ), [fieldConfig?.options, fieldMeta?.options]);
   const hasOptions = normalizedOptions.length > 0 || isOptionsField;
+  const intakeLocked = fieldKey === 'phone';
 
   useEffect(() => {
     setName(fieldConfig?.name || fieldKey);
@@ -554,21 +555,31 @@ const FieldSettingsModal = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIntakeEnabled((current) => !current)}
+                    onClick={() => {
+                      if (intakeLocked) return;
+                      setIntakeEnabled((current) => !current);
+                    }}
+                    disabled={intakeLocked}
                     className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
-                      intakeEnabled
+                      intakeLocked || intakeEnabled
                         ? 'border-cyan-400/35 bg-cyan-500/20'
                         : 'border-white/[0.08] bg-black/35'
-                    }`}
+                    } ${intakeLocked ? 'cursor-not-allowed opacity-100' : ''}`}
                     aria-pressed={intakeEnabled}
+                    aria-disabled={intakeLocked}
                   >
                     <span
                       className={`inline-block h-5 w-5 rounded-full transition-transform ${
-                        intakeEnabled ? 'translate-x-6 bg-cyan-300' : 'translate-x-1 bg-zinc-500'
+                        intakeLocked || intakeEnabled ? 'translate-x-6 bg-cyan-300' : 'translate-x-1 bg-zinc-500'
                       }`}
                     />
                   </button>
                 </div>
+                {intakeLocked && (
+                  <p className="mt-2 text-[10px] text-cyan-300/80">
+                    Phone is always included in intake.
+                  </p>
+                )}
               </div>
 
               <div className="rounded-2xl border border-white/[0.06] bg-black/30 px-4 py-3.5">

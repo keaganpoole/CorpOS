@@ -981,10 +981,21 @@ const IntakeFieldsPopover = ({ columns, fieldConfig, onToggleField, onEnableAll,
       <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
         {filtered.map((column) => {
           const enabled = isIntakeEnabled(fieldConfig, column.id);
+          const locked = column.id === 'phone';
           return (
-            <button key={column.id} type="button" onClick={() => onToggleField(column.id, !enabled)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04]">
+            <button
+              key={column.id}
+              type="button"
+              disabled={locked}
+              onClick={() => {
+                if (locked) return;
+                onToggleField(column.id, !enabled);
+              }}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${locked ? 'cursor-not-allowed opacity-100' : 'hover:bg-white/[0.04]'}`}
+            >
               <span className="w-4">{enabled && <Check size={12} className="text-cyan-400" />}</span>
               <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${enabled ? 'text-zinc-300' : 'text-zinc-500'}`}>{getColumnLabel(column, fieldConfig)}</span>
+              {locked && <span className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-semibold tracking-[-0.02em] text-cyan-300">Required</span>}
             </button>
           );
         })}
@@ -1473,16 +1484,17 @@ const LeadsTable = ({
   }, [allDataColumns, fieldConfig, updateViewSettings]);
 
   const setFieldIntakeEnabled = useCallback((key, intakeEnabled) => {
+    if (key === 'phone' && intakeEnabled === false) return;
     persistFieldConfig({
       ...fieldConfig,
-      [key]: { ...fieldConfig[key], intakeEnabled },
+      [key]: { ...fieldConfig[key], intakeEnabled: key === 'phone' ? true : intakeEnabled },
     });
   }, [fieldConfig]);
 
   const setAllFieldsIntakeEnabled = useCallback((intakeEnabled) => {
     const next = { ...fieldConfig };
     allDataColumns.forEach((column) => {
-      next[column.id] = { ...next[column.id], intakeEnabled };
+      next[column.id] = { ...next[column.id], intakeEnabled: column.id === 'phone' ? true : intakeEnabled };
     });
     persistFieldConfig(next);
   }, [allDataColumns, fieldConfig]);

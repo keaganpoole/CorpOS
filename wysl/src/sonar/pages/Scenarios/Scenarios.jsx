@@ -33,6 +33,7 @@ import {
   Hash,
   Code,
   ShieldCheck,
+  Upload,
 } from 'lucide-react';
 import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
@@ -763,6 +764,9 @@ export default function ScenariosPage() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showJsonModal, setShowJsonModal] = useState(false);
+  const [showImportJsonModal, setShowImportJsonModal] = useState(false);
+  const [importJsonValue, setImportJsonValue] = useState('');
+  const [importJsonError, setImportJsonError] = useState('');
   const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
   const [integrationStep, setIntegrationStep] = useState(0);
   const [recurringSchedule, setRecurringSchedule] = useState(getDefaultSchedule);
@@ -777,7 +781,7 @@ export default function ScenariosPage() {
   const [integrationError, setIntegrationError] = useState('');
   const [selectedIntegrationProvider, setSelectedIntegrationProvider] = useState(INTEGRATION_PROVIDERS[0]?.key || 'gmail');
   const integrationsLoadedRef = useRef(false);
-  
+
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
   const [quantumOrbits, setQuantumOrbits] = useState({}); // { [nodeId]: [ring configs] }
@@ -892,6 +896,7 @@ export default function ScenariosPage() {
   const circleRefs = useRef({}); // per-node circle element refs
   const edgeDragRef = useRef(null);
   const scenarioRunStateRef = useRef(null);
+  const builderRunPollRef = useRef({ cancelled: false, executionId: null });
 
   const dragRef = useRef({ id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 });
   const panRef = useRef(null);
@@ -910,6 +915,10 @@ export default function ScenariosPage() {
   useEffect(() => {
     scenarioRunStateRef.current = scenarioRunState;
   }, [scenarioRunState]);
+
+  useEffect(() => () => {
+    builderRunPollRef.current.cancelled = true;
+  }, []);
 
   // Auto-save edge rules to edges whenever rules change (while panel is open)
   useEffect(() => {
@@ -1014,12 +1023,17 @@ export default function ScenariosPage() {
     try {
       return await fetch(`${API_BASE_URL}${path}`, { ...options, headers, signal: options.signal });
     } catch (error) {
+      if (error?.name === 'AbortError' || error?.message?.includes('signal is aborted')) {
+        throw error;
+      }
       const detail = error instanceof Error ? error.message : 'Request failed';
       throw new Error(`API request failed for ${path}: ${detail}`);
     }
   }, [session?.access_token]);
 
+  const integrationRequestRef = useRef(null);
   const refreshIntegrations = useCallback(async () => {
+    if (integrationRequestRef.current) return integrationRequestRef.current;
     if (!session?.access_token) {
       setIntegrations(DEFAULT_INTEGRATIONS);
       integrationsLoadedRef.current = false;
@@ -1028,6 +1042,7 @@ export default function ScenariosPage() {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 8000);
     setIntegrationLoading(true);
+    integrationRequestRef.current = (async () => {
     try {
       const response = await authorizedApiFetch('/users/me/integrations', { signal: controller.signal });
       const result = await response.json();
@@ -1037,14 +1052,23 @@ export default function ScenariosPage() {
       setIntegrations(normalizeIntegrationState(result));
       integrationsLoadedRef.current = true;
     } catch (error) {
-      const message = error?.name === 'AbortError'
+      const message = error?.name === 'AbortError' || error?.message?.includes('signal is aborted')
         ? 'Loading integrations timed out. You can still continue and try connecting directly.'
         : (error?.message || 'Failed to load integrations.');
+      if (error?.name === 'AbortError' || error?.message?.includes('signal is aborted')) {
+        return;
+      }
       console.warn('[Scenarios] Failed to load integrations:', message, error);
       setIntegrationError(message);
     } finally {
       window.clearTimeout(timeoutId);
       setIntegrationLoading(false);
+    }
+    })();
+    try {
+      return await integrationRequestRef.current;
+    } finally {
+      integrationRequestRef.current = null;
     }
   }, [authorizedApiFetch, session?.access_token]);
 
@@ -1404,6 +1428,11 @@ export default function ScenariosPage() {
             const color = TABLE_COLORS[parts[0]] || '#a78bfa';
             const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
             result += `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;line-height:1.6;vertical-align:baseline;">${tableLabel}.${parts[1]}</span>`;
+          } else if (parts.length >= 3 && /^\d+$/.test(parts[1])) {
+            const tableKey = parts[0];
+            const color = TABLE_COLORS[tableKey] || '#a78bfa';
+            const tableLabel = TABLE_LABELS[tableKey] || tableKey;
+            result += `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;line-height:1.6;vertical-align:baseline;">${tableLabel}.${parts.slice(2).join('.')}</span>`;
           } else { result += escapeHTML(value.substring(i, end + 2)); }
           i = end + 2;
         } else { result += escapeHTML(value[i]); i++; }
@@ -2231,12 +2260,14 @@ export default function ScenariosPage() {
     const top = canvasRect.top + 32;
     const left = canvasRect.left + view.x + midX * view.scale;
     
-    // Determine context type from source node
-    const ctxType = getContextType(from);
+    const contextNode = to || from;
+
+    // Match the regular variables pane context to the downstream node when available.
+    const ctxType = getContextType(contextNode);
     setLogicContextType(ctxType);
     
-    // Build available variables from previous nodes
-    const vars = buildVariableMap(nodes, edges, edge.from);
+    // Match the regular variables pane by resolving variables against the target node context.
+    const vars = buildVariableMap(nodes, edges, contextNode?.id || edge.to || edge.from);
     setLogicAvailableVars(vars);
     
     // Check if this is a fallback edge
@@ -2488,6 +2519,7 @@ export default function ScenariosPage() {
       // Track current scenario for save logic
       setCurrentScenario(scenario);
       setScenarioName(scenario.name || '');
+      setScenarioDescription(scenario.description || '');
       
       // Load toolbar state
       if (scenario.schedule_config) {
@@ -2516,6 +2548,44 @@ export default function ScenariosPage() {
     }
   };
 
+  const importScenarioFromRawJson = useCallback((rawText) => {
+    try {
+      const parsed = JSON.parse(rawText);
+      const importedScenario = {
+        id: null,
+        name: parsed?.name || 'Imported Scenario',
+        description: parsed?.description || '',
+        nodes_data: Array.isArray(parsed?.nodes_data) ? parsed.nodes_data : parsed?.nodes_data,
+        edges_data: Array.isArray(parsed?.edges_data) ? parsed.edges_data : parsed?.edges_data,
+        schedule_config: parsed?.schedule_config || getDefaultSchedule(),
+        notes: parsed?.notes || '',
+        is_active: parsed?.is_active !== false,
+      };
+
+      if (!importedScenario.nodes_data || !importedScenario.edges_data) {
+        throw new Error('Scenario JSON must include nodes_data and edges_data.');
+      }
+
+      handleLoadScenario(importedScenario);
+      setCurrentScenario(null);
+      setShowImportJsonModal(false);
+      setImportJsonValue('');
+      setImportJsonError('');
+    } catch (error) {
+      console.error('[Scenarios] Failed to import scenario JSON:', error);
+      setImportJsonError(error?.message || 'Failed to import scenario JSON.');
+    }
+  }, [handleLoadScenario]);
+
+  const handleImportScenarioClick = useCallback(() => {
+    setImportJsonError('');
+    setShowImportJsonModal(true);
+  }, []);
+
+  const handleImportScenarioSubmit = useCallback(() => {
+    importScenarioFromRawJson(importJsonValue);
+  }, [importJsonValue, importScenarioFromRawJson]);
+
   const handleSaveScenario = () => {
     // If editing existing scenario, save directly without modal
     if (currentScenario) {
@@ -2529,16 +2599,7 @@ export default function ScenariosPage() {
     setShowSaveModal(true);
   };
 
-  const handleConfirmSaveScenario = async () => {
-    const normalizedScenarioName = scenarioName?.trim()
-      ? scenarioName.trim().charAt(0).toUpperCase() + scenarioName.trim().slice(1)
-      : '';
-    const resolvedScenarioName = currentScenario
-      ? (normalizedScenarioName || currentScenario.name)
-      : (normalizedScenarioName || `Scenario ${scenarios.length + 1}`);
-    const resolvedDescription = scenarioDescription
-      ? scenarioDescription.charAt(0).toUpperCase() + scenarioDescription.slice(1)
-      : '';
+  const buildCurrentScenarioPayload = useCallback((overrides = {}) => {
     const activeCustomFieldKeys = new Set(peopleCustomFields.map((field) => field.key));
     const sanitizeActionConfig = (config) => {
       if (!config) return null;
@@ -2551,12 +2612,14 @@ export default function ScenariosPage() {
       }));
     };
     const normalizedSchedule = normalizeScenarioSchedule(recurringSchedule);
-    const scenarioData = {
+    return {
+      id: currentScenario?.id || null,
       user_id: userId,
       created_by: currentScenario?.created_by || userId,
-      name: resolvedScenarioName,
-      description: resolvedDescription,
-      nodes_data: nodes.map(n => ({
+      business_id: currentScenario?.business_id || null,
+      name: overrides.name || currentScenario?.name || scenarioName || `Scenario ${scenarios.length + 1}`,
+      description: overrides.description ?? currentScenario?.description ?? scenarioDescription ?? '',
+      nodes_data: nodes.map((n) => ({
         id: n.id,
         x: n.x,
         y: n.y,
@@ -2574,17 +2637,49 @@ export default function ScenariosPage() {
         categoryKey: n.categoryKey || null,
         categoryType: n.categoryType || null,
       })),
-      edges_data: edges.map(e => ({
+      edges_data: edges.map((e) => ({
         id: e.id,
         from: e.from,
         to: e.to,
-        filter: e.filter
+        filter: e.filter,
       })),
       status: 'active',
       is_active: scenarioIsActive,
       schedule_config: normalizedSchedule.mode === 'scheduled' ? normalizedSchedule : null,
       notes: scenarioNotes,
     };
+  }, [
+    currentScenario?.business_id,
+    currentScenario?.created_by,
+    currentScenario?.description,
+    currentScenario?.id,
+    currentScenario?.name,
+    edges,
+    nodes,
+    peopleCustomFields,
+    recurringSchedule,
+    scenarioDescription,
+    scenarioIsActive,
+    scenarioName,
+    scenarioNotes,
+    scenarios.length,
+    userId,
+  ]);
+
+  const handleConfirmSaveScenario = async () => {
+    const normalizedScenarioName = scenarioName?.trim()
+      ? scenarioName.trim().charAt(0).toUpperCase() + scenarioName.trim().slice(1)
+      : '';
+    const resolvedScenarioName = currentScenario
+      ? (normalizedScenarioName || currentScenario.name)
+      : (normalizedScenarioName || `Scenario ${scenarios.length + 1}`);
+    const resolvedDescription = scenarioDescription
+      ? scenarioDescription.charAt(0).toUpperCase() + scenarioDescription.slice(1)
+      : '';
+    const scenarioData = buildCurrentScenarioPayload({
+      name: resolvedScenarioName,
+      description: resolvedDescription,
+    });
     
     let result;
     
@@ -2762,6 +2857,9 @@ export default function ScenariosPage() {
 
     const directPath = normalizePathValue(rawValue);
     const directResolved = directPath ? readRuntimePath(resultsMap, directPath.split('.').filter(Boolean)) : null;
+    const directParentResolved = directPath.endsWith('.records') || directPath.endsWith('.results')
+      ? readRuntimePath(resultsMap, directPath.split('.').slice(0, -1).filter(Boolean))
+      : null;
     const interpolated = typeof rawValue === 'string'
       ? resolveVariableRefs(resolveTableVariableRefs(rawValue, resultsMap), resultsMap)
       : rawValue;
@@ -2769,7 +2867,10 @@ export default function ScenariosPage() {
     const interpolatedResolved = interpolatedPath && interpolatedPath !== directPath
       ? readRuntimePath(resultsMap, interpolatedPath.split('.').filter(Boolean))
       : null;
-    const resolved = directResolved ?? interpolatedResolved ?? interpolated;
+    const interpolatedParentResolved = interpolatedPath && interpolatedPath !== directPath && (interpolatedPath.endsWith('.records') || interpolatedPath.endsWith('.results'))
+      ? readRuntimePath(resultsMap, interpolatedPath.split('.').slice(0, -1).filter(Boolean))
+      : null;
+    const resolved = directResolved ?? directParentResolved ?? interpolatedResolved ?? interpolatedParentResolved ?? interpolated;
 
     let items = [];
     let sourceTable = '';
@@ -2778,6 +2879,9 @@ export default function ScenariosPage() {
       sourceTable = normalizeScenarioTableKey(directPath.split('.')[0] || interpolatedPath.split('.')[0] || '');
     } else if (resolved && typeof resolved === 'object' && Array.isArray(resolved.records)) {
       items = resolved.records;
+      sourceTable = normalizeScenarioTableKey(resolved.table || directPath.split('.')[0] || interpolatedPath.split('.')[0] || '');
+    } else if (resolved && typeof resolved === 'object' && Array.isArray(resolved.results)) {
+      items = resolved.results;
       sourceTable = normalizeScenarioTableKey(resolved.table || directPath.split('.')[0] || interpolatedPath.split('.')[0] || '');
     }
 
@@ -2818,6 +2922,10 @@ export default function ScenariosPage() {
     return fields
       .filter((field) => hasUnresolvedVariableToken(config?.[field.key]))
       .filter((field) => {
+        if (node?.actionConfig?._key === 'iterator' && field.key === 'collection_path') {
+          const { items } = resolveIteratorCollectionFromResultsMap(config?.[field.key], resultsMap);
+          return !Array.isArray(items) || items.length === 0;
+        }
         const resolvedValue = resolveRunFieldValue(config[field.key], resultsMap, false, undefined);
         return hasUnresolvedVariableToken(resolvedValue);
       });
@@ -3168,6 +3276,23 @@ export default function ScenariosPage() {
         });
         const result = await resp.json();
         if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Create customer failed');
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
+        return finishNodeRun(result);
+      }
+
+      if (actionKey === 'call_customer') {
+        console.log('[Run Node] call_customer request', { nodeId, personId: getValue('person_id') || null });
+        const resp = await authorizedApiFetch('/api/sonar/call-customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            person_id: getValue('person_id') || null,
+            main_content: getValue('main_content') || '',
+            first_message: getValue('first_message') || '',
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error || result.detail) throw new Error(result.error || result.detail || 'Call customer failed');
         setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, outputData: result } : n));
         return finishNodeRun(result);
       }
@@ -3823,11 +3948,7 @@ export default function ScenariosPage() {
     const execIndexMap = new Map(execOrder.map((node, index) => [node.id, index]));
     let breadcrumbSequence = 0;
     const nextBreadcrumbId = () => `run-breadcrumb-${breadcrumbSequence += 1}`;
-    const getOutgoingEdgesForNode = (nodeId) => (
-      edges
-        .filter((edge) => edge.from === nodeId)
-        .sort((a, b) => (execIndexMap.get(a.to) ?? Number.MAX_SAFE_INTEGER) - (execIndexMap.get(b.to) ?? Number.MAX_SAFE_INTEGER))
-    );
+    const nodeLabelMap = Object.fromEntries(execOrder.map((node) => [node.id, node.label || node.id]));
 
     const markNodeOutcome = (nodeId, status, preview, durationMs, nextMode = null) => {
       setScenarioRunState((prev) => {
@@ -3859,132 +3980,31 @@ export default function ScenariosPage() {
         };
       });
     };
-
-    const executeNodeBranch = async (nodeId, runtimeResultsMap, parentNodeId = null) => {
-      const node = nodeMap[nodeId];
-      if (!node) return runtimeResultsMap;
-
-      const actionKey = node.actionConfig?._key;
-      const stepNumber = (execIndexMap.get(nodeId) ?? 0) + 1;
-      const stepText = `[${stepNumber}/${execOrder.length}] ${node.label || node.id}`;
-      const incomingEdgeId = parentNodeId
-        ? edges.find((edge) => edge.from === parentNodeId && edge.to === nodeId)?.id || null
+    const markNodeRunning = (nodeId, previousNodeId = null, nextMode = 'running') => {
+      const incomingEdgeId = previousNodeId
+        ? edges.find((edge) => edge.from === previousNodeId && edge.to === nodeId)?.id || null
         : null;
-
+      const stepNumber = (execIndexMap.get(nodeId) ?? 0) + 1;
+      const label = nodeLabelMap[nodeId] || nodeId;
       setScenarioRunState((prev) => {
         if (!prev) return prev;
+        const alreadyRunning = prev.breadcrumbs.some((entry) => entry.nodeId === nodeId && entry.status === 'running');
         return {
           ...prev,
-          activeNodeId: null,
+          mode: nextMode,
+          activeNodeId: nodeId,
           activeEdgeId: incomingEdgeId,
-          breadcrumbs: [
-            ...prev.breadcrumbs,
-            { runId: nextBreadcrumbId(), nodeId: node.id, label: node.label || node.id, status: 'running' },
-          ],
+          breadcrumbs: alreadyRunning
+            ? prev.breadcrumbs
+            : [...prev.breadcrumbs, { runId: nextBreadcrumbId(), nodeId, label, status: 'running' }],
         };
       });
-      setRunProgress(`Routing to ${stepText}`);
-      await delay(parentNodeId ? 140 : 100);
-      focusRunNode(node.id, originalView);
-
-      if (!node.configured || !actionKey) {
-        markNodeOutcome(node.id, 'skipped', 'Skipped', 0);
-        return runtimeResultsMap;
-      }
-
-      const unresolvedFields = getUnresolvedRunFields(node, runtimeResultsMap);
-      if (unresolvedFields.length > 0) {
-        const errorMessage = `${node.label}: missing ${unresolvedFields.map((field) => field.label).join(', ')}`;
-        markNodeOutcome(node.id, 'error', errorMessage, 0, 'failed');
-        setRunProgress(errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      setScenarioRunState((prev) => prev ? { ...prev, activeNodeId: node.id } : prev);
-      setRunProgress(`Running ${stepText}`);
-      const startedAt = performance.now();
-
-      try {
-        if (actionKey === 'iterator') {
-          const iteratorResult = await executeRunnableNode(node.id, {}, runtimeResultsMap);
-          const durationMs = performance.now() - startedAt;
-          const preview = summarizeRunResult(actionKey, iteratorResult);
-          markNodeOutcome(node.id, 'success', preview, durationMs);
-          setRunProgress(`${stepText} completed`);
-
-          let branchResultsMap = {
-            ...runtimeResultsMap,
-            [node.id]: iteratorResult,
-          };
-          const {
-            items,
-            sourceTable,
-            collectionPath,
-          } = resolveIteratorCollectionFromResultsMap(
-            node.actionConfig?.collection_path || node.actionConfig?.collection || node.actionConfig?.array_path || '',
-            runtimeResultsMap
-          );
-          const branchEdges = getOutgoingEdgesForNode(node.id);
-          const branchResults = [];
-
-          for (let index = 0; index < items.length; index += 1) {
-            let itemResultsMap = applyIteratorItemResultsMap(
-              branchResultsMap,
-              items[index],
-              index,
-              items.length,
-              sourceTable,
-              collectionPath
-            );
-
-            for (const edge of branchEdges) {
-              itemResultsMap = await executeNodeBranch(edge.to, itemResultsMap, node.id);
-            }
-
-            branchResults.push({
-              index,
-              item: items[index],
-            });
-          }
-
-          const finalizedIteratorResult = {
-            ...iteratorResult,
-            results: branchResults,
-          };
-          setNodes((prev) => prev.map((entry) => (
-            entry.id === node.id ? { ...entry, outputData: finalizedIteratorResult } : entry
-          )));
-
-          return {
-            ...branchResultsMap,
-            [node.id]: finalizedIteratorResult,
-          };
-        }
-
-        const result = await executeRunnableNode(node.id, {}, runtimeResultsMap);
-        const durationMs = performance.now() - startedAt;
-        const preview = summarizeRunResult(actionKey, result);
-        markNodeOutcome(node.id, 'success', preview, durationMs);
-        setRunProgress(`${stepText} completed`);
-
-        let nextResultsMap = {
-          ...runtimeResultsMap,
-          [node.id]: result,
-        };
-        const outgoingEdges = getOutgoingEdgesForNode(node.id);
-        for (const edge of outgoingEdges) {
-          nextResultsMap = await executeNodeBranch(edge.to, nextResultsMap, node.id);
-        }
-        return nextResultsMap;
-      } catch (error) {
-        const durationMs = performance.now() - startedAt;
-        const preview = summarizeRunResult(actionKey, null, error?.message || 'Failed');
-        markNodeOutcome(node.id, 'error', preview, durationMs, 'failed');
-        setRunProgress(`${stepText} failed: ${error?.message || 'Unknown error'}`);
-        throw error;
-      } finally {
-        await delay(220);
-      }
+      setRunProgress(
+        nextMode === 'paused'
+          ? `Call in progress: [${stepNumber}/${execOrder.length}] ${label}`
+          : `Running [${stepNumber}/${execOrder.length}] ${label}`
+      );
+      focusRunNode(nodeId, originalView);
     };
 
     setIsRunning(true);
@@ -4019,18 +4039,147 @@ export default function ScenariosPage() {
           ],
         };
       });
-
-      let runtimeResultsMap = buildFlowResultsMap(triggerNode?.id);
-      const triggerOutgoingEdges = triggerNode ? getOutgoingEdgesForNode(triggerNode.id) : [];
-      for (const edge of triggerOutgoingEdges) {
-        runtimeResultsMap = await executeNodeBranch(edge.to, runtimeResultsMap, triggerNode.id);
+      const scenarioPayload = buildCurrentScenarioPayload();
+      const runResponse = await authorizedApiFetch('/api/scenarios/run-builder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario: scenarioPayload,
+          event_type: 'manual_trigger',
+          payload: {},
+        }),
+      });
+      const runResult = await runResponse.json();
+      if (!runResponse.ok || runResult?.detail || runResult?.error || runResult?.ok === false) {
+        throw new Error(runResult?.detail || runResult?.error || 'Failed to start scenario execution');
       }
 
-      setRunProgress('Scenario complete');
-      setScenarioRunState((prev) => prev ? { ...prev, mode: 'complete', activeNodeId: null, activeEdgeId: null } : prev);
+      const executionId = runResult.execution_id || runResult.result?.executionId || runResult.result?.execution_id || runResult.result?.context?._executionId;
+      if (!executionId) {
+        setRunProgress('Scenario complete');
+        setScenarioRunState((prev) => prev ? { ...prev, mode: 'complete', activeNodeId: null, activeEdgeId: null } : prev);
+        return;
+      }
+
+      builderRunPollRef.current = {
+        cancelled: false,
+        executionId,
+        lastNodeId: triggerNode?.id || null,
+        completedNodeIds: new Set(triggerNode?.id ? [triggerNode.id] : []),
+        nodeStartTimes: {},
+        traceIndex: 0,
+      };
+
+      while (!builderRunPollRef.current.cancelled) {
+        const executionResponse = await authorizedApiFetch(`/api/scenarios/executions/${encodeURIComponent(executionId)}`, { method: 'GET' });
+        const execution = await executionResponse.json();
+        if (!executionResponse.ok || execution?.detail) {
+          throw new Error(execution?.detail || 'Failed to load scenario execution');
+        }
+
+        const pollState = builderRunPollRef.current;
+        const status = String(execution.status || '').toLowerCase();
+        const pausedNodeId = execution.pause_data?.paused_node_id || null;
+        const currentNodeId = pausedNodeId || execution.current_node_id || null;
+        const flowContext = typeof execution.flow_context === 'string'
+          ? (() => { try { return JSON.parse(execution.flow_context); } catch { return {}; } })()
+          : (execution.flow_context || {});
+        const executionTrace = Array.isArray(flowContext._execution_trace) ? flowContext._execution_trace : [];
+
+        while (pollState.traceIndex < executionTrace.length) {
+          const traceEntry = executionTrace[pollState.traceIndex];
+          pollState.traceIndex += 1;
+          const tracedNodeId = traceEntry?.node_id;
+          const traceStatus = traceEntry?.status;
+          if (!tracedNodeId || tracedNodeId === triggerNode?.id) continue;
+
+          const previousNodeId = pollState.lastNodeId;
+          if (traceStatus === 'paused') {
+            pollState.lastNodeId = tracedNodeId;
+            pollState.nodeStartTimes[tracedNodeId] = pollState.nodeStartTimes[tracedNodeId] || performance.now();
+            markNodeRunning(tracedNodeId, previousNodeId, 'paused');
+            continue;
+          }
+
+          if (traceStatus === 'success' && !pollState.completedNodeIds.has(tracedNodeId)) {
+            pollState.lastNodeId = tracedNodeId;
+            pollState.nodeStartTimes[tracedNodeId] = pollState.nodeStartTimes[tracedNodeId] || performance.now();
+            markNodeRunning(tracedNodeId, previousNodeId, 'running');
+            await delay(220);
+            pollState.completedNodeIds.add(tracedNodeId);
+            markNodeOutcome(
+              tracedNodeId,
+              'success',
+              'Completed',
+              performance.now() - (pollState.nodeStartTimes[tracedNodeId] || performance.now())
+            );
+            continue;
+          }
+
+          if (traceStatus === 'failed') {
+            pollState.lastNodeId = tracedNodeId;
+            markNodeOutcome(
+              tracedNodeId,
+              'error',
+              execution.error || 'Failed',
+              performance.now() - (pollState.nodeStartTimes[tracedNodeId] || performance.now()),
+              'failed'
+            );
+          }
+        }
+
+        if (currentNodeId && currentNodeId !== pollState.lastNodeId) {
+          const previousNodeId = pollState.lastNodeId;
+          if (previousNodeId && !pollState.completedNodeIds.has(previousNodeId)) {
+            const startedAt = pollState.nodeStartTimes[previousNodeId] || performance.now();
+            pollState.completedNodeIds.add(previousNodeId);
+            markNodeOutcome(previousNodeId, 'success', 'Completed', performance.now() - startedAt);
+          }
+          pollState.lastNodeId = currentNodeId;
+          pollState.nodeStartTimes[currentNodeId] = performance.now();
+          markNodeRunning(currentNodeId, previousNodeId, status === 'paused' ? 'paused' : 'running');
+        } else if (currentNodeId) {
+          setScenarioRunState((prev) => prev ? {
+            ...prev,
+            mode: status === 'paused' ? 'paused' : 'running',
+            activeNodeId: currentNodeId,
+          } : prev);
+          const stepNumber = (execIndexMap.get(currentNodeId) ?? 0) + 1;
+          setRunProgress(
+            status === 'paused'
+              ? `Call in progress: [${stepNumber}/${execOrder.length}] ${nodeLabelMap[currentNodeId] || currentNodeId}`
+              : `Running [${stepNumber}/${execOrder.length}] ${nodeLabelMap[currentNodeId] || currentNodeId}`
+          );
+        }
+
+        if (status === 'completed') {
+          const finalNodeId = pollState.lastNodeId;
+          if (finalNodeId && !pollState.completedNodeIds.has(finalNodeId)) {
+            const startedAt = pollState.nodeStartTimes[finalNodeId] || performance.now();
+            pollState.completedNodeIds.add(finalNodeId);
+            markNodeOutcome(finalNodeId, 'success', 'Completed', performance.now() - startedAt);
+          }
+          setRunProgress('Scenario complete');
+          setScenarioRunState((prev) => prev ? { ...prev, mode: 'complete', activeNodeId: null, activeEdgeId: null } : prev);
+          break;
+        }
+
+        if (status === 'failed') {
+          const failedNodeId = currentNodeId || pollState.lastNodeId;
+          if (failedNodeId) {
+            const startedAt = pollState.nodeStartTimes[failedNodeId] || performance.now();
+            markNodeOutcome(failedNodeId, 'error', execution.error || 'Failed', performance.now() - startedAt, 'failed');
+          }
+          throw new Error(execution.error || 'Scenario execution failed');
+        }
+
+        await delay(status === 'paused' ? 1200 : 650);
+      }
     } catch (error) {
       console.error('[Scenario Run] Scenario execution failed', error);
+      setRunProgress(error?.message || 'Scenario execution failed');
     } finally {
+      builderRunPollRef.current.cancelled = true;
       await delay(420);
       setView(originalView);
       setScenarioRunState((prev) => prev ? { ...prev, viewport: originalView } : prev);
@@ -4371,6 +4520,7 @@ export default function ScenariosPage() {
               const isEdgeDropTarget = edgeDrag?.snapTargetId === node.id;
               const inRunPath = scenarioRunState?.orderIds?.includes(node.id);
               const isRunActiveNode = scenarioRunState?.activeNodeId === node.id;
+              const isRunPausedNode = isRunActiveNode && scenarioRunState?.mode === 'paused';
               const isRunCompletedNode = scenarioRunState?.completedNodeIds?.includes(node.id);
               const isRunFutureNode = inRunPath && !isRunCompletedNode && !isRunActiveNode;
               const isRunUnrelatedNode = Boolean(scenarioRunState) && !inRunPath;
@@ -4383,7 +4533,7 @@ export default function ScenariosPage() {
                   }}
                   className={`sb-builder-node ${node.type === 'router' ? 'router-node' : ''} ${
                     isActive ? 'sb-active-node' : ''
-                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''} ${isRunActiveNode ? 'sb-run-node-active' : ''} ${isRunCompletedNode ? 'sb-run-node-complete' : ''} ${isRunFutureNode ? 'sb-run-node-future' : ''} ${isRunUnrelatedNode ? 'sb-run-node-unrelated' : ''}`}
+                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''} ${isRunActiveNode ? 'sb-run-node-active' : ''} ${isRunPausedNode ? 'sb-run-node-paused' : ''} ${isRunCompletedNode ? 'sb-run-node-complete' : ''} ${isRunFutureNode ? 'sb-run-node-future' : ''} ${isRunUnrelatedNode ? 'sb-run-node-unrelated' : ''}`}
                   style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
                   onPointerEnter={() => setHoveredNodeId(node.id)}
                   onPointerLeave={() => setHoveredNodeId((current) => (current === node.id ? null : current))}
@@ -4413,10 +4563,10 @@ export default function ScenariosPage() {
 
                         {/* The Primary Gradient Sphere */}
                         <div
-                          className={`sb-node-sphere ${isActive ? 'sb-sphere-active' : ''} ${nodeRunState ? `is-${nodeRunState}` : ''}`}
+                          className={`sb-node-sphere ${isActive ? 'sb-sphere-active' : ''} ${nodeRunState ? `is-${nodeRunState}` : ''} ${isRunActiveNode ? 'is-scenario-running' : ''}`}
                           style={{ '--node-accent-color': accent }}
                         >
-                          {nodeRunState === 'running' && (
+                          {(nodeRunState === 'running' || isRunActiveNode) && (
                             <div className="sb-node-run-overlay" aria-hidden="true">
                               <span className="sb-node-run-wave w1" />
                               <span className="sb-node-run-wave w2" />
@@ -5899,7 +6049,7 @@ export default function ScenariosPage() {
               edges={edges}
               currentNodeId={(() => {
                 const edge = edges.find(e => e.id === logicPanel.edgeId);
-                return edge?.from || selectedNodeId;
+                return edge?.to || edge?.from || selectedNodeId;
               })()}
               style={{
                 position: 'absolute',
@@ -6016,6 +6166,15 @@ export default function ScenariosPage() {
             <button
               type="button"
               className="sb-toolbar-icon-btn"
+              onClick={handleImportScenarioClick}
+              title="Import JSON"
+            >
+              <Upload size={13} />
+            </button>
+
+            <button
+              type="button"
+              className="sb-toolbar-icon-btn"
               onClick={() => setShowJsonModal(true)}
               title="View JSON"
             >
@@ -6037,6 +6196,56 @@ export default function ScenariosPage() {
 
           </div>
         </div>
+        )}
+
+        {showImportJsonModal && (
+          <div className="sb-json-modal-overlay" onClick={() => setShowImportJsonModal(false)}>
+            <div className="sb-json-modal" onClick={e => e.stopPropagation()}>
+              <div className="sb-json-modal-header">
+                <h3 className="sb-json-modal-title">Import Scenario JSON</h3>
+                <button
+                  type="button"
+                  className="sb-json-modal-close"
+                  onClick={() => setShowImportJsonModal(false)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="sb-json-modal-body">
+                <div className="sb-json-import-body">
+                  <textarea
+                    className="sb-json-import-textarea"
+                    value={importJsonValue}
+                    onChange={(e) => {
+                      setImportJsonValue(e.target.value);
+                      if (importJsonError) setImportJsonError('');
+                    }}
+                    placeholder="Paste scenario JSON here..."
+                    spellCheck={false}
+                  />
+                  {importJsonError && (
+                    <div className="sb-json-import-error">{importJsonError}</div>
+                  )}
+                </div>
+              </div>
+              <div className="sb-json-import-footer">
+                <button
+                  type="button"
+                  className="sb-schedule-cancel-btn"
+                  onClick={() => setShowImportJsonModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="save-scenario-btn"
+                  onClick={handleImportScenarioSubmit}
+                >
+                  Import
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {scenarioRunState && (

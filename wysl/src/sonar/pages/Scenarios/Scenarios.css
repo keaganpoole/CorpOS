@@ -815,6 +815,23 @@
   z-index: 12;
 }
 
+.sb-builder-node.sb-run-node-active .sb-node-aura {
+  opacity: 0.34;
+  filter: blur(24px);
+  animation: sb-scenario-aura-breathe 2.2s ease-in-out infinite;
+}
+
+.sb-builder-node.sb-run-node-active .sb-node-ring {
+  border-color: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 30px rgba(255, 255, 255, 0.2);
+  animation: sb-scenario-ring-pulse 1.8s ease-in-out infinite;
+}
+
+.sb-builder-node.sb-run-node-paused .sb-node-ring {
+  border-color: rgba(50, 240, 217, 0.72);
+  box-shadow: 0 0 0 2px rgba(50, 240, 217, 0.14), 0 0 38px rgba(50, 240, 217, 0.3);
+}
+
 .sb-builder-node.sb-run-node-complete {
   opacity: 0.85 !important;
 }
@@ -924,6 +941,11 @@
 
 .sb-node-sphere.is-running {
   box-shadow: 0 14px 36px -10px rgba(225, 29, 72, 0.42), inset 0 2px 18px rgba(255, 255, 255, 0.16);
+}
+
+.sb-node-sphere.is-scenario-running {
+  box-shadow: 0 16px 42px -8px rgba(255, 255, 255, 0.28), inset 0 2px 18px rgba(255, 255, 255, 0.2);
+  animation: sb-scenario-sphere-breathe 1.9s ease-in-out infinite;
 }
 
 .sb-node-sphere.is-success {
@@ -1205,6 +1227,21 @@
     transform: scale(1.05);
     box-shadow: 0 0 0 6px rgba(255, 255, 255, 0);
   }
+}
+
+@keyframes sb-scenario-aura-breathe {
+  0%, 100% { opacity: 0.22; transform: scale(0.94); }
+  50% { opacity: 0.48; transform: scale(1.12); }
+}
+
+@keyframes sb-scenario-ring-pulse {
+  0%, 100% { transform: scale(0.98); }
+  50% { transform: scale(1.035); }
+}
+
+@keyframes sb-scenario-sphere-breathe {
+  0%, 100% { transform: scale(0.985); filter: saturate(1); }
+  50% { transform: scale(1.035); filter: saturate(1.25) brightness(1.08); }
 }
 
 
@@ -4653,4 +4690,45 @@
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.sb-json-import-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sb-json-import-textarea {
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(10, 10, 12, 0.92);
+  color: #e4e4e7;
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  outline: none;
+}
+
+.sb-json-import-textarea:focus {
+  border-color: rgba(50, 240, 217, 0.35);
+  box-shadow: 0 0 0 1px rgba(50, 240, 217, 0.18);
+}
+
+.sb-json-import-error {
+  font-size: 12px;
+  color: #f87171;
+}
+
+.sb-json-import-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }

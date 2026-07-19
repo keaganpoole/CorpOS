@@ -1,88 +1,59 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Appointment Service Procedure</title>
-  <style>
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-      background: #0b0b0f;
-      color: #f5f5f7;
-      padding: 32px;
-      line-height: 1.5;
+{
+  "name": "New Customer Intake",
+  "trigger": "New customer or missing customer record",
+  "steps": [
+    {
+      "type": "say",
+      "message": "strawberry"
+    },
+    {
+      "type": "ask",
+      "instruction": "If the customer's full name has not already been provided, casually ask for it in a natural and personable way."
+    },
+    {
+      "type": "ask",
+      "instruction": "If the customer's best phone number has not already been provided, ask for it."
+    },
+    {
+      "type": "ask",
+      "instruction": "If needed, ask for the customer's email address."
+    },
+    {
+      "type": "tool_call",
+      "tool_id": "tool_6901kq3gx3tgefd9ne57sggdhm77",
+      "tool_name": "set_agent_data",
+      "instruction": "Save the customer's intake details."
+    },
+    {
+      "type": "branch",
+      "branches": [
+        {
+          "condition": {
+            "type": "llm",
+            "condition": "The customer intake details are complete."
+          },
+          "steps": [
+            {
+              "type": "tool_call",
+              "tool_id": "tool_6901kq3gx3tgefd9ne57sggdhm77",
+              "tool_name": "set_agent_data",
+              "instruction": "Set ready_create_record to TRUE."
+            }
+          ]
+        },
+        {
+          "condition": {
+            "type": "llm",
+            "condition": "The customer intake details are not complete."
+          },
+          "steps": [
+            {
+              "type": "ask",
+              "instruction": "Ask for any remaining missing customer intake fields one at a time."
+            }
+          ]
+        }
+      ]
     }
-    .card {
-      max-width: 900px;
-      margin: 0 auto;
-      background: #15151c;
-      border: 1px solid #2a2a35;
-      border-radius: 16px;
-      padding: 28px;
-    }
-    h1 {
-      margin-top: 0;
-      font-size: 28px;
-    }
-    .step {
-      margin: 22px 0;
-      padding: 18px;
-      background: #1f1f29;
-      border-radius: 12px;
-      border-left: 4px solid #7c7cff;
-    }
-    .step h2 {
-      margin: 0 0 8px;
-      font-size: 19px;
-    }
-    .branch {
-      margin-left: 26px;
-      padding-left: 18px;
-      border-left: 2px solid #3a3a48;
-    }
-    .success {
-      border-left-color: #42d392;
-    }
-    .fail {
-      border-left-color: #ff6b6b;
-    }
-    code {
-      background: #111118;
-      padding: 2px 6px;
-      border-radius: 6px;
-      color: #d7d7ff;
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Appointment Procedure: Select Service</h1>
-
-    <div class="step">
-      <h2>🗣️ Ask</h2>
-      <p>If the customer has not already said what service they want, casually ask what service they would like to book. Keep it natural, brief, and personable.</p>
-    </div>
-
-    <div class="step">
-      <h2>🔧 Tool: get_services</h2>
-      <p>Use the customer's request to find the closest matching service offered by the business. Return the exact <code>service_id</code> for the selected service.</p>
-    </div>
-
-    <div class="step">
-      <h2>❓ If</h2>
-      <div class="branch success">
-        <h2>✅ Matching service found</h2>
-        <p>Call <code>set_agent_data</code>.</p>
-        <p>Save <code>appointment_service_id</code> using the exact <code>service_id</code> returned by <code>get_services</code>.</p>
-        <p>Then continue to the next appointment step.</p>
-      </div>
-
-      <div class="branch fail">
-        <h2>❌ No matching service found</h2>
-        <p>Politely explain that the requested service is not offered by the business. Be empathetic and conversational, then ask if there is another service they would like to book instead.</p>
-        <p>After the customer gives another service request, call <code>get_services</code> again and repeat the service check.</p>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
+  ]
+}

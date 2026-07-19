@@ -18,7 +18,7 @@ import {
   getContextType,
   DEFAULT_FIELDS,
 } from '../../lib/fieldContexts';
-import { renderVarChipsHTML } from './VariablesPane';
+import { getTableFields, renderVarChipsHTML } from './VariablesPane';
 
 const TYPE_LABELS = {
   text: 'Text',
@@ -31,6 +31,7 @@ const TYPE_LABELS = {
   boolean: 'Boolean',
   number: 'Number',
   currency: 'Currency',
+  date: 'Date',
   timestamp: 'Timestamp',
 };
 
@@ -39,6 +40,10 @@ const OPERATORS_BY_TYPE = {
     { value: 'equals', label: 'Equal to' },
     { value: 'not_equals', label: 'Not equal to' },
     { value: 'contains', label: 'Contains' },
+    { value: 'before', label: 'Before' },
+    { value: 'after', label: 'After' },
+    { value: 'on_or_before', label: 'On or before' },
+    { value: 'on_or_after', label: 'On or after' },
     { value: 'is_empty', label: 'Is empty' },
     { value: 'is_not_empty', label: 'Is not empty' },
   ],
@@ -90,13 +95,29 @@ const OPERATORS_BY_TYPE = {
   ],
   currency: [
     { value: 'equals', label: 'Equal to' },
+    { value: 'not_equals', label: 'Not equal to' },
     { value: 'greater_than', label: 'Greater than' },
     { value: 'less_than', label: 'Less than' },
     { value: 'is_empty', label: 'Is empty' },
+    { value: 'is_not_empty', label: 'Is not empty' },
   ],
-  timestamp: [
+  date: [
+    { value: 'equals', label: 'On' },
+    { value: 'not_equals', label: 'Not on' },
     { value: 'before', label: 'Before' },
     { value: 'after', label: 'After' },
+    { value: 'on_or_before', label: 'On or before' },
+    { value: 'on_or_after', label: 'On or after' },
+    { value: 'is_empty', label: 'Is empty' },
+    { value: 'is_not_empty', label: 'Is not empty' },
+  ],
+  timestamp: [
+    { value: 'equals', label: 'On' },
+    { value: 'not_equals', label: 'Not on' },
+    { value: 'before', label: 'Before' },
+    { value: 'after', label: 'After' },
+    { value: 'on_or_before', label: 'On or before' },
+    { value: 'on_or_after', label: 'On or after' },
     { value: 'is_empty', label: 'Is empty' },
     { value: 'is_not_empty', label: 'Is not empty' },
   ],
@@ -110,11 +131,23 @@ const normalizeValue = (field, rawValue) => {
 };
 
 const getField = (fieldKey, contextFields) => {
+  const normalizedFieldKey = String(fieldKey || '').trim();
+  const unwrappedFieldKey = normalizedFieldKey.replace(/^\{\{\s*|\s*\}\}$/g, '');
+
   // First check context-specific fields
-  const ctxField = contextFields.find(f => f.key === fieldKey);
+  const ctxField = contextFields.find((f) => f.key === normalizedFieldKey || f.key === unwrappedFieldKey);
   if (ctxField) return ctxField;
+
+  const parts = unwrappedFieldKey.split('.');
+  if (parts.length >= 2) {
+    const tableKey = parts.length >= 3 ? parts[parts.length - 2] : parts[0];
+    const nestedFieldKey = parts[parts.length - 1];
+    const tableField = getTableFields(tableKey).find((f) => f.key === nestedFieldKey);
+    if (tableField) return tableField;
+  }
+
   // Fallback to LEAD_FIELDS
-  return LEAD_FIELDS.find((field) => field.key === fieldKey);
+  return LEAD_FIELDS.find((field) => field.key === normalizedFieldKey || field.key === unwrappedFieldKey);
 };
 
 const getOperatorOptions = (field) => OPERATORS_BY_TYPE[field?.type] || OPERATORS_BY_TYPE.text;
@@ -124,15 +157,20 @@ const defaultOperatorForField = (field) => {
   return operators[0]?.value || 'equals';
 };
 
+const DATE_OPERATORS = new Set(['before', 'after', 'on_or_before', 'on_or_after']);
+
 // Value field is always a plain text input — never a dropdown.
-const getValueComponent = ({ rule, onUpdateRule, onFieldFocus }) => {
+const getValueComponent = ({ field, rule, onUpdateRule, onFieldFocus }) => {
   const valStr = String(rule.value || '');
   const hasChips = valStr.includes('{{');
   const isDisabled = rule.operator === 'is_empty' || rule.operator === 'is_not_empty';
+  const isDateInput = DATE_OPERATORS.has(rule.operator) || field?.type === 'date' || field?.type === 'timestamp';
+  const inputType = !hasChips && isDateInput ? 'date' : 'text';
   return (
     <>
       <input
         className="sb-input-field"
+        type={inputType}
         value={rule.value ?? ''}
         onChange={(event) => onUpdateRule(rule.id, 'value', event.target.value)}
         onFocus={(event) => onFieldFocus?.(rule.id, 'value', event.target)}
@@ -173,6 +211,7 @@ const AetherEdgeLogic = ({
   onToggleFallback,
 }) => {
   const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startPosTop: 0, startPosLeft: 0 });
+  const valueInputRefs = useRef(new Map());
 
   // No clamping — free drag anywhere
   const clampPosition = useCallback((top, left) => {
@@ -301,7 +340,22 @@ const AetherEdgeLogic = ({
                   <select
                     className="aether-rule-select aether-rule-select--op"
                     value={rule.operator}
-                    onChange={(event) => onUpdateRule(rule.id, 'operator', event.target.value)}
+                    onChange={(event) => {
+                      const nextOperator = event.target.value;
+                      onUpdateRule(rule.id, 'operator', nextOperator);
+                      if (DATE_OPERATORS.has(nextOperator)) {
+                        window.requestAnimationFrame(() => {
+                          const input = valueInputRefs.current.get(rule.id);
+                          if (!input) return;
+                          input.focus();
+                          if (typeof input.showPicker === 'function') {
+                            try {
+                              input.showPicker();
+                            } catch {}
+                          }
+                        });
+                      }
+                    }}
                   >
                     {operators.map((operator) => (
                       <option key={operator.value} value={operator.value}>
@@ -310,7 +364,17 @@ const AetherEdgeLogic = ({
                     ))}
                   </select>
                   <div className="aether-rule-value">
-                    {getValueComponent({ rule, onUpdateRule, onFieldFocus })}
+                    {getValueComponent({
+                      field,
+                      rule,
+                      onUpdateRule,
+                      onFieldFocus: (ruleId, fieldKey, inputEl) => {
+                        if (fieldKey === 'value') {
+                          valueInputRefs.current.set(ruleId, inputEl);
+                        }
+                        onFieldFocus?.(ruleId, fieldKey, inputEl);
+                      },
+                    })}
                   </div>
                   <button
                     type="button"

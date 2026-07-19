@@ -430,6 +430,7 @@ const inferVariableType = (key, value) => {
   if (normalizedKey.includes('email')) return 'email';
   if (normalizedKey.includes('url') || normalizedKey.includes('pdf')) return 'url';
   if (normalizedKey.includes('phone')) return 'phone';
+  if (normalizedKey === 'date' || normalizedKey.endsWith('_date')) return 'date';
   if (normalizedKey === 'created' || normalizedKey === 'due_date' || normalizedKey.endsWith('_at')) return 'timestamp';
   return 'text';
 };

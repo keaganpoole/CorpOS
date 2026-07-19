@@ -3493,6 +3493,8 @@ def build_people_intake_fields(business: Optional[dict]) -> list[dict]:
         for field_key, field_settings in config.items()
         if isinstance(field_settings, dict) and field_settings.get("intakeEnabled") is True
     ]
+    if "phone" not in enabled_keys:
+        enabled_keys.insert(0, "phone")
     if not enabled_keys:
         return []
 
@@ -3756,7 +3758,7 @@ def find_business_by_forwarded_number(forwarded_number: Optional[str]):
         return None
 
     try:
-        response = supabase.table("businesses").select("id,user_id,name,phone,forwarding_config").execute()
+        response = supabase.table("businesses").select("*").execute()
     except Exception:
         return None
 
@@ -3788,7 +3790,7 @@ def find_business_by_called_number(called_number: Optional[str]):
             business_response = (
                 supabase
                 .table("businesses")
-                .select("id,user_id,name,phone,forwarding_config")
+                .select("*")
                 .eq("id", row.get("business_id"))
                 .limit(1)
                 .execute()
@@ -5150,6 +5152,7 @@ async def route_call_compat(request: Request):
         "twilio_to_number": call_payload.get("to_number"),
         "twilio_call_sid": call_payload.get("call_id"),
     }
+    dynamic_variables["intake_fields"] = json.dumps(build_people_intake_fields(business), ensure_ascii=True)
     matched_person = lookup_person_record(
         phone_number=call_payload.get("from_number"),
         business_id=str(business.get("id")) if business and business.get("id") is not None else None,

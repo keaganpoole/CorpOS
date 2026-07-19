@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
   User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, CreditCard, Search, Layers
@@ -142,10 +142,24 @@ const normalizeIteratorCollectionPath = (value) => {
   return (match?.[1] || trimmed).trim();
 };
 
+const getIteratorCollectionRef = (nodeId) => `{{${nodeId}}}`;
+const getCollectionVariableRef = (tableKey) => `{{${normalizeParsedTableKey(tableKey)}.records}}`;
+
 const getNodeArrayOutput = (node) => {
   if (Array.isArray(node?.searchResults)) return node.searchResults;
   if (Array.isArray(node?.outputData)) return node.outputData;
+  if (Array.isArray(node?.outputData?.results)) return node.outputData.results;
   if (Array.isArray(node?.outputData?.records)) return node.outputData.records;
+  return null;
+};
+
+const getSearchOutputTableKey = (node) => {
+  const actionKey = node?.actionConfig?._key;
+  if (actionKey === 'search_appointments') return 'appointments';
+  if (actionKey === 'search_records') {
+    const tableKey = (node.actionConfig?.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
+    return normalizeParsedTableKey(tableKey);
+  }
   return null;
 };
 
@@ -181,6 +195,50 @@ const getAncestorIdsInOrder = (startNodeId, nodes, edges) => {
 
   const currentIdx = topoOrder.indexOf(startNodeId);
   return currentIdx > 0 ? topoOrder.slice(0, currentIdx).reverse() : [];
+};
+
+const getUpstreamSearchOutputsByTable = (currentNodeId, nodes, edges) => {
+  const outputs = {};
+  const ancestorIds = getAncestorIdsInOrder(currentNodeId, nodes, edges);
+
+  ancestorIds.forEach((nodeId) => {
+    const node = nodes.find((entry) => entry.id === nodeId);
+    const tableKey = getSearchOutputTableKey(node);
+    const records = getNodeArrayOutput(node);
+    if (!tableKey || !Array.isArray(records) || outputs[tableKey]) return;
+    outputs[tableKey] = {
+      nodeId,
+      label: node.label || 'Search',
+      records,
+    };
+  });
+
+  return outputs;
+};
+
+const getUpstreamIteratorSourcesByTable = (currentNodeId, nodes, edges) => {
+  const outputs = {};
+  const ancestorIds = getAncestorIdsInOrder(currentNodeId, nodes, edges);
+
+  ancestorIds.forEach((nodeId) => {
+    const node = nodes.find((entry) => entry.id === nodeId);
+    if (node?.actionConfig?._key !== 'iterator') return;
+
+    const iteratorSource = getIteratorCurrentFieldsFromNode(node, nodes, edges);
+    const sourceTableKey = getSearchOutputTableKey(iteratorSource.sourceNode);
+    const sourceRecords = getNodeArrayOutput(iteratorSource.sourceNode) || [];
+    const sampleRecord = sourceRecords.find((item) => item && typeof item === 'object' && !Array.isArray(item)) || null;
+    if (!sourceTableKey || !sampleRecord || outputs[sourceTableKey]) return;
+
+    outputs[sourceTableKey] = {
+      iteratorNodeId: node.id,
+      sourceNodeId: iteratorSource.sourceNode?.id || '',
+      label: iteratorSource.sourceNode?.label || 'Search',
+      records: [sampleRecord],
+    };
+  });
+
+  return outputs;
 };
 
 const findIteratorSourceNode = (iteratorNode, nodes, edges) => {
@@ -502,7 +560,7 @@ const TABLE_DEFS = [
     icon: Calendar,
     fields: [
       { key: 'id', label: 'Record ID', type: 'text' },
-      { key: 'date', label: 'Date', type: 'text' },
+      { key: 'date', label: 'Date', type: 'date' },
       { key: 'time', label: 'Time', type: 'text' },
       { key: 'duration', label: 'Duration', type: 'number' },
       { key: 'status', label: 'Status', type: 'text' },
@@ -686,7 +744,7 @@ export const TABLE_LABELS = {
   business: 'Business',
 };
 
-const AGENT_SOURCE_TABLES = new Set(['people', 'appointments']);
+const AGENT_SOURCE_TABLES = new Set(TABLE_DEFS.map((table) => table.key));
 
 export const getAgentFieldsForTable = (tableKey) => {
   if (!AGENT_SOURCE_TABLES.has(tableKey)) return [];
@@ -724,6 +782,24 @@ export const renderVarChipsHTML = (value) => {
   });
   result = result.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
     const parts = ref.split('.');
+    if (parts.length === 1) {
+      const tableKey = normalizeParsedTableKey(parts[0]);
+      const color = TABLE_COLORS[tableKey] || TABLE_COLORS[parts[0]] || '#32f0d9';
+      const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
+      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${escapeHtml(tableLabel)}.records</span>`;
+    }
+    if (parts.length >= 2 && parts[0] === 'iterator' && parts[1] === 'current') {
+      const color = TABLE_COLORS.iterator || '#f472b6';
+      const fieldLabel = getIteratorFieldLabel(parts.slice(2).join('.'));
+      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Iterator.Current Bundle.${escapeHtml(fieldLabel)}</span>`;
+    }
+    if (parts.length >= 3 && /^\d+$/.test(parts[1])) {
+      const tableKey = normalizeParsedTableKey(parts[0]);
+      const color = TABLE_COLORS[tableKey] || '#a78bfa';
+      const tableLabel = TABLE_LABELS[parts[0]] || TABLE_LABELS[tableKey] || parts[0];
+      const fieldLabel = getFieldDisplayLabel(tableKey, parts.slice(2).join('.'));
+      return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${escapeHtml(tableLabel)}.${escapeHtml(fieldLabel)}</span>`;
+    }
     if (parts.length === 3 && (parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist')) {
       const tableKey = normalizeParsedTableKey(parts[1]);
       const color = TABLE_COLORS[tableKey] || '#a78bfa';
@@ -738,8 +814,9 @@ export const renderVarChipsHTML = (value) => {
     }
     if (parts.length !== 2) return match;
     if (parts[1] === 'records') {
-      const color = '#32f0d9';
-      const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
+      const tableKey = normalizeParsedTableKey(parts[0]);
+      const color = TABLE_COLORS[tableKey] || TABLE_COLORS[parts[0]] || '#32f0d9';
+      const tableLabel = TABLE_LABELS[parts[0]] || TABLE_LABELS[tableKey] || parts[0];
       return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${escapeHtml(tableLabel)}.records</span>`;
     }
     if (parts[0] === 'agent' || parts[0] === 'receptionist') {
@@ -941,8 +1018,8 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
               <button
                 type="button"
                 className="sb-vars-field"
-                onClick={(e) => { e.stopPropagation(); onInsertVariable?.(getVariableRef(node.nodeId, 'records'), `${node.label} records`, '#32f0d9'); }}
-                title={`Insert {{${node.nodeId}.records}}`}
+                onClick={(e) => { e.stopPropagation(); onInsertVariable?.(getIteratorCollectionRef(node.nodeId), `${node.label} records`, '#32f0d9'); }}
+                title={`Insert {{${node.nodeId}}}`}
                 style={{ fontWeight: 700 }}
               >
                 <span className="sb-vars-field-name" style={{ color: '#32f0d9' }}>All records</span>
@@ -1058,7 +1135,7 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
       if (!node) return null;
       const isTriggerNode = node.categoryType === 'TRIGGERS' || (!!node.triggerKey && !node.actionConfig);
       if (isTriggerNode) return null;
-      if (node.actionConfig?._key === 'search_records') return null;
+      if (getSearchOutputTableKey(node)) return null;
       const display = getNodeDisplay(node.categoryType);
       const label = node.label || display.defaultLabel;
       const isIteratorNode = node.actionConfig?._key === 'iterator';
@@ -1245,13 +1322,9 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     const triggerKey = findTriggerKeyForNode(currentNodeId, nodes, edges);
     const available = getAvailableTables(triggerKey, currentNode || null);
     const fetchAll = async () => {
-      const results = {};
-      const indices = {};
-      for (const table of available) {
-        const data = await table.fetch();
-        results[table.key] = data;
-        indices[table.key] = 0;
-      }
+      const fetched = await Promise.all(available.map(async (table) => [table.key, await table.fetch()]));
+      const results = Object.fromEntries(fetched);
+      const indices = Object.fromEntries(available.map((table) => [table.key, 0]));
       setRecords(results);
       setActiveIndex(indices);
       setExpanded((prev) => {
@@ -1265,7 +1338,12 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       });
     };
     fetchAll();
-  }, [visible, currentNodeId, nodes, edges, customFieldsReady, currentNode]);
+  }, [visible, currentNodeId, customFieldsReady, findTriggerKeyForNode(currentNodeId, nodes, edges), focusedTableKey]);
+
+  const receptionistSelectionKey = [
+    currentNodeId,
+    findNearestUpstreamCallNode(currentNodeId, nodes, edges)?.actionConfig?.assigned_receptionist || '',
+  ].join(':');
 
   useEffect(() => {
     let cancelled = false;
@@ -1452,7 +1530,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 
     loadActiveReceptionist();
     return () => { cancelled = true; };
-  }, [visible, currentNodeId, nodes, edges]);
+  }, [visible, receptionistSelectionKey]);
 
   useEffect(() => {
     if (!visible || !customFieldsReady) return;
@@ -1539,8 +1617,6 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     };
   }, [visible]);
 
-  if (!visible) return null;
-
   const hasCallNodeBefore = (() => {
     if (!currentNodeId || !nodes.length) return false;
     const callNodeIds = nodes
@@ -1576,6 +1652,30 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   })();
 
   const showFromCall = hasCallNodeBefore && !isPhoneCallTrigger && !isCallAction;
+  const searchOutputsByTable = useMemo(
+    () => getUpstreamSearchOutputsByTable(currentNodeId, nodes, edges),
+    [currentNodeId, nodes, edges]
+  );
+  const iteratorSourcesByTable = useMemo(
+    () => getUpstreamIteratorSourcesByTable(currentNodeId, nodes, edges),
+    [currentNodeId, nodes, edges]
+  );
+
+  if (!visible) return null;
+
+  const getVisibleTableRecords = (tableKey) => {
+    const activeSource = activeSources[sourceStateKey(tableKey)] || (
+      iteratorSourcesByTable[tableKey]
+        ? 'search'
+        : searchOutputsByTable[tableKey]
+        ? 'search'
+        : (showFromCall && getAgentFieldsForTable(tableKey).length > 0 ? 'agent' : 'trigger')
+    );
+    if (activeSource === 'search') {
+      return iteratorSourcesByTable[tableKey]?.records || searchOutputsByTable[tableKey]?.records || [];
+    }
+    return records[tableKey] || [];
+  };
 
   const handleSearch = (tableKey, query) => {
     setSearchQueries(prev => ({ ...prev, [tableKey]: query }));
@@ -1587,7 +1687,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     }
     setSearchStates(prev => ({ ...prev, [tableKey]: true }));
     searchTimers.current[tableKey] = setTimeout(() => {
-      const tableRecords = records[tableKey] || [];
+      const tableRecords = getVisibleTableRecords(tableKey);
       const searchFields = SEARCH_FIELDS[tableKey] || [];
       const lowerQuery = query.toLowerCase();
       let matchIndex = 0;
@@ -1628,7 +1728,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   const getCount = (tableKey) => {
     const query = searchQueries[tableKey];
     if (!query || !query.trim()) return 0;
-    const tableRecords = records[tableKey] || [];
+    const tableRecords = getVisibleTableRecords(tableKey);
     const searchFields = SEARCH_FIELDS[tableKey] || [];
     const lowerQuery = query.toLowerCase();
     let count = 0;
@@ -1645,7 +1745,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
   const getMatchedIndices = (tableKey) => {
     const query = searchQueries[tableKey];
     if (!query || !query.trim()) return [];
-    const tableRecords = records[tableKey] || [];
+    const tableRecords = getVisibleTableRecords(tableKey);
     const searchFields = SEARCH_FIELDS[tableKey] || [];
     const lowerQuery = query.toLowerCase();
     const indices = [];
@@ -1687,12 +1787,32 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     return matched;
   };
 
-  const availableTables = orderDisplayedTables(getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges), currentNode || null));
   const sourceStateKey = (tableKey) => `${currentNodeId || 'none'}::${tableKey}`;
+  const availableTables = (() => {
+    const baseTables = orderDisplayedTables(getAvailableTables(findTriggerKeyForNode(currentNodeId, nodes, edges), currentNode || null));
+    const byKey = new Map(baseTables.map((table) => [table.key, table]));
+    [...new Set([...Object.keys(searchOutputsByTable), ...Object.keys(iteratorSourcesByTable)])].forEach((tableKey) => {
+      if (!byKey.has(tableKey)) {
+        const table = TABLE_DEFS.find((item) => item.key === tableKey);
+        if (table) byKey.set(tableKey, withCustomFields(table));
+      }
+    });
+    const tables = Array.from(byKey.values());
+    return tables.sort((a, b) => {
+      const aSearch = (searchOutputsByTable[a.key] || iteratorSourcesByTable[a.key]) ? 0 : 1;
+      const bSearch = (searchOutputsByTable[b.key] || iteratorSourcesByTable[b.key]) ? 0 : 1;
+      if (aSearch !== bSearch) return aSearch - bSearch;
+      return 0;
+    });
+  })();
 
   const getSourceCycleOrder = (tableKey) => {
     const hasAgentFields = showFromCall && getAgentFieldsForTable(tableKey).length > 0;
-    return hasAgentFields ? ['agent', 'trigger'] : ['trigger'];
+    const order = [];
+    if (searchOutputsByTable[tableKey] || iteratorSourcesByTable[tableKey]) order.push('search');
+    if (hasAgentFields) order.push('agent');
+    order.push('trigger');
+    return order;
   };
 
   const cycleTableSource = (tableKey) => {
@@ -1700,7 +1820,11 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
     if (sourceOrder.length <= 1) return;
     setActiveSources(prev => {
       const key = sourceStateKey(tableKey);
-      const current = prev[key] || (showFromCall && getAgentFieldsForTable(tableKey).length > 0 ? 'agent' : 'trigger');
+      const current = prev[key] || (
+        (searchOutputsByTable[tableKey] || iteratorSourcesByTable[tableKey])
+          ? 'search'
+          : (showFromCall && getAgentFieldsForTable(tableKey).length > 0 ? 'agent' : 'trigger')
+      );
       const currentIndex = sourceOrder.indexOf(current);
       const next = sourceOrder[(currentIndex + 1) % sourceOrder.length];
       return { ...prev, [key]: next };
@@ -1749,36 +1873,33 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
           onTableHover={onTableHover}
         />
 
-        <SearchRecordsOutput
-          currentNodeId={currentNodeId}
-          nodes={nodes}
-          edges={edges}
-          onInsertVariable={onInsertVariable}
-          onTableHover={onTableHover}
-        />
-
         {availableTables.map((table) => {
-          const tableRecords = records[table.key] || [];
-          const idx = activeIndex[table.key] || 0;
-          const currentRecord = tableRecords[idx] || null;
           const isExpanded = expanded[table.key];
           const query = searchQueries[table.key] || '';
           const isSearching = searchStates[table.key] || false;
           const editing = editingTables[table.key] || false;
-          const resultCount = getCount(table.key);
-          const matchedFields = getMatchedFields(table.key, currentRecord);
           const TableIcon = table.icon;
           const agentFields = getAgentFieldsForTable(table.key);
           const hasAgentData = showFromCall && agentFields.length > 0;
-          const activeSource = activeSources[sourceStateKey(table.key)] || (hasAgentData ? 'agent' : 'trigger');
+          const searchSource = iteratorSourcesByTable[table.key] || searchOutputsByTable[table.key] || null;
+          const activeSource = activeSources[sourceStateKey(table.key)] || (searchSource ? 'search' : (hasAgentData ? 'agent' : 'trigger'));
           const showingAgent = activeSource === 'agent';
           const sourceColor = table.color;
           const sourceBg = table.colorBg;
           const sourceBorder = table.colorBorder;
           const receptionistName = activeReceptionist?.first_name?.trim() || activeReceptionist?.full_name?.trim();
-          const sourceLabel = showingAgent
-            ? (receptionistName || 'Receptionist')
-            : 'Trigger';
+          const sourceLabel = activeSource === 'search'
+            ? 'Search'
+            : showingAgent
+              ? (receptionistName || 'Receptionist')
+              : 'Trigger';
+          const tableRecords = activeSource === 'search'
+            ? (searchSource?.records || [])
+            : (records[table.key] || []);
+          const idx = Math.min(activeIndex[table.key] || 0, Math.max(tableRecords.length - 1, 0));
+          const currentRecord = tableRecords[idx] || null;
+          const resultCount = getCount(table.key);
+          const matchedFields = getMatchedFields(table.key, currentRecord);
           if (table.key === 'people' && showingAgent) {
             scenarioLog('log', '[VariablesPane] render:agent-source-label', {
               tableKey: table.key,
@@ -1805,19 +1926,19 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
               onMouseLeave={() => onTableHover?.('')}
             >
               <div
-                className={`sb-vars-table-header ${editing ? 'sb-vars-header-searching' : ''} ${hasAgentData ? 'sb-vars-table-header--cycle' : ''} ${showReceptionistArt ? 'sb-vars-table-header--receptionist' : ''}`}
+                className={`sb-vars-table-header ${editing ? 'sb-vars-header-searching' : ''} ${(hasAgentData || searchSource) ? 'sb-vars-table-header--cycle' : ''} ${showReceptionistArt ? 'sb-vars-table-header--receptionist' : ''}`}
                 style={editing ? { padding: '4px 6px' } : undefined}
                 onClick={() => cycleTableSource(table.key)}
                 onKeyDown={(e) => {
-                  if (!hasAgentData) return;
+                  if (!hasAgentData && !searchSource) return;
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     cycleTableSource(table.key);
                   }
                 }}
-                role={hasAgentData ? 'button' : undefined}
-                tabIndex={hasAgentData ? 0 : undefined}
-                title={hasAgentData ? 'Click to switch source' : undefined}
+                role={(hasAgentData || searchSource) ? 'button' : undefined}
+                tabIndex={(hasAgentData || searchSource) ? 0 : undefined}
+                title={(hasAgentData || searchSource) ? 'Click to switch source' : undefined}
               >
                 {showReceptionistArt && (
                   <span
@@ -1855,7 +1976,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); navigateMatched(table.key, 1); }} style={{ background: 'none', border: 'none', color: sourceColor, cursor: 'pointer', padding: '0 1px', display: 'flex', flexShrink: 0, opacity: 0.7 }}><ChevronDown size={10} /></button>
                       </>
                     )}
-                    {hasAgentData && (
+                    {(hasAgentData || searchSource) && (
                       <span className="sb-vars-table-source">
                         <span className="sb-vars-table-source-prefix">via</span>
                         <span
@@ -1920,24 +2041,44 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
                       })}
                     </>
                   ) : currentRecord ? (
-                    table.fields.map((field) => {
-                      const sampleValue = getRecordFieldValue(currentRecord, field.key);
-                      const varRef = getVariableRef(table.key, field.key);
-                      const hasValue = sampleValue !== null && sampleValue !== undefined;
-                      const isMatched = matchedFields.has(field.key);
-                      return (
+                    <>
+                      {activeSource === 'search' && searchSource && (
                         <button
-                          key={field.key}
                           type="button"
-                          className={`sb-vars-field ${isSearching ? 'sb-vars-field-tuning' : ''} ${isMatched ? 'sb-vars-field-matched' : ''}`}
-                          onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, sourceColor); }}
-                          title={hasValue ? formatValue(sampleValue, field.type) : 'No value'}
+                          className="sb-vars-field"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onInsertVariable?.(getCollectionVariableRef(table.key), `${table.label} records`, sourceColor);
+                          }}
+                          title={`Insert {{${normalizeParsedTableKey(table.key)}.records}}`}
                         >
-                          <span className="sb-vars-field-name" style={{ color: sourceColor }}>{field.label}</span>
-                          {hasValue && <span className="sb-vars-field-value">{formatValue(sampleValue, field.type)}</span>}
+                          <span className="sb-vars-field-name" style={{ color: sourceColor }}>All records</span>
+                          <span className="sb-vars-field-value">{tableRecords.length} item{tableRecords.length === 1 ? '' : 's'}</span>
                         </button>
-                      );
-                    })
+                      )}
+                      {table.fields.map((field) => {
+                        const sampleValue = getRecordFieldValue(currentRecord, field.key);
+                        const varRef = activeSource === 'search' && searchSource?.iteratorNodeId
+                          ? `{{iterator.current.${field.key}}}`
+                          : activeSource === 'search' && searchSource
+                            ? getVariableRef(table.key, `${idx}.${field.key}`)
+                          : getVariableRef(table.key, field.key);
+                        const hasValue = sampleValue !== null && sampleValue !== undefined;
+                        const isMatched = matchedFields.has(field.key);
+                        return (
+                          <button
+                            key={field.key}
+                            type="button"
+                            className={`sb-vars-field ${isSearching ? 'sb-vars-field-tuning' : ''} ${isMatched ? 'sb-vars-field-matched' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); onInsertVariable?.(varRef, field.label, sourceColor); }}
+                            title={hasValue ? formatValue(sampleValue, field.type) : 'No value'}
+                          >
+                            <span className="sb-vars-field-name" style={{ color: sourceColor }}>{field.label}</span>
+                            {hasValue && <span className="sb-vars-field-value">{formatValue(sampleValue, field.type)}</span>}
+                          </button>
+                        );
+                      })}
+                    </>
                   ) : null}
                 </div>
               )}
