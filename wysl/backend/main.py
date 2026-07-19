@@ -3421,6 +3421,8 @@ def coerce_people_custom_field_value(value, field_type: Optional[str]):
             return float(value)
         except (TypeError, ValueError):
             return value
+    if field_type == "date":
+        return normalize_appointment_date_value(value, fallback=str(value).strip())
     return value
 
 
@@ -3565,6 +3567,16 @@ def add_people_intake_dynamic_variables(dynamic_variables: dict, business: Optio
         "Treat them as required before the record is considered complete."
     )
     return dynamic_variables
+
+
+def is_present_intake_value(value) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return bool(value)
+    return True
 
 
 def enrich_call_log_with_person(
@@ -4027,7 +4039,17 @@ def normalize_appointment_date_value(value, fallback: str | None = None) -> str:
                 return datetime.fromisoformat(candidate).date().isoformat()
             except ValueError:
                 pass
-            for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%m/%d/%y", "%m-%d-%y"):
+            for fmt in (
+                "%Y-%m-%d",
+                "%m/%d/%Y",
+                "%m-%d-%Y",
+                "%m/%d/%y",
+                "%m-%d-%y",
+                "%B %d, %Y",
+                "%b %d, %Y",
+                "%B %d %Y",
+                "%b %d %Y",
+            ):
                 try:
                     return datetime.strptime(stripped, fmt).date().isoformat()
                 except ValueError:
@@ -5326,9 +5348,28 @@ async def legacy_server_tool(tool_name: str, request: Request):
     normalized_tool = (tool_name or "").strip().lower().replace("_", "-")
 
     if normalized_tool in {"identify-caller", "lookup-customer"}:
-        search_phone = normalize_phone_number(first_present(payload, "phone", "from_number", "caller_phone", "From"))
+        search_phone = normalize_phone_number(first_present(
+            payload,
+            "phone",
+            "caller_number",
+            "from_number",
+            "caller_phone",
+            "system__caller_id",
+            "system_caller_id",
+            "From",
+        ))
         search_email = first_present(payload, "email", "caller_email")
         search_name = str(first_present(payload, "name", "full_name", "customer_name") or "").strip().lower()
+
+        if not search_phone and not search_email and not search_name:
+            return {
+                "ok": True,
+                "found": False,
+                "customer": None,
+                "person": None,
+                "matches": [],
+                "count": 0,
+            }
 
         query = supabase.table("people").select("*")
         if business and business.get("id"):
@@ -5451,13 +5492,53 @@ async def legacy_server_tool(tool_name: str, request: Request):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
 
         intake_values = payload.get("intake_values") if isinstance(payload.get("intake_values"), dict) else {}
+        intake_values_json = first_present(payload, "intake_values_json")
+        if intake_values_json:
+            try:
+                parsed_intake_values = json.loads(str(intake_values_json))
+            except json.JSONDecodeError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="intake_values_json must be a valid JSON object string",
+                ) from exc
+            if not isinstance(parsed_intake_values, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="intake_values_json must be a valid JSON object string",
+                )
+            intake_values = {**intake_values, **parsed_intake_values}
         merged_payload = {**intake_values, **payload}
         merged_payload.pop("intake_values", None)
+        merged_payload.pop("intake_values_json", None)
 
         if first_present(merged_payload, "phone", "customer_phone", "caller_number"):
             merged_payload["phone"] = first_present(merged_payload, "phone", "customer_phone", "caller_number")
         if first_present(merged_payload, "email", "customer_email"):
             merged_payload["email"] = first_present(merged_payload, "email", "customer_email")
+
+        required_intake_fields = [
+            field
+            for field in build_people_intake_fields(business)
+            if field.get("required") is True and field.get("key")
+        ]
+        missing_intake_fields = [
+            {
+                "key": field.get("key"),
+                "label": field.get("label") or field.get("key"),
+                "type": field.get("type"),
+                "custom": bool(field.get("custom")),
+            }
+            for field in required_intake_fields
+            if not is_present_intake_value(merged_payload.get(field.get("key")))
+        ]
+        if missing_intake_fields:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "Missing required intake fields",
+                    "missing_intake_fields": missing_intake_fields,
+                },
+            )
 
         allowed_standard_fields = {
             "first_name",
@@ -5598,6 +5679,77 @@ async def legacy_server_tool(tool_name: str, request: Request):
             "requested": {"date": appointment_date, "time": appointment_time, "duration": appointment_duration},
             "conflicts": aggregated_conflicts,
             "available_staff": available_staff,
+        }
+
+    if normalized_tool in {"get-appointments", "search-appointments"}:
+        if not business:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
+
+        business_id = business.get("id")
+        person_id = int_or_none(first_present(payload, "person_id", "record_id", "customer_id"))
+        search_phone = normalize_phone_number(first_present(payload, "phone", "caller_number", "from_number", "customer_phone"))
+        search_email = str(first_present(payload, "email", "customer_email") or "").strip().lower()
+        search_name = str(first_present(payload, "name", "full_name", "customer_name") or "").strip().lower()
+
+        matched_people = []
+        if not person_id and (search_phone or search_email or search_name):
+            people_query = supabase.table("people").select("*").eq("business_id", business_id).limit(500)
+            people_rows = people_query.execute().data or []
+            filtered_people = people_rows
+            if search_phone:
+                phone_values = set(build_phone_match_values(search_phone))
+                filtered_people = [
+                    row for row in filtered_people
+                    if set(build_phone_match_values(row.get("phone"))) & phone_values
+                ]
+            if search_email:
+                filtered_people = [
+                    row for row in filtered_people
+                    if str(row.get("email") or "").strip().lower() == search_email
+                ]
+            if search_name:
+                filtered_people = [
+                    row for row in filtered_people
+                    if search_name in " ".join(filter(None, [row.get("first_name"), row.get("last_name")])).strip().lower()
+                ]
+            matched_people = filtered_people[:10]
+            if matched_people:
+                person_id = int_or_none(matched_people[0].get("id"))
+
+        appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
+        status_value = str(first_present(payload, "status", "appointment_status") or "").strip().lower()
+        date_value = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"), fallback=None)
+        date_from = normalize_appointment_date_value(first_present(payload, "date_from", "start_date"), fallback=None)
+        date_to = normalize_appointment_date_value(first_present(payload, "date_to", "end_date"), fallback=None)
+        include_cancelled = str(first_present(payload, "include_cancelled") or "").strip().lower() in {"true", "1", "yes"}
+        limit_value = int_or_none(first_present(payload, "limit"))
+        limit_value = max(1, min(limit_value or 10, 50))
+
+        query = supabase.table("appointments").select("*").eq("business_id", business_id)
+        if appointment_id:
+            query = query.eq("id", appointment_id)
+        if person_id:
+            query = query.eq("person_id", person_id)
+        if status_value:
+            query = query.eq("status", normalize_appointment_status(status_value))
+        elif not include_cancelled:
+            query = query.neq("status", "cancelled")
+        if date_value:
+            query = query.eq("date", date_value)
+        if date_from:
+            query = query.gte("date", date_from)
+        if date_to:
+            query = query.lte("date", date_to)
+
+        appointments = query.order("date").order("time").limit(limit_value).execute().data or []
+        return {
+            "ok": True,
+            "appointments": appointments,
+            "appointment": appointments[0] if appointments else None,
+            "found": bool(appointments),
+            "count": len(appointments),
+            "person": matched_people[0] if matched_people else None,
+            "people_matches": matched_people,
         }
 
     if normalized_tool == "create-appointment":
