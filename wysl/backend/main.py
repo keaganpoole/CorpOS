@@ -5446,6 +5446,78 @@ async def legacy_server_tool(tool_name: str, request: Request):
             "forwarding_target_number": get_business_forwarding_target_number(business),
         }
 
+    if normalized_tool in {"create-person", "create-record"}:
+        if not business:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
+
+        intake_values = payload.get("intake_values") if isinstance(payload.get("intake_values"), dict) else {}
+        merged_payload = {**intake_values, **payload}
+        merged_payload.pop("intake_values", None)
+
+        if first_present(merged_payload, "phone", "customer_phone", "caller_number"):
+            merged_payload["phone"] = first_present(merged_payload, "phone", "customer_phone", "caller_number")
+        if first_present(merged_payload, "email", "customer_email"):
+            merged_payload["email"] = first_present(merged_payload, "email", "customer_email")
+
+        allowed_standard_fields = {
+            "first_name",
+            "last_name",
+            "phone",
+            "email",
+            "street_address",
+            "city",
+            "state",
+            "zip_code",
+            "preferred_contact_method",
+            "preferred_language",
+            "best_time_to_contact",
+            "consent_sms",
+            "consent_call",
+            "do_not_call",
+            "do_not_text",
+            "source",
+            "lead_source_detail",
+            "special_instructions",
+            "notes",
+            "status",
+            "tags",
+        }
+        person_payload = {
+            key: value
+            for key, value in merged_payload.items()
+            if key in allowed_standard_fields or str(key).startswith("custom_")
+        }
+        person_payload["business_id"] = business.get("id")
+        person_payload["user_id"] = user_id or business.get("user_id")
+        person_payload["phone"] = normalize_phone_number(person_payload.get("phone")) or person_payload.get("phone")
+
+        person_payload = normalize_people_payload_custom_fields(
+            person_payload,
+            business.get("id"),
+        )
+
+        response = supabase.table("people").insert(person_payload).execute()
+        created = response.data[0] if response.data else person_payload
+        person_name = format_person_display_name(created)
+        if person_name:
+            created = {**created, "name": person_name}
+
+        schedule_backend_scenario_execution("record_created", {
+            "record_id": created.get("id"),
+            "person_id": created.get("id"),
+            "user_id": created.get("user_id") or user_id or business.get("user_id"),
+            "business_id": created.get("business_id") or business.get("id"),
+            "person": created,
+            "record": created,
+        })
+        return {
+            "ok": True,
+            "person": created,
+            "record": created,
+            "person_id": created.get("id"),
+            "record_id": created.get("id"),
+        }
+
     if normalized_tool == "check-availability":
         appointment_date = first_present(payload, "date", "appointment_date")
         appointment_time = first_present(payload, "time", "appointment_time")
