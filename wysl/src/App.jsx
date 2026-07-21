@@ -11,6 +11,8 @@ import OnboardingPage from './pages/OnboardingPage';
 import Onboarding2Page from './pages/Onboarding2Page';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import VerificationPage from './pages/VerificationPage';
+import DocumentUploadPage from './pages/DocumentUploadPage';
 import SplashScreen from './components/SplashScreen';
 
 // Sonar Dashboard
@@ -80,6 +82,8 @@ function AppContent() {
         <Route path="/onboarding2" element={<Onboarding2Page />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/verify/:token" element={<VerificationPage />} />
+        <Route path="/upload/:token" element={<DocumentUploadPage />} />
 
         {/* --- Dashboard (Sonar) --- */}
         <Route path="/dashboard" element={<DashboardGate />} />

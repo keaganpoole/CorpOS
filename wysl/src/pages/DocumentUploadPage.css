@@ -1,0 +1,19 @@
+.document-upload-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #08090b; color: #f5f7fa; }
+.document-upload-panel { width: min(100%, 440px); padding: 44px 36px 36px; text-align: center; background: #111318; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; box-shadow: 0 24px 70px rgba(0,0,0,.42); }
+.document-upload-icon { width: 60px; height: 60px; margin: 0 auto 22px; display: grid; place-items: center; border-radius: 50%; color: #b7c0ff; background: rgba(113,126,255,.14); }
+.document-upload-icon-success { color: #57d59a; background: rgba(44,187,119,.15); }
+.document-upload-eyebrow { margin-bottom: 10px; color: #a3abc0; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.document-upload-panel h1 { margin-bottom: 12px; font-size: clamp(26px, 7vw, 34px); letter-spacing: 0; }
+.document-upload-message { min-height: 48px; margin: 0 auto 26px; color: #aeb5c4; font-size: 15px; line-height: 1.6; }
+.document-upload-picker, .document-upload-button { min-height: 48px; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border-radius: 6px; font-size: 15px; font-weight: 700; cursor: pointer; }
+.document-upload-picker { border: 1px dashed #7180ff; color: #dce0ff; background: rgba(113,126,255,.1); }
+.document-upload-panel input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.document-upload-filename { overflow-wrap: anywhere; margin: 12px 0; color: #c6cbd7; font-size: 13px; }
+.document-upload-button { border: 0; background: #7180ff; color: #fff; transition: background 160ms ease, transform 160ms ease; }
+.document-upload-button:hover:not(:disabled) { background: #8290ff; transform: translateY(-1px); }
+.document-upload-button:disabled { opacity: .55; cursor: not-allowed; }
+.document-upload-confirmation { display: inline-flex; align-items: center; gap: 7px; color: #57d59a; font-size: 14px; font-weight: 700; }
+.document-upload-footnote { margin: 28px 0 0; color: #737b8d; font-size: 12px; }
+.document-upload-spinner { animation: document-upload-spin 900ms linear infinite; }
+@keyframes document-upload-spin { to { transform: rotate(360deg); } }
+@media (max-width: 480px) { .document-upload-panel { padding: 36px 24px 28px; } }

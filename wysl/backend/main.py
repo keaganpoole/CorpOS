@@ -1,7 +1,7 @@
 # main.py
   
-import logging
 import os
+import logging
 import stripe
 import json
 import re
@@ -96,6 +96,7 @@ from config import (
     outlook_scopes,
     microsoft_graph_base_url,
     frontend_base_url,
+    verification_base_url,
 )
 
  
@@ -111,6 +112,13 @@ from models import (
 )
 from dependencies import get_current_user, get_current_rep
 from scenario_engine import ScenarioEngine
+from verification_service import (
+    complete_verification,
+    create_verification_session,
+    get_public_verification,
+    get_verification_status,
+)
+from document_service import create_document_request, get_document_request, get_document_request_status, store_document
 
 try:
     from elevenlabs.client import ElevenLabs
@@ -4854,6 +4862,211 @@ async def get_config_status():
     """Returns the current configuration status, like TEST_MODE."""
     return {"test_mode": TEST_MODE}
 
+
+def ensure_inbound_verification_tool(payload: dict) -> None:
+    """Keep verification tools scoped to the inbound agent when identifiable."""
+    direction = str(first_present(payload, "direction", "call_direction") or "").strip().lower()
+    agent_id = first_present(
+        payload,
+        "agent_id",
+        "elevenlabs_agent_id",
+        "metadata.agent_id",
+        "system__agent_id",
+        "system_agent_id",
+    )
+    if direction in {"outbound", "outgoing"} or (
+        agent_id and elevenlabs_agent_id_outbound and str(agent_id) == str(elevenlabs_agent_id_outbound)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Verification tools are available to the inbound agent only.",
+        )
+
+
+def build_verification_request_context(payload: dict) -> dict:
+    ensure_inbound_verification_tool(payload)
+    context = resolve_business_context(payload)
+    business = context.get("business") or {}
+    business_id = business.get("id") or first_present(payload, "business_id")
+    phone = normalize_phone_number(first_present(
+        payload,
+        "phone",
+        "caller_number",
+        "caller_phone",
+        "from_number",
+        "system__caller_id",
+        "system_caller_id",
+        "From",
+    ))
+    person_id = context.get("person_id") or first_present(payload, "person_id", "record_id", "customer_id")
+    if not person_id and phone:
+        matched_person = lookup_person_record(
+            phone_number=phone,
+            business_id=str(business_id) if business_id is not None else None,
+            user_id=context.get("user_id") or business.get("user_id"),
+        )
+        if matched_person:
+            person_id = matched_person.get("id")
+            business_id = business_id or matched_person.get("business_id")
+    return {
+        "business_id": business_id,
+        "person_id": person_id,
+        "phone": phone,
+        "user_id": context.get("user_id") or business.get("user_id") or first_present(payload, "user_id"),
+        "metadata": {
+            "source": "inbound_agent",
+            "direction": "inbound",
+            "conversation_id": first_present(payload, "conversation_id", "system__conversation_id", "system_conversation_id"),
+            "call_id": first_present(payload, "call_id", "CallSid", "callSid"),
+            "agent_id": first_present(payload, "agent_id", "elevenlabs_agent_id"),
+            **(payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}),
+        },
+    }
+
+
+async def send_verification_link_tool(request: Request):
+    payload = await parse_request_payload(request)
+    context = build_verification_request_context(payload)
+    return create_verification_session(
+        supabase_admin,
+        base_url=verification_base_url,
+        **context,
+    )
+
+
+async def check_verification_status_tool(request: Request):
+    payload = await parse_request_payload(request)
+    context = build_verification_request_context(payload)
+    token = first_present(payload, "token", "verification_token")
+    session_id = first_present(payload, "session_id", "verification_session_id")
+    if not token and not session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="token or session_id is required",
+        )
+    return get_verification_status(
+        supabase_admin,
+        token=token,
+        session_id=session_id,
+        business_id=context.get("business_id"),
+    )
+
+
+async def request_document_upload_tool(request: Request):
+    payload = await parse_request_payload(request)
+    context = build_verification_request_context(payload)
+    if context.get("business_id") is None or context.get("person_id") is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A matching business and person are required before requesting a document upload.",
+        )
+    return create_document_request(supabase_admin, base_url=verification_base_url, **context)
+
+
+async def check_document_upload_status_tool(request: Request):
+    payload = await parse_request_payload(request)
+    context = build_verification_request_context(payload)
+    token = first_present(payload, "token", "document_token", "request_token")
+    request_id = first_present(payload, "request_id", "document_request_id", "session_id")
+    if not token and not request_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="token or request_id is required",
+        )
+    return get_document_request_status(
+        supabase_admin,
+        token=token,
+        request_id=request_id,
+        business_id=context.get("business_id"),
+    )
+
+
+@app.get("/api/upload/{token}", tags=["Document Upload"])
+async def get_document_upload_state(token: str):
+    return get_document_request(supabase_admin, token)
+
+
+@app.post("/api/upload/{token}/files", tags=["Document Upload"])
+async def upload_document_file(token: str, request: Request):
+    try:
+        form = await request.form()
+        uploaded = form.get("file")
+        if uploaded is None or not hasattr(uploaded, "read"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="file is required")
+        content = await uploaded.read()
+        result = store_document(
+            supabase_admin,
+            token=token,
+            filename=getattr(uploaded, "filename", "document"),
+            content_type=getattr(uploaded, "content_type", None),
+            content=content,
+        )
+        if not result.get("success"):
+            detail = {"message": result.get("message") or "Upload failed", "status": result.get("status")}
+            if result.get("debug"):
+                detail["debug"] = result.get("debug")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Document upload request failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
+
+
+@app.get("/api/verification/{token}", tags=["Verification"])
+async def get_verification_page_state(token: str):
+    return get_public_verification(supabase_admin, token)
+
+
+@app.post("/api/verification/{token}/complete", tags=["Verification"])
+async def complete_verification_page(token: str):
+    return complete_verification(supabase_admin, token)
+
+
+@app.post("/api/tools/send-verification-link", tags=["Server Tools"])
+async def send_verification_link_route(request: Request):
+    return await send_verification_link_tool(request)
+
+
+@app.post("/api/tools/request-authentication", tags=["Server Tools"])
+@app.post("/api/tools/request_authentication", tags=["Server Tools"])
+@app.post("/api/tools/auth-request", tags=["Server Tools"])
+@app.post("/api/tools/auth_request", tags=["Server Tools"])
+async def request_authentication_route(request: Request):
+    return await send_verification_link_tool(request)
+
+
+@app.post("/api/tools/request_docs", tags=["Server Tools"])
+@app.post("/api/tools/request-docs", tags=["Server Tools"])
+@app.post("/api/tools/document_request", tags=["Server Tools"])
+@app.post("/api/tools/document-request", tags=["Server Tools"])
+async def request_document_upload_route(request: Request):
+    return await request_document_upload_tool(request)
+
+
+@app.post("/api/tools/get_docs", tags=["Server Tools"])
+@app.post("/api/tools/get-docs", tags=["Server Tools"])
+@app.post("/api/tools/document_verify", tags=["Server Tools"])
+@app.post("/api/tools/document-verify", tags=["Server Tools"])
+async def verify_document_upload_route(request: Request):
+    return await check_document_upload_status_tool(request)
+
+
+@app.post("/api/tools/check-verification-status", tags=["Server Tools"])
+async def check_verification_status_route(request: Request):
+    return await check_verification_status_tool(request)
+
+
+@app.post("/api/tools/check-authentication", tags=["Server Tools"])
+@app.post("/api/tools/check_authentication", tags=["Server Tools"])
+@app.post("/api/tools/verify-authentication", tags=["Server Tools"])
+@app.post("/api/tools/verify_authentication", tags=["Server Tools"])
+@app.post("/api/tools/auth-verify", tags=["Server Tools"])
+@app.post("/api/tools/auth_verify", tags=["Server Tools"])
+async def check_authentication_route(request: Request):
+    return await check_verification_status_tool(request)
+
 @app.post("/api/scenarios/trigger", tags=["Scenarios"])
 async def trigger_scenario(request: ScenarioTriggerRequest):
     return emit_scenario_trigger(request.trigger_key, request.payload, request.created_at)
@@ -5346,6 +5559,45 @@ async def legacy_server_tool(tool_name: str, request: Request):
     receptionist = context.get("receptionist")
 
     normalized_tool = (tool_name or "").strip().lower().replace("_", "-")
+
+    if normalized_tool in {"send-verification-link", "request-authentication", "auth-request"}:
+        context_payload = {**payload, "business": business, "user_id": user_id}
+        context = build_verification_request_context(context_payload)
+        return create_verification_session(
+            supabase_admin,
+            base_url=verification_base_url,
+            **context,
+        )
+
+    if normalized_tool in {"check-verification-status", "check-authentication", "verify-authentication", "auth-verify"}:
+        context = build_verification_request_context({**payload, "business": business, "user_id": user_id})
+        token = first_present(payload, "token", "verification_token")
+        session_id = first_present(payload, "session_id", "verification_session_id")
+        if not token and not session_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="token or session_id is required")
+        return get_verification_status(
+            supabase_admin,
+            token=token,
+            session_id=session_id,
+            business_id=context.get("business_id"),
+        )
+
+    if normalized_tool in {"request-docs", "document-request", "document-upload-request"}:
+        context = build_verification_request_context({**payload, "business": business, "user_id": user_id})
+        return create_document_request(supabase_admin, base_url=verification_base_url, **context)
+
+    if normalized_tool in {"get-docs", "document-verify", "document-upload-verify"}:
+        context = build_verification_request_context({**payload, "business": business, "user_id": user_id})
+        token = first_present(payload, "token", "document_token", "request_token")
+        request_id = first_present(payload, "request_id", "document_request_id", "session_id")
+        if not token and not request_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="token or request_id is required")
+        return get_document_request_status(
+            supabase_admin,
+            token=token,
+            request_id=request_id,
+            business_id=context.get("business_id"),
+        )
 
     if normalized_tool in {"identify-caller", "lookup-customer"}:
         search_phone = normalize_phone_number(first_present(

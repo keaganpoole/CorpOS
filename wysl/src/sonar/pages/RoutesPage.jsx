@@ -22,6 +22,10 @@ const ENDPOINTS = [
   { group: 'Server Tools', path: '/api/tools/log-call-outcome', method: 'POST', desc: 'Log call result', icon: '📊', wsEvent: 'log' },
   { group: 'Server Tools', path: '/api/tools/report-intent-checkpoint', method: 'POST', desc: 'Emit live scenario intent checkpoint', icon: '🧭', wsEvent: 'intent' },
   { group: 'Server Tools', path: '/api/tools/transfer-call', method: 'POST', desc: 'Transfer to human', icon: '📞', wsEvent: 'transfer' },
+  { group: 'Server Tools', path: '/api/tools/auth-request', method: 'POST', desc: 'Create inbound auth link', icon: '🔐', wsEvent: 'verification' },
+  { group: 'Server Tools', path: '/api/tools/auth-verify', method: 'POST', desc: 'Verify inbound auth status', icon: '🔎', wsEvent: 'verification' },
+  { group: 'Server Tools', path: '/api/tools/request-docs', method: 'POST', desc: 'Create inbound document upload link', icon: '📄', wsEvent: 'verification' },
+  { group: 'Server Tools', path: '/api/tools/get-docs', method: 'POST', desc: 'Fetch uploaded document request status and records', icon: '📄', wsEvent: 'verification' },
   // Management API (dashboard)
   { group: 'Dashboard', path: '/api/sonar/business/profile', method: 'GET', desc: 'Business profile', icon: '🏢' },
   { group: 'Dashboard', path: '/api/sonar/business/profile', method: 'PUT', desc: 'Update profile', icon: '✏️' },

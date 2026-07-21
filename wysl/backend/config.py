@@ -100,6 +100,11 @@ frontend_base_url = (
     or os.environ.get("VITE_FRONTEND_URL")
     or os.environ.get("VITE_APP_URL")
 )
+verification_base_url = (
+    os.environ.get("VERIFICATION_BASE_URL")
+    or frontend_base_url
+    or "http://localhost:5173"
+)
 
 try:
     if not url:
