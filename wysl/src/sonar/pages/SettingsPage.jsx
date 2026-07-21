@@ -185,6 +185,11 @@ const defaultSettings = {
   allow_cancellations: true,
   cancellation_window_hours: 24,
   autonomy_index: 1,
+  preferences: {
+    calls: {
+      allow_caller_authentication: false,
+    },
+  },
   knowledge_base: {
     about: '',
     services: '',
@@ -1966,8 +1971,22 @@ const SettingsPage = () => {
     setSettings(prev => ({ ...prev, [field]: value }));
   };
 
+  const updatePreference = (section, field, value) => {
+    setSettings(prev => ({
+      ...prev,
+      preferences: {
+        ...(prev.preferences || {}),
+        [section]: {
+          ...((prev.preferences || {})[section] || {}),
+          [field]: value,
+        },
+      },
+    }));
+  };
+
   const settingsSections = [
     { id: 'business', title: 'Business Info', icon: Building2, color: 'text-indigo-400', hint: 'Name, contact, and location' },
+    { id: 'preferences', title: 'Preferences', icon: Shield, color: 'text-emerald-400', hint: 'Call permissions and controls' },
     { id: 'intro', title: 'Intro Message', icon: MessageSquareText, color: 'text-indigo-400', hint: 'Opening call greeting' },
     { id: 'appointments', title: 'Hours', icon: Calendar, color: 'text-cyan-400', hint: 'Business availability' },
     { id: 'staff', title: 'Staff', icon: Users, color: 'text-cyan-400', hint: 'Bookable team members and hours' },
@@ -2053,6 +2072,41 @@ const SettingsPage = () => {
               onChange={(v) => update('knowledge_base', v)}
             />
           </>
+        );
+      case 'preferences':
+        return (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/[0.05] bg-zinc-950/40 p-5">
+              <div className="flex items-start justify-between gap-5">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Shield size={15} className="text-emerald-400/70" />
+                    <h4 className="text-[13px] font-semibold text-zinc-100">Authenticate Callers</h4>
+                    <span className="group relative inline-flex">
+                      <button
+                        type="button"
+                        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/[0.12] text-[10px] font-bold text-zinc-500 transition-colors hover:border-cyan-400/40 hover:text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-400/40"
+                        aria-label="Caller authentication details"
+                      >
+                        i
+                      </button>
+                      <span className="pointer-events-none absolute left-1/2 top-6 z-20 hidden w-72 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-zinc-950 px-3 py-2 text-[11px] font-normal leading-4 text-zinc-400 shadow-2xl shadow-black/40 group-hover:block group-focus-within:block">
+                        If a caller's incoming phone number doesn't match the number on file, the receptionist will text a secure OTP verification link to confirm their identity before making any account changes. This helps protect customer accounts from unauthorized access.
+                      </span>
+                    </span>
+                  </div>
+                  <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
+                    Sends a secure text message with a one-time verification link to confirm the caller's identity.
+                  </p>
+                </div>
+                <Toggle
+                  value={settings.preferences?.calls?.allow_caller_authentication === true}
+                  onChange={(value) => updatePreference('calls', 'allow_caller_authentication', value)}
+                  color="cyan"
+                />
+              </div>
+            </div>
+          </div>
         );
       default:
         return (

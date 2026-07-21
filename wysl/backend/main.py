@@ -507,6 +507,23 @@ def get_account_autonomy_index_for_user(user_id: Optional[str] = None) -> int:
         return 1
 
 
+def caller_authentication_allowed(*, user_id: Optional[str] = None, business_id: Optional[str] = None) -> bool:
+    try:
+        query = supabase.table("account_settings").select("preferences")
+        if business_id is not None:
+            query = query.eq("business_id", business_id)
+        elif user_id:
+            query = query.eq("user_id", str(user_id))
+        response = query.limit(1).execute()
+        row = (response.data or [None])[0] or {}
+        preferences = row.get("preferences") if isinstance(row.get("preferences"), dict) else {}
+        calls = preferences.get("calls") if isinstance(preferences.get("calls"), dict) else {}
+        return calls.get("allow_caller_authentication") is True
+    except Exception as exc:
+        logging.warning("Failed to load caller authentication preference: %s", exc)
+        return False
+
+
 def call_routing_allows(direction: str, call_routing: Optional[str] = None) -> bool:
     normalized_direction = str(direction or "").strip().lower()
     normalized_routing = str(call_routing or get_account_call_routing()).strip().lower()
@@ -4927,6 +4944,11 @@ def build_verification_request_context(payload: dict) -> dict:
 async def send_verification_link_tool(request: Request):
     payload = await parse_request_payload(request)
     context = build_verification_request_context(payload)
+    if not caller_authentication_allowed(user_id=context.get("user_id"), business_id=context.get("business_id")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Caller authentication is disabled in account preferences.",
+        )
     return create_verification_session(
         supabase_admin,
         base_url=verification_base_url,
@@ -4937,6 +4959,11 @@ async def send_verification_link_tool(request: Request):
 async def check_verification_status_tool(request: Request):
     payload = await parse_request_payload(request)
     context = build_verification_request_context(payload)
+    if not caller_authentication_allowed(user_id=context.get("user_id"), business_id=context.get("business_id")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Caller authentication is disabled in account preferences.",
+        )
     token = first_present(payload, "token", "verification_token")
     session_id = first_present(payload, "session_id", "verification_session_id")
     if not token and not session_id:
@@ -5379,6 +5406,10 @@ async def route_call_compat(request: Request):
 
     dynamic_variables = {
         "autonomy_index": get_account_autonomy_index_for_user(context.get("user_id") or (business or {}).get("user_id")),
+        "caller_authentication": caller_authentication_allowed(
+            user_id=context.get("user_id") or (business or {}).get("user_id"),
+            business_id=str(business.get("id")) if business and business.get("id") is not None else None,
+        ),
         "caller_number": call_payload.get("from_number"),
         "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
         "business_name": business.get("name") if business else None,
