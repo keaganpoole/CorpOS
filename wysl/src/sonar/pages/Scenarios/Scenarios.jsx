@@ -1253,8 +1253,8 @@ export default function ScenariosPage() {
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
   const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage);
   const panelTitle = isPrimaryNode ? 'Add Trigger' : 'Add Action';
-  const appointmentDateInputMode = appointmentConfig.date_input_mode || 'picker';
-  const appointmentTimeInputMode = appointmentConfig.time_input_mode || 'picker';
+  const appointmentDateInputMode = appointmentConfig.date_input_mode || 'text';
+  const appointmentTimeInputMode = appointmentConfig.time_input_mode || 'text';
   const scheduleDateInputMode = scheduleConfig.date_input_mode || 'picker';
   const scheduleTimeInputMode = scheduleConfig.time_input_mode || 'picker';
   const selectedProviderConfig = INTEGRATION_PROVIDERS.find((provider) => provider.key === selectedIntegrationProvider) || INTEGRATION_PROVIDERS[0];
@@ -1675,7 +1675,12 @@ export default function ScenariosPage() {
       // If this node has an appointment config, show the config form
       else if (node?.appointmentConfig) {
         restoringFromNodeRef.current = true;
-        setAppointmentConfig({ ...node.appointmentConfig });
+        setAppointmentConfig({
+          ...node.appointmentConfig,
+          date_input_mode: node.appointmentConfig.date_input_mode || 'text',
+          time_input_mode: node.appointmentConfig.time_input_mode || 'text',
+          status_input_mode: node.appointmentConfig.status_input_mode || 'text',
+        });
         setPanelStage('appointmentConfig');
       }
       // If this node has an appointment soon filter, show the trigger filter form
@@ -2261,8 +2266,8 @@ export default function ScenariosPage() {
           date: '',
           time: '',
           duration: '30',
-          date_input_mode: 'picker',
-          time_input_mode: 'picker',
+          date_input_mode: 'text',
+          time_input_mode: 'text',
           status: 'pending',
           assigned_receptionist: '',
           notes: '',
@@ -2679,6 +2684,12 @@ export default function ScenariosPage() {
         return true;
       }));
     };
+    const sanitizeAppointmentConfig = (config) => {
+      if (!config) return null;
+      return Object.fromEntries(Object.entries(config).filter(([key]) => (
+        !key.startsWith('_manual_') && !key.startsWith('_automation_')
+      )));
+    };
     const normalizedSchedule = normalizeScenarioSchedule(recurringSchedule);
     return {
       id: currentScenario?.id || null,
@@ -2697,7 +2708,7 @@ export default function ScenariosPage() {
         configured: n.configured,
         accent: n.accent,
         icon: n.icon?.name,
-        appointmentConfig: n.appointmentConfig || null,
+        appointmentConfig: sanitizeAppointmentConfig(n.appointmentConfig),
         scheduleConfig: n.scheduleConfig || null,
         triggerFilter: n.triggerFilter || null,
         triggerConfig: n.triggerConfig || null,
@@ -3034,6 +3045,168 @@ export default function ScenariosPage() {
           {modeToggle}
         </div>
         {activeMode === 'automation' ? automationInput : manualControl}
+      </div>
+    );
+  };
+
+  const renderAppointmentVariableInput = ({ fieldKey, fieldLabel, fieldType = 'text' }) => {
+    const value = appointmentConfig[fieldKey] || '';
+    return (
+      <div style={{ position: 'relative' }}>
+        <input
+          className="sb-input-field"
+          type="text"
+          value={value}
+          onChange={e => setAppointmentConfig({ ...appointmentConfig, [fieldKey]: e.target.value })}
+          onFocus={() => setVarsPane({ visible: true, fieldKey, fieldLabel, fieldType })}
+          style={{
+            ...(String(value).includes('{{') ? { color: 'transparent' } : {}),
+            ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === fieldKey ? {
+              borderColor: hoveredTableColor,
+              boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+            } : {}),
+          }}
+        />
+        {String(value).includes('{{') && (
+          <div
+            className="sb-var-chip-overlay"
+            style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
+            dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }}
+          />
+        )}
+      </div>
+    );
+  };
+
+  const renderAppointmentModeToggle = ({ fieldKey, manualMode }) => (
+    <button
+      type="button"
+      aria-label={manualMode ? 'Use variable input' : 'Use manual input'}
+      title={manualMode ? 'Use variable input' : 'Use manual input'}
+      onClick={() => setAppointmentConfig({ ...appointmentConfig, [`${fieldKey}_input_mode`]: manualMode ? 'text' : 'picker' })}
+      style={{
+        width: 16,
+        height: 16,
+        border: 0,
+        background: 'transparent',
+        color: 'rgba(255,255,255,0.42)',
+        padding: 0,
+        cursor: 'pointer',
+        flex: '0 0 auto',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {manualMode ? <RectangleEllipsis size={11} /> : <Code size={11} />}
+    </button>
+  );
+
+  const renderAppointmentStatusInput = () => {
+    const fieldKey = 'status';
+    const modeKey = 'status_input_mode';
+    const manualKey = '_manual_status';
+    const automationKey = '_automation_status';
+    const manualMode = appointmentConfig[modeKey] === 'picker';
+    const options = ['pending', 'confirmed', 'cancelled'];
+    const value = manualMode
+      ? (appointmentConfig[manualKey] ?? appointmentConfig.status ?? '')
+      : (appointmentConfig[automationKey] ?? appointmentConfig.status ?? '');
+    const setValue = (nextValue) => setAppointmentConfig({
+      ...appointmentConfig,
+      status: nextValue,
+      ...(manualMode ? { [manualKey]: nextValue } : { [automationKey]: nextValue }),
+    });
+    const setMode = () => {
+      const nextManualMode = !manualMode;
+      setRecordFieldMenu(null);
+      setAppointmentConfig({
+        ...appointmentConfig,
+        [modeKey]: nextManualMode ? 'picker' : 'text',
+        status: nextManualMode ? (appointmentConfig[manualKey] ?? '') : (appointmentConfig[automationKey] ?? ''),
+      });
+    };
+    return (
+      <div className="sb-record-field" style={{ order: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+          <label className="sb-record-label" style={{ marginBottom: 0 }}>Status</label>
+          <button type="button" aria-label="Toggle status input mode" title="Toggle status input mode" onClick={setMode} style={{ width: 16, height: 16, border: 0, background: 'transparent', color: 'rgba(255,255,255,0.42)', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            {manualMode ? <RectangleEllipsis size={11} /> : <Code size={11} />}
+          </button>
+        </div>
+        {manualMode ? (
+          <div className="sb-crm-select-shell">
+            <button type="button" className={`sb-crm-select-trigger ${value ? 'has-value' : ''}`} onClick={() => setRecordFieldMenu(recordFieldMenu === 'appointment_status' ? null : 'appointment_status')}>
+              {value ? (
+                <>
+                  <span className="sb-crm-dot" style={{ backgroundColor: value === 'confirmed' ? '#10b981' : value === 'cancelled' ? '#ef4444' : '#f59e0b' }} />
+                  <span>{value}</span>
+                </>
+              ) : (
+                <>
+                  <span className="sb-crm-dot" style={{ backgroundColor: '#71717a' }} />
+                  <span className="sb-crm-empty-label">Blank</span>
+                </>
+              )}
+            </button>
+            {recordFieldMenu === 'appointment_status' && (
+              <div className="sb-crm-menu">
+                <button type="button" className="sb-crm-menu-item" onClick={() => { setValue(''); setRecordFieldMenu(null); }}>
+                  <span className="sb-crm-dot" style={{ backgroundColor: '#3f3f46' }} />
+                  <span className="sb-crm-empty">&nbsp;</span>
+                  {!value && <Check size={11} className="sb-crm-check" />}
+                </button>
+                {options.map((option) => {
+                  const active = value === option;
+                  return (
+                    <button key={option} type="button" className={`sb-crm-menu-item ${active ? 'is-active' : ''}`} onClick={() => { setValue(option); setRecordFieldMenu(null); }}>
+                      <span className="sb-crm-dot" style={{ backgroundColor: option === 'confirmed' ? '#10b981' : option === 'cancelled' ? '#ef4444' : '#f59e0b' }} />
+                      {option}
+                      {active && <Check size={11} className="sb-crm-check" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : renderAppointmentVariableInput({ fieldKey: 'status', fieldLabel: 'Status', fieldType: 'text' })}
+      </div>
+    );
+  };
+
+  const renderAppointmentDateInput = () => {
+    const fieldKey = 'date';
+    const modeKey = 'date_input_mode';
+    const manualKey = '_manual_date';
+    const automationKey = '_automation_date';
+    const manualMode = appointmentConfig[modeKey] === 'picker';
+    const value = manualMode
+      ? (appointmentConfig[manualKey] ?? appointmentConfig.date ?? '')
+      : (appointmentConfig[automationKey] ?? appointmentConfig.date ?? '');
+    const setValue = (nextValue) => setAppointmentConfig({
+      ...appointmentConfig,
+      date: nextValue,
+      ...(manualMode ? { [manualKey]: nextValue } : { [automationKey]: nextValue }),
+    });
+    const setMode = () => {
+      const nextManualMode = !manualMode;
+      setAppointmentConfig({
+        ...appointmentConfig,
+        [modeKey]: nextManualMode ? 'picker' : 'text',
+        date: nextManualMode ? (appointmentConfig[manualKey] ?? '') : (appointmentConfig[automationKey] ?? ''),
+      });
+    };
+    return (
+      <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 5 } : appointmentConfig.key === 'create_appointment' ? { order: 3 } : undefined}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+          <label className="sb-record-label" style={{ marginBottom: 0 }}>Date</label>
+          <button type="button" aria-label="Toggle date input mode" title="Toggle date input mode" onClick={setMode} style={{ width: 16, height: 16, border: 0, background: 'transparent', color: 'rgba(255,255,255,0.42)', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            {manualMode ? <RectangleEllipsis size={11} /> : <Code size={11} />}
+          </button>
+        </div>
+        {manualMode ? (
+          <input type="date" className="sb-input-field" value={value} onChange={e => setValue(e.target.value)} style={{ colorScheme: 'dark' }} />
+        ) : renderAppointmentVariableInput({ fieldKey: 'date', fieldLabel: 'Date', fieldType: 'text' })}
       </div>
     );
   };
@@ -5770,127 +5943,17 @@ export default function ScenariosPage() {
                       )}
                       {/* Status — for update_appointment (second field) */}
                       {appointmentConfig.key === 'update_appointment' && (
-                        <div className="sb-record-field" style={{ order: 4 }}>
-                          <label className="sb-record-label">Status</label>
-                          <select className="sb-input-field sb-select-field" value={appointmentConfig.status || ''}
-                            onChange={e => setAppointmentConfig({ ...appointmentConfig, status: e.target.value })}>
-                            <option value="">Select...</option>
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </div>
+                        renderAppointmentStatusInput()
                       )}
                       {/* Date — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
-                        <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 5 } : appointmentConfig.key === 'create_appointment' ? { order: 3 } : undefined}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-                            <label className="sb-record-label" style={{ marginBottom: 0 }}>Date</label>
-                            <button
-                              type="button"
-                              onClick={() => setAppointmentConfig({ ...appointmentConfig, date_input_mode: appointmentDateInputMode === 'text' ? 'picker' : 'text' })}
-                              style={{ ...sbModeToggleStyle, ...(appointmentDateInputMode === 'text' ? sbModeToggleActiveStyle : {}) }}
-                            >
-                          {appointmentDateInputMode === 'picker' ? 'Picker' : 'Text'}
-                            </button>
-                          </div>
-                          <div style={{ position: 'relative' }}>
-                            {appointmentDateInputMode === 'picker' ? (
-                              <input
-                                type="date"
-                                className="sb-input-field"
-                                value={appointmentConfig.date || ''}
-                                onChange={e => setAppointmentConfig({ ...appointmentConfig, date: e.target.value })}
-                                style={{ colorScheme: 'dark' }}
-                              />
-                            ) : (
-                              <input
-                                type="text"
-                                className="sb-input-field"
-                                value={appointmentConfig.date || ''}
-                                onChange={e => setAppointmentConfig({ ...appointmentConfig, date: e.target.value })}
-                                onFocus={() => setVarsPane({ visible: true, fieldKey: 'date', fieldLabel: 'Date', fieldType: 'text' })}
-                                style={{
-                                  ...(String(appointmentConfig.date || '').includes('{{') ? { color: 'transparent' } : {}),
-                                }}
-                              />
-                            )}
-                            {appointmentConfig.date_input_mode !== 'picker' && (appointmentConfig.date || '').includes('{{') && (
-                              <div
-                                className="sb-var-chip-overlay"
-                                style={{
-                                  position: 'absolute',
-                                  inset: 0,
-                                  pointerEvents: 'none',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  padding: '0 10px',
-                                  fontSize: 12,
-                                  color: '#e4e4e7',
-                                  overflow: 'hidden',
-                                  whiteSpace: 'nowrap',
-                                  fontFamily: 'Inter, sans-serif',
-                                }}
-                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.date) }}
-                              />
-                            )}
-                          </div>
-                        </div>
+                        renderAppointmentDateInput()
                       )}
                       {/* Time — for create and update_appointment */}
                       {(appointmentConfig.key === 'create_appointment' || appointmentConfig.key === 'update_appointment') && (
                         <div className="sb-record-field" style={appointmentConfig.key === 'update_appointment' ? { order: 6 } : appointmentConfig.key === 'create_appointment' ? { order: 4 } : undefined}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-                            <label className="sb-record-label" style={{ marginBottom: 0 }}>Time</label>
-                            <button
-                              type="button"
-                              onClick={() => setAppointmentConfig({ ...appointmentConfig, time_input_mode: appointmentTimeInputMode === 'text' ? 'picker' : 'text' })}
-                              style={{ ...sbModeToggleStyle, ...(appointmentTimeInputMode === 'text' ? sbModeToggleActiveStyle : {}) }}
-                            >
-                              {appointmentTimeInputMode === 'picker' ? 'Picker' : 'Text'}
-                            </button>
-                          </div>
-                          <div style={{ position: 'relative' }}>
-                            {appointmentTimeInputMode === 'picker' ? (
-                              <input
-                                type="time"
-                                className="sb-input-field"
-                                value={appointmentConfig.time || ''}
-                                onChange={e => setAppointmentConfig({ ...appointmentConfig, time: e.target.value })}
-                                style={{ colorScheme: 'dark' }}
-                              />
-                            ) : (
-                              <input
-                                type="text"
-                                className="sb-input-field"
-                                value={appointmentConfig.time || ''}
-                                onChange={e => setAppointmentConfig({ ...appointmentConfig, time: e.target.value })}
-                                onFocus={() => setVarsPane({ visible: true, fieldKey: 'time', fieldLabel: 'Time', fieldType: 'text' })}
-                                style={{
-                                  ...(String(appointmentConfig.time || '').includes('{{') ? { color: 'transparent' } : {}),
-                                }}
-                              />
-                            )}
-                            {appointmentConfig.time_input_mode !== 'picker' && (appointmentConfig.time || '').includes('{{') && (
-                              <div
-                                className="sb-var-chip-overlay"
-                                style={{
-                                  position: 'absolute',
-                                  inset: 0,
-                                  pointerEvents: 'none',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  padding: '0 10px',
-                                  fontSize: 12,
-                                  color: '#e4e4e7',
-                                  overflow: 'hidden',
-                                  whiteSpace: 'nowrap',
-                                  fontFamily: 'Inter, sans-serif',
-                                }}
-                                dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.time) }}
-                              />
-                            )}
-                          </div>
+                          <label className="sb-record-label">Time</label>
+                          {renderAppointmentVariableInput({ fieldKey: 'time', fieldLabel: 'Time', fieldType: 'text' })}
                         </div>
                       )}
                       {/* Duration */}

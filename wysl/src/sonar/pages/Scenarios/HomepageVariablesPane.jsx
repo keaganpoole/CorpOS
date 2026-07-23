@@ -6,7 +6,7 @@ import {
 import { getOutputVariables, isStripeResponseNode } from '../../../sonar/lib/fieldContexts';
 import { api } from '../../lib/api';
 import { fetchCustomFields, getCurrentBusinessId, getCustomValue, isCustomFieldKey } from '../../lib/customFields';
-import { getSmartActionByKey, getSmartActions } from './smartActions';
+import { getSmartActionByKey } from './smartActions';
 
 const SMART_ACTION_MAP = {};
 try {
@@ -1410,7 +1410,7 @@ const pickRandomItem = (items = []) => {
   return items[Math.floor(Math.random() * items.length)];
 };
 
-const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, onInsertSmartAction, smartActions = [], onTableHover, onClose, style = {}, nodes = [], edges = [], currentNodeId = '', demoMode = false, demoPeopleCustomFields = [] }) => {
+const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, onClose, style = {}, nodes = [], edges = [], currentNodeId = '', demoMode = false, demoPeopleCustomFields = [] }) => {
   const [records, setRecords] = useState({});
   const [activeIndex, setActiveIndex] = useState({});
   const [expanded, setExpanded] = useState({});
@@ -1973,23 +1973,6 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
       </div>
 
       <div className="sb-vars-scroll">
-        {onInsertSmartAction && smartActions.length > 0 && (
-          <div className="sb-smart-actions-section">
-            <div className="sb-smart-actions-header">
-              <Sparkles size={12} className="sb-smart-actions-icon" />
-              <span className="sb-smart-actions-title">Smart Actions</span>
-            </div>
-            <div className="sb-smart-actions-list">
-              {smartActions.map((action) => (
-                <button key={action.key} type="button" className="sb-smart-action-item" onClick={(e) => { e.stopPropagation(); onInsertSmartAction(action, targetFieldKey); }} title={action.description}>
-                  <Zap size={11} className="sb-smart-action-item-icon" />
-                  <span className="sb-smart-action-item-name">{action.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         <PreviousNodeVars
           currentNodeId={currentNodeId}
           nodes={nodes}
