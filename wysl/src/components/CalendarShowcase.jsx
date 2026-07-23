@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import HomepageScenariosDemo from '../sonar/pages/Scenarios/HomepageScenariosDemo';
-import HomepagePeopleCrmDemo from '../sonar/pages/HomepagePeopleCrmDemo';
+import HomepagePeopleCrmDemo, { DEMO_CUSTOM_FIELDS } from '../sonar/pages/HomepagePeopleCrmDemo';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -540,6 +540,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const [bookingPlayState, setBookingPlayState] = useState('idle');
   const [demoResetState, setDemoResetState] = useState(null);
   const [demoInstanceKey, setDemoInstanceKey] = useState(0);
+  const [demoPeopleCustomFields, setDemoPeopleCustomFields] = useState(DEMO_CUSTOM_FIELDS);
   const [scenarioAwaitingReentry, setScenarioAwaitingReentry] = useState(false);
   const [crmAwaitingReentry, setCrmAwaitingReentry] = useState(false);
   const [crmHeadlinePlayed, setCrmHeadlinePlayed] = useState(false);
@@ -752,6 +753,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     }
     setDemoResetState('message');
     window.setTimeout(() => {
+      setDemoPeopleCustomFields(DEMO_CUSTOM_FIELDS);
       setDemoInstanceKey((prev) => prev + 1);
       setDemoResetState('intro');
     }, 1300);
@@ -940,6 +942,9 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   key={demoInstanceKey}
                   className="homepage-crm-demo"
                   onDemoLimitExceeded={handleDemoLimitExceeded}
+                  onDemoSchemaChange={({ customFields } = {}) => {
+                    setDemoPeopleCustomFields(Array.isArray(customFields) ? customFields : []);
+                  }}
                 />
               ) : (
                 <div
@@ -953,6 +958,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                     key={demoInstanceKey}
                     demoMode
                     demoMaxNodes={4}
+                    demoPeopleCustomFields={demoPeopleCustomFields}
                     onDemoLimitExceeded={handleDemoLimitExceeded}
                     className="homepage-scenarios-builder"
                   />

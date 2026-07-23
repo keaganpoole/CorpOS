@@ -21,6 +21,7 @@ const StudioSelect = ({ value, options, onChange, placeholder = 'Select...', cla
   const [menuPosition, setMenuPosition] = useState(null);
   const ref = useRef(null);
   const menuRef = useRef(null);
+  const portalTarget = typeof document !== 'undefined' ? document.body : null;
   const selected = options.find((option) => option.value === value);
   const label = selected?.label || placeholder;
 
@@ -52,7 +53,7 @@ const StudioSelect = ({ value, options, onChange, placeholder = 'Select...', cla
     };
   }, [open, updateMenuPosition]);
 
-  return createPortal(
+  return (
     <div ref={ref} className={`relative min-w-0 ${className}`}>
       <button
         type="button"
@@ -62,7 +63,7 @@ const StudioSelect = ({ value, options, onChange, placeholder = 'Select...', cla
         <span className="min-w-0 truncate">{label}</span>
         <ChevronDown size={11} className={`shrink-0 text-zinc-600 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {createPortal(
+      {portalTarget && createPortal(
         <AnimatePresence>
           {open && (
             <motion.div

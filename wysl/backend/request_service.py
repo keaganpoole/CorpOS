@@ -81,6 +81,12 @@ def create_request(
     saved = (response.data or [row])[0]
     url = f"{base_url.rstrip('/')}/{path_prefix.strip('/')}/{quote(token, safe='')}"
     logging.info("[request][mock-delivery] request_type=%s url=%s", request_type, url)
+    print(
+        f"\n[MOCK REQUEST LINK]\n"
+        f"type: {request_type}\n"
+        f"url:  {url}\n",
+        flush=True,
+    )
     return {
         "success": True, "request_id": str(saved.get("id")), "session_id": str(saved.get("id")),
         "request_type": request_type, "status": "pending",

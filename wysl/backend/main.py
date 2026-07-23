@@ -5406,7 +5406,7 @@ async def route_call_compat(request: Request):
 
     dynamic_variables = {
         "autonomy_index": get_account_autonomy_index_for_user(context.get("user_id") or (business or {}).get("user_id")),
-        "caller_authentication": caller_authentication_allowed(
+        "authenticate_caller": caller_authentication_allowed(
             user_id=context.get("user_id") or (business or {}).get("user_id"),
             business_id=str(business.get("id")) if business and business.get("id") is not None else None,
         ),
@@ -5880,6 +5880,121 @@ async def legacy_server_tool(tool_name: str, request: Request):
             "record": created,
             "person_id": created.get("id"),
             "record_id": created.get("id"),
+        }
+
+    if normalized_tool in {"update-person", "update-record", "update-customer"}:
+        if not business:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
+
+        person_id = first_present(payload, "people_id", "person_id", "record_id", "customer_id")
+        if not person_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="people_id is required")
+
+        allowed_standard_fields = {
+            "first_name",
+            "last_name",
+            "phone",
+            "email",
+            "street_address",
+            "city",
+            "state",
+            "zip_code",
+            "preferred_contact_method",
+            "preferred_language",
+            "best_time_to_contact",
+            "consent_sms",
+            "consent_call",
+            "do_not_call",
+            "do_not_text",
+            "source",
+            "lead_source_detail",
+            "special_instructions",
+            "notes",
+            "status",
+            "tags",
+        }
+        existing_query = supabase.table("people").select("*").eq("id", str(person_id))
+        if business.get("id") is not None:
+            existing_query = existing_query.eq("business_id", business["id"])
+        elif user_id:
+            existing_query = existing_query.eq("user_id", user_id)
+        existing_response = existing_query.limit(1).execute()
+        if not existing_response.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+
+        merged_payload = {**payload}
+        custom_fields_json = first_present(payload, "custom_fields_json")
+        if custom_fields_json:
+            try:
+                parsed_custom_fields = json.loads(str(custom_fields_json))
+            except json.JSONDecodeError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="custom_fields_json must be a valid JSON object string",
+                ) from exc
+            if not isinstance(parsed_custom_fields, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="custom_fields_json must be a valid JSON object string",
+                )
+            merged_payload.update(parsed_custom_fields)
+        merged_payload.pop("custom_fields_json", None)
+
+        updates = {
+            key: value
+            for key, value in merged_payload.items()
+            if key in allowed_standard_fields or str(key).startswith("custom_")
+        }
+        name = first_present(merged_payload, "name", "full_name", "customer_name")
+        if name and not updates.get("first_name") and not updates.get("last_name"):
+            parts = str(name).strip().split()
+            if parts:
+                updates["first_name"] = parts[0]
+                if len(parts) > 1:
+                    updates["last_name"] = " ".join(parts[1:])
+        if first_present(merged_payload, "customer_phone"):
+            updates["phone"] = first_present(merged_payload, "customer_phone")
+        if first_present(merged_payload, "customer_email"):
+            updates["email"] = first_present(merged_payload, "customer_email")
+        if updates.get("phone"):
+            updates["phone"] = normalize_phone_number(updates.get("phone")) or updates.get("phone")
+
+        if not updates:
+            existing = existing_response.data[0]
+            return {
+                "ok": True,
+                "person": existing,
+                "record": existing,
+                "person_id": existing.get("id"),
+                "people_id": existing.get("id"),
+                "record_id": existing.get("id"),
+                "updated": False,
+            }
+
+        updates = normalize_people_payload_custom_fields(
+            updates,
+            business.get("id"),
+            existing_response.data[0].get("custom_fields"),
+        )
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+        response = supabase.table("people").update(updates).eq("id", str(person_id)).execute()
+        updated = (response.data or [{**existing_response.data[0], **updates}])[0]
+        schedule_backend_scenario_execution("record_updated", {
+            "record_id": updated.get("id") or person_id,
+            "person_id": updated.get("id") or person_id,
+            "user_id": updated.get("user_id") or user_id or business.get("user_id"),
+            "business_id": updated.get("business_id") or business.get("id"),
+            "person": updated,
+            "record": updated,
+        })
+        return {
+            "ok": True,
+            "person": updated,
+            "record": updated,
+            "person_id": updated.get("id") or person_id,
+            "people_id": updated.get("id") or person_id,
+            "record_id": updated.get("id") or person_id,
+            "updated": True,
         }
 
     if normalized_tool == "check-availability":

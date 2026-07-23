@@ -114,6 +114,8 @@ const toScenarioCustomField = (field) => ({
   label: field.label,
   description: field.description,
   type: field.type,
+  options: field.options || field.config?.options || [],
+  optionColors: field.optionColors || field.config?.optionColors || {},
   custom: true,
 });
 
@@ -275,7 +277,6 @@ const TRIGGER_TABLE_MAP = {
   appointment_missed: ['appointments', 'people', 'services', 'staff', 'businesses'],
   record_created: ['people', 'businesses'],
   record_updated: ['people', 'businesses'],
-  record_deleted: ['people', 'businesses'],
   incoming_call: ['people', 'businesses', 'hired_receptionists'],
   call_answered: ['people', 'businesses', 'hired_receptionists'],
   missed_call: ['people', 'businesses'],
@@ -1409,7 +1410,7 @@ const pickRandomItem = (items = []) => {
   return items[Math.floor(Math.random() * items.length)];
 };
 
-const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, onInsertSmartAction, smartActions = [], onTableHover, onClose, style = {}, nodes = [], edges = [], currentNodeId = '', demoMode = false }) => {
+const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, onInsertSmartAction, smartActions = [], onTableHover, onClose, style = {}, nodes = [], edges = [], currentNodeId = '', demoMode = false, demoPeopleCustomFields = [] }) => {
   const [records, setRecords] = useState({});
   const [activeIndex, setActiveIndex] = useState({});
   const [expanded, setExpanded] = useState({});
@@ -1428,9 +1429,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 
   useEffect(() => {
     if (demoMode) {
-      setPeopleCustomVariableFields([
-        { key: 'custom_membership_level', label: 'Membership Level', description: 'Demo custom field', type: 'text' },
-      ]);
+      setPeopleCustomVariableFields(Array.isArray(demoPeopleCustomFields) ? demoPeopleCustomFields : []);
       setCustomFieldsReady(true);
       return undefined;
     }
@@ -1452,7 +1451,7 @@ const VariablesPane = ({ visible, targetFieldKey, fieldLabel, onInsertVariable, 
 
     loadCustomFields();
     return () => { cancelled = true; };
-  }, [demoMode]);
+  }, [demoMode, demoPeopleCustomFields]);
 
   useEffect(() => {
     if (!visible || !customFieldsReady) return;

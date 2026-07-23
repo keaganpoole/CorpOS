@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import LeadsTable from './LeadsTable';
 import { DEFAULT_FIELD_CONFIG } from '../lib/fieldConfig';
 
-const DEMO_CUSTOM_FIELDS = [
+export const DEMO_CUSTOM_FIELDS = [
   {
     key: 'custom_membership_status',
     label: 'Membership Status',
@@ -483,7 +483,7 @@ const createInitialRows = () => [
   }, '2026-06-07T18:16:10.433Z'),
 ];
 
-const HomepagePeopleCrmDemo = ({ className = '', onDemoLimitExceeded }) => {
+const HomepagePeopleCrmDemo = ({ className = '', onDemoLimitExceeded, onDemoSchemaChange }) => {
   const [rows, setRows] = useState(() => createInitialRows());
   const [selectedId, setSelectedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -494,6 +494,10 @@ const HomepagePeopleCrmDemo = ({ className = '', onDemoLimitExceeded }) => {
       onDemoLimitExceeded?.();
     }
   }, [onDemoLimitExceeded, rows.length]);
+
+  React.useEffect(() => {
+    onDemoSchemaChange?.({ customFields: DEMO_CUSTOM_FIELDS });
+  }, [onDemoSchemaChange]);
 
   const filteredRows = useMemo(() => {
     if (!searchQuery.trim()) return rows;
@@ -564,6 +568,7 @@ const HomepagePeopleCrmDemo = ({ className = '', onDemoLimitExceeded }) => {
         demoInitialFieldConfig={DEMO_FIELD_CONFIG}
         demoInitialColorbarRules={DEMO_COLORBAR_RULES}
         demoInitialViewSettings={{ rowHeight: 3, sortRules: [], frozenCount: 0 }}
+        onSchemaChange={onDemoSchemaChange}
         hideTitle
         searchPlaceholder="Search records..."
       />

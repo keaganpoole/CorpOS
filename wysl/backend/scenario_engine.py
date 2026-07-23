@@ -90,7 +90,6 @@ TRIGGER_EVENT_MAP = {
     "sms_sent": "sms_sent",
     "record_updated": "record_updated",
     "record_created": "record_created",
-    "record_deleted": "record_deleted",
     "appointment_created": "appointment_created",
     "appointment_updated": "appointment_updated",
     "appointment_cancelled": "appointment_cancelled",
@@ -2532,8 +2531,10 @@ class ScenarioEngine:
             if not self._event_matches_scenario_tenant(scenario, payload):
                 continue
             trigger_node = match
-            logging.info("⚡ %s → %s", event_type, scenario.get("name"))
             flow_context = await self._build_flow_context(scenario, event_type, payload)
+            if not self._trigger_matches_config(trigger_node, event_type, payload, flow_context):
+                continue
+            logging.info("⚡ %s → %s", event_type, scenario.get("name"))
             result = await self.flow_executor.start(
                 scenario,
                 {"event_type": event_type, "payload": payload},
@@ -2542,6 +2543,54 @@ class ScenarioEngine:
             )
             runs.append({"scenario_id": scenario.get("id"), "scenario_name": scenario.get("name"), "result": result})
         return {"ok": True, "matched": len(runs), "runs": runs}
+
+    def _resolve_trigger_filter_value(self, value: Any, context: dict):
+        if not isinstance(value, str):
+            return value
+
+        def replace(match):
+            reference = match.group(1).strip()
+            parts = reference.split(".")
+            if not parts:
+                return ""
+            aliases = {"person": "people", "appointment": "appointments", "business": "business"}
+            root = aliases.get(parts[0], parts[0])
+            resolved = deep_get(context.get(root), ".".join(parts[1:])) if len(parts) > 1 else context.get(root)
+            return "" if resolved is None else str(resolved)
+
+        resolved = re.sub(r"\{\{([^}]+)\}\}", replace, value)
+        return resolved.strip() if isinstance(resolved, str) else resolved
+
+    def _trigger_matches_config(self, trigger_node: dict, event_type: str, payload: dict, context: dict) -> bool:
+        config = trigger_node.get("triggerConfig") or {}
+        fields = config.get("fields") if isinstance(config, dict) else None
+        if not isinstance(fields, dict):
+            return True
+
+        source = context
+        if event_type == "incoming_call":
+            source = {**payload, "phone_number": payload.get("from_number") or payload.get("caller_number") or payload.get("phone_number")}
+        elif event_type == "record_updated":
+            source = context.get("person") or payload.get("person") or payload.get("record") or payload
+        elif event_type.startswith("appointment_") or event_type == "appointment_reminder":
+            source = context.get("appointment") or payload.get("appointment") or payload
+
+        for field, expected_raw in fields.items():
+            if is_empty_value(expected_raw):
+                continue
+            expected = self._resolve_trigger_filter_value(expected_raw, context)
+            actual = deep_get(source, field)
+            if actual is None and field == "phone_number":
+                actual = source.get("from_number") or source.get("caller_number") or source.get("phone")
+            if actual is None:
+                return False
+            if normalize_phone_number(expected) and normalize_phone_number(actual):
+                matches = normalize_phone_number(expected) == normalize_phone_number(actual)
+            else:
+                matches = str(actual).strip().lower() == str(expected).strip().lower()
+            if not matches:
+                return False
+        return True
 
     def _event_matches_scenario_tenant(self, scenario: dict, payload: dict) -> bool:
         event_user_id = payload.get("user_id")

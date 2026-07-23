@@ -32,6 +32,7 @@ import {
   Database,
   Hash,
   Code,
+  RectangleEllipsis,
   ShieldCheck,
 } from 'lucide-react';
 import './Scenarios.css';
@@ -351,7 +352,6 @@ const AUTOMATION_HIERARCHY = {
       sub_options: [
         { key: 'record_created', name: 'Person Created', description: 'When a new person is created' },
         { key: 'record_updated', name: 'Person Updated', description: 'When a person is updated' },
-        { key: 'record_deleted', name: 'Person Deleted', description: 'When a person is deleted' },
       ],
     },
     {
@@ -748,6 +748,7 @@ const sbModeToggleActiveStyle = {
 export default function ScenariosPage({
   demoMode = false,
   demoMaxNodes = Infinity,
+  demoPeopleCustomFields = [],
   onDemoLimitExceeded,
   className = '',
 } = {}) {
@@ -785,10 +786,12 @@ export default function ScenariosPage({
   const [appointmentConfig, setAppointmentConfig] = useState({});
   const [scheduleConfig, setScheduleConfig] = useState({});
   const [triggerFilter, setTriggerFilter] = useState({});
+  const [triggerConfig, setTriggerConfig] = useState(null);
   const triggerFilterSourceNodeRef = useRef(null);
   const [varsPane, setVarsPane] = useState({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
   const [hoveredTableColor, setHoveredTableColor] = useState('');
   const [actionConfig, setActionConfig] = useState(null);
+  const [recordFieldMenu, setRecordFieldMenu] = useState(null);
   const [peopleCustomFields, setPeopleCustomFields] = useState([]);
   const [contextMenu, setContextMenu] = useState(null); // { x, y, nodeId }
   const [runNodeModal, setRunNodeModal] = useState(null);
@@ -944,9 +947,7 @@ export default function ScenariosPage({
 
   const refreshPeopleCustomFields = useCallback(async () => {
     if (demoMode) {
-      const demoFields = [
-        { key: 'custom_membership_level', label: 'Membership Level', description: 'Demo custom field', type: 'text' },
-      ];
+      const demoFields = Array.isArray(demoPeopleCustomFields) ? demoPeopleCustomFields : [];
       setPeopleCustomFields(demoFields);
       setPeopleCustomVariableFields(demoFields);
       return;
@@ -962,7 +963,7 @@ export default function ScenariosPage({
       setPeopleCustomFields([]);
       setPeopleCustomVariableFields([]);
     }
-  }, [demoMode]);
+  }, [demoMode, demoPeopleCustomFields]);
 
   useEffect(() => {
     refreshPeopleCustomFields();
@@ -1048,6 +1049,12 @@ export default function ScenariosPage({
     setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, triggerFilter: normalizeAppointmentSoonFilter(triggerFilter) } : n));
   }, [triggerFilter, selectedNodeId]);
 
+  useEffect(() => {
+    if (restoringFromNodeRef.current) { restoringFromNodeRef.current = false; return; }
+    if (!selectedNodeId || !triggerConfig?.key) return;
+    setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, triggerConfig: { ...triggerConfig } } : n));
+  }, [triggerConfig, selectedNodeId]);
+
   const nodeMap = useMemo(() => nodes.reduce((acc, node) => ({ ...acc, [node.id]: node }), {}), [nodes]);
   const selectedNode = selectedNodeId ? nodeMap[selectedNodeId] : null;
 
@@ -1083,6 +1090,7 @@ export default function ScenariosPage({
       setAppointmentConfig({});
       setScheduleConfig({});
       setTriggerFilter({});
+      setTriggerConfig(null);
       triggerFilterSourceNodeRef.current = null;
       setPanelStage('options');
     }
@@ -1325,7 +1333,7 @@ export default function ScenariosPage({
       : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
-  const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'runNode'].includes(panelStage);
+  const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage);
   const panelTitle = isPrimaryNode ? 'Add Trigger' : 'Add Action';
   const appointmentDateInputMode = appointmentConfig.date_input_mode || 'picker';
   const appointmentTimeInputMode = appointmentConfig.time_input_mode || 'picker';
@@ -1409,6 +1417,11 @@ export default function ScenariosPage({
 
     if (panelStage === 'scheduleConfig') {
       applyInsert(setScheduleConfig);
+      return;
+    }
+
+    if (panelStage === 'triggerConfig') {
+      setTriggerConfig(prev => ({ ...(prev || {}), fields: { ...(prev?.fields || {}), [varsPane.fieldKey]: prev?.fields?.[varsPane.fieldKey] ? `${prev.fields[varsPane.fieldKey]} ${varRef}` : varRef } }));
       return;
     }
 
@@ -1742,6 +1755,11 @@ export default function ScenariosPage({
         triggerFilterSourceNodeRef.current = nodeId;
         setTriggerFilter(normalizeAppointmentSoonFilter(node.triggerFilter));
         setPanelStage('triggerFilter');
+      }
+      else if (node?.triggerConfig?.key) {
+        restoringFromNodeRef.current = true;
+        setTriggerConfig({ ...node.triggerConfig, fields: { ...(node.triggerConfig.fields || {}) } });
+        setPanelStage('triggerConfig');
       }
       // If this node has an action config, show the action config form
       else if (node?.configured && node?.actionConfig?._key) {
@@ -2206,6 +2224,24 @@ export default function ScenariosPage({
     const meta = CATEGORY_META[panelCategory] || CATEGORY_META.TRIGGERS;
     const currentNodeId = selectedNodeId; // Capture before finalizeSelection clears it
     const currentNode = nodeMap[currentNodeId];
+
+    const triggerFieldDefinitions = (() => {
+      if (subOption.key === 'incoming_call') return [{ key: 'phone_number', label: 'Phone Number', type: 'phone' }];
+      if (subOption.key === 'record_updated') return getRecordFieldsForTable(PEOPLE_RECORD_TABLE).filter((field) => field.key !== 'id');
+      if (subOption.key.startsWith('appointment_') && subOption.key !== 'appointment_soon') return [{ key: 'id', label: 'Record ID', type: 'text' }, { key: 'person_id', label: 'Person ID', type: 'text' }, { key: 'service_id', label: 'Service ID', type: 'text' }, { key: 'staff_id', label: 'Staff ID', type: 'text' }, ...getTableFields('appointments').filter((field) => field.key !== 'id')];
+      return [];
+    })();
+
+    if (panelCategory === 'TRIGGERS' && triggerFieldDefinitions.length > 0) {
+      const initialTriggerConfig = { key: subOption.key, fields: Object.fromEntries(triggerFieldDefinitions.map((field) => [field.key, currentNode?.triggerConfig?.fields?.[field.key] || ''])) };
+      setNodes(prev => prev.map(node => node.id === currentNodeId ? { ...node, configured: true, label: subOption.name, detail: subOption.description, icon: subIcon, type: meta.type, category: meta.detail, accent: subAccent, categoryType: panelCategory, subOptionKey: subOption.key, categoryKey: activeOption?.key || '', triggerConfig: initialTriggerConfig } : node));
+      restoringFromNodeRef.current = true;
+      setTriggerConfig(initialTriggerConfig);
+      setActiveOption(null);
+      setPanelSearch('');
+      setPanelStage('triggerConfig');
+      return;
+    }
 
     if (TRIGGER_FILTER_ACTIONS.has(subOption.key)) {
       const triggerFilterConfig = normalizeAppointmentSoonFilter(
@@ -2696,7 +2732,7 @@ export default function ScenariosPage({
     const sanitizeActionConfig = (config) => {
       if (!config) return null;
       return Object.fromEntries(Object.entries(config).filter(([key]) => {
-        if (key === '_fields') return false;
+        if (key === '_fields' || key.startsWith('_mode_') || key.startsWith('_manual_') || key.startsWith('_automation_')) return false;
         if (key.startsWith('field_custom_')) {
           return activeCustomFieldKeys.has(key.replace(/^field_/, ''));
         }
@@ -2722,6 +2758,7 @@ export default function ScenariosPage({
         appointmentConfig: n.appointmentConfig || null,
         scheduleConfig: n.scheduleConfig || null,
         triggerFilter: n.triggerFilter || null,
+        triggerConfig: n.triggerConfig || null,
         actionConfig: sanitizeActionConfig(n.actionConfig),
         subOptionKey: n.subOptionKey || null,
         categoryKey: n.categoryKey || null,
@@ -2810,12 +2847,222 @@ export default function ScenariosPage({
         key: field.key,
         label: field.label,
         type: field.type || 'text',
+        options: field.options || [],
+        optionColors: field.optionColors || {},
         custom: Boolean(field.custom),
       }));
     }
 
     return [];
   }, []);
+
+  const renderRecordFieldInput = (field) => {
+    const fieldKey = `field_${field.key}`;
+    const modeKey = `_mode_${fieldKey}`;
+    const manualKey = `_manual_${fieldKey}`;
+    const automationKey = `_automation_${fieldKey}`;
+    const normalizedType = String(field.type || 'text').toLowerCase();
+    const supportsManualMode = new Set(['date', 'boolean', 'select', 'multi_select']).has(normalizedType);
+    const activeMode = supportsManualMode
+      ? (actionConfig[modeKey] || 'automation')
+      : 'automation';
+    const manualValue = actionConfig[manualKey] ?? (activeMode === 'manual' ? actionConfig[fieldKey] : '') ?? '';
+    const automationValue = actionConfig[automationKey] ?? (activeMode === 'automation' ? actionConfig[fieldKey] : '') ?? '';
+    const val = supportsManualMode && activeMode === 'manual' ? manualValue : automationValue;
+    const setFieldValue = (nextValue) => setActionConfig(prev => ({
+      ...prev,
+      [fieldKey]: nextValue,
+      ...(supportsManualMode && activeMode === 'manual' ? { [manualKey]: nextValue } : {}),
+      ...(supportsManualMode && activeMode === 'automation' ? { [automationKey]: nextValue } : {}),
+    }));
+    const setFieldMode = (nextMode) => {
+      setRecordFieldMenu(null);
+      setActionConfig(prev => ({
+        ...prev,
+        [modeKey]: nextMode,
+        [fieldKey]: nextMode === 'manual'
+          ? (prev[manualKey] ?? '')
+          : (prev[automationKey] ?? ''),
+      }));
+    };
+    const optionColor = (option) => field.optionColors?.[option] || field.optionColors?.[String(option).trim()] || '#71717a';
+    const crmSelectControl = (multi = false) => {
+      const selected = multi
+        ? String(val).split(',').map((item) => item.trim()).filter(Boolean)
+        : [];
+      const current = multi ? '' : String(val || '').trim();
+      return (
+        <div className="sb-crm-select-shell">
+          <button
+            type="button"
+            className={`sb-crm-select-trigger ${current || selected.length ? 'has-value' : ''}`}
+            onClick={() => setRecordFieldMenu(recordFieldMenu === fieldKey ? null : fieldKey)}
+          >
+            {multi ? (
+              selected.length ? selected.slice(0, 2).map((option) => (
+                <span key={option} className="sb-crm-chip">
+                  <span className="sb-crm-dot" style={{ backgroundColor: optionColor(option) }} />
+                  {option}
+                </span>
+              )) : <span className="sb-crm-empty">&nbsp;</span>
+            ) : current ? (
+              <>
+                <span className="sb-crm-dot" style={{ backgroundColor: optionColor(current) }} />
+                <span>{current}</span>
+              </>
+            ) : (
+              <>
+                <span className="sb-crm-dot" style={{ backgroundColor: '#71717a' }} />
+                <span className="sb-crm-empty-label">Blank</span>
+              </>
+            )}
+            {multi && selected.length > 2 && <span className="sb-crm-more">+{selected.length - 2}</span>}
+          </button>
+          {recordFieldMenu === fieldKey && (
+            <div className="sb-crm-menu">
+              {!multi && (
+                <button type="button" className="sb-crm-menu-item" onClick={() => { setFieldValue(''); setRecordFieldMenu(null); }}>
+                  <span className="sb-crm-dot" style={{ backgroundColor: '#3f3f46' }} />
+                  <span className="sb-crm-empty">&nbsp;</span>
+                  {!current && <Check size={11} className="sb-crm-check" />}
+                </button>
+              )}
+              {(field.options || []).map((option) => {
+                const selectedOption = multi ? selected.includes(option) : current === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    className={`sb-crm-menu-item ${selectedOption ? 'is-active' : ''}`}
+                    onClick={() => {
+                      if (multi) {
+                        const next = selectedOption ? selected.filter((item) => item !== option) : [...selected, option];
+                        setFieldValue(next.join(', '));
+                        return;
+                      }
+                      setFieldValue(option);
+                      setRecordFieldMenu(null);
+                    }}
+                  >
+                    <span className="sb-crm-dot" style={{ backgroundColor: optionColor(option) }} />
+                    {option}
+                    {selectedOption && <Check size={11} className="sb-crm-check" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    };
+    const automationInput = (
+      <div style={{ position: 'relative' }}>
+        <input
+          className="sb-input-field"
+          type="text"
+          value={val}
+          onChange={e => setFieldValue(e.target.value)}
+          onFocus={() => setVarsPane({ visible: true, fieldKey, fieldLabel: field.label, fieldType: field.type || 'text' })}
+          style={{
+            ...(String(val).includes('{{') ? { color: 'transparent' } : {}),
+            ...(varsPane.visible && hoveredTableColor && fieldKey === varsPane.fieldKey ? {
+              borderColor: hoveredTableColor,
+              boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+            } : {}),
+          }}
+        />
+        {String(val).includes('{{') && (
+          <div
+            className="sb-var-chip-overlay"
+            style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              display: 'flex', alignItems: 'center', padding: '0 10px',
+              fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+              whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
+            }}
+            dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(val) }}
+          />
+        )}
+      </div>
+    );
+
+    const modeToggle = supportsManualMode && (
+      <button
+        type="button"
+        aria-label={activeMode === 'automation' ? 'Use manual input' : 'Use variable input'}
+        title={activeMode === 'automation' ? 'Use manual input' : 'Use variable input'}
+        onClick={() => setFieldMode(activeMode === 'automation' ? 'manual' : 'automation')}
+        style={{
+          width: 16,
+          height: 16,
+          border: 0,
+          background: 'transparent',
+          color: 'rgba(255,255,255,0.42)',
+          padding: 0,
+          cursor: 'pointer',
+          flex: '0 0 auto',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {activeMode === 'automation' ? <Code size={11} /> : <RectangleEllipsis size={11} />}
+      </button>
+    );
+
+    let manualControl = automationInput;
+    if (normalizedType === 'boolean') {
+      const current = val === 'true' || val === true ? 'true' : val === 'false' || val === false ? 'false' : '';
+      const next = current === '' ? 'true' : current === 'true' ? 'false' : '';
+      const state = current === 'true'
+        ? { label: 'Yes', dot: '#10b981' }
+        : current === 'false'
+          ? { label: 'No', dot: '#71717a' }
+          : { label: '', dot: '#71717a' };
+      manualControl = (
+        <button
+          type="button"
+          onClick={() => setFieldValue(next)}
+          className={`sb-crm-boolean-cycle ${current ? 'has-value' : ''}`}
+          title="Click to cycle Blank / Yes / No"
+        >
+          {current ? (
+            <>
+              <span className="sb-crm-dot" style={{ backgroundColor: state.dot }} />
+              {state.label}
+            </>
+          ) : (
+            <>
+              <span className="sb-crm-dot" style={{ backgroundColor: state.dot }} />
+              <span className="sb-crm-empty-label">Blank</span>
+            </>
+          )}
+        </button>
+      );
+    } else if (normalizedType === 'select' && Array.isArray(field.options) && field.options.length > 0) {
+      manualControl = crmSelectControl(false);
+    } else if (normalizedType === 'multi_select' && Array.isArray(field.options) && field.options.length > 0) {
+      manualControl = crmSelectControl(true);
+    } else if (normalizedType === 'date') {
+      manualControl = <input className="sb-input-field" type="date" value={val} onChange={e => setFieldValue(e.target.value)} />;
+    } else if (normalizedType === 'timestamp' || normalizedType === 'datetime') {
+      manualControl = <input className="sb-input-field" type="datetime-local" value={val} onChange={e => setFieldValue(e.target.value)} />;
+    } else if (normalizedType === 'email') {
+      manualControl = <input className="sb-input-field" type="email" value={val} onChange={e => setFieldValue(e.target.value)} />;
+    } else if (normalizedType === 'phone') {
+      manualControl = <input className="sb-input-field" type="tel" value={val} onChange={e => setFieldValue(e.target.value)} />;
+    }
+
+    return (
+      <div key={field.key} className="sb-record-field">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+          <label className="sb-record-label" style={{ marginBottom: 0 }}>{field.label}</label>
+          {modeToggle}
+        </div>
+        {activeMode === 'automation' ? automationInput : manualControl}
+      </div>
+    );
+  };
 
   const readRuntimePath = (source, path) => {
     let current = source;
@@ -4774,7 +5021,7 @@ export default function ScenariosPage({
                   <p className="sb-panel-subheader">Select an action for {activeOption.option}</p>
                 </>
               )}
-              {!['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'runNode'].includes(panelStage) && (
+              {!['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage) && (
                 <>
                   <div className="sb-panel-search">
                     <Search className="sb-panel-search-icon" size={16} />
@@ -4803,7 +5050,7 @@ export default function ScenariosPage({
                 </>
               )}
               {/* Action banner — persists across all config stages */}
-              {['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'runNode'].includes(panelStage) && selectedNode && (
+              {['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage) && selectedNode && (
                 <div
                   className="sb-active-banner sleek-cyber"
                   style={{ borderLeft: 'none' }}
@@ -4860,7 +5107,15 @@ export default function ScenariosPage({
                 </div>
               )}
               <div className="sb-panel-actions">
-                {panelStage === 'triggerFilter' && triggerFilter ? (
+                {panelStage === 'triggerConfig' && triggerConfig ? (
+                  <div className="sb-action-config-form">
+                    <div className="sb-action-config-header"><h4 className="sb-action-config-title">Trigger Criteria</h4><button type="button" className="sb-action-config-close" onClick={() => setPanelStage('options')}><X size={14} /></button></div>
+                    <div className="sb-trigger-filter-copy">Only fire this trigger when the fields below match. Leave every field empty to run for any value.</div>
+                    <div className="sb-record-fields-grid">
+                      {(() => { const definitions = triggerConfig.key === 'incoming_call' ? [{ key: 'phone_number', label: 'Phone Number', type: 'phone' }] : triggerConfig.key === 'record_updated' ? getRecordFieldsForTable(PEOPLE_RECORD_TABLE).filter((field) => field.key !== 'id') : [{ key: 'id', label: 'Record ID', type: 'text' }, { key: 'person_id', label: 'Person ID', type: 'text' }, { key: 'service_id', label: 'Service ID', type: 'text' }, { key: 'staff_id', label: 'Staff ID', type: 'text' }, ...getTableFields('appointments').filter((field) => field.key !== 'id')]; return definitions.map((field) => { const value = triggerConfig.fields?.[field.key] || ''; return <div key={field.key} className="sb-record-field"><label className="sb-record-label">{field.label}</label><div style={{ position: 'relative' }}><input className="sb-input-field" type="text" value={value} onChange={(event) => setTriggerConfig((prev) => ({ ...prev, fields: { ...(prev?.fields || {}), [field.key]: event.target.value } }))} onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type || 'text' })} style={value.includes('{{') ? { color: 'transparent' } : {}} />{value.includes('{{') && <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }} />}</div></div>; }); })()}
+                    </div>
+                  </div>
+                ) : panelStage === 'triggerFilter' && triggerFilter ? (
                   <div className="sb-action-config-form">
                     <div className="sb-action-config-header">
                       <h4 className="sb-action-config-title">Filter</h4>
@@ -5327,69 +5582,7 @@ export default function ScenariosPage({
                         <div className="sb-record-fields-grid">
                           {getRecordFieldsForTable(PEOPLE_RECORD_TABLE)
                             .filter((field) => field.key !== 'id')
-                            .map((field) => {
-                            const fieldKey = `field_${field.key}`;
-                            const val = actionConfig[fieldKey] || '';
-                            const isBooleanCustomField = field.custom && field.type === 'boolean';
-                            return (
-                              <div key={field.key} className="sb-record-field">
-                                <label className="sb-record-label">{field.label}</label>
-                                {isBooleanCustomField && (
-                                  <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                                    {['true', 'false'].map((option) => (
-                                      <button
-                                        key={option}
-                                        type="button"
-                                        onClick={() => setActionConfig(prev => ({ ...prev, [fieldKey]: option }))}
-                                        style={{
-                                          border: `1px solid ${val === option ? 'rgba(50,240,217,0.45)' : 'rgba(255,255,255,0.08)'}`,
-                                          background: val === option ? 'rgba(50,240,217,0.12)' : 'rgba(255,255,255,0.03)',
-                                          color: val === option ? '#32f0d9' : 'rgba(255,255,255,0.62)',
-                                          borderRadius: 999,
-                                          padding: '4px 9px',
-                                          fontSize: 10,
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          textTransform: 'capitalize',
-                                        }}
-                                      >
-                                        {option}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                                <div style={{ position: 'relative' }}>
-                                  <input
-                                    className="sb-input-field"
-                                    type="text"
-                                    value={val}
-                                    onChange={e => setActionConfig(prev => ({ ...prev, [fieldKey]: e.target.value }))}
-                                    onFocus={() => setVarsPane({ visible: true, fieldKey, fieldLabel: field.label, fieldType: field.type || 'text' })}
-                                    placeholder={isBooleanCustomField ? 'true, false, or variable' : undefined}
-                                    style={{
-                                      ...(val.includes('{{') ? { color: 'transparent' } : {}),
-                                      ...(varsPane.visible && hoveredTableColor && fieldKey === varsPane.fieldKey ? {
-                                        borderColor: hoveredTableColor,
-                                        boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
-                                      } : {}),
-                                    }}
-                                  />
-                                  {val.includes('{{') && (
-                                    <div
-                                      className="sb-var-chip-overlay"
-                                      style={{
-                                        position: 'absolute', inset: 0, pointerEvents: 'none',
-                                        display: 'flex', alignItems: 'center', padding: '0 10px',
-                                        fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
-                                        whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
-                                      }}
-                                      dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(val) }}
-                                    />
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
+                            .map(renderRecordFieldInput)}
                         </div>
                         )}
                       </div>
@@ -6022,6 +6215,7 @@ export default function ScenariosPage({
             edges={edges}
             currentNodeId={selectedNodeId}
             demoMode={demoMode}
+            demoPeopleCustomFields={demoPeopleCustomFields}
             style={{
               position: 'absolute',
               top: panelStyle.top,
@@ -6070,6 +6264,7 @@ export default function ScenariosPage({
                 return edge?.from || selectedNodeId;
               })()}
               demoMode={demoMode}
+              demoPeopleCustomFields={demoPeopleCustomFields}
               style={{
                 position: 'absolute',
                 top: logicPanelDragPos?.top ?? logicPanel.top,
@@ -6603,6 +6798,7 @@ export default function ScenariosPage({
                       icon: n.icon?.name || n.icon,
                       appointmentConfig: n.appointmentConfig || null,
                       triggerFilter: n.triggerFilter || null,
+                      triggerConfig: n.triggerConfig || null,
                       isCommunication: n.isCommunication || false,
                       firstMessage: n.firstMessage || '',
                       mainBox: n.mainBox || '',

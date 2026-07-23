@@ -114,6 +114,8 @@ const toScenarioCustomField = (field) => ({
   label: field.label,
   description: field.description,
   type: field.type,
+  options: field.options || field.config?.options || [],
+  optionColors: field.optionColors || field.config?.optionColors || {},
   custom: true,
 });
 
@@ -333,7 +335,6 @@ const TRIGGER_TABLE_MAP = {
   appointment_missed: ['appointments', 'people', 'services', 'staff', 'businesses'],
   record_created: ['people', 'businesses'],
   record_updated: ['people', 'businesses'],
-  record_deleted: ['people', 'businesses'],
   incoming_call: ['people', 'businesses', 'hired_receptionists'],
   call_answered: ['people', 'businesses', 'hired_receptionists'],
   missed_call: ['people', 'businesses'],
