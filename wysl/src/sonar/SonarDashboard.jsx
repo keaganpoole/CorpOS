@@ -45,7 +45,9 @@ import {
   Copy,
   CheckCircle2,
   ArrowDown,
+  ArrowUp,
   ArrowUpDown,
+  Minus,
   BookUser,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
@@ -165,7 +167,55 @@ const formatMetricValue = (value) => {
   return numeric.toLocaleString('en-US');
 };
 
-const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, activeForwardingEntry = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onToggleActive, onTerminate }) => {
+const normalizeAgentDirection = (value) => {
+  const normalized = String(value || 'all').trim().toLowerCase();
+  if (normalized === 'incoming') return 'inbound';
+  if (normalized === 'outgoing') return 'outbound';
+  if (normalized === 'off' || normalized === 'disabled') return 'none';
+  return ['inbound', 'outbound', 'all', 'none'].includes(normalized) ? normalized : 'all';
+};
+
+const displayAgentDirection = (value) => {
+  const normalized = normalizeAgentDirection(value);
+  if (normalized === 'inbound') return 'Inbound';
+  if (normalized === 'outbound') return 'Outbound';
+  if (normalized === 'none') return 'Off';
+  return 'All';
+};
+
+const CallHandlingIcon = ({ direction }) => {
+  const normalized = normalizeAgentDirection(direction);
+  const Icon = normalized === 'inbound' ? ArrowDown : normalized === 'outbound' ? ArrowUp : normalized === 'none' ? Minus : ArrowUpDown;
+  const motionProps = normalized === 'inbound'
+    ? {
+        initial: { y: -5, scale: 0.9, opacity: 0.45 },
+        animate: { y: 0, scale: 1, opacity: 1 },
+        transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
+      }
+    : normalized === 'none'
+      ? {
+          initial: { scaleX: 0.55, scaleY: 0.9, opacity: 0.45 },
+          animate: { scaleX: 1, scaleY: 1, opacity: 1 },
+          transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+        }
+    : {
+        initial: { rotate: normalized === 'outbound' ? -14 : 14, scale: 0.84, opacity: 0.45 },
+        animate: { rotate: 0, scale: 1, opacity: 1 },
+        transition: { duration: 0.36, ease: [0.22, 1, 0.36, 1] },
+      };
+
+  return (
+    <motion.span
+      key={normalized}
+      className="inline-flex h-[14px] w-[14px] items-center justify-center text-orange-400/70"
+      {...motionProps}
+    >
+      <Icon size={14} />
+    </motion.span>
+  );
+};
+
+const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, activeForwardingEntry = null, onOpenMarketplace, onOpenScenarios, onOpenForwarding, onUpdateDirection, onTerminate }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   const displayModel = pending || agent.model || 'Not set';
@@ -184,7 +234,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
   const outboundCalls = formatMetricValue(agent.outbound_calls_count);
   const failedCalls = formatMetricValue(agent.failed_calls_count);
   const missedCalls = formatMetricValue(agent.missed_calls_count);
-  const toggleIsActive = agent.is_active !== false;
+  const directionLabel = displayAgentDirection(agent.direction);
 
   return (
     <motion.div
@@ -237,36 +287,26 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
       </div>
 
       <div className="p-6 space-y-3.5">
-        <div className="flex items-center justify-between px-0.5 py-1">
-          <div className="min-w-0">
-            <p className="text-[8px] font-black uppercase tracking-[0.24em] text-zinc-600">Receptionist</p>
-            <p className={`mt-1 text-[11px] font-bold ${toggleIsActive ? 'text-zinc-200' : 'text-zinc-500'}`}>
-              {toggleIsActive ? 'Active' : 'Inactive'}
-            </p>
-          </div>
-          <button
-            onClick={async (e) => {
-              e.stopPropagation();
-              if (onToggleActive) {
-                await onToggleActive(agent, !toggleIsActive);
-              }
-            }}
-            className={`relative h-6 w-10 rounded-full border transition-all ${
-              toggleIsActive
-                ? 'border-emerald-400/30 bg-emerald-400/15'
-                : 'border-white/[0.08] bg-black/30'
-            }`}
-            aria-label={toggleIsActive ? 'Disable receptionist' : 'Enable receptionist'}
-            title={toggleIsActive ? 'Disable receptionist' : 'Enable receptionist'}
-          >
-            <div
-              className={`absolute top-[3px] h-4 w-4 rounded-full transition-transform ${
-                toggleIsActive
-                  ? 'translate-x-5 bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.35)]'
-                  : 'translate-x-1 bg-zinc-200'
-              }`}
+        <div className="px-0.5 py-1">
+          <p className="mb-1.5 text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Call Handling</p>
+          <div className="origin-left">
+            <GradientBleed
+              trigger="Calls"
+              options={['Inbound', 'Outbound', 'All', 'Off']}
+              variant="prism"
+              icon={<CallHandlingIcon direction={agent.direction} />}
+              value={directionLabel}
+              showTrigger={false}
+              colorSelectedValue={false}
+              textClassName="text-[16px] leading-none tracking-tight"
+              optionTextClassName="text-[11px] leading-none tracking-tight"
+              buttonPaddingClassName="px-0 py-1"
+              optionsGapClassName="gap-3.5"
+              optionsOpenClassName="max-w-[260px] pl-4 pr-3"
+              underlineOffsetClassName="bottom-[-5px]"
+              onSelect={(val) => onUpdateDirection && onUpdateDirection(agent, String(val || 'All').toLowerCase())}
             />
-          </button>
+          </div>
         </div>
 
         <div className="hidden">
@@ -1551,7 +1591,23 @@ const ForwardNumberModal = ({ agent, authSession, onClose, onSaved }) => {
   );
 };
 
-const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpenChange }) => {
+const GradientBleed = ({
+  trigger,
+  options,
+  icon,
+  variant,
+  value,
+  onSelect,
+  onOpenChange,
+  showTrigger = true,
+  colorSelectedValue = true,
+  textClassName = 'text-[11px] tracking-widest',
+  optionTextClassName = null,
+  buttonPaddingClassName = 'px-4 py-2',
+  optionsGapClassName = 'gap-6',
+  optionsOpenClassName = 'max-w-4xl pl-3',
+  underlineOffsetClassName = 'bottom-0',
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
 
@@ -1564,9 +1620,9 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
   const colorMap = {
     'RED': '#ef4444',
     'BLUE': '#3b82f6',
-    'Inbound': '#3b82f6',
-    'Outbound': '#ef4444',
-    'All': '#6366f1',
+    'Inbound': '#c084fc',
+    'Outbound': '#22d3ee',
+    'All': '#facc15',
     '7': '#f87171',
     '6': '#fb923c',
     '5': '#facc15',
@@ -1575,7 +1631,7 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
     '2': '#818cf8',
     '1': '#c084fc',
     'Code': '#6366f1',
-    'Calls': '#6366f1',
+    'Calls': '#c084fc',
     'Zone': '#6366f1',
   };
 
@@ -1612,29 +1668,29 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
       <div className="flex items-center">
         <button
           onClick={() => toggleOpen()}
-          className={`no-drag flex items-center gap-2 px-4 py-2 font-bold transition-colors duration-500 z-10 text-[11px] tracking-widest ${isOpen ? '' : 'hover:text-zinc-200'}`}
+          className={`no-drag flex items-center gap-2 font-bold transition-colors duration-500 z-10 ${buttonPaddingClassName} ${textClassName} ${isOpen ? '' : 'hover:text-zinc-200'}`}
         >
           {icon}
-          <span className="text-white">{trigger}</span>
+          {showTrigger && <span className="text-white">{trigger}</span>}
           {value && (
-            <span style={{ color: activeColor }} className="transition-colors duration-500">{value}</span>
+            <span style={colorSelectedValue ? { color: activeColor } : undefined} className={`transition-colors duration-500 ${colorSelectedValue ? '' : 'text-zinc-200'}`}>{value}</span>
           )}
         </button>
 
         <div
-          className={`flex gap-6 items-center overflow-hidden transition-all z-10 ${getExpansionClass()} ${
-            isOpen ? 'max-w-4xl opacity-100 pl-3' : 'max-w-0 opacity-0'
+          className={`flex ${optionsGapClassName} items-center overflow-hidden transition-all z-10 ${getExpansionClass()} ${
+            isOpen ? `${optionsOpenClassName} opacity-100` : 'max-w-0 opacity-0'
           }`}
           style={{
             filter: variant === 'elastic' && !isOpen ? 'blur(10px)' : 'blur(0px)',
             transitionProperty: 'all, filter',
           }}
         >
-          {options.map((o) => (
+          {options.filter((o) => o !== value).map((o) => (
             <button
               key={o}
               onClick={() => handleSelect(o)}
-              className={`no-drag text-[11px] font-black tracking-widest transition-all duration-500 ${
+              className={`no-drag font-black transition-all duration-500 ${optionTextClassName || textClassName} ${
                 variant === 'elastic' ? '' : 'hover:scale-110'
               }`}
               style={{ color: value === o ? activeColor : undefined }}
@@ -1646,7 +1702,7 @@ const GradientBleed = ({ trigger, options, icon, variant, value, onSelect, onOpe
       </div>
 
       <div
-        className={`absolute bottom-0 left-0 h-[2px] transition-all z-20 ${getExpansionClass()} ${
+        className={`absolute ${underlineOffsetClassName} left-0 h-[2px] transition-all z-20 ${getExpansionClass()} ${
           isOpen ? 'w-full opacity-100' : 'w-0 opacity-0'
         } ${variant === 'prism' && isOpen ? 'animate-skyPrism' : ''}`}
         style={borderStyle}
@@ -1769,7 +1825,6 @@ const SonarDashboard = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [glitch, setGlitch] = useState(false);
   const [zoneOpen, setZoneOpen] = useState(false);
-  const [codeOpen, setCodeOpen] = useState(false);
   const [marketplaceAgent, setMarketplaceAgent] = useState(null);
   const [pendingModel, setPendingModel] = useState(null);
   const [receptionistsAgent, setReceptionistsAgent] = useState(null);
@@ -1868,8 +1923,7 @@ const SonarDashboard = () => {
     summary,
     wsStatus,
     setZone,
-    setCallsFilter,
-    updateAgentActive,
+    updateAgentDirection,
     refresh,
   } = useSonarState();
 
@@ -1880,8 +1934,6 @@ const SonarDashboard = () => {
     }
     return { ...a, _scenario: null, scenario_name: null, scenario_id: null };
   });
-
-  const normalizedCallsFilter = String(controlState?.calls_filter || 'all').toLowerCase();
 
   useEffect(() => {
     if (!pendingModel || !agents) return;
@@ -1958,7 +2010,7 @@ const SonarDashboard = () => {
                       onOpenMarketplace={setMarketplaceAgent}
                       onOpenScenarios={setReceptionistsAgent}
                       onOpenForwarding={setForwardingAgent}
-                      onToggleActive={(agent, nextIsActive) => updateAgentActive(agent.id, nextIsActive)}
+                      onUpdateDirection={(agent, nextDirection) => updateAgentDirection(agent.id, nextDirection)}
                       onTerminate={(agent) => setTerminateAgent(agent)}
                     />
                   );
@@ -2090,11 +2142,6 @@ const SonarDashboard = () => {
   };
 
   const displayZone = controlState?.zone || 1;
-  const displayCalls = normalizedCallsFilter === 'inbound'
-    ? 'Inbound'
-    : normalizedCallsFilter === 'outbound'
-      ? 'Outbound'
-      : 'All';
 
   return (
     <AudioPlayerProvider>
@@ -2145,20 +2192,8 @@ const SonarDashboard = () => {
             />
           </div>
 
-          <div className={`relative transition-opacity duration-500 ${zoneOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ width: '120px', textAlign: 'center' }}>
-            <GradientBleed
-              trigger="Calls"
-              options={['Inbound', 'Outbound', 'All']}
-              variant="elastic"
-              icon={<Phone size={12} />}
-              value={displayCalls}
-              onSelect={(val) => setCallsFilter(String(val || 'ALL').toLowerCase())}
-              onOpenChange={(open) => setCodeOpen(open)}
-            />
-          </div>
-
           <div 
-            className={`relative flex flex-col items-center transition-opacity duration-500 mx-20 ${zoneOpen || codeOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+            className={`relative flex flex-col items-center transition-opacity duration-500 mx-20 ${zoneOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
           >
             <div className={`relative transition-all duration-700 transform ${glitch ? 'opacity-10 scale-[1.05] blur-sm' : 'opacity-100 scale-100'}`}>
               <div className="absolute -left-6 inset-y-0 w-[1px] bg-white/10" />

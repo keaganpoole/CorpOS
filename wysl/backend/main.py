@@ -534,11 +534,73 @@ def call_routing_allows(direction: str, call_routing: Optional[str] = None) -> b
     return False
 
 
+def normalize_receptionist_direction(value: Optional[str]) -> str:
+    normalized = str(value or "all").strip().lower()
+    if normalized == "incoming":
+        return "inbound"
+    if normalized == "outgoing":
+        return "outbound"
+    if normalized in {"off", "disabled"}:
+        return "none"
+    return normalized if normalized in {"inbound", "outbound", "all", "none"} else "all"
+
+
+def conflicting_receptionist_directions(direction: Optional[str]) -> list[str]:
+    normalized = normalize_receptionist_direction(direction)
+    if normalized == "all":
+        return ["inbound", "outbound", "all"]
+    if normalized == "inbound":
+        return ["inbound", "all"]
+    if normalized == "outbound":
+        return ["outbound", "all"]
+    return []
+
+
+def clear_conflicting_receptionist_directions(agent_id: str, existing_agent: Optional[dict], next_direction: Optional[str]) -> None:
+    conflicts = conflicting_receptionist_directions(next_direction)
+    if not conflicts or not existing_agent:
+        return
+
+    try:
+        query = (
+            supabase
+            .table("hired_receptionists")
+            .update({"direction": "none", "status": "Idle"})
+            .neq("id", agent_id)
+            .in_("direction", conflicts)
+        )
+        if existing_agent.get("user_id"):
+            query = query.eq("user_id", existing_agent.get("user_id"))
+        elif existing_agent.get("business_id"):
+            query = query.eq("business_id", existing_agent.get("business_id"))
+        else:
+            return
+        query.execute()
+    except Exception as exc:
+        logger.warning(
+            "Failed to clear conflicting receptionist directions: agent_id=%s direction=%s error=%s",
+            agent_id,
+            next_direction,
+            exc,
+        )
+
+
+def receptionist_direction_allows(call_direction: str, receptionist_direction: Optional[str]) -> bool:
+    normalized_call_direction = str(call_direction or "").strip().lower()
+    normalized_receptionist_direction = normalize_receptionist_direction(receptionist_direction)
+    if normalized_call_direction == "inbound":
+        return normalized_receptionist_direction in {"inbound", "all"}
+    if normalized_call_direction in {"outbound", "outgoing"}:
+        return normalized_receptionist_direction in {"outbound", "all"}
+    return False
+
+
 def derive_receptionist_status(
     current_status: Optional[str] = None,
     *,
     preserve_offline: bool = True,
     call_routing: Optional[str] = None,
+    direction: Optional[str] = None,
     is_active: bool = True,
 ) -> str:
     if not is_active:
@@ -546,6 +608,11 @@ def derive_receptionist_status(
     normalized_current = str(current_status or "").strip().lower()
     if preserve_offline and normalized_current == "offline":
         return "Offline"
+    if direction is not None:
+        return "Online" if (
+            receptionist_direction_allows("inbound", direction)
+            or receptionist_direction_allows("outbound", direction)
+        ) else "Idle"
     return "Online" if call_routing_allows("inbound", call_routing) or call_routing_allows("outbound", call_routing) else "Idle"
 
 
@@ -592,7 +659,7 @@ def maybe_auto_verify_business_forwarding(
         agent_lookup = (
             supabase
             .table("hired_receptionists")
-            .select("id,status,is_active")
+            .select("id,status,is_active,direction")
             .eq("id", str(agent_id))
             .limit(1)
             .execute()
@@ -602,7 +669,8 @@ def maybe_auto_verify_business_forwarding(
             next_status = derive_receptionist_status(
                 agent_row.get("status"),
                 preserve_offline=False,
-                is_active=bool(agent_row.get("is_active", True)),
+                direction=agent_row.get("direction"),
+                is_active=agent_row.get("is_active") is not False,
             )
             supabase.table("hired_receptionists").update({"status": next_status}).eq("id", str(agent_id)).execute()
 
@@ -2515,7 +2583,10 @@ class ZoneRequest(BaseModel):
     zone: int
 
 class AgentCallTypesRequest(BaseModel):
-    call_types: str
+    call_types: Optional[str] = None
+    direction: Optional[str] = None
+    call_routing: Optional[str] = None
+    calls: Optional[str] = None
 
 class AgentModelRequest(BaseModel):
     model: str
@@ -3708,19 +3779,11 @@ def get_receptionist_display_name(receptionist: Optional[dict]) -> Optional[str]
 def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: Optional[str] = None):
     business_id_value = int_or_none(business_id)
     user_id_value = str(user_id).strip() if user_id else None
-    call_routing = get_account_call_routing()
     if not business_id_value and not user_id_value:
         logging.info(
             "Inbound receptionist lookup skipped: missing business_id and user_id. business_id=%s user_id=%s",
             business_id,
             user_id,
-        )
-        return None
-
-    if not call_routing_allows("inbound", call_routing):
-        logging.info(
-            "Inbound receptionist lookup skipped because account call routing does not allow inbound calls. call_routing=%s",
-            call_routing,
         )
         return None
 
@@ -3756,11 +3819,15 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
         )
         return None
 
-    candidates = [row for row in rows_by_id.values() if bool(row.get("is_active", True))]
+    candidates = [
+        row
+        for row in rows_by_id.values()
+        if row.get("is_active") is not False and receptionist_direction_allows("inbound", row.get("direction"))
+    ]
 
     if not candidates:
         logging.info(
-            "Inbound receptionist lookup found no active candidates: business_id=%s user_id=%s rows=%s",
+            "Inbound receptionist lookup found no direction-eligible candidates: business_id=%s user_id=%s rows=%s",
             business_id_value,
             user_id_value,
             len(rows_by_id),
@@ -3770,8 +3837,8 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
     def sort_key(row: dict):
         status_value = str(derive_receptionist_status(
             row.get("status"),
-            call_routing=call_routing,
-            is_active=bool(row.get("is_active", True)),
+            direction=row.get("direction"),
+            is_active=row.get("is_active") is not False,
         )).strip().lower()
         is_online = status_value not in {"offline", "disabled", "inactive"}
         hired_at = str(row.get("hired_at") or "")
@@ -3779,12 +3846,12 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
 
     selected = sorted(candidates, key=sort_key, reverse=True)[0]
     logging.info(
-        "Inbound receptionist resolved: business_id=%s user_id=%s receptionist_id=%s receptionist_name=%s call_routing=%s candidates=%s",
+        "Inbound receptionist resolved: business_id=%s user_id=%s receptionist_id=%s receptionist_name=%s direction=%s candidates=%s",
         business_id_value,
         user_id_value,
         selected.get("id"),
         get_receptionist_display_name(selected),
-        call_routing,
+        normalize_receptionist_direction(selected.get("direction")),
         len(candidates),
     )
     return selected
@@ -6513,17 +6580,18 @@ async def get_sonar_agents(current_user: dict = Depends(get_current_user)):
             .order('hired_at', desc=True)
             .execute()
         )
-        call_routing = get_account_call_routing_for_user(current_user_id)
         agents = []
         for row in response.data or []:
+            row_direction = normalize_receptionist_direction(row.get("direction"))
             agents.append({
                 **row,
+                "direction": row_direction,
                 "name": row.get("full_name") or row.get("first_name") or "Receptionist",
                 "role": row.get("stereotype") or "Receptionist",
                 "status": derive_receptionist_status(
                     row.get("status"),
-                    call_routing=call_routing,
-                    is_active=bool(row.get("is_active", True)),
+                    direction=row_direction,
+                    is_active=row.get("is_active") is not False,
                 ),
                 "current_activity": row.get("current_activity") or "Idle",
                 "model": row.get("model"),
@@ -6659,14 +6727,27 @@ async def clear_pending_restart(restart_id: str):
 
 @app.post("/api/agents/{agent_id}/call-types", tags=["Sonar Controller Compat"])
 async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest):
-    existing_response = supabase.table('hired_receptionists').select('id,status').eq('id', agent_id).limit(1).execute()
+    payload_dict = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    next_direction = normalize_receptionist_direction(
+        payload_dict.get("direction")
+        or payload_dict.get("call_routing")
+        or payload_dict.get("calls")
+        or "all"
+    )
+    existing_response = supabase.table('hired_receptionists').select('id,user_id,business_id,status,is_active,direction').eq('id', agent_id).limit(1).execute()
     existing_agent = (existing_response.data or [{}])[0]
-    next_status = derive_receptionist_status(existing_agent.get('status'))
+    next_status = derive_receptionist_status(
+        existing_agent.get('status'),
+        direction=next_direction,
+        is_active=existing_agent.get("is_active") is not False,
+    )
     response = supabase.table('hired_receptionists').update({
+        'direction': next_direction,
         'status': next_status,
     }).eq('id', agent_id).execute()
-    push_live_event("Agent call handling updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "call_routing": get_account_call_routing()})
-    return response.data[0] if response.data else {"id": agent_id, "status": next_status}
+    clear_conflicting_receptionist_directions(agent_id, existing_agent, next_direction)
+    push_live_event("Agent call handling updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "direction": next_direction})
+    return response.data[0] if response.data else {"id": agent_id, "direction": next_direction, "status": next_status}
 
 @app.post("/api/agents/{agent_id}/model", tags=["Sonar Controller Compat"])
 async def update_agent_model(agent_id: str, payload: AgentModelRequest):
@@ -6683,7 +6764,7 @@ async def patch_agent(agent_id: str, payload: dict):
     existing_response = (
         supabase
         .table('hired_receptionists')
-        .select('id,user_id,is_active,status')
+        .select('id,user_id,business_id,is_active,status,direction')
         .eq('id', agent_id)
         .limit(1)
         .execute()
@@ -6693,6 +6774,15 @@ async def patch_agent(agent_id: str, payload: dict):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
     update_payload = dict(payload)
+    if 'direction' in update_payload:
+        update_payload['direction'] = normalize_receptionist_direction(update_payload.get('direction'))
+        update_payload['status'] = derive_receptionist_status(
+            existing_agent.get('status'),
+            preserve_offline=False,
+            direction=update_payload['direction'],
+            is_active=existing_agent.get('is_active') is not False,
+        )
+
     next_is_active = update_payload.get('is_active')
     if next_is_active is not None:
         next_is_active = bool(next_is_active)
@@ -6700,16 +6790,13 @@ async def patch_agent(agent_id: str, payload: dict):
         update_payload['status'] = derive_receptionist_status(
             existing_agent.get('status'),
             preserve_offline=False,
+            direction=update_payload.get('direction', existing_agent.get('direction')),
             is_active=next_is_active,
         )
 
-        if next_is_active and existing_agent.get('user_id'):
-            supabase.table('hired_receptionists').update({
-                'is_active': False,
-                'status': 'Offline',
-            }).eq('user_id', existing_agent.get('user_id')).neq('id', agent_id).execute()
-
     response = supabase.table('hired_receptionists').update(update_payload).eq('id', agent_id).execute()
+    if 'direction' in update_payload:
+        clear_conflicting_receptionist_directions(agent_id, existing_agent, update_payload.get('direction'))
     push_live_event("Agent updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, **update_payload})
     return response.data[0] if response.data else {"id": agent_id, **update_payload}
 
@@ -7111,16 +7198,6 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
         )
         business_row = (business_response.data or [None])[0]
 
-        active_response = (
-            supabase.table("hired_receptionists")
-            .select("id")
-            .eq("user_id", current_user_id)
-            .eq("is_active", True)
-            .limit(1)
-            .execute()
-        )
-        active_row = (active_response.data or [None])[0]
-
         insert_payload = {
             "catalog_id": catalog_row.get("id"),
             "full_name": catalog_row.get("full_name"),
@@ -7132,7 +7209,8 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
             "age": catalog_row.get("age"),
             "first_name": catalog_row.get("first_name"),
             "gender": catalog_row.get("gender"),
-            "is_active": not bool(active_row and active_row.get("id")),
+            "is_active": True,
+            "direction": "all",
             "user_id": current_user_id,
             "business_id": business_row.get("id") if business_row else None,
             "phone_number": business_row.get("phone") if business_row else None,

@@ -13,6 +13,23 @@ function normalizeAutonomyIndex(value) {
   return Math.min(5, Math.max(1, parsed));
 }
 
+function normalizeCallDirection(value) {
+  const normalized = String(value || 'all').trim().toLowerCase();
+  if (normalized === 'incoming') return 'inbound';
+  if (normalized === 'outgoing') return 'outbound';
+  if (normalized === 'off' || normalized === 'disabled') return 'none';
+  return ['inbound', 'outbound', 'all', 'none'].includes(normalized) ? normalized : 'all';
+}
+
+function directionConflicts(selectedDirection, existingDirection) {
+  const selected = normalizeCallDirection(selectedDirection);
+  const existing = normalizeCallDirection(existingDirection);
+  if (selected === 'all') return existing !== 'none';
+  if (selected === 'inbound') return existing === 'inbound' || existing === 'all';
+  if (selected === 'outbound') return existing === 'outbound' || existing === 'all';
+  return false;
+}
+
 export function useSonarState() {
   const [tasks, setTasks] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -440,6 +457,54 @@ const [reactions, setReactions] = useState([]);
     return result;
   }, []);
 
+  const updateAgentDirection = useCallback(async (agentId, direction) => {
+    const normalizedDirection = normalizeCallDirection(direction);
+    let previousAgents = null;
+
+    setAgents(prev => {
+      previousAgents = prev;
+      return prev.map(agent => (
+        String(agent.id) === String(agentId)
+          ? {
+              ...agent,
+              direction: normalizedDirection,
+              status: agent.is_active === false ? 'Offline' : 'Online',
+            }
+          : directionConflicts(normalizedDirection, agent.direction)
+            ? {
+                ...agent,
+                direction: 'none',
+                status: agent.is_active === false ? 'Offline' : 'Idle',
+              }
+          : agent
+      ));
+    });
+
+    const result = await api.patchAgent(agentId, {
+      direction: normalizedDirection,
+    });
+
+    if (!result) {
+      if (previousAgents) {
+        setAgents(previousAgents);
+      }
+      return null;
+    }
+
+    setAgents(prev => prev.map(agent => (
+      String(agent.id) === String(agentId)
+        ? {
+            ...agent,
+            ...result,
+            direction: normalizeCallDirection(result.direction ?? normalizedDirection),
+            status: result.status ?? agent.status,
+          }
+        : agent
+    )));
+
+    return result;
+  }, []);
+
   return {
     tasks,
     agents,
@@ -458,6 +523,7 @@ const [reactions, setReactions] = useState([]);
     setCallsFilter,
     pingMax,
     updateAgentActive,
+    updateAgentDirection,
     refresh: loadInitialData,
   };
 }

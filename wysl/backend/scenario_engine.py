@@ -69,6 +69,27 @@ def normalize_phone_number(phone_value: Optional[str]) -> Optional[str]:
     return f"+{digits}"
 
 
+def normalize_receptionist_direction(value: Any) -> str:
+    normalized = str(value or "all").strip().lower()
+    if normalized == "incoming":
+        return "inbound"
+    if normalized == "outgoing":
+        return "outbound"
+    if normalized in {"off", "disabled"}:
+        return "none"
+    return normalized if normalized in {"inbound", "outbound", "all", "none"} else "all"
+
+
+def receptionist_direction_allows(call_direction: str, receptionist_direction: Any) -> bool:
+    normalized_call_direction = str(call_direction or "").strip().lower()
+    normalized_receptionist_direction = normalize_receptionist_direction(receptionist_direction)
+    if normalized_call_direction == "inbound":
+        return normalized_receptionist_direction in {"inbound", "all"}
+    if normalized_call_direction in {"outbound", "outgoing"}:
+        return normalized_receptionist_direction in {"outbound", "all"}
+    return False
+
+
 def format_person_display_name(person: Optional[dict]) -> str:
     if not person:
         return ""
@@ -1501,15 +1522,9 @@ class ScenarioActionExecutor:
             if not to_number:
                 return {"success": False, "error": "No phone number for call"}
 
-            try:
-                settings_response = self.supabase.table("account_settings").select("call_routing").limit(1).execute()
-                settings_row = (settings_response.data or [None])[0] or {}
-                call_routing = str(settings_row.get("call_routing") or "all").strip().lower()
-            except Exception:
-                call_routing = "all"
-
-            if call_routing not in {"outbound", "all"}:
-                return {"success": False, "error": "Outbound calling is disabled by account call routing"}
+            receptionist = context.get("receptionist") if isinstance(context.get("receptionist"), dict) else {}
+            if receptionist and not receptionist_direction_allows("outbound", receptionist.get("direction")):
+                return {"success": False, "error": "Outbound calling is disabled for this receptionist"}
 
             elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
             agent_id = os.environ.get("ELEVENLABS_AGENT_ID_OUTBOUND")
@@ -2953,11 +2968,16 @@ class ScenarioEngine:
                     .select("*")
                     .eq("user_id", business.get("user_id"))
                     .eq("is_active", True)
-                    .limit(1)
                     .execute()
                 )
             if receptionist_response and receptionist_response.data:
-                context["receptionist"] = receptionist_response.data[0]
+                eligible = [
+                    row
+                    for row in receptionist_response.data
+                    if receptionist_direction_allows("outbound", row.get("direction"))
+                    or receptionist_direction_allows("inbound", row.get("direction"))
+                ]
+                context["receptionist"] = (eligible or receptionist_response.data)[0]
         except Exception as exc:
             logging.warning("[ScenarioEngine] Could not fetch receptionist: %s", exc)
 

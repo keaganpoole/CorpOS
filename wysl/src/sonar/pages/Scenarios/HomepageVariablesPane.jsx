@@ -1589,31 +1589,9 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
           return;
         }
 
-        let settingsQuery = supabase
-          .from('account_settings')
-          .select('call_routing')
-          .eq('user_id', userId)
-          .limit(1);
-
-        if (businessId) {
-          settingsQuery = settingsQuery.eq('business_id', businessId);
-        }
-
-        const { data: settings } = await settingsQuery.maybeSingle();
-        scenarioLog('log', '[VariablesPane] loadActiveReceptionist:settings', settings);
-
-        const callRouting = String(settings?.call_routing || 'all').toLowerCase();
-        if (!['outbound', 'all'].includes(callRouting)) {
-          scenarioLog('warn', '[VariablesPane] loadActiveReceptionist:blocked-by-routing', {
-            callRouting,
-          });
-          setActiveReceptionist(null);
-          return;
-        }
-
         let receptionistQuery = supabase
           .from('hired_receptionists')
-          .select('id, full_name, first_name, avatar, status, user_id, business_id, catalog_id, call_types')
+          .select('id, full_name, first_name, avatar, status, user_id, business_id, catalog_id, call_types, direction')
           .eq('is_active', true)
           .limit(10);
 
@@ -1629,7 +1607,7 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
         if ((!rows || rows.length === 0) && businessId) {
           const fallbackResponse = await supabase
             .from('hired_receptionists')
-            .select('id, full_name, first_name, avatar, status, user_id, business_id, catalog_id, call_types')
+            .select('id, full_name, first_name, avatar, status, user_id, business_id, catalog_id, call_types, direction')
             .eq('user_id', userId)
             .eq('is_active', true)
             .limit(10);
@@ -1640,6 +1618,8 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
         if (cancelled) return;
 
         const outboundRows = (rows || []).filter((row) => {
+          const direction = String(row.direction || '').toLowerCase();
+          if (direction) return direction === 'outbound' || direction === 'all';
           const callTypes = String(row.call_types || 'both').toLowerCase();
           return callTypes === 'both' || callTypes === 'outbound';
         });

@@ -425,7 +425,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
               top: menuPosition?.top ?? 0,
               width: menuPosition?.width ?? 170,
             }}
-            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden py-1"
+            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
               onClick={() => { setOpen(false); onSave(null); }}
@@ -528,7 +528,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               top: menuPosition?.top ?? 0,
               width: Math.min(Math.max(menuPosition?.width ?? 190, 190), 260),
             }}
-            className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#111] px-2 py-2 shadow-[0_12px_36px_rgba(0,0,0,0.72)]"
+            className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#111] px-2 py-2 shadow-[0_10px_26px_rgba(0,0,0,0.42)]"
           >
             <div className="flex flex-wrap gap-1.5">
               {selected.map((tag) => (
@@ -556,7 +556,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               top: menuPosition?.top ?? 0,
               width: menuPosition?.width ?? 190,
             }}
-            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden py-1"
+            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             {options.map((opt, idx) => {
               const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
@@ -1992,8 +1992,9 @@ const LeadsTable = ({
                         event.stopPropagation();
                         setZonePaletteId(zone.id);
                       }}
+                      onMouseEnter={() => setZonePaletteId(zone.id)}
                       className="absolute z-10 rounded-full pointer-events-auto"
-                      style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 8, 0), height: 16 }}
+                      style={{ left: zone.left, width: zone.width, top: Math.max(zone.top - 10, 0), height: 22 }}
                       aria-label="Edit zone color"
                     >
                       <span
