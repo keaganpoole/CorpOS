@@ -103,7 +103,7 @@ const SEARCH_FIELDS = {
   appointments: ['notes', 'status', 'date'],
   services: ['name', 'description', 'category'],
   staff: ['full_name', 'role', 'email', 'phone'],
-  hired_receptionists: ['full_name', 'stereotype', 'phone_number'],
+  hired_receptionists: ['full_name', 'stereotype'],
   businesses: ['name', 'email', 'phone', 'address', 'city', 'state'],
 };
 
@@ -621,7 +621,6 @@ const TABLE_DEFS = [
       { key: 'elevenlabs_voice_id', label: 'ElevenLabs Voice ID', type: 'text' },
       { key: 'age', label: 'Age', type: 'number' },
       { key: 'call_types', label: 'Call Types', type: 'text' },
-      { key: 'phone_number', label: 'Phone', type: 'phone' },
       { key: 'is_active', label: 'Is Active', type: 'boolean' },
       { key: 'language_model', label: 'Language Model', type: 'text' },
       { key: 'status', label: 'Status', type: 'text' },

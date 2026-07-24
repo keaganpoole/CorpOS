@@ -1549,6 +1549,7 @@ class ScenarioActionExecutor:
                 "autonomy_index": self._get_account_autonomy_index(context),
                 "receptionist_name": (context.get("receptionist") or {}).get("first_name") or "Receptionist",
                 "receptionist_id": str((context.get("receptionist") or {}).get("id") or ""),
+                "elevenlabs_voice_id": (context.get("receptionist") or {}).get("elevenlabs_voice_id") or "",
                 "customer_name": (context.get("customer") or {}).get("first_name") or (context.get("person") or {}).get("first_name") or "",
                 "direction": "outgoing",
                 "flow_execution_id": context.get("_executionId") or "",
@@ -1578,10 +1579,21 @@ class ScenarioActionExecutor:
                 default=str,
                 separators=(",", ":"),
             )
+            conversation_initiation_client_data = {
+                "scenario_context": scenario_context,
+                "dynamic_variables": elevenlabs_dynamic_variables,
+            }
+            if scenario_context.get("elevenlabs_voice_id"):
+                conversation_initiation_client_data["conversation_config_override"] = {
+                    "tts": {
+                        "voice_id": scenario_context["elevenlabs_voice_id"],
+                    },
+                }
             logging.info("[ActionExecutor] outbound call dynamic variables: %s", json.dumps({
                 "user_id": scenario_context["user_id"],
                 "receptionist_name": scenario_context["receptionist_name"],
                 "receptionist_id": scenario_context["receptionist_id"],
+                "elevenlabs_voice_id": scenario_context["elevenlabs_voice_id"],
                 "direction": scenario_context["direction"],
                 "scenario_id": scenario_context["scenario_id"],
                 "flow_execution_id": scenario_context["flow_execution_id"],
@@ -1600,10 +1612,7 @@ class ScenarioActionExecutor:
                     "agent_id": agent_id,
                     "agent_phone_number_id": phone_number_id,
                     "to_number": to_number,
-                    "conversation_initiation_client_data": {
-                        "scenario_context": scenario_context,
-                        "dynamic_variables": elevenlabs_dynamic_variables,
-                    },
+                    "conversation_initiation_client_data": conversation_initiation_client_data,
                 },
                 timeout=30,
             )
@@ -2967,7 +2976,6 @@ class ScenarioEngine:
                     self.supabase.table("hired_receptionists")
                     .select("*")
                     .eq("user_id", business.get("user_id"))
-                    .eq("is_active", True)
                     .execute()
                 )
             if receptionist_response and receptionist_response.data:

@@ -10,6 +10,8 @@ import {
   CalendarClock, Mail, PhoneCall, ListChecks,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const TIMEZONES = [
@@ -1727,7 +1729,121 @@ const IntroMessageEditor = ({ value, onChange }) => {
 };
 
 // ─── Settings Page ──────────────────────────────────────────────────────────
+const formatForwardingPhoneNumber = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  const normalized = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  if (normalized.length !== 10) return value || 'Unassigned';
+  return `(${normalized.slice(0, 3)}) ${normalized.slice(3, 6)}-${normalized.slice(6)}`;
+};
+
+const BusinessForwardingSettings = ({ authSession }) => {
+  const [entry, setEntry] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showModal, setShowModal] = useState(false);
+
+  const loadForwardingState = async () => {
+    if (!authSession?.access_token) {
+      setEntry(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`${FORWARDING_API_BASE_URL}/businesses/me/forwarding`, {
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      setEntry(data?.current_entry || null);
+    } catch (err) {
+      console.error('[SettingsPage] Failed to load forwarding state:', err);
+      setEntry(null);
+      setError('Could not load forwarding status.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadForwardingState();
+  }, [authSession?.access_token]);
+
+  const sourceLabel = formatForwardingPhoneNumber(entry?.source_number || entry?.source_label);
+  const targetLabel = formatForwardingPhoneNumber(entry?.target_number);
+  const isVerified = entry?.status === 'verified';
+
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="rounded-[24px] border border-white/[0.05] bg-zinc-950/40 p-5">
+          <div className="flex items-start justify-between gap-5">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <PhoneCall size={15} className="text-orange-400/70" />
+                <h4 className="text-[13px] font-semibold text-zinc-100">Business Number Forwarding</h4>
+                <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+                  isVerified
+                    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500'
+                }`}>
+                  {loading ? 'Loading' : isVerified ? 'Active' : 'Not Set'}
+                </span>
+              </div>
+              <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
+                Set the forwarding number for this business once. All receptionist call handling uses this business-level setup.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowModal(true)}
+              className="shrink-0 rounded-xl bg-orange-500/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-orange-300 transition-all hover:bg-orange-500/15 active:scale-95"
+            >
+              {entry ? 'Manage' : 'Setup'}
+            </button>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/[0.04] bg-black/20 p-4">
+              <p className="text-[8px] font-black uppercase tracking-widest text-zinc-700">Business Number</p>
+              <p className="mt-2 truncate text-[14px] font-semibold text-zinc-200">
+                {loading ? 'Loading...' : sourceLabel}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/[0.04] bg-black/20 p-4">
+              <p className="text-[8px] font-black uppercase tracking-widest text-zinc-700">Receptionist Number</p>
+              <p className="mt-2 truncate text-[14px] font-semibold text-zinc-200">
+                {loading ? 'Loading...' : targetLabel}
+              </p>
+            </div>
+          </div>
+
+          {error && (
+            <p className="mt-4 text-[11px] font-medium text-rose-400">{error}</p>
+          )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showModal && (
+          <ForwardNumberModal
+            authSession={authSession}
+            onClose={() => setShowModal(false)}
+            onSaved={(savedEntry) => {
+              setEntry(savedEntry || null);
+              loadForwardingState();
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
+
 const SettingsPage = () => {
+  const { session: authSession } = useAuth();
   const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1986,6 +2102,7 @@ const SettingsPage = () => {
 
   const settingsSections = [
     { id: 'business', title: 'Business Info', icon: Building2, color: 'text-indigo-400', hint: 'Name, contact, and location' },
+    { id: 'forwarding', title: 'Connections', icon: PhoneCall, color: 'text-orange-400', hint: 'Call routing' },
     { id: 'preferences', title: 'Preferences', icon: Shield, color: 'text-emerald-400', hint: 'Call permissions and controls' },
     { id: 'intro', title: 'Intro Message', icon: MessageSquareText, color: 'text-indigo-400', hint: 'Opening call greeting' },
     { id: 'appointments', title: 'Hours', icon: Calendar, color: 'text-cyan-400', hint: 'Business availability' },
@@ -1999,6 +2116,8 @@ const SettingsPage = () => {
 
   const renderSectionContent = () => {
     switch (activeSection) {
+      case 'forwarding':
+        return <BusinessForwardingSettings authSession={authSession} />;
       case 'intro':
         return (
           <>

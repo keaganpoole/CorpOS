@@ -603,8 +603,6 @@ def derive_receptionist_status(
     direction: Optional[str] = None,
     is_active: bool = True,
 ) -> str:
-    if not is_active:
-        return "Offline"
     normalized_current = str(current_status or "").strip().lower()
     if preserve_offline and normalized_current == "offline":
         return "Offline"
@@ -670,7 +668,6 @@ def maybe_auto_verify_business_forwarding(
                 agent_row.get("status"),
                 preserve_offline=False,
                 direction=agent_row.get("direction"),
-                is_active=agent_row.get("is_active") is not False,
             )
             supabase.table("hired_receptionists").update({"status": next_status}).eq("id", str(agent_id)).execute()
 
@@ -3822,7 +3819,7 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
     candidates = [
         row
         for row in rows_by_id.values()
-        if row.get("is_active") is not False and receptionist_direction_allows("inbound", row.get("direction"))
+        if receptionist_direction_allows("inbound", row.get("direction"))
     ]
 
     if not candidates:
@@ -3837,8 +3834,8 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
     def sort_key(row: dict):
         status_value = str(derive_receptionist_status(
             row.get("status"),
+            preserve_offline=False,
             direction=row.get("direction"),
-            is_active=row.get("is_active") is not False,
         )).strip().lower()
         is_online = status_value not in {"offline", "disabled", "inactive"}
         hired_at = str(row.get("hired_at") or "")
@@ -3985,15 +3982,6 @@ def resolve_business_context(payload: Optional[dict] = None):
         business = load_business_by_user_id(user_id)
     if not business and forwarded_from:
         business = find_business_by_forwarded_number(forwarded_from)
-    if not business and receptionist_phone:
-        try:
-            response = supabase.table("hired_receptionists").select("*").eq("phone_number", str(receptionist_phone)).limit(1).execute()
-            receptionist = receptionist or (response.data[0] if response.data else None)
-            if receptionist:
-                user_id = user_id or receptionist.get("user_id")
-                business = load_business_by_id(receptionist.get("business_id")) or load_business_by_user_id(user_id)
-        except Exception:
-            pass
 
     return {
         "business": business,
@@ -4515,7 +4503,7 @@ def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id
         if hired_receptionist_id:
             response = (
                 supabase.table("hired_receptionists")
-                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id,avatar")
+                .select("id,user_id,full_name,elevenlabs_voice_id,avatar")
                 .eq("id", str(hired_receptionist_id))
                 .limit(1)
                 .execute()
@@ -4526,19 +4514,8 @@ def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id
         if elevenlabs_agent_id:
             response = (
                 supabase.table("hired_receptionists")
-                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id,avatar")
+                .select("id,user_id,full_name,elevenlabs_voice_id,avatar")
                 .eq("elevenlabs_voice_id", str(elevenlabs_agent_id))
-                .limit(1)
-                .execute()
-            )
-            if response.data:
-                return response.data[0]
-
-        if phone_number:
-            response = (
-                supabase.table("hired_receptionists")
-                .select("id,user_id,full_name,phone_number,elevenlabs_voice_id,avatar")
-                .eq("phone_number", str(phone_number))
                 .limit(1)
                 .execute()
             )
@@ -4731,7 +4708,6 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
     receptionist = lookup_hired_receptionist(
         hired_receptionist_id=hired_receptionist_id,
         elevenlabs_agent_id=elevenlabs_agent_id,
-        phone_number=to_number,
     )
 
     return {
@@ -4749,7 +4725,7 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
         "caller_phone": normalize_phone_number(from_number),
         "caller_name": str(caller_name) if caller_name else None,
         "from_number": normalize_phone_number(from_number),
-        "to_number": normalize_phone_number(to_number) or (normalize_phone_number(receptionist.get("phone_number")) if receptionist else None),
+        "to_number": normalize_phone_number(to_number),
         "started_at": started_at.isoformat() if started_at else None,
         "ended_at": ended_at.isoformat() if ended_at else None,
         "duration_seconds": duration_seconds,
@@ -5377,6 +5353,7 @@ async def twilio_inbound_webhook(request: Request):
                 "business_name": business.get("name") if business else None,
                 "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
                 "receptionist_name": get_receptionist_display_name(receptionist),
+                "elevenlabs_voice_id": receptionist.get("elevenlabs_voice_id") if receptionist else None,
                 "twilio_to_number": to_number,
                 "twilio_call_sid": first_present(payload, "CallSid"),
             }
@@ -5410,6 +5387,12 @@ async def twilio_inbound_webhook(request: Request):
         for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
         if value is not None
     }
+    if receptionist and receptionist.get("elevenlabs_voice_id"):
+        register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
+            "tts": {
+                "voice_id": receptionist.get("elevenlabs_voice_id"),
+            },
+        }
 
     logging.info(
         "ElevenLabs inbound register-call payload: %s",
@@ -5441,7 +5424,7 @@ async def route_call_compat(request: Request):
     context = resolve_business_context(call_payload)
     business = context.get("business")
     receptionist = (
-        (context.get("receptionist") if (context.get("receptionist") or {}).get("is_active") else None)
+        (context.get("receptionist") if receptionist_direction_allows("inbound", (context.get("receptionist") or {}).get("direction")) else None)
         or find_inbound_receptionist_for_business(
             (business or {}).get("id"),
             context.get("user_id") or (business or {}).get("user_id"),
@@ -5482,6 +5465,7 @@ async def route_call_compat(request: Request):
         "business_name": business.get("name") if business else None,
         "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
         "receptionist_name": get_receptionist_display_name(receptionist),
+        "elevenlabs_voice_id": receptionist.get("elevenlabs_voice_id") if receptionist else None,
         "twilio_to_number": call_payload.get("to_number"),
         "twilio_call_sid": call_payload.get("call_id"),
     }
@@ -5505,7 +5489,7 @@ async def route_call_compat(request: Request):
         json.dumps(dynamic_variables, default=str),
     )
 
-    return {
+    response_payload = {
         "ok": True,
         "message": "FastAPI call route compatibility endpoint handled the request.",
         "route": event_payload,
@@ -5513,6 +5497,13 @@ async def route_call_compat(request: Request):
         "type": "conversation_initiation_client_data",
         "dynamic_variables": dynamic_variables,
     }
+    if receptionist and receptionist.get("elevenlabs_voice_id"):
+        response_payload["conversation_config_override"] = {
+            "tts": {
+                "voice_id": receptionist.get("elevenlabs_voice_id"),
+            },
+        }
+    return response_payload
 
 @app.post("/api/tools/report-intent-checkpoint", tags=["Server Tools"])
 async def report_intent_checkpoint(request: IntentCheckpointRequest):
@@ -6590,8 +6581,8 @@ async def get_sonar_agents(current_user: dict = Depends(get_current_user)):
                 "role": row.get("stereotype") or "Receptionist",
                 "status": derive_receptionist_status(
                     row.get("status"),
+                    preserve_offline=False,
                     direction=row_direction,
-                    is_active=row.get("is_active") is not False,
                 ),
                 "current_activity": row.get("current_activity") or "Idle",
                 "model": row.get("model"),
@@ -6607,13 +6598,18 @@ async def get_sonar_system_summary(current_user: dict = Depends(get_current_user
         agents = (
             supabase
             .table('hired_receptionists')
-            .select('id,is_active')
+            .select('id,direction')
             .eq('user_id', str(current_user.id))
             .execute()
             .data
             or []
         )
-        active_agents = len([agent for agent in agents if agent.get('is_active', True)])
+        active_agents = len([
+            agent
+            for agent in agents
+            if receptionist_direction_allows("inbound", agent.get("direction"))
+            or receptionist_direction_allows("outbound", agent.get("direction"))
+        ])
         total_agents = len(agents)
         return {
             "ok": active_agents,
@@ -6738,8 +6734,8 @@ async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest)
     existing_agent = (existing_response.data or [{}])[0]
     next_status = derive_receptionist_status(
         existing_agent.get('status'),
+        preserve_offline=False,
         direction=next_direction,
-        is_active=existing_agent.get("is_active") is not False,
     )
     response = supabase.table('hired_receptionists').update({
         'direction': next_direction,
@@ -6774,13 +6770,13 @@ async def patch_agent(agent_id: str, payload: dict):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
     update_payload = dict(payload)
+    update_payload.pop("phone_number", None)
     if 'direction' in update_payload:
         update_payload['direction'] = normalize_receptionist_direction(update_payload.get('direction'))
         update_payload['status'] = derive_receptionist_status(
             existing_agent.get('status'),
             preserve_offline=False,
             direction=update_payload['direction'],
-            is_active=existing_agent.get('is_active') is not False,
         )
 
     next_is_active = update_payload.get('is_active')
@@ -6791,7 +6787,6 @@ async def patch_agent(agent_id: str, payload: dict):
             existing_agent.get('status'),
             preserve_offline=False,
             direction=update_payload.get('direction', existing_agent.get('direction')),
-            is_active=next_is_active,
         )
 
     response = supabase.table('hired_receptionists').update(update_payload).eq('id', agent_id).execute()
@@ -7191,7 +7186,7 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
 
         business_response = (
             supabase.table("businesses")
-            .select("id,phone")
+            .select("id")
             .eq("user_id", current_user_id)
             .limit(1)
             .execute()
@@ -7213,7 +7208,6 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
             "direction": "all",
             "user_id": current_user_id,
             "business_id": business_row.get("id") if business_row else None,
-            "phone_number": business_row.get("phone") if business_row else None,
             "elevenlabs_voice_id": catalog_row.get("elevenlabs_voice_id") or catalog_row.get("elevenlabs_agent_id"),
         }
         response = supabase.table("hired_receptionists").insert(insert_payload).execute()
@@ -10243,7 +10237,7 @@ async def update_business_forwarding(
             agent_lookup = (
                 supabase
                 .table('hired_receptionists')
-                .select('id,status,is_active')
+                .select('id,status,direction')
                 .eq('id', payload.agent_id)
                 .eq('user_id', current_user_id)
                 .limit(1)
@@ -10254,7 +10248,7 @@ async def update_business_forwarding(
                 next_agent_status = derive_receptionist_status(
                     agent_row.get('status'),
                     preserve_offline=False,
-                    is_active=bool(agent_row.get('is_active', True)),
+                    direction=agent_row.get('direction'),
                 )
                 supabase.table('hired_receptionists').update({
                     'status': next_agent_status,
