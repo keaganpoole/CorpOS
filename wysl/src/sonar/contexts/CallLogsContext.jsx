@@ -4,32 +4,48 @@ import { supabase } from '../lib/supabase';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const CallLogsContext = createContext(null);
+const CALL_LOGS_PAGE_SIZE = 20;
 
 export const CallLogsProvider = ({ children, normalizeCall }) => {
   const { session } = useAuth();
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [selectedForDelete, setSelectedForDelete] = useState([]);
   const hasLoadedRef = useRef(false);
   const loadingRef = useRef(false);
+  const activeQueryRef = useRef('');
 
-  const loadCallLogs = async ({ initial = false, force = false } = {}) => {
+  const loadCallLogs = async ({ initial = false, force = false, append = false, searchQuery = activeQueryRef.current } = {}) => {
     if (!session?.access_token) {
       setCalls([]);
       setLoading(false);
+      setLoadingMore(false);
+      setHasMore(false);
       hasLoadedRef.current = false;
       return;
     }
     if (loadingRef.current) return;
-    if (!force && initial && hasLoadedRef.current) return;
+    const normalizedQuery = String(searchQuery || '').trim();
+    const queryChanged = normalizedQuery !== activeQueryRef.current;
+    if (!force && initial && hasLoadedRef.current && !queryChanged) return;
 
     loadingRef.current = true;
-    setLoading(initial && !hasLoadedRef.current);
+    activeQueryRef.current = normalizedQuery;
+    const offset = append && !queryChanged ? calls.length : 0;
+    setLoading(!append && calls.length === 0 && (initial || force || queryChanged || !hasLoadedRef.current));
+    setLoadingMore(append);
     setError('');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs?limit=100`, {
+      const params = new URLSearchParams({
+        limit: String(CALL_LOGS_PAGE_SIZE),
+        offset: String(offset),
+      });
+      if (normalizedQuery) params.set('q', normalizedQuery);
+      const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -37,20 +53,26 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
       if (!response.ok) throw new Error(`Call logs request failed (${response.status})`);
       const data = await response.json();
       const normalizedCalls = Array.isArray(data) ? data.map(normalizeCall) : [];
-      setCalls(normalizedCalls);
+      const nextCalls = append && !queryChanged ? [...calls, ...normalizedCalls] : normalizedCalls;
+      setCalls(nextCalls);
+      setHasMore(normalizedCalls.length === CALL_LOGS_PAGE_SIZE);
       setSelectedId((current) => (
-        normalizedCalls.some((call) => call.id === current)
+        nextCalls.some((call) => call.id === current)
           ? current
-          : normalizedCalls[0]?.id || null
+          : nextCalls[0]?.id || null
       ));
-      setSelectedForDelete((current) => current.filter((id) => normalizedCalls.some((call) => call.id === id)));
+      setSelectedForDelete((current) => current.filter((id) => nextCalls.some((call) => call.id === id)));
     } catch (loadError) {
       setError(loadError.message || 'Failed to load call logs.');
-      setCalls([]);
+      if (!append) {
+        setCalls([]);
+        setHasMore(false);
+      }
     } finally {
       hasLoadedRef.current = true;
       loadingRef.current = false;
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -58,6 +80,8 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
     if (!session?.access_token) {
       setCalls([]);
       setLoading(false);
+      setLoadingMore(false);
+      setHasMore(false);
       hasLoadedRef.current = false;
       return undefined;
     }
@@ -103,7 +127,9 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
     selectedForDelete,
     setSelectedForDelete,
     loadCallLogs,
-  }), [calls, loading, error, selectedId, selectedForDelete]);
+    loadingMore,
+    hasMore,
+  }), [calls, loading, loadingMore, hasMore, error, selectedId, selectedForDelete]);
 
   return (
     <CallLogsContext.Provider value={value}>

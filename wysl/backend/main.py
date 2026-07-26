@@ -7238,15 +7238,39 @@ async def list_receptionist_catalog():
     return response.data or []
 
 @app.get("/api/sonar/call-logs", tags=["Sonar Calls"])
-async def list_call_logs(limit: int = 50, current_user: dict = Depends(get_current_user)):
+async def list_call_logs(
+    limit: int = 50,
+    offset: int = 0,
+    q: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
     safe_limit = max(1, min(limit, 200))
+    safe_offset = max(0, offset)
     query = (
         supabase.table("call_logs")
         .select("*")
         .eq("user_id", str(current_user.id))
         .order("created_at", desc=True)
-        .limit(safe_limit)
+        .range(safe_offset, safe_offset + safe_limit - 1)
     )
+    search_query = (q or "").strip()
+    if search_query:
+        escaped_query = search_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_").replace(",", "\\,")
+        pattern = f"%{escaped_query}%"
+        query = query.or_(
+            ",".join([
+                f"caller_name.ilike.{pattern}",
+                f"caller_phone.ilike.{pattern}",
+                f"from_number.ilike.{pattern}",
+                f"summary.ilike.{pattern}",
+                f"notes.ilike.{pattern}",
+                f"outcome.ilike.{pattern}",
+                f"status.ilike.{pattern}",
+                f"call_successful.ilike.{pattern}",
+                f"agent_name.ilike.{pattern}",
+                f"receptionist_name.ilike.{pattern}",
+            ])
+        )
     response = query.execute()
     rows = response.data or []
     for row in rows:

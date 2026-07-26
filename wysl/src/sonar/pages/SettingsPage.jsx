@@ -411,7 +411,7 @@ const TextInput = ({ value, onChange, placeholder, type = 'text' }) => (
     value={value}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
-    className="w-full bg-zinc-950/80 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-700 focus:outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+    className="w-full bg-zinc-950/80 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-700 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all"
   />
 );
 
@@ -419,7 +419,7 @@ const SelectInput = ({ value, onChange, options }) => (
   <select
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="w-full bg-zinc-950/80 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 focus:outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer"
+    className="w-full bg-zinc-950/80 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none cursor-pointer"
     style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
   >
     {options.map(opt => (
@@ -436,7 +436,7 @@ const NumberInput = ({ value, onChange, min, max, step = 1 }) => (
     min={min}
     max={max}
     step={step}
-    className="w-28 bg-zinc-950/80 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 focus:outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+    className="w-28 bg-zinc-950/80 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
   />
 );
 
@@ -497,14 +497,14 @@ const DayHoursRow = ({ day, settings, onChange }) => {
             type="time"
             value={hours.open}
             onChange={(e) => update('open', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none focus:outline-none focus-visible:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 transition-all appearance-none"
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
           />
           <span className="text-[11px] text-zinc-600">to</span>
           <input
             type="time"
             value={hours.close}
             onChange={(e) => update('close', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none focus:outline-none focus-visible:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 transition-all appearance-none"
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
           />
         </div>
       ) : (
@@ -551,14 +551,14 @@ const StaffHoursRow = ({ day, hours, onChange }) => {
             type="time"
             value={value.open}
             onChange={(e) => update('open', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none focus:outline-none focus-visible:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 transition-all appearance-none"
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
           />
           <span className="text-[11px] text-zinc-600">to</span>
           <input
             type="time"
             value={value.close}
             onChange={(e) => update('close', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none focus:outline-none focus-visible:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 transition-all appearance-none"
+            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
           />
         </div>
       ) : (
@@ -753,14 +753,11 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
             </p>
           </div>
         </div>
-            <div className="group/note relative min-h-[32px] min-w-0 border-t border-white/[0.04] pt-3">
-              <p className="truncate text-[11px] font-bold leading-none tracking-tight text-zinc-300">
-                {staff.knowledge || 'No knowledge set'}
-              </p>
-              {staff.knowledge && <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-[260px] rounded-lg border border-white/[0.08] bg-zinc-950 px-3 py-2 text-[11px] font-medium leading-relaxed text-zinc-300 shadow-[0_14px_40px_rgba(0,0,0,0.45)] group-hover/note:block">
-                {staff.knowledge}
-              </div>}
-            </div>
+        <div className="relative min-h-[32px] min-w-0 border-t border-white/[0.04] pt-3">
+          <p className="truncate text-[11px] font-bold leading-none tracking-tight text-zinc-300">
+            {staff.knowledge || 'No knowledge set'}
+          </p>
+        </div>
       </div>
     </motion.div>
   );
@@ -885,20 +882,20 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
           <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1.5 block">Service Name</label>
           <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
             placeholder="e.g. Roof Repair"
-            className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-amber-500/30 transition-all" />
+            className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-800 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all" />
         </div>
         <div className="col-span-2">
           <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1.5 block">Description</label>
           <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
             placeholder="What's included, what to expect..."
             rows={2}
-            className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-amber-500/30 transition-all resize-none" />
+            className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 placeholder:text-zinc-800 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all resize-none" />
         </div>
         <div>
           <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1.5 block">Category</label>
           <input type="text" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
             placeholder="e.g. Roofing, Gutters"
-            className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-amber-500/30 transition-all" />
+            className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 placeholder:text-zinc-800 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all" />
         </div>
         {form.price_type !== 'free' && form.price_type !== 'quote' && (
           <>
@@ -908,20 +905,20 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
               </label>
               <input type="number" value={form.price_min} onChange={e => setForm(f => ({ ...f, price_min: e.target.value ? Number(e.target.value) : '' }))}
                 placeholder="0" min={0}
-                className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-amber-500/30 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 placeholder:text-zinc-800 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
             </div>
             {form.price_type === 'range' && (
               <div>
                 <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1.5 block">Max Price</label>
                 <input type="number" value={form.price_max} onChange={e => setForm(f => ({ ...f, price_max: e.target.value ? Number(e.target.value) : '' }))}
                   placeholder="0" min={0}
-                  className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-amber-500/30 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                  className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 placeholder:text-zinc-800 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               </div>
             )}
             <div>
               <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1.5 block">Unit</label>
               <select value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
-                className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:border-amber-500/30 transition-all appearance-none cursor-pointer">
+                className="w-full bg-black/50 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none cursor-pointer">
                 {PRICE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
               </select>
             </div>
@@ -1203,6 +1200,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadName, setAvatarUploadName] = useState('');
   const [showKnowledgeTips, setShowKnowledgeTips] = useState(false);
+  const [deleteStaffTarget, setDeleteStaffTarget] = useState(null);
 
   useEffect(() => {
     loadStaff();
@@ -1274,6 +1272,11 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     setError('');
   };
 
+  const requestDeleteStaff = (staff) => {
+    if (!staff?.id) return;
+    setDeleteStaffTarget(staff);
+  };
+
   const validateStaffSlide = () => {
     if (staffSlide !== 0) return true;
     const fullName = String(form.full_name || '').trim()
@@ -1305,16 +1308,20 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     setAvatarUploading(true);
     setError('');
     try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData?.user?.id;
+      if (!userId) throw new Error('User not found');
       const business = await ensureBusinessRecord({ createIfMissing: true });
       const resolvedBusinessId = business?.id || businessId || 'business';
       if (business?.id) onBusinessLinked?.(business.id);
       const extension = file.name?.split('.').pop()?.toLowerCase() || 'jpg';
-      const path = `staff/${resolvedBusinessId}/${editingStaffId || 'new'}-${Date.now()}.${extension}`;
+      const path = `${userId}/${resolvedBusinessId}/${editingStaffId || 'new'}-${Date.now()}.${extension}`;
       const { error: uploadError } = await supabase.storage
-        .from('avatars')
+        .from('staff-avatars')
         .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type });
       if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+      const { data } = supabase.storage.from('staff-avatars').getPublicUrl(path);
       setForm((prev) => ({ ...prev, avatar: data?.publicUrl || '' }));
       setAvatarUploadName(file.name || 'Uploaded image');
     } catch (err) {
@@ -1388,6 +1395,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
       setStaffMembers((prev) => prev.filter((member) => member.id !== staff.id));
       setSelectedStaff((prev) => (prev?.id === staff.id ? null : prev));
+      setDeleteStaffTarget((prev) => (prev?.id === staff.id ? null : prev));
       if (editingStaffId === staff.id) closeModal();
     } catch (err) {
       console.error('[StaffManager] Failed to delete:', err);
@@ -1435,27 +1443,27 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block space-y-2 md:col-span-2">
             <span className="text-[13px] font-normal text-zinc-400">Full Name</span>
-            <input type="text" value={form.full_name} onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))} placeholder="e.g. Olivia Hart" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+            <input type="text" value={form.full_name} onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))} placeholder="e.g. Olivia Hart" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
           </label>
           <label className="block space-y-2">
             <span className="text-[13px] font-normal text-zinc-400">First Name</span>
-            <input type="text" value={form.first_name} onChange={(e) => setForm((prev) => ({ ...prev, first_name: e.target.value }))} placeholder="Olivia" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+            <input type="text" value={form.first_name} onChange={(e) => setForm((prev) => ({ ...prev, first_name: e.target.value }))} placeholder="Olivia" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
           </label>
           <label className="block space-y-2">
             <span className="text-[13px] font-normal text-zinc-400">Last Name</span>
-            <input type="text" value={form.last_name} onChange={(e) => setForm((prev) => ({ ...prev, last_name: e.target.value }))} placeholder="Hart" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+            <input type="text" value={form.last_name} onChange={(e) => setForm((prev) => ({ ...prev, last_name: e.target.value }))} placeholder="Hart" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
           </label>
           <label className="block space-y-2">
             <span className="text-[13px] font-normal text-zinc-400">Role</span>
-            <input type="text" value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))} placeholder="Senior Stylist" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+            <input type="text" value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))} placeholder="Senior Stylist" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
           </label>
           <label className="block space-y-2">
             <span className="text-[13px] font-normal text-zinc-400">Phone</span>
-            <input type="text" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="(555) 000-0000" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+            <input type="text" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="(555) 000-0000" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
           </label>
           <label className="block space-y-2 md:col-span-2">
             <span className="text-[13px] font-normal text-zinc-400">Email</span>
-            <input type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="olivia@business.com" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+            <input type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="olivia@business.com" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
           </label>
         </div>
       );
@@ -1473,7 +1481,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
     if (staffSlide === 2) {
       return (
-        <textarea value={form.knowledge} onChange={(e) => setForm((prev) => ({ ...prev, knowledge: e.target.value }))} className="custom-scrollbar h-[410px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 pr-5 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+        <textarea value={form.knowledge} onChange={(e) => setForm((prev) => ({ ...prev, knowledge: e.target.value }))} className="custom-scrollbar h-[410px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 pr-5 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-700" />
       );
     }
 
@@ -1544,7 +1552,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                 staff={staff}
                 onSelect={setSelectedStaff}
                 onEdit={openEditModal}
-                onDelete={deleteStaff}
+                onDelete={requestDeleteStaff}
                 onToggleActive={toggleStaffActive}
                 compact={compactCards}
               />
@@ -1560,6 +1568,60 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
             onClose={() => setSelectedStaff(null)}
             onEdit={openEditModal}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteStaffTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1250] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md"
+            onClick={() => setDeleteStaffTarget(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-[400px] bg-[#0a0a0a] border border-white/[0.06] rounded-2xl overflow-hidden shadow-2xl"
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04]">
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Delete Staff Member</span>
+                <button onClick={() => setDeleteStaffTarget(null)} className="p-1 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-all">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="p-6">
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
+                    <Trash2 size={18} className="text-rose-400" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] text-zinc-200 font-medium">
+                      Remove <span className="text-white font-bold">{deleteStaffTarget?.first_name || deleteStaffTarget?.full_name}</span> from active duty?
+                    </p>
+                    <p className="text-[11px] text-zinc-600 mt-1">This action cannot be undone.</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setDeleteStaffTarget(null)}
+                    className="px-4 py-2 rounded-xl text-[11px] font-bold text-zinc-500 uppercase tracking-wider hover:text-zinc-300 hover:bg-white/[0.03] transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => deleteStaff(deleteStaffTarget)}
+                    className="px-5 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-black uppercase tracking-wider hover:bg-rose-400 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)] active:scale-95"
+                  >
+                    Terminate
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -1639,7 +1701,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                       type="button"
                       onClick={() => {
                         const selected = staffMembers.find((member) => member.id === editingStaffId);
-                        if (selected) deleteStaff(selected);
+                        if (selected) requestDeleteStaff(selected);
                       }}
                       className="h-10 w-full rounded-full text-xs font-normal text-zinc-600 transition hover:text-rose-300"
                     >
@@ -1833,7 +1895,7 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
               value={content}
               onChange={(e) => updateDoc(e.target.value)}
               placeholder={`Write about ${activeConfig.label.toLowerCase()}...`}
-              className="w-full min-h-[360px] bg-black/30 border border-white/[0.04] rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 focus:outline-none focus:border-amber-500/20 focus:shadow-[0_0_20px_rgba(245,158,11,0.04)] transition-all resize-y leading-relaxed font-mono"
+              className="w-full min-h-[360px] bg-black/30 border border-white/[0.04] rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none transition-all resize-y leading-relaxed font-mono"
               style={{ tabSize: 2 }}
             />
           </div>
@@ -1869,7 +1931,6 @@ const INTRO_VARIABLES = [
 ];
 
 const IntroMessageEditor = ({ value, onChange }) => {
-  const [focused, setFocused] = useState(false);
   const textareaRef = React.useRef(null);
 
   const renderTokenizedValue = (text) => {
@@ -1960,16 +2021,10 @@ const IntroMessageEditor = ({ value, onChange }) => {
           ref={textareaRef}
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           placeholder="Hey, this is Receptionist Name at Business Name. What can I do for you?"
-          className={`min-h-[118px] w-full resize-none bg-black/30 border rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 focus:outline-none transition-all leading-relaxed font-sans ${
-            focused
-              ? 'border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.06)]'
-              : 'border-white/[0.04]'
-          }`}
+          className="min-h-[118px] w-full resize-none bg-black/30 border border-white/[0.04] rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none transition-all leading-relaxed font-sans"
         />
         <div className="mt-3 rounded-xl border border-white/[0.04] bg-black/20 px-4 py-3">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-600">Preview</div>
@@ -2371,7 +2426,6 @@ const SettingsPage = () => {
     { id: 'preferences', title: 'Preferences', icon: Shield, color: 'text-emerald-400', hint: 'Call permissions and controls' },
     { id: 'intro', title: 'Intro Message', icon: MessageSquareText, color: 'text-indigo-400', hint: 'Opening call greeting' },
     { id: 'appointments', title: 'Hours', icon: Calendar, color: 'text-cyan-400', hint: 'Business availability' },
-    { id: 'staff', title: 'Staff', icon: Users, color: 'text-cyan-400', hint: 'Bookable team members and hours' },
     { id: 'services', title: 'Services & Pricing', icon: Tag, color: 'text-amber-400', hint: 'Offer catalog and rates' },
     { id: 'knowledge', title: 'Knowledge Base', icon: BookOpen, color: 'text-amber-400', hint: 'Policies, FAQs, and context' },
   ];
@@ -2430,15 +2484,6 @@ const SettingsPage = () => {
             />
           </>
         );
-      case 'staff':
-        return (
-          <StaffManager
-            businessId={settings._business_id}
-            ensureBusinessRecord={ensureBusinessRecord}
-            onBusinessLinked={syncBusinessId}
-            defaultHours={settings.business_hours}
-          />
-        );
       case 'knowledge':
         return (
           <>
@@ -2469,7 +2514,7 @@ const SettingsPage = () => {
                     <span className="group relative inline-flex">
                       <button
                         type="button"
-                        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/[0.12] text-[10px] font-bold text-zinc-500 transition-colors hover:border-cyan-400/40 hover:text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-400/40"
+                        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/[0.12] text-[10px] font-bold text-zinc-500 transition-colors hover:border-cyan-400/40 hover:text-cyan-300 outline-none focus:outline-none focus-visible:outline-none"
                         aria-label="Caller authentication details"
                       >
                         i

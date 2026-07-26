@@ -447,9 +447,16 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
     return palettes[color] || palettes.zinc;
   };
   const currentStyle = styleFor(current);
+  const handleSave = (event, nextValue) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setOpen(false);
+    if (nextValue === current) return;
+    onSave(nextValue);
+  };
   return (
     <div className="relative" ref={ref}>
-      <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}
         className={`w-full min-h-[26px] inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-[-0.02em] border ${currentStyle.bg} ${currentStyle.text} ${currentStyle.border}`}>
         {current ? (
           <>
@@ -479,7 +486,8 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
             onClick={(e) => e.stopPropagation()}>
             <div className="max-h-full overflow-y-auto custom-scrollbar py-1">
               <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
-                onClick={() => { setOpen(false); onSave(null); }}
+                type="button"
+                onClick={(event) => handleSave(event, null)}
                 className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${current == null || current === '' ? 'text-white' : 'text-zinc-400'}`}>
                 <div className="w-2 h-2 rounded-full bg-zinc-700" />
                 <span className="invisible">.</span>
@@ -490,8 +498,17 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
                 const valueKey = typeof val === 'string' ? val.toLowerCase() : '';
                 const isActive = valueKey !== '' && valueKey === currentKey;
                 return (
-                  <motion.button key={val} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: (idx + 1) * 0.02 }}
-                    onClick={() => { setOpen(false); if (!isActive) onSave(val); }}
+                  <motion.button key={`${valueKey || 'empty'}-${idx}`} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: (idx + 1) * 0.02 }}
+                    type="button"
+                    onClick={(event) => {
+                      if (isActive) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setOpen(false);
+                        return;
+                      }
+                      handleSave(event, val);
+                    }}
                     className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
                     {val}
@@ -769,12 +786,15 @@ const DraggableHeader = ({
   );
 };
 
-const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], selection = null, lookupOptions = {}, receptionistsById = new Map() }) => {
+const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], selection = null, lookupOptions = {}, receptionistsById = new Map(), getLatestAppointment = null }) => {
   const getConfiguredOptions = (key, fallbackOptions = []) => fieldConfig[key]?.options || fallbackOptions;
   const customField = customFields.find((field) => field.key === colId);
   if (customField) {
     const value = getCustomValue(appointment.custom_fields, colId);
-    const saveCustom = (nextValue) => autoSave(appointment.id, 'custom_fields', setCustomFieldValue(appointment.custom_fields, colId, nextValue));
+    const saveCustom = (nextValue) => {
+      const latestAppointment = getLatestAppointment?.(appointment.id) || appointment;
+      autoSave(appointment.id, 'custom_fields', setCustomFieldValue(latestAppointment.custom_fields, colId, nextValue));
+    };
     if (customField.type === 'boolean') return <InlineBoolean value={value} onSave={saveCustom} />;
     if (customField.type === 'number') return <InlineNumber value={value} onSave={saveCustom} />;
     if (customField.type === 'date') return <InlineDateOnly value={value} onSave={saveCustom} />;
@@ -813,11 +833,7 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
             value={appointment.person_id}
             options={lookupOptions.people || []}
             placeholder="Select person"
-            onSave={(personId) => {
-              autoSave(appointment.id, {
-                person_id: personId,
-              });
-            }}
+            onSave={(personId) => autoSave(appointment.id, 'person_id', personId)}
           />
         </div>
       );
@@ -1393,6 +1409,9 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
     const payload = typeof field === 'object' && field !== null ? field : { [field]: value };
     onUpdateAppointment(appointmentId, payload);
   }, [onUpdateAppointment]);
+  const getLatestAppointment = useCallback((appointmentId) => (
+    appointments.find((appointment) => appointment.id === appointmentId) || null
+  ), [appointments]);
 
   const handleCreateColumn = async (type) => {
     if (!businessId) return;
@@ -1845,7 +1864,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
       style={{ width: col.width, minWidth: col.width }}
       className={col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'}
     >
-      <AppointmentCell colId={col.id} appointment={appointment} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(appointment.id), toggle: toggleSelectedId }} lookupOptions={lookupOptions} receptionistsById={receptionistsById} />
+      <AppointmentCell colId={col.id} appointment={appointment} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(appointment.id), toggle: toggleSelectedId }} lookupOptions={lookupOptions} receptionistsById={receptionistsById} getLatestAppointment={getLatestAppointment} />
     </div>
   );
 

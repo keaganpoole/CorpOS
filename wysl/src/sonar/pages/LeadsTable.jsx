@@ -2042,9 +2042,12 @@ const LeadsTable = ({
                       initial={{ opacity: 0, scaleX: 0.94 }}
                       animate={{ opacity: 1, scaleX: 1 }}
                       exit={{ opacity: 0, scaleX: 0.94 }}
-                      className="absolute h-4"
+                      className="pointer-events-none absolute h-4"
                       style={{ left: hoveredZoneMetric.left, width: hoveredZoneMetric.width, top: 0 }}
                     >
+                      <span className="absolute left-1/2 -top-5 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.04] bg-white/[0.02] px-2 py-1 text-[10px] font-medium leading-none text-zinc-500 shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
+                        click and drag to create zone
+                      </span>
                       <span className="absolute inset-x-1 top-[3px] h-px rounded-full bg-white/20 shadow-[0_0_10px_rgba(255,255,255,0.08)]" />
                     </motion.div>
                   )}
@@ -2147,6 +2150,9 @@ const LeadsTable = ({
             <Wand2 size={12} className="relative z-10 text-cyan-400 group-hover/colorbar:text-white transition-colors group-hover/colorbar:rotate-12 duration-300" />
             <span className="relative z-10">Colorbar</span>
           </button>
+          <TableControlButton ref={intakeButtonRef} active={activeControl === 'intake' || intakeEnabledCount > 0} onClick={() => setActiveControl((current) => (current === 'intake' ? null : 'intake'))}>
+            Intake
+          </TableControlButton>
         </div>
         <div className="flex-1" />
         <div className={`relative w-[260px] ${searchFieldClassName}`}>
@@ -2170,9 +2176,6 @@ const LeadsTable = ({
             </TableControlButton>
             <TableControlButton ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
               Row Height
-            </TableControlButton>
-            <TableControlButton ref={intakeButtonRef} active={activeControl === 'intake' || intakeEnabledCount > 0} onClick={() => setActiveControl((current) => (current === 'intake' ? null : 'intake'))}>
-              Intake
             </TableControlButton>
           </div>
           <div className="relative bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/[0.06] rounded-[1.5rem] flex flex-col h-full overflow-hidden">

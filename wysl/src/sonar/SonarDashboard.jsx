@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
 import { supabase } from './lib/supabase';
 import {
-  Headset,
+  IdCardLanyard,
   Activity,
   BarChart3,
   Database,
@@ -738,7 +738,7 @@ const SonarDashboard = () => {
 
   const navItems = [
     { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
-    { id: 'receptionists', icon: <Headset size={18} />, label: 'Team' },
+    { id: 'receptionists', icon: <IdCardLanyard size={18} />, label: 'Team' },
     { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios' },
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
@@ -755,7 +755,7 @@ const SonarDashboard = () => {
               <div className="flex items-center gap-5">
                 <div className="flex items-center gap-4">
                   <div className="p-2.5 bg-indigo-500/5 rounded-xl border border-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.05)]">
-                    <Headset size={22} className="text-indigo-400" />
+                    <IdCardLanyard size={22} className="text-indigo-400" />
                   </div>
                   <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Team</h2>
                 </div>

@@ -13,6 +13,7 @@ import {
   Phone,
   Play,
   Pause,
+  RefreshCw,
   Search,
   Star,
   Square,
@@ -600,6 +601,8 @@ export default function CallLogsPage() {
     selectedForDelete,
     setSelectedForDelete,
     loadCallLogs,
+    loadingMore,
+    hasMore,
   } = useCallLogs();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(CATEGORY_OPTIONS[0]);
@@ -607,6 +610,28 @@ export default function CallLogsPage() {
   const [sentimentFilter, setSentimentFilter] = useState(SENTIMENT_OPTIONS[0]);
   const [deleteTargetIds, setDeleteTargetIds] = useState([]);
   const [deleting, setDeleting] = useState(false);
+  const listScrollRef = useRef(null);
+  const searchReadyRef = useRef(false);
+
+  useEffect(() => {
+    if (!searchReadyRef.current) {
+      searchReadyRef.current = true;
+      return undefined;
+    }
+    const timeout = window.setTimeout(() => {
+      loadCallLogs({ force: true, searchQuery });
+    }, 280);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const handleListScroll = () => {
+    const element = listScrollRef.current;
+    if (!element || loading || loadingMore || !hasMore) return;
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    if (distanceFromBottom < 180) {
+      loadCallLogs({ append: true, searchQuery });
+    }
+  };
 
   const toggleSelectCall = (callId) => {
     setSelectedForDelete((current) => (
@@ -702,7 +727,7 @@ export default function CallLogsPage() {
   const filteredCalls = useMemo(() => {
     const query = normalized(searchQuery);
     return calls.filter((call) => {
-      const matchesSearch = !query || [call.name, call.phone, call.summary, call.purpose, call.status]
+      const matchesSearch = !query || [call.name, call.phone, call.summary, call.purpose, call.status, call.receptionist, call.raw?.notes, call.raw?.agent_name]
         .some((value) => normalized(value).includes(query));
       const matchesCategory = categoryFilter === CATEGORY_OPTIONS[0] || call.purpose === categoryFilter;
       const matchesStatus = statusFilter === STATUS_OPTIONS[0] || call.status === statusFilter;
@@ -727,7 +752,7 @@ export default function CallLogsPage() {
             </div>
             <div>
               <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Call Logs</h2>
-              <p className="mt-1 text-[12px] font-medium text-zinc-600">{loading ? 'Loading calls' : `${calls.length} recent calls`}</p>
+              <p className="mt-1 text-[12px] font-medium text-zinc-600">{loading ? 'Loading calls' : `${calls.length}${hasMore ? '+' : ''} recent calls`}</p>
             </div>
           </div>
         </div>
@@ -738,13 +763,26 @@ export default function CallLogsPage() {
           <div className="shrink-0 space-y-3 bg-[#020202]/95 p-4">
             <label className="relative block">
               <span className="sr-only">Search call logs</span>
-              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search calls"
-                className="h-11 w-full rounded-lg bg-white/[0.045] pl-10 pr-4 text-[13px] text-white outline-none transition placeholder:text-zinc-700 hover:bg-white/[0.06] focus:bg-white/[0.07]"
-              />
+              <div className="flex gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search calls"
+                    className="h-11 w-full rounded-lg bg-white/[0.045] pl-10 pr-4 text-[13px] text-white outline-none transition placeholder:text-zinc-700 hover:bg-white/[0.06] focus:bg-white/[0.07]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadCallLogs({ force: true, searchQuery })}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/[0.045] text-zinc-500 transition hover:bg-white/[0.06] hover:text-white active:scale-95"
+                  aria-label="Refresh call logs"
+                  title="Refresh call logs"
+                >
+                  <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                </button>
+              </div>
             </label>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
               <FilterSelect label="Category" value={categoryFilter} onChange={setCategoryFilter} options={categoryOptions} />
@@ -766,7 +804,7 @@ export default function CallLogsPage() {
             )}
           </div>
 
-          <div className="custom-scrollbar min-h-[320px] flex-1 overflow-y-auto px-3 py-2">
+          <div ref={listScrollRef} onScroll={handleListScroll} className="custom-scrollbar min-h-[320px] flex-1 overflow-y-auto px-3 py-2">
             {loading && (
               <CallLogsLoader />
             )}
@@ -794,6 +832,11 @@ export default function CallLogsPage() {
                 />
               </div>
             ))}
+            {!loading && !error && loadingMore && (
+              <div className="py-5 text-center">
+                <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-700 animate-pulse">Loading more calls</span>
+              </div>
+            )}
             {!loading && !error && filteredCalls.length === 0 && (
               <div className="p-6 text-center">
                 <p className="text-[13px] font-semibold text-zinc-300">No calls found</p>
