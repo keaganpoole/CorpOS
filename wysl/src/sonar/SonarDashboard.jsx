@@ -757,10 +757,7 @@ const SonarDashboard = () => {
                   <div className="p-2.5 bg-indigo-500/5 rounded-xl border border-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.05)]">
                     <Headset size={22} className="text-indigo-400" />
                   </div>
-                  <div>
-                    <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Team</h2>
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1">{enrichedAgents.length} receptionists · staff</p>
-                  </div>
+                  <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Team</h2>
                 </div>
                 <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
                   <button
@@ -779,14 +776,14 @@ const SonarDashboard = () => {
               </div>
               <div className="flex items-center gap-3">
                 {teamView === 'receptionists' ? (
-                  <button onClick={() => setShowHireModal(true)} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">Hire Receptionist</button>
+                  <button onClick={() => setShowHireModal(true)} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">New Receptionist</button>
                 ) : (
-                  <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">New Staff Member</button>
+                  <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">New Staff Member</button>
                 )}
               </div>
             </div>
 
-            <div key={teamView} className="custom-scrollbar min-h-0 flex-1 overflow-auto border-t border-white/[0.04] px-12 py-8">
+            <div key={teamView} className="custom-scrollbar min-h-0 flex-1 overflow-auto px-12 py-8">
               {teamView === 'receptionists' ? (
                 <div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6">
                   {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
