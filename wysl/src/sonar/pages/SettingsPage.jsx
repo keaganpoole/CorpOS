@@ -702,7 +702,7 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
       <div className={bodyClass}>
         <div className="px-0.5 py-1">
           <div className="min-w-0">
-            <p className="text-[8px] font-black uppercase tracking-[0.24em] text-zinc-600">Staff Member</p>
+            <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Staff Member</p>
             <div className="mt-1" onClick={(e) => e.stopPropagation()}>
               <StaffAvailabilitySelector
               value={staff.is_active}
@@ -719,7 +719,7 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
               Availability Window
             </p>
             <div className="flex items-baseline gap-2">
-              <span className="truncate text-[11px] font-bold text-zinc-300">
+              <span className="truncate text-[11px] font-bold leading-none tracking-tight text-zinc-300">
                 {formatHourLabel(availability.firstOpen)} - {formatHourLabel(availability.lastClose)}
               </span>
             </div>
@@ -730,30 +730,30 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
               Email
             </p>
             <div className="flex items-baseline gap-2">
-              <span className="truncate text-[11px] font-bold text-zinc-300">{staff.email || 'No email set'}</span>
+              <span className="truncate text-[11px] font-bold leading-none tracking-tight text-zinc-300">{staff.email || 'No email set'}</span>
             </div>
           </div>
           <div className="min-w-0">
-            <p className="mb-1 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
+            <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
               <PhoneCall size={10} className="text-amber-400/70" />
               Phone Number
             </p>
-            <div className="min-w-0 text-[11px] font-bold text-zinc-500">
+            <div className="min-w-0 text-[11px] font-bold leading-none tracking-tight text-zinc-300">
               <span className="block truncate">{staff.phone || 'No phone set'}</span>
             </div>
           </div>
           <div className="min-w-0">
-            <p className="mb-1 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
+            <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
               <ListChecks size={10} className="text-amber-400/70" />
               Working Hours
             </p>
-            <p className="truncate text-[11px] leading-relaxed text-zinc-500">
+            <p className="truncate text-[11px] font-bold leading-none tracking-tight text-zinc-300">
               {availability.scheduleLabel}
             </p>
           </div>
         </div>
             <div className="group/note relative min-h-[32px] min-w-0 border-t border-white/[0.04] pt-3">
-              <p className="truncate text-[11px] leading-relaxed text-zinc-600">
+              <p className="truncate text-[11px] font-bold leading-none tracking-tight text-zinc-300">
                 {staff.knowledge || 'No knowledge set'}
               </p>
               {staff.knowledge && <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-[260px] rounded-lg border border-white/[0.08] bg-zinc-950 px-3 py-2 text-[11px] font-medium leading-relaxed text-zinc-300 shadow-[0_14px_40px_rgba(0,0,0,0.45)] group-hover/note:block">
