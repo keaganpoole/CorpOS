@@ -6,8 +6,8 @@ import {
   BookOpen, FileText, Shield, HelpCircle, Sparkles,
   Eye, EyeOff, Lightbulb, Zap, Star, Info,
   Plus, Trash2, GripVertical, Tag, DollarSign,
-  ChevronRight, ArrowRight, X, MessageSquareText, Users,
-  CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck,
+  ArrowRight, X, MessageSquareText, Users,
+  CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -619,7 +619,7 @@ const StaffAvailabilitySelector = ({ value, onChange }) => {
   );
 };
 
-const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActive, compact = false }) => {
+const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onToggleActive, compact = false }) => {
   const [avatarFailed, setAvatarFailed] = useState(false);
   const availability = getStaffAvailabilitySummary(staff.working_hours);
   const borderClass = isSelected ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
@@ -673,11 +673,12 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onSelect?.(staff);
+              onEdit?.(staff);
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-black/60 text-zinc-200 opacity-0 backdrop-blur-xl transition-all group-hover:opacity-100 hover:border-white/15 hover:bg-white/10"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-black/60 text-zinc-300 opacity-0 backdrop-blur-xl transition-all group-hover:opacity-100 hover:border-white/15 hover:bg-white/10 hover:text-white"
+            aria-label="Edit staff member"
           >
-            <ChevronRight size={13} />
+            <Pencil size={12} strokeWidth={2.2} />
           </button>
           <button
             type="button"
@@ -766,6 +767,114 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
 };
 
 // ─── Service Form (outside ServicesManager to preserve state) ─────────────
+const StaffDetailsModal = ({ staff, onClose, onEdit }) => {
+  if (!staff) return null;
+
+  const availability = getStaffAvailabilitySummary(staff.working_hours);
+  const normalizedHours = createDefaultHours(staff.working_hours);
+  const detailItems = [
+    { label: 'Full Name', value: staff.full_name || 'Not set' },
+    { label: 'First Name', value: staff.first_name || 'Not set' },
+    { label: 'Last Name', value: staff.last_name || 'Not set' },
+    { label: 'Role', value: staff.role || 'Staff Member' },
+    { label: 'Phone Number', value: staff.phone || 'No phone set' },
+    { label: 'Email', value: staff.email || 'No email set' },
+    { label: 'Status', value: staff.is_active !== false ? 'Active' : 'Inactive' },
+    {
+      label: 'Availability Window',
+      value: availability.activeDays > 0
+        ? `${formatHourLabel(availability.firstOpen)} - ${formatHourLabel(availability.lastClose)}`
+        : 'No hours configured',
+    },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[1180] flex items-center justify-center bg-black/80 p-6 backdrop-blur-xl"
+      onClick={onClose}
+    >
+      <motion.section
+        initial={{ opacity: 0, y: 22, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 14, scale: 0.98 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative flex max-h-[calc(100vh-32px)] w-full max-w-[820px] flex-col overflow-hidden rounded-[32px] border border-white/[0.08] bg-[#070707]/95 text-left shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+      >
+        <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-orange-500/[0.07] blur-[90px]" />
+        <div className="relative flex items-start justify-between gap-5 border-b border-white/[0.05] px-7 py-6">
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-2">
+              <span className={`h-1.5 w-1.5 rounded-full ${staff.is_active !== false ? 'bg-orange-300 shadow-[0_0_6px_rgba(253,186,116,0.45)]' : 'bg-zinc-600'}`} />
+              <span className={`text-[8px] font-bold uppercase tracking-widest ${staff.is_active !== false ? 'text-orange-300' : 'text-zinc-400'}`}>
+                {staff.is_active !== false ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            <h2 className="truncate text-2xl font-bold leading-none tracking-tight text-white sm:text-3xl">
+              {staff.full_name || 'Unnamed Staff Member'}
+            </h2>
+            <p className="mt-2 inline-flex max-w-full items-center truncate rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
+              {staff.role || 'Staff Member'}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onEdit?.(staff)}
+              className="flex h-9 w-9 items-center justify-center text-zinc-500 transition hover:text-white"
+              aria-label="Edit staff member"
+            >
+              <Pencil size={14} strokeWidth={2.2} />
+            </button>
+            <button type="button" onClick={onClose} className="rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="custom-scrollbar relative flex-1 overflow-auto px-7 py-6">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {detailItems.map((item) => (
+              <div key={item.label} className="min-w-0 rounded-2xl border border-white/[0.05] bg-white/[0.025] px-4 py-3">
+                <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">{item.label}</p>
+                <p className="truncate text-[11px] font-bold leading-none tracking-tight text-zinc-300">{item.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/[0.05] bg-white/[0.025] px-4 py-4">
+            <p className="mb-3 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Schedule</p>
+            <div className="grid gap-x-8 gap-y-0 sm:grid-cols-2">
+              {DAYS.map((day) => {
+                const hours = normalizedHours[day] || {};
+                return (
+                  <div key={day} className="flex items-center justify-between gap-3 border-b border-white/[0.04] py-2 last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0">
+                    <span className="truncate text-[11px] font-bold leading-none tracking-tight text-zinc-300">{day}</span>
+                    <span className="shrink-0 text-[11px] font-bold leading-none tracking-tight text-zinc-500">
+                      {hours.enabled ? `${formatHourLabel(hours.open)} - ${formatHourLabel(hours.close)}` : 'Inactive'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/[0.05] bg-white/[0.025] px-4 py-4">
+            <p className="mb-3 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Knowledge</p>
+            <div className="custom-scrollbar max-h-[260px] overflow-auto rounded-xl border border-white/[0.05] bg-black/20 p-4 pr-5">
+              <p className="whitespace-pre-wrap text-[11px] font-bold leading-6 tracking-tight text-zinc-300">
+                {staff.knowledge || 'No knowledge set'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+    </motion.div>
+  );
+};
+
 const ServiceForm = ({ initial, onSave, onCancel }) => {
   const [form, setForm] = useState(createServiceFormState(initial));
 
@@ -1089,6 +1198,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const [form, setForm] = useState(createStaffFormState(null, defaultHours));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState(null);
+  const [selectedStaff, setSelectedStaff] = useState(null);
   const [staffSlide, setStaffSlide] = useState(0);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadName, setAvatarUploadName] = useState('');
@@ -1143,6 +1253,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   };
 
   const openEditModal = (staff) => {
+    setSelectedStaff(null);
     setEditingStaffId(staff.id);
     setForm(createStaffFormState(staff, defaultHours));
     setStaffSlide(0);
@@ -1276,6 +1387,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       if (deleteError) throw deleteError;
 
       setStaffMembers((prev) => prev.filter((member) => member.id !== staff.id));
+      setSelectedStaff((prev) => (prev?.id === staff.id ? null : prev));
       if (editingStaffId === staff.id) closeModal();
     } catch (err) {
       console.error('[StaffManager] Failed to delete:', err);
@@ -1300,6 +1412,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       if (toggleError) throw toggleError;
 
       setStaffMembers((prev) => prev.map((member) => (member.id === data.id ? data : member)));
+      setSelectedStaff((prev) => (prev?.id === data.id ? data : prev));
       if (editingStaffId === data.id) {
         setForm((prev) => ({ ...prev, is_active: data.is_active }));
       }
@@ -1429,7 +1542,8 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
               <StaffCard
                 key={staff.id}
                 staff={staff}
-                onSelect={openEditModal}
+                onSelect={setSelectedStaff}
+                onEdit={openEditModal}
                 onDelete={deleteStaff}
                 onToggleActive={toggleStaffActive}
                 compact={compactCards}
@@ -1438,6 +1552,16 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {selectedStaff && (
+          <StaffDetailsModal
+            staff={selectedStaff}
+            onClose={() => setSelectedStaff(null)}
+            onEdit={openEditModal}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isModalOpen && (
