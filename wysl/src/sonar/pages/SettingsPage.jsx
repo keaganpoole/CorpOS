@@ -7,7 +7,7 @@ import {
   Eye, EyeOff, Lightbulb, Zap, Star, Info,
   Plus, Trash2, GripVertical, Tag, DollarSign,
   ChevronRight, ArrowRight, X, MessageSquareText, Users,
-  CalendarClock, Mail, PhoneCall, ListChecks, Upload,
+  CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -568,6 +568,57 @@ const StaffHoursRow = ({ day, hours, onChange }) => {
   );
 };
 
+const StaffAvailabilitySelector = ({ value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const current = value ? 'Active' : 'Inactive';
+  const options = [
+    { label: 'Active', value: true },
+    { label: 'Inactive', value: false },
+  ];
+
+  const selectOption = (nextValue) => {
+    onChange?.(nextValue);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative inline-flex items-center">
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen((prev) => !prev);
+          }}
+          className="no-drag z-10 flex items-center gap-2 px-0 py-1 text-[16px] font-bold leading-none tracking-tight text-zinc-200 transition-colors duration-300 hover:text-white"
+        >
+          <CalendarCheck size={14} className={value ? 'text-cyan-400/80' : 'text-zinc-600'} />
+          <span>{current}</span>
+        </button>
+        <div
+          className={`z-10 flex items-center gap-3.5 overflow-hidden pl-4 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+            isOpen ? 'max-w-[180px] opacity-100' : 'max-w-0 opacity-0'
+          }`}
+        >
+          {options.filter((option) => option.label !== current).map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                selectOption(option.value);
+              }}
+              className="no-drag text-[11px] font-black leading-none tracking-tight text-zinc-500 transition-all duration-300 hover:scale-105 hover:text-zinc-200"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActive, compact = false }) => {
   const [avatarFailed, setAvatarFailed] = useState(false);
   const availability = getStaffAvailabilitySummary(staff.working_hours);
@@ -649,19 +700,15 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
       </div>
 
       <div className={bodyClass}>
-        <div className="flex items-center justify-between px-0.5 py-1">
+        <div className="px-0.5 py-1">
           <div className="min-w-0">
             <p className="text-[8px] font-black uppercase tracking-[0.24em] text-zinc-600">Staff Member</p>
-            <p className={`mt-1 text-[11px] font-bold ${staff.is_active ? 'text-zinc-200' : 'text-zinc-500'}`}>
-              {staff.is_active ? 'Accepting appointments' : 'Unavailable for booking'}
-            </p>
-          </div>
-          <div onClick={(e) => e.stopPropagation()}>
-            <Toggle
+            <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+              <StaffAvailabilitySelector
               value={staff.is_active}
               onChange={(nextValue) => onToggleActive?.(staff, nextValue)}
-              color="cyan"
-            />
+              />
+            </div>
           </div>
         </div>
 
