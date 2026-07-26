@@ -7,7 +7,7 @@ import {
   Eye, EyeOff, Lightbulb, Zap, Star, Info,
   Plus, Trash2, GripVertical, Tag, DollarSign,
   ChevronRight, ArrowRight, X, MessageSquareText, Users,
-  CalendarClock, Mail, PhoneCall, ListChecks,
+  CalendarClock, Mail, PhoneCall, ListChecks, Upload,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -273,6 +273,27 @@ const createDefaultHours = (baseHours = null) => (
   }, {})
 );
 
+const DEFAULT_STAFF_KNOWLEDGE = `Staff Profile Knowledge Base
+
+Role and specialties:
+- Senior stylist specializing in layered cuts, dimensional color, blonding, gloss treatments, and blowouts.
+- Best fit for clients who want thoughtful consultation, low-maintenance color plans, and polished styling.
+
+Booking guidance:
+- Standard haircut appointments usually need 45 minutes.
+- Color consultations should be booked before major transformations, corrections, or first-time blonding.
+- Leave extra time for thick hair, corrective color, extensions, or clients requesting a full style change.
+
+Client preferences:
+- Prefers a clear inspiration photo when the client wants a major change.
+- Likes to know whether the client wants low-maintenance upkeep or a high-impact result.
+- Recommends clients arrive with clean, dry hair for color services unless told otherwise.
+
+Important knowledge for the receptionist:
+- If a client mentions damaged hair, box dye, previous color correction, or uncertainty about the service, book a consultation first.
+- If the requested service timing is unclear, choose the longer appointment option and add a note for the staff member.
+- For new color clients, collect current hair color, desired result, hair history, and whether they have inspiration photos.`;
+
 const createStaffFormState = (staff, baseHours = null) => ({
   id: staff?.id || null,
   full_name: staff?.full_name || '',
@@ -283,7 +304,7 @@ const createStaffFormState = (staff, baseHours = null) => ({
   phone: staff?.phone || '',
   avatar: staff?.avatar || '',
   is_active: staff?.is_active !== false,
-  notes: staff?.notes || '',
+  knowledge: staff ? (staff.knowledge || '') : DEFAULT_STAFF_KNOWLEDGE,
   working_hours: createDefaultHours(staff?.working_hours || baseHours),
 });
 
@@ -302,7 +323,7 @@ const normalizeStaffPayload = (form, businessId) => {
     avatar: String(form.avatar || '').trim() || null,
     is_active: form.is_active !== false,
     working_hours: createDefaultHours(form.working_hours),
-    notes: String(form.notes || '').trim() || null,
+    knowledge: String(form.knowledge || '').trim() || null,
   };
 };
 
@@ -548,12 +569,18 @@ const StaffHoursRow = ({ day, hours, onChange }) => {
 };
 
 const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActive, compact = false }) => {
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const availability = getStaffAvailabilitySummary(staff.working_hours);
   const borderClass = isSelected ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
   const cardSizeClass = compact ? 'h-[465px] min-h-[465px] max-h-[465px] w-[300px] min-w-[300px] max-w-[300px]' : 'h-[550px] min-h-[550px] max-h-[550px] w-[380px] min-w-[380px] max-w-[380px]';
   const imageHeightClass = compact ? 'h-[150px]' : 'h-[280px]';
   const bodyClass = compact ? 'h-[315px] min-h-[315px] max-h-[315px] p-4 space-y-2.5' : 'h-[270px] min-h-[270px] max-h-[270px] p-6 space-y-3.5';
   const nameClass = compact ? 'text-xl' : 'text-2xl';
+  const showAvatar = Boolean(staff.avatar) && !avatarFailed;
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [staff.avatar]);
 
   return (
     <motion.div
@@ -570,22 +597,14 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
       tabIndex={0}
       className={`group relative box-border flex ${cardSizeClass} flex-col overflow-hidden rounded-[28px] border bg-[#0A0A0A] text-left transition-colors duration-300 hover:border-white/10 ${borderClass}`}
     >
-      <div className={`relative ${imageHeightClass} shrink-0 overflow-hidden rounded-t-[28px]`}>
-        {staff.avatar ? (
+      <div className={`relative ${imageHeightClass} shrink-0 overflow-hidden rounded-t-[28px] bg-gradient-to-br from-zinc-800 to-zinc-950`}>
+        {showAvatar && (
           <img
             src={staff.avatar}
             alt={staff.full_name}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
-            }}
+            onError={() => setAvatarFailed(true)}
           />
-        ) : null}
-        {!staff.avatar && (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-950">
-            <Users size={62} className="text-white/15" />
-          </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/40 to-transparent" />
 
@@ -688,10 +707,10 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
         </div>
             <div className="group/note relative min-h-[32px] min-w-0 border-t border-white/[0.04] pt-3">
               <p className="truncate text-[11px] leading-relaxed text-zinc-600">
-                {staff.notes || 'No notes set'}
+                {staff.knowledge || 'No knowledge set'}
               </p>
-              {staff.notes && <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-[260px] rounded-lg border border-white/[0.08] bg-zinc-950 px-3 py-2 text-[11px] font-medium leading-relaxed text-zinc-300 shadow-[0_14px_40px_rgba(0,0,0,0.45)] group-hover/note:block">
-                {staff.notes}
+              {staff.knowledge && <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-[260px] rounded-lg border border-white/[0.08] bg-zinc-950 px-3 py-2 text-[11px] font-medium leading-relaxed text-zinc-300 shadow-[0_14px_40px_rgba(0,0,0,0.45)] group-hover/note:block">
+                {staff.knowledge}
               </div>}
             </div>
       </div>
@@ -1023,6 +1042,10 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const [form, setForm] = useState(createStaffFormState(null, defaultHours));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState(null);
+  const [staffSlide, setStaffSlide] = useState(0);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarUploadName, setAvatarUploadName] = useState('');
+  const [showKnowledgeTips, setShowKnowledgeTips] = useState(false);
 
   useEffect(() => {
     loadStaff();
@@ -1065,6 +1088,9 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const openCreateModal = () => {
     setEditingStaffId(null);
     setForm(createStaffFormState(null, defaultHours));
+    setStaffSlide(0);
+    setAvatarUploadName('');
+    setShowKnowledgeTips(false);
     setError('');
     setIsModalOpen(true);
   };
@@ -1072,6 +1098,9 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const openEditModal = (staff) => {
     setEditingStaffId(staff.id);
     setForm(createStaffFormState(staff, defaultHours));
+    setStaffSlide(0);
+    setAvatarUploadName('');
+    setShowKnowledgeTips(false);
     setError('');
     setIsModalOpen(true);
   };
@@ -1081,7 +1110,61 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     setIsModalOpen(false);
     setEditingStaffId(null);
     setForm(createStaffFormState(null, defaultHours));
+    setStaffSlide(0);
+    setAvatarUploadName('');
+    setShowKnowledgeTips(false);
     setError('');
+  };
+
+  const validateStaffSlide = () => {
+    if (staffSlide !== 0) return true;
+    const fullName = String(form.full_name || '').trim()
+      || [form.first_name, form.last_name].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+    if (!fullName) {
+      setError('Full name is required.');
+      return false;
+    }
+    return true;
+  };
+
+  const goNextStaffSlide = () => {
+    setError('');
+    if (!validateStaffSlide()) return;
+    setStaffSlide((prev) => Math.min(prev + 1, 3));
+  };
+
+  const goBackStaffSlide = () => {
+    setError('');
+    setStaffSlide((prev) => Math.max(prev - 1, 0));
+  };
+
+  const uploadStaffAvatar = async (file) => {
+    if (!file) return;
+    if (!file.type?.startsWith('image/')) {
+      setError('Choose an image file for the staff profile photo.');
+      return;
+    }
+    setAvatarUploading(true);
+    setError('');
+    try {
+      const business = await ensureBusinessRecord({ createIfMissing: true });
+      const resolvedBusinessId = business?.id || businessId || 'business';
+      if (business?.id) onBusinessLinked?.(business.id);
+      const extension = file.name?.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `staff/${resolvedBusinessId}/${editingStaffId || 'new'}-${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+      setForm((prev) => ({ ...prev, avatar: data?.publicUrl || '' }));
+      setAvatarUploadName(file.name || 'Uploaded image');
+    } catch (err) {
+      console.error('[StaffManager] Failed to upload avatar:', err);
+      setError(err.message || 'Failed to upload image. Confirm the Supabase avatars bucket exists and allows uploads.');
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   const saveStaff = async () => {
@@ -1179,6 +1262,74 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     }
   };
 
+  const staffSteps = [
+    { label: 'Profile', title: 'Basic Info', description: 'Add basic info for this staff member.' },
+    { label: 'Schedule', title: 'Schedule', description: 'Set the exact days and hours this staff member can accept appointments.' },
+    { label: 'Knowledge', title: 'Knowledge', description: 'Help your receptionist learn more about this staff member. This allows it to recommend the right person, explain their strengths clearly, and make better booking decisions during calls.' },
+    { label: 'Photo', title: 'Upload Image', description: 'Upload a profile image that helps keep this staff member easy to recognize across the Team page.' },
+  ];
+
+  const renderStaffSlide = () => {
+    if (staffSlide === 0) {
+      return (
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block space-y-2 md:col-span-2">
+            <span className="text-[13px] font-normal text-zinc-400">Full Name</span>
+            <input type="text" value={form.full_name} onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))} placeholder="e.g. Olivia Hart" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+          </label>
+          <label className="block space-y-2">
+            <span className="text-[13px] font-normal text-zinc-400">First Name</span>
+            <input type="text" value={form.first_name} onChange={(e) => setForm((prev) => ({ ...prev, first_name: e.target.value }))} placeholder="Olivia" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+          </label>
+          <label className="block space-y-2">
+            <span className="text-[13px] font-normal text-zinc-400">Last Name</span>
+            <input type="text" value={form.last_name} onChange={(e) => setForm((prev) => ({ ...prev, last_name: e.target.value }))} placeholder="Hart" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+          </label>
+          <label className="block space-y-2">
+            <span className="text-[13px] font-normal text-zinc-400">Role</span>
+            <input type="text" value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))} placeholder="Senior Stylist" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+          </label>
+          <label className="block space-y-2">
+            <span className="text-[13px] font-normal text-zinc-400">Phone</span>
+            <input type="text" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="(555) 000-0000" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+          </label>
+          <label className="block space-y-2 md:col-span-2">
+            <span className="text-[13px] font-normal text-zinc-400">Email</span>
+            <input type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="olivia@business.com" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+          </label>
+        </div>
+      );
+    }
+
+    if (staffSlide === 1) {
+      return (
+        <div className="custom-scrollbar max-h-[400px] overflow-auto rounded-[22px] border border-white/[0.06] bg-black/20 p-4 pr-3">
+          {DAYS.map((day) => (
+            <StaffHoursRow key={day} day={day} hours={form.working_hours} onChange={(nextHours) => setForm((prev) => ({ ...prev, working_hours: nextHours }))} />
+          ))}
+        </div>
+      );
+    }
+
+    if (staffSlide === 2) {
+      return (
+        <textarea value={form.knowledge} onChange={(e) => setForm((prev) => ({ ...prev, knowledge: e.target.value }))} className="custom-scrollbar h-[410px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 pr-5 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]" />
+      );
+    }
+
+    return (
+      <label className="flex h-[300px] cursor-pointer flex-col items-center justify-center rounded-[28px] border border-dashed border-white/[0.12] bg-white/[0.035] px-6 text-center transition hover:border-orange-300/40 hover:bg-white/[0.055]">
+        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-black/20 text-zinc-500">
+          <Upload size={24} />
+        </div>
+        <p className="text-sm font-bold text-white">{avatarUploading ? 'Uploading image...' : 'Upload staff image'}</p>
+        <p className="mt-2 max-w-sm text-xs leading-5 text-zinc-600">Choose a clear image file. Once uploaded, it will be saved as this staff member's profile photo.</p>
+        {(avatarUploadName || form.avatar) && <p className="mt-4 max-w-full truncate text-xs text-orange-300/80">{avatarUploadName || 'Image ready'}</p>}
+        <input type="file" accept="image/*" className="hidden" disabled={avatarUploading || saving} onChange={(e) => uploadStaffAvatar(e.target.files?.[0])} />
+      </label>
+    );
+  };
+
   const activeCount = staffMembers.filter((member) => member.is_active !== false).length;
 
   return (
@@ -1255,183 +1406,116 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/92 p-5 shadow-[0_28px_90px_rgba(0,0,0,0.5)] backdrop-blur-xl sm:p-7"
+              className="relative max-h-[calc(100vh-24px)] w-full max-w-[700px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
             >
-              <div className="mb-8 flex items-start justify-between gap-5">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-normal text-orange-300">
-                    {editingStaffId ? 'Update team member' : 'Add team member'}
-                  </p>
-                  <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
-                    {editingStaffId ? 'Edit staff profile' : 'Create staff profile'}
-                  </h2>
-                  <p className="mt-3 max-w-md text-sm leading-6 text-zinc-500">
-                    Add the staff details your receptionist should use when checking appointment availability and routing bookings.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="shrink-0 rounded-full border border-white/[0.08] px-3 py-2 text-xs font-normal text-zinc-500 transition hover:border-white/[0.16] hover:text-white"
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="custom-scrollbar max-h-[68vh] overflow-auto pr-2">
-                <div className="space-y-5">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <label className="block space-y-2 md:col-span-2">
-                      <span className="text-[13px] font-normal text-zinc-400">Full Name</span>
-                      <input
-                        type="text"
-                        value={form.full_name}
-                        onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))}
-                        placeholder="e.g. Olivia Hart"
-                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-                      />
-                    </label>
-
-                    <label className="block space-y-2">
-                      <span className="text-[13px] font-normal text-zinc-400">First Name</span>
-                      <input
-                        type="text"
-                        value={form.first_name}
-                        onChange={(e) => setForm((prev) => ({ ...prev, first_name: e.target.value }))}
-                        placeholder="Olivia"
-                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-                      />
-                    </label>
-
-                    <label className="block space-y-2">
-                      <span className="text-[13px] font-normal text-zinc-400">Last Name</span>
-                      <input
-                        type="text"
-                        value={form.last_name}
-                        onChange={(e) => setForm((prev) => ({ ...prev, last_name: e.target.value }))}
-                        placeholder="Hart"
-                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-                      />
-                    </label>
-
-                    <label className="block space-y-2">
-                      <span className="text-[13px] font-normal text-zinc-400">Role</span>
-                      <input
-                        type="text"
-                        value={form.role}
-                        onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
-                        placeholder="Senior Stylist"
-                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-                      />
-                    </label>
-
-                    <label className="block space-y-2">
-                      <span className="text-[13px] font-normal text-zinc-400">Phone</span>
-                      <input
-                        type="text"
-                        value={form.phone}
-                        onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-                        placeholder="(555) 000-0000"
-                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-                      />
-                    </label>
-
-                    <label className="block space-y-2 md:col-span-2">
-                      <span className="text-[13px] font-normal text-zinc-400">Email</span>
-                      <input
-                        type="email"
-                        value={form.email}
-                        onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                        placeholder="olivia@business.com"
-                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-                      />
-                    </label>
-
-                    <label className="block space-y-2 md:col-span-2">
-                      <span className="text-[13px] font-normal text-zinc-400">Avatar URL</span>
-                      <input
-                        type="text"
-                        value={form.avatar}
-                        onChange={(e) => setForm((prev) => ({ ...prev, avatar: e.target.value }))}
-                        placeholder="https://..."
-                        className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.025] p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-[13px] font-normal text-zinc-400">Availability</p>
-                        <p className="mt-1 text-xs leading-5 text-zinc-600">These are the hours the receptionist can use when placing appointments on this staff member's calendar.</p>
+              <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-orange-500/[0.07] blur-[90px]" />
+              <div className="relative p-6 sm:p-8">
+                <div className="mb-6 flex items-start justify-between gap-5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex h-4 items-center gap-3 pr-8">
+                      <p className="shrink-0 text-[13px] font-normal leading-4 text-orange-300">{staffSteps[staffSlide].label} · {staffSlide + 1} of {staffSteps.length}</p>
+                      <div className="h-1 w-[190px] shrink-0 translate-y-0 overflow-hidden rounded-full bg-white/[0.06]">
+                        <div className="h-full rounded-full bg-gradient-to-r from-orange-300 via-orange-400 to-orange-600 transition-all duration-500" style={{ width: `${((staffSlide + 1) / staffSteps.length) * 100}%` }} />
                       </div>
-                      <Toggle
-                        value={form.is_active}
-                        onChange={(nextValue) => setForm((prev) => ({ ...prev, is_active: nextValue }))}
-                        color="cyan"
-                      />
                     </div>
-                    <div className="rounded-[22px] border border-white/[0.06] bg-black/20 p-4">
-                      {DAYS.map((day) => (
-                        <StaffHoursRow
-                          key={day}
-                          day={day}
-                          hours={form.working_hours}
-                          onChange={(nextHours) => setForm((prev) => ({ ...prev, working_hours: nextHours }))}
-                        />
-                      ))}
+                    <div className="mt-5 flex items-center gap-3">
+                      <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
+                        {staffSteps[staffSlide].title}
+                      </h2>
+                      {staffSlide === 2 && (
+                        <button type="button" onClick={() => setShowKnowledgeTips(true)} className="h-6 rounded-full border border-white/[0.08] px-2.5 text-[10px] font-semibold tracking-normal text-zinc-500 transition hover:border-orange-300/30 hover:text-orange-300">
+                          Tips
+                        </button>
+                      )}
                     </div>
+                    <p className="mt-3 w-full max-w-none text-sm leading-6 text-zinc-500">
+                      {staffSteps[staffSlide].description}
+                    </p>
                   </div>
-
-                  <label className="block space-y-2">
-                    <span className="text-[13px] font-normal text-zinc-400">Notes</span>
-                    <textarea
-                      value={form.notes}
-                      onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-                      rows={4}
-                      placeholder="Specialties, internal scheduling notes, days this person prefers, or anything the receptionist should factor in."
-                      className="min-h-[160px] w-full resize-none rounded-[22px] border border-white/[0.08] bg-white/[0.035] px-4 py-4 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055] focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-                    />
-                  </label>
+                  <button type="button" onClick={closeModal} className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white">
+                    <X size={16} />
+                  </button>
                 </div>
-              </div>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  {editingStaffId && (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={staffSlide}
+                    initial={{ opacity: 0, x: 18 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -18 }}
+                    transition={{ duration: 0.18 }}
+                    className="min-h-[420px]"
+                  >
+                    {renderStaffSlide()}
+                  </motion.div>
+                </AnimatePresence>
+
+                <div className="mt-5 space-y-3">
+                  {staffSlide === staffSteps.length - 1 ? (
+                    <button type="button" onClick={saveStaff} disabled={saving || avatarUploading} className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">
+                      {saving ? 'Saving...' : editingStaffId ? 'Update staff' : 'Add staff'}
+                    </button>
+                  ) : (
+                    <button type="button" onClick={goNextStaffSlide} disabled={saving || avatarUploading} className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">
+                      Continue
+                    </button>
+                  )}
+                  <button type="button" onClick={staffSlide === 0 ? closeModal : goBackStaffSlide} disabled={saving || avatarUploading} className="h-11 w-full rounded-full text-sm font-normal text-zinc-500 transition hover:text-white disabled:opacity-40">
+                    {staffSlide === 0 ? 'Close' : 'Back'}
+                  </button>
+                  {editingStaffId && staffSlide === staffSteps.length - 1 && (
                     <button
                       type="button"
                       onClick={() => {
                         const selected = staffMembers.find((member) => member.id === editingStaffId);
                         if (selected) deleteStaff(selected);
                       }}
-                      className="rounded-full border border-white/[0.08] px-4 py-2 text-xs font-normal text-zinc-500 transition hover:border-rose-500/40 hover:text-rose-300"
+                      className="h-10 w-full rounded-full text-xs font-normal text-zinc-600 transition hover:text-rose-300"
                     >
                       Delete staff member
                     </button>
                   )}
-                </div>
-                <div className="flex gap-3 sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    disabled={saving}
-                    className="h-11 rounded-full px-5 text-sm font-normal text-zinc-500 transition hover:text-white disabled:opacity-40"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveStaff}
-                    disabled={saving}
-                    className="h-12 rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {saving ? 'Saving...' : editingStaffId ? 'Update staff' : 'Add staff'}
-                  </button>
+                  {error && <p className="text-center text-sm text-red-400">{error}</p>}
                 </div>
               </div>
             </motion.section>
+            <AnimatePresence>
+              {showKnowledgeTips && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-[10] flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowKnowledgeTips(false);
+                  }}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 18, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 12, scale: 0.97 }}
+                    transition={{ duration: 0.18 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full max-w-[520px] rounded-[28px] border border-white/[0.08] bg-[#181818] p-6 text-left shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-[13px] font-normal text-orange-300">Knowledge tips</p>
+                        <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">What should go here?</h3>
+                      </div>
+                      <button type="button" onClick={() => setShowKnowledgeTips(false)} className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.05] hover:text-white">
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div className="mt-5 space-y-4 text-sm leading-7 text-zinc-400">
+                      <p>Write this like you are briefing a smart receptionist before a call. Give them the details that help them make better choices: what this staff member is great at, what they should or should not be booked for, when a consultation is needed, timing preferences, and any client situations that need special handling.</p>
+                      <p>During a call, the receptionist can use this context to explain options accurately, pick the right staff member, avoid bad bookings, and ask the right follow-up questions instead of guessing.</p>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

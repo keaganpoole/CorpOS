@@ -308,6 +308,8 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
               optionsGapClassName="gap-3.5"
               optionsOpenClassName="max-w-[260px] pl-4 pr-3"
               underlineOffsetClassName="bottom-[-5px]"
+              showUnderline={false}
+              showSweep={false}
               onSelect={(val) => onUpdateDirection && onUpdateDirection(agent, String(val || 'All').toLowerCase())}
             />
           </div>
@@ -391,6 +393,8 @@ const GradientBleed = ({
   optionsGapClassName = 'gap-6',
   optionsOpenClassName = 'max-w-4xl pl-3',
   underlineOffsetClassName = 'bottom-0',
+  showUnderline = true,
+  showSweep = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
@@ -485,14 +489,16 @@ const GradientBleed = ({
         </div>
       </div>
 
-      <div
-        className={`absolute ${underlineOffsetClassName} left-0 h-[2px] transition-all z-20 ${getExpansionClass()} ${
-          isOpen ? 'w-full opacity-100' : 'w-0 opacity-0'
-        } ${variant === 'prism' && isOpen ? 'animate-skyPrism' : ''}`}
-        style={borderStyle}
-      />
+      {showUnderline && (
+        <div
+          className={`absolute ${underlineOffsetClassName} left-0 h-[2px] transition-all z-20 ${getExpansionClass()} ${
+            isOpen ? 'w-full opacity-100' : 'w-0 opacity-0'
+          } ${variant === 'prism' && isOpen ? 'animate-skyPrism' : ''}`}
+          style={borderStyle}
+        />
+      )}
 
-      {isSweeping && (
+      {showSweep && isSweeping && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl z-0">
           <div
             className="absolute inset-0 w-[200%] -skew-x-12 translate-x-[-100%] animate-skySweep"
