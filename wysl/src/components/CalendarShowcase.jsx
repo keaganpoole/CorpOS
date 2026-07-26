@@ -5,6 +5,7 @@ import {
   AudioLines,
   ArrowRight,
   Calendar as CalendarIcon,
+  ClipboardList,
   CreditCard,
   Database,
   GitBranch,
@@ -57,88 +58,52 @@ const FALLBACK_RECEPTIONISTS = [
 ];
 const FEATURE_ITEMS = [
   {
-    icon: (
-      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17 8h1a4 4 0 0 1 0 8h-1" className="transition-all duration-500 group-hover:stroke-cyan-400" />
-        <path d="M7 8H6a4 4 0 0 0 0 8h1" className="transition-all duration-500 group-hover:stroke-cyan-400" />
-        <rect x="7" y="6" width="10" height="12" rx="3" className="origin-center transition-all duration-500 group-hover:scale-105 group-hover:stroke-cyan-300" />
-        <path d="M10 10h4M10 14h4" className="transition-all duration-500 group-hover:stroke-cyan-300" />
-      </svg>
-    ),
-    colorClass: 'bg-cyan-400',
-    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
-    hoverTextClass: 'group-hover:text-cyan-400',
-    title: 'Multiple Conversations',
-    copy: 'Handle multiple conversations simultaneously without hold times, missed opportunities, or the limitations of traditional staffing.',
-  },
-  {
-    icon: (
-      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" className="transition-all duration-500 group-hover:stroke-pink-400" />
-        <line x1="9" y1="10" x2="9" y2="14" className="origin-center transition-all duration-500 group-hover:scale-y-150 group-hover:stroke-pink-300" />
-        <line x1="12" y1="8" x2="12" y2="16" className="origin-center transition-all duration-500 delay-75 group-hover:scale-y-75 group-hover:stroke-pink-300" />
-        <line x1="15" y1="10" x2="15" y2="14" className="origin-center transition-all duration-500 delay-100 group-hover:scale-y-150 group-hover:stroke-pink-300" />
-      </svg>
-    ),
-    colorClass: 'bg-pink-500',
-    glowClass: 'shadow-[0_0_12px_rgba(236,72,153,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    title: '24/7 Answering',
-    copy: 'Your AI receptionist answers every call instantly, day or night, so customers always reach your business instead of voicemail.',
-  },
-  {
-    icon: (
-      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="5" width="20" height="14" rx="2" className="origin-center transition-all duration-500 group-hover:-translate-y-0.5 group-hover:rotate-3 group-hover:stroke-blue-400" />
-        <line x1="2" y1="10" x2="22" y2="10" className="transition-all duration-500 group-hover:-translate-y-0.5" />
-        <rect x="6" y="14" width="3" height="2" rx="0.5" className="transition-all duration-500 group-hover:fill-blue-300/30" />
-      </svg>
-    ),
-    colorClass: 'bg-blue-500',
-    glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
-    hoverTextClass: 'group-hover:text-blue-400',
-    title: 'Take Payments',
-    copy: 'Connect your payment processor and get paid the moment customers are ready. Your AI receptionist can collect deposits, process payments, and handle billing questions automatically.',
-  },
-  {
-    icon: (
-      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" className="origin-center transition-all duration-500 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:scale-105 group-hover:stroke-emerald-400" />
-        <path d="M3 21a18 18 0 0 1 8-8" strokeDasharray="3 3" className="transition-all duration-500 group-hover:stroke-emerald-300" />
-      </svg>
-    ),
+    icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
     colorClass: 'bg-emerald-500',
     glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
     hoverTextClass: 'group-hover:text-emerald-400',
-    title: 'Follow Ups',
-    copy: 'Your AI receptionist knows when to reach out, what to say, and can even trigger personalized follow-ups through custom workflow automations.',
+    title: 'Booking CRM',
+    copy: 'Create beautifully organized appointment records that bring together customer details, history, notes, and everything else surrounding each visit.',
   },
   {
-    icon: (
-      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" className="transition-all duration-500 group-hover:stroke-amber-400" />
-        <path d="M2 12h20" className="transition-all duration-500 group-hover:opacity-60" />
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="origin-center transition-all duration-700 ease-in-out group-hover:rotate-[180deg] group-hover:stroke-amber-300" />
-      </svg>
-    ),
+    icon: <CalendarIcon className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
+    colorClass: 'bg-pink-500',
+    glowClass: 'shadow-[0_0_12px_rgba(236,72,153,0.6)]',
+    hoverTextClass: 'group-hover:text-pink-400',
+    title: 'Fully Managed',
+    copy: 'Handle the full appointment flow during the call, from new bookings to changes and cancellations.',
+  },
+  {
+    icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-blue-300" />,
+    colorClass: 'bg-blue-500',
+    glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
+    hoverTextClass: 'group-hover:text-blue-400',
+    title: 'Staff Matching',
+    copy: 'Intelligently match callers to the right service, staff member, or appointment type based on what they need.',
+  },
+  {
+    icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-amber-300" />,
     colorClass: 'bg-amber-400',
     glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
     hoverTextClass: 'group-hover:text-amber-400',
-    title: '70+ Languages',
-    copy: "Your AI receptionist automatically detects the caller's language and responds fluently, allowing customers from around the world to communicate naturally without translators, transfers, or awkward misunderstandings.",
+    title: 'Follow-Ups',
+    copy: 'Send confirmations, reminders, and appointment updates so customers know exactly what was booked and what happens next.',
   },
   {
-    icon: (
-      <svg className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out" fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" className="origin-center transition-all duration-500 group-hover:-translate-y-1 group-hover:stroke-indigo-400" />
-        <circle cx="12" cy="10" r="3" className="origin-center transition-all duration-500 group-hover:scale-125 group-hover:fill-indigo-300/30" />
-      </svg>
-    ),
+    icon: <Search className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-cyan-300" />,
+    colorClass: 'bg-cyan-400',
+    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
+    hoverTextClass: 'group-hover:text-cyan-400',
+    title: 'Manual Edits',
+    copy: 'Review and adjust the appointment records your receptionist creates whenever staff need to update details, notes, or status.',
+  },
+  {
+    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-indigo-300" />,
     colorClass: 'bg-indigo-400',
     glowClass: 'shadow-[0_0_12px_rgba(129,140,248,0.6)]',
     hoverTextClass: 'group-hover:text-indigo-400',
-    title: 'Step-by-Step Directions',
-    copy: 'Powered by Google Maps, your AI receptionist can intelligently guide customers to your business with real-time directions, parking recommendations, traffic insights, and location-specific assistance.',
+    title: 'Deposits & Payments',
+    copy: 'Collect payment or send deposit links during booking when an appointment needs to be secured.',
   },
 ];
 
@@ -233,6 +198,14 @@ const CRM_FEATURE_ITEMS = [
     hoverTextClass: 'group-hover:text-rose-400',
     title: 'Real-Time Updates',
     copy: 'See live customer activity as it happens, making every record more useful and every decision faster.',
+  },
+  {
+    icon: <ClipboardList className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-cyan-300" />,
+    colorClass: 'bg-cyan-400',
+    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
+    hoverTextClass: 'group-hover:text-cyan-300',
+    title: 'Custom Intake Fields',
+    copy: 'Tell your receptionist which details matter most, and it will prioritize collecting them during the call before saving them to the customer record.',
   },
 ];
 
@@ -1003,7 +976,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 <div className={`homepage-copy-reveal homepage-copy-reveal--delayed calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:mx-auto md:max-w-[36rem] md:text-center md:text-[1.1rem] md:leading-[1.55] lg:mx-0 lg:max-w-[24rem] lg:text-left lg:text-base lg:leading-[1.45] ${copyVisible ? 'is-visible' : ''}`}>
                   {isScenariosVariant
                     ? 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.'
-                    : 'Turn every conversation into a booked appointment. Your AI receptionist answers every call instantly, checks real-time availability, books, reschedules, and confirms appointments while handling multiple conversations at once. No hold times, no missed opportunities, no smoke breaks — just a calendar that fills itself 24/7.'}
+                    : 'Turn conversations into booked appointments. Your AI receptionist answers every call instantly, checks real-time availability, books, reschedules, and confirms appointments while handling multiple conversations at once. No hold times, no missed opportunities, no smoke breaks — just a calendar that fills itself 24/7.'}
                 </div>
               </div>
             </div>

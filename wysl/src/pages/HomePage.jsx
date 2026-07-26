@@ -4,7 +4,7 @@ import useLegacyAnimation from '../hooks/useLegacyAnimation';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
-import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessageSquare, Phone, ShieldCheck, X as XIcon, ArrowRight, Check } from 'lucide-react';
+import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessagesSquare, Phone, PhoneOutgoing, ShieldCheck, X as XIcon, ArrowRight, Check } from 'lucide-react';
 import SplashScreen from '../components/SplashScreen';
 import { getCookie } from '../utils/cookieUtils';
 import '../styles/HomePage.css';
@@ -79,7 +79,7 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
     hoverTextClass: 'group-hover:text-cyan-400',
     title: '24/7 Call Handling',
-    copy: 'Answer every inbound call instantly, handle multiple conversations at once, and keep customers from falling into voicemail.',
+    copy: 'Answer inbound calls instantly, day or night, so customers reach your business instead of voicemail.',
   },
   {
     icon: <ShieldCheck className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
@@ -87,15 +87,15 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
     hoverTextClass: 'group-hover:text-emerald-400',
     title: 'Secure Verification',
-    copy: 'Send authentication links during inbound calls so customers can verify identity before account details or account changes are handled.',
+    copy: 'Optionally send authentication links during inbound calls so customers can verify identity before account details or account changes are handled.',
   },
   {
     icon: <FileUp className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-amber-300" />,
     colorClass: 'bg-amber-400',
     glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
     hoverTextClass: 'group-hover:text-amber-400',
-    title: 'Document Upload Links',
-    copy: 'Request documents while the customer is still on the phone and send a secure upload link that keeps the conversation moving.',
+    title: 'Real-time Docs',
+    copy: 'Allow customers to securely upload documents by texting them a secure upload link during the call, eliminating the need to email files or call back later.',
   },
   {
     icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-blue-300" />,
@@ -106,12 +106,20 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     copy: 'Collect deposits, send payment links, process payments, and answer billing questions without handing the call to staff.',
   },
   {
-    icon: <MessageSquare className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-rose-300" />,
+    icon: <PhoneOutgoing className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:stroke-rose-300" />,
     colorClass: 'bg-rose-500',
     glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
     hoverTextClass: 'group-hover:text-rose-400',
-    title: 'Customer Follow-Ups',
-    copy: 'Trigger confirmations, reminders, and personalized follow-ups based on what happened during the call.',
+    title: 'Outbound Calling',
+    copy: 'Have your AI receptionist place calls for reminders, confirmations, updates, and any custom tasks you desire, without tying up your team.',
+  },
+  {
+    icon: <MessagesSquare className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-violet-300" />,
+    colorClass: 'bg-violet-500',
+    glowClass: 'shadow-[0_0_12px_rgba(139,92,246,0.6)]',
+    hoverTextClass: 'group-hover:text-violet-400',
+    title: 'Multiple Conversations',
+    copy: 'Handle multiple conversations simultaneously, making hold queues virtually nonexistent.',
   },
   {
     icon: <Globe2 className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-indigo-300" />,
@@ -319,9 +327,10 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   const heroIntroExited = sectionProgress >= 0.26;
   const receptionistEntered = sectionProgress >= 0.22;
   const heroFeaturesEntered = sectionProgress >= 0.64;
-  const receptionistExited = heroFeaturesEntered;
   const crmOpacity = heroIntroExited ? 0 : 1;
-  const receptionistOpacity = receptionistEntered && !receptionistExited ? 1 : 0;
+  const receptionistOpacity = receptionistEntered ? (heroFeaturesEntered ? 0.11 : 1) : 0;
+  const receptionistBlur = heroFeaturesEntered ? 13 : 0;
+  const receptionistBrightness = heroFeaturesEntered ? 0.46 : 1;
   const heroFeatureProgress = heroFeaturesEntered ? 1 : 0;
   const heroFeatureOpacity = heroFeaturesEntered ? 1 : 0;
 
@@ -357,7 +366,8 @@ const StackedHeroShowcase = ({ sectionRef }) => {
           style={{
             opacity: receptionistOpacity,
             visibility: receptionistOpacity <= 0.01 ? 'hidden' : 'visible',
-            transform: `translateY(${receptionistEntered ? 0 : 18}px) scale(${receptionistExited ? 0.988 : 1})`,
+            transform: `translateY(${receptionistEntered ? 0 : 18}px) scale(${heroFeaturesEntered ? 0.988 : 1})`,
+            filter: `blur(${receptionistBlur}px) brightness(${receptionistBrightness})`,
           }}
         >
           <HeroConcept />
