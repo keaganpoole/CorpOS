@@ -813,12 +813,12 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
       ? ['Live Call Monitoring']
       : isCrmVariant
       ? ['One.', 'CRM.']
-      : ['Build Custom Workflows'];
+      : ['Build Outbound Workflows'];
     const description = isMonitoringVariant
       ? 'Monitor calls as they happen and review every conversation later with the context, playback, and history your team actually needs.'
       : isCrmVariant
       ? 'Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.'
-      : 'Create custom workflows that automate calls, bookings, payments, follow-ups, and more, with triggers, conditions, and actions that keep everything moving automatically.';
+      : 'Create custom workflows that automate outbound calls, bookings, payments, follow-ups, and more, with triggers, conditions, and actions that keep everything moving automatically.';
 
     return (
       <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[170vh]' : 'h-[250vh]'}`}>
@@ -1053,7 +1053,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   );
 };
 
-function RightFeatureList({ featureProgress, items, useScrollHighlight = false }) {
+export function RightFeatureList({ featureProgress, items, useScrollHighlight = false }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const isVisible = featureProgress > 0.12;

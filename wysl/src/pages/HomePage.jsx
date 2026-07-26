@@ -4,7 +4,7 @@ import useLegacyAnimation from '../hooks/useLegacyAnimation';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
-import { Menu as MenuIcon, X as XIcon, ArrowRight, Check } from 'lucide-react';
+import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessageSquare, Phone, ShieldCheck, X as XIcon, ArrowRight, Check } from 'lucide-react';
 import SplashScreen from '../components/SplashScreen';
 import { getCookie } from '../utils/cookieUtils';
 import '../styles/HomePage.css';
@@ -42,7 +42,7 @@ import expandedWifi from '@/assets/t1-expanded-wifi.png';
 import expandedX from '@/assets/t1-expanded-x.png';
 import TypingAnimation from '../components/TypingAnimation';
 import HeroConcept from '../components/HeroConcept';
-import CalendarShowcase from '../components/CalendarShowcase';
+import CalendarShowcase, { RightFeatureList } from '../components/CalendarShowcase';
 import { trackVisitor } from '../services/apiService';
 
 const NUMBER_ICON_MASKS = {
@@ -71,6 +71,57 @@ const NumberGradientIcon = ({ icon = 'transfer', colors = ['#ff4fd8', '#8b5cf6']
     />
   );
 };
+
+const HERO_RECEPTIONIST_FEATURE_ITEMS = [
+  {
+    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-cyan-300" />,
+    colorClass: 'bg-cyan-400',
+    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
+    hoverTextClass: 'group-hover:text-cyan-400',
+    title: '24/7 Call Handling',
+    copy: 'Answer every inbound call instantly, handle multiple conversations at once, and keep customers from falling into voicemail.',
+  },
+  {
+    icon: <ShieldCheck className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
+    colorClass: 'bg-emerald-500',
+    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
+    hoverTextClass: 'group-hover:text-emerald-400',
+    title: 'Secure Verification',
+    copy: 'Send authentication links during inbound calls so customers can verify identity before account details or account changes are handled.',
+  },
+  {
+    icon: <FileUp className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-amber-300" />,
+    colorClass: 'bg-amber-400',
+    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
+    hoverTextClass: 'group-hover:text-amber-400',
+    title: 'Document Upload Links',
+    copy: 'Request documents while the customer is still on the phone and send a secure upload link that keeps the conversation moving.',
+  },
+  {
+    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-blue-300" />,
+    colorClass: 'bg-blue-500',
+    glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
+    hoverTextClass: 'group-hover:text-blue-400',
+    title: 'Payments',
+    copy: 'Collect deposits, send payment links, process payments, and answer billing questions without handing the call to staff.',
+  },
+  {
+    icon: <MessageSquare className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-rose-300" />,
+    colorClass: 'bg-rose-500',
+    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
+    hoverTextClass: 'group-hover:text-rose-400',
+    title: 'Customer Follow-Ups',
+    copy: 'Trigger confirmations, reminders, and personalized follow-ups based on what happened during the call.',
+  },
+  {
+    icon: <Globe2 className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-indigo-300" />,
+    colorClass: 'bg-indigo-400',
+    glowClass: 'shadow-[0_0_12px_rgba(129,140,248,0.6)]',
+    hoverTextClass: 'group-hover:text-indigo-400',
+    title: '70+ Languages',
+    copy: "Detect a caller's language automatically and respond naturally without transfers, translators, or awkward misunderstandings.",
+  },
+];
 
 const FadingImageCollage = ({ images }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -265,11 +316,17 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     };
   }, []);
 
-  const crmOpacity = sectionProgress < 0.32 ? 1 : 0;
-  const receptionistOpacity = sectionProgress < 0.32 ? 0 : 1;
+  const heroIntroExited = sectionProgress >= 0.26;
+  const receptionistEntered = sectionProgress >= 0.22;
+  const heroFeaturesEntered = sectionProgress >= 0.64;
+  const receptionistExited = heroFeaturesEntered;
+  const crmOpacity = heroIntroExited ? 0 : 1;
+  const receptionistOpacity = receptionistEntered && !receptionistExited ? 1 : 0;
+  const heroFeatureProgress = heroFeaturesEntered ? 1 : 0;
+  const heroFeatureOpacity = heroFeaturesEntered ? 1 : 0;
 
   return (
-    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[190vh] bg-[#020202]">
+    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[280vh] bg-[#020202]">
       <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
         <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -280,7 +337,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
           style={{
             opacity: crmOpacity,
             visibility: crmOpacity <= 0.01 ? 'hidden' : 'visible',
-            transform: 'translateY(0)',
+            transform: `translateY(${heroIntroExited ? -12 : 0}px)`,
           }}
         >
           <div className="relative z-10 mx-auto w-full max-w-[1300px] text-center md:px-10 lg:px-12">
@@ -289,7 +346,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
                 Meet Your AI Receptionist
               </h2>
               <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
-                Deploy an AI Receptionist that makes and receives calls, books appointments, processes payments, manages your CRM, and handles customers 24/7. Handle multiple conversations simultaneously with incredibly natural, human-like interactions that deliver a level of speed, availability, and consistency traditional staffing simply can't match—all at a fraction of the cost.
+                Revolutionize your front desk by deploying an AI Receptionist that makes and receives calls, books appointments, processes payments, manages your CRM, and handles customers 24/7. Handle multiple conversations simultaneously with incredibly natural, human-like interactions that deliver a level of speed, availability, and consistency traditional staffing simply can't match—all at a fraction of the cost.
               </div>
             </div>
           </div>
@@ -300,10 +357,27 @@ const StackedHeroShowcase = ({ sectionRef }) => {
           style={{
             opacity: receptionistOpacity,
             visibility: receptionistOpacity <= 0.01 ? 'hidden' : 'visible',
-            transform: 'translateY(0)',
+            transform: `translateY(${receptionistEntered ? 0 : 18}px) scale(${receptionistExited ? 0.988 : 1})`,
           }}
         >
           <HeroConcept />
+        </div>
+
+        <div
+          className={`absolute inset-0 z-30 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${heroFeatureOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
+          style={{
+            opacity: heroFeatureOpacity,
+            visibility: heroFeatureOpacity <= 0.01 ? 'hidden' : 'visible',
+            transform: `translateY(${heroFeaturesEntered ? 0 : 18}px)`,
+          }}
+        >
+          <div className="mx-auto w-full max-w-[1120px]">
+            <RightFeatureList
+              featureProgress={heroFeatureProgress}
+              items={HERO_RECEPTIONIST_FEATURE_ITEMS}
+              useScrollHighlight={false}
+            />
+          </div>
         </div>
       </div>
     </div>
