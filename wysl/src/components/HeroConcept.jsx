@@ -336,6 +336,18 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                   className="w-full"
                 >
                   <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:max-w-[34rem] lg:items-start lg:gap-5 lg:text-left">
+                    <div className="-mb-5 inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-2 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md md:-mb-6 md:px-2.5 md:py-2 lg:mx-0 lg:-mb-6 lg:gap-2 lg:px-2.5 lg:py-1.5">
+                      <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
+                      <div className="flex min-w-0 items-center gap-1 text-[8px] font-black tracking-[0.14em] text-white/60 md:text-[9px] lg:gap-1.5 lg:text-[9px] lg:tracking-[0.16em]">
+                        {active.traits.map((trait, i) => (
+                          <React.Fragment key={`${active.id}-${trait}-${i}`}>
+                            <span className="truncate">{toTitleCase(trait)}</span>
+                            {i < active.traits.length - 1 && <span className="text-white/30">&bull;</span>}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+
                     <h1
                       aria-label={active.name}
                       className={`hero-concept-name homepage-copy-reveal lg:self-start ${copyVisible ? 'is-visible' : ''}`}
@@ -354,8 +366,10 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                         aria-hidden="true"
                         style={{
                           position: 'absolute',
-                          inset: '-0.04em 0 -0.24em 0',
-                          lineHeight: 1.08,
+                          inset: '-0.06em 0 -0.58em 0',
+                          display: 'block',
+                          lineHeight: 1.42,
+                          paddingBottom: '0.22em',
                           background: `linear-gradient(90deg, ${activeGradient[0]}, ${activeGradient[1]}, ${activeGradient[2]}, ${activeGradient[0]})`,
                           backgroundSize: '200% auto',
                           WebkitBackgroundClip: 'text',
@@ -369,20 +383,8 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                       <span aria-hidden="true" style={{ visibility: 'hidden' }}>{active.name}</span>
                     </h1>
 
-                    <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-2 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md md:mt-3 md:px-2.5 md:py-2 lg:mx-0 lg:mt-2.5 lg:gap-2 lg:px-2.5 lg:py-1.5">
-                      <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
-                      <div className="flex min-w-0 items-center gap-1 text-[8px] font-black tracking-[0.14em] text-white/60 md:text-[9px] lg:gap-1.5 lg:text-[9px] lg:tracking-[0.16em]">
-                        {active.traits.map((trait, i) => (
-                          <React.Fragment key={`${active.id}-${trait}-${i}`}>
-                            <span className="truncate">{toTitleCase(trait)}</span>
-                            {i < active.traits.length - 1 && <span className="text-white/30">&bull;</span>}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    </div>
-
                     {active.description && (
-                      <p className={`homepage-copy-reveal homepage-copy-reveal--delayed max-w-md text-base font-light leading-relaxed text-white/60 md:max-w-[36rem] md:text-[1.22rem] md:leading-[1.75] lg:mx-0 lg:max-w-md lg:text-lg lg:leading-relaxed ${copyVisible ? 'is-visible' : ''}`}>
+                      <p className={`homepage-copy-reveal homepage-copy-reveal--delayed mt-20 max-w-md text-base font-light leading-relaxed text-white/60 md:mt-24 md:max-w-[36rem] md:text-[1.22rem] md:leading-[1.75] lg:mx-0 lg:mt-20 lg:max-w-md lg:text-lg lg:leading-relaxed ${copyVisible ? 'is-visible' : ''}`}>
                         {active.description}
                       </p>
                     )}
