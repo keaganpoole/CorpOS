@@ -547,9 +547,13 @@ const StaffHoursRow = ({ day, hours, onChange }) => {
   );
 };
 
-const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActive }) => {
+const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActive, compact = false }) => {
   const availability = getStaffAvailabilitySummary(staff.working_hours);
   const borderClass = isSelected ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
+  const cardSizeClass = compact ? 'h-[465px] min-h-[465px] max-h-[465px] w-[300px] min-w-[300px] max-w-[300px]' : 'h-[550px] min-h-[550px] max-h-[550px] w-[380px] min-w-[380px] max-w-[380px]';
+  const imageHeightClass = compact ? 'h-[150px]' : 'h-[280px]';
+  const bodyClass = compact ? 'h-[315px] min-h-[315px] max-h-[315px] p-4 space-y-2.5' : 'h-[270px] min-h-[270px] max-h-[270px] p-6 space-y-3.5';
+  const nameClass = compact ? 'text-xl' : 'text-2xl';
 
   return (
     <motion.div
@@ -564,9 +568,9 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
       }}
       role="button"
       tabIndex={0}
-      className={`group relative flex w-full max-w-[380px] flex-col overflow-visible rounded-[28px] border bg-[#0A0A0A] text-left shadow-[0_24px_80px_rgba(0,0,0,0.42)] transition-all duration-500 hover:border-white/10 ${borderClass}`}
+      className={`group relative box-border flex ${cardSizeClass} flex-col overflow-hidden rounded-[28px] border bg-[#0A0A0A] text-left transition-colors duration-300 hover:border-white/10 ${borderClass}`}
     >
-      <div className="relative h-[280px] overflow-hidden rounded-t-[28px]">
+      <div className={`relative ${imageHeightClass} shrink-0 overflow-hidden rounded-t-[28px]`}>
         {staff.avatar ? (
           <img
             src={staff.avatar}
@@ -618,14 +622,14 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
-          <h3 className="text-2xl font-bold leading-none tracking-tight text-white">{staff.full_name}</h3>
-          <p className="mt-1 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
+          <h3 className={`${nameClass} truncate font-bold leading-none tracking-tight text-white`}>{staff.full_name}</h3>
+          <p className="mt-1 inline-flex max-w-full items-center truncate rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
             {staff.role || 'Staff Member'}
           </p>
         </div>
       </div>
 
-      <div className="p-6 space-y-3.5">
+      <div className={bodyClass}>
         <div className="flex items-center justify-between px-0.5 py-1">
           <div className="min-w-0">
             <p className="text-[8px] font-black uppercase tracking-[0.24em] text-zinc-600">Staff Member</p>
@@ -642,7 +646,7 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
           </div>
         </div>
 
-        <div className="border-t border-white/[0.04] pt-3.5 space-y-3">
+        <div className={`grid grid-cols-2 gap-x-5 gap-y-3 border-t border-white/[0.04] ${compact ? 'pt-2.5' : 'pt-3.5'}`}>
           <div className="min-w-0">
             <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
               <CalendarClock size={10} className="text-amber-400/70" />
@@ -663,34 +667,33 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onDelete, onToggleActi
               <span className="truncate text-[11px] font-bold text-zinc-300">{staff.email || 'No email set'}</span>
             </div>
           </div>
-        </div>
-
-        <div className="border-t border-white/[0.04] pt-3">
-          <p className="mb-1 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
-            <PhoneCall size={10} className="text-amber-400/70" />
-            Phone Number
-          </p>
-          <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="mb-1 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
+              <PhoneCall size={10} className="text-amber-400/70" />
+              Phone Number
+            </p>
             <div className="min-w-0 text-[11px] font-bold text-zinc-500">
-              <span className="truncate">{staff.phone || 'No phone set'}</span>
+              <span className="block truncate">{staff.phone || 'No phone set'}</span>
             </div>
           </div>
-        </div>
-
-        <div className="border-t border-white/[0.04] pt-3">
-          <p className="mb-1 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
-            <ListChecks size={10} className="text-amber-400/70" />
-            Working Hours
-          </p>
-          <p className="text-[11px] leading-relaxed text-zinc-500">
-            {availability.scheduleLabel}
-          </p>
-          {staff.notes && (
-            <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-zinc-600">
-              {staff.notes}
+          <div className="min-w-0">
+            <p className="mb-1 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
+              <ListChecks size={10} className="text-amber-400/70" />
+              Working Hours
             </p>
-          )}
+            <p className="truncate text-[11px] leading-relaxed text-zinc-500">
+              {availability.scheduleLabel}
+            </p>
+          </div>
         </div>
+            <div className="group/note relative min-h-[32px] min-w-0 border-t border-white/[0.04] pt-3">
+              <p className="truncate text-[11px] leading-relaxed text-zinc-600">
+                {staff.notes || 'No notes set'}
+              </p>
+              {staff.notes && <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-[260px] rounded-lg border border-white/[0.08] bg-zinc-950 px-3 py-2 text-[11px] font-medium leading-relaxed text-zinc-300 shadow-[0_14px_40px_rgba(0,0,0,0.45)] group-hover/note:block">
+                {staff.notes}
+              </div>}
+            </div>
       </div>
     </motion.div>
   );
@@ -1012,7 +1015,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked })
   );
 };
 
-const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defaultHours }) => {
+export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defaultHours, hideIntro = false, hideToolbar = false, cardGridClassName = '', compactCards = false }) => {
   const [staffMembers, setStaffMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1024,6 +1027,12 @@ const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defa
   useEffect(() => {
     loadStaff();
   }, [businessId]);
+
+  useEffect(() => {
+    const handleExternalCreate = () => openCreateModal();
+    window.addEventListener('team:open-staff-modal', handleExternalCreate);
+    return () => window.removeEventListener('team:open-staff-modal', handleExternalCreate);
+  }, [defaultHours]);
 
   const loadStaff = async () => {
     setLoading(true);
@@ -1174,11 +1183,11 @@ const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defa
 
   return (
     <div className="space-y-4">
-      <div className="mb-4">
+      {!hideIntro && <div className="mb-4">
         <p className="text-[12px] leading-relaxed text-zinc-500">
           Add the real people your receptionist can book appointments for. Each staff record carries its own availability window so scheduling decisions are tied to actual staff hours, not just business hours.
         </p>
-      </div>
+      </div>}
 
       {error && (
         <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-[11px] font-medium text-rose-300">
@@ -1187,7 +1196,7 @@ const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defa
       )}
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between rounded-[24px] border border-white/[0.05] bg-zinc-950/30 px-4 py-3">
+        {!hideToolbar && <div className="flex items-center justify-between rounded-[24px] border border-white/[0.05] bg-zinc-950/30 px-4 py-3">
           <div className="flex items-center gap-2.5">
             <Users size={14} className="text-cyan-400/60" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
@@ -1204,7 +1213,7 @@ const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defa
             <Plus size={11} />
             Add Staff
           </button>
-        </div>
+        </div>}
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -1217,7 +1226,7 @@ const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defa
             <p className="mt-1 text-[10px] text-zinc-900">Add your first bookable staff member</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <div className={cardGridClassName || 'grid grid-cols-1 gap-4 xl:grid-cols-2'}>
             {staffMembers.map((staff) => (
               <StaffCard
                 key={staff.id}
@@ -1225,6 +1234,7 @@ const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defa
                 onSelect={openEditModal}
                 onDelete={deleteStaff}
                 onToggleActive={toggleStaffActive}
+                compact={compactCards}
               />
             ))}
           </div>

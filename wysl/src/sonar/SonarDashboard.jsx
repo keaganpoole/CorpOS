@@ -60,6 +60,7 @@ import HireReceptionistModal from './pages/HireReceptionistModal';
 import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 import ScenariosPage from './pages/Scenarios/Scenarios';
 import SettingsPage from './pages/SettingsPage';
+import { StaffManager } from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
@@ -215,7 +216,7 @@ const CallHandlingIcon = ({ direction }) => {
   );
 };
 
-const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onUpdateDirection, onTerminate }) => {
+const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onUpdateDirection, onTerminate, compact = false, slim = false }) => {
   const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   const displayModel = pending || agent.model || 'Not set';
@@ -232,14 +233,20 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
   const failedCalls = formatMetricValue(agent.failed_calls_count);
   const missedCalls = formatMetricValue(agent.missed_calls_count);
   const directionLabel = displayAgentDirection(agent.direction);
+  const cardWidthClass = compact ? 'w-[300px]' : slim ? 'w-[340px]' : 'w-[380px]';
+  const imageHeightClass = compact ? 'h-[250px]' : 'h-[280px]';
+  const bodyClass = compact ? 'p-4 space-y-2.5' : 'p-6 space-y-3.5';
+  const nameClass = compact ? 'text-xl' : 'text-2xl';
+  const metricGridClass = compact ? 'grid grid-cols-2 gap-x-5 gap-y-3' : 'grid grid-cols-2 gap-x-8 gap-y-5';
+  const metricValueClass = compact ? 'text-[17px]' : 'text-[20px]';
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={`shrink-0 bg-[#0A0A0A] border ${borderClass} rounded-[28px] w-[380px] flex flex-col hover:border-white/10 transition-all duration-500 relative group overflow-visible shadow-[0_24px_80px_rgba(0,0,0,0.42)]`}
+      className={`box-border shrink-0 bg-[#0A0A0A] border ${borderClass} rounded-[28px] ${cardWidthClass} flex flex-col hover:border-white/10 transition-colors duration-300 relative group overflow-hidden`}
     >
-      <div className="relative h-[280px] overflow-hidden rounded-t-[28px]">
+      <div className={`relative ${imageHeightClass} overflow-hidden rounded-t-[28px]`}>
         <img
           src={agent.avatar || `${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
           alt={agent.name}
@@ -274,7 +281,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
-          <h3 className="text-2xl font-bold text-white tracking-tight leading-none">{agent.name}</h3>
+          <h3 className={`${nameClass} font-bold text-white tracking-tight leading-none`}>{agent.name}</h3>
           {agent.age && (
             <p className="mt-1 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
               🎂 {agent.age} years old
@@ -283,7 +290,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         </div>
       </div>
 
-      <div className="p-6 space-y-3.5">
+      <div className={bodyClass}>
         <div className="px-0.5 py-1">
           <p className="mb-1.5 text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Call Handling</p>
           <div className="origin-left">
@@ -295,7 +302,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
               value={directionLabel}
               showTrigger={false}
               colorSelectedValue={false}
-              textClassName="text-[16px] leading-none tracking-tight"
+              textClassName={compact ? 'text-[14px] leading-none tracking-tight' : 'text-[16px] leading-none tracking-tight'}
               optionTextClassName="text-[11px] leading-none tracking-tight"
               buttonPaddingClassName="px-0 py-1"
               optionsGapClassName="gap-3.5"
@@ -334,30 +341,30 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         </div>
         </div>
 
-        <div className="pt-3.5 border-t border-white/[0.04]">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-5">
+        <div className={`${compact ? 'pt-2.5' : 'pt-3.5'} border-t border-white/[0.04]`}>
+          <div className={metricGridClass}>
             <div className="min-w-0">
               <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1.5">Inbound Calls</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-[20px] leading-none font-black tracking-tight text-white tabular-nums">{inboundCalls}</span>
+                <span className={`${metricValueClass} leading-none font-black tracking-tight text-white tabular-nums`}>{inboundCalls}</span>
               </div>
             </div>
             <div className="min-w-0">
               <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1.5">Outbound Calls</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-[20px] leading-none font-black tracking-tight text-white tabular-nums">{outboundCalls}</span>
+                <span className={`${metricValueClass} leading-none font-black tracking-tight text-white tabular-nums`}>{outboundCalls}</span>
               </div>
             </div>
             <div className="min-w-0">
               <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1.5">Failed Calls</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-[20px] leading-none font-black tracking-tight text-white tabular-nums">{failedCalls}</span>
+                <span className={`${metricValueClass} leading-none font-black tracking-tight text-white tabular-nums`}>{failedCalls}</span>
               </div>
             </div>
             <div className="min-w-0">
               <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1.5">Missed Calls</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-[20px] leading-none font-black tracking-tight text-white tabular-nums">{missedCalls}</span>
+                <span className={`${metricValueClass} leading-none font-black tracking-tight text-white tabular-nums`}>{missedCalls}</span>
               </div>
             </div>
           </div>
@@ -612,7 +619,34 @@ const SonarDashboard = () => {
   const [logoHover, setLogoHover] = useState(false);
   const [terminateAgent, setTerminateAgent] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [staffBusinessId, setStaffBusinessId] = useState(null);
+  const [teamView, setTeamView] = useState('receptionists');
   const userId = authSession?.user?.id || profile?.id || null;
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from('businesses').select('id').eq('user_id', userId).limit(1).maybeSingle()
+      .then(({ data, error }) => {
+        if (error) console.error('[Team] Failed to load business:', error);
+        if (data?.id) setStaffBusinessId(data.id);
+      });
+  }, [userId]);
+
+  const ensureStaffBusiness = async ({ createIfMissing = false } = {}) => {
+    if (staffBusinessId) return { id: staffBusinessId };
+    if (!userId) throw new Error('User not found');
+    const { data, error } = await supabase.from('businesses').select('id').eq('user_id', userId).limit(1).maybeSingle();
+    if (error) throw error;
+    if (data?.id) {
+      setStaffBusinessId(data.id);
+      return data;
+    }
+    if (!createIfMissing) return null;
+    const { data: created, error: createError } = await supabase.from('businesses').insert({ user_id: userId }).select('id').single();
+    if (createError) throw createError;
+    setStaffBusinessId(created.id);
+    return created;
+  };
 
   const [agentScenarios, setAgentScenarios] = useState({});
 
@@ -698,7 +732,7 @@ const SonarDashboard = () => {
 
   const navItems = [
     { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
-    { id: 'receptionists', icon: <Headset size={18} />, label: 'Receptionists' },
+    { id: 'receptionists', icon: <Headset size={18} />, label: 'Team' },
     { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios' },
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
@@ -712,46 +746,72 @@ const SonarDashboard = () => {
         return (
           <div className={`h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
             <div className="shrink-0 px-7 py-5 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-2.5 bg-indigo-500/5 rounded-xl border border-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.05)]">
-                  <Headset size={22} className="text-indigo-400" />
+              <div className="flex items-center gap-5">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-indigo-500/5 rounded-xl border border-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.05)]">
+                    <Headset size={22} className="text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Team</h2>
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1">{enrichedAgents.length} receptionists · staff</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Receptionists</h2>
-                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1">{enrichedAgents.length} active</p>
+                <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
+                  <button
+                    onClick={() => setTeamView('receptionists')}
+                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'receptionists' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Receptionists
+                  </button>
+                  <button
+                    onClick={() => setTeamView('staff')}
+                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'staff' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Staff
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={() => setShowHireModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95"
-              >
-                <Plus size={14} />
-                Hire Receptionist
-              </button>
+              <div className="flex items-center gap-3">
+                {teamView === 'receptionists' ? (
+                  <button onClick={() => setShowHireModal(true)} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">Hire Receptionist</button>
+                ) : (
+                  <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">New Staff Member</button>
+                )}
+              </div>
             </div>
 
-            <div className="custom-scrollbar flex flex-1 overflow-x-auto overflow-y-hidden px-12 py-8">
-              <div className={`flex min-w-max items-center gap-8 ${enrichedAgents.length < 3 ? 'justify-center w-full min-w-full' : 'justify-start'}`}>
-                {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
-                  const reactionsMap = {};
-                  for (const r of (reactions || [])) {
-                    reactionsMap[r.agent_name] = r;
-                  }
-                  return (
-                    <AgentNode
-                      key={agent.id}
-                      agent={agent}
-                      isActive={false}
-                      reactions={reactionsMap[agent.name] || {}}
-                      pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
-                      onOpenMarketplace={setMarketplaceAgent}
-                      onOpenScenarios={setReceptionistsAgent}
-                      onUpdateDirection={(agent, nextDirection) => updateAgentDirection(agent.id, nextDirection)}
-                      onTerminate={(agent) => setTerminateAgent(agent)}
-                    />
-                  );
-                })}
-              </div>
+            <div key={teamView} className="custom-scrollbar min-h-0 flex-1 overflow-auto border-t border-white/[0.04] px-12 py-8">
+              {teamView === 'receptionists' ? (
+                <div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6">
+                  {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
+                    const reactionsMap = {};
+                    for (const r of (reactions || [])) reactionsMap[r.agent_name] = r;
+                    return (
+                      <AgentNode
+                        key={agent.id}
+                        agent={agent}
+                        isActive={false}
+                        reactions={reactionsMap[agent.name] || {}}
+                        pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
+                        onOpenMarketplace={setMarketplaceAgent}
+                        onOpenScenarios={setReceptionistsAgent}
+                        onUpdateDirection={(agent, nextDirection) => updateAgentDirection(agent.id, nextDirection)}
+                        onTerminate={(agent) => setTerminateAgent(agent)}
+                        slim
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <StaffManager
+                  businessId={staffBusinessId}
+                  ensureBusinessRecord={ensureStaffBusiness}
+                  onBusinessLinked={setStaffBusinessId}
+                  hideIntro
+                  hideToolbar
+                  cardGridClassName="grid grid-cols-[repeat(auto-fill,380px)] items-start justify-start gap-8"
+                />
+              )}
             </div>
             <AnimatePresence>
               {showHireModal && (
@@ -946,7 +1006,10 @@ const SonarDashboard = () => {
                   key={item.id}
                   item={item}
                   isActive={currentRoute === item.id}
-                  onClick={() => setCurrentRoute(item.id)}
+                  onClick={() => {
+                    setSidebarCollapsed(true);
+                    setCurrentRoute(item.id);
+                  }}
                   collapsed={sidebarCollapsed}
                 />
               ))}
