@@ -366,6 +366,7 @@ function MonitoringHeadline({ playKey }) {
 }
 
 function CrmStunningWord({ shouldAnimate }) {
+  const text = 'Stunning.';
   const animatedStyle = shouldAnimate
     ? {
         animationDuration: '1.2s',
@@ -378,20 +379,38 @@ function CrmStunningWord({ shouldAnimate }) {
   return (
     <>
       <style>{CRM_STUNNING_STYLES}</style>
-      <span className="relative mx-[0.08em] inline-block align-baseline">
-        <span className="relative inline-block">
+      <span aria-label={text} className="relative mx-[0.08em] inline-block overflow-visible align-baseline">
+        <span aria-hidden="true" className="invisible inline-block">
+          {text}
+        </span>
+
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-0 top-0 block overflow-visible"
+          style={{ lineHeight: 'inherit' }}
+        >
           <span
-            className="pointer-events-none absolute inset-0 select-none text-[#ff0055] mix-blend-screen"
-            style={shouldAnimate ? { ...animatedStyle, animationName: 'crm-prism-red-move' } : { opacity: 0 }}
+            className="absolute left-0 top-0 select-none text-[#ff0055] mix-blend-screen"
+            style={{
+              padding: '0.22em 0.16em 0.42em',
+              margin: '-0.22em -0.16em -0.42em',
+              lineHeight: 'inherit',
+              ...(shouldAnimate ? { ...animatedStyle, animationName: 'crm-prism-red-move' } : { opacity: 0 }),
+            }}
           >
-            Stunning.
+            {text}
           </span>
 
           <span
-            className="pointer-events-none absolute inset-0 select-none text-[#00ffcc] mix-blend-screen"
-            style={shouldAnimate ? { ...animatedStyle, animationName: 'crm-prism-blue-move' } : { opacity: 0 }}
+            className="absolute left-0 top-0 select-none text-[#00ffcc] mix-blend-screen"
+            style={{
+              padding: '0.22em 0.16em 0.42em',
+              margin: '-0.22em -0.16em -0.42em',
+              lineHeight: 'inherit',
+              ...(shouldAnimate ? { ...animatedStyle, animationName: 'crm-prism-blue-move' } : { opacity: 0 }),
+            }}
           >
-            Stunning.
+            {text}
           </span>
 
           <span
@@ -399,6 +418,9 @@ function CrmStunningWord({ shouldAnimate }) {
             style={
               shouldAnimate
                 ? {
+                    padding: '0.22em 0.16em 0.42em',
+                    margin: '-0.22em -0.16em -0.42em',
+                    lineHeight: 'inherit',
                     animationName: 'crm-prism-green-move, crm-flash-settle',
                     animationDuration: '1.2s, 0.9s',
                     animationDelay: '0s, 0.24s',
@@ -406,10 +428,14 @@ function CrmStunningWord({ shouldAnimate }) {
                     animationIterationCount: '1, 1',
                     animationFillMode: 'forwards',
                   }
-                : undefined
+                : {
+                    padding: '0.22em 0.16em 0.42em',
+                    margin: '-0.22em -0.16em -0.42em',
+                    lineHeight: 'inherit',
+                  }
             }
           >
-            Stunning.
+            {text}
           </span>
         </span>
       </span>
