@@ -26,23 +26,6 @@ const supabase = createClient(
 );
 
 const HERO_COLORS = ['#818cf8', '#2dd4bf', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#34d399'];
-const BOOKING_DIAL_REELS = [
-  ['05', 'GMT', '12:00', 'MON', 'OCT', '22', 'UTC', '09:45', 'WED', 'DEC', '14', 'EST', '18:30', 'PST', 'B'],
-  ['12', 'CET', '15:30', 'TUE', 'JAN', '08', 'JST', '21:15', 'THU', 'APR', '29', 'AST', '11:00', 'MST', 'O'],
-  ['19', 'PST', '08:15', 'WED', 'FEB', '31', 'MST', '14:30', 'FRI', 'MAY', '03', 'CST', '23:45', 'AEST', 'O'],
-  ['27', 'EST', '23:00', 'THU', 'MAR', '11', 'NST', '07:00', 'SAT', 'JUN', '18', 'HST', '16:15', 'AKST', 'K'],
-  ['03', 'JST', '06:45', 'FRI', 'APR', '15', 'AEST', '19:30', 'SUN', 'JUL', '25', 'SST', '08:00', 'ChST', 'I'],
-  ['14', 'AEST', '17:00', 'SAT', 'MAY', '29', 'ChST', '11:15', 'MON', 'AUG', '07', 'GMT', '20:30', 'WET', 'N'],
-  ['22', 'NZST', '10:30', 'SUN', 'JUN', '04', 'WET', '16:00', 'TUE', 'SEP', '13', 'CET', '05:15', 'EET', 'G'],
-];
-const BOOKING_REEL_MOTION = {
-  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-  delays: [0, 200, 400, 500, 400, 200, 0],
-  durations: [1500, 1500, 1500, 1500, 1500, 1500, 1500],
-};
-const BOOKING_TARGET_CHARS = ['B', 'o', 'o', 'k', 'i', 'n', 'g'];
-const BOOKING_LETTER_WIDTHS = ['0.71em', '0.58em', '0.58em', '0.61em', '0.28em', '0.57em', '0.61em'];
-const BOOKING_LETTER_OFFSETS = ['0em', '-0.015em', '-0.02em', '-0.03em', '-0.05em', '-0.03em', '-0.02em'];
 const TAG_COLORS = {
   Color: HERO_COLORS[0],
   Extensions: HERO_COLORS[1],
@@ -352,6 +335,13 @@ const CRM_STUNNING_STYLES = `
   }
 `;
 
+const BOOKING_SCAN_STYLES = `
+  @keyframes booking-shimmer-sweep {
+    0% { background-position: 200% center; }
+    100% { background-position: -200% center; }
+  }
+`;
+
 function MonitoringHeadline({ playKey }) {
   return (
     <>
@@ -431,104 +421,49 @@ const getTagColor = (tag) => TAG_COLORS[tag] || HERO_COLORS[0];
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 function BookingReelWord({ playState }) {
-  const [isResolved, setIsResolved] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const text = 'Booking.';
 
   useEffect(() => {
     if (playState === 'resetting') {
-      setIsResolved(false);
+      setIsScanning(false);
       return undefined;
     }
 
     if (playState !== 'playing') return undefined;
 
-    const maxAnimationTime = Math.max(
-      ...BOOKING_REEL_MOTION.delays.map((delay, index) => delay + BOOKING_REEL_MOTION.durations[index])
-    );
-    const timer = window.setTimeout(() => setIsResolved(true), maxAnimationTime - 110);
+    setIsScanning(true);
+    const timer = window.setTimeout(() => setIsScanning(false), 1500);
     return () => window.clearTimeout(timer);
   }, [playState]);
 
   return (
-    <span
-      className="relative inline-flex items-end align-baseline"
-      style={{
-        height: '0.98em',
-        paddingBottom: '0.08em',
-      }}
-    >
-      <span className="invisible inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent">
-        Booking
+    <>
+      <style>{BOOKING_SCAN_STYLES}</style>
+      <span key={playState} className="relative inline-block select-none align-baseline">
+        <span
+          className="relative inline-block transition-colors duration-200"
+          style={{ color: isScanning ? '#e4e4e7' : '#ffffff' }}
+        >
+          {text}
+        </span>
+
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10 inline-block bg-clip-text text-transparent"
+          style={{
+            backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.1) 100%)',
+            backgroundSize: '200% auto',
+            WebkitBackgroundClip: 'text',
+            color: 'transparent',
+            opacity: isScanning ? 1 : 0,
+            animation: isScanning ? 'booking-shimmer-sweep 1.5s cubic-bezier(0.4, 0, 0.2, 1) both' : undefined,
+          }}
+        >
+          {text}
+        </span>
       </span>
-
-      <span
-        className="absolute inset-0 inline-flex items-end"
-        style={{
-          opacity: isResolved ? 0 : 1,
-          filter: `blur(${isResolved ? 0.45 : 0}px)`,
-          transition: 'opacity 240ms ease-out, filter 260ms ease-out',
-        }}
-      >
-        {BOOKING_DIAL_REELS.map((reel, dialIdx) => {
-          const delayVal = BOOKING_REEL_MOTION.delays[dialIdx];
-          const durationVal = BOOKING_REEL_MOTION.durations[dialIdx];
-          const translateY = playState === 'playing' ? (14 * -0.98) : 0;
-
-          return (
-            <span
-              key={dialIdx}
-              style={{
-                height: '0.98em',
-                width: BOOKING_LETTER_WIDTHS[dialIdx],
-                marginRight: BOOKING_LETTER_OFFSETS[dialIdx],
-              }}
-              className="inline-block overflow-hidden last:mr-0"
-            >
-              <span
-                className="flex flex-col items-center"
-                style={{
-                  transform: `translateY(${translateY}em)`,
-                  transitionProperty: playState === 'resetting' ? 'none' : 'transform',
-                  transitionDuration: `${durationVal}ms`,
-                  transitionDelay: `${delayVal}ms`,
-                  transitionTimingFunction: BOOKING_REEL_MOTION.easing,
-                }}
-              >
-                {reel.map((char, charIdx) => {
-                  const isTarget = charIdx === 14;
-                  const displayChar = isTarget ? BOOKING_TARGET_CHARS[dialIdx] : char;
-
-                  return (
-                    <span
-                      key={charIdx}
-                      style={{ height: '0.98em' }}
-                      className={`flex w-full items-center justify-center text-center ${
-                        isTarget
-                          ? 'bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text font-black text-transparent'
-                          : 'scale-90 font-medium text-zinc-600/25 blur-[0.35px]'
-                      }`}
-                    >
-                      {displayChar}
-                    </span>
-                  );
-                })}
-              </span>
-            </span>
-          );
-        })}
-      </span>
-
-      <span
-        className="absolute inset-0 inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent"
-        style={{
-          opacity: isResolved ? 1 : 0,
-          filter: `blur(${isResolved ? 0 : 1.6}px)`,
-          transform: `translateY(${isResolved ? 0 : 1}px)`,
-          transition: 'opacity 280ms ease-out, filter 320ms ease-out, transform 320ms ease-out',
-        }}
-      >
-        Booking
-      </span>
-    </span>
+    </>
   );
 }
 
@@ -672,7 +607,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
       setBookingPlayState('resetting');
       replayTimer = window.setTimeout(() => {
         setBookingPlayState('playing');
-      }, 50);
+      }, 950);
     };
 
     const observer = new IntersectionObserver(
@@ -1022,7 +957,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               }}
             >
               <div className="text-center lg:text-left">
-                <h2 className={`homepage-copy-reveal bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-1 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[4rem] lg:pb-2 ${copyVisible ? 'is-visible' : ''}`}>
+                <h2 className={`homepage-copy-reveal pb-1 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-white md:text-7xl lg:text-[4rem] lg:pb-2 ${copyVisible ? 'is-visible' : ''}`}>
                   {isScenariosVariant ? (
                     <>
                       Scenario
@@ -1036,7 +971,6 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                       Fully Autonomous
                       <br />
                       <BookingReelWord playState={bookingPlayState} />
-                      <span>.</span>
                     </>
                   )}
                 </h2>

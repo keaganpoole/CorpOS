@@ -218,6 +218,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   const [isHoveringVoice, setIsHoveringVoice] = useState(false);
   const [mobileTimelineOpacity, setMobileTimelineOpacity] = useState(1);
   const [copyVisible, setCopyVisible] = useState(false);
+  const [isInView, setIsInView] = useState(false);
   const autoPlayRef = useRef(null);
   const audioRef = useRef(null);
   const innerRef = useRef(null);
@@ -233,13 +234,13 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   };
 
   useEffect(() => {
-    if (shouldPause) {
+    if (!isInView || shouldPause) {
       clearInterval(autoPlayRef.current);
       return undefined;
     }
-    autoPlayRef.current = setInterval(nextSlide, 6000);
+    autoPlayRef.current = setInterval(nextSlide, 9000);
     return () => clearInterval(autoPlayRef.current);
-  }, [receptionists.length, shouldPause]);
+  }, [receptionists.length, shouldPause, isInView]);
 
   const playVoice = (voiceUrl, id) => {
     if (isPlaying === id) {
@@ -262,6 +263,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
+          setIsInView(true);
           setCopyVisible(true);
           observer.disconnect();
         }
@@ -335,24 +337,39 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                 >
                   <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:max-w-[34rem] lg:items-start lg:gap-5 lg:text-left">
                     <h1
+                      aria-label={active.name}
                       className={`hero-concept-name homepage-copy-reveal lg:self-start ${copyVisible ? 'is-visible' : ''}`}
                       style={{
+                        position: 'relative',
+                        display: 'inline-block',
                         fontSize: 'clamp(5rem, 12vw, 11rem)',
-                        lineHeight: 0.8,
+                        lineHeight: 0.82,
                         letterSpacing: '-0.04em',
                         fontWeight: 400,
-                        background: `linear-gradient(90deg, ${activeGradient[0]}, ${activeGradient[1]}, ${activeGradient[2]}, ${activeGradient[0]})`,
-                        backgroundSize: '200% auto',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        animation: 'miami-flow 8s linear infinite',
                         margin: 0,
+                        overflow: 'visible',
                       }}
                     >
-                      {active.name}
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute',
+                          inset: '-0.04em 0 -0.24em 0',
+                          lineHeight: 1.08,
+                          background: `linear-gradient(90deg, ${activeGradient[0]}, ${activeGradient[1]}, ${activeGradient[2]}, ${activeGradient[0]})`,
+                          backgroundSize: '200% auto',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          animation: 'miami-flow 8s linear infinite',
+                          overflow: 'visible',
+                        }}
+                      >
+                        {active.name}
+                      </span>
+                      <span aria-hidden="true" style={{ visibility: 'hidden' }}>{active.name}</span>
                     </h1>
 
-                    <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-2 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md md:px-2.5 md:py-2 lg:mx-0 lg:gap-2 lg:px-2.5 lg:py-1.5">
+                    <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-2 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md md:mt-3 md:px-2.5 md:py-2 lg:mx-0 lg:mt-2.5 lg:gap-2 lg:px-2.5 lg:py-1.5">
                       <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
                       <div className="flex min-w-0 items-center gap-1 text-[8px] font-black tracking-[0.14em] text-white/60 md:text-[9px] lg:gap-1.5 lg:text-[9px] lg:tracking-[0.16em]">
                         {active.traits.map((trait, i) => (
