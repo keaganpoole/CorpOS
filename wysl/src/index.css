@@ -5,6 +5,18 @@
 @tailwind utilities;
 
 :root {
+  /* Centralized application branding */
+  --brandGradientStart: #ff32ac;
+  --brandGradientEnd: #8B5CF6;
+  --buttonBackground: #ffffff;
+  --buttonText: #000000;
+  --pageBackground: #020202;
+  --modalBloom: rgba(236, 72, 153, 0.07);
+  --modalBloomSecondary: rgba(139, 92, 246, 0.05);
+  --focusOutline: rgba(50, 240, 217, 0.42);
+  --iconColor: #d2d2d7;
+  --toggleColor: #10b981;
+
   /* Base Theme Colors */
   --color-black: #0B0C10; /* Darker, more modern black */
   --color-dark-gray: #111216;
@@ -23,8 +35,8 @@
   --color-status-default: #6b7280;
 
   /* Custom Colors — Sonar Brand */
-  --color1: #22d3ee; /* vivid teal */
-  --color2: #ec4899; /* vivid pink */
+  --color1: var(--brandGradientStart);
+  --color2: var(--brandGradientEnd);
   --color3: #a855f7; /* vivid purple */
 
   /* Font */
@@ -44,11 +56,81 @@ body {
   font-family: var(--font-family-sans);
   margin: 0;
   padding: 0;
-  background-color: #000000;
+  background-color: var(--pageBackground);
   color: #e5e7eb; /* Default light text color */
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Branding helpers. These intentionally affect accent utilities only. */
+.brand-gradient {
+  background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd));
+}
+.brand-icon {
+  color: var(--brandGradientStart);
+  stroke: currentColor;
+}
+.brand-icon-gradient {
+  color: var(--brandGradientStart);
+}
+.brand-icon-gradient * {
+  stroke: url(#brandIconGradient);
+}
+.brand-border { border-color: var(--brandGradientStart) !important; }
+.brand-outline:focus,
+.brand-outline:focus-visible { outline-color: var(--focusOutline) !important; }
+.settings-icon {
+  color: var(--iconColor) !important;
+  stroke: currentColor;
+}
+.dashboard-toggle-active {
+  background-color: var(--toggleColor) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--toggleColor) 35%, transparent);
+}
+.dashboard-toggle-knob-active {
+  background-color: var(--toggleColor) !important;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--toggleColor) 50%, transparent);
+}
+
+/* Existing cyan/teal utility accents now resolve through the brand system without recoloring body text. */
+:where([class*="border-cyan-"]) { border-color: color-mix(in srgb, var(--brandGradientStart) 42%, transparent) !important; }
+:where([class*="bg-cyan-"]) { background-color: color-mix(in srgb, var(--brandGradientStart) 12%, transparent) !important; }
+
+.dashboard-neutral-button,
+.settings-neutral-button {
+  background: var(--buttonBackground) !important;
+  color: var(--buttonText) !important;
+  border-color: transparent !important;
+}
+.dashboard-neutral-button:hover,
+.settings-neutral-button:hover { background: var(--buttonBackground) !important; }
+
+/* Page-specific legacy accents are remapped without touching semantic status colors. */
+.receptionists-page-scope :where([class*="bg-indigo-"], [class*="bg-orange-"], [class*="bg-amber-"], [class*="bg-purple-"], [class*="bg-pink-"]) { background-color: var(--modalBloom) !important; }
+.receptionists-page-scope :where([class*="border-indigo-"], [class*="border-orange-"], [class*="border-amber-"], [class*="border-purple-"], [class*="border-pink-"]) { border-color: color-mix(in srgb, var(--brandGradientStart) 30%, transparent) !important; }
+.receptionists-page-scope :where([class*="from-orange-"], [class*="via-orange-"], [class*="to-orange-"]) { --tw-gradient-from: var(--brandGradientStart) !important; --tw-gradient-via: var(--brandGradientStart) !important; --tw-gradient-to: var(--brandGradientEnd) !important; }
+
+.settings-page-scope :where([class*="bg-indigo-"], [class*="bg-orange-"], [class*="bg-amber-"], [class*="bg-emerald-"]) { background-color: color-mix(in srgb, var(--brandGradientStart) 10%, transparent) !important; }
+.settings-page-scope :where([class*="border-indigo-"], [class*="border-orange-"], [class*="border-amber-"], [class*="border-emerald-"]) { border-color: color-mix(in srgb, var(--brandGradientStart) 28%, transparent) !important; }
+.settings-page-scope button[class*="bg-indigo-"],
+.settings-page-scope button[class*="bg-orange-"],
+.settings-page-scope button[class*="bg-amber-"] {
+  background: var(--buttonBackground) !important;
+  color: var(--buttonText) !important;
+}
+.settings-page-scope svg:not([width="0"]) {
+  color: var(--iconColor) !important;
+  stroke: currentColor;
+}
+
+/* All form focus states share the Scenario Builder focus color. */
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible,
+[role="combobox"]:focus-visible {
+  outline-color: var(--focusOutline);
 }
 
 .time-input-no-icon::-webkit-calendar-picker-indicator {
@@ -82,13 +164,18 @@ p {
 }
 
 /* --- PRICING PAGE STYLES --- */
-.pricing-page-bg { background-color: #0a0a0a; }
+.pricing-page-bg { background-color: var(--pageBackground); }
 .pricing-page-bg .gradient-text { background: linear-gradient(90deg, var(--color1), var(--color2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
-.savings-gradient-text { background: linear-gradient(90deg, #00b950, #049142); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
-.pricing-page-bg .gradient-bg { background: linear-gradient(90deg, var(--color1), var(--color2)); }
+.pricing-recommended-text { background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
+.savings-gradient-text { background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
+.pricing-page-bg .gradient-bg { background: var(--buttonBackground); }
+.pricing-neutral-button {
+  background: var(--buttonBackground) !important;
+  color: var(--buttonText) !important;
+}
 .plan-card { transition: transform 0.3s ease; position: relative; overflow: visible; }
 .plan-card:not(.current-plan-glow):hover { transform: translateY(-5px); }
-.plan-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 1rem; border: 3px solid transparent; background: linear-gradient(90deg, var(--accent_color1), var(--accent_color2)) border-box; -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0); -webkit-mask-composite: destination-out; mask-composite: exclude; opacity: 0; transition: opacity 0.3s ease-in-out; pointer-events: none; }
+.plan-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 1rem; border: 3px solid transparent; background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd)) border-box; -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0); -webkit-mask-composite: destination-out; mask-composite: exclude; opacity: 0; transition: opacity 0.3s ease-in-out; pointer-events: none; }
 .plan-card:hover::before { opacity: 1; }
 .current-plan-glow { box-shadow: 0 0 30px var(--color1); transform: translateY(-5px); }
 .current-plan-glow::before { opacity: 1; animation: pulse-glow 3s infinite ease-in-out; }
@@ -119,7 +206,7 @@ p {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: linear-gradient(45deg, #ff32ac, #d4026c); /* Your brand gradient */
+    background: linear-gradient(45deg, var(--brandGradientStart), var(--brandGradientEnd));
     color: white;
     display: flex;
     align-items: center;

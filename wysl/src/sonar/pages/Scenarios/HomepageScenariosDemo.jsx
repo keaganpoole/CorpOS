@@ -329,7 +329,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'no_trigger',
       option: 'No Trigger',
       description: 'Use a schedule instead of an event',
-      accent: '#32f0d9',
+      accent: 'var(--brandGradientStart)',
       icon: Clock,
       sub_options: [],
     },
@@ -337,7 +337,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'phone_calls',
       option: 'Phone Calls',
       description: 'When something happens with a call',
-      accent: '#32f0d9',
+      accent: 'var(--brandGradientStart)',
       icon: OPTION_ICONS.phone_calls,
       sub_options: [
         { key: 'incoming_call', name: 'Incoming Call', description: 'When a new call arrives' },
@@ -347,7 +347,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'records',
       option: 'People',
       description: 'When something happens to a person',
-      accent: '#32f0d9',
+      accent: 'var(--brandGradientStart)',
       icon: OPTION_ICONS.records,
       sub_options: [
         { key: 'record_created', name: 'Person Created', description: 'When a new person is created' },
@@ -358,7 +358,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'appointments',
       option: 'Appointments',
       description: 'When something happens with an appointment',
-      accent: '#32f0d9',
+      accent: 'var(--brandGradientStart)',
       icon: OPTION_ICONS.appointments,
       sub_options: [
         { key: 'appointment_created', name: 'Appointment Created', description: 'Create a new appointment' },
@@ -375,7 +375,7 @@ const AUTOMATION_HIERARCHY = {
       key: 'payments',
       option: 'Payments',
       description: 'When something happens with billing, customers, or subscriptions',
-      accent: '#32f0d9',
+      accent: 'var(--brandGradientStart)',
       icon: OPTION_ICONS.payments,
       sub_options: [
         { key: 'payment_received', name: 'Payment Received', description: 'When a payment is successfully collected' },
@@ -558,7 +558,7 @@ const PANEL_CATEGORY_LABELS = {
 };
 
 const CATEGORY_META = {
-  TRIGGERS: { detail: 'Trigger', type: 'trigger', icon: Bell, accent: '#32f0d9' },
+  TRIGGERS: { detail: 'Trigger', type: 'trigger', icon: Bell, accent: 'var(--brandGradientStart)' },
   ACTIONS: { detail: 'Action', type: 'action', icon: Phone, accent: '#38bdf8' },
   UTILITIES: { detail: 'Utility', type: 'utility', icon: Zap, accent: '#f472b6' },
 };
@@ -4818,7 +4818,7 @@ export default function ScenariosPage({
                   <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.2)" />
                 </marker>
                 <marker id="sb-arrowhead-active" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(50,240,217,0.85)" />
+                  <polygon points="0 0, 10 3.5, 0 7" fill="var(--brandGradientStart)" />
                 </marker>
               </defs>
               {edges.map((edge) => {
@@ -4968,7 +4968,7 @@ export default function ScenariosPage({
                     if (el) nodeRefs.current[node.id] = el;
                     else delete nodeRefs.current[node.id];
                   }}
-                  className={`sb-builder-node ${node.type === 'router' ? 'router-node' : ''} ${
+                  className={`sb-builder-node ${node.configured ? 'sb-matte-node' : ''} ${node.id !== INITIAL_NODE.id ? 'sb-post-intro-node' : ''} ${node.type === 'router' ? 'router-node' : ''} ${
                     isActive ? 'sb-active-node' : ''
                   } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''} ${isRunActiveNode ? 'sb-run-node-active' : ''} ${isRunCompletedNode ? 'sb-run-node-complete' : ''} ${isRunFutureNode ? 'sb-run-node-future' : ''} ${isRunUnrelatedNode ? 'sb-run-node-unrelated' : ''}`}
                   style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}

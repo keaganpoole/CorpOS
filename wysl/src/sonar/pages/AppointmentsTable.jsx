@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -60,7 +60,7 @@ const getClampedOverlayPosition = (rect, {
 };
 
 const ZONE_META_KEY = '__zones';
-const ZONE_SWATCHES = ['#22d3ee', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#f59e0b', '#10b981', '#14b8a6'];
+const ZONE_SWATCHES = ['var(--brandGradientStart)', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#f59e0b', '#10b981', '#14b8a6'];
 const REQUIRED_COLUMN_IDS = new Set(['person_id', 'service_id']);
 
 const isZoneEligibleColumn = (col) => Boolean(col?.label) && col.id !== 'select' && col.id !== 'avatar';
@@ -427,8 +427,8 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
   }, [open, updateMenuPosition]);
   const palettes = {
     emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', dot: '#10b981' },
-    cyan: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20', dot: '#06b6d4' },
-    blue: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', dot: '#3b82f6' },
+    cyan: { bg: 'bg-white/[0.04]', text: 'text-zinc-300', border: 'border-white/[0.08]', dot: 'var(--brandGradientStart)' },
+    blue: { bg: 'bg-white/[0.04]', text: 'text-zinc-300', border: 'border-white/[0.08]', dot: 'var(--brandGradientEnd)' },
     amber: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', dot: '#f59e0b' },
     orange: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', dot: '#f97316' },
     fuchsia: { bg: 'bg-fuchsia-500/10', text: 'text-fuchsia-400', border: 'border-fuchsia-500/20', dot: '#d946ef' },
@@ -491,7 +491,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
                 className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${current == null || current === '' ? 'text-white' : 'text-zinc-400'}`}>
                 <div className="w-2 h-2 rounded-full bg-zinc-700" />
                 <span className="invisible">.</span>
-                {(current == null || current === '') && <Check size={11} className="text-cyan-400 ml-auto" />}
+                {(current == null || current === '') && <Check size={11} className="brand-icon ml-auto" />}
               </motion.button>
               {options.map((opt, idx) => {
                 const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
@@ -512,7 +512,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
                     className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
                     {val}
-                    {isActive && <Check size={11} className="text-cyan-400 ml-auto" />}
+                    {isActive && <Check size={11} className="brand-icon ml-auto" />}
                   </motion.button>
                 );
               })}
@@ -638,7 +638,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
                     className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
                     <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(val) }} />
                     {val}
-                    {active && <Check size={11} className="text-cyan-400 ml-auto" />}
+                    {active && <Check size={11} className="brand-icon ml-auto" />}
                   </motion.button>
                 );
               })}
@@ -741,7 +741,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
                       className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}
                     >
                       <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                      {isActive && <Check size={11} className="text-cyan-400 ml-auto" />}
+                      {isActive && <Check size={11} className="brand-icon ml-auto" />}
                     </motion.button>
                   );
                 })}
@@ -781,7 +781,7 @@ const DraggableHeader = ({
         </button>
       ) : <div className="w-full" />}
       {col.id !== 'avatar' && col.label && <button onClick={(e) => { e.stopPropagation(); onFieldSettings(col.id); }} className="p-1 rounded text-zinc-800 hover:text-white hover:bg-white/5 transition-all opacity-0 group-hover/header:opacity-100"><Settings2 size={10} /></button>}
-      {dragOverIndex === index && !isDragging && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(34,211,238,0.5)]" />}
+      {dragOverIndex === index && !isDragging && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-cyan-400 rounded-full shadow-[0_0_8px_color-mix(in srgb, var(--brandGradientStart) 50%, transparent)]" />}
     </div>
   );
 };
@@ -818,7 +818,7 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
             className={`h-3.5 w-3.5 rounded-[4px] border transition-all ${isSelected ? 'border-cyan-400/60 bg-cyan-400/15 opacity-100' : 'border-white/20 bg-black/40 opacity-0 group-hover:opacity-100'} ${anySelected ? 'opacity-100' : ''}`}
             aria-label="Select record"
           >
-            {isSelected && <Check size={9} className="text-cyan-300 m-auto" />}
+            {isSelected && <Check size={9} className="brand-icon m-auto" />}
           </button>
         </div>
       );
@@ -1104,7 +1104,7 @@ const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
         ))}
       </div>
       <div className="border-t border-white/[0.05] p-3">
-        <button type="button" onClick={addRule} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.08] py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 transition-colors hover:border-cyan-500/25 hover:text-cyan-400">
+        <button type="button" onClick={addRule} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.08] py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 transition-colors hover:border-white/20 hover:text-zinc-300">
           <Plus size={12} /> Add Sort
         </button>
       </div>
@@ -1134,7 +1134,7 @@ const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll
           const locked = isColumnLocked(column.id);
           return (
             <button key={column.id} type="button" disabled={locked} onClick={() => onSetHidden(column.id, !hidden)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${locked ? 'cursor-not-allowed opacity-65' : 'hover:bg-white/[0.04]'}`}>
-              <span className="w-4">{!hidden && <Check size={12} className="text-cyan-400" />}</span>
+              <span className="w-4">{!hidden && <Check size={12} className="brand-icon" />}</span>
               <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${hidden ? 'text-zinc-500' : 'text-zinc-300'}`}>{getColumnLabel(column, fieldConfig)}</span>
               {locked && <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Locked</span>}
             </button>
@@ -1185,7 +1185,7 @@ const RowHeightPopover = ({ value, onChange }) => {
     <div className="p-2">
       {options.map((option) => (
         <button key={option.key} type="button" onClick={() => onChange(option.key)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] transition-colors hover:bg-white/[0.04] ${value === option.key ? 'text-white' : 'text-zinc-500'}`}>
-          <span className="w-4">{value === option.key && <Check size={12} className="text-cyan-400" />}</span>
+          <span className="w-4">{value === option.key && <Check size={12} className="brand-icon" />}</span>
           {option.label}
         </button>
       ))}
@@ -2019,7 +2019,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
           <button
             type="button"
             onPointerDown={handleFrozenPointerDown}
-            className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-cyan-300/70 transition-colors hover:border-cyan-400/30 hover:text-white"
+            className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-zinc-500 transition-colors hover:border-white/20 hover:text-white"
             aria-label="Drag frozen column divider"
           >
             <GripVertical size={10} />
@@ -2035,7 +2035,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
                 <button
                   type="button"
                   onPointerDown={handleFrozenPointerDown}
-                  className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-cyan-300/70 transition-colors hover:border-cyan-400/30 hover:text-white"
+                  className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-zinc-500 transition-colors hover:border-white/20 hover:text-white"
                   aria-label="Drag frozen column divider"
                 >
                   <GripVertical size={10} />
@@ -2214,11 +2214,11 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
           </div>
           <button onClick={() => setShowColorbarStudio(true)} className="group/colorbar relative ml-2 flex items-center gap-2 rounded-xl px-4 py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 transition-all hover:text-white">
             <div className="absolute rounded-xl opacity-0 group-hover/colorbar:opacity-100 transition-opacity duration-300 pointer-events-none overflow-hidden" style={{ inset: '-0.7px' }}>
-              <div className="absolute inset-0 animate-[colorbarFlow_3s_linear_infinite]" style={{ background: 'linear-gradient(90deg, #22d3ee, #d946ef, #f59e0b, #22d3ee, #22d3ee, #d946ef, #f59e0b)', backgroundSize: '300% 100%' }} />
+              <div className="absolute inset-0 animate-[colorbarFlow_3s_linear_infinite]" style={{ background: 'linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd), var(--brandGradientStart))', backgroundSize: '300% 100%' }} />
             </div>
             <div className="absolute rounded-[11px] bg-[#0a0a0a] pointer-events-none" style={{ inset: '0.7px' }} />
             <div className="absolute inset-0 rounded-xl border border-white/[0.06] group-hover/colorbar:opacity-0 transition-opacity duration-300 pointer-events-none" />
-            <Wand2 size={12} className="relative z-10 text-cyan-400 group-hover/colorbar:text-white transition-colors group-hover/colorbar:rotate-12 duration-300" />
+            <Wand2 size={12} className="relative z-10 brand-icon group-hover/colorbar:text-white transition-colors group-hover/colorbar:rotate-12 duration-300" />
             <span className="relative z-10">Colorbar</span>
           </button>
         </div>
@@ -2342,7 +2342,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
                     onClick={() => handleCreateColumn(option.type)}
                     className="w-full px-3 py-2 text-left transition-all hover:bg-white/[0.04] flex items-center gap-2.5 group/fieldtype"
                   >
-                    <IconComp size={13} className="text-zinc-600 group-hover/fieldtype:text-cyan-300 transition-colors" />
+                    <IconComp size={13} className="text-zinc-600 group-hover/fieldtype:text-zinc-300 transition-colors" />
                     <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 group-hover/fieldtype:text-white transition-colors">{option.label}</span>
                   </motion.button>
                 );

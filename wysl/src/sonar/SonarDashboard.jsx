@@ -117,7 +117,7 @@ class ErrorBoundary extends Component {
             )}
             <button
               onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
-              className="mt-6 w-full py-2.5 bg-white text-black rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-cyan-400 transition-all active:scale-[0.98]"
+              className="mt-6 w-full py-2.5 bg-white text-black rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-zinc-200 transition-all active:scale-[0.98]"
             >
               Retry
             </button>
@@ -208,7 +208,7 @@ const CallHandlingIcon = ({ direction }) => {
   return (
     <motion.span
       key={normalized}
-      className="inline-flex h-[14px] w-[14px] items-center justify-center text-orange-400/70"
+      className="brand-icon inline-flex h-[14px] w-[14px] items-center justify-center"
       {...motionProps}
     >
       <Icon size={14} />
@@ -217,7 +217,7 @@ const CallHandlingIcon = ({ direction }) => {
 };
 
 const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onUpdateDirection, onTerminate, compact = false, slim = false }) => {
-  const borderClass = isActive ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
+  const borderClass = isActive ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_20%,transparent)] shadow-[0_0_30px_color-mix(in_srgb,var(--brandGradientStart)_5%,transparent)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   const displayModel = pending || agent.model || 'Not set';
   const normalizedAgentStatus = String(agent.status || 'Offline').trim().toLowerCase();
@@ -323,7 +323,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
             className="w-full flex items-center justify-between group/model cursor-pointer"
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className={`text-[11px] font-bold truncate transition-colors ${pending ? 'text-amber-400/80' : 'text-cyan-400/80 group-hover/model:text-cyan-400/90'}`}>
+              <span className={`text-[11px] font-bold truncate transition-colors ${pending ? 'text-amber-400/80' : 'text-zinc-400 group-hover/model:text-zinc-200'}`}>
                 {displayModel?.replace(/^openrouter\//, '') || displayModel}
               </span>
               {pending ? (
@@ -337,7 +337,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-2 opacity-0 group-hover/model:opacity-100 transition-opacity">
               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded">Change</span>
-              <Cpu size={11} className="text-cyan-500/60" />
+              <Cpu size={11} className="text-zinc-500" />
             </div>
           </button>
         </div>
@@ -603,7 +603,7 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
 const PlaceholderView = ({ title, body }) => (
   <div className="flex items-center justify-center h-full text-zinc-500 flex-col gap-4">
     <div className="p-16 border border-white/5 rounded-3xl bg-[#0A0A0A] flex flex-col items-center text-center shadow-2xl relative overflow-hidden">
-      <Database size={56} className="text-cyan-400 mb-8 drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]" />
+      <Database size={56} className="brand-icon mb-8 drop-shadow-[0_0_15px_color-mix(in_srgb,var(--brandGradientStart)_30%,transparent)]" />
       <h3 className="text-xl font-bold text-zinc-100 tracking-tight uppercase">{title}</h3>
       <p className="text-[12px] font-bold text-zinc-600 max-w-xs mt-4 leading-relaxed uppercase tracking-widest opacity-60">{body}</p>
     </div>
@@ -750,12 +750,20 @@ const SonarDashboard = () => {
     switch (currentRoute) {
       case 'receptionists':
         return (
-          <div className={`h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
+          <div className={`receptionists-page-scope h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
             <div className="shrink-0 px-7 py-5 flex items-center justify-between">
               <div className="flex items-center gap-5">
                 <div className="flex items-center gap-4">
-                  <div className="p-2.5 bg-indigo-500/5 rounded-xl border border-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.05)]">
-                    <IdCardLanyard size={22} className="text-indigo-400" />
+                  <div>
+                    <svg width="0" height="0" className="absolute">
+                      <defs>
+                        <linearGradient id="brandIconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="var(--brandGradientStart)" />
+                          <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <IdCardLanyard size={22} className="brand-icon-gradient" />
                   </div>
                   <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Team</h2>
                 </div>
@@ -776,9 +784,9 @@ const SonarDashboard = () => {
               </div>
               <div className="flex items-center gap-3">
                 {teamView === 'receptionists' ? (
-                  <button onClick={() => setShowHireModal(true)} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">New Receptionist</button>
+                  <button onClick={() => setShowHireModal(true)} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
                 ) : (
-                  <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold tracking-wider hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">New Staff Member</button>
+                  <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Staff Member</button>
                 )}
               </div>
             </div>
@@ -945,7 +953,7 @@ const SonarDashboard = () => {
       <div className="drag-region fixed top-0 left-0 right-0 h-8 z-50 pointer-events-none" />
 
       {/* Toolbar */}
-      <header className="shrink-0 h-14 border-b border-white/5 bg-black/60 backdrop-blur-2xl flex items-center px-10 z-30 relative">
+      <header className="shrink-0 h-14 border-b border-white/5 bg-[#020202] flex items-center px-10 z-30 relative">
         <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.03]">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
         </div>

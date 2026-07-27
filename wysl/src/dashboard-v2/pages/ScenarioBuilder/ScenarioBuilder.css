@@ -2,9 +2,9 @@
   --bg-main: #0a0a0c;
   --bg-panel: rgba(18, 18, 22, 0.8);
   --border-color: rgba(255, 255, 255, 0.1);
-  --accent-primary: #32f0d9;
-  --accent-secondary: #38bdf8;
-  --accent-rose: #f472b6;
+  --accent-primary: var(--brandGradientStart);
+  --accent-secondary: var(--brandGradientEnd);
+  --accent-rose: var(--brandGradientEnd);
   --text-dim: rgba(255, 255, 255, 0.5);
   --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -598,7 +598,7 @@
 }
 
 .input-field:focus {
-  border-color: rgba(50, 240, 217, 0.42);
+  border-color: var(--focusOutline);
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -626,7 +626,7 @@
 }
 
 .select-field:focus {
-  border-color: rgba(50, 240, 217, 0.42);
+  border-color: var(--focusOutline);
 }
 
 .select-icon {

@@ -440,29 +440,12 @@ const NumberInput = ({ value, onChange, min, max, step = 1 }) => (
   />
 );
 
-const Toggle = ({ value, onChange, color = 'indigo' }) => {
-  const activeStyles = {
-    indigo: {
-      bg: 'bg-indigo-500',
-      glow: 'shadow-[0_0_12px_rgba(99,102,241,0.4)]',
-    },
-    cyan: {
-      bg: 'bg-cyan-500',
-      glow: 'shadow-[0_0_6px_rgba(34,211,238,0.22)]',
-    },
-    amber: {
-      bg: 'bg-amber-500',
-      glow: 'shadow-[0_0_12px_rgba(245,158,11,0.35)]',
-    },
-  };
-  const activeColor = activeStyles[color]?.bg || activeStyles.indigo.bg;
-  const glowColor = activeStyles[color]?.glow || activeStyles.indigo.glow;
-
+const Toggle = ({ value, onChange }) => {
   return (
     <button
       type="button"
       onClick={() => onChange(!value)}
-      className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-all ${value ? activeColor + ' ' + glowColor : 'bg-zinc-800 border border-white/[0.06]'}`}
+      className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-all ${value ? 'dashboard-toggle-active' : 'bg-zinc-800 border border-white/[0.06]'}`}
       aria-pressed={value}
     >
       <div
@@ -592,7 +575,7 @@ const StaffAvailabilitySelector = ({ value, onChange }) => {
           }}
           className="no-drag z-10 flex items-center gap-2 px-0 py-1 text-[16px] font-bold leading-none tracking-tight text-zinc-200 transition-colors duration-300 hover:text-white"
         >
-          <CalendarCheck size={14} className={value ? 'text-cyan-400/80' : 'text-zinc-600'} />
+          <CalendarCheck size={14} className={value ? 'settings-icon' : 'text-zinc-600'} />
           <span>{current}</span>
         </button>
         <div
@@ -622,7 +605,7 @@ const StaffAvailabilitySelector = ({ value, onChange }) => {
 const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onToggleActive, compact = false }) => {
   const [avatarFailed, setAvatarFailed] = useState(false);
   const availability = getStaffAvailabilitySummary(staff.working_hours);
-  const borderClass = isSelected ? 'border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.05)]' : 'border-white/[0.04]';
+  const borderClass = isSelected ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_20%,transparent)] shadow-[0_0_30px_color-mix(in_srgb,var(--brandGradientStart)_5%,transparent)]' : 'border-white/[0.04]';
   const cardSizeClass = compact ? 'h-[465px] min-h-[465px] max-h-[465px] w-[300px] min-w-[300px] max-w-[300px]' : 'h-[550px] min-h-[550px] max-h-[550px] w-[380px] min-w-[380px] max-w-[380px]';
   const imageHeightClass = compact ? 'h-[150px]' : 'h-[280px]';
   const bodyClass = compact ? 'h-[315px] min-h-[315px] max-h-[315px] p-4 space-y-2.5' : 'h-[270px] min-h-[270px] max-h-[270px] p-6 space-y-3.5';
@@ -716,7 +699,7 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
         <div className={`grid grid-cols-2 gap-x-5 gap-y-3 border-t border-white/[0.04] ${compact ? 'pt-2.5' : 'pt-3.5'}`}>
           <div className="min-w-0">
             <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
-              <CalendarClock size={10} className="text-amber-400/70" />
+              <CalendarClock size={10} className="settings-icon" />
               Availability Window
             </p>
             <div className="flex items-baseline gap-2">
@@ -727,7 +710,7 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
           </div>
           <div className="min-w-0">
             <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
-              <Mail size={10} className="text-amber-400/70" />
+              <Mail size={10} className="settings-icon" />
               Email
             </p>
             <div className="flex items-baseline gap-2">
@@ -736,7 +719,7 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
           </div>
           <div className="min-w-0">
             <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
-              <PhoneCall size={10} className="text-amber-400/70" />
+              <PhoneCall size={10} className="settings-icon" />
               Phone Number
             </p>
             <div className="min-w-0 text-[11px] font-bold leading-none tracking-tight text-zinc-300">
@@ -745,7 +728,7 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
           </div>
           <div className="min-w-0">
             <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
-              <ListChecks size={10} className="text-amber-400/70" />
+              <ListChecks size={10} className="settings-icon" />
               Working Hours
             </p>
             <p className="truncate text-[11px] font-bold leading-none tracking-tight text-zinc-300">
@@ -800,12 +783,12 @@ const StaffDetailsModal = ({ staff, onClose, onEdit }) => {
         onClick={(e) => e.stopPropagation()}
         className="relative flex max-h-[calc(100vh-32px)] w-full max-w-[820px] flex-col overflow-hidden rounded-[32px] border border-white/[0.08] bg-[#070707]/95 text-left shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
       >
-        <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-orange-500/[0.07] blur-[90px]" />
+        <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-[90px]" style={{ background: 'var(--modalBloom)' }} />
         <div className="relative flex items-start justify-between gap-5 border-b border-white/[0.05] px-7 py-6">
           <div className="min-w-0">
             <div className="mb-3 flex items-center gap-2">
-              <span className={`h-1.5 w-1.5 rounded-full ${staff.is_active !== false ? 'bg-orange-300 shadow-[0_0_6px_rgba(253,186,116,0.45)]' : 'bg-zinc-600'}`} />
-              <span className={`text-[8px] font-bold uppercase tracking-widest ${staff.is_active !== false ? 'text-orange-300' : 'text-zinc-400'}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${staff.is_active !== false ? 'brand-gradient shadow-[0_0_6px_color-mix(in_srgb,var(--brandGradientStart)_45%,transparent)]' : 'bg-zinc-600'}`} />
+              <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-400">
                 {staff.is_active !== false ? 'Active' : 'Inactive'}
               </span>
             </div>
@@ -876,7 +859,7 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
   const [form, setForm] = useState(createServiceFormState(initial));
 
   return (
-    <div className="border border-amber-500/15 rounded-2xl bg-amber-500/[0.03] p-5 space-y-4">
+    <div className="border border-white/[0.06] rounded-2xl bg-white/[0.025] p-5 space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1.5 block">Service Name</label>
@@ -932,7 +915,7 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
         </button>
         <button onClick={() => onSave(form)}
           disabled={!form.name.trim()}
-          className="px-5 py-2 rounded-xl bg-amber-500 text-black text-[11px] font-black uppercase tracking-wider hover:bg-amber-400 transition-all disabled:opacity-20 disabled:cursor-not-allowed">
+          className="settings-neutral-button px-5 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all disabled:opacity-20 disabled:cursor-not-allowed">
           Save Service
         </button>
       </div>
@@ -1079,7 +1062,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked })
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.03]">
         <div className="flex items-center gap-2.5">
-          <DollarSign size={14} className="text-amber-400/60" />
+          <DollarSign size={14} className="settings-icon" />
           <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
             {services.length} service{services.length !== 1 ? 's' : ''} configured
           </span>
@@ -1121,7 +1104,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked })
           Object.entries(categories).map(([cat, catServices]) => (
             <div key={cat}>
               <div className="flex items-center gap-2 mb-3">
-                <Tag size={10} className="text-amber-400/40" />
+                <Tag size={10} className="settings-icon" />
                 <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.3em]">{cat}</span>
                 <div className="flex-1 h-px bg-white/[0.03]" />
               </div>
@@ -1164,7 +1147,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked })
                         </div>
 
                         {/* Price */}
-                        <span className="shrink-0 text-[12px] font-black text-amber-400/70 tabular-nums">
+                        <span className="shrink-0 text-[12px] font-black text-zinc-300 tabular-nums">
                           {formatPrice(svc)}
                         </span>
 
@@ -1486,13 +1469,13 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     }
 
     return (
-      <label className="flex h-[300px] cursor-pointer flex-col items-center justify-center rounded-[28px] border border-dashed border-white/[0.12] bg-white/[0.035] px-6 text-center transition hover:border-orange-300/40 hover:bg-white/[0.055]">
+      <label className="flex h-[300px] cursor-pointer flex-col items-center justify-center rounded-[28px] border border-dashed border-white/[0.12] bg-white/[0.035] px-6 text-center transition hover:border-white/25 hover:bg-white/[0.055]">
         <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-black/20 text-zinc-500">
           <Upload size={24} />
         </div>
         <p className="text-sm font-bold text-white">{avatarUploading ? 'Uploading image...' : 'Upload staff image'}</p>
         <p className="mt-2 max-w-sm text-xs leading-5 text-zinc-600">Choose a clear image file. Once uploaded, it will be saved as this staff member's profile photo.</p>
-        {(avatarUploadName || form.avatar) && <p className="mt-4 max-w-full truncate text-xs text-orange-300/80">{avatarUploadName || 'Image ready'}</p>}
+        {(avatarUploadName || form.avatar) && <p className="mt-4 max-w-full truncate text-xs text-zinc-300">{avatarUploadName || 'Image ready'}</p>}
         <input type="file" accept="image/*" className="hidden" disabled={avatarUploading || saving} onChange={(e) => uploadStaffAvatar(e.target.files?.[0])} />
       </label>
     );
@@ -1517,7 +1500,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       <div className="space-y-4">
         {!hideToolbar && <div className="flex items-center justify-between rounded-[24px] border border-white/[0.05] bg-zinc-950/30 px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <Users size={14} className="text-cyan-400/60" />
+            <Users size={14} className="settings-icon" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
               {staffMembers.length} staff member{staffMembers.length !== 1 ? 's' : ''} configured
             </span>
@@ -1641,14 +1624,14 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
               onClick={(e) => e.stopPropagation()}
               className="relative max-h-[calc(100vh-24px)] w-full max-w-[700px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
             >
-              <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-orange-500/[0.07] blur-[90px]" />
+              <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-[90px]" style={{ background: 'var(--modalBloom)' }} />
               <div className="relative p-6 sm:p-8">
                 <div className="mb-6 flex items-start justify-between gap-5">
                   <div className="min-w-0 flex-1">
                     <div className="flex h-4 items-center gap-3 pr-8">
-                      <p className="shrink-0 text-[13px] font-normal leading-4 text-orange-300">{staffSteps[staffSlide].label} · {staffSlide + 1} of {staffSteps.length}</p>
+                      <p className="shrink-0 text-[13px] font-normal leading-4 text-zinc-300">{staffSteps[staffSlide].label} · {staffSlide + 1} of {staffSteps.length}</p>
                       <div className="h-1 w-[190px] shrink-0 translate-y-0 overflow-hidden rounded-full bg-white/[0.06]">
-                        <div className="h-full rounded-full bg-gradient-to-r from-orange-300 via-orange-400 to-orange-600 transition-all duration-500" style={{ width: `${((staffSlide + 1) / staffSteps.length) * 100}%` }} />
+                        <div className="h-full rounded-full brand-gradient transition-all duration-500" style={{ width: `${((staffSlide + 1) / staffSteps.length) * 100}%` }} />
                       </div>
                     </div>
                     <div className="mt-5 flex items-center gap-3">
@@ -1656,7 +1639,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                         {staffSteps[staffSlide].title}
                       </h2>
                       {staffSlide === 2 && (
-                        <button type="button" onClick={() => setShowKnowledgeTips(true)} className="h-6 rounded-full border border-white/[0.08] px-2.5 text-[10px] font-semibold tracking-normal text-zinc-500 transition hover:border-orange-300/30 hover:text-orange-300">
+                        <button type="button" onClick={() => setShowKnowledgeTips(true)} className="h-6 rounded-full border border-white/[0.08] px-2.5 text-[10px] font-semibold tracking-normal text-zinc-500 transition hover:border-white/20 hover:text-zinc-300">
                           Tips
                         </button>
                       )}
@@ -1734,7 +1717,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-[13px] font-normal text-orange-300">Knowledge tips</p>
+                        <p className="text-[13px] font-normal text-zinc-300">Knowledge tips</p>
                         <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">What should go here?</h3>
                       </div>
                       <button type="button" onClick={() => setShowKnowledgeTips(false)} className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.05] hover:text-white">
@@ -1800,7 +1783,7 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
               onClick={() => { setActiveTab(tab.key); setShowPreview(false); }}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap
                 ${isActive
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.08)]'
+                  ? 'bg-white/[0.06] text-white border border-white/[0.08] shadow-[0_0_15px_color-mix(in_srgb,var(--brandGradientStart)_8%,transparent)]'
                   : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.02] border border-transparent'
                 }`}
             >
@@ -1817,7 +1800,7 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
       {/* Hint bar */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.02] bg-white/[0.01]">
         <div className="flex items-center gap-2">
-          <Lightbulb size={12} className="text-amber-400/60" />
+          <Lightbulb size={12} className="settings-icon" />
           <span className="text-[11px] text-zinc-600">{activeConfig.hint}</span>
         </div>
         <div className="flex items-center gap-3">
@@ -1826,7 +1809,7 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
             onClick={() => setShowPreview(!showPreview)}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all
               ${showPreview
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                ? 'bg-white/[0.06] text-white border border-white/[0.08]'
                 : 'text-zinc-700 hover:text-zinc-400 border border-transparent'
               }`}
           >
@@ -1852,8 +1835,8 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
                     if (line.startsWith('Q:') || line.startsWith('A:')) {
                       const isQuestion = line.startsWith('Q:');
                       return (
-                        <div key={i} className={isQuestion ? 'mt-4 mb-1' : 'mb-2 pl-4 border-l-2 border-amber-500/10'}>
-                          <span className={`font-bold ${isQuestion ? 'text-amber-400/80' : 'text-cyan-400/60'}`}>
+                        <div key={i} className={isQuestion ? 'mt-4 mb-1' : 'mb-2 pl-4 border-l-2 border-white/[0.08]'}>
+                          <span className={`font-bold ${isQuestion ? 'text-zinc-200' : 'text-zinc-500'}`}>
                             {line.substring(0, 2)}
                           </span>
                           <span className={isQuestion ? 'text-zinc-200 font-semibold' : 'text-zinc-400'}>
@@ -1865,13 +1848,13 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
                     if (line.startsWith('•') || line.startsWith('-')) {
                       return (
                         <div key={i} className="pl-4 flex items-start gap-2 my-1">
-                          <span className="text-amber-400/40 mt-0.5 shrink-0">▸</span>
+                          <span className="text-zinc-500 mt-0.5 shrink-0">▸</span>
                           <span className="text-zinc-400">{line.substring(1).trim()}</span>
                         </div>
                       );
                     }
                     if (line.startsWith('SERVICES') || line.startsWith('WHAT') || line.startsWith('CANCELLATION') || line.startsWith('PAYMENT') || line.startsWith('WARRANTY') || line.startsWith('INSURANCE')) {
-                      return <div key={i} className="text-amber-400/80 font-black text-[12px] uppercase tracking-wider mt-4 mb-2">{line}</div>;
+                      return <div key={i} className="text-zinc-200 font-black text-[12px] uppercase tracking-wider mt-4 mb-2">{line}</div>;
                     }
                     if (line.trim() === '') {
                       return <div key={i} className="h-2" />;
@@ -1906,7 +1889,7 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
       <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.03] bg-white/[0.01]">
         <button
           onClick={loadTemplate}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-amber-500/15 bg-amber-500/5 text-[11px] font-bold text-amber-400 uppercase tracking-wider hover:bg-amber-500/10 hover:border-amber-500/25 transition-all"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-white/[0.08] bg-white/[0.04] text-[11px] font-bold text-zinc-300 uppercase tracking-wider hover:bg-white/[0.06] hover:border-white/15 transition-all"
         >
           <Star size={12} />
           Load Template
@@ -2005,9 +1988,9 @@ const IntroMessageEditor = ({ value, onChange }) => {
             onDragStart={(e) => handleDragStart(e, v.key)}
             onClick={() => insertVariable(v.key)}
             title={v.desc}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/8 border border-indigo-500/15 text-[10px] font-bold text-indigo-400 uppercase tracking-wider hover:bg-indigo-500/15 hover:border-indigo-500/25 transition-all cursor-grab active:cursor-grabbing select-none"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-zinc-300 uppercase tracking-wider hover:bg-white/[0.06] hover:border-white/15 transition-all cursor-grab active:cursor-grabbing select-none"
           >
-            <GripVertical size={10} className="text-indigo-500/40" />
+            <GripVertical size={10} className="settings-icon" />
             {v.label}
           </button>
         ))}
@@ -2040,7 +2023,7 @@ const IntroMessageEditor = ({ value, onChange }) => {
           <span className="text-[10px] text-zinc-700 tabular-nums">{wordCount} words · {(value || '').length} chars</span>
         </div>
         <div className="flex items-center gap-2">
-          <Lightbulb size={11} className="text-amber-400/60" />
+          <Lightbulb size={11} className="settings-icon" />
           <span className="text-[10px] text-zinc-600">Variables resolve dynamically per call — receptionist and business names update automatically</span>
         </div>
       </div>
@@ -2102,7 +2085,7 @@ const BusinessForwardingSettings = ({ authSession }) => {
           <div className="flex items-start justify-between gap-5">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <PhoneCall size={15} className="text-orange-400/70" />
+                <PhoneCall size={15} className="settings-icon" />
                 <h4 className="text-[13px] font-semibold text-zinc-100">Business Number Forwarding</h4>
                 <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
                   isVerified
@@ -2119,7 +2102,7 @@ const BusinessForwardingSettings = ({ authSession }) => {
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="shrink-0 rounded-xl bg-orange-500/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-orange-300 transition-all hover:bg-orange-500/15 active:scale-95"
+              className="settings-neutral-button shrink-0 rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
             >
               {entry ? 'Manage' : 'Setup'}
             </button>
@@ -2421,13 +2404,13 @@ const SettingsPage = () => {
   };
 
   const settingsSections = [
-    { id: 'business', title: 'Business Info', icon: Building2, color: 'text-indigo-400', hint: 'Name, contact, and location' },
-    { id: 'forwarding', title: 'Connections', icon: PhoneCall, color: 'text-orange-400', hint: 'Call routing' },
-    { id: 'preferences', title: 'Preferences', icon: Shield, color: 'text-emerald-400', hint: 'Call permissions and controls' },
-    { id: 'intro', title: 'Intro Message', icon: MessageSquareText, color: 'text-indigo-400', hint: 'Opening call greeting' },
-    { id: 'appointments', title: 'Hours', icon: Calendar, color: 'text-cyan-400', hint: 'Business availability' },
-    { id: 'services', title: 'Services & Pricing', icon: Tag, color: 'text-amber-400', hint: 'Offer catalog and rates' },
-    { id: 'knowledge', title: 'Knowledge Base', icon: BookOpen, color: 'text-amber-400', hint: 'Policies, FAQs, and context' },
+    { id: 'business', title: 'Business Info', icon: Building2, iconClass: 'settings-icon', hint: 'Name, contact, and location' },
+    { id: 'forwarding', title: 'Connections', icon: PhoneCall, iconClass: 'settings-icon', hint: 'Call routing' },
+    { id: 'preferences', title: 'Preferences', icon: Shield, iconClass: 'settings-icon', hint: 'Call permissions and controls' },
+    { id: 'intro', title: 'Intro Message', icon: MessageSquareText, iconClass: 'settings-icon', hint: 'Opening call greeting' },
+    { id: 'appointments', title: 'Hours', icon: Calendar, iconClass: 'settings-icon', hint: 'Business availability' },
+    { id: 'services', title: 'Services & Pricing', icon: Tag, iconClass: 'settings-icon', hint: 'Offer catalog and rates' },
+    { id: 'knowledge', title: 'Knowledge Base', icon: BookOpen, iconClass: 'settings-icon', hint: 'Policies, FAQs, and context' },
   ];
 
   const activeSectionConfig = settingsSections.find(section => section.id === activeSection) || settingsSections[0];
@@ -2445,7 +2428,7 @@ const SettingsPage = () => {
                 The first thing callers hear when your AI receptionist picks up. Use variables to personalize it automatically.
               </p>
               <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
-                <Info size={11} className="text-indigo-400/60 shrink-0" />
+                <Info size={11} className="settings-icon shrink-0" />
                 Variables resolve dynamically if the receptionist changes.
               </p>
             </div>
@@ -2459,7 +2442,7 @@ const SettingsPage = () => {
         return (
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <Clock size={14} className="text-cyan-400/60" />
+              <Clock size={14} className="settings-icon" />
               <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Business Hours</span>
             </div>
             <div className="flex flex-col">
@@ -2492,7 +2475,7 @@ const SettingsPage = () => {
                 Your AI receptionist reads these documents during calls. They contain your business story, policies, and common answers.
               </p>
               <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
-                <Info size={11} className="text-amber-400/60 shrink-0" />
+                <Info size={11} className="settings-icon shrink-0" />
                 Each tab has a ready-to-customize template.
               </p>
             </div>
@@ -2509,12 +2492,12 @@ const SettingsPage = () => {
               <div className="flex items-start justify-between gap-5">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <Shield size={15} className="text-emerald-400/70" />
+                    <Shield size={15} className="settings-icon" />
                     <h4 className="text-[13px] font-semibold text-zinc-100">Authenticate Callers</h4>
                     <span className="group relative inline-flex">
                       <button
                         type="button"
-                        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/[0.12] text-[10px] font-bold text-zinc-500 transition-colors hover:border-cyan-400/40 hover:text-cyan-300 outline-none focus:outline-none focus-visible:outline-none"
+                        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/[0.12] text-[10px] font-bold text-zinc-500 transition-colors hover:border-white/30 hover:text-zinc-300 outline-none focus:outline-none focus-visible:outline-none"
                         aria-label="Caller authentication details"
                       >
                         i
@@ -2586,13 +2569,21 @@ const SettingsPage = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#020202] text-zinc-400 font-sans selection:bg-indigo-500/20 overflow-hidden">
+    <div className="settings-page-scope h-full flex flex-col bg-[#020202] text-zinc-400 font-sans selection:bg-indigo-500/20 overflow-hidden">
 
       {/* ─── Header ─────────────────────────────────────────────────────── */}
       <header className="shrink-0 flex items-center justify-between border-b border-white/[0.02] bg-gradient-to-b from-zinc-950/20 to-transparent px-8 py-6">
         <div className="flex items-center gap-4">
-          <div className="p-2.5 bg-indigo-500/5 rounded-xl border border-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.05)]">
-            <Settings className="text-indigo-400" size={22} />
+          <div>
+            <svg width="0" height="0" className="absolute">
+              <defs>
+                <linearGradient id="brandIconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="var(--brandGradientStart)" />
+                  <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <Settings className="settings-icon" size={22} />
           </div>
           <div>
             <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Settings</h2>
@@ -2603,11 +2594,7 @@ const SettingsPage = () => {
         <button
           onClick={handleSave}
           disabled={saving}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95
-            ${savedFlash
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-              : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.3)]'
-            }`}
+          className="settings-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95"
         >
           {savedFlash ? <><Check size={14} /> Saved</> : saving ? 'Saving...' : <><Save size={14} /> Save Changes</>}
         </button>
@@ -2641,7 +2628,7 @@ const SettingsPage = () => {
                     }`}
                   >
                     <span className="flex items-center gap-3">
-                      <Icon size={16} className={isActive ? section.color : 'text-zinc-600'} />
+                      <Icon size={16} className={section.iconClass} />
                       <span className="min-w-0">
                         <span className="block text-[13px] font-semibold tracking-[-0.02em]">{section.title}</span>
                         <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{section.hint}</span>
@@ -2655,8 +2642,8 @@ const SettingsPage = () => {
 
           <section className="min-h-0 overflow-auto custom-scrollbar rounded-[28px] border border-white/[0.05] bg-gradient-to-b from-zinc-950/40 to-transparent p-6">
             <div className="mb-6 flex items-center gap-3 border-b border-white/[0.04] pb-5">
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2.5">
-                <ActiveSettingsIcon size={18} className={activeSectionConfig.color} />
+              <div>
+                <ActiveSettingsIcon size={18} className={activeSectionConfig.iconClass} />
               </div>
               <div>
                 <h3 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">{activeSectionConfig.title}</h3>
@@ -2672,7 +2659,7 @@ const SettingsPage = () => {
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
 
           {/* ── Business Info ────────────────────────────────────────────── */}
-          <Section title="Business Info" icon={Building2} color="bg-indigo-500/10 text-indigo-400" defaultOpen={true}>
+          <Section title="Business Info" icon={Building2} color="bg-white/[0.04] text-white" defaultOpen={true}>
             <div className="grid grid-cols-2 gap-x-6">
               <Field label="Business Name">
                 <TextInput value={settings.business_name} onChange={(v) => update('business_name', v)} placeholder="Acme Corp" />
@@ -2708,13 +2695,13 @@ const SettingsPage = () => {
           </Section>
 
           {/* ── Intro Message ─────────────────────────────────────────────── */}
-          <Section title="Intro Message" icon={MessageSquareText} color="bg-indigo-500/10 text-indigo-400" defaultOpen={true}>
+          <Section title="Intro Message" icon={MessageSquareText} color="bg-white/[0.04] text-white" defaultOpen={true}>
             <div className="mb-4">
               <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
                 The first thing callers hear when your AI receptionist picks up. Use variables to personalize it automatically.
               </p>
               <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
-                <Info size={11} className="text-indigo-400/60 shrink-0" />
+                <Info size={11} className="settings-icon shrink-0" />
                 Variables resolve dynamically — if the receptionist changes, the greeting updates automatically.
               </p>
             </div>
@@ -2725,10 +2712,10 @@ const SettingsPage = () => {
           </Section>
 
           {/* ── Calendar & Appointments ──────────────────────────────────── */}
-          <Section title="Calendar & Appointments" icon={Calendar} color="bg-cyan-500/10 text-cyan-400" defaultOpen={true}>
+          <Section title="Calendar & Appointments" icon={Calendar} color="bg-white/[0.04] text-white" defaultOpen={true}>
             <div className="border-t border-white/[0.03] pt-5 mt-1">
               <div className="flex items-center gap-2 mb-4">
-                <Clock size={14} className="text-cyan-400/60" />
+                <Clock size={14} className="settings-icon" />
                 <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Business Hours</span>
               </div>
               <div className="flex flex-col">
@@ -2741,7 +2728,7 @@ const SettingsPage = () => {
 
           {/* ── Call & Notification Settings ─────────────────────────────── */}
           {/* ── Services & Pricing ──────────────────────────────────────── */}
-          <Section title="Services & Pricing" icon={Tag} color="bg-amber-500/10 text-amber-400" defaultOpen={true}>
+          <Section title="Services & Pricing" icon={Tag} color="bg-white/[0.04] text-white" defaultOpen={true}>
             <div className="mb-4">
               <p className="text-[12px] text-zinc-500 leading-relaxed">
                 Your AI receptionist uses these to answer pricing questions and describe what you offer.
@@ -2756,13 +2743,13 @@ const SettingsPage = () => {
           </Section>
 
           {/* ── Knowledge Base ──────────────────────────────────────────── */}
-          <Section title="Knowledge Base" icon={BookOpen} color="bg-amber-500/10 text-amber-400" defaultOpen={true}>
+          <Section title="Knowledge Base" icon={BookOpen} color="bg-white/[0.04] text-white" defaultOpen={true}>
             <div className="mb-4">
               <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
                 Your AI receptionist reads these documents during calls. They contain everything it needs to know about your business — your story, services, pricing, policies, and common answers.
               </p>
               <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
-                <Info size={11} className="text-amber-400/60 shrink-0" />
+                <Info size={11} className="settings-icon shrink-0" />
                 Each tab below has a ready-to-customize template. Just edit the placeholders and your receptionist knows your business.
               </p>
             </div>

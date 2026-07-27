@@ -18,8 +18,8 @@ const getConfiguredOptions = (field, fieldConfig) => fieldConfig?.[field.key]?.o
 
 const colorStyles = {
   emerald: { dot: '#10b981', className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-  cyan: { dot: '#06b6d4', className: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
-  blue: { dot: '#3b82f6', className: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  cyan: { dot: 'var(--brandGradientStart)', className: 'bg-white/[0.04] text-zinc-300 border-white/[0.08]' },
+  blue: { dot: 'var(--brandGradientEnd)', className: 'bg-white/[0.04] text-zinc-300 border-white/[0.08]' },
   amber: { dot: '#f59e0b', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
   orange: { dot: '#f97316', className: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
   fuchsia: { dot: '#d946ef', className: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20' },
@@ -87,7 +87,7 @@ const SelectEditor = ({ field, value, onChange, fieldConfig }) => {
                 <button key={option} type="button" onClick={() => { onChange(option); setOpen(false); }} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: optionStyle.dot }} />
                   <span className="min-w-0 flex-1 truncate">{option}</span>
-                  {active && <Check size={11} className="text-cyan-400" />}
+                  {active && <Check size={11} className="brand-icon" />}
                 </button>
               );
             })}
@@ -143,7 +143,7 @@ const LookupEditor = ({ value, options = [], onChange, placeholder = 'Search...'
               {filtered.map((option) => (
                 <button key={option.value} type="button" onClick={() => { onChange(option.value); setOpen(false); }} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] hover:bg-white/[0.06] ${current?.value === option.value ? 'text-white' : 'text-zinc-400'}`}>
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                  {current?.value === option.value && <Check size={11} className="text-cyan-400" />}
+                  {current?.value === option.value && <Check size={11} className="brand-icon" />}
                 </button>
               ))}
               {filtered.length === 0 && <div className="px-3 py-2 text-[11px] text-zinc-600">No matches</div>}

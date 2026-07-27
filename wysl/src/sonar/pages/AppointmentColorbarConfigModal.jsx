@@ -96,7 +96,7 @@ const StudioSelect = ({ value, options, onChange, placeholder = 'Select...', cla
                   >
                     {option.color ? <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: option.color }} /> : null}
                     <span className="min-w-0 truncate">{option.label}</span>
-                    {active && <Check size={11} className="ml-auto shrink-0 text-cyan-400" />}
+                    {active && <Check size={11} className="ml-auto shrink-0 brand-icon" />}
                   </motion.button>
                 );
               })}
@@ -330,8 +330,8 @@ const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
 
         {/* Toggle enabled */}
         <button onClick={e => { e.stopPropagation(); updateRule({ enabled: !rule.enabled }); }}
-          className={`w-8 h-5 rounded-full transition-all relative ${rule.enabled ? 'bg-cyan-500/30' : 'bg-zinc-800'}`}>
-          <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${rule.enabled ? 'left-3.5 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'left-0.5 bg-zinc-600'}`} />
+          className={`w-8 h-5 rounded-full transition-all relative ${rule.enabled ? 'dashboard-toggle-active' : 'bg-zinc-800'}`}>
+          <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${rule.enabled ? 'left-3.5 bg-white' : 'left-0.5 bg-zinc-600'}`} />
         </button>
 
         {/* Expand / Delete */}
@@ -366,7 +366,7 @@ const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
                     fields={fields} />
                 ))}
                 <button onClick={addCondition}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 hover:text-cyan-400 transition-colors">
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 hover:text-zinc-300 transition-colors">
                   <Plus size={10} /> Add Condition
                 </button>
               </div>
@@ -518,8 +518,8 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
         <div className="shrink-0 border-b border-white/[0.04] px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-500/10 to-fuchsia-500/10 border border-white/[0.06]">
-                <Wand2 size={14} className="text-cyan-400" />
+              <div className="p-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <Wand2 size={14} className="settings-icon" />
               </div>
               <div className="min-w-0">
                 <h3 className="flex items-center gap-2 text-[14px] font-semibold leading-none tracking-[-0.03em] text-white">
@@ -538,7 +538,7 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
         {/* Rules List */}
         <div ref={scrollRef} className="crm-modal-scrollbar flex-1 overflow-y-auto p-6 space-y-3">
           <button onClick={handleAddRule} disabled={!defaultField}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[0.06] py-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 transition-all hover:border-cyan-500/20 hover:text-cyan-400">
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[0.06] py-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-600 transition-all hover:border-white/20 hover:text-zinc-300">
             <Plus size={13} /> Add Rule
           </button>
 
@@ -572,7 +572,7 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
               Cancel
             </button>
             <button onClick={() => { handleSave(); onClose(); }}
-              className="rounded-xl bg-white px-5 py-2.5 text-[11px] font-semibold tracking-[-0.02em] text-black transition-all hover:bg-cyan-400 active:scale-95">
+              className="dashboard-neutral-button rounded-xl px-5 py-2.5 text-[11px] font-semibold tracking-[-0.02em] transition-all active:scale-95">
               <Zap size={10} className="inline mr-1" /> Apply Rules
             </button>
           </div>

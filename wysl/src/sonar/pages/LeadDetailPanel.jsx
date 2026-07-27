@@ -27,8 +27,8 @@ const getOptionColor = (field, fieldConfig, value) => {
 
 const colorStyles = {
   emerald: { dot: '#10b981', className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-  cyan: { dot: '#06b6d4', className: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
-  blue: { dot: '#3b82f6', className: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  cyan: { dot: 'var(--brandGradientStart)', className: 'bg-white/[0.04] text-zinc-300 border-white/[0.08]' },
+  blue: { dot: 'var(--brandGradientEnd)', className: 'bg-white/[0.04] text-zinc-300 border-white/[0.08]' },
   amber: { dot: '#f59e0b', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
   orange: { dot: '#f97316', className: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
   fuchsia: { dot: '#d946ef', className: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20' },
@@ -100,7 +100,7 @@ const SelectEditor = ({ field, value, onChange, fieldConfig }) => {
                 >
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: optionStyle.dot }} />
                   <span className="min-w-0 flex-1 truncate">{option}</span>
-                  {active && <Check size={11} className="text-cyan-400" />}
+                  {active && <Check size={11} className="brand-icon" />}
                 </button>
               );
             })}
@@ -132,7 +132,7 @@ const MultiSelectEditor = ({ field, value, onChange, fieldConfig }) => {
             key={option}
             type="button"
             onClick={() => toggle(option)}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-semibold tracking-[-0.02em] transition ${active ? 'border-cyan-500/25 bg-cyan-500/10 text-cyan-300' : 'border-white/[0.06] bg-white/[0.02] text-zinc-500 hover:border-white/15 hover:text-zinc-300'}`}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-semibold tracking-[-0.02em] transition ${active ? 'border-cyan-500/25 bg-cyan-500/10 brand-icon' : 'border-white/[0.06] bg-white/[0.02] text-zinc-500 hover:border-white/15 hover:text-zinc-300'}`}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: dot }} />
             {option}

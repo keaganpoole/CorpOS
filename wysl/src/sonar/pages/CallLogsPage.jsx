@@ -60,7 +60,7 @@ const STATUS_STYLES = {
   },
   escalated: {
     icon: AlertCircle,
-    className: 'bg-cyan-400/8 text-cyan-300',
+    className: 'bg-cyan-400/8 brand-icon',
   },
 };
 
@@ -241,7 +241,7 @@ function DirectionIcon({ direction, compact = false, withLabel = false }) {
   const Icon = isOutbound ? ArrowUpRight : ArrowDownLeft;
   const label = isOutbound ? 'Outbound' : isInbound ? 'Inbound' : 'Unknown';
   const className = isOutbound
-    ? 'text-cyan-200'
+    ? 'text-zinc-200'
     : isInbound
       ? 'text-zinc-200'
       : 'text-zinc-400';
@@ -317,7 +317,7 @@ function CallLogsLoader() {
   return (
     <div className="px-4 py-6">
       <div className="flex items-center gap-3 text-zinc-500">
-        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center text-cyan-300/80">
+        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center text-zinc-300">
           <motion.div
             animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.96, 1.04, 0.96] }}
             transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
@@ -481,7 +481,7 @@ function TranscriptBubble({ entry, receptionistAvatar, receptionistName, custome
           className={cn(
             'rounded-2xl px-4 py-3 text-[13px] leading-6 shadow-[0_12px_30px_rgba(0,0,0,0.18)]',
             isReceptionist
-              ? 'rounded-br-md bg-cyan-400/10 text-cyan-50'
+              ? 'rounded-br-md bg-cyan-400/10 text-zinc-50'
               : 'rounded-bl-md bg-white/[0.06] text-zinc-100'
           )}
         >
@@ -506,7 +506,7 @@ function TranscriptBubble({ entry, receptionistAvatar, receptionistName, custome
         />
       )}
       {isReceptionist && (!receptionistAvatar || avatarFailed) && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-[11px] font-bold text-cyan-100">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-[11px] font-bold text-zinc-100">
           {initial}
         </div>
       )}
@@ -747,7 +747,7 @@ export default function CallLogsPage() {
       <div className="shrink-0 border-b border-white/[0.05] px-5 py-5 sm:px-7">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/8 text-cyan-300">
+            <div className="flex h-11 w-11 items-center justify-center brand-icon">
               <Phone size={21} />
             </div>
             <div>

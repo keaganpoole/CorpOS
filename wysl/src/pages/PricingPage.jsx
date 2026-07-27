@@ -188,14 +188,14 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
 
         const savingsEl = savingsRef.current;
         savingsEl.innerHTML = '\u00A0';
-        savingsEl.classList.remove('animate', 'savings-gradient-text', 'text-green-500');
+        savingsEl.classList.remove('animate', 'savings-gradient-text', 'text-zinc-400');
         
         if (price > 0) {
             scrambleFx.current.setText(String(price)).then(() => {
                 if (cycle === 'annually' && annualSavings > 0) {
                     setTimeout(() => {
                         savingsEl.innerHTML = `Save $${annualSavings} per year!`;
-                        savingsEl.classList.add('animate', 'text-green-500');
+                        savingsEl.classList.add('animate', 'text-zinc-400');
                     }, 100);
                 }
             });
@@ -211,7 +211,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
                     <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-                    {plan.isRecommended && <span className="text-xs font-semibold gradient-text animate-glow" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
+                    {plan.isRecommended && <span className="text-xs font-semibold pricing-recommended-text animate-glow" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
                 </div>
                 <p className="text-gray-400 mt-2">{plan.description}</p>
                 <div className="my-6">
@@ -274,8 +274,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
                     <button 
                         onClick={handleUpgradeClick}
                         disabled={isCheckoutLoading}
-                        className="w-full mt-auto font-semibold py-3 rounded-lg text-[var(--color3)] hover:opacity-90 transition-opacity btn-shine disabled:opacity-50 disabled:cursor-wait"
-                        style={{ background: 'linear-gradient(to right, var(--color1), var(--color2))' }}>
+                        className="pricing-neutral-button w-full mt-auto font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity btn-shine disabled:opacity-50 disabled:cursor-wait">
                         {isCheckoutLoading ? 'Redirecting...' : (
                             isTestMode ? 'Test this subscription' : (
                                 plan.name === 'Free' ? 'Choose plan' : (
@@ -401,7 +400,7 @@ const PricingPage = () => {
     return (
         <div className="pricing-page-bg text-gray-300 antialiased min-h-screen">
             <svg width="0" height="0" style={{ position: 'absolute' }}><defs>
-                <linearGradient id="checkGradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#22d3ee" /><stop offset="100%" stopColor="#a855f7" /></linearGradient>
+                <linearGradient id="checkGradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient>
             </defs></svg>
             <div className="absolute top-0 left-0 right-0 pt-4">
                 <div className="text-center">
@@ -421,8 +420,8 @@ const PricingPage = () => {
                 <div className="flex justify-center items-center mb-12">
                     <div className="relative flex items-center bg-[#1a1a1a] p-1 rounded-full border border-gray-800">
                         <div ref={pillBgRef} className="absolute h-[85%] rounded-full gradient-bg transition-all duration-300 ease-in-out"></div>
-                        <button ref={annualBtnRef} onClick={() => setCycle('annually')} className={`toggle-button relative z-10 text-sm font-semibold px-6 py-2 transition-colors duration-300 ${cycle === 'annually' ? '' : 'text-gray-400'}`} style={{ color: cycle === 'annually' ? 'var(--color3)' : ''}}>Annually</button>
-                        <button ref={monthlyBtnRef} onClick={() => setCycle('monthly')} className={`toggle-button relative z-10 text-sm font-semibold px-6 py-2 transition-colors duration-300 ${cycle === 'monthly' ? '' : 'text-gray-400'}`} style={{ color: cycle === 'monthly' ? 'var(--color3)' : ''}}>Monthly</button>
+                        <button ref={annualBtnRef} onClick={() => setCycle('annually')} className={`toggle-button relative z-10 text-sm font-semibold px-6 py-2 transition-colors duration-300 ${cycle === 'annually' ? 'text-[var(--buttonText)]' : 'text-gray-400'}`}>Annually</button>
+                        <button ref={monthlyBtnRef} onClick={() => setCycle('monthly')} className={`toggle-button relative z-10 text-sm font-semibold px-6 py-2 transition-colors duration-300 ${cycle === 'monthly' ? 'text-[var(--buttonText)]' : 'text-gray-400'}`}>Monthly</button>
                     </div>
                 </div>
                 <div className="relative text-center">

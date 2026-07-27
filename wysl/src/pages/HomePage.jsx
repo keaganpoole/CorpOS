@@ -50,7 +50,7 @@ const NUMBER_ICON_MASKS = {
   plus: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2.25a9.75 9.75 0 1 0 0 19.5 9.75 9.75 0 0 0 0-19.5Zm0 4.25a.75.75 0 0 1 .75.75v3.25H16a.75.75 0 0 1 0 1.5h-3.25V15a.75.75 0 0 1-1.5 0v-3.25H8a.75.75 0 0 1 0-1.5h3.25V7.25A.75.75 0 0 1 12 6.5Z"/></svg>')}`,
 };
 
-const NumberGradientIcon = ({ icon = 'transfer', colors = ['#ff4fd8', '#8b5cf6'] }) => {
+const NumberGradientIcon = ({ icon = 'transfer', colors = ['var(--brandGradientStart)', 'var(--brandGradientEnd)'] }) => {
   const iconMask = NUMBER_ICON_MASKS[icon] || NUMBER_ICON_MASKS.transfer;
 
   return (
@@ -74,10 +74,10 @@ const NumberGradientIcon = ({ icon = 'transfer', colors = ['#ff4fd8', '#8b5cf6']
 
 const HERO_RECEPTIONIST_FEATURE_ITEMS = [
   {
-    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-cyan-300" />,
+    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
     colorClass: 'bg-cyan-400',
-    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
-    hoverTextClass: 'group-hover:text-cyan-400',
+    glowClass: 'shadow-[0_0_12px_color-mix(in srgb, var(--brandGradientStart) 60%, transparent)]',
+    hoverTextClass: 'group-hover:text-white',
     title: '24/7 Call Handling',
     copy: 'Answer inbound calls instantly, day or night, so customers reach your business instead of voicemail.',
   },
@@ -98,10 +98,10 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     copy: 'Allow customers to securely upload documents by texting them a secure upload link during the call, eliminating the need to email files or call back later.',
   },
   {
-    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-blue-300" />,
+    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-pink-300" />,
     colorClass: 'bg-blue-500',
     glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
-    hoverTextClass: 'group-hover:text-blue-400',
+    hoverTextClass: 'group-hover:text-zinc-300',
     title: 'Payments',
     copy: 'Collect deposits, send payment links, process payments, and answer billing questions without handing the call to staff.',
   },
@@ -404,7 +404,7 @@ const NumberOptionsShowcase = () => {
         <div className="grid w-full max-w-[980px] grid-cols-1 gap-16 justify-items-center lg:grid-cols-[1fr_auto_1fr] lg:gap-12 lg:items-stretch">
           <div className="w-full max-w-[24rem] text-left">
               <div className="homepage-number-pill">
-                <NumberGradientIcon icon="transfer" colors={['#ff4fd8', '#8b5cf6']} />
+                <NumberGradientIcon icon="transfer" colors={['var(--brandGradientStart)', 'var(--brandGradientEnd)']} />
                 <span>Forward existing line</span>
               </div>
               <h2 className="homepage-number-title">
@@ -433,7 +433,7 @@ const NumberOptionsShowcase = () => {
 
           <div className="w-full max-w-[24rem] text-left">
               <div className="homepage-number-pill">
-                <NumberGradientIcon icon="plus" colors={['#ff4fd8', '#8b5cf6']} />
+                <NumberGradientIcon icon="plus" colors={['var(--brandGradientStart)', 'var(--brandGradientEnd)']} />
                 <span>Claim a new line</span>
               </div>
               <h2 className="homepage-number-title">
