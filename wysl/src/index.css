@@ -96,6 +96,7 @@ body {
 /* Existing cyan/teal utility accents now resolve through the brand system without recoloring body text. */
 :where([class*="border-cyan-"]) { border-color: color-mix(in srgb, var(--brandGradientStart) 42%, transparent) !important; }
 :where([class*="bg-cyan-"]) { background-color: color-mix(in srgb, var(--brandGradientStart) 12%, transparent) !important; }
+.feature-reveal-row__dot.bg-cyan-400 { background-color: #22d3ee !important; }
 
 .dashboard-neutral-button,
 .settings-neutral-button {
