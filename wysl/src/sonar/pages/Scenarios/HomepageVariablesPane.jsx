@@ -1080,7 +1080,10 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
     <>
       {prevNodes.map((prev) => {
         const NodeIcon = prev.icon;
-        const color = prev.isIteratorNode ? '#f472b6' : '#a78bfa';
+        const isPeopleVariableSet = String(prev.label || '').toLowerCase() === 'people';
+        const color = isPeopleVariableSet ? '#32f0d9' : (prev.isIteratorNode ? '#f472b6' : '#a78bfa');
+        const responseBg = isPeopleVariableSet ? 'rgba(50,240,217,0.08)' : 'rgba(167,139,250,0.08)';
+        const responseBorder = isPeopleVariableSet ? 'rgba(50,240,217,0.2)' : 'rgba(167,139,250,0.2)';
         const isExpanded = expandedNodes[prev.nodeId] !== false;
         const hasOutput = prev.outputData != null;
         const sourceName = prev.isStripeResponse ? 'Stripe' : null;
@@ -1094,8 +1097,8 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
             className="sb-vars-table-group sb-vars-table-group--response"
             style={{
               '--table-color': color,
-              '--table-bg': 'rgba(167,139,250,0.08)',
-              '--table-border': 'rgba(167,139,250,0.2)',
+              '--table-bg': responseBg,
+              '--table-border': responseBorder,
             }}
             onMouseEnter={() => onTableHover?.(color)}
             onMouseLeave={() => onTableHover?.('')}
@@ -1107,7 +1110,11 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
                 background: 'rgba(244,114,182,0.08)',
                 borderColor: 'rgba(244,114,182,0.2)',
                 boxShadow: 'none',
-              } : undefined}
+              } : {
+                background: responseBg,
+                borderColor: responseBorder,
+                boxShadow: `inset 0 0 0 1px ${responseBorder}, inset 3px 0 0 ${color}`,
+              }}
               onClick={() => setExpandedNodes(p => ({ ...p, [prev.nodeId]: !isExpanded }))}
             >
               <span className="sb-vars-table-chevron">
