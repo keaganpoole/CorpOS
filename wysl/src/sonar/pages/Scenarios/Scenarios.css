@@ -3778,7 +3778,7 @@
     opacity: 0;
   }
   100% {
-    background: white;
+    background: transparent;
     transform: scale(1);
     opacity: 1;
   }
