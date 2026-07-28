@@ -718,7 +718,7 @@ export default function ScenariosPage() {
   const [triggerFilter, setTriggerFilter] = useState({});
   const [triggerConfig, setTriggerConfig] = useState(null);
   const triggerFilterSourceNodeRef = useRef(null);
-  const [varsPane, setVarsPane] = useState({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
+  const [varsPane, setVarsPane] = useState({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
   const [hoveredTableColor, setHoveredTableColor] = useState('');
   const [actionConfig, setActionConfig] = useState(null);
   const [recordFieldMenu, setRecordFieldMenu] = useState(null);
@@ -2948,12 +2948,12 @@ export default function ScenariosPage() {
           type="text"
           value={val}
           onChange={e => setFieldValue(e.target.value)}
-          onFocus={() => setVarsPane({ visible: true, fieldKey, fieldLabel: field.label, fieldType: field.type || 'text' })}
+          onFocus={() => setVarsPane({ visible: true, active: true, fieldKey, fieldLabel: field.label, fieldType: field.type || 'text' })}
           style={{
             ...(String(val).includes('{{') ? { color: 'transparent' } : {}),
-            ...(varsPane.visible && hoveredTableColor && fieldKey === varsPane.fieldKey ? {
+            ...(varsPane.visible && varsPane.active && hoveredTableColor && fieldKey === varsPane.fieldKey ? {
               borderColor: hoveredTableColor,
-              boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+              boxShadow: `0 0 0 1px ${hoveredTableColor}`,
             } : {}),
           }}
         />
@@ -3059,12 +3059,12 @@ export default function ScenariosPage() {
           type="text"
           value={value}
           onChange={e => setAppointmentConfig({ ...appointmentConfig, [fieldKey]: e.target.value })}
-          onFocus={() => setVarsPane({ visible: true, fieldKey, fieldLabel, fieldType })}
+          onFocus={() => setVarsPane({ visible: true, active: true, fieldKey, fieldLabel, fieldType })}
           style={{
             ...(String(value).includes('{{') ? { color: 'transparent' } : {}),
-            ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === fieldKey ? {
+            ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === fieldKey ? {
               borderColor: hoveredTableColor,
-              boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+              boxShadow: `0 0 0 1px ${hoveredTableColor}`,
             } : {}),
           }}
         />
@@ -5319,7 +5319,7 @@ export default function ScenariosPage() {
                             : [{ key: 'id', label: 'Record ID', type: 'text' }, { key: 'person_id', label: 'Person ID', type: 'text' }, { key: 'service_id', label: 'Service ID', type: 'text' }, { key: 'staff_id', label: 'Staff ID', type: 'text' }, ...getTableFields('appointments').filter((field) => field.key !== 'id')];
                         return definitions.map((field) => {
                           const value = triggerConfig.fields?.[field.key] || '';
-                          return <div key={field.key} className="sb-record-field"><label className="sb-record-label">{field.label}</label><div style={{ position: 'relative' }}><input className="sb-input-field" type="text" value={value} onChange={(event) => setTriggerConfig((prev) => ({ ...prev, fields: { ...(prev?.fields || {}), [field.key]: event.target.value } }))} onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type || 'text' })} style={value.includes('{{') ? { color: 'transparent' } : {}} />{value.includes('{{') && <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }} />}</div></div>;
+                          return <div key={field.key} className="sb-record-field"><label className="sb-record-label">{field.label}</label><div style={{ position: 'relative' }}><input className="sb-input-field" type="text" value={value} onChange={(event) => setTriggerConfig((prev) => ({ ...prev, fields: { ...(prev?.fields || {}), [field.key]: event.target.value } }))} onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type || 'text' })} style={value.includes('{{') ? { color: 'transparent' } : {}} />{value.includes('{{') && <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }} />}</div></div>;
                         });
                       })()}
                     </div>
@@ -5580,20 +5580,20 @@ export default function ScenariosPage() {
                                 </div>
                                 <div style={{ position: 'relative' }}>
                                   <textarea
-                                    className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
+                                    className={`sb-input-field${varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
                                     value={rawVal}
                                     onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                    onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                    onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
 
                                     rows={4}
                                     style={{
                                       resize: 'none',
                                       ...(rawVal.includes('{{') || rawVal.includes('\x1E') ? { color: 'transparent' } : {}),
-                                      ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
+                                      ...(varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? {
                                         borderColor: hoveredTableColor,
-                                        boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
-                                        '--hover-glow-color': `${hoveredTableColor}20`,
-                                        '--hover-glow-color-strong': `${hoveredTableColor}40`,
+                                        boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                        '--hover-glow-color': `${hoveredTableColor}`,
+                                        '--hover-glow-color-strong': `${hoveredTableColor}66`,
                                       } : {}),
                                     }}
                                   />
@@ -5647,17 +5647,17 @@ export default function ScenariosPage() {
                                     </div>
                                     <div style={{ position: 'relative' }}>
                                       <textarea
-                                        className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
+                                        className={`sb-input-field${varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
                                         value={rawVal}
                                         onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                        onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                        onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
                                         rows={3}
                                         style={{
                                           resize: 'none',
                                           ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
-                                          ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
+                                          ...(varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? {
                                             borderColor: hoveredTableColor,
-                                            boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                            boxShadow: `0 0 0 1px ${hoveredTableColor}`,
                                           } : {}),
                                         }}
                                       />
@@ -5680,19 +5680,19 @@ export default function ScenariosPage() {
                             ) : field.type === 'textarea' ? (
                               <div style={{ position: 'relative' }}>
                                 <textarea
-                                  className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
+                                  className={`sb-input-field${varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
                                   value={rawVal}
                                   onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                  onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                  onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
                                   rows={3}
                                   style={{
                                     resize: 'none',
                                     ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
-                                    ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
+                                    ...(varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? {
                                       borderColor: hoveredTableColor,
-                                      boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
-                                      '--hover-glow-color': `${hoveredTableColor}20`,
-                                      '--hover-glow-color-strong': `${hoveredTableColor}40`,
+                                      boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                      '--hover-glow-color': `${hoveredTableColor}`,
+                                      '--hover-glow-color-strong': `${hoveredTableColor}66`,
                                     } : {}),
                                   }}
                                 />
@@ -5712,18 +5712,18 @@ export default function ScenariosPage() {
                             ) : (
                               <div style={{ position: 'relative' }}>
                                 <input
-                                  className={`sb-input-field${varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
+                                  className={`sb-input-field${varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
                                   type="text"
                                   value={rawVal}
                                   onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                  onFocus={() => setVarsPane({ visible: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                  onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
                                   style={{
                                     ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
-                                    ...(varsPane.visible && hoveredTableColor && field.key === varsPane.fieldKey ? {
+                                    ...(varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? {
                                       borderColor: hoveredTableColor,
-                                      boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
-                                      '--hover-glow-color': `${hoveredTableColor}20`,
-                                      '--hover-glow-color-strong': `${hoveredTableColor}40`,
+                                      boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                      '--hover-glow-color': `${hoveredTableColor}`,
+                                      '--hover-glow-color-strong': `${hoveredTableColor}66`,
                                     } : {}),
                                   }}
                                 />
@@ -5761,12 +5761,12 @@ export default function ScenariosPage() {
                               type="text"
                               value={actionConfig.record_id || ''}
                               onChange={e => setActionConfig(prev => ({ ...prev, record_id: e.target.value }))}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'record_id', fieldLabel: getRecordIdLabelForTable(PEOPLE_RECORD_TABLE), fieldType: 'text' })}
+                              onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: 'record_id', fieldLabel: getRecordIdLabelForTable(PEOPLE_RECORD_TABLE), fieldType: 'text' })}
                               style={{
                                 ...(actionConfig.record_id?.includes('{{') ? { color: 'transparent' } : {}),
-                                ...(varsPane.visible && hoveredTableColor && 'record_id' === varsPane.fieldKey ? {
+                                ...(varsPane.visible && varsPane.active && hoveredTableColor && 'record_id' === varsPane.fieldKey ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -5824,12 +5824,12 @@ export default function ScenariosPage() {
                               type="text"
                               value={appointmentConfig.person_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, person_id: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'person_id', fieldLabel: 'Person ID', fieldType: 'person_id' })}
+                              onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: 'person_id', fieldLabel: 'Person ID', fieldType: 'person_id' })}
                               style={{
                                 ...(appointmentConfig.person_id?.includes('{{') ? { color: 'transparent' } : {}),
-                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'person_id' ? {
+                                ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'person_id' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -5851,12 +5851,12 @@ export default function ScenariosPage() {
                               className="sb-input-field"
                               value={appointmentConfig.service_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, service_id: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'service_id', fieldLabel: 'Service ID', fieldType: 'service_id' })}
+                              onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: 'service_id', fieldLabel: 'Service ID', fieldType: 'service_id' })}
                               style={{
                                 ...(appointmentConfig.service_id?.includes('{{') ? { color: 'transparent' } : {}),
-                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'service_id' ? {
+                                ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'service_id' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -5891,12 +5891,12 @@ export default function ScenariosPage() {
                               className="sb-input-field"
                               value={appointmentConfig.staff_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, staff_id: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'staff_id', fieldLabel: 'Staff ID', fieldType: 'staff_id' })}
+                              onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: 'staff_id', fieldLabel: 'Staff ID', fieldType: 'staff_id' })}
                               style={{
                                 ...(appointmentConfig.staff_id?.includes('{{') ? { color: 'transparent' } : {}),
-                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'staff_id' ? {
+                                ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'staff_id' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -5932,12 +5932,12 @@ export default function ScenariosPage() {
                               type="text"
                               value={appointmentConfig.appointment_id || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, appointment_id: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'appointment_id', fieldLabel: 'Appointment ID', fieldType: 'text' })}
+                              onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: 'appointment_id', fieldLabel: 'Appointment ID', fieldType: 'text' })}
                               style={{
                                 ...(appointmentConfig.appointment_id?.includes('{{') ? { color: 'transparent' } : {}),
-                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'appointment_id' ? {
+                                ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'appointment_id' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -5977,7 +5977,7 @@ export default function ScenariosPage() {
                               className="sb-input-field"
                               value={durationValue}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, duration: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'duration', fieldLabel: 'Duration', fieldType: 'text' })}
+                              onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: 'duration', fieldLabel: 'Duration', fieldType: 'text' })}
                               style={{
                                 ...(durationValue.includes('{{') ? { color: 'transparent' } : {}),
                               }}
@@ -6015,14 +6015,14 @@ export default function ScenariosPage() {
                               className="sb-input-field"
                               value={appointmentConfig.notes || ''}
                               onChange={e => setAppointmentConfig({ ...appointmentConfig, notes: e.target.value })}
-                              onFocus={() => setVarsPane({ visible: true, fieldKey: 'notes', fieldLabel: 'Notes', fieldType: 'textarea' })}
+                              onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: 'notes', fieldLabel: 'Notes', fieldType: 'textarea' })}
                               rows={2}
                               style={{
                                 resize: 'none',
                                 ...(appointmentConfig.notes?.includes('{{') ? { color: 'transparent' } : {}),
-                                ...(varsPane.visible && hoveredTableColor && varsPane.fieldKey === 'notes' ? {
+                                ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'notes' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}40`,
+                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -6076,7 +6076,7 @@ export default function ScenariosPage() {
                                 type="text"
                                 value={scheduleConfig.date || ''}
                                 onChange={e => setScheduleConfig({ ...scheduleConfig, date: e.target.value })}
-                                onFocus={() => setVarsPane({ visible: true, fieldKey: 'date', fieldLabel: 'Date', fieldType: 'text' })}
+                                onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: 'date', fieldLabel: 'Date', fieldType: 'text' })}
                                 style={sbInputStyle}
                               />
                               {(scheduleConfig.date || '').includes('{{') && (
@@ -6125,7 +6125,7 @@ export default function ScenariosPage() {
                                 type="text"
                                 value={scheduleConfig.time || '09:00'}
                                 onChange={e => setScheduleConfig({ ...scheduleConfig, time: e.target.value })}
-                                onFocus={() => setVarsPane({ visible: true, fieldKey: 'time', fieldLabel: 'Time', fieldType: 'text' })}
+                                onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: 'time', fieldLabel: 'Time', fieldType: 'text' })}
                                 style={sbInputStyle}
                               />
                               {(scheduleConfig.time || '').includes('{{') && (
@@ -6309,7 +6309,7 @@ export default function ScenariosPage() {
             onInsertSmartAction={handleInsertSmartAction}
             smartActions={getSmartActions(findParentTriggerKey(selectedNodeId), currentActionKey)}
             onTableHover={(color) => setHoveredTableColor(color)}
-            onClose={() => { setVarsPane({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' }); setHoveredTableColor(''); }}
+            onClose={() => { setVarsPane({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' }); setHoveredTableColor(''); }}
             nodes={nodes}
             edges={edges}
             currentNodeId={selectedNodeId}
@@ -6353,7 +6353,7 @@ export default function ScenariosPage() {
               onInsertSmartAction={null}
               smartActions={[]}
               onTableHover={(color) => setHoveredTableColor(color)}
-              onClose={() => setVarsPane({ visible: false, fieldKey: '', fieldLabel: '', fieldType: 'text' })}
+              onClose={() => setVarsPane({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' })}
               nodes={nodes}
               edges={edges}
               currentNodeId={(() => {
