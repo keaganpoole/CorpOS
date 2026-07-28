@@ -133,17 +133,21 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
 
 const FadingImageCollage = ({ images }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const ref = useRef(null);
+  const isInView = useInView(ref, { amount: 0.25 });
 
   useEffect(() => {
+    if (!isInView || images.length <= 1) return undefined;
+
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [images]);
+  }, [images.length, isInView]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
+    <div ref={ref} className="relative w-full h-full overflow-hidden">
       {images.map((image, index) => (
         <motion.img
           key={index}
@@ -411,7 +415,7 @@ const NumberOptionsShowcase = () => {
                 Keep Your Number
               </h2>
               <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
-                Keep your existing business number and route it into CorpOS. Your customers keep calling the same line, while CorpOS answers on the other end and handles the conversation for you.
+                Keep your existing business number and <span className="homepage-gradient-word">route</span> it into CorpOS. Your customers keep calling the same line, while CorpOS answers on the other end and handles the conversation for you.
               </div>
             </div>
 
@@ -440,7 +444,7 @@ const NumberOptionsShowcase = () => {
                 Choose New Number
               </h2>
               <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
-                If you want a clean setup, claim a new number directly in CorpOS. It becomes your dedicated business line for calls handled by the receptionist from day one.
+                If you want a clean setup, claim a new number directly in CorpOS. It becomes your <span className="homepage-gradient-word">dedicated</span> business line for calls handled by the receptionist from day one.
               </div>
             </div>
           </div>
@@ -567,8 +571,8 @@ const HomePage = () => {
   };
 
   const RainingImages = () => {
-    const [isInView, setIsInView] = useState(true);
     const ref = useRef(null);
+    const isInView = useInView(ref, { amount: 0.2 });
 
     const imageVariants = {
       hidden: { y: -100, opacity: 0, rotate: 0 },

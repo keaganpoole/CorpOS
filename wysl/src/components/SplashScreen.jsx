@@ -49,7 +49,7 @@ const SplashScreen = ({ onAnimationEnd }) => {
         <div className="fixed inset-0 bg-[#0B0C10] flex items-center justify-center z-[100] transition-opacity duration-1000">
             <div className={`transform transition-all duration-1000 ease-in-out ${getAnimationClasses()}`}>
                 <img
-                    src="https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges/max.jpg"
+                    src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png"
                     alt="Sonar Logo"
                     className="w-28 h-auto"
                 />

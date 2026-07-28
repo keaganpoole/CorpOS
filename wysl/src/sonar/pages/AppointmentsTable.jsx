@@ -482,7 +482,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
               width: menuPosition?.width ?? 170,
               maxHeight: menuPosition?.maxHeight ?? 300,
             }}
-            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden py-1"
+            className="fixed z-[280] bg-[#080808] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             <div className="max-h-full overflow-y-auto custom-scrollbar py-1">
               <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
@@ -595,7 +595,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               width: Math.min(Math.max(menuPosition?.width ?? 190, 190), 260),
               maxHeight: Math.min(menuPosition?.maxHeight ?? 180, 180),
             }}
-            className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#111] px-2 py-2 shadow-[0_12px_36px_rgba(0,0,0,0.72)]"
+            className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#080808] px-2 py-2 shadow-[0_10px_26px_rgba(0,0,0,0.42)]"
           >
             <div className="flex flex-wrap gap-1.5">
               {selected.map((tag) => (
@@ -625,7 +625,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               width: menuPosition?.width ?? 190,
               maxHeight: menuPosition?.maxHeight ?? 320,
             }}
-            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden py-1"
+            className="fixed z-[280] bg-[#080808] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             <div className="max-h-full overflow-y-auto custom-scrollbar py-1">
               {options.map((opt, idx) => {
@@ -710,7 +710,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
                 width: menuPosition?.width ?? 200,
                 maxHeight: menuPosition?.maxHeight ?? 360,
               }}
-              className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] overflow-hidden"
+              className="fixed z-[280] bg-[#080808] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="border-b border-white/[0.04] p-2.5">
@@ -815,10 +815,10 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
               e.stopPropagation();
               selection?.toggle?.(appointment.id);
             }}
-            className={`h-3.5 w-3.5 rounded-[4px] border transition-all ${isSelected ? 'border-cyan-400/60 bg-cyan-400/15 opacity-100' : 'border-white/20 bg-black/40 opacity-0 group-hover:opacity-100'} ${anySelected ? 'opacity-100' : ''}`}
+            className={`h-3.5 w-3.5 rounded-[4px] border transition-all ${isSelected ? 'border-zinc-400/70 bg-zinc-400/20 opacity-100' : 'border-white/20 bg-black/40 opacity-0 group-hover:opacity-100'} ${anySelected ? 'opacity-100' : ''}`}
             aria-label="Select record"
           >
-            {isSelected && <Check size={9} className="brand-icon m-auto" />}
+            {isSelected && <Check size={9} className="m-auto text-zinc-200" />}
           </button>
         </div>
       );
@@ -995,7 +995,7 @@ const TableControlButton = React.forwardRef(({ active, children, onClick }, ref)
     onClick={onClick}
     className={`inline-flex h-8 items-center gap-2 rounded-xl border px-3 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
       active
-        ? 'border-cyan-500/25 bg-cyan-500/10 text-white'
+        ? 'border-white/[0.12] bg-white/[0.06] text-white'
         : 'border-white/[0.06] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200'
     }`}
   >
@@ -1042,7 +1042,7 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
           style={{ top: position.top, bottom: position.bottom, left: position.left, width, maxHeight: position.maxHeight }}
-          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d0d]/96 shadow-[0_24px_70px_rgba(0,0,0,0.86)] backdrop-blur-xl"
+          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#080808]/98 shadow-[0_14px_36px_rgba(0,0,0,0.56)] backdrop-blur-xl"
         >
           <div className="max-h-full overflow-y-auto custom-scrollbar">
             {children}
@@ -1094,7 +1094,7 @@ const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
               <button type="button" onClick={() => moveRule(index, 1)} className="text-zinc-700 hover:text-white disabled:opacity-20" disabled={index === rules.length - 1}><ChevronDown size={11} /></button>
             </div>
             <select value={rule.field} onChange={(event) => updateRule(index, { field: event.target.value })} className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none">
-              {sortableColumns.map((column) => <option key={column.id} value={column.id} className="bg-[#111]">{getColumnLabel(column, fieldConfig)}</option>)}
+              {sortableColumns.map((column) => <option key={column.id} value={column.id} className="bg-[#080808]">{getColumnLabel(column, fieldConfig)}</option>)}
             </select>
             <button type="button" onClick={() => updateRule(index, { direction: rule.direction === 'asc' ? 'desc' : 'asc' })} className="w-[78px] rounded-lg border border-white/[0.06] bg-black/30 px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 hover:text-white">
               {rule.direction === 'asc' ? 'Asc' : 'Desc'}
@@ -1945,7 +1945,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
           className="group flex h-20 w-20 items-center justify-center rounded-[24px] border border-white/[0.08] bg-white/[0.02] text-white shadow-[0_0_30px_rgba(255,255,255,0.08)] transition-transform duration-300 hover:scale-105"
         >
           {creating ? (
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-cyan-500/60" />
+            <div className="brand-gradient-spinner h-8 w-8 animate-spin rounded-full border-2" />
           ) : (
             <Plus size={40} strokeWidth={1.6} />
           )}
@@ -1999,7 +1999,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
               >
                 {creating ? (
                   <div className="flex items-center gap-3 px-2 text-zinc-700">
-                    <div className="h-4 w-4 animate-spin rounded-full border border-white/10 border-t-cyan-500/60" />
+                    <div className="brand-gradient-spinner h-4 w-4 animate-spin rounded-full border" />
                     <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-500">Creating appointment...</span>
                   </div>
                 ) : (
@@ -2139,7 +2139,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
                     ref={columnOptionsButtonRef}
                     type="button"
                     onClick={toggleColumnOptions}
-                    className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-cyan-500/25 hover:bg-cyan-500/10 transition-all flex items-center justify-center"
+                    className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-white/[0.14] hover:bg-white/[0.05] transition-all flex items-center justify-center"
                     aria-label="Add column"
                   >
                     <Plus size={13} />
@@ -2154,7 +2154,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             {loading ? (
               <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
                 <div className="flex flex-col items-center justify-center gap-4">
-                <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-cyan-500/60 animate-spin" />
+                <div className="brand-gradient-spinner w-8 h-8 rounded-full border-2 animate-spin" />
                 <p className="text-[11px] text-zinc-600 font-medium">Loading appointments...</p>
                 </div>
               </div>
@@ -2189,7 +2189,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
                 >
                   {creating ? (
                     <div className="flex items-center gap-3 px-2 text-zinc-700">
-                      <div className="h-4 w-4 animate-spin rounded-full border border-white/10 border-t-cyan-500/60" />
+                      <div className="brand-gradient-spinner h-4 w-4 animate-spin rounded-full border" />
                       <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-500">Creating appointment...</span>
                     </div>
                   ) : (
@@ -2206,11 +2206,11 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full">
-      <div className="shrink-0 px-8 py-5 flex items-center gap-3">
+      <div className="shrink-0 px-10 py-8 flex items-center gap-3">
         <div className="flex items-center gap-3">
           <div>
-            <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Appointments</h2>
-            <p className="text-[11px] text-zinc-600 mt-0.5">{totalCount} Appointments</p>
+            <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">Appointments</h2>
+            <p className="text-[13px] text-zinc-500 mt-1 mb-0">{totalCount} Appointments</p>
           </div>
           <button onClick={() => setShowColorbarStudio(true)} className="group/colorbar relative ml-2 flex items-center gap-2 rounded-xl px-4 py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 transition-all hover:text-white">
             <div className="absolute rounded-xl opacity-0 group-hover/colorbar:opacity-100 transition-opacity duration-300 pointer-events-none overflow-hidden" style={{ inset: '-0.7px' }}>
@@ -2225,7 +2225,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
         <div className="flex-1" />
         <div className="relative w-[260px]">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search appointments..." className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-white/20 transition-colors" />
+          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search appointments..." className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-[var(--focusOutline)] transition-colors" />
           {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
         </div>
       </div>
@@ -2306,7 +2306,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             initial={{ opacity: 0, scale: 0.96, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -4 }}
-            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#111]/95"
+            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#080808]/98"
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2327,7 +2327,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{ top: columnOptionsPosition.top, bottom: columnOptionsPosition.bottom, left: columnOptionsPosition.left }}
-            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d0d0d]/95 shadow-[0_18px_48px_rgba(0,0,0,0.82)] backdrop-blur-xl"
+            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#080808]/98 shadow-[0_12px_28px_rgba(0,0,0,0.52)] backdrop-blur-xl"
           >
             <div className="py-1">
               {column_options.map((option, idx) => {

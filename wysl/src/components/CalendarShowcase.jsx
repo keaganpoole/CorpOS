@@ -315,6 +315,14 @@ const BOOKING_SCAN_STYLES = `
   }
 `;
 
+function GradientWord({ children }) {
+  return (
+    <span className="homepage-gradient-word">
+      {children}
+    </span>
+  );
+}
+
 function MonitoringHeadline({ playKey }) {
   return (
     <>
@@ -643,7 +651,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 One. Stunning. CRM.
               </h2>
               <div className={`homepage-copy-reveal homepage-copy-reveal--delayed mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl ${copyVisible ? 'is-visible' : ''}`}>
-                Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.
+                Transform customer data into a beautiful, visual workspace built for <GradientWord>clarity</GradientWord>, organization, and control.
               </div>
             </div>
           </div>
@@ -787,11 +795,13 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
       : isCrmVariant
       ? ['One.', 'CRM.']
       : ['Build Outbound Workflows'];
-    const description = isMonitoringVariant
-      ? 'Monitor calls as they happen and review every conversation later with the context, playback, and history your team actually needs.'
-      : isCrmVariant
-      ? 'Transform customer data into a beautiful, visual workspace built for clarity, organization, and control.'
-      : 'Create custom workflows that automate outbound calls, bookings, payments, follow-ups, and more, with triggers, conditions, and actions that keep everything moving automatically.';
+    const description = isMonitoringVariant ? (
+      <>Monitor calls as they happen and review every conversation later with the context, <GradientWord>playback</GradientWord>, and history your team actually needs.</>
+    ) : isCrmVariant ? (
+      <>Transform customer data into a beautiful, visual workspace built for <GradientWord>clarity</GradientWord>, organization, and control.</>
+    ) : (
+      <>Create custom workflows that <GradientWord>automate</GradientWord> outbound calls, bookings, payments, follow-ups, and more, with triggers, conditions, and actions that keep everything moving automatically.</>
+    );
 
     return (
       <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[170vh]' : 'h-[250vh]'}`}>
@@ -974,9 +984,11 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   )}
                 </h2>
                 <div className={`homepage-copy-reveal homepage-copy-reveal--delayed calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:mx-auto md:max-w-[36rem] md:text-center md:text-[1.1rem] md:leading-[1.55] lg:mx-0 lg:max-w-[24rem] lg:text-left lg:text-base lg:leading-[1.45] ${copyVisible ? 'is-visible' : ''}`}>
-                  {isScenariosVariant
-                    ? 'Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and follow-ups.'
-                    : 'Turn conversations into booked appointments. Your AI receptionist answers every call instantly, checks real-time availability, books, reschedules, and confirms appointments while handling multiple conversations at once. No hold times, no missed opportunities, no smoke breaks — just a calendar that fills itself 24/7.'}
+                  {isScenariosVariant ? (
+                    <>Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and <GradientWord>follow-ups</GradientWord>.</>
+                  ) : (
+                    <>Turn conversations into booked appointments. Your AI receptionist answers every call instantly, checks real-time availability, books, reschedules, and confirms appointments while handling multiple conversations at once. No hold times, no missed <GradientWord>opportunities</GradientWord>, no smoke breaks — just a calendar that fills itself 24/7.</>
+                  )}
                 </div>
               </div>
             </div>
@@ -1108,7 +1120,7 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
                     isHighlighted ? 'translate-x-1' : ''
                   }`}
                 >
-                  <div className="text-xs font-medium leading-relaxed tracking-tight text-zinc-400 md:text-[13px] lg:text-xs">
+                  <div className="homepage-feature-copy text-xs font-medium leading-relaxed tracking-tight text-zinc-400 md:text-[13px] lg:text-xs">
                     {item.copy}
                   </div>
                 </div>

@@ -433,7 +433,7 @@ function CallCard({ call, selected, checked, onClick, onToggleSelect, onToggleFa
           </div>
           <div className="mt-1 flex items-center gap-1.5 text-[12px] text-zinc-500">
             <Phone size={12} />
-            <span>{call.phone}</span>
+            <span className="font-medium" style={brandPhoneTextStyle}>{call.phone}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -472,7 +472,7 @@ function TranscriptBubble({ entry, receptionistAvatar, receptionistName, custome
   return (
     <div className={cn('flex items-center gap-3', isReceptionist ? 'justify-end' : 'justify-start')}>
       {!isReceptionist && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-[11px] font-bold text-zinc-300">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-zinc-800 text-[11px] font-bold text-zinc-300">
           {initial}
         </div>
       )}
@@ -481,9 +481,10 @@ function TranscriptBubble({ entry, receptionistAvatar, receptionistName, custome
           className={cn(
             'rounded-2xl px-4 py-3 text-[13px] leading-6 shadow-[0_12px_30px_rgba(0,0,0,0.18)]',
             isReceptionist
-              ? 'rounded-br-md bg-cyan-400/10 text-zinc-50'
-              : 'rounded-bl-md bg-white/[0.06] text-zinc-100'
+              ? 'rounded-br-md text-white'
+              : 'rounded-bl-md text-white'
           )}
+          style={{ backgroundColor: isReceptionist ? '#007AFF' : '#2C2C2E' }}
         >
           {entry.text}
         </div>
@@ -506,13 +507,20 @@ function TranscriptBubble({ entry, receptionistAvatar, receptionistName, custome
         />
       )}
       {isReceptionist && (!receptionistAvatar || avatarFailed) && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-[11px] font-bold text-zinc-100">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-zinc-800 text-[11px] font-bold text-zinc-300">
           {initial}
         </div>
       )}
     </div>
   );
 }
+
+const brandPhoneTextStyle = {
+  background: 'linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd))',
+  WebkitBackgroundClip: 'text',
+  backgroundClip: 'text',
+  color: 'transparent',
+};
 
 function AudioStrip({ call }) {
   const hasAudio = Boolean(call.audioUrl);
@@ -744,16 +752,11 @@ export default function CallLogsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#020202] text-zinc-100">
-      <div className="shrink-0 border-b border-white/[0.05] px-5 py-5 sm:px-7">
+      <div className="shrink-0 border-b border-white/[0.05] px-10 py-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-11 w-11 items-center justify-center brand-icon">
-              <Phone size={21} />
-            </div>
-            <div>
-              <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Call Logs</h2>
-              <p className="mt-1 text-[12px] font-medium text-zinc-600">{loading ? 'Loading calls' : `${calls.length}${hasMore ? '+' : ''} recent calls`}</p>
-            </div>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">Call Logs</h2>
+            <p className="text-[13px] text-zinc-500 m-0">{loading ? 'Loading calls' : `${calls.length}${hasMore ? '+' : ''} recent calls`}</p>
           </div>
         </div>
       </div>
@@ -864,7 +867,7 @@ export default function CallLogsPage() {
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-[12px] text-zinc-500">
                     <span className="inline-flex items-center gap-1.5">
                       <Phone size={13} />
-                      {selectedCall.phone}
+                      <span className="font-medium" style={brandPhoneTextStyle}>{selectedCall.phone}</span>
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <Clock size={13} />

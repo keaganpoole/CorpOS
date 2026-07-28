@@ -1335,6 +1335,7 @@ export default function ScenariosPage({
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
   const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage);
   const panelTitle = isPrimaryNode ? 'Add Trigger' : 'Add Action';
+  const selectedNodeNumber = Math.max(1, nodes.findIndex((node) => node.id === selectedNodeId) + 1);
   const appointmentDateInputMode = appointmentConfig.date_input_mode || 'text';
   const appointmentTimeInputMode = appointmentConfig.time_input_mode || 'text';
   const scheduleDateInputMode = scheduleConfig.date_input_mode || 'picker';
@@ -4814,11 +4815,15 @@ export default function ScenariosPage({
           >
             <svg className="sb-canvas-connections">
               <defs>
+                <linearGradient id="sb-brand-edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="var(--brandGradientStart)" />
+                  <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+                </linearGradient>
                 <marker id="sb-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.2)" />
+                  <polygon points="0 0, 10 3.5, 0 7" fill="var(--brandGradientEnd)" />
                 </marker>
                 <marker id="sb-arrowhead-active" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                  <polygon points="0 0, 10 3.5, 0 7" fill="var(--brandGradientStart)" />
+                  <polygon points="0 0, 10 3.5, 0 7" fill="var(--brandGradientEnd)" />
                 </marker>
               </defs>
               {edges.map((edge) => {
@@ -5028,11 +5033,11 @@ export default function ScenariosPage({
                         {/* Icon Container with Glassmorphism */}
                         <div className={`sb-node-icon-glass ${nodeRunState ? `is-${nodeRunState}` : ''}`}>
                           <div className={`sb-node-icon-glyph ${nodeRunState === 'success' ? 'is-hidden' : ''}`}>
-                            {Icon ? <Icon size={42} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={42} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
+                            {Icon ? <Icon size={34} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} /> : <Plus size={34} className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }} strokeWidth={1.5} />}
                           </div>
                           {nodeRunState === 'success' && (
                             <div className="sb-node-run-status is-success" aria-hidden="true">
-                              <Check size={42} strokeWidth={2.8} />
+                              <Check size={34} strokeWidth={2.8} />
                             </div>
                           )}
                           {nodeRunState === 'empty' && (
@@ -5111,7 +5116,7 @@ export default function ScenariosPage({
                 <div>
                   {showNodeConfigText && (
                     <>
-                      <p className="sb-panel-label">Node Config</p>
+                      <p className="sb-panel-label">Node {selectedNodeNumber}</p>
                       <h3 className="sb-panel-title">{panelTitle}</h3>
                     </>
                   )}
@@ -6386,7 +6391,7 @@ export default function ScenariosPage({
         )}
 
         {/* Bottom Toolbar — shown after intro node is configured */}
-        {nodes[0]?.configured && (
+        {!demoMode && nodes[0]?.configured && (
           <div className="sb-bottom-toolbar">
             <div className="sb-toolbar-inner">
             {/* Power toggle */}

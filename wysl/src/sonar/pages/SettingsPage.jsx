@@ -787,7 +787,7 @@ const StaffDetailsModal = ({ staff, onClose, onEdit }) => {
         <div className="relative flex items-start justify-between gap-5 border-b border-white/[0.05] px-7 py-6">
           <div className="min-w-0">
             <div className="mb-3 flex items-center gap-2">
-              <span className={`h-1.5 w-1.5 rounded-full ${staff.is_active !== false ? 'brand-gradient shadow-[0_0_6px_color-mix(in_srgb,var(--brandGradientStart)_45%,transparent)]' : 'bg-zinc-600'}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${staff.is_active !== false ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-600'}`} />
               <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-400">
                 {staff.is_active !== false ? 'Active' : 'Inactive'}
               </span>
@@ -2572,23 +2572,10 @@ const SettingsPage = () => {
     <div className="settings-page-scope h-full flex flex-col bg-[#020202] text-zinc-400 font-sans selection:bg-indigo-500/20 overflow-hidden">
 
       {/* ─── Header ─────────────────────────────────────────────────────── */}
-      <header className="shrink-0 flex items-center justify-between border-b border-white/[0.02] bg-gradient-to-b from-zinc-950/20 to-transparent px-8 py-6">
-        <div className="flex items-center gap-4">
-          <div>
-            <svg width="0" height="0" className="absolute">
-              <defs>
-                <linearGradient id="brandIconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="var(--brandGradientStart)" />
-                  <stop offset="100%" stopColor="var(--brandGradientEnd)" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <Settings className="settings-icon" size={22} />
-          </div>
-          <div>
-            <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Settings</h2>
-            <p className="text-[11px] text-zinc-600 mt-1 tracking-wider uppercase">Account &amp; Business Configuration</p>
-          </div>
+      <header className="shrink-0 flex items-center justify-between border-b border-white/[0.02] bg-gradient-to-b from-zinc-950/20 to-transparent px-10 py-8">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">Settings</h2>
+          <p className="text-[13px] text-zinc-500 m-0">Account &amp; business configuration</p>
         </div>
 
         <button

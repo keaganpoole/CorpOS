@@ -217,7 +217,7 @@ const CallHandlingIcon = ({ direction }) => {
 };
 
 const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onUpdateDirection, onTerminate, compact = false, slim = false }) => {
-  const borderClass = isActive ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_20%,transparent)] shadow-[0_0_30px_color-mix(in_srgb,var(--brandGradientStart)_5%,transparent)]' : 'border-white/[0.04]';
+  const borderClass = isActive ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_16%,transparent)] shadow-[0_0_18px_color-mix(in_srgb,var(--brandGradientStart)_3%,transparent)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   const displayModel = pending || agent.model || 'Not set';
   const normalizedAgentStatus = String(agent.status || 'Offline').trim().toLowerCase();
@@ -540,16 +540,22 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
       className={`no-drag w-full flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] relative group overflow-hidden ${isActive ? 'text-zinc-100 bg-white/5' : 'text-zinc-500 hover:text-white'}`}
       title={collapsed ? item.label : undefined}
     >
-      <span className={`relative w-5 shrink-0 transition-colors duration-300 ${isActive ? '' : 'text-zinc-600 group-hover:text-white'}`}
-        style={isActive ? {
-          background: 'linear-gradient(90deg, #22d3ee, #ec4899, #a855f7, #22d3ee)',
-          backgroundSize: '200% 100%',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          animation: sweeping ? 'navIconSweep 0.42s ease-out' : 'navIconIdle 1.8s ease-in-out infinite',
-        } : undefined}
-      >
-        {item.icon}
+      <span className={`relative w-5 shrink-0 ${isActive ? '' : 'text-zinc-600 group-hover:text-white'} transition-colors duration-300`}>
+        <span className={`block transition-opacity duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${isActive ? 'opacity-0' : 'opacity-100'}`}>
+          {item.icon}
+        </span>
+        <span
+          className={`absolute inset-0 block transition-opacity duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${isActive ? 'opacity-100' : 'opacity-0'}`}
+          style={{
+            background: 'linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd), var(--brandGradientStart))',
+            backgroundSize: '200% 100%',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            animation: isActive ? (sweeping ? 'navIconSweep 0.5s ease-out' : 'navIconIdle 2.4s ease-in-out infinite') : undefined,
+          }}
+        >
+          {item.icon}
+        </span>
       </span>
       <span
         className={`overflow-hidden font-bold tracking-tight whitespace-nowrap transition-[max-width,opacity,transform,margin] duration-180 ease-out ${
@@ -559,14 +565,14 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
         {item.label}
       </span>
       {isActive && (
-        <motion.div layoutId="nav-active" className="absolute left-0 w-1 h-5 bg-white rounded-r-full shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
+        <motion.div layoutId="nav-active" className="absolute left-0 w-1 h-5 bg-white rounded-r-full shadow-[0_0_8px_rgba(255,255,255,0.18)]" />
       )}
       {sweeping && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
           <div
             className="absolute inset-0 w-[200%] -skew-x-12 nav-sweep"
             style={{
-              background: 'linear-gradient(to right, transparent 0%, rgba(34,211,238,0.06) 30%, rgba(168,85,247,0.08) 50%, rgba(236,72,153,0.06) 70%, transparent 100%)',
+              background: 'linear-gradient(to right, transparent 0%, color-mix(in srgb, var(--brandGradientStart) 6%, transparent) 30%, color-mix(in srgb, var(--brandGradientEnd) 8%, transparent) 50%, color-mix(in srgb, var(--brandGradientStart) 6%, transparent) 70%, transparent 100%)',
             }}
           />
         </div>
@@ -603,7 +609,7 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
 const PlaceholderView = ({ title, body }) => (
   <div className="flex items-center justify-center h-full text-zinc-500 flex-col gap-4">
     <div className="p-16 border border-white/5 rounded-3xl bg-[#0A0A0A] flex flex-col items-center text-center shadow-2xl relative overflow-hidden">
-      <Database size={56} className="brand-icon mb-8 drop-shadow-[0_0_15px_color-mix(in_srgb,var(--brandGradientStart)_30%,transparent)]" />
+      <Database size={56} className="brand-icon mb-8 drop-shadow-[0_0_8px_color-mix(in_srgb,var(--brandGradientStart)_16%,transparent)]" />
       <h3 className="text-xl font-bold text-zinc-100 tracking-tight uppercase">{title}</h3>
       <p className="text-[12px] font-bold text-zinc-600 max-w-xs mt-4 leading-relaxed uppercase tracking-widest opacity-60">{body}</p>
     </div>
@@ -751,21 +757,11 @@ const SonarDashboard = () => {
       case 'receptionists':
         return (
           <div className={`receptionists-page-scope h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
-            <div className="shrink-0 px-7 py-5 flex items-center justify-between">
+            <div className="shrink-0 px-10 py-8 flex items-center justify-between">
               <div className="flex items-center gap-5">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <svg width="0" height="0" className="absolute">
-                      <defs>
-                        <linearGradient id="brandIconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="var(--brandGradientStart)" />
-                          <stop offset="100%" stopColor="var(--brandGradientEnd)" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <IdCardLanyard size={22} className="brand-icon-gradient" />
-                  </div>
-                  <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">Team</h2>
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">Team</h2>
+                  <p className="text-[13px] text-zinc-500 m-0">Manage receptionists and staff</p>
                 </div>
                 <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
                   <button

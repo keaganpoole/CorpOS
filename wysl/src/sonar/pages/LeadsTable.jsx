@@ -425,7 +425,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
               top: menuPosition?.top ?? 0,
               width: menuPosition?.width ?? 170,
             }}
-            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
+            className="fixed z-[280] bg-[#080808] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
               onClick={() => { setOpen(false); onSave(null); }}
@@ -528,7 +528,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               top: menuPosition?.top ?? 0,
               width: Math.min(Math.max(menuPosition?.width ?? 190, 190), 260),
             }}
-            className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#111] px-2 py-2 shadow-[0_10px_26px_rgba(0,0,0,0.42)]"
+            className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#080808] px-2 py-2 shadow-[0_10px_26px_rgba(0,0,0,0.42)]"
           >
             <div className="flex flex-wrap gap-1.5">
               {selected.map((tag) => (
@@ -556,7 +556,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               top: menuPosition?.top ?? 0,
               width: menuPosition?.width ?? 190,
             }}
-            className="fixed z-[280] bg-[#111] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
+            className="fixed z-[280] bg-[#080808] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             {options.map((opt, idx) => {
               const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
@@ -637,10 +637,10 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
               e.stopPropagation();
               selection?.toggle?.(lead.id);
             }}
-            className={`h-3.5 w-3.5 rounded-[4px] border transition-all ${isSelected ? 'border-cyan-400/60 bg-cyan-400/15 opacity-100' : 'border-white/20 bg-black/40 opacity-0 group-hover:opacity-100'} ${anySelected ? 'opacity-100' : ''}`}
+            className={`h-3.5 w-3.5 rounded-[4px] border transition-all ${isSelected ? 'border-zinc-400/70 bg-zinc-400/20 opacity-100' : 'border-white/20 bg-black/40 opacity-0 group-hover:opacity-100'} ${anySelected ? 'opacity-100' : ''}`}
             aria-label="Select record"
           >
-            {isSelected && <Check size={9} className="brand-icon m-auto" />}
+            {isSelected && <Check size={9} className="m-auto text-zinc-200" />}
           </button>
         </div>
       );
@@ -802,7 +802,7 @@ const TableControlButton = React.forwardRef(({ active, children, onClick }, ref)
     onClick={onClick}
     className={`inline-flex h-8 items-center gap-2 rounded-xl border px-3 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
       active
-        ? 'border-cyan-500/25 bg-cyan-500/10 text-white'
+        ? 'border-white/[0.12] bg-white/[0.06] text-white'
         : 'border-white/[0.06] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200'
     }`}
   >
@@ -848,7 +848,7 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
           style={{ top: position.top, left: position.left, width }}
-          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d0d]/97 shadow-[0_24px_70px_rgba(0,0,0,0.86)] backdrop-blur-xl"
+          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#080808]/98 shadow-[0_14px_36px_rgba(0,0,0,0.56)] backdrop-blur-xl"
         >
           {children}
         </motion.div>
@@ -898,7 +898,7 @@ const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
               <button type="button" onClick={() => moveRule(index, 1)} className="text-zinc-700 hover:text-white disabled:opacity-20" disabled={index === rules.length - 1}><ChevronDown size={11} /></button>
             </div>
             <select value={rule.field} onChange={(event) => updateRule(index, { field: event.target.value })} className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none">
-              {sortableColumns.map((column) => <option key={column.id} value={column.id} className="bg-[#111]">{getColumnLabel(column, fieldConfig)}</option>)}
+              {sortableColumns.map((column) => <option key={column.id} value={column.id} className="bg-[#080808]">{getColumnLabel(column, fieldConfig)}</option>)}
             </select>
             <button type="button" onClick={() => updateRule(index, { direction: rule.direction === 'asc' ? 'desc' : 'asc' })} className="w-[78px] rounded-lg border border-white/[0.06] bg-black/30 px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 hover:text-white">
               {rule.direction === 'asc' ? 'Asc' : 'Desc'}
@@ -2133,12 +2133,12 @@ const LeadsTable = ({
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full">
-      <div className="shrink-0 px-8 py-5 flex items-center gap-3">
+      <div className="shrink-0 px-10 py-8 flex items-center gap-3">
         <div className="flex items-center gap-3">
           {!hideTitle && (
-            <div>
-              <h2 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">People</h2>
-              <p className="text-[11px] text-zinc-600 mt-0.5">{totalCount} People</p>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">People</h2>
+              <p className="text-[13px] text-zinc-500 m-0">{totalCount} People</p>
             </div>
           )}
           <button onClick={() => setShowColorbarStudio(true)} className="group/colorbar relative ml-2 flex items-center gap-2 rounded-xl px-4 py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 transition-all hover:text-white">
@@ -2157,7 +2157,7 @@ const LeadsTable = ({
         <div className="flex-1" />
         <div className={`relative w-[260px] ${searchFieldClassName}`}>
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder={searchPlaceholder} className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-white/20 transition-colors" />
+          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder={searchPlaceholder} className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-[var(--focusOutline)] transition-colors" />
           {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
         </div>
       </div>
@@ -2247,7 +2247,7 @@ const LeadsTable = ({
             initial={{ opacity: 0, scale: 0.96, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -4 }}
-            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#111]/95"
+            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#080808]/98"
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2268,7 +2268,7 @@ const LeadsTable = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{ top: columnOptionsPosition.top, left: columnOptionsPosition.left }}
-            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d0d0d]/97 shadow-[0_18px_48px_rgba(0,0,0,0.82)] backdrop-blur-xl"
+            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#080808]/98 shadow-[0_12px_28px_rgba(0,0,0,0.52)] backdrop-blur-xl"
           >
             <div className="py-1">
               {column_options.map((option, idx) => {

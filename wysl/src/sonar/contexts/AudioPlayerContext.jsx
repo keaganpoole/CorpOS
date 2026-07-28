@@ -124,14 +124,25 @@ export const PersistentAudioPlayer = () => {
         <button
           type="button"
           onClick={() => toggleTrack(track)}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black transition hover:bg-cyan-300 active:scale-95"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-95"
+          style={{ background: 'var(--buttonBackground)', color: 'var(--buttonText)' }}
           aria-label={isPlaying ? 'Pause call recording' : 'Play call recording'}
         >
           {isPlaying ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" className="ml-0.5" />}
         </button>
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex min-w-0 items-center gap-2">
-            <AudioLines size={14} className="shrink-0 text-cyan-300" />
+            <span className="shrink-0 leading-none">
+              <svg width="0" height="0" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="audioPlayerBrandGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="var(--brandGradientStart)" />
+                    <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <AudioLines size={14} style={{ stroke: 'url(#audioPlayerBrandGradient)' }} />
+            </span>
             <span className="truncate text-[12px] font-bold text-white">{track.title || 'Call recording'}</span>
             {track.subtitle && <span className="hidden truncate text-[11px] font-medium text-zinc-500 sm:block">{track.subtitle}</span>}
           </div>

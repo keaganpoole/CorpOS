@@ -501,6 +501,17 @@ main,
 .feature-reveal-row {
     will-change: opacity, transform;
 }
+.homepage-gradient-word {
+    background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+}
+.homepage-feature-copy,
+.feature-reveal-row__title {
+    -webkit-text-fill-color: currentColor;
+}
 .content-section-image { margin-top: 60px; max-width: 90%; height: auto; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); }
 .agenda-item {
     opacity: 0;

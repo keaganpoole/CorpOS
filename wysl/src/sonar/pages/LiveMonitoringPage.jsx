@@ -881,7 +881,7 @@ function AnalyticsControls({ selectedKeys, periodKey, dateRange, onDateRangeChan
                     onClick={() => onToggleMetric(metric.key)}
                   >
                     <span className="live-metric-option-icon">
-                      {selected ? <Check size={12} /> : <Icon size={14} />}
+                      {selected ? <Check size={12} className="brand-icon" /> : <Icon size={14} />}
                     </span>
                     <span className="live-metric-option-copy">
                       <span className="live-metric-option-title">{metric.label}</span>
@@ -2362,9 +2362,13 @@ export default function LiveMonitoringPage() {
           line-height: 1.15;
         }
 
-        .live-metric-option:hover:not(:disabled),
-        .live-metric-option-active {
+        .live-metric-option:hover:not(:disabled) {
           background: rgba(255,255,255,0.045);
+          color: #ffffff;
+        }
+
+        .live-metric-option-active {
+          background: transparent;
           color: #ffffff;
         }
 
