@@ -4027,6 +4027,98 @@ def serialize_business_profile_row(row: dict):
         "forwarding_config": normalize_forwarding_config(row.get("forwarding_config")),
     }
 
+def parse_usage_seconds(value) -> int:
+    try:
+        return max(0, int(float(value or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+def increment_business_usage_summary(business_id, duration_delta_seconds) -> None:
+    business_id = int_or_none(business_id)
+    duration_delta_seconds = parse_usage_seconds(duration_delta_seconds)
+    if not business_id or duration_delta_seconds <= 0:
+        return
+
+    try:
+        try:
+            supabase.rpc("increment_business_cycle_usage", {
+                "business_id_param": business_id,
+                "duration_delta_seconds_param": duration_delta_seconds,
+            }).execute()
+            return
+        except Exception as rpc_exc:
+            logging.warning("Business usage RPC unavailable, falling back to direct update: %s", rpc_exc)
+
+        response = (
+            supabase.table("businesses")
+            .select("current_cycle_used_seconds,current_cycle_included_minutes")
+            .eq("id", business_id)
+            .limit(1)
+            .execute()
+        )
+        business = response.data[0] if getattr(response, "data", None) else None
+        if not business:
+            return
+
+        used_seconds = int(business.get("current_cycle_used_seconds") or 0) + duration_delta_seconds
+        included_minutes = int(business.get("current_cycle_included_minutes") or 0)
+        included_seconds = max(0, included_minutes * 60)
+        overage_seconds = max(0, used_seconds - included_seconds)
+
+        supabase.table("businesses").update({
+            "current_cycle_used_seconds": used_seconds,
+            "current_cycle_used_minutes": round(used_seconds / 60, 2),
+            "current_cycle_overage_seconds": overage_seconds,
+            "current_cycle_overage_minutes": round(overage_seconds / 60, 2),
+        }).eq("id", business_id).execute()
+    except Exception as exc:
+        logging.error("Failed to update business usage summary for business %s: %s", business_id, exc, exc_info=True)
+
+def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period_end=None, reset_usage=False) -> None:
+    """Copy the active plan's minute allowance into the business usage summary."""
+    if not user_id:
+        return
+
+    try:
+        plan_slug = str(plan_name or "free").strip().lower()
+        plan_response = (
+            supabase_admin.table("sonar_plans")
+            .select("entitlements")
+            .eq("slug", plan_slug)
+            .limit(1)
+            .execute()
+        )
+        plan_row = plan_response.data[0] if getattr(plan_response, "data", None) else None
+        entitlements = plan_row.get("entitlements") if plan_row else {}
+        included_minutes = int((entitlements or {}).get("included_call_minutes") or 0)
+
+        business_response = (
+            supabase_admin.table("businesses")
+            .select("id")
+            .eq("user_id", str(user_id))
+            .limit(1)
+            .execute()
+        )
+        business = business_response.data[0] if getattr(business_response, "data", None) else None
+        if not business:
+            return
+
+        update_data = {
+            "current_cycle_included_minutes": included_minutes,
+            "current_cycle_started_at": period_start,
+            "current_cycle_ends_at": period_end,
+        }
+        if reset_usage:
+            update_data.update({
+                "current_cycle_used_seconds": 0,
+                "current_cycle_used_minutes": 0,
+                "current_cycle_overage_seconds": 0,
+                "current_cycle_overage_minutes": 0,
+            })
+        supabase_admin.table("businesses").update(update_data).eq("id", business["id"]).execute()
+    except Exception as exc:
+        logging.error("Failed to sync plan entitlement for user %s plan %s: %s", user_id, plan_name, exc, exc_info=True)
+
 def build_call_route_payload(payload: dict, request: Request):
     forwarded_from = first_present(payload, "forwarded_from", "forwardedFrom", "ForwardedFrom", "source_number")
     trigger_key = first_present(payload, "trigger_key", "trigger", "event", "type")
@@ -6309,29 +6401,31 @@ async def legacy_server_tool(tool_name: str, request: Request):
         return {"ok": True, "appointment": cancelled}
 
     if normalized_tool == "log-call-outcome":
+        duration_seconds = first_present(payload, "duration_seconds", "duration")
         call_log = {
             "source": "server_tool",
-            "external_call_id": first_present(payload, "call_id", "CallSid", "callSid"),
+            "provider_call_sid": first_present(payload, "call_id", "CallSid", "callSid"),
             "conversation_id": first_present(payload, "conversation_id"),
             "elevenlabs_agent_id": first_present(payload, "agent_id", "elevenlabs_agent_id"),
             "hired_receptionist_id": (receptionist or {}).get("id") or first_present(payload, "hired_receptionist_id", "receptionist_id"),
             "user_id": user_id,
+            "business_id": (business or {}).get("id") or first_present(payload, "business_id"),
             "receptionist_name": (receptionist or {}).get("full_name") or first_present(payload, "receptionist_name"),
             "scenario_id": first_present(payload, "scenario_id"),
             "from_number": normalize_phone_number(first_present(payload, "from_number", "From", "caller_phone")),
             "to_number": normalize_phone_number(first_present(payload, "to_number", "To", "phone_number")) or get_business_forwarding_target_number(business),
             "started_at": first_present(payload, "started_at"),
             "ended_at": first_present(payload, "ended_at"),
-            "duration_seconds": first_present(payload, "duration_seconds", "duration"),
+            "duration_seconds": duration_seconds,
             "status": first_present(payload, "status", "call_status"),
             "outcome": first_present(payload, "outcome"),
             "summary": first_present(payload, "summary"),
             "transcript_text": first_present(payload, "transcript", "transcript_text"),
-            "sentiment": first_present(payload, "sentiment"),
             "raw_payload": payload,
         }
         response = supabase.table("call_logs").insert(call_log).execute()
         saved = response.data[0] if response.data else call_log
+        increment_business_usage_summary(call_log.get("business_id"), duration_seconds)
         return {"ok": True, "call_log": saved}
 
     if normalized_tool == "transfer-call":
@@ -6483,7 +6577,7 @@ async def elevenlabs_post_call_webhook(
         if call_log.get("conversation_id"):
             existing = (
                 supabase.table("call_logs")
-                .select("id,audio_storage_path")
+                .select("id,audio_storage_path,duration_seconds,business_id")
                 .eq("conversation_id", call_log["conversation_id"])
                 .limit(1)
                 .execute()
@@ -6504,6 +6598,10 @@ async def elevenlabs_post_call_webhook(
         ) from exc
 
     saved = response.data[0] if getattr(response, "data", None) else call_log
+    previous_duration_seconds = parse_usage_seconds(existing[0].get("duration_seconds")) if existing else 0
+    saved_duration_seconds = parse_usage_seconds(saved.get("duration_seconds") or call_log.get("duration_seconds"))
+    usage_business_id = saved.get("business_id") or call_log.get("business_id") or (existing[0].get("business_id") if existing else None)
+    increment_business_usage_summary(usage_business_id, max(0, saved_duration_seconds - (previous_duration_seconds or 0)))
     if call_log.get("hired_receptionist_id"):
         refresh_receptionist_call_metrics(call_log.get("hired_receptionist_id"))
 
@@ -7650,7 +7748,21 @@ async def get_plans():
 
 @app.get("/api/sonar/pricing/plans", tags=["Sonar Payments"])
 async def get_sonar_pricing_plans():
-    return await get_plans()
+    stripe_data = await get_plans()
+    try:
+        plan_rows = (
+            supabase_admin.table("sonar_plans")
+            .select("slug,name,stripe_product_name,sort_order,is_recommended,display,entitlements,features")
+            .eq("is_public", True)
+            .order("sort_order")
+            .execute()
+        ).data or []
+    except Exception as e:
+        # Keep Stripe pricing available while the optional entitlement table is being deployed.
+        logging.warning("Could not load Sonar plan entitlements: %s", e)
+        plan_rows = []
+
+    return {**stripe_data, "plans": plan_rows}
 
 @app.post("/create-checkout-session", tags=["Billing"])
 async def create_checkout_session(request: CreateCheckoutSessionRequest, current_user: dict = Depends(get_current_user)):
@@ -8496,7 +8608,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             subscription_status = "trialing"
 
         # Fetch current user data to check existing plan
-        user_data_response = supabase.table('users').select('plan').eq('stripe_customer_id', customer_id).single().execute()
+        user_data_response = supabase.table('users').select('id,plan').eq('stripe_customer_id', customer_id).single().execute()
         current_plan = user_data_response.data.get('plan') if user_data_response.data else None
 
         update_data = {
@@ -8515,6 +8627,13 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             update_data['plan_change_popup'] = None
 
         supabase.table('users').update(update_data).eq('stripe_customer_id', customer_id).execute()
+        sync_business_plan_entitlement(
+            user_data_response.data.get('id') if user_data_response.data else None,
+            plan_name,
+            datetime.fromtimestamp(subscription.get('current_period_start'), timezone.utc).isoformat() if subscription.get('current_period_start') else None,
+            datetime.fromtimestamp(subscription.get('current_period_end'), timezone.utc).isoformat() if subscription.get('current_period_end') else None,
+            reset_usage=current_plan != plan_name,
+        )
         logging.info(f"Checkout session completed for user with customer ID: {customer_id}. Plan changed: {current_plan} -> {plan_name}")
 
     elif event_type == 'invoice.created':
@@ -8579,7 +8698,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 return {"status": "skipped"}
             
             # 1. Update user's subscription_status to "active" and increment months_subscribed
-            user_data_response = supabase.table('users').select('id, associate, months_subscribed, subscription_status, stripe_subscription_id').eq('stripe_customer_id', customer_id).single().execute()
+            user_data_response = supabase.table('users').select('id, plan, associate, months_subscribed, subscription_status, stripe_subscription_id').eq('stripe_customer_id', customer_id).single().execute()
 
             if user_data_response.data:
                 user_id = user_data_response.data['id']
@@ -8608,6 +8727,13 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 if not user_status_update_response.data:
                     logging.error(f"Supabase update for user {user_id} subscription status affected no rows.", exc_info=True)
                     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update user's subscription status.")
+                sync_business_plan_entitlement(
+                    user_id,
+                    user_data_response.data.get('plan'),
+                    datetime.fromtimestamp(invoice.get('period_start'), timezone.utc).isoformat() if invoice.get('period_start') else None,
+                    datetime.fromtimestamp(invoice.get('period_end'), timezone.utc).isoformat() if invoice.get('period_end') else None,
+                    reset_usage=True,
+                )
                 logging.info(f"User {user_id} subscription status updated to 'active' and months_subscribed incremented to {updated_months_subscribed}.")
                 emit_payment_trigger("invoice_paid", {
                     "invoice": invoice,

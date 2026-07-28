@@ -278,7 +278,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
                         {isCheckoutLoading ? 'Redirecting...' : (
                             isTestMode ? 'Test this subscription' : (
                                 plan.name === 'Free' ? 'Choose plan' : (
-                                    hasStartedTrial ? 'Choose plan' : 'Try for 14 days'
+                                    plan.cta || (hasStartedTrial ? 'Choose plan' : 'Try for 14 days')
                                 )
                             )
                         )}
@@ -297,6 +297,8 @@ const PricingPage = () => {
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [source, setSource] = useState('standard');
     const [stripeData, setStripeData] = useState(null);
+    const [planEntitlements, setPlanEntitlements] = useState(null);
+    const [plansError, setPlansError] = useState('');
     const [isTestMode, setIsTestMode] = useState(false);
     const pillBgRef = useRef(null);
     const annualBtnRef = useRef(null);
@@ -350,8 +352,17 @@ const PricingPage = () => {
             try {
                 const { data } = await axios.get(`${API_BASE_URL}/pricing/plans`);
                 setStripeData(data);
+                if (Array.isArray(data.plans) && data.plans.length) {
+                    setPlanEntitlements(data.plans);
+                    setPlansError('');
+                } else {
+                    setPlanEntitlements([]);
+                    setPlansError('No public plans were returned from the pricing API.');
+                }
             } catch (err) {
                 console.error("Error fetching plans:", err);
+                setPlanEntitlements([]);
+                setPlansError('Pricing plans could not be loaded from the server.');
             }
         };
         fetchPlans();
@@ -365,7 +376,21 @@ const PricingPage = () => {
         }
     }, [cycle]);
 
-    const plansToDisplay = plansConfig.map(plan => {
+    const configuredPlans = (planEntitlements || []).map((databasePlan) => {
+        const fallbackPlan = plansConfig.find((plan) => plan.name.toLowerCase() === databasePlan.name.toLowerCase()) || {};
+        const display = databasePlan.display || {};
+        return {
+            ...fallbackPlan,
+            name: databasePlan.name,
+            description: display.description || '',
+            features: Array.isArray(databasePlan.features) ? databasePlan.features : [],
+            isRecommended: Boolean(databasePlan.is_recommended),
+            entitlements: databasePlan.entitlements || {},
+            cta: display.cta || null,
+        };
+    });
+
+    const plansToDisplay = configuredPlans.map(plan => {
         if (plan.name === 'Free') return { ...plan, price: { monthly: 0, annually: 0 }, priceIds: {} };
         
         if (!stripeData) return { ...plan, price: { monthly: 0, annually: 0 }, priceIds: {} };
@@ -425,9 +450,13 @@ const PricingPage = () => {
                     </div>
                 </div>
                 <div className="relative text-center">
-                    <div className="inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4">
-                       {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} hasStartedTrial={startedTrial} isTestMode={isTestMode} />)}
-                    </div>
+                    {plansError ? (
+                        <div className="py-10 text-sm text-gray-500">{plansError}</div>
+                    ) : (
+                        <div className="inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4">
+                           {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} hasStartedTrial={startedTrial} isTestMode={isTestMode} />)}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
