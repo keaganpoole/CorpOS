@@ -77,7 +77,8 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
     colorClass: 'bg-cyan-400',
     glowClass: 'shadow-[0_0_12px_color-mix(in srgb, var(--brandGradientStart) 60%, transparent)]',
-    hoverTextClass: 'group-hover:text-white',
+    hoverTextClass: 'group-hover:text-pink-400',
+    accentColor: '#ec4899',
     title: '24/7 Call Handling',
     copy: 'Answer inbound calls instantly, day or night, so customers reach your business instead of voicemail.',
   },
@@ -101,7 +102,8 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-pink-300" />,
     colorClass: 'bg-blue-500',
     glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
-    hoverTextClass: 'group-hover:text-zinc-300',
+    hoverTextClass: 'group-hover:text-pink-400',
+    accentColor: '#ec4899',
     title: 'Payments',
     copy: 'Collect deposits, send payment links, process payments, and answer billing questions without handing the call to staff.',
   },
@@ -343,7 +345,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
       <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
         <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_42%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]" />
 
         <div
           className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${crmOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
@@ -415,7 +417,7 @@ const NumberOptionsShowcase = () => {
                 Keep Your Number
               </h2>
               <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
-                Keep your existing business number and <span className="homepage-gradient-word">route</span> it into CorpOS. Your customers keep calling the same line, while CorpOS answers on the other end and handles the conversation for you.
+                Keep your existing business number and route it into CorpOS. Your customers keep calling the same line, while CorpOS answers on the other end and handles the conversation for you.
               </div>
             </div>
 
@@ -444,7 +446,7 @@ const NumberOptionsShowcase = () => {
                 Choose New Number
               </h2>
               <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
-                If you want a clean setup, claim a new number directly in CorpOS. It becomes your <span className="homepage-gradient-word">dedicated</span> business line for calls handled by the receptionist from day one.
+                If you want a clean setup, claim a new number directly in CorpOS. It becomes your dedicated business line for calls handled by the receptionist from day one.
               </div>
             </div>
           </div>

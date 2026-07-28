@@ -217,7 +217,7 @@ const CallHandlingIcon = ({ direction }) => {
 };
 
 const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onUpdateDirection, onTerminate, compact = false, slim = false }) => {
-  const borderClass = isActive ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_16%,transparent)] shadow-[0_0_18px_color-mix(in_srgb,var(--brandGradientStart)_3%,transparent)]' : 'border-white/[0.04]';
+  const borderClass = isActive ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_14%,transparent)] shadow-[0_0_10px_color-mix(in_srgb,var(--brandGradientStart)_1.5%,transparent)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
   const displayModel = pending || agent.model || 'Not set';
   const normalizedAgentStatus = String(agent.status || 'Offline').trim().toLowerCase();
@@ -565,14 +565,14 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
         {item.label}
       </span>
       {isActive && (
-        <motion.div layoutId="nav-active" className="absolute left-0 w-1 h-5 bg-white rounded-r-full shadow-[0_0_8px_rgba(255,255,255,0.18)]" />
+        <motion.div layoutId="nav-active" className="absolute left-0 w-1 h-5 bg-white rounded-r-full shadow-[0_0_4px_rgba(255,255,255,0.1)]" />
       )}
       {sweeping && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
           <div
             className="absolute inset-0 w-[200%] -skew-x-12 nav-sweep"
             style={{
-              background: 'linear-gradient(to right, transparent 0%, color-mix(in srgb, var(--brandGradientStart) 6%, transparent) 30%, color-mix(in srgb, var(--brandGradientEnd) 8%, transparent) 50%, color-mix(in srgb, var(--brandGradientStart) 6%, transparent) 70%, transparent 100%)',
+              background: 'linear-gradient(to right, transparent 0%, color-mix(in srgb, var(--brandGradientStart) 3%, transparent) 30%, color-mix(in srgb, var(--brandGradientEnd) 4%, transparent) 50%, color-mix(in srgb, var(--brandGradientStart) 3%, transparent) 70%, transparent 100%)',
             }}
           />
         </div>
@@ -609,7 +609,7 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
 const PlaceholderView = ({ title, body }) => (
   <div className="flex items-center justify-center h-full text-zinc-500 flex-col gap-4">
     <div className="p-16 border border-white/5 rounded-3xl bg-[#0A0A0A] flex flex-col items-center text-center shadow-2xl relative overflow-hidden">
-      <Database size={56} className="brand-icon mb-8 drop-shadow-[0_0_8px_color-mix(in_srgb,var(--brandGradientStart)_16%,transparent)]" />
+      <Database size={56} className="brand-icon mb-8 drop-shadow-[0_0_5px_color-mix(in_srgb,var(--brandGradientStart)_8%,transparent)]" />
       <h3 className="text-xl font-bold text-zinc-100 tracking-tight uppercase">{title}</h3>
       <p className="text-[12px] font-bold text-zinc-600 max-w-xs mt-4 leading-relaxed uppercase tracking-widest opacity-60">{body}</p>
     </div>

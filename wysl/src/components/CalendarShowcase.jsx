@@ -77,7 +77,8 @@ const FEATURE_ITEMS = [
     icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
     colorClass: 'bg-blue-500',
     glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
-    hoverTextClass: 'group-hover:text-zinc-300',
+    hoverTextClass: 'group-hover:text-pink-400',
+    accentColor: '#ec4899',
     title: 'Staff Matching',
     copy: 'Intelligently match callers to the right service, staff member, or appointment type based on what they need.',
   },
@@ -93,7 +94,8 @@ const FEATURE_ITEMS = [
     icon: <Search className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-pink-300" />,
     colorClass: 'bg-cyan-400',
     glowClass: 'shadow-[0_0_12px_color-mix(in srgb, var(--brandGradientStart) 60%, transparent)]',
-    hoverTextClass: 'group-hover:text-white',
+    hoverTextClass: 'group-hover:text-pink-400',
+    accentColor: '#ec4899',
     title: 'Manual Edits',
     copy: 'Review and adjust the appointment records your receptionist creates whenever staff need to update details, notes, or status.',
   },
@@ -112,7 +114,8 @@ const SCENARIO_FEATURE_ITEMS = [
     icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-pink-300" />,
     colorClass: 'bg-cyan-400',
     glowClass: 'shadow-[0_0_12px_color-mix(in srgb, var(--brandGradientStart) 60%, transparent)]',
-    hoverTextClass: 'group-hover:text-white',
+    hoverTextClass: 'group-hover:text-pink-400',
+    accentColor: '#ec4899',
     title: 'Call Automation',
     copy: 'Have your receptionist make phone calls as part of the workflow, so calls happen exactly when they should, at the perfect moment.',
   },
@@ -136,7 +139,8 @@ const SCENARIO_FEATURE_ITEMS = [
     icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-pink-300" />,
     colorClass: 'bg-blue-500',
     glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
-    hoverTextClass: 'group-hover:text-zinc-300',
+    hoverTextClass: 'group-hover:text-pink-400',
+    accentColor: '#ec4899',
     title: 'Built-In Payments',
     copy: 'Automate billing tasks like payment collection, invoice creation, and payment links as part of the conversation.',
   },
@@ -203,7 +207,8 @@ const CRM_FEATURE_ITEMS = [
     icon: <ClipboardList className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
     colorClass: 'bg-cyan-400',
     glowClass: 'shadow-[0_0_12px_color-mix(in srgb, var(--brandGradientStart) 60%, transparent)]',
-    hoverTextClass: 'group-hover:text-white',
+    hoverTextClass: 'group-hover:text-pink-400',
+    accentColor: '#ec4899',
     title: 'Custom Intake Fields',
     copy: 'Tell your receptionist which details matter most, and it will prioritize collecting them during the call before saving them to the customer record.',
   },
@@ -230,7 +235,8 @@ const MONITORING_FEATURE_ITEMS = [
     icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
     colorClass: 'bg-cyan-400',
     glowClass: 'shadow-[0_0_12px_color-mix(in srgb, var(--brandGradientStart) 60%, transparent)]',
-    hoverTextClass: 'group-hover:text-white',
+    hoverTextClass: 'group-hover:text-pink-400',
+    accentColor: '#ec4899',
     title: 'Live Call Visibility',
     copy: 'Experience every call as it happens with a live visual flow that reveals the path your AI receptionist takes from start to finish.',
   },
@@ -316,11 +322,7 @@ const BOOKING_SCAN_STYLES = `
 `;
 
 function GradientWord({ children }) {
-  return (
-    <span className="homepage-gradient-word">
-      {children}
-    </span>
-  );
+  return <>{children}</>;
 }
 
 function MonitoringHeadline({ playKey }) {
@@ -1106,11 +1108,15 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
                     className={`feature-reveal-row__icon flex items-center justify-center overflow-visible transition-all duration-300 ${
                       isHighlighted ? 'scale-110 text-white' : 'text-zinc-600'
                     }`}
+                    style={isHighlighted && item.accentColor ? { color: item.accentColor } : undefined}
                   >
                     {item.icon}
                   </div>
 
-                  <div className={`feature-reveal-row__title text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-[1.35rem] lg:text-2xl ${item.hoverTextClass}`}>
+                  <div
+                    className={`feature-reveal-row__title text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-[1.35rem] lg:text-2xl ${item.hoverTextClass}`}
+                    style={isHighlighted && item.accentColor ? { color: item.accentColor } : undefined}
+                  >
                     {item.title}
                   </div>
                 </div>

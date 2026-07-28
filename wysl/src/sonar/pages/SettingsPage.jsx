@@ -605,7 +605,7 @@ const StaffAvailabilitySelector = ({ value, onChange }) => {
 const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onToggleActive, compact = false }) => {
   const [avatarFailed, setAvatarFailed] = useState(false);
   const availability = getStaffAvailabilitySummary(staff.working_hours);
-  const borderClass = isSelected ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_20%,transparent)] shadow-[0_0_30px_color-mix(in_srgb,var(--brandGradientStart)_5%,transparent)]' : 'border-white/[0.04]';
+  const borderClass = isSelected ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_16%,transparent)] shadow-[0_0_14px_color-mix(in_srgb,var(--brandGradientStart)_2%,transparent)]' : 'border-white/[0.04]';
   const cardSizeClass = compact ? 'h-[465px] min-h-[465px] max-h-[465px] w-[300px] min-w-[300px] max-w-[300px]' : 'h-[550px] min-h-[550px] max-h-[550px] w-[380px] min-w-[380px] max-w-[380px]';
   const imageHeightClass = compact ? 'h-[150px]' : 'h-[280px]';
   const bodyClass = compact ? 'h-[315px] min-h-[315px] max-h-[315px] p-4 space-y-2.5' : 'h-[270px] min-h-[270px] max-h-[270px] p-6 space-y-3.5';
@@ -1783,7 +1783,7 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
               onClick={() => { setActiveTab(tab.key); setShowPreview(false); }}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap
                 ${isActive
-                  ? 'bg-white/[0.06] text-white border border-white/[0.08] shadow-[0_0_15px_color-mix(in_srgb,var(--brandGradientStart)_8%,transparent)]'
+                  ? 'bg-white/[0.06] text-white border border-white/[0.08] shadow-[0_0_8px_color-mix(in_srgb,var(--brandGradientStart)_3%,transparent)]'
                   : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.02] border border-transparent'
                 }`}
             >
