@@ -5091,7 +5091,7 @@ export default function ScenariosPage() {
                     </>
                   ) : (
                     <div className="sb-node-inner-wrap" ref={(el) => { if (el) circleRefs.current[node.id] = el.querySelector('.sb-quantum-circle') || el; }}>
-                      <div className="sb-quantum-circle" style={{ width: '100%', height: '100%', opacity: 1, transform: 'scale(1)' }} />
+                      <div className="sb-quantum-circle" style={{ width: '100%', height: '100%', opacity: 1, transform: 'scale(1)', animation: 'quantum-breathe 6s 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite' }} />
                     </div>
                   )}
                 </div>

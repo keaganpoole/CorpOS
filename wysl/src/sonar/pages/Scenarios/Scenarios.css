@@ -3663,7 +3663,9 @@
   border: 2px solid white;
   border-radius: 50%;
   background: transparent;
-  animation: quantum-fade-in 1s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation:
+    quantum-fade-in 1s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    quantum-breathe 6s 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   opacity: 0;
   cursor: pointer;
   flex-shrink: 0;
