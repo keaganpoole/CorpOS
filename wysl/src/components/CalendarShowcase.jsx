@@ -1063,6 +1063,14 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
 
   return (
     <div className="flex h-full w-full items-center">
+      <svg className="pointer-events-none absolute h-0 w-0" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="homepage-feature-icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--brandGradientStart)" />
+            <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+          </linearGradient>
+        </defs>
+      </svg>
       <div className="mx-auto w-full max-w-[820px] text-left md:max-w-[940px] lg:max-w-[820px]">
         <div className="flex flex-col">
           {items.map((item, index) => {
@@ -1098,8 +1106,8 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
                 >
                   <div className="relative flex h-3 w-3 items-center justify-center">
                     <span
-                      className={`feature-reveal-row__dot absolute h-1.5 w-1.5 rounded-full transition-all duration-300 ease-out ${item.colorClass} ${
-                        isHighlighted ? `${item.glowClass} scale-110 opacity-100` : 'scale-75 opacity-30'
+                      className={`feature-reveal-row__dot absolute h-1.5 w-1.5 rounded-full transition-all duration-300 ease-out ${
+                        isHighlighted ? 'is-highlighted scale-110 opacity-100' : 'scale-75 opacity-30'
                       }`}
                     />
                   </div>
@@ -1107,15 +1115,13 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
                   <div
                     className={`feature-reveal-row__icon flex items-center justify-center overflow-visible transition-all duration-300 ${
                       isHighlighted ? 'scale-110 text-white' : 'text-zinc-600'
-                    }`}
-                    style={isHighlighted && item.accentColor ? { color: item.accentColor } : undefined}
+                    } ${isHighlighted ? 'is-highlighted' : ''}`}
                   >
                     {item.icon}
                   </div>
 
                   <div
-                    className={`feature-reveal-row__title text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-[1.35rem] lg:text-2xl ${item.hoverTextClass}`}
-                    style={isHighlighted && item.accentColor ? { color: item.accentColor } : undefined}
+                    className={`feature-reveal-row__title text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-[1.35rem] lg:text-2xl ${isHighlighted ? 'is-highlighted' : ''}`}
                   >
                     {item.title}
                   </div>

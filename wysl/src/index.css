@@ -96,7 +96,30 @@ body {
 /* Existing cyan/teal utility accents now resolve through the brand system without recoloring body text. */
 :where([class*="border-cyan-"]) { border-color: color-mix(in srgb, var(--brandGradientStart) 42%, transparent) !important; }
 :where([class*="bg-cyan-"]) { background-color: color-mix(in srgb, var(--brandGradientStart) 12%, transparent) !important; }
-.feature-reveal-row__dot.bg-cyan-400 { background-color: #22d3ee !important; }
+.feature-reveal-row__dot {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brandGradientStart) 46%, #050505),
+    color-mix(in srgb, var(--brandGradientEnd) 42%, #050505)
+  ) !important;
+}
+.feature-reveal-row__dot.is-highlighted {
+  background: linear-gradient(135deg, var(--brandGradientStart), var(--brandGradientEnd)) !important;
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--brandGradientStart) 42%, transparent),
+    0 0 14px color-mix(in srgb, var(--brandGradientEnd) 30%, transparent);
+}
+.feature-reveal-row__icon.is-highlighted svg {
+  stroke: url(#homepage-feature-icon-gradient) !important;
+  filter: saturate(0.84) brightness(0.96);
+}
+.feature-reveal-row__title.is-highlighted {
+  background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+}
 
 .dashboard-neutral-button,
 .settings-neutral-button {
