@@ -853,7 +853,6 @@
 .sb-builder-node.sb-run-node-active .sb-node-aura {
   opacity: 0.34;
   filter: blur(24px);
-  animation: sb-scenario-aura-breathe 2.2s ease-in-out infinite;
 }
 
 .sb-builder-node.sb-run-node-active .sb-node-ring {
@@ -1007,7 +1006,6 @@
 
 .sb-node-sphere.is-scenario-running {
   box-shadow: 0 16px 42px -8px rgba(255, 255, 255, 0.28), inset 0 2px 18px rgba(255, 255, 255, 0.2);
-  animation: sb-scenario-sphere-breathe 1.9s ease-in-out infinite;
 }
 
 .sb-node-sphere.is-success {
@@ -3079,7 +3077,6 @@
   border-radius: 1px;
   background: var(--varbar-color, #fff);
   opacity: 0;
-  animation: varbar-breathe 3.5s ease-in-out infinite;
 }
 
 @keyframes varbar-breathe {
@@ -3186,13 +3183,13 @@
 /* Input glow when variables pane table is hovered */
 .sb-input-field.sb-input-glow {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  animation: sb-breathe-glow 2s ease-in-out infinite;
 }
 
 @keyframes sb-breathe-glow {
   0%, 100% { box-shadow: 0 0 0 1px var(--hover-glow-color, rgba(255,255,255,0.1)); }
   50% { box-shadow: 0 0 0 1px var(--hover-glow-color-strong, rgba(255,255,255,0.2)); }
 }
+
 
 
 /* ─── Record Fields Section ─── */
@@ -3666,9 +3663,7 @@
   border: 2px solid white;
   border-radius: 50%;
   background: transparent;
-  animation:
-    quantum-fade-in 1s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards,
-    quantum-breathe 6s 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation: quantum-fade-in 1s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
   cursor: pointer;
   flex-shrink: 0;
