@@ -43,6 +43,7 @@ import expandedX from '@/assets/t1-expanded-x.png';
 import TypingAnimation from '../components/TypingAnimation';
 import HeroConcept from '../components/HeroConcept';
 import CalendarShowcase, { RightFeatureList } from '../components/CalendarShowcase';
+import WorkWeekComparison from '../components/WorkWeekComparison';
 import { trackVisitor } from '../services/apiService';
 
 const NUMBER_ICON_MASKS = {
@@ -455,6 +456,54 @@ const NumberOptionsShowcase = () => {
   );
 };
 
+const ComparisonShowcase = () => {
+  const rootRef = useRef(null);
+  const previousProgressRef = useRef(0);
+  const [sectionProgress, setSectionProgress] = useState(0);
+  const [direction, setDirection] = useState(0);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+
+    let frame = null;
+    const updateProgress = () => {
+      frame = null;
+      const rect = root.getBoundingClientRect();
+      const scrollableDistance = Math.max(root.offsetHeight - window.innerHeight, 1);
+      const nextProgress = clamp((-rect.top) / scrollableDistance, 0, 1);
+      setDirection(nextProgress >= previousProgressRef.current ? 1 : -1);
+      previousProgressRef.current = nextProgress;
+      setSectionProgress(nextProgress);
+    };
+
+    const onScroll = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(updateProgress);
+    };
+
+    updateProgress();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
+  const scrollStep = Math.min(6, Math.floor(sectionProgress * 7));
+
+  return (
+    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[800vh]">
+      <div className="sr-only" id="comparison-section-title">Comparison</div>
+      <div className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
+        <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} />
+      </div>
+    </section>
+  );
+};
+
 const HomePage = () => {
   const [showSplash, setShowSplash] = useState(true);
   useLegacyAnimation();
@@ -723,6 +772,8 @@ const HomePage = () => {
         <section className="content-section content-section--showcase dark-bg text-center">
           <CalendarShowcase variant="live-monitoring" />
         </section>
+
+        <ComparisonShowcase />
 
         <section className="content-section content-section--showcase dark-bg text-center">
           <CalendarShowcase variant="scenarios" />
