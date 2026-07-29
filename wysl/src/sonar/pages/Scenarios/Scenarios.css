@@ -1052,7 +1052,7 @@
 }
 
 .sb-builder-node:hover .sb-node-sphere {
-  transform: scale(1.05);
+  transform: scale(1.018);
 }
 
 /* Hover shadow: 0 10px 25px -8px with inset 0 4px 20px rgba(255,255,255,0.2) */
@@ -1246,7 +1246,7 @@
 }
 
 .sb-builder-node:hover .sb-node-icon-glass {
-  transform: translate(-50%, -50%) rotate(360deg);
+  transform: translate(-50%, -50%);
 }
 
 .sb-node-icon-glyph {
@@ -3638,6 +3638,15 @@
 .sb-builder-node.sb-is-placeholder {
   width: auto;
   height: auto;
+}
+
+.sb-builder-node.sb-post-intro-node.sb-is-placeholder .sb-node-inner-wrap {
+  animation: sb-placeholder-node-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes sb-placeholder-node-fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 /* Container fade-in (concepts.txt exact) */

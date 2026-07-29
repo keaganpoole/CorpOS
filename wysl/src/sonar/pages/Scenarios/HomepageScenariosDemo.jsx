@@ -5052,7 +5052,7 @@ export default function ScenariosPage({
                         {isRunActiveNode && <div className="sb-node-live-marker" aria-hidden="true" />}
 
                         {/* Add button */}
-                        {!hasOutgoingNode && (
+                        {canAddChild(node) && (
                           <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
                             <Plus size={13} />
                           </button>

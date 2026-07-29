@@ -113,7 +113,7 @@ for each row execute function public.set_sonar_plans_updated_at();
 
 -- Backfill the allowance for businesses that already have a matching user plan.
 update public.businesses as b
-set current_cycle_included_minutes = coalesce((p.entitlements ->> 'included_call_minutes')::integer, 0)
+set current_cycle_included_seconds = coalesce((p.entitlements ->> 'included_call_minutes')::integer, 0) * 60
 from public.users as u
 join public.sonar_plans as p on p.slug = lower(coalesce(u.plan, 'free'))
 where b.user_id = u.id;

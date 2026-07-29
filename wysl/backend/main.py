@@ -54,7 +54,7 @@ for handler in logging.getLogger("uvicorn.access").handlers:
 # --- End Logging Configuration ---
 
 from pydantic import BaseModel, Field, EmailStr
-from fastapi import FastAPI, HTTPException, status, Depends, Request, Header
+from fastapi import FastAPI, HTTPException, status, Depends, Request, Header, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
@@ -4051,7 +4051,7 @@ def increment_business_usage_summary(business_id, duration_delta_seconds) -> Non
 
         response = (
             supabase.table("businesses")
-            .select("current_cycle_used_seconds,current_cycle_included_minutes")
+            .select("current_cycle_used_seconds,current_cycle_included_seconds")
             .eq("id", business_id)
             .limit(1)
             .execute()
@@ -4061,15 +4061,12 @@ def increment_business_usage_summary(business_id, duration_delta_seconds) -> Non
             return
 
         used_seconds = int(business.get("current_cycle_used_seconds") or 0) + duration_delta_seconds
-        included_minutes = int(business.get("current_cycle_included_minutes") or 0)
-        included_seconds = max(0, included_minutes * 60)
+        included_seconds = int(business.get("current_cycle_included_seconds") or 0)
         overage_seconds = max(0, used_seconds - included_seconds)
 
         supabase.table("businesses").update({
             "current_cycle_used_seconds": used_seconds,
-            "current_cycle_used_minutes": round(used_seconds / 60, 2),
             "current_cycle_overage_seconds": overage_seconds,
-            "current_cycle_overage_minutes": round(overage_seconds / 60, 2),
         }).eq("id", business_id).execute()
     except Exception as exc:
         logging.error("Failed to update business usage summary for business %s: %s", business_id, exc, exc_info=True)
@@ -4091,6 +4088,7 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
         plan_row = plan_response.data[0] if getattr(plan_response, "data", None) else None
         entitlements = plan_row.get("entitlements") if plan_row else {}
         included_minutes = int((entitlements or {}).get("included_call_minutes") or 0)
+        included_seconds = max(0, included_minutes * 60)
 
         business_response = (
             supabase_admin.table("businesses")
@@ -4104,16 +4102,14 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
             return
 
         update_data = {
-            "current_cycle_included_minutes": included_minutes,
+            "current_cycle_included_seconds": included_seconds,
             "current_cycle_started_at": period_start,
             "current_cycle_ends_at": period_end,
         }
         if reset_usage:
             update_data.update({
                 "current_cycle_used_seconds": 0,
-                "current_cycle_used_minutes": 0,
                 "current_cycle_overage_seconds": 0,
-                "current_cycle_overage_minutes": 0,
             })
         supabase_admin.table("businesses").update(update_data).eq("id", business["id"]).execute()
     except Exception as exc:
@@ -6974,7 +6970,7 @@ async def update_sonar_business_profile(payload: dict, current_user: dict = Depe
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
     allowed_fields = {
-        "name", "phone", "email", "address", "city", "state", "zip", "website",
+        "name", "phone", "email", "avatar", "address", "city", "state", "zip", "website",
         "about_us", "policies", "faq", "business_hours", "business_timezone", "industry",
     }
     updates = {key: value for key, value in payload.items() if key in allowed_fields}
@@ -6986,6 +6982,62 @@ async def update_sonar_business_profile(payload: dict, current_user: dict = Depe
     response = supabase.table("businesses").update(updates).eq("id", business["id"]).execute()
     updated = response.data[0] if response.data else {**business, **updates}
     return serialize_business_profile_row(updated)
+
+@app.post("/api/sonar/business/avatar", tags=["Sonar Business"])
+async def upload_sonar_business_avatar(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    content_type = (file.content_type or "").lower()
+    allowed_content_types = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/gif": "gif",
+    }
+    if content_type not in allowed_content_types:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload a JPEG, PNG, WEBP, or GIF image.")
+
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        response = (
+            supabase_admin.table("businesses")
+            .insert({"user_id": str(current_user.id)})
+            .execute()
+        )
+        business = response.data[0] if getattr(response, "data", None) else None
+    if not business:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create business record.")
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image must be 5MB or smaller.")
+
+    extension = allowed_content_types[content_type]
+    storage_path = f"{current_user.id}/{business['id']}/avatar-{uuid4().hex}.{extension}"
+    try:
+        supabase_admin.storage.from_("business-avatars").upload(
+            storage_path,
+            content,
+            file_options={
+                "content-type": content_type,
+                "cache-control": "3600",
+                "upsert": "true",
+            },
+        )
+        public_response = supabase_admin.storage.from_("business-avatars").get_public_url(storage_path)
+        avatar_url = public_response if isinstance(public_response, str) else public_response.get("publicUrl")
+        if not avatar_url:
+            raise RuntimeError("Supabase did not return a public avatar URL.")
+        update_response = (
+            supabase_admin.table("businesses")
+            .update({"avatar": avatar_url})
+            .eq("id", business["id"])
+            .eq("user_id", str(current_user.id))
+            .execute()
+        )
+        updated = update_response.data[0] if getattr(update_response, "data", None) else {**business, "avatar": avatar_url}
+        return {"ok": True, "business": serialize_business_profile_row(updated), "avatar": avatar_url}
+    except Exception as exc:
+        logging.error("Failed to upload business avatar for user %s: %s", current_user.id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to upload business avatar.") from exc
 
 @app.get("/api/sonar/people", tags=["Sonar People"])
 async def list_sonar_people(limit: int = 100, current_user: dict = Depends(get_current_user)):

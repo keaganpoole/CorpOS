@@ -3,6 +3,7 @@
  * Renders the full Sonar dashboard UI at /dashboard.
  */
 import React, { useState, useEffect, useRef, Component } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from './lib/supabase';
 import {
   IdCardLanyard,
@@ -617,6 +618,206 @@ const PlaceholderView = ({ title, body }) => (
 );
 
 // ─── Main SonarDashboard Component ────────────────────────────────────────
+const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSettings, onUpgrade }) => {
+  const menuRef = useRef(null);
+  const buttonRef = useRef(null);
+  const panelRef = useRef(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 56, right: 40 });
+  const usedSeconds = Number(usage?.current_cycle_used_seconds ?? 0);
+  const includedSeconds = Number(usage?.current_cycle_included_seconds ?? 0);
+  const usedMinutes = usedSeconds / 60;
+  const includedMinutes = includedSeconds / 60;
+  const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
+  const percent = includedSeconds > 0 ? Math.min(100, Math.max(0, (usedSeconds / includedSeconds) * 100)) : 0;
+  const remainingPercent = includedSeconds > 0 ? Math.min(100, Math.max(0, 100 - percent)) : 0;
+  const avatarRadius = 17;
+  const avatarCircumference = 2 * Math.PI * avatarRadius;
+  const avatarDashOffset = avatarCircumference - ((remainingPercent / 100) * avatarCircumference);
+  const avatarUrl = String(usage?.avatar || '').trim();
+  const initials = String(profile?.first_name || profile?.email || 'S').trim().slice(0, 1).toUpperCase();
+  const rawPlanName = String(profile?.plan || 'Free').trim() || 'Free';
+  const planName = rawPlanName
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(' ') || 'Free';
+  const displayPlan = `${planName} plan`;
+  const formatMinutes = (value) => {
+    const safeValue = Number.isFinite(value) ? value : 0;
+    return safeValue >= 100 ? safeValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) : safeValue.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const updateMenuPosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMenuPosition({
+        top: Math.round(rect.bottom + 8),
+        right: Math.max(12, Math.round(window.innerWidth - rect.right)),
+      });
+    };
+    updateMenuPosition();
+
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      const clickedTrigger = menuRef.current?.contains(target);
+      const clickedPanel = panelRef.current?.contains(target);
+      if (!clickedTrigger && !clickedPanel) {
+        onClose();
+      }
+    };
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [isOpen, onClose]);
+
+  return (
+    <div ref={menuRef} className="relative z-[200] ml-auto no-drag">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={onToggle}
+        className="group/account relative flex h-10 w-10 items-center justify-center rounded-full text-zinc-300 transition-colors hover:text-white"
+        aria-label="Open account menu"
+      >
+        <svg width="0" height="0" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="accountUsageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="var(--brandGradientStart)" />
+              <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
+          <circle
+            cx="20"
+            cy="20"
+            r={avatarRadius}
+            fill="none"
+            stroke="url(#accountUsageGradient)"
+            strokeWidth="1.35"
+            strokeLinecap="round"
+            strokeDasharray={avatarCircumference}
+            strokeDashoffset={avatarDashOffset}
+          />
+        </svg>
+        <span className="relative flex h-7 w-7 items-center justify-center overflow-hidden rounded-full text-[11px] font-black leading-none">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="h-full w-full object-cover transition-opacity duration-200 group-hover/account:opacity-20" />
+          ) : (
+            <span className="transition-opacity duration-200 group-hover/account:opacity-0">
+              {initials}
+            </span>
+          )}
+          <span className="absolute inset-0 flex items-center justify-center bg-[#050505]/85 text-[9px] font-black text-white opacity-0 transition-opacity duration-200 group-hover/account:opacity-100">
+            {Math.round(remainingPercent)}%
+          </span>
+        </span>
+      </button>
+
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isOpen && (
+          <motion.div
+            ref={panelRef}
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            style={{ top: menuPosition.top, right: menuPosition.right }}
+            className="fixed z-[2147483647] w-[276px] overflow-hidden rounded-2xl border border-white/[0.075] bg-[#080808]/95 shadow-[0_24px_80px_rgba(0,0,0,0.85)] backdrop-blur-xl"
+          >
+            <div className="relative border-b border-white/[0.06] px-4 py-4">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-zinc-300">
+                    <BarChart3 size={13} />
+                  </span>
+                  <span className="truncate text-[15px] font-semibold leading-none tracking-tight text-zinc-100">Call usage</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onUpgrade}
+                  className="rounded-full border border-white/[0.12] bg-white/[0.92] px-3 py-1.5 text-[11px] font-semibold leading-none text-black transition-all hover:bg-white"
+                >
+                  Upgrade
+                </button>
+              </div>
+
+              <div className="mb-5">
+                <div className="mb-2 flex items-end justify-between">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-600">Remaining</span>
+                  <span className="text-[28px] font-light leading-none tracking-tight text-white tabular-nums">{Math.round(remainingPercent)}%</span>
+                </div>
+                <div className="h-px overflow-hidden rounded-full bg-white/[0.08]">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-500 ease-out"
+                    style={{
+                      width: `${remainingPercent}%`,
+                      background: 'linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd))',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3.5 text-[13px] leading-none">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-zinc-500">Total minutes</span>
+                  <span className="font-semibold text-zinc-100 tabular-nums">{formatMinutes(includedMinutes)} min</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-zinc-500">Minutes remaining</span>
+                  <span className="font-semibold text-zinc-100 tabular-nums">{formatMinutes(remainingMinutes)} min</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-zinc-500">Minutes used</span>
+                  <span className="font-semibold text-zinc-100 tabular-nums">{formatMinutes(usedMinutes)} min</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-b border-white/[0.06] bg-white/[0.025] px-4 py-4">
+              <div className="text-[11px] font-medium uppercase leading-none tracking-[0.18em] text-zinc-600">Current plan</div>
+              <div className="mt-4 flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-[18px] font-semibold leading-none tracking-tight text-zinc-100">{planName}</div>
+                  <div className="mt-2 truncate text-[12px] font-medium leading-none text-zinc-500">{displayPlan}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onUpgrade}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-black/80 text-zinc-200 transition-colors hover:border-white/15 hover:text-white"
+                  aria-label="Change plan"
+                >
+                  <ArrowUpDown size={14} />
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="flex w-full items-center justify-between px-4 py-4 text-left text-[14px] font-semibold leading-none tracking-tight text-zinc-200 transition-colors hover:bg-white/[0.045] hover:text-white"
+            >
+              <span>Settings</span>
+              <Settings size={15} className="text-zinc-500" />
+            </button>
+          </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </div>
+  );
+};
+
 const SonarDashboard = () => {
   const { session: authSession, profile } = useAuth();
   const [currentRoute, setCurrentRoute] = useState(getInitialDashboardRoute);
@@ -632,17 +833,37 @@ const SonarDashboard = () => {
   const [terminateAgent, setTerminateAgent] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [staffBusinessId, setStaffBusinessId] = useState(null);
+  const [businessUsage, setBusinessUsage] = useState(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [teamView, setTeamView] = useState('receptionists');
   const userId = authSession?.user?.id || profile?.id || null;
 
   useEffect(() => {
     if (!userId) return;
-    supabase.from('businesses').select('id').eq('user_id', userId).limit(1).maybeSingle()
+    supabase.from('businesses').select('id,avatar,current_cycle_used_seconds,current_cycle_included_seconds,current_cycle_overage_seconds,current_cycle_started_at,current_cycle_ends_at').eq('user_id', userId).limit(1).maybeSingle()
       .then(({ data, error }) => {
         if (error) console.error('[Team] Failed to load business:', error);
-        if (data?.id) setStaffBusinessId(data.id);
+        if (data?.id) {
+          setStaffBusinessId(data.id);
+          setBusinessUsage(data);
+        }
       });
   }, [userId]);
+
+  useEffect(() => {
+    if (!staffBusinessId) return undefined;
+    const channel = supabase
+      .channel(`business-usage-${staffBusinessId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'businesses', filter: `id=eq.${staffBusinessId}` },
+        (payload) => setBusinessUsage(payload.new)
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [staffBusinessId]);
 
   const ensureStaffBusiness = async ({ createIfMissing = false } = {}) => {
     if (staffBusinessId) return { id: staffBusinessId };
@@ -749,7 +970,6 @@ const SonarDashboard = () => {
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
     { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
-    { id: 'settings', icon: <Settings size={18} />, label: 'Settings' },
   ];
 
   const renderView = () => {
@@ -997,6 +1217,21 @@ const SonarDashboard = () => {
           </div>
 
         </div>
+        <AccountDropdown
+          profile={profile}
+          usage={businessUsage}
+          isOpen={accountMenuOpen}
+          onToggle={() => setAccountMenuOpen((open) => !open)}
+          onClose={() => setAccountMenuOpen(false)}
+          onOpenSettings={() => {
+            setAccountMenuOpen(false);
+            setCurrentRoute('settings');
+          }}
+          onUpgrade={() => {
+            setAccountMenuOpen(false);
+            window.location.href = '/pricing';
+          }}
+        />
       </header>
 
       {/* Layout */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings, Clock, Building2, Phone, Bell, Calendar,
@@ -164,6 +164,7 @@ const defaultSettings = {
   business_name: '',
   business_phone: '',
   business_email: '',
+  business_avatar: '',
   business_timezone: 'America/New_York',
   business_street: '',
   business_city: '',
@@ -2153,6 +2154,8 @@ const SettingsPage = () => {
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState('business');
+  const [businessAvatarUploading, setBusinessAvatarUploading] = useState(false);
+  const businessAvatarInputRef = useRef(null);
 
   useEffect(() => {
     loadSettings();
@@ -2173,6 +2176,7 @@ const SettingsPage = () => {
       name: settings.business_name || '',
       phone: settings.business_phone || '',
       email: settings.business_email || '',
+      avatar: settings.business_avatar || '',
       address: settings.business_street || '',
       city: settings.business_city || '',
       state: settings.business_state || '',
@@ -2250,7 +2254,7 @@ const SettingsPage = () => {
       // Load business info from businesses table
       const { data: bizData, error: bizErr } = await supabase
         .from('businesses')
-        .select('id, name, phone, email, address, city, state, zip, business_hours, about_us, policies, faq')
+        .select('id, name, phone, email, avatar, address, city, state, zip, business_hours, about_us, policies, faq')
         .eq('user_id', userId)
         .limit(1)
         .maybeSingle();
@@ -2280,6 +2284,7 @@ const SettingsPage = () => {
         business_name: biz.name || '',
         business_phone: biz.phone || '',
         business_email: biz.email || '',
+        business_avatar: biz.avatar || '',
         business_street: biz.address || '',
         business_city: biz.city || '',
         business_state: biz.state || '',
@@ -2321,7 +2326,7 @@ const SettingsPage = () => {
       const normalizedBusinessId = business?.id ?? null;
 
       // Save app config to account_settings (excluding business fields and services)
-      const { business_name, business_phone, business_email, business_street, business_city, business_state, business_zip, business_hours, business_timezone, _business_id, services, knowledge_base, id: _id, created_at, updated_at, ...appConfig } = settings;
+      const { business_name, business_phone, business_email, business_avatar, business_street, business_city, business_state, business_zip, business_hours, business_timezone, _business_id, services, knowledge_base, id: _id, created_at, updated_at, ...appConfig } = settings;
       const normalizedAppConfig = normalizeNullishStrings(appConfig);
       const scopedAppConfig = {
         ...normalizedAppConfig,
@@ -2401,6 +2406,61 @@ const SettingsPage = () => {
         },
       },
     }));
+  };
+
+  const uploadBusinessAvatar = async (file) => {
+    if (!file) return;
+    if (!file.type?.startsWith('image/')) {
+      setError('Choose an image file for the business avatar.');
+      return;
+    }
+
+    setBusinessAvatarUploading(true);
+    setError(null);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData?.user?.id;
+      if (!userId) throw new Error('User not found');
+
+      await ensureBusinessRecord({ createIfMissing: true });
+
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`${FORWARDING_API_BASE_URL}/api/sonar/business/avatar`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token}`,
+        },
+        body: formData,
+      });
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+          const payload = await response.json();
+          message = payload?.detail || message;
+        } catch {
+          // Keep fallback status text.
+        }
+        throw new Error(message);
+      }
+      const payload = await response.json();
+      const avatarUrl = payload?.avatar || payload?.business?.avatar || '';
+      const businessId = payload?.business?.id;
+      if (!avatarUrl) throw new Error('Avatar uploaded, but no public URL was returned.');
+
+      setSettings(prev => ({
+        ...prev,
+        _business_id: businessId || prev._business_id,
+        business_avatar: avatarUrl,
+      }));
+    } catch (err) {
+      console.error('[SettingsPage] Failed to upload business avatar:', err);
+      setError(err.message || 'Failed to upload business avatar.');
+    } finally {
+      setBusinessAvatarUploading(false);
+      if (businessAvatarInputRef.current) businessAvatarInputRef.current.value = '';
+    }
   };
 
   const settingsSections = [
@@ -2628,14 +2688,51 @@ const SettingsPage = () => {
           </aside>
 
           <section className="min-h-0 overflow-auto custom-scrollbar rounded-[28px] border border-white/[0.05] bg-gradient-to-b from-zinc-950/40 to-transparent p-6">
-            <div className="mb-6 flex items-center gap-3 border-b border-white/[0.04] pb-5">
-              <div>
-                <ActiveSettingsIcon size={18} className={activeSectionConfig.iconClass} />
+            <div className="mb-6 flex items-center justify-between gap-4 border-b border-white/[0.04] pb-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div>
+                  <ActiveSettingsIcon size={18} className={activeSectionConfig.iconClass} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">{activeSectionConfig.title}</h3>
+                  <p className="mt-2 text-[13px] leading-5 text-zinc-600">{activeSectionConfig.hint}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">{activeSectionConfig.title}</h3>
-                <p className="mt-2 text-[13px] leading-5 text-zinc-600">{activeSectionConfig.hint}</p>
-              </div>
+              {activeSection === 'business' && (
+                <div className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    onClick={() => businessAvatarInputRef.current?.click()}
+                    disabled={businessAvatarUploading || saving}
+                    className="group/avatar relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/[0.07] bg-white/[0.025] transition hover:border-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Upload business avatar"
+                  >
+                    {settings.business_avatar ? (
+                      <img src={settings.business_avatar} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-[13px] font-semibold text-zinc-500">
+                        {(settings.business_name || 'B').trim().slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/70 text-white opacity-0 transition-opacity duration-200 group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100">
+                      <Upload size={16} />
+                    </span>
+                    {businessAvatarUploading && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/75 text-[8px] font-bold uppercase tracking-widest text-zinc-300">
+                        ...
+                      </span>
+                    )}
+                  </button>
+                  <input
+                    ref={businessAvatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={businessAvatarUploading || saving}
+                    onChange={(event) => uploadBusinessAvatar(event.target.files?.[0])}
+                  />
+                </div>
+              )}
             </div>
             {renderSectionContent()}
           </section>

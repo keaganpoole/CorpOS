@@ -11,7 +11,10 @@ const TIMELINE = [
   { id: 'sun', day: 'Sunday', time: '06:15 PM', scenario: 'Service Opportunity', context: 'A customer is ready to book.', human: 'The extra service is never offered.', ai: 'A relevant service is recommended.', netTime: 15, netRev: 150 },
 ];
 
-const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'text-white', shouldReveal = true }) => {
+const easeOutExpoSoft = (progress) => (progress === 1 ? 1 : 1 - Math.pow(2, -8 * progress));
+const easeOutQuint = (progress) => 1 - Math.pow(1 - progress, 5);
+
+const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'text-white', shouldReveal = true, centered = false }) => {
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
@@ -22,7 +25,7 @@ const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'te
     const animate = (currentTime) => {
       if (!startTime) startTime = currentTime;
       const progress = Math.min((currentTime - startTime) / 1000, 1);
-      const ease = 1 - Math.pow(1 - progress, 4);
+      const ease = easeOutExpoSoft(progress);
       setDisplay(Math.round(startValue + (value - startValue) * ease));
       if (progress < 1) requestAnimationFrame(animate);
     };
@@ -32,7 +35,7 @@ const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'te
 
   return (
     <motion.div
-      className="flex flex-col items-center md:items-start"
+      className={`flex flex-col ${centered ? 'w-full items-center text-center' : 'items-center md:items-start'}`}
       initial={false}
       animate={shouldReveal ? 'visible' : 'hidden'}
       variants={{
@@ -79,12 +82,34 @@ const statementVariants = {
   },
 };
 
-export default function WorkWeekComparison({ scrollStep = null, scrollDirection = 0, comparisonActive = true }) {
+const FINALE_ITEMS = [
+  { label: 'Wages', amount: 900, time: 6 },
+  { label: 'Commissions', amount: 200, time: 6 },
+  { label: 'Employee benefits', amount: 260, time: 0 },
+  { label: 'Payroll taxes', amount: 190, time: 0 },
+  { label: 'Paid vacation & sick time', amount: 120, time: 8 },
+  { label: 'Paid holidays', amount: 55, time: 0 },
+  { label: 'Overtime & temporary coverage', amount: 110, time: 4 },
+  { label: 'Absence coverage', amount: 90, time: 5 },
+  { label: 'Idle & break time', amount: 75, time: 3 },
+  { label: 'Recruiting & background checks', amount: 60, time: 0 },
+  { label: 'Hiring & training', amount: 85, time: 12 },
+  { label: 'Workers’ compensation', amount: 45, time: 0 },
+  { label: 'Unemployment insurance', amount: 35, time: 0 },
+  { label: 'Supervision & admin', amount: 100, time: 4 },
+];
+
+const FINALE_ROI_MULTIPLE = 14;
+
+export default function WorkWeekComparison({ scrollStep = null, scrollDirection = 0, comparisonActive = true, finaleProgress = 0 }) {
   const [[step, direction], setPage] = useState([0, 0]);
   const [stats, setStats] = useState({ time: 0, rev: 0 });
   const [datePhase, setDatePhase] = useState('hidden');
   const [contentReveal, setContentReveal] = useState(false);
   const [statsReveal, setStatsReveal] = useState(false);
+  const [finaleRevealStage, setFinaleRevealStage] = useState(0);
+  const [roiDisplay, setRoiDisplay] = useState(0);
+  const [annualDisplay, setAnnualDisplay] = useState(0);
   const stepRef = useRef(0);
   const isScrollingRef = useRef(false);
   const containerRef = useRef(null);
@@ -92,6 +117,79 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
   const activeStep = isScrollDriven ? scrollStep : step;
   const activeDirection = isScrollDriven ? scrollDirection : direction;
   const current = TIMELINE[activeStep];
+  const finaleActive = finaleProgress > 0;
+  const revealedFinaleItems = Math.min(FINALE_ITEMS.length, Math.floor(finaleProgress * (FINALE_ITEMS.length + 1)));
+  const allFinaleTotals = FINALE_ITEMS.reduce((totals, item) => ({
+    rev: totals.rev + item.amount,
+    time: totals.time + item.time,
+  }), { rev: 0, time: 0 });
+  const finaleTotals = FINALE_ITEMS.slice(0, revealedFinaleItems).reduce((totals, item) => ({
+    rev: totals.rev + item.amount,
+    time: totals.time + item.time,
+  }), { rev: 0, time: 0 });
+  const finaleComplete = finaleProgress >= 0.9;
+  const displayStats = finaleActive
+    ? {
+      time: stats.time + (finaleComplete ? allFinaleTotals.time : finaleTotals.time),
+      rev: stats.rev + (finaleComplete ? allFinaleTotals.rev : finaleTotals.rev),
+    }
+    : stats;
+  const annualSavings = displayStats.rev * 52;
+  const roiMultiple = FINALE_ROI_MULTIPLE;
+
+  useEffect(() => {
+    if (!finaleComplete) {
+      setFinaleRevealStage(0);
+      return undefined;
+    }
+
+    setFinaleRevealStage(1);
+    const annualLabelTimer = window.setTimeout(() => setFinaleRevealStage(2), 1750);
+    const annualTotalTimer = window.setTimeout(() => setFinaleRevealStage(3), 2300);
+    return () => {
+      window.clearTimeout(annualLabelTimer);
+      window.clearTimeout(annualTotalTimer);
+    };
+  }, [finaleComplete]);
+
+  useEffect(() => {
+    if (finaleRevealStage < 3) {
+      setAnnualDisplay(0);
+      return undefined;
+    }
+
+    const duration = 2300;
+    const startedAt = performance.now();
+    let frame;
+    const animateAnnual = (now) => {
+      const progress = Math.min((now - startedAt) / duration, 1);
+      const ease = easeOutQuint(progress);
+      setAnnualDisplay(Math.round(annualSavings * ease));
+      if (progress < 1) frame = window.requestAnimationFrame(animateAnnual);
+    };
+    frame = window.requestAnimationFrame(animateAnnual);
+    return () => window.cancelAnimationFrame(frame);
+  }, [annualSavings, finaleRevealStage]);
+
+  useEffect(() => {
+    if (finaleRevealStage === 0) {
+      setRoiDisplay(0);
+      return undefined;
+    }
+    if (finaleRevealStage !== 1) return undefined;
+
+    const duration = 1650;
+    const startedAt = performance.now();
+    let frame;
+    const animateRoi = (now) => {
+      const progress = Math.min((now - startedAt) / duration, 1);
+      const ease = easeOutExpoSoft(progress);
+      setRoiDisplay(Number((roiMultiple * ease).toFixed(1)));
+      if (progress < 1) frame = window.requestAnimationFrame(animateRoi);
+    };
+    frame = window.requestAnimationFrame(animateRoi);
+    return () => window.cancelAnimationFrame(frame);
+  }, [roiMultiple, finaleRevealStage]);
 
   useEffect(() => {
     setDatePhase('hidden');
@@ -183,8 +281,12 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
   return (
     <div ref={containerRef} className="comparison-section relative flex h-[100dvh] flex-col overflow-hidden bg-[#050505] font-sans text-white selection:bg-white selection:text-black">
       <header className="pointer-events-none absolute left-0 top-0 z-50 flex w-full items-start justify-between p-8 md:p-12">
-        <div className="pointer-events-auto"><AnimatedStat value={stats.time} suffix=" mins" label="Time Recovered" shouldReveal={statsReveal} /></div>
-        <div className="pointer-events-auto"><AnimatedStat value={stats.rev} prefix="+$" label="Revenue Saved" colorClass="text-[#34C759]" shouldReveal={statsReveal} /></div>
+        <motion.div className={finaleComplete ? 'pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : 'pointer-events-auto'} animate={finaleComplete ? { opacity: 0, scale: 0.9 } : { opacity: 1, scale: 1 }} transition={{ duration: 0.55 }}>
+          <AnimatedStat value={displayStats.time} suffix=" mins" label="Time Recovered" shouldReveal={statsReveal} />
+        </motion.div>
+        <motion.div className={finaleComplete ? 'pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : 'pointer-events-auto'} animate={finaleComplete ? { opacity: 0, scale: 0.9 } : { opacity: 1, scale: 1 }} transition={{ duration: 0.55 }}>
+          <AnimatedStat value={displayStats.rev} prefix="$" label="Revenue Saved" colorClass="text-[#34C759]" shouldReveal={statsReveal} />
+        </motion.div>
       </header>
 
       <main className="relative flex h-full w-full flex-col justify-center px-8 md:px-24">
@@ -192,9 +294,71 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
         <div className="absolute inset-y-0 right-0 z-20 w-3/4 cursor-e-resize" onClick={() => !isScrollDriven && !isScrollingRef.current && step < TIMELINE.length - 1 && setPage([step + 1, 1])} />
 
         <motion.div
+          className="absolute inset-0 z-30 flex items-center justify-center px-8 md:px-24"
+          initial={false}
+          animate={{ opacity: finaleActive ? 1 : 0, pointerEvents: finaleActive ? 'auto' : 'none' }}
+          transition={{ duration: 0.45 }}
+        >
+          <div className="relative flex w-full max-w-xl flex-col items-center">
+            <div className="flex w-full flex-col items-center">
+              <AnimatePresence mode="popLayout">
+                {!finaleComplete ? FINALE_ITEMS.slice(0, revealedFinaleItems).map((item, index) => (
+                <motion.div
+                  key={item.label}
+                  initial={{ opacity: 0, y: 18, filter: 'blur(8px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -18, filter: 'blur(8px)' }}
+                  transition={{ duration: 0.65, delay: index === revealedFinaleItems - 1 ? 0.05 : 0, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex w-full items-baseline justify-between border-b border-white/10 py-3 text-left"
+                >
+                  <span className="text-sm uppercase tracking-[0.18em] text-white/45 md:text-base">{item.label}</span>
+                  <span className="ml-8 text-xl font-light tracking-tight text-white md:text-2xl">+${item.amount}<span className="ml-1 text-xs text-white/30">/wk</span></span>
+                </motion.div>
+                )) : null}
+              </AnimatePresence>
+            </div>
+            <div className="mt-8 flex min-h-[220px] w-full flex-col items-center justify-center text-center">
+              <motion.div
+                className="mb-10 flex flex-col items-center text-center"
+                initial={false}
+                animate={{ opacity: finaleRevealStage >= 1 ? 1 : 0, y: finaleRevealStage >= 1 ? 0 : 14, filter: finaleRevealStage >= 1 ? 'blur(0px)' : 'blur(10px)' }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <span className="mb-2 text-[10px] uppercase tracking-[0.35em] text-white/30 md:text-xs">ROI</span>
+                <span className="block text-4xl font-light tracking-tighter text-white md:text-6xl">
+                  {Number.isInteger(roiDisplay) ? roiDisplay : roiDisplay.toFixed(1)}x
+                </span>
+              </motion.div>
+              <motion.span
+                className="mb-3 text-[10px] uppercase tracking-[0.35em] text-white/30 md:text-xs"
+                initial={false}
+                animate={{ opacity: finaleRevealStage >= 2 ? 1 : 0, y: finaleRevealStage >= 2 ? 0 : 10, filter: finaleRevealStage >= 2 ? 'blur(0px)' : 'blur(8px)' }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              >
+                Annual Savings
+              </motion.span>
+              <motion.span
+                className="block text-6xl font-light tracking-tighter text-[#34C759] md:text-8xl"
+                initial={false}
+                animate={{
+                  opacity: finaleRevealStage >= 3 ? 1 : 0,
+                  y: finaleRevealStage >= 3 ? 0 : 18,
+                  scale: finaleRevealStage >= 3 ? 1 : 0.96,
+                  filter: finaleRevealStage >= 3 ? 'blur(0px)' : 'blur(12px)',
+                }}
+                transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+              >
+                ${annualDisplay.toLocaleString()}
+              </motion.span>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
           className="relative z-10 mb-12 flex h-20 w-full items-center justify-center pointer-events-none"
           initial={false}
-          animate={datePhase}
+          animate={finaleActive ? { opacity: 0 } : datePhase}
+          style={{ transformStyle: 'preserve-3d', perspective: '1000px' }}
           variants={{
             hidden: { y: 118, opacity: 0, scale: 1.08, filter: 'blur(16px)' },
             centered: {
@@ -212,7 +376,6 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
               transition: { duration: 0.95, ease: [0.16, 1, 0.3, 1] },
             },
           }}
-          style={{ transformStyle: 'preserve-3d', perspective: '1000px' }}
         >
           <AnimatePresence custom={activeDirection} mode="popLayout">
             <motion.div key={`${current.id}-time`} custom={activeDirection} variants={timePickerVariants} initial="enter" animate="center" exit="exit" className="absolute flex flex-col items-center gap-1">
@@ -225,7 +388,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
         <motion.div
           variants={cascadeVariants}
           initial="initial"
-          animate={contentReveal ? 'animate' : 'initial'}
+          animate={finaleActive ? { opacity: 0 } : (contentReveal ? 'animate' : 'initial')}
           className="max-w-6xl mx-auto w-full flex flex-col lg:flex-row justify-center items-center lg:items-start relative z-10 pointer-events-none gap-12 lg:gap-24"
         >
           <div className="flex-1 flex flex-col items-center lg:items-end text-center lg:text-right w-full">
@@ -243,7 +406,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
         </motion.div>
       </main>
 
-      <div className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap text-[10px] uppercase tracking-widest text-white/10">Scroll to advance • Arrow keys supported</div>
+      <div className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap text-[10px] uppercase tracking-widest text-white/10">Results may vary</div>
     </div>
   );
 }

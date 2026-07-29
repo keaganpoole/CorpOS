@@ -129,8 +129,8 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     colorClass: 'bg-indigo-400',
     glowClass: 'shadow-[0_0_12px_rgba(129,140,248,0.6)]',
     hoverTextClass: 'group-hover:text-indigo-400',
-    title: '70+ Languages',
-    copy: "Detect a caller's language automatically and respond naturally without transfers, translators, or awkward misunderstandings.",
+    title: '30+ Languages',
+    copy: "Detect a caller's language automatically and respond fluently without transfers, translators, or awkward misunderstandings.",
   },
 ];
 
@@ -580,7 +580,9 @@ const ComparisonShowcase = () => {
   const introExited = sectionProgress >= comparisonStart;
   const blinkProgress = clamp((sectionProgress - 0.1) / 0.16, 0, 1);
   const comparisonProgress = mondayRevealComplete ? clamp((sectionProgress - mondayHoldEnd) / (1 - mondayHoldEnd), 0, 1) : 0;
-  const scrollStep = Math.min(6, Math.floor(comparisonProgress * 7));
+  const timelineProgress = clamp(comparisonProgress / 0.62, 0, 1);
+  const scrollStep = Math.min(6, Math.floor(timelineProgress * 7));
+  const finaleProgress = clamp((comparisonProgress - 0.62) / 0.38, 0, 1);
 
   useEffect(() => {
     if (!introExited || mondayRevealComplete) return undefined;
@@ -629,7 +631,7 @@ const ComparisonShowcase = () => {
             transform: `translateY(${introExited ? 0 : 18}px)`,
           }}
         >
-          <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} comparisonActive={introExited} />
+          <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} comparisonActive={introExited} finaleProgress={finaleProgress} />
         </div>
       </div>
     </section>
