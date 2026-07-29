@@ -536,8 +536,10 @@ const BlinkedWord = ({ progress }) => {
 const ComparisonShowcase = () => {
   const rootRef = useRef(null);
   const previousProgressRef = useRef(0);
+  const mondayLockYRef = useRef(null);
   const [sectionProgress, setSectionProgress] = useState(0);
   const [direction, setDirection] = useState(0);
+  const [mondayRevealComplete, setMondayRevealComplete] = useState(false);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -573,8 +575,44 @@ const ComparisonShowcase = () => {
   const mondayHoldEnd = 0.42;
   const introExited = sectionProgress >= comparisonStart;
   const blinkProgress = clamp((sectionProgress - 0.1) / 0.16, 0, 1);
-  const comparisonProgress = clamp((sectionProgress - mondayHoldEnd) / (1 - mondayHoldEnd), 0, 1);
+  const comparisonProgress = mondayRevealComplete ? clamp((sectionProgress - mondayHoldEnd) / (1 - mondayHoldEnd), 0, 1) : 0;
   const scrollStep = Math.min(6, Math.floor(comparisonProgress * 7));
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !introExited || direction < 0 || mondayRevealComplete) return undefined;
+
+    const scrollableDistance = Math.max(root.offsetHeight - window.innerHeight, 1);
+    const lockY = root.getBoundingClientRect().top + window.scrollY + scrollableDistance * comparisonStart;
+    mondayLockYRef.current = lockY;
+    window.scrollTo(0, lockY);
+
+    const releaseTimer = window.setTimeout(() => {
+      mondayLockYRef.current = null;
+      setMondayRevealComplete(true);
+    }, 2300);
+
+    const lockScroll = (event) => {
+      event.preventDefault();
+      window.scrollTo(0, mondayLockYRef.current ?? lockY);
+    };
+
+    window.addEventListener('wheel', lockScroll, { passive: false });
+    window.addEventListener('touchmove', lockScroll, { passive: false });
+
+    return () => {
+      window.clearTimeout(releaseTimer);
+      window.removeEventListener('wheel', lockScroll);
+      window.removeEventListener('touchmove', lockScroll);
+      mondayLockYRef.current = null;
+    };
+  }, [direction, introExited, mondayRevealComplete]);
+
+  useEffect(() => {
+    if (sectionProgress < 0.02) {
+      setMondayRevealComplete(false);
+    }
+  }, [sectionProgress]);
 
   return (
     <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[430vh]">
