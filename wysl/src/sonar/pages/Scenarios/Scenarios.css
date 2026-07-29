@@ -171,7 +171,7 @@
 .scenario-card-title {
   font-size: 16px;
   font-weight: 600;
-  margin: 0;
+  margin: 0 0 0 12px;
   color: #fff;
 }
 
@@ -407,7 +407,7 @@
 .scenario-card-title {
   font-size: 16px;
   font-weight: 600;
-  margin: 0;
+  margin: 0 0 0 12px;
 }
 
 .scenario-card-status {
@@ -951,13 +951,13 @@
   background: linear-gradient(to top right, var(--brandGradientStart), var(--brandGradientEnd));
 }
 
-.sb-builder-node:hover .sb-node-aura {
+.sb-builder-node:hover:not(.sb-plus-hovered) .sb-node-aura {
   opacity: 0.16;
   filter: blur(24px);
   transform: scale(1.08);
 }
 
-.sb-builder-node:hover .sb-node-ring {
+.sb-builder-node:hover:not(.sb-plus-hovered) .sb-node-ring {
   border-color: rgba(255, 255, 255, 0.18);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.08),
@@ -1060,7 +1060,7 @@
   box-shadow: 0 14px 34px -10px rgba(255, 255, 255, 0.16), inset 0 2px 16px rgba(255, 255, 255, 0.14);
 }
 
-.sb-builder-node:hover .sb-node-sphere {
+.sb-builder-node:hover:not(.sb-plus-hovered) .sb-node-sphere {
   transform: scale(1.012);
   filter: brightness(1.06) saturate(1.05);
 }
@@ -1255,11 +1255,11 @@
   }
 }
 
-.sb-builder-node:hover .sb-node-icon-glass {
+.sb-builder-node:hover:not(.sb-plus-hovered) .sb-node-icon-glass {
   transform: translate(-50%, -50%);
 }
 
-.sb-builder-node:hover .sb-node-icon-glyph:not(.is-hidden) {
+.sb-builder-node:hover:not(.sb-plus-hovered) .sb-node-icon-glyph:not(.is-hidden) {
   transform: scale(1.08);
   filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.18));
 }
@@ -1374,16 +1374,25 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  transition: background 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
   z-index: 10;
 }
 
 .sb-node-add:hover {
-  background: linear-gradient(135deg, var(--brandGradientStart), var(--brandGradientEnd));
-  border-color: color-mix(in srgb, var(--brandGradientStart) 45%, rgba(255, 255, 255, 0.2));
-  color: #ffffff;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22), 0 0 0 2px color-mix(in srgb, var(--brandGradientStart) 12%, transparent);
-  transform: scale(1.1);
+  background: rgba(248, 248, 248, 0.94);
+  border-color: rgba(255, 255, 255, 0.8);
+  color: #050505;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28), 0 0 0 2px rgba(255, 255, 255, 0.08), inset 0 1px 8px rgba(255, 255, 255, 0.74);
+}
+
+.sb-node-add svg {
+  transition: transform 0.72s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center;
+}
+
+.sb-node-add:hover svg {
+  transform: rotate(360deg);
 }
 
 /* Typography Section � mt-8, text-xl md:text-2xl, max-w-220px */
@@ -1412,7 +1421,7 @@
   transition: opacity 0.3s;
 }
 
-.sb-builder-node:hover .sb-node-below-desc {
+.sb-builder-node:hover:not(.sb-plus-hovered) .sb-node-below-desc {
   opacity: 1;
 }
 
@@ -1427,7 +1436,7 @@
   transition: height 0.5s ease;
 }
 
-.sb-builder-node:hover .sb-node-connector-line {
+.sb-builder-node:hover:not(.sb-plus-hovered) .sb-node-connector-line {
   height: 48px;
 }
 /* Panel */
@@ -1969,7 +1978,7 @@
   color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   opacity: 0.8;
-  transition: all 0.2s;
+  transition: color 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -1981,7 +1990,8 @@
 .aether-close:hover {
   opacity: 1;
   background: transparent;
-  color: var(--sb-accent-rose);
+  color: rgba(255, 255, 255, 0.92);
+  filter: brightness(1.12);
 }
 
 .condition-group {
@@ -2453,12 +2463,13 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  transition: all 0.15s ease;
+  transition: color 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
 }
 
 .aether-rule-remove:hover {
-  color: var(--sb-accent-rose);
+  color: rgba(255, 255, 255, 0.82);
   background: transparent;
+  filter: brightness(1.12);
 }
 
 .aether-rule-logic-pill {
@@ -3128,9 +3139,15 @@
 .scenarios-container:not(.scenarios-container--demo) .sb-node-below-desc {
   font-size: 10px;
   font-weight: 500;
-  color: #626262;
-  margin-top: 8px;
+  color: #747474;
+  margin-top: 5px;
   line-height: 1.4;
+  opacity: 0.8;
+}
+
+.scenarios-container.scenarios-container--demo .sb-builder-node .sb-node-below-desc,
+.scenarios-container.scenarios-container--demo .sb-builder-node:hover:not(.sb-plus-hovered) .sb-node-below-desc {
+  color: #747474;
   opacity: 0.8;
 }
 

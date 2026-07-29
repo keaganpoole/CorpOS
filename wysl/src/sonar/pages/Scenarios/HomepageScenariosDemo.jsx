@@ -768,6 +768,7 @@ export default function ScenariosPage({
   const [viewportReady, setViewportReady] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState('node-1');
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
+  const [plusHoveredNodeId, setPlusHoveredNodeId] = useState(null);
   const [panelStyle, setPanelStyle] = useState({ top: 0, left: 0 });
   const panelDragRef = useRef({ dragging: false, startX: 0, startY: 0, startTop: 0, startLeft: 0 });
   const [isPanelVisible, setIsPanelVisible] = useState(false);
@@ -4976,7 +4977,7 @@ export default function ScenariosPage({
                   }}
                   className={`sb-builder-node ${node.configured ? 'sb-matte-node' : ''} ${node.id !== INITIAL_NODE.id ? 'sb-post-intro-node' : ''} ${node.type === 'router' ? 'router-node' : ''} ${
                     isActive ? 'sb-active-node' : ''
-                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''} ${isRunActiveNode ? 'sb-run-node-active' : ''} ${isRunCompletedNode ? 'sb-run-node-complete' : ''} ${isRunFutureNode ? 'sb-run-node-future' : ''} ${isRunUnrelatedNode ? 'sb-run-node-unrelated' : ''}`}
+                  } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${plusHoveredNodeId === node.id ? 'sb-plus-hovered' : ''} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''} ${isRunActiveNode ? 'sb-run-node-active' : ''} ${isRunCompletedNode ? 'sb-run-node-complete' : ''} ${isRunFutureNode ? 'sb-run-node-future' : ''} ${isRunUnrelatedNode ? 'sb-run-node-unrelated' : ''}`}
                   style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
                   onPointerEnter={() => setHoveredNodeId(node.id)}
                   onPointerLeave={() => setHoveredNodeId((current) => (current === node.id ? null : current))}
@@ -5054,7 +5055,13 @@ export default function ScenariosPage({
 
                         {/* Add button */}
                         {canAddChild(node) && (
-                          <button className="sb-node-add" type="button" onClick={() => handleAddNode(node.id)}>
+                          <button
+                            className="sb-node-add"
+                            type="button"
+                            onPointerEnter={() => setPlusHoveredNodeId(node.id)}
+                            onPointerLeave={() => setPlusHoveredNodeId((current) => (current === node.id ? null : current))}
+                            onClick={() => handleAddNode(node.id)}
+                          >
                             <Plus size={13} />
                           </button>
                         )}

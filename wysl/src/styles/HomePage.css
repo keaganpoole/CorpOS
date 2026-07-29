@@ -449,12 +449,12 @@ main,
     gap: 0;
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-title {
-    font-size: 20px;
+    font-size: 18px;
     line-height: 1.05;
     letter-spacing: -0.02em;
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-desc {
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1.35;
     margin-top: 4px;
     text-align: left;
@@ -521,7 +521,7 @@ main,
 .scenario-demo-showcase .homepage-scenarios-builder .sb-node-below-desc {
     font-size: 10px;
     font-weight: 500;
-    color: #525252;
+    color: #464646;
     line-height: 1.4;
     opacity: 0.8;
 }
