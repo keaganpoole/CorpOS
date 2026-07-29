@@ -66,6 +66,19 @@ const textVariants = {
   exit: { opacity: 0, y: -10, filter: 'blur(10px)', transition: { duration: 0.15 } },
 };
 
+const statementVariants = {
+  human: {
+    initial: { opacity: 0, y: 15, filter: 'blur(10px)' },
+    animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { delay: 0, duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+    exit: { opacity: 0, y: -10, filter: 'blur(10px)', transition: { duration: 0.15 } },
+  },
+  ai: {
+    initial: { opacity: 0, y: 15, filter: 'blur(10px)' },
+    animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { delay: 0.15, duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+    exit: { opacity: 0, y: -10, filter: 'blur(10px)', transition: { duration: 0.15 } },
+  },
+};
+
 export default function WorkWeekComparison({ scrollStep = null, scrollDirection = 0 }) {
   const [[step, direction], setPage] = useState([0, 0]);
   const [stats, setStats] = useState({ time: 0, rev: 0 });
@@ -207,13 +220,13 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
           <div className="flex-1 flex flex-col items-center lg:items-end text-center lg:text-right w-full">
             <motion.span variants={textVariants} className="text-[10px] uppercase tracking-[0.2em] text-white/20 mb-4 lg:mb-6">Human Receptionist</motion.span>
             <AnimatePresence mode="wait">
-              <motion.p key={`${current.id}-human`} variants={textVariants} initial="initial" animate="animate" exit="exit" className="comparison-human-statement text-3xl lg:text-5xl text-white/40 font-light leading-snug">{current.human}</motion.p>
+              <motion.p key={`${current.id}-human`} variants={statementVariants.human} initial="initial" animate="animate" exit="exit" className="comparison-human-statement text-3xl lg:text-5xl text-white/40 font-light leading-snug">{current.human}</motion.p>
             </AnimatePresence>
           </div>
           <div className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
             <motion.span variants={textVariants} className="text-[10px] uppercase tracking-[0.24em] text-white/35 mb-4 lg:mb-6 flex items-center justify-center gap-2 font-semibold"><span className="bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text text-transparent drop-shadow-[0_0_10px_color-mix(in_srgb,var(--brandGradientStart)_28%,transparent)]">Nodemere</span> AI Receptionist</motion.span>
             <AnimatePresence mode="wait">
-              <motion.p key={`${current.id}-ai`} variants={textVariants} initial="initial" animate="animate" exit="exit" className="comparison-ai-statement text-3xl lg:text-5xl text-white font-medium leading-snug">{current.ai}<svg className="inline-block w-6 h-6 lg:w-8 lg:h-8 ml-1 -mt-2 shrink-0 align-middle" fill="none" viewBox="0 0 24 24" strokeWidth={3}><defs><linearGradient id="comparison-check-gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient></defs><path stroke="url(#comparison-check-gradient)" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></motion.p>
+              <motion.p key={`${current.id}-ai`} variants={statementVariants.ai} initial="initial" animate="animate" exit="exit" className="comparison-ai-statement text-3xl lg:text-5xl text-white font-medium leading-snug">{current.ai}<svg className="inline-block w-6 h-6 lg:w-8 lg:h-8 ml-1 -mt-2 shrink-0 align-middle" fill="none" viewBox="0 0 24 24" strokeWidth={3}><defs><linearGradient id="comparison-check-gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient></defs><path stroke="url(#comparison-check-gradient)" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></motion.p>
             </AnimatePresence>
           </div>
         </motion.div>
