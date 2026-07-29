@@ -635,6 +635,10 @@ const getCategoryRailGradient = (categoryType) => (
   CATEGORY_RAIL_GRADIENTS[categoryType] || CATEGORY_RAIL_GRADIENTS.TRIGGERS
 );
 
+const getCategoryTextGradient = (categoryType) => (
+  getCategoryRailGradient(categoryType).replace('180deg', '90deg')
+);
+
 const getCategoryIconColor = (categoryType) => (
   CATEGORY_ICON_COLORS[categoryType] || CATEGORY_ICON_COLORS.TRIGGERS
 );
@@ -1331,7 +1335,6 @@ export default function ScenariosPage({
     : !hasConfiguredTrigger
       ? ['TRIGGERS']
       : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
-  const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
   const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage);
   const panelTitle = isPrimaryNode ? 'Add Trigger' : 'Add Action';
@@ -5164,13 +5167,10 @@ export default function ScenariosPage({
                     />
                     <div className="sb-cyber-inner">
                       <div className="sb-cyber-header">
-                      <div
-                        className="sb-cyber-pill"
-                        style={{
-                          backgroundColor: `${getCategoryIconColor(panelCategory)}20`,
-                          color: getCategoryIconColor(panelCategory),
-                        }}
-                      >
+                        <div
+                          className="sb-cyber-pill sb-cyber-pill--plain"
+                          style={{ backgroundImage: getCategoryTextGradient(panelCategory) }}
+                        >
                         {bannerCategoryLabel}
                       </div>
                         <button type="button" className="sb-cyber-back" onClick={handleBackToOptions}>
@@ -5178,15 +5178,6 @@ export default function ScenariosPage({
                         </button>
                       </div>
                       <div className="sb-cyber-main">
-                      <div
-                        className="sb-cyber-icon-box"
-                        style={{
-                            background: getCategoryIconBackground(panelCategory),
-                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
-                        }}
-                      >
-                          <BannerIcon size={24} style={{ color: getCategoryIconColor(panelCategory) }} />
-                        </div>
                         <div className="sb-cyber-title-group">
                           <h2 className="sb-cyber-title">{activeOption.option}</h2>
                           <p className="sb-cyber-desc">{activeOption.description}</p>
@@ -5238,13 +5229,10 @@ export default function ScenariosPage({
                     <div className="sb-cyber-inner">
                     <div className="sb-cyber-header">
                       <div
-                        className="sb-cyber-pill"
-                        style={{
-                          backgroundColor: `${getCategoryIconColor(selectedNode.categoryType || panelCategory)}20`,
-                          color: getCategoryIconColor(selectedNode.categoryType || panelCategory),
-                        }}
+                        className="sb-cyber-pill sb-cyber-pill--plain"
+                        style={{ backgroundImage: getCategoryTextGradient(selectedNode.categoryType || panelCategory) }}
                       >
-                        {selectedNode.category || categoryMeta.detail}
+                        {(PANEL_CATEGORY_LABELS[selectedNode.categoryType || panelCategory] || selectedNode.categoryType || panelCategory).toUpperCase()}
                       </div>
                       <button
                         type="button"
@@ -5263,17 +5251,6 @@ export default function ScenariosPage({
                       </button>
                     </div>
                     <div className="sb-cyber-main">
-                      <div
-                        className="sb-cyber-icon-box"
-                        style={{
-                          background: getCategoryIconBackground(selectedNode.categoryType || panelCategory),
-                          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
-                        }}
-                      >
-                        {selectedNode.icon && typeof selectedNode.icon === 'function'
-                          ? <selectedNode.icon size={24} style={{ color: getCategoryIconColor(selectedNode.categoryType || panelCategory) }} />
-                          : <Phone size={24} style={{ color: getCategoryIconColor(selectedNode.categoryType || panelCategory) }} />}
-                      </div>
                       <div className="sb-cyber-title-group">
                         <h2 className="sb-cyber-title">{selectedNode.label}</h2>
                         <p className="sb-cyber-desc">{getNodeHelperText(selectedNode)}</p>
@@ -5285,7 +5262,7 @@ export default function ScenariosPage({
               <div className="sb-panel-actions">
                 {panelStage === 'triggerConfig' && triggerConfig ? (
                   <div className="sb-action-config-form">
-                    <div className="sb-action-config-header"><h4 className="sb-action-config-title">Trigger Criteria</h4><button type="button" className="sb-action-config-close" onClick={() => setPanelStage('options')}><X size={14} /></button></div>
+                    <div className="sb-action-config-header"><h4 className="sb-action-config-title">Trigger Criteria</h4></div>
                     <div className="sb-trigger-filter-copy">Only fire this trigger when the fields below match. Leave every field empty to run for any value.</div>
                     <div className="sb-record-fields-grid">
                       {(() => { const definitions = triggerConfig.key === 'incoming_call' ? [{ key: 'phone_number', label: 'Phone Number', type: 'phone' }] : triggerConfig.key === 'record_updated' ? getRecordFieldsForTable(PEOPLE_RECORD_TABLE).filter((field) => field.key !== 'id') : [{ key: 'id', label: 'Record ID', type: 'text' }, { key: 'person_id', label: 'Person ID', type: 'text' }, { key: 'service_id', label: 'Service ID', type: 'text' }, { key: 'staff_id', label: 'Staff ID', type: 'text' }, ...getTableFields('appointments').filter((field) => field.key !== 'id')]; return definitions.map((field) => { const value = triggerConfig.fields?.[field.key] || ''; return <div key={field.key} className="sb-record-field"><label className="sb-record-label">{field.label}</label><div style={{ position: 'relative' }}><input className="sb-input-field" type="text" value={value} onChange={(event) => setTriggerConfig((prev) => ({ ...prev, fields: { ...(prev?.fields || {}), [field.key]: event.target.value } }))} onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type || 'text' })} style={value.includes('{{') ? { color: 'transparent' } : {}} />{value.includes('{{') && <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }} />}</div></div>; }); })()}
@@ -5295,9 +5272,6 @@ export default function ScenariosPage({
                   <div className="sb-action-config-form">
                     <div className="sb-action-config-header">
                       <h4 className="sb-action-config-title">Filter</h4>
-                      <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); }}>
-                        <X size={14} />
-                      </button>
                     </div>
                     <div className="sb-trigger-filter-copy">
                       Only fire this trigger when the current time matches the selected offset before the appointment.
@@ -5350,18 +5324,6 @@ export default function ScenariosPage({
                         <h4 className="sb-action-config-title">Run Node</h4>
                         <div className="sb-run-node-panel-subtitle">{runNodeModal.nodeLabel}</div>
                       </div>
-                      <button
-                        type="button"
-                        className="sb-action-config-close"
-                        onClick={() => {
-                          runNodeTargetRef.current = null;
-                          setRunNodeModal(null);
-                          setPanelStage(selectedNode?.actionConfig?._key ? 'actionConfig' : 'options');
-                        }}
-                        disabled={runNodeModal.isSubmitting}
-                      >
-                        <X size={14} />
-                      </button>
                     </div>
                     <div className="sb-run-node-panel-copy">
                       Enter values for the fields that still depend on scenario variables before this node can run.
@@ -5444,9 +5406,6 @@ export default function ScenariosPage({
                     {!actionIntegrationMissing && (
                       <div className="sb-action-config-header">
                         <h4 className="sb-action-config-title">Action Details</h4>
-                        <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); setActionConfig(null); }}>
-                          <X size={14} />
-                        </button>
                       </div>
                     )}
                     {actionRequiresEmailIntegration && !hasConnectedEmailIntegration ? (

@@ -357,6 +357,7 @@ main,
     width: 100%;
     height: 100%;
     text-align: left;
+    --sb-bg-panel: rgba(18, 18, 18, 0.95);
 }
 .scenario-demo-showcase .homepage-scenarios-builder-frame {
     width: 100%;
@@ -426,11 +427,36 @@ main,
 .scenario-demo-showcase .homepage-scenarios-builder .sb-panel-action-detail {
     font-size: 10px;
 }
+.scenario-demo-showcase .homepage-scenarios-builder .sb-active-banner.sleek-cyber {
+    background: #121212;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-rail {
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.08);
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-pill--plain {
+    padding: 0;
+    background: transparent;
+    background-clip: text;
+    border-radius: 0;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-main {
+    gap: 0;
+}
 .scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-title {
-    font-size: 16px;
+    font-size: 20px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-desc {
     font-size: 11px;
+    line-height: 1.35;
+    margin-top: 4px;
     text-align: left;
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-cyber-title-group {
@@ -439,6 +465,35 @@ main,
     flex-direction: column;
     min-width: 0;
     text-align: left;
+    transform: translateY(3px);
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-variables-pane,
+.scenario-demo-showcase .homepage-scenarios-builder .aether-condition-panel {
+    background: linear-gradient(135deg, rgba(18, 18, 18, 0.988), rgba(20, 20, 20, 0.988));
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-vars-table-art::after {
+    background:
+        linear-gradient(90deg, rgba(18, 18, 18, 0.94) 0%, rgba(18, 18, 18, 0.88) 40%, rgba(18, 18, 18, 0.64) 68%, rgba(18, 18, 18, 0.74) 100%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 58%);
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-vars-table-header--response,
+.scenario-demo-showcase .homepage-scenarios-builder .sb-vars-table-header--response:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018) 42%, transparent 78%);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+        inset 3px 0 0 rgba(255, 255, 255, 0.16);
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-search-record-bundle .sb-vars-table-header,
+.scenario-demo-showcase .homepage-scenarios-builder .sb-search-record-bundle .sb-vars-table-header:hover {
+    background: rgba(255, 255, 255, 0.035);
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-vars-table-badge {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.11);
+}
+.scenario-demo-showcase .homepage-scenarios-builder .sb-vars-table-badge::after,
+.scenario-demo-showcase .homepage-scenarios-builder .sb-vars-table-badge--iterator::after {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-action-config-title {
     font-size: 12px;
@@ -466,7 +521,7 @@ main,
 .scenario-demo-showcase .homepage-scenarios-builder .sb-node-below-desc {
     font-size: 10px;
     font-weight: 500;
-    color: #64748b;
+    color: #525252;
     line-height: 1.4;
     opacity: 0.8;
 }
