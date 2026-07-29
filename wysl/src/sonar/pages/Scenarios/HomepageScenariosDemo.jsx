@@ -1333,7 +1333,7 @@ export default function ScenariosPage({
       : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
-  const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage);
+  const showNodeConfigText = !['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage);
   const panelTitle = isPrimaryNode ? 'Add Trigger' : 'Add Action';
   const selectedNodeNumber = Math.max(1, nodes.findIndex((node) => node.id === selectedNodeId) + 1);
   const appointmentDateInputMode = appointmentConfig.date_input_mode || 'text';
@@ -5116,7 +5116,7 @@ export default function ScenariosPage({
                 <div>
                   {showNodeConfigText && (
                     <>
-                      <p className="sb-panel-label">Node {selectedNodeNumber}</p>
+                      <p className="sb-panel-label sb-panel-node-number">{demoMode ? `Node ${selectedNodeNumber}` : selectedNodeNumber}</p>
                       <h3 className="sb-panel-title">{panelTitle}</h3>
                     </>
                   )}

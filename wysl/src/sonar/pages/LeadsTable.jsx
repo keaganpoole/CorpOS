@@ -2147,7 +2147,7 @@ const LeadsTable = ({
             </div>
             <div className="absolute rounded-[11px] bg-[#0a0a0a] pointer-events-none" style={{ inset: '0.7px' }} />
             <div className="absolute inset-0 rounded-xl border border-white/[0.06] group-hover/colorbar:opacity-0 transition-opacity duration-300 pointer-events-none" />
-            <Wand2 size={12} className="relative z-10 brand-icon group-hover/colorbar:text-white transition-colors group-hover/colorbar:rotate-12 duration-300" />
+            <Wand2 size={12} className="relative z-10 text-zinc-400 transition-colors group-hover/colorbar:rotate-12 group-hover/colorbar:text-white duration-300" />
             <span className="relative z-10">Colorbar</span>
           </button>
           <TableControlButton ref={intakeButtonRef} active={activeControl === 'intake'} onClick={() => setActiveControl((current) => (current === 'intake' ? null : 'intake'))}>

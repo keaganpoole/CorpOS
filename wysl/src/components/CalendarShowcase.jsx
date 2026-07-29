@@ -1275,15 +1275,17 @@ function RightCalendarGrid({ hasAnimatedDots }) {
 
   return (
     <div className="relative flex h-full w-full items-center">
-      <div className={`relative w-full overflow-hidden border border-white/5 bg-[#08080A] shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] ${isCompact ? 'rounded-[22px] p-3 sm:p-4 md:p-5' : 'rounded-[28px] p-10'}`}>
-        <div className={`border-b border-white/5 text-left ${isCompact ? 'mb-3 pb-3 md:mb-4 md:pb-4' : 'mb-6 pb-6'}`}>
+      <div className={`relative isolate w-full overflow-hidden border border-white/5 bg-[#111113] shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] ${isCompact ? 'rounded-[22px] p-3 sm:p-4 md:p-5' : 'rounded-[28px] p-10'}`}>
+        <div className="pointer-events-none absolute left-1/2 top-[-220px] -z-10 h-[420px] w-[560px] -translate-x-1/2 rounded-full opacity-45 blur-[95px]" style={{ background: 'var(--modalBloom)' }} />
+        <div className="pointer-events-none absolute left-1/2 top-[-180px] -z-10 h-[340px] w-[460px] -translate-x-1/2 rounded-full opacity-30 blur-[85px]" style={{ background: 'var(--modalBloomSecondary)' }} />
+        <div className={`relative z-10 border-b border-white/5 text-left ${isCompact ? 'mb-3 pb-3 md:mb-4 md:pb-4' : 'mb-6 pb-6'}`}>
           <span className={`flex items-center space-x-2 font-bold tracking-tight text-white ${isMobile ? 'text-[1rem]' : isCompact ? 'text-[1.25rem]' : 'text-[2rem]'}`}>
             <CalendarIcon className="text-zinc-300" size={22} />
             <span>October 2026</span>
           </span>
         </div>
 
-        <div className={`mb-2 grid grid-cols-7 text-center ${isCompact ? 'gap-1 md:gap-1.5' : 'gap-2'}`}>
+        <div className={`relative z-10 mb-2 grid grid-cols-7 text-center ${isCompact ? 'gap-1 md:gap-1.5' : 'gap-2'}`}>
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
             <span key={`${day}-${index}`} className={`py-1 font-bold uppercase tracking-widest text-zinc-500 ${isMobile ? 'text-[8px]' : isCompact ? 'text-[9px]' : 'text-[10px]'}`}>
               {day}
@@ -1291,7 +1293,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
           ))}
         </div>
 
-        <div className={`grid grid-cols-7 ${isCompact ? 'gap-1 md:gap-1.5' : 'gap-2'}`}>
+        <div className={`relative z-10 grid grid-cols-7 ${isCompact ? 'gap-1 md:gap-1.5' : 'gap-2'}`}>
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={`empty-${index}`} className="aspect-square bg-transparent opacity-5" />
           ))}
@@ -1333,7 +1335,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
           })}
         </div>
 
-        <div className={`border-t border-white/5 ${isMobile ? 'mt-3 min-h-[118px] pt-3' : isCompact ? 'mt-4 min-h-[138px] pt-4' : 'mt-8 min-h-[170px] pt-5'}`}>
+        <div className={`relative z-10 border-t border-white/5 ${isMobile ? 'mt-3 min-h-[118px] pt-3' : isCompact ? 'mt-4 min-h-[138px] pt-4' : 'mt-8 min-h-[170px] pt-5'}`}>
           <span className={`mb-3 flex items-center space-x-1.5 font-bold tracking-widest text-zinc-400 ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}>
             <Activity size={10} className="text-zinc-300" />
             <span>Appointments for October {selectedDay}</span>

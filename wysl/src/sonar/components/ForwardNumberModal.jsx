@@ -95,6 +95,13 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                 ? 'Caller ID verified.'
                 : 'Use your business number for outbound calls.'
               : 'Forwarding verified.';
+  const forwardingSteps = [
+    {
+      label: 'Number forwarding',
+      title: modalTitle,
+      description: `Forward calls to ${agentName} so ${agentPronoun} can handle calls for ${businessName || 'your business'}.`,
+    },
+  ];
   const normalizedSourceNumber = sourceNumber.trim();
   const sourceOptions = [];
   const seenNumbers = new Set();
@@ -621,14 +628,14 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                 <div className={`relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border transition-all duration-500 ${
                   passed
                     ? 'border-emerald-400/20 bg-emerald-400/[0.06] shadow-[0_0_44px_rgba(52,211,153,0.16)]'
-                    : 'border-orange-400/20 bg-orange-400/[0.06] shadow-[0_0_44px_rgba(249,115,22,0.12)]'
+                    : 'border-white/[0.10] bg-pink-400/[0.06] shadow-[0_0_44px_color-mix(in_srgb,var(--brandGradientStart)_12%,transparent)]'
                 }`}>
-                  <span className={`absolute h-20 w-20 rounded-full border ${passed ? 'border-emerald-300/25' : 'border-orange-300/25 animate-ping'}`} />
-                  <span className={`absolute h-14 w-14 rounded-full border ${passed ? 'border-emerald-300/20' : 'border-orange-300/20 animate-pulse'}`} />
+                  <span className={`absolute h-20 w-20 rounded-full border ${passed ? 'border-emerald-300/25' : 'border-white/[0.14] animate-ping'}`} />
+                  <span className={`absolute h-14 w-14 rounded-full border ${passed ? 'border-emerald-300/20' : 'border-white/[0.10] animate-pulse'}`} />
                   <div className={`relative flex h-12 w-12 items-center justify-center rounded-full text-black transition-all duration-500 ${
                     passed
                       ? 'bg-emerald-300 shadow-[0_0_22px_rgba(52,211,153,0.22)]'
-                      : 'bg-orange-300 shadow-[0_0_22px_rgba(249,115,22,0.22)]'
+                      : 'bg-pink-300 shadow-[0_0_22px_color-mix(in_srgb,var(--brandGradientStart)_22%,transparent)]'
                   }`}>
                     {passed ? <CheckCircle2 size={21} /> : <Phone size={21} />}
                   </div>
@@ -651,7 +658,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                       <span
                         key={dot}
                         className={`h-1.5 w-1.5 rounded-full ${
-                          passed ? 'bg-emerald-300' : dot <= targetQualityStep ? 'bg-orange-300' : 'bg-zinc-700'
+                          passed ? 'bg-emerald-300' : dot <= targetQualityStep ? 'bg-pink-300' : 'bg-zinc-700'
                         } ${passed ? '' : 'transition-colors duration-300'}`}
                       />
                     ))}
@@ -677,7 +684,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                     setTargetSearch((current) => ({ ...current, areaCode: event.target.value.replace(/\D/g, '').slice(0, 3) }));
                   }}
                   placeholder="207"
-                  className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055]"
+                  className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-white/20 focus:bg-white/[0.055]"
                 />
               </label>
               <label className="space-y-2">
@@ -691,7 +698,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                     setTargetSearch((current) => ({ ...current, contains: event.target.value.replace(/[^\dA-Za-z+*$%]/g, '').slice(0, 16) }));
                   }}
                   placeholder="Ends with 22"
-                  className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055]"
+                  className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-white/20 focus:bg-white/[0.055]"
                 />
               </label>
             </div>
@@ -716,7 +723,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                         }}
                         className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
                           active
-                            ? 'border-orange-400 bg-orange-400/12 text-white'
+                            ? 'border-white/20 bg-white/[0.045] text-white'
                             : 'border-white/[0.08] bg-transparent text-zinc-300 hover:border-white/[0.14] hover:text-white'
                         }`}
                       >
@@ -724,12 +731,12 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                           <div className={`truncate text-sm font-semibold ${active ? 'text-white' : 'text-zinc-200'}`}>
                             {option.friendly_name || option.phone_number}
                           </div>
-                          <div className={`mt-1 truncate text-xs ${active ? 'text-orange-100' : 'text-zinc-500'}`}>
+                          <div className={`mt-1 truncate text-xs ${active ? 'text-zinc-300' : 'text-zinc-500'}`}>
                             {[option.phone_number, option.locality, option.region].filter(Boolean).join(' · ')}
                           </div>
                         </div>
                         {active ? (
-                          <div className="shrink-0 rounded-full bg-orange-300 p-1 text-black">
+                          <div className="shrink-0 rounded-full p-1 text-zinc-200">
                             <CheckCircle2 size={14} />
                           </div>
                         ) : null}
@@ -762,7 +769,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                 </div>
               ) : null}
               {!canPurchaseNumber ? (
-                <div className="rounded-2xl border border-orange-400/20 bg-orange-400/8 px-4 py-3 text-sm leading-6 text-orange-200">
+                <div className="rounded-2xl border border-white/[0.10] bg-pink-400/8 px-4 py-3 text-sm leading-6 text-pink-200">
                   This business has reached its number purchase limit right now.
                 </div>
               ) : null}
@@ -778,6 +785,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
               <div className="mb-3 flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-600">Current receptionist number</p>
+                  <p className="mt-2 truncate text-xs font-normal text-zinc-500">{businessName || 'Your business'}</p>
                   <p className="mt-2 break-words text-2xl font-semibold tracking-[-0.04em] text-white">
                     {forwardingNumber}
                   </p>
@@ -785,7 +793,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                     <p className="mt-1 truncate text-xs text-zinc-600">{twilioNumberLabel}</p>
                   ) : null}
                 </div>
-                <div className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">
+                <div className="shrink-0 px-1 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">
                   Active
                 </div>
               </div>
@@ -799,7 +807,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                   setTargetQualityState('idle');
                   setTargetQualityMessage('');
                 }}
-                className="mt-4 h-10 rounded-full border border-white/[0.08] px-4 text-sm font-semibold text-zinc-300 transition hover:border-orange-400/40 hover:text-white"
+                className="mt-4 h-10 rounded-full border border-white/[0.08] px-4 text-sm font-semibold text-zinc-300 transition hover:border-white/20 hover:text-white"
               >
                 Replace AI number
               </button>
@@ -815,7 +823,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                     onClick={() => selectSourceOption(option)}
                     className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
                       active
-                        ? 'border-orange-400 bg-orange-400/12 text-white'
+                        ? 'border-white/20 bg-transparent text-white'
                         : 'border-white/[0.08] bg-black/20 text-zinc-300 hover:border-white/[0.14] hover:text-white'
                     }`}
                   >
@@ -823,12 +831,12 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                       <div className={`truncate text-sm font-semibold ${active ? 'text-white' : 'text-zinc-200'}`}>
                         {option.source_label || option.source_number}
                       </div>
-                      <div className={`mt-1 truncate text-xs ${active ? 'text-orange-100' : 'text-zinc-500'}`}>
+                      <div className={`mt-1 truncate text-xs ${active ? 'text-zinc-300' : 'text-zinc-500'}`}>
                         {option.source_number}
                       </div>
                     </div>
                     {option.status === 'verified' ? (
-                      <div className={`shrink-0 rounded-full p-1 ${active ? 'bg-orange-300 text-black' : 'text-emerald-300'}`}>
+                      <div className="shrink-0 rounded-full p-1 text-emerald-300">
                         <CheckCircle2 size={14} />
                       </div>
                     ) : null}
@@ -840,8 +848,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
               onClick={startAddingNewNumber}
               className={`mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition ${
                 isAddingNewNumber
-                  ? 'border-orange-400/50 bg-orange-400/10 text-orange-200'
-                  : 'border-dashed border-white/[0.12] bg-transparent text-zinc-400 hover:border-orange-400/40 hover:text-white'
+                  ? 'border-white/20 bg-white/[0.045] text-zinc-200'
+                  : 'border-dashed border-white/[0.12] bg-transparent text-zinc-400 hover:border-white/20 hover:text-white'
               }`}
             >
               <Plus size={14} />
@@ -858,14 +866,14 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                     setForwardingStatus('draft');
                   }}
                   placeholder="+1 (555) 123-4567"
-                  className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055]"
+                  className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-white/20 focus:bg-white/[0.055]"
                 />
                 <input
                   type="text"
                   value={sourceLabel}
                   onChange={(event) => setSourceLabel(event.target.value)}
                   placeholder="Front desk"
-                  className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-orange-400/60 focus:bg-white/[0.055]"
+                  className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-white/20 focus:bg-white/[0.055]"
                 />
               </div>
             )}
@@ -879,7 +887,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                 : 'Choose the business number customers already call, or add it if it is not listed yet.'}
           </p>
           {!hasTargetNumber && (
-            <p className="text-xs leading-5 text-orange-300/80">
+            <p className="text-xs leading-5 text-pink-300/80">
               Assign a phone number before forwarding calls to your AI receptionist.
             </p>
           )}
@@ -904,7 +912,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
               type="button"
               onClick={copyForwardingNumber}
               disabled={!hasTargetNumber}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.035] text-zinc-400 transition hover:border-orange-400/40 hover:text-orange-300 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.035] text-zinc-400 transition hover:border-white/20 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
               title="Copy number"
             >
               {copied ? <CheckCircle2 size={18} /> : <Copy size={17} />}
@@ -931,8 +939,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                   onClick={() => setSelectedProviderId(provider.id)}
                   className={`rounded-2xl border px-3 py-2 text-left text-xs font-semibold transition ${
                     active
-                      ? 'border-orange-400 bg-orange-400 text-black shadow-[0_0_22px_rgba(249,115,22,0.18)]'
-                      : 'border-white/[0.08] bg-black/20 text-zinc-400 hover:border-orange-400/40 hover:text-white'
+                      ? 'border-white/20 bg-white/[0.06] text-white'
+                      : 'border-white/[0.08] bg-black/20 text-zinc-400 hover:border-white/20 hover:text-white'
                   }`}
                 >
                   {provider.label}
@@ -942,7 +950,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           </div>
           <div className="mt-4 border-t border-white/[0.06] pt-4">
             <div className="mb-4 flex items-center gap-2">
-              <Repeat size={15} className="text-orange-300" />
+              <Repeat size={15} className="text-pink-300" />
               <p className="text-[13px] font-normal text-zinc-400">{selectedProvider.action}</p>
             </div>
             <div className="space-y-2 text-sm text-zinc-500">
@@ -964,14 +972,14 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           <div className={`relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border transition-all duration-500 ${
             isVerified
               ? 'border-emerald-400/20 bg-emerald-400/[0.06] shadow-[0_0_44px_rgba(52,211,153,0.16)]'
-              : 'border-orange-400/20 bg-orange-400/[0.06] shadow-[0_0_44px_rgba(249,115,22,0.12)]'
+              : 'border-white/[0.10] bg-pink-400/[0.06] shadow-[0_0_44px_color-mix(in_srgb,var(--brandGradientStart)_12%,transparent)]'
           }`}>
-            <span className={`absolute h-20 w-20 rounded-full border ${isVerified ? 'border-emerald-300/25' : 'border-orange-300/25 animate-ping'}`} />
-            <span className={`absolute h-14 w-14 rounded-full border ${isVerified ? 'border-emerald-300/20' : 'border-orange-300/20 animate-pulse'}`} />
+            <span className={`absolute h-20 w-20 rounded-full border ${isVerified ? 'border-emerald-300/25' : 'border-white/[0.14] animate-ping'}`} />
+            <span className={`absolute h-14 w-14 rounded-full border ${isVerified ? 'border-emerald-300/20' : 'border-white/[0.10] animate-pulse'}`} />
             <div className={`relative flex h-12 w-12 items-center justify-center rounded-full text-black transition-all duration-500 ${
               isVerified
                 ? 'bg-emerald-300 shadow-[0_0_22px_rgba(52,211,153,0.22)]'
-                : 'bg-orange-300 shadow-[0_0_22px_rgba(249,115,22,0.22)]'
+                : 'bg-pink-300 shadow-[0_0_22px_color-mix(in_srgb,var(--brandGradientStart)_22%,transparent)]'
             }`}>
               <Phone size={21} />
             </div>
@@ -993,7 +1001,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
               {[0, 1, 2].map((dot) => (
                 <span
                   key={dot}
-                  className={`h-1.5 w-1.5 rounded-full ${isVerified ? 'bg-emerald-300' : 'bg-orange-300 animate-pulse'}`}
+                  className={`h-1.5 w-1.5 rounded-full ${isVerified ? 'bg-emerald-300' : 'bg-pink-300 animate-pulse'}`}
                   style={{ animationDelay: `${dot * 160}ms` }}
                 />
               ))}
@@ -1015,12 +1023,12 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           </p>
 
           {callerIdPending ? (
-            <div className="space-y-4 rounded-[24px] border border-orange-400/20 bg-orange-400/[0.06] p-4">
-              <div className="flex items-center gap-2 text-orange-200">
+            <div className="space-y-4 rounded-[24px] border border-white/[0.10] bg-pink-400/[0.06] p-4">
+              <div className="flex items-center gap-2 text-pink-200">
                 <Phone size={15} />
                 <span className="text-sm font-semibold">Verification call in progress</span>
               </div>
-              <p className="text-sm leading-6 text-orange-100/90">
+              <p className="text-sm leading-6 text-pink-100/90">
                 Answer the call to {sourceNumber || 'your business line'} and enter this code on the keypad.
               </p>
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-center text-3xl font-semibold tracking-[0.35em] text-white">
@@ -1090,15 +1098,20 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
         onClick={(e) => e.stopPropagation()}
         className="relative max-h-[calc(100vh-32px)] w-full max-w-[520px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
       >
-        <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-orange-500/[0.07] blur-[90px]" />
+        <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-[90px]" style={{ background: 'var(--modalBloom)' }} />
 
         <div className="relative p-5 sm:p-7">
           <div className="mb-6 flex items-start justify-between gap-5">
-            <div className="min-w-0">
-              <p className="text-[13px] font-normal text-orange-300">Number forwarding</p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">{modalTitle}</h2>
+            <div className="min-w-0 flex-1">
+              <div className="flex h-4 items-center gap-3 pr-8">
+                <p className="shrink-0 text-[13px] font-normal leading-4 text-zinc-300">{forwardingSteps[0].label} · {slide + 1} of {totalSlides}</p>
+                <div className="h-1 w-[190px] shrink-0 translate-y-0 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div className="h-full rounded-full brand-gradient transition-all duration-500" style={{ width: `${((slide + 1) / totalSlides) * 100}%` }} />
+                </div>
+              </div>
+              <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">{forwardingSteps[0].title}</h2>
               <p className="mt-3 max-w-md text-sm leading-6 text-zinc-500">
-                Forward calls to {agentName} so {agentPronoun} can handle calls for {businessName || 'your business'}.
+                {forwardingSteps[0].description}
               </p>
             </div>
             <button
@@ -1108,17 +1121,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
             >
               <X size={16} />
             </button>
-          </div>
-
-          <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                (slide === 3 && forwardingStatus === 'verified') || (slide === 4 && callerIdStatus === 'verified')
-                  ? 'bg-gradient-to-r from-emerald-300 via-emerald-400 to-emerald-500'
-                  : 'bg-gradient-to-r from-orange-300 via-orange-400 to-orange-600'
-              }`}
-              style={{ width: `${((slide + 1) / totalSlides) * 100}%` }}
-            />
           </div>
 
           <AnimatePresence mode="wait">

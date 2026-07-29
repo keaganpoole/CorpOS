@@ -156,6 +156,22 @@ body {
   color: var(--iconColor) !important;
   stroke: currentColor;
 }
+.settings-page-scope .settings-save-status-icon svg {
+  color: currentColor !important;
+}
+.settings-page-scope input:-webkit-autofill,
+.settings-page-scope input:-webkit-autofill:hover,
+.settings-page-scope input:-webkit-autofill:focus,
+.settings-page-scope textarea:-webkit-autofill,
+.settings-page-scope textarea:-webkit-autofill:hover,
+.settings-page-scope textarea:-webkit-autofill:focus,
+.settings-page-scope select:-webkit-autofill,
+.settings-page-scope select:-webkit-autofill:hover,
+.settings-page-scope select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #070707 inset !important;
+  -webkit-text-fill-color: #e4e4e7 !important;
+  caret-color: #e4e4e7;
+}
 
 /* All form focus states share the Scenario Builder focus color. */
 input:focus,

@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings, Clock, Building2, Phone, Bell, Calendar,
-  Save, Check, ChevronDown, ChevronUp, Sun, Moon,
+  Check, ChevronDown, ChevronUp, Sun, Moon,
   BookOpen, FileText, Shield, HelpCircle, Sparkles,
   Eye, EyeOff, Lightbulb, Zap, Star, Info,
-  Plus, Trash2, GripVertical, Tag, DollarSign,
+  Plus, Trash2, Tag, DollarSign,
   ArrowRight, X, MessageSquareText, Users,
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil,
 } from 'lucide-react';
@@ -412,7 +412,7 @@ const TextInput = ({ value, onChange, placeholder, type = 'text' }) => (
     value={value}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
-    className="w-full bg-zinc-950/80 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-700 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all"
+    className="w-full bg-[#070707]/85 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-700 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all"
   />
 );
 
@@ -420,7 +420,7 @@ const SelectInput = ({ value, onChange, options }) => (
   <select
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="w-full bg-zinc-950/80 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none cursor-pointer"
+    className="w-full bg-[#070707]/85 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none cursor-pointer"
     style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
   >
     {options.map(opt => (
@@ -437,7 +437,7 @@ const NumberInput = ({ value, onChange, min, max, step = 1 }) => (
     min={min}
     max={max}
     step={step}
-    className="w-28 bg-zinc-950/80 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+    className="w-28 bg-[#070707]/85 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
   />
 );
 
@@ -446,12 +446,12 @@ const Toggle = ({ value, onChange }) => {
     <button
       type="button"
       onClick={() => onChange(!value)}
-      className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-all ${value ? 'dashboard-toggle-active' : 'bg-zinc-800 border border-white/[0.06]'}`}
+      className={`flex h-5 w-9 items-center rounded-full p-0.5 transition-all ${value ? 'dashboard-toggle-active' : 'bg-zinc-800 border border-white/[0.06]'}`}
       aria-pressed={value}
     >
       <div
-        className="h-5 w-5 rounded-full bg-white transition-transform"
-        style={{ transform: value ? 'translateX(20px)' : 'translateX(0px)' }}
+        className="h-4 w-4 rounded-full bg-white transition-transform"
+        style={{ transform: value ? 'translateX(16px)' : 'translateX(0px)' }}
       />
     </button>
   );
@@ -481,14 +481,14 @@ const DayHoursRow = ({ day, settings, onChange }) => {
             type="time"
             value={hours.open}
             onChange={(e) => update('open', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
+            className="time-input-no-icon bg-[#070707]/85 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
           />
           <span className="text-[11px] text-zinc-600">to</span>
           <input
             type="time"
             value={hours.close}
             onChange={(e) => update('close', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
+            className="time-input-no-icon bg-[#070707]/85 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
           />
         </div>
       ) : (
@@ -535,14 +535,14 @@ const StaffHoursRow = ({ day, hours, onChange }) => {
             type="time"
             value={value.open}
             onChange={(e) => update('open', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
+            className="time-input-no-icon bg-[#070707]/85 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
           />
           <span className="text-[11px] text-zinc-600">to</span>
           <input
             type="time"
             value={value.close}
             onChange={(e) => update('close', e.target.value)}
-            className="time-input-no-icon bg-zinc-950/80 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
+            className="time-input-no-icon bg-[#070707]/85 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
           />
         </div>
       ) : (
@@ -1887,7 +1887,7 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
       </div>
 
       {/* Action bar */}
-      <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.03] bg-white/[0.01]">
+      <div className="flex items-center justify-end px-5 py-3 border-t border-white/[0.03] bg-white/[0.01]">
         <button
           onClick={loadTemplate}
           className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-white/[0.08] bg-white/[0.04] text-[11px] font-bold text-zinc-300 uppercase tracking-wider hover:bg-white/[0.06] hover:border-white/15 transition-all"
@@ -1909,95 +1909,13 @@ const KnowledgeBaseEditor = ({ value, onChange }) => {
 };
 
 // ─── Intro Message Editor ──────────────────────────────────────────────────
-const INTRO_VARIABLES = [
-  { key: '{{receptionist_name}}', label: 'Receptionist Name', desc: "The receptionist's name" },
-  { key: '{{company_name}}', label: 'Business Name', desc: 'Your business name' },
-];
-
 const IntroMessageEditor = ({ value, onChange }) => {
   const textareaRef = React.useRef(null);
-
-  const renderTokenizedValue = (text) => {
-    const parts = String(text || '').split(/({{receptionist_name}}|{{company_name}})/g);
-    return parts.map((part, index) => {
-      const variable = INTRO_VARIABLES.find(v => v.key === part);
-      if (!variable) return <span key={`${part}-${index}`}>{part}</span>;
-      return (
-        <span key={`${part}-${index}`} className="sb-var-chip mx-0.5 align-middle" contentEditable={false}>
-          <span className="sb-var-chip-text">{variable.label}</span>
-        </span>
-      );
-    });
-  };
-
-  const handleDragStart = (e, variable) => {
-    e.dataTransfer.setData('text/plain', variable);
-    e.dataTransfer.effectAllowed = 'copy';
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const variable = e.dataTransfer.getData('text/plain');
-    if (!variable) return;
-
-    const target = textareaRef.current;
-    const start = target?.selectionStart ?? (value || '').length;
-    const end = target?.selectionEnd ?? (value || '').length;
-    const currentValue = value || '';
-    const newValue = `${currentValue.slice(0, start)}${variable}${currentValue.slice(end)}`;
-    onChange(newValue);
-    setTimeout(() => {
-      if (!target) return;
-      const cursor = start + variable.length;
-      target.focus();
-      target.setSelectionRange(cursor, cursor);
-    }, 0);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-  };
-
-  const insertVariable = (variable) => {
-    const target = textareaRef.current;
-    const start = target?.selectionStart ?? (value || '').length;
-    const end = target?.selectionEnd ?? (value || '').length;
-    const currentValue = value || '';
-    const newValue = `${currentValue.slice(0, start)}${variable}${currentValue.slice(end)}`;
-    onChange(newValue);
-    setTimeout(() => {
-      if (!target) return;
-      const cursor = start + variable.length;
-      target.focus();
-      target.setSelectionRange(cursor, cursor);
-    }, 0);
-  };
 
   const wordCount = (value || '').trim() ? (value || '').trim().split(/\s+/).length : 0;
 
   return (
     <div className="border border-white/[0.04] rounded-2xl bg-gradient-to-b from-zinc-950/40 to-transparent overflow-hidden">
-      {/* Variable chips */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.03]">
-        <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest shrink-0">Variables</span>
-        <div className="h-4 w-px bg-white/[0.06] shrink-0" />
-        {INTRO_VARIABLES.map(v => (
-          <button
-            key={v.key}
-            draggable
-            onDragStart={(e) => handleDragStart(e, v.key)}
-            onClick={() => insertVariable(v.key)}
-            title={v.desc}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-zinc-300 uppercase tracking-wider hover:bg-white/[0.06] hover:border-white/15 transition-all cursor-grab active:cursor-grabbing select-none"
-          >
-            <GripVertical size={10} className="settings-icon" />
-            {v.label}
-          </button>
-        ))}
-        <span className="text-[10px] text-zinc-700 ml-auto italic">drag into text or click to insert</span>
-      </div>
-
       {/* Editor */}
       <div className="p-5">
         <textarea
@@ -2005,27 +1923,15 @@ const IntroMessageEditor = ({ value, onChange }) => {
           ref={textareaRef}
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          placeholder="Hey, this is Receptionist Name at Business Name. What can I do for you?"
+          placeholder="Hey, thanks for calling. What can I do for you?"
           className="min-h-[118px] w-full resize-none bg-black/30 border border-white/[0.04] rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none transition-all leading-relaxed font-sans"
         />
-        <div className="mt-3 rounded-xl border border-white/[0.04] bg-black/20 px-4 py-3">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-600">Preview</div>
-          <div className="min-h-[24px] text-[13px] leading-relaxed text-zinc-300">
-            {value ? renderTokenizedValue(value) : <span className="text-zinc-800">Hey, this is Receptionist Name at Business Name. What can I do for you?</span>}
-          </div>
-        </div>
       </div>
 
       {/* Footer */}
       <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.03] bg-white/[0.01]">
         <div className="flex items-center gap-3">
           <span className="text-[10px] text-zinc-700 tabular-nums">{wordCount} words · {(value || '').length} chars</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Lightbulb size={11} className="settings-icon" />
-          <span className="text-[10px] text-zinc-600">Variables resolve dynamically per call — receptionist and business names update automatically</span>
         </div>
       </div>
     </div>
@@ -2088,13 +1994,6 @@ const BusinessForwardingSettings = ({ authSession }) => {
               <div className="flex items-center gap-2">
                 <PhoneCall size={15} className="settings-icon" />
                 <h4 className="text-[13px] font-semibold text-zinc-100">Business Number Forwarding</h4>
-                <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-                  isVerified
-                    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500'
-                }`}>
-                  {loading ? 'Loading' : isVerified ? 'Active' : 'Not Set'}
-                </span>
               </div>
               <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
                 Set the forwarding number for this business once. All receptionist call handling uses this business-level setup.
@@ -2485,11 +2384,7 @@ const SettingsPage = () => {
           <>
             <div className="mb-4">
               <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
-                The first thing callers hear when your AI receptionist picks up. Use variables to personalize it automatically.
-              </p>
-              <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
-                <Info size={11} className="settings-icon shrink-0" />
-                Variables resolve dynamically if the receptionist changes.
+                The first thing callers hear when your AI receptionist picks up.
               </p>
             </div>
             <IntroMessageEditor
@@ -2562,7 +2457,7 @@ const SettingsPage = () => {
                       >
                         i
                       </button>
-                      <span className="pointer-events-none absolute left-1/2 top-6 z-20 hidden w-72 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-zinc-950 px-3 py-2 text-[11px] font-normal leading-4 text-zinc-400 shadow-2xl shadow-black/40 group-hover:block group-focus-within:block">
+                      <span className="pointer-events-none absolute bottom-6 left-1/2 z-20 hidden w-72 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-zinc-950 px-3 py-2 text-[11px] font-normal leading-4 text-zinc-400 shadow-2xl shadow-black/40 group-hover:block group-focus-within:block">
                         If a caller's incoming phone number doesn't match the number on file, the receptionist will text a secure OTP verification link to confirm their identity before making any account changes. This helps protect customer accounts from unauthorized access.
                       </span>
                     </span>
@@ -2641,9 +2536,32 @@ const SettingsPage = () => {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="settings-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95"
+          className="settings-neutral-button relative flex min-w-[72px] items-center justify-center px-5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95"
         >
-          {savedFlash ? <><Check size={14} /> Saved</> : saving ? 'Saving...' : <><Save size={14} /> Save Changes</>}
+          <AnimatePresence mode="wait" initial={false}>
+            {savedFlash ? (
+              <motion.span
+                key="saved-check"
+                initial={{ opacity: 0, y: 4, scale: 0.92 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.92 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className="settings-save-status-icon inline-flex items-center justify-center text-current"
+              >
+                <Check size={14} />
+              </motion.span>
+            ) : (
+              <motion.span
+                key={saving ? 'saving' : 'save'}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </motion.span>
+            )}
+          </AnimatePresence>
         </button>
       </header>
 
@@ -2714,7 +2632,7 @@ const SettingsPage = () => {
                         {(settings.business_name || 'B').trim().slice(0, 1).toUpperCase()}
                       </span>
                     )}
-                    <span className="absolute inset-0 flex items-center justify-center bg-black/70 text-white opacity-0 transition-opacity duration-200 group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100">
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/85 text-white opacity-0 transition-opacity duration-200 group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100">
                       <Upload size={16} />
                     </span>
                     {businessAvatarUploading && (
@@ -2782,11 +2700,7 @@ const SettingsPage = () => {
           <Section title="Intro Message" icon={MessageSquareText} color="bg-white/[0.04] text-white" defaultOpen={true}>
             <div className="mb-4">
               <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
-                The first thing callers hear when your AI receptionist picks up. Use variables to personalize it automatically.
-              </p>
-              <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
-                <Info size={11} className="settings-icon shrink-0" />
-                Variables resolve dynamically — if the receptionist changes, the greeting updates automatically.
+                The first thing callers hear when your AI receptionist picks up.
               </p>
             </div>
             <IntroMessageEditor
