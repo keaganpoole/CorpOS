@@ -536,7 +536,6 @@ const BlinkedWord = ({ progress }) => {
 const ComparisonShowcase = () => {
   const rootRef = useRef(null);
   const previousProgressRef = useRef(0);
-  const mondayLockYRef = useRef(null);
   const [sectionProgress, setSectionProgress] = useState(0);
   const [direction, setDirection] = useState(0);
   const [mondayRevealComplete, setMondayRevealComplete] = useState(false);
@@ -579,34 +578,15 @@ const ComparisonShowcase = () => {
   const scrollStep = Math.min(6, Math.floor(comparisonProgress * 7));
 
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root || !introExited || direction < 0 || mondayRevealComplete) return undefined;
-
-    const scrollableDistance = Math.max(root.offsetHeight - window.innerHeight, 1);
-    const lockY = root.getBoundingClientRect().top + window.scrollY + scrollableDistance * comparisonStart;
-    mondayLockYRef.current = lockY;
-    window.scrollTo(0, lockY);
+    if (!introExited || mondayRevealComplete) return undefined;
 
     const releaseTimer = window.setTimeout(() => {
-      mondayLockYRef.current = null;
       setMondayRevealComplete(true);
     }, 2300);
-
-    const lockScroll = (event) => {
-      event.preventDefault();
-      window.scrollTo(0, mondayLockYRef.current ?? lockY);
-    };
-
-    window.addEventListener('wheel', lockScroll, { passive: false });
-    window.addEventListener('touchmove', lockScroll, { passive: false });
-
     return () => {
       window.clearTimeout(releaseTimer);
-      window.removeEventListener('wheel', lockScroll);
-      window.removeEventListener('touchmove', lockScroll);
-      mondayLockYRef.current = null;
     };
-  }, [direction, introExited, mondayRevealComplete]);
+  }, [introExited, mondayRevealComplete]);
 
   useEffect(() => {
     if (sectionProgress < 0.02) {
