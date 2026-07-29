@@ -468,11 +468,11 @@ const BlinkedWord = ({ progress }) => {
   } else if (closingProgress < 0.7) {
     const eased = smoothStep((closingProgress - 0.44) / 0.26);
     openAmount = 0.82 - eased * 0.5;
-  } else if (closingProgress < 0.86) {
-    const eased = smoothStep((closingProgress - 0.7) / 0.16);
+  } else if (closingProgress < 0.88) {
+    const eased = smoothStep((closingProgress - 0.7) / 0.18);
     openAmount = 0.32 + eased * 0.16;
   } else {
-    const eased = smoothStep((closingProgress - 0.86) / 0.14);
+    const eased = smoothStep((closingProgress - 0.88) / 0.12);
     openAmount = 0.48 - eased * 0.48;
   }
 
