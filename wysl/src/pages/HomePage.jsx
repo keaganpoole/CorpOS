@@ -1,5 +1,5 @@
 // HomePage.jsx
-import React, { useId, useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useLegacyAnimation from '../hooks/useLegacyAnimation';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -457,8 +457,6 @@ const NumberOptionsShowcase = () => {
 };
 
 const BlinkedWord = ({ progress }) => {
-  const reactId = useId();
-  const clipId = `blinked-word-${reactId.replace(/:/g, '')}`;
   const closingProgress = clamp(progress, 0, 1);
   const smoothStep = (value) => value * value * (3 - 2 * value);
   const easeInQuart = (value) => value * value * value * value;
@@ -486,19 +484,12 @@ const BlinkedWord = ({ progress }) => {
   const upperY = midY - effectiveOpen * 0.48;
   const lowerY = midY + effectiveOpen * 0.48;
   const jitterX = flutterOffset * 0.18;
-  const pathD = `M 0,${midY} Q 0.5,${upperY} 1,${midY} Q 0.5,${lowerY} 0,${midY} Z`;
-  const animationBlend = smoothStep(clamp((closingProgress - 0.08) / 0.14, 0, 1));
+  const topLidHeight = clamp(upperY, 0, 0.5);
+  const bottomLidTop = clamp(lowerY, 0.5, 1);
   const rimOpacity = smoothStep(clamp((closingProgress - 0.12) / 0.72, 0, 1));
 
   return (
     <span className="relative inline-block whitespace-nowrap align-baseline" aria-label="blinked">
-      <svg className="absolute h-0 w-0" aria-hidden="true">
-        <defs>
-          <clipPath id={clipId} clipPathUnits="objectBoundingBox">
-            <path d={pathD} />
-          </clipPath>
-        </defs>
-      </svg>
       <span
         aria-hidden="true"
         className="opacity-0"
@@ -508,29 +499,18 @@ const BlinkedWord = ({ progress }) => {
       <span
         aria-hidden="true"
         className="absolute inset-0"
-        style={{ opacity: 1 - animationBlend }}
+        style={{ transform: `translateX(${jitterX}em)`, transformOrigin: 'center' }}
       >
         blinked
       </span>
-      <span
-        aria-hidden="true"
-        className="absolute inset-0"
-        style={{
-          clipPath: `url(#${clipId})`,
-          WebkitClipPath: `url(#${clipId})`,
-          opacity: animationBlend,
-          transform: `translateX(${jitterX}em)`,
-          transformOrigin: 'center',
-        }}
-      >
-        blinked
-      </span>
+      <span aria-hidden="true" className="absolute left-0 top-0 w-full bg-[#020202]" style={{ height: `${topLidHeight * 100}%` }} />
+      <span aria-hidden="true" className="absolute bottom-0 left-0 w-full bg-[#020202]" style={{ top: `${bottomLidTop * 100}%` }} />
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
         viewBox="0 0 1 1"
         preserveAspectRatio="none"
         aria-hidden="true"
-        style={{ opacity: animationBlend * rimOpacity }}
+        style={{ opacity: rimOpacity }}
       >
         <path
           d={`M 0,${midY} Q 0.5,${lowerY} 1,${midY}`}
