@@ -228,11 +228,11 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 .animate-nudge { animation: nudge 2s ease-in-out infinite; }
 @keyframes subtle-glow { 0% { text-shadow: 0 0 7px var(--brandGradientStart); } 50% { text-shadow: 0 0 14px var(--brandGradientEnd); } 100% { text-shadow: 0 0 7px var(--brandGradientStart); } }
 .animate-glow { animation: subtle-glow 3s ease-in-out infinite; animation-delay: var(--animation-delay, 0s); }
-@keyframes blinked-gradient-cycle { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes blinked-gradient-cycle { 0%, 100% { background-position: 38% 50%; } 50% { background-position: 62% 50%; } }
 .blinked-gradient-cycle {
   background-image: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd), var(--brandGradientStart));
-  background-size: 240% 100%;
-  animation: blinked-gradient-cycle var(--blinked-gradient-duration, 14s) ease-in-out infinite;
+  background-size: 180% 100%;
+  animation: blinked-gradient-cycle var(--blinked-gradient-duration, 18s) ease-in-out infinite;
 }
 @keyframes animate-savings { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .savings-text.animate { animation: animate-savings 0.5s ease-out forwards; }
