@@ -380,7 +380,7 @@ main,
 .scenario-demo-showcase .homepage-scenarios-builder .sb-json-modal-overlay {
     position: absolute;
 }
-.scenario-demo-showcase .homepage-scenarios-builder :is(p, h1, h2, h3, h4, h5, h6) {
+.content-section .scenario-demo-showcase .homepage-scenarios-builder :is(p, h1, h2, h3, h4, h5, h6) {
     opacity: 1;
     transform: none;
     filter: none;
@@ -479,12 +479,12 @@ main,
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-node-label-below {
     position: absolute;
-    top: calc(100% + 24px);
+    top: 164px;
     left: 50%;
     margin-top: 0;
+    margin-left: -110px;
     width: 220px;
     max-width: 220px;
-    transform: translateX(-50%);
     text-align: center;
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-node-below-desc {

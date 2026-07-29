@@ -1333,7 +1333,7 @@ export default function ScenariosPage({
       : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
   const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
-  const showNodeConfigText = !['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage);
+  const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage);
   const panelTitle = isPrimaryNode ? 'Add Trigger' : 'Add Action';
   const selectedNodeNumber = Math.max(1, nodes.findIndex((node) => node.id === selectedNodeId) + 1);
   const appointmentDateInputMode = appointmentConfig.date_input_mode || 'text';
@@ -1601,7 +1601,7 @@ export default function ScenariosPage({
     const node = nodeMap[nodeId];
     if (!node) return null;
     const measured = circleCenterRef.current[nodeId];
-    const y = !node.configured && measured ? measured.cy + measured.r : node.y;
+    const y = measured ? measured.cy + measured.r : node.y;
     return { x: node.x, y };
   }, [nodeMap]);
 
@@ -4838,14 +4838,14 @@ export default function ScenariosPage({
                 const isActiveEdge = scenarioRunState?.activeEdgeId === edge.id;
                 const isFutureEdge = isRunPathEdge && !isCompletedEdge && !isActiveEdge;
                 const isUnrelatedEdge = Boolean(scenarioRunState) && !isRunPathEdge;
-                // For unconfigured nodes, edge should target circle bottom (center + radius)
-                // Configured nodes already have node.y near sphere bottom due to label+connector below
+                // Anchor the demo edge to the bottom of each measured circle so the
+                // connection follows the same geometry as the real builder.
                 const fromMeasured = circleCenterRef.current[edge.from];
                 const toMeasured = circleCenterRef.current[edge.to];
-                const fromY = !from.configured && fromMeasured ? fromMeasured.cy + fromMeasured.r : from.y;
+                const fromY = fromMeasured ? fromMeasured.cy + fromMeasured.r : from.y;
                 const dragPoint = isDraggingEdge ? edgeDrag.point : null;
                 const toX = dragPoint?.x ?? to.x;
-                const toY = dragPoint?.y ?? (!to.configured && toMeasured ? toMeasured.cy + toMeasured.r : to.y);
+                const toY = dragPoint?.y ?? (toMeasured ? toMeasured.cy + toMeasured.r : to.y);
                 const dx = toX - from.x;
                 const path = `M ${from.x} ${fromY} C ${from.x + dx/2} ${fromY}, ${from.x + dx/2} ${toY}, ${toX} ${toY}`;
 
@@ -4887,7 +4887,7 @@ export default function ScenariosPage({
               const to = nodeMap[edge.to];
               if (!from || !to) return null;
               const toMeasuredHandle = circleCenterRef.current[edge.to];
-              const handleY = !to.configured && toMeasuredHandle ? toMeasuredHandle.cy + toMeasuredHandle.r : to.y;
+              const handleY = toMeasuredHandle ? toMeasuredHandle.cy + toMeasuredHandle.r : to.y;
               return (
                 <button
                   key={`edge-handle-${edge.id}`}
@@ -4925,8 +4925,8 @@ export default function ScenariosPage({
               if (!from || !to) return null;
               const fromMeasuredPin = circleCenterRef.current[edge.from];
               const toMeasuredPin = circleCenterRef.current[edge.to];
-              const fromYPin = !from.configured && fromMeasuredPin ? fromMeasuredPin.cy + fromMeasuredPin.r : from.y;
-              const toYPin = !to.configured && toMeasuredPin ? toMeasuredPin.cy + toMeasuredPin.r : to.y;
+              const fromYPin = fromMeasuredPin ? fromMeasuredPin.cy + fromMeasuredPin.r : from.y;
+              const toYPin = toMeasuredPin ? toMeasuredPin.cy + toMeasuredPin.r : to.y;
               const midX = (from.x + to.x) / 2;
               const midY = (fromYPin + toYPin) / 2;
               const isFallback = edge.filter?.type === 'fallback';
