@@ -11,10 +11,12 @@ const TIMELINE = [
   { id: 'sun', day: 'Sunday', time: '06:15 PM', scenario: 'Service Opportunity', context: 'A customer is ready to book.', human: 'The extra service is never offered.', ai: 'A relevant service is recommended.', netTime: 15, netRev: 150 },
 ];
 
-const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'text-white' }) => {
+const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'text-white', shouldReveal = true }) => {
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
+    if (!shouldReveal) return undefined;
+
     let startTime;
     const startValue = display;
     const animate = (currentTime) => {
@@ -26,15 +28,29 @@ const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'te
     };
     const frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
-  }, [value]);
+  }, [value, shouldReveal]);
 
   return (
-    <div className="flex flex-col items-center md:items-start">
+    <motion.div
+      className="flex flex-col items-center md:items-start"
+      initial={false}
+      animate={shouldReveal ? 'visible' : 'hidden'}
+      variants={{
+        hidden: { opacity: 0, y: -18, scale: 0.96, filter: 'blur(12px)' },
+        visible: {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          filter: 'blur(0px)',
+          transition: { duration: 0.75, ease: [0.16, 1, 0.3, 1] },
+        },
+      }}
+    >
       <span className="mb-2 text-[10px] uppercase tracking-[0.3em] text-white/30 md:text-xs">{label}</span>
       <span className={`text-3xl font-light tracking-tighter md:text-5xl ${colorClass}`}>
         {prefix}{display}{suffix}
       </span>
-    </div>
+    </motion.div>
   );
 };
 
@@ -53,6 +69,9 @@ const textVariants = {
 export default function WorkWeekComparison({ scrollStep = null, scrollDirection = 0 }) {
   const [[step, direction], setPage] = useState([0, 0]);
   const [stats, setStats] = useState({ time: 0, rev: 0 });
+  const [stageReveal, setStageReveal] = useState(false);
+  const [contentReveal, setContentReveal] = useState(false);
+  const [statsReveal, setStatsReveal] = useState(false);
   const stepRef = useRef(0);
   const isScrollingRef = useRef(false);
   const containerRef = useRef(null);
@@ -60,6 +79,22 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
   const activeStep = isScrollDriven ? scrollStep : step;
   const activeDirection = isScrollDriven ? scrollDirection : direction;
   const current = TIMELINE[activeStep];
+
+  useEffect(() => {
+    setStageReveal(false);
+    setContentReveal(false);
+    setStatsReveal(false);
+
+    const stageTimer = window.setTimeout(() => setStageReveal(true), 90);
+    const contentTimer = window.setTimeout(() => setContentReveal(true), 620);
+    const statsTimer = window.setTimeout(() => setStatsReveal(true), 1120);
+
+    return () => {
+      window.clearTimeout(stageTimer);
+      window.clearTimeout(contentTimer);
+      window.clearTimeout(statsTimer);
+    };
+  }, []);
 
   useEffect(() => {
     stepRef.current = activeStep;
@@ -131,32 +166,54 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
   return (
     <div ref={containerRef} className="comparison-section relative flex h-[100dvh] flex-col overflow-hidden bg-[#050505] font-sans text-white selection:bg-white selection:text-black">
       <header className="pointer-events-none absolute left-0 top-0 z-50 flex w-full items-start justify-between p-8 md:p-12">
-        <div className="pointer-events-auto"><AnimatedStat value={stats.time} suffix=" mins" label="Time Recovered" /></div>
-        <div className="pointer-events-auto"><AnimatedStat value={stats.rev} prefix="+$" label="Revenue Saved" colorClass="text-[#34C759]" /></div>
+        <div className="pointer-events-auto"><AnimatedStat value={stats.time} suffix=" mins" label="Time Recovered" shouldReveal={statsReveal} /></div>
+        <div className="pointer-events-auto"><AnimatedStat value={stats.rev} prefix="+$" label="Revenue Saved" colorClass="text-[#34C759]" shouldReveal={statsReveal} /></div>
       </header>
 
       <main className="relative flex h-full w-full flex-col justify-center px-8 md:px-24">
         <div className="absolute inset-y-0 left-0 z-20 w-1/4 cursor-w-resize" onClick={() => !isScrollDriven && !isScrollingRef.current && step > 0 && setPage([step - 1, -1])} />
         <div className="absolute inset-y-0 right-0 z-20 w-3/4 cursor-e-resize" onClick={() => !isScrollDriven && !isScrollingRef.current && step < TIMELINE.length - 1 && setPage([step + 1, 1])} />
 
-        <div className="relative z-10 mb-12 flex h-20 w-full items-center justify-center pointer-events-none" style={{ transformStyle: 'preserve-3d', perspective: '1000px' }}>
+        <motion.div
+          className="relative z-10 mb-12 flex h-20 w-full items-center justify-center pointer-events-none"
+          initial={false}
+          animate={stageReveal ? 'lifted' : 'centered'}
+          variants={{
+            centered: { y: 118, opacity: 0, scale: 1.08, filter: 'blur(12px)' },
+            lifted: {
+              y: 0,
+              opacity: 1,
+              scale: 1,
+              filter: 'blur(0px)',
+              transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
+            },
+          }}
+          style={{ transformStyle: 'preserve-3d', perspective: '1000px' }}
+        >
           <AnimatePresence custom={activeDirection} mode="popLayout">
             <motion.div key={`${current.id}-time`} custom={activeDirection} variants={timePickerVariants} initial="enter" animate="center" exit="exit" className="absolute flex flex-col items-center gap-1">
               <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-white/20">{current.day}</span>
               <span className="text-xs font-light tracking-[0.1em] text-white/40">{current.time}</span>
             </motion.div>
           </AnimatePresence>
-        </div>
+        </motion.div>
 
         <AnimatePresence mode="wait">
-          <motion.div key={current.id} variants={cascadeVariants} initial="initial" animate="animate" exit="exit" className="max-w-6xl mx-auto w-full flex flex-col lg:flex-row justify-center items-center lg:items-start relative z-10 pointer-events-none gap-12 lg:gap-24">
+          <motion.div
+            key={current.id}
+            variants={cascadeVariants}
+            initial="initial"
+            animate={contentReveal ? 'animate' : 'initial'}
+            exit="exit"
+            className="max-w-6xl mx-auto w-full flex flex-col lg:flex-row justify-center items-center lg:items-start relative z-10 pointer-events-none gap-12 lg:gap-24"
+          >
             <motion.div variants={textVariants} className="flex-1 flex flex-col items-center lg:items-end text-center lg:text-right w-full">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/20 mb-4 lg:mb-6">Human Reality</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/20 mb-4 lg:mb-6">Human Receptionist</span>
               <p className="comparison-human-statement text-3xl lg:text-5xl text-white/40 font-light leading-snug">{current.human}</p>
             </motion.div>
             <motion.div variants={textVariants} className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-[#34C759]/80 mb-4 lg:mb-6 flex items-center justify-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-white" />AI Advantage</span>
-              <p className="comparison-ai-statement text-3xl lg:text-5xl text-white font-medium leading-snug">{current.ai}<svg className="inline-block w-6 h-6 lg:w-8 lg:h-8 text-[#34C759] ml-1 -mt-2 shrink-0 align-middle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></p>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/20 mb-4 lg:mb-6 flex items-center justify-center gap-2">AI Advantage</span>
+              <p className="comparison-ai-statement text-3xl lg:text-5xl text-white font-medium leading-snug">{current.ai}<svg className="inline-block w-6 h-6 lg:w-8 lg:h-8 ml-1 -mt-2 shrink-0 align-middle" fill="none" viewBox="0 0 24 24" stroke="url(#comparison-check-gradient)" strokeWidth={3}><defs><linearGradient id="comparison-check-gradient" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse"><stop stopColor="var(--brandGradientStart)" /><stop offset="1" stopColor="var(--brandGradientEnd)" /></linearGradient></defs><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></p>
             </motion.div>
           </motion.div>
         </AnimatePresence>
