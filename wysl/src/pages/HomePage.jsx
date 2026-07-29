@@ -486,6 +486,7 @@ const BlinkedWord = ({ progress }) => {
   const jitterX = flutterOffset * 0.18;
   const upperLidPath = `M 0,0 H 1 V ${midY} Q 0.5,${upperY} 0,${midY} Z`;
   const lowerLidPath = `M 0,1 H 1 V ${midY} Q 0.5,${lowerY} 0,${midY} Z`;
+  const isBlinking = closingProgress > 0.08;
   const rimOpacity = smoothStep(clamp((closingProgress - 0.12) / 0.72, 0, 1));
 
   return (
@@ -499,35 +500,37 @@ const BlinkedWord = ({ progress }) => {
       <span
         aria-hidden="true"
         className="absolute inset-0"
-        style={{ transform: `translateX(${jitterX}em)`, transformOrigin: 'center' }}
+        style={{ transform: isBlinking ? `translateX(${jitterX}em)` : 'none', transformOrigin: 'center' }}
       >
         blinked
       </span>
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox="0 0 1 1"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <path d={upperLidPath} fill="#020202" />
-        <path d={lowerLidPath} fill="#020202" />
-        <path
-          d={`M 0,${midY} Q 0.5,${lowerY} 1,${midY}`}
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth={effectiveOpen > 0.02 ? '0.006' : '0'}
-          strokeOpacity={0.28 * effectiveOpen}
-          style={{ filter: 'blur(0.5px)', opacity: rimOpacity }}
-        />
-        <path
-          d={`M 0,${midY} Q 0.5,${upperY} 1,${midY}`}
-          fill="none"
-          stroke="#000000"
-          strokeWidth="0.03"
-          strokeOpacity={0.65 * effectiveOpen}
-          style={{ filter: 'blur(4px)', opacity: rimOpacity }}
-        />
-      </svg>
+      {isBlinking && (
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          viewBox="0 0 1 1"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path d={upperLidPath} fill="#020202" />
+          <path d={lowerLidPath} fill="#020202" />
+          <path
+            d={`M 0,${midY} Q 0.5,${lowerY} 1,${midY}`}
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth={effectiveOpen > 0.02 ? '0.006' : '0'}
+            strokeOpacity={0.28 * effectiveOpen}
+            style={{ filter: 'blur(0.5px)', opacity: rimOpacity }}
+          />
+          <path
+            d={`M 0,${midY} Q 0.5,${upperY} 1,${midY}`}
+            fill="none"
+            stroke="#000000"
+            strokeWidth="0.03"
+            strokeOpacity={0.65 * effectiveOpen}
+            style={{ filter: 'blur(4px)', opacity: rimOpacity }}
+          />
+        </svg>
+      )}
     </span>
   );
 };
