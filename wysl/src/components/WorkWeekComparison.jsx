@@ -81,8 +81,7 @@ const AnimatedStat = ({
   label,
   colorClass = 'text-white',
   shouldReveal = true,
-  align = 'start',
-  valueWidthClass = 'min-w-[7ch]'
+  align = 'start'
 }) => {
   const [display, setDisplay] = useState(0);
   const alignmentClass =
@@ -143,8 +142,7 @@ const AnimatedStat = ({
       </span>
 
       <span
-        className={`${valueWidthClass} inline-block text-3xl font-light tracking-tighter tabular-nums md:text-5xl ${align === 'end' ? 'text-right' : 'text-left'} ${colorClass}`}
-        style={{ fontVariantNumeric: 'tabular-nums' }}
+        className={`text-3xl font-light tracking-tighter tabular-nums md:text-5xl ${colorClass}`}
       >
         {prefix}
         {display}
@@ -499,7 +497,6 @@ export default function WorkWeekComparison({
             colorClass="text-[#34C759]"
             shouldReveal={statsReveal}
             align="end"
-            valueWidthClass="min-w-[8.5ch]"
           />
         </div>
       </header>
