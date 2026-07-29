@@ -509,15 +509,10 @@ const ComparisonShowcase = () => {
             transform: `translateY(${introExited ? -12 : 0}px)`,
           }}
         >
-          <div className="mx-auto max-w-[860px] px-2 text-center sm:px-4">
-            <h2 id="comparison-section-title" className="homepage-copy-reveal is-visible bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.8rem]">
-              Human vs.
-              <br />
-              AI Coverage
+          <div className="mx-auto max-w-6xl px-2 text-center sm:px-4">
+            <h2 id="comparison-section-title" className="homepage-copy-reveal is-visible mx-auto max-w-[980px] text-3xl font-medium leading-snug text-white md:text-5xl lg:text-6xl">
+              Experience what an entire week looks like when your front desk runs at its full potential.
             </h2>
-            <div className="homepage-copy-reveal homepage-copy-reveal--delayed is-visible mx-auto mt-6 max-w-[760px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
-              See what a full week looks like when missed calls, forgotten follow-ups, and after-hours inquiries are handled automatically instead of falling through the cracks.
-            </div>
           </div>
         </div>
 
