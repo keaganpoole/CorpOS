@@ -4838,8 +4838,6 @@ export default function ScenariosPage({
                 const isActiveEdge = scenarioRunState?.activeEdgeId === edge.id;
                 const isFutureEdge = isRunPathEdge && !isCompletedEdge && !isActiveEdge;
                 const isUnrelatedEdge = Boolean(scenarioRunState) && !isRunPathEdge;
-                // Anchor the demo edge to the bottom of each measured circle so the
-                // connection follows the same geometry as the real builder.
                 const fromMeasured = circleCenterRef.current[edge.from];
                 const toMeasured = circleCenterRef.current[edge.to];
                 const fromY = fromMeasured ? fromMeasured.cy + fromMeasured.r : from.y;
@@ -4855,7 +4853,7 @@ export default function ScenariosPage({
                     d={path}
                     className={`sb-edge-line ${isDraft ? 'sb-edge-draft' : ''} ${isFallback ? 'sb-edge-fallback' : ''} ${isDraggingEdge ? 'sb-edge-dragging' : ''} ${isActiveEdge ? 'is-run-active' : ''} ${isCompletedEdge ? 'is-run-complete' : ''} ${isFutureEdge ? 'is-run-future' : ''} ${isUnrelatedEdge ? 'is-run-unrelated' : ''}`}
                     fill="none"
-                    markerEnd={!isDraft ? (isDraggingEdge ? "url(#sb-arrowhead-active)" : "url(#sb-arrowhead)") : ""}
+                    markerEnd={isDraggingEdge ? "url(#sb-arrowhead-active)" : ""}
                     style={isFallback ? { stroke: '#f59e0b', strokeDasharray: '8 4', strokeWidth: '2px' } : {}}
                   />
                 );
