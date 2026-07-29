@@ -1,5 +1,5 @@
 // HomePage.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useId, useState, useEffect, useRef } from 'react';
 import useLegacyAnimation from '../hooks/useLegacyAnimation';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -456,6 +456,75 @@ const NumberOptionsShowcase = () => {
   );
 };
 
+const BlinkedWord = ({ progress }) => {
+  const reactId = useId();
+  const clipId = `blinked-word-${reactId.replace(/:/g, '')}`;
+  const closingProgress = clamp(progress, 0, 1);
+  const eyeProgress = 0.5 + closingProgress * 0.5;
+  const baseOpen = Math.sin(eyeProgress * Math.PI);
+  let flutterOffset = 0;
+
+  if (eyeProgress > 0.62 && eyeProgress < 0.95) {
+    flutterOffset = Math.sin(eyeProgress * 75) * 0.14 * ((eyeProgress - 0.62) * 2.4);
+  }
+
+  const effectiveOpen = clamp(baseOpen + flutterOffset, 0, 1);
+  const width = 800;
+  const height = 320;
+  const midY = height / 2;
+  const upperY = midY - effectiveOpen * (height * 0.48);
+  const lowerY = midY + effectiveOpen * (height * 0.48);
+  const jitterX = flutterOffset * 18;
+  const pathD = `M 20,${midY} Q ${width / 2},${upperY} ${width - 20},${midY} Q ${width / 2},${lowerY} 20,${midY} Z`;
+
+  return (
+    <span className="relative inline-block h-[1em] w-[4.85ch] align-[-0.08em]" aria-label="blinked">
+      <svg className="absolute h-0 w-0" aria-hidden="true">
+        <defs>
+          <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+            <path d={pathD} />
+          </clipPath>
+        </defs>
+      </svg>
+      <span
+        aria-hidden="true"
+        className="absolute left-1/2 top-1/2 inline-flex h-[320px] w-[800px] items-center justify-center text-[5.5rem] font-medium tracking-normal text-white md:text-[8.75rem] lg:text-[11rem]"
+        style={{
+          clipPath: `url(#${clipId})`,
+          WebkitClipPath: `url(#${clipId})`,
+          transform: `translate(calc(-50% + ${jitterX}px), -50%) scale(0.34)`,
+          transformOrigin: 'center',
+        }}
+      >
+        blinked
+      </span>
+      <svg
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[1.08em] w-[4.9ch] -translate-x-1/2 -translate-y-1/2"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <path
+          d={`M 20,${midY} Q ${width / 2},${lowerY} ${width - 20},${midY}`}
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth={effectiveOpen > 0.02 ? '1.5' : '0'}
+          strokeOpacity={0.28 * effectiveOpen}
+          style={{ filter: 'blur(0.5px)' }}
+        />
+        <path
+          d={`M 20,${midY} Q ${width / 2},${upperY} ${width - 20},${midY}`}
+          fill="none"
+          stroke="#000000"
+          strokeWidth="8"
+          strokeOpacity={0.65 * effectiveOpen}
+          style={{ filter: 'blur(4px)' }}
+        />
+      </svg>
+    </span>
+  );
+};
+
 const ComparisonShowcase = () => {
   const rootRef = useRef(null);
   const previousProgressRef = useRef(0);
@@ -493,6 +562,7 @@ const ComparisonShowcase = () => {
   }, []);
 
   const introExited = sectionProgress >= 0.26;
+  const blinkProgress = clamp((sectionProgress - 0.16) / 0.1, 0, 1);
   const comparisonProgress = clamp((sectionProgress - 0.26) / 0.74, 0, 1);
   const scrollStep = Math.min(6, Math.floor(comparisonProgress * 7));
 
@@ -511,7 +581,7 @@ const ComparisonShowcase = () => {
         >
           <div className="mx-auto max-w-6xl px-2 text-center sm:px-4">
             <h2 id="comparison-section-title" className="homepage-copy-reveal is-visible mx-auto max-w-[980px] text-3xl font-medium leading-snug text-white md:text-5xl lg:text-6xl">
-              What if your front desk never blinked?
+              What if your front desk never <BlinkedWord progress={blinkProgress} />?
             </h2>
           </div>
         </div>
