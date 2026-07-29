@@ -465,15 +465,15 @@ const BlinkedWord = ({ progress }) => {
   if (closingProgress < 0.44) {
     const eased = easeInQuart(closingProgress / 0.44);
     openAmount = 1 - eased * 0.18;
-  } else if (closingProgress < 0.68) {
-    const eased = smoothStep((closingProgress - 0.44) / 0.24);
+  } else if (closingProgress < 0.7) {
+    const eased = smoothStep((closingProgress - 0.44) / 0.26);
     openAmount = 0.82 - eased * 0.5;
-  } else if (closingProgress < 0.9) {
-    const eased = smoothStep((closingProgress - 0.68) / 0.22);
-    openAmount = 0.32 + eased * 0.2;
+  } else if (closingProgress < 0.86) {
+    const eased = smoothStep((closingProgress - 0.7) / 0.16);
+    openAmount = 0.32 + eased * 0.16;
   } else {
-    const eased = smoothStep((closingProgress - 0.9) / 0.1);
-    openAmount = 0.52 - eased * 0.52;
+    const eased = smoothStep((closingProgress - 0.86) / 0.14);
+    openAmount = 0.48 - eased * 0.48;
   }
 
   const closingTension = smoothStep(clamp((closingProgress - 0.36) / 0.64, 0, 1));
@@ -484,8 +484,8 @@ const BlinkedWord = ({ progress }) => {
   const upperY = midY - effectiveOpen * 0.48;
   const lowerY = midY + effectiveOpen * 0.48;
   const jitterX = flutterOffset * 0.18;
-  const upperLidPath = `M 0,0 H 1 V ${midY} Q 0.5,${upperY} 0,${midY} Z`;
-  const lowerLidPath = `M 0,1 H 1 V ${midY} Q 0.5,${lowerY} 0,${midY} Z`;
+  const topLidHeight = clamp(upperY, 0, 0.5);
+  const bottomLidTop = clamp(lowerY, 0.5, 1);
   const rimOpacity = smoothStep(clamp((closingProgress - 0.12) / 0.72, 0, 1));
 
   return (
@@ -503,21 +503,22 @@ const BlinkedWord = ({ progress }) => {
       >
         blinked
       </span>
+      <span aria-hidden="true" className="absolute left-0 top-0 w-full bg-[#020202]" style={{ height: `${topLidHeight * 100}%` }} />
+      <span aria-hidden="true" className="absolute bottom-0 left-0 w-full bg-[#020202]" style={{ top: `${bottomLidTop * 100}%` }} />
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
         viewBox="0 0 1 1"
         preserveAspectRatio="none"
         aria-hidden="true"
+        style={{ opacity: rimOpacity }}
       >
-        <path d={upperLidPath} fill="#020202" />
-        <path d={lowerLidPath} fill="#020202" />
         <path
           d={`M 0,${midY} Q 0.5,${lowerY} 1,${midY}`}
           fill="none"
           stroke="#ffffff"
           strokeWidth={effectiveOpen > 0.02 ? '0.006' : '0'}
           strokeOpacity={0.28 * effectiveOpen}
-          style={{ filter: 'blur(0.5px)', opacity: rimOpacity }}
+          style={{ filter: 'blur(0.5px)' }}
         />
         <path
           d={`M 0,${midY} Q 0.5,${upperY} 1,${midY}`}
@@ -525,7 +526,7 @@ const BlinkedWord = ({ progress }) => {
           stroke="#000000"
           strokeWidth="0.03"
           strokeOpacity={0.65 * effectiveOpen}
-          style={{ filter: 'blur(4px)', opacity: rimOpacity }}
+          style={{ filter: 'blur(4px)' }}
         />
       </svg>
     </span>
