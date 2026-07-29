@@ -212,7 +212,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
               <p className="comparison-human-statement text-3xl lg:text-5xl text-white/40 font-light leading-snug">{current.human}</p>
             </motion.div>
             <motion.div variants={textVariants} className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/20 mb-4 lg:mb-6 flex items-center justify-center gap-2">Nodemere AI Receptionist</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/20 mb-4 lg:mb-6 flex items-center justify-center gap-2"><span className="bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text text-transparent">Nodemere</span> AI Receptionist</span>
               <p className="comparison-ai-statement text-3xl lg:text-5xl text-white font-medium leading-snug">{current.ai}<svg className="inline-block w-6 h-6 lg:w-8 lg:h-8 ml-1 -mt-2 shrink-0 align-middle" fill="none" viewBox="0 0 24 24" strokeWidth={3}><defs><linearGradient id="comparison-check-gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient></defs><path stroke="url(#comparison-check-gradient)" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></p>
             </motion.div>
           </motion.div>
