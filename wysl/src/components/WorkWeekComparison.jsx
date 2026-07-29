@@ -74,25 +74,6 @@ const TIMELINE = [
   }
 ];
 
-const statRevealVariants = {
-  hidden: {
-    opacity: 0,
-    y: -18,
-    scale: 0.96,
-    filter: 'blur(12px)'
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    filter: 'blur(0px)',
-    transition: {
-      duration: 0.75,
-      ease: [0.16, 1, 0.3, 1]
-    }
-  }
-};
-
 const AnimatedStat = ({
   value,
   prefix = '',
@@ -104,26 +85,16 @@ const AnimatedStat = ({
   valueWidthClass = 'min-w-[7ch]'
 }) => {
   const [display, setDisplay] = useState(0);
-  const displayRef = useRef(0);
-  const frameRef = useRef(null);
   const alignmentClass =
     align === 'end'
       ? 'items-center text-center md:items-end md:text-right'
       : 'items-center text-center md:items-start md:text-left';
 
   useEffect(() => {
-    displayRef.current = display;
-  }, [display]);
-
-  useEffect(() => {
     if (!shouldReveal) return undefined;
 
-    if (frameRef.current !== null) {
-      cancelAnimationFrame(frameRef.current);
-    }
-
     let startTime;
-    const startValue = displayRef.current;
+    const startValue = display;
 
     const animate = (currentTime) => {
       if (!startTime) startTime = currentTime;
@@ -135,21 +106,12 @@ const AnimatedStat = ({
         Math.round((startValue + (value - startValue) * ease) * 100) / 100
       );
 
-      if (progress < 1) {
-        frameRef.current = requestAnimationFrame(animate);
-      } else {
-        frameRef.current = null;
-      }
+      if (progress < 1) requestAnimationFrame(animate);
     };
 
-    frameRef.current = requestAnimationFrame(animate);
+    const frame = requestAnimationFrame(animate);
 
-    return () => {
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
-      }
-    };
+    return () => cancelAnimationFrame(frame);
   }, [value, shouldReveal]);
 
   return (
@@ -157,7 +119,24 @@ const AnimatedStat = ({
       className={`flex flex-col ${alignmentClass}`}
       initial={false}
       animate={shouldReveal ? 'visible' : 'hidden'}
-      variants={statRevealVariants}
+      variants={{
+        hidden: {
+          opacity: 0,
+          y: -18,
+          scale: 0.96,
+          filter: 'blur(12px)'
+        },
+        visible: {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          filter: 'blur(0px)',
+          transition: {
+            duration: 0.75,
+            ease: [0.16, 1, 0.3, 1]
+          }
+        }
+      }}
     >
       <span className="mb-2 text-[10px] uppercase tracking-[0.3em] text-white/30 md:text-xs">
         {label}
