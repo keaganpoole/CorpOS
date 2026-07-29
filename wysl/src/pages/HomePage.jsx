@@ -498,7 +498,7 @@ const BlinkedWord = ({ progress }) => {
       </span>
       <span
         aria-hidden="true"
-        className="absolute inset-0"
+        className="absolute inset-0 bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text text-transparent"
         style={{ transform: `translateX(${jitterX}em)`, transformOrigin: 'center' }}
       >
         blinked
