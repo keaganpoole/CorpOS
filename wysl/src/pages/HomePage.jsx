@@ -487,6 +487,8 @@ const BlinkedWord = ({ progress }) => {
   const topLidHeight = clamp(upperY, 0, 0.5);
   const bottomLidTop = clamp(lowerY, 0.5, 1);
   const rimOpacity = smoothStep(clamp((closingProgress - 0.12) / 0.72, 0, 1));
+  const gradientSpeedUp = smoothStep(clamp((closingProgress - 0.1) / 0.76, 0, 1));
+  const gradientDuration = 14 - gradientSpeedUp * 9.5;
 
   return (
     <span className="relative inline-block whitespace-nowrap align-baseline" aria-label="blinked">
@@ -499,7 +501,11 @@ const BlinkedWord = ({ progress }) => {
       <span
         aria-hidden="true"
         className="absolute inset-0 blinked-gradient-cycle bg-clip-text text-transparent"
-        style={{ transform: `translateX(${jitterX}em)`, transformOrigin: 'center' }}
+        style={{
+          '--blinked-gradient-duration': `${gradientDuration}s`,
+          transform: `translateX(${jitterX}em)`,
+          transformOrigin: 'center'
+        }}
       >
         blinked
       </span>

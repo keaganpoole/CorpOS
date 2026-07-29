@@ -232,7 +232,7 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 .blinked-gradient-cycle {
   background-image: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd), var(--brandGradientStart));
   background-size: 240% 100%;
-  animation: blinked-gradient-cycle 14s ease-in-out infinite;
+  animation: blinked-gradient-cycle var(--blinked-gradient-duration, 14s) ease-in-out infinite;
 }
 @keyframes animate-savings { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .savings-text.animate { animation: animate-savings 0.5s ease-out forwards; }
