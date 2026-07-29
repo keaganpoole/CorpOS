@@ -487,6 +487,7 @@ const BlinkedWord = ({ progress }) => {
   const lowerY = midY + effectiveOpen * 0.48;
   const jitterX = flutterOffset * 0.18;
   const pathD = `M 0,${midY} Q 0.5,${upperY} 1,${midY} Q 0.5,${lowerY} 0,${midY} Z`;
+  const animationBlend = smoothStep(clamp((closingProgress - 0.08) / 0.14, 0, 1));
   const rimOpacity = smoothStep(clamp((closingProgress - 0.12) / 0.72, 0, 1));
 
   return (
@@ -507,7 +508,7 @@ const BlinkedWord = ({ progress }) => {
       <span
         aria-hidden="true"
         className="absolute inset-0"
-        style={{ opacity: 0 }}
+        style={{ opacity: 1 - animationBlend }}
       >
         blinked
       </span>
@@ -517,7 +518,7 @@ const BlinkedWord = ({ progress }) => {
         style={{
           clipPath: `url(#${clipId})`,
           WebkitClipPath: `url(#${clipId})`,
-          opacity: 1,
+          opacity: animationBlend,
           transform: `translateX(${jitterX}em)`,
           transformOrigin: 'center',
         }}
@@ -529,7 +530,7 @@ const BlinkedWord = ({ progress }) => {
         viewBox="0 0 1 1"
         preserveAspectRatio="none"
         aria-hidden="true"
-        style={{ opacity: rimOpacity }}
+        style={{ opacity: animationBlend * rimOpacity }}
       >
         <path
           d={`M 0,${midY} Q 0.5,${lowerY} 1,${midY}`}
