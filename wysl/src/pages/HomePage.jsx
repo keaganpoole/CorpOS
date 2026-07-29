@@ -575,7 +575,7 @@ const ComparisonShowcase = () => {
     };
   }, []);
 
-  const comparisonStart = 0.245;
+  const comparisonStart = 0.26;
   const mondayHoldEnd = 0.42;
   const introExited = sectionProgress >= comparisonStart;
   const blinkProgress = clamp((sectionProgress - 0.1) / 0.16, 0, 1);
