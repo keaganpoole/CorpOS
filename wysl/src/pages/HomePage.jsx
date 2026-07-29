@@ -492,13 +492,47 @@ const ComparisonShowcase = () => {
     };
   }, []);
 
-  const scrollStep = Math.min(6, Math.floor(sectionProgress * 7));
+  const introExited = sectionProgress >= 0.26;
+  const comparisonProgress = clamp((sectionProgress - 0.26) / 0.74, 0, 1);
+  const scrollStep = Math.min(6, Math.floor(comparisonProgress * 7));
 
   return (
-    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[320vh]">
-      <div className="sr-only" id="comparison-section-title">Comparison</div>
+    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[430vh]">
       <div className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
-        <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} />
+        <div
+          className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
+            introExited ? 'pointer-events-none' : ''
+          }`}
+          style={{
+            opacity: introExited ? 0 : 1,
+            visibility: introExited ? 'hidden' : 'visible',
+            transform: `translateY(${introExited ? -12 : 0}px)`,
+          }}
+        >
+          <div className="mx-auto max-w-[860px] px-2 text-center sm:px-4">
+            <h2 id="comparison-section-title" className="homepage-copy-reveal is-visible bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.8rem]">
+              Human vs.
+              <br />
+              AI Coverage
+            </h2>
+            <div className="homepage-copy-reveal homepage-copy-reveal--delayed is-visible mx-auto mt-6 max-w-[760px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
+              See what a full week looks like when missed calls, forgotten follow-ups, and after-hours inquiries are handled automatically instead of falling through the cracks.
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${
+            !introExited ? 'pointer-events-none' : ''
+          }`}
+          style={{
+            opacity: introExited ? 1 : 0,
+            visibility: introExited ? 'visible' : 'hidden',
+            transform: `translateY(${introExited ? 0 : 18}px)`,
+          }}
+        >
+          <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} />
+        </div>
       </div>
     </section>
   );
