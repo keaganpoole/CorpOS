@@ -495,7 +495,7 @@ const ComparisonShowcase = () => {
   const scrollStep = Math.min(6, Math.floor(sectionProgress * 7));
 
   return (
-    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[600vh]">
+    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[320vh]">
       <div className="sr-only" id="comparison-section-title">Comparison</div>
       <div className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
         <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} />
