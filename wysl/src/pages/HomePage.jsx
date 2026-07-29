@@ -461,23 +461,25 @@ const BlinkedWord = ({ progress }) => {
   const clipId = `blinked-word-${reactId.replace(/:/g, '')}`;
   const closingProgress = clamp(progress, 0, 1);
   const smoothStep = (value) => value * value * (3 - 2 * value);
+  const easeInQuart = (value) => value * value * value * value;
   let openAmount = 1;
 
-  if (closingProgress < 0.18) {
-    openAmount = 1;
-  } else if (closingProgress < 0.58) {
-    const eased = smoothStep((closingProgress - 0.18) / 0.4);
-    openAmount = 1 - eased * 0.68;
-  } else if (closingProgress < 0.78) {
-    const eased = smoothStep((closingProgress - 0.58) / 0.2);
-    openAmount = 0.32 + eased * 0.18;
+  if (closingProgress < 0.44) {
+    const eased = easeInQuart(closingProgress / 0.44);
+    openAmount = 1 - eased * 0.18;
+  } else if (closingProgress < 0.7) {
+    const eased = smoothStep((closingProgress - 0.44) / 0.26);
+    openAmount = 0.82 - eased * 0.5;
+  } else if (closingProgress < 0.86) {
+    const eased = smoothStep((closingProgress - 0.7) / 0.16);
+    openAmount = 0.32 + eased * 0.16;
   } else {
-    const eased = smoothStep((closingProgress - 0.78) / 0.22);
-    openAmount = 0.5 - eased * 0.5;
+    const eased = smoothStep((closingProgress - 0.86) / 0.14);
+    openAmount = 0.48 - eased * 0.48;
   }
 
-  const closingTension = smoothStep(clamp((closingProgress - 0.2) / 0.8, 0, 1));
-  const flutterStrength = Math.sin(closingProgress * Math.PI) * 0.035;
+  const closingTension = smoothStep(clamp((closingProgress - 0.36) / 0.64, 0, 1));
+  const flutterStrength = Math.sin(closingProgress * Math.PI) * 0.018;
   const flutterOffset = Math.sin(closingProgress * 54) * flutterStrength * closingTension;
   const effectiveOpen = clamp(openAmount + flutterOffset, 0, 1);
   const midY = 0.5;
@@ -485,7 +487,7 @@ const BlinkedWord = ({ progress }) => {
   const lowerY = midY + effectiveOpen * 0.48;
   const jitterX = flutterOffset * 0.18;
   const pathD = `M 0,${midY} Q 0.5,${upperY} 1,${midY} Q 0.5,${lowerY} 0,${midY} Z`;
-  const isClosing = closingProgress > 0.01;
+  const rimOpacity = smoothStep(clamp((closingProgress - 0.12) / 0.72, 0, 1));
 
   return (
     <span className="relative inline-block whitespace-nowrap align-baseline" aria-label="blinked">
@@ -505,7 +507,7 @@ const BlinkedWord = ({ progress }) => {
       <span
         aria-hidden="true"
         className="absolute inset-0"
-        style={{ opacity: isClosing ? 0 : 1 }}
+        style={{ opacity: 0 }}
       >
         blinked
       </span>
@@ -515,7 +517,7 @@ const BlinkedWord = ({ progress }) => {
         style={{
           clipPath: `url(#${clipId})`,
           WebkitClipPath: `url(#${clipId})`,
-          opacity: isClosing ? 1 : 0,
+          opacity: 1,
           transform: `translateX(${jitterX}em)`,
           transformOrigin: 'center',
         }}
@@ -527,7 +529,7 @@ const BlinkedWord = ({ progress }) => {
         viewBox="0 0 1 1"
         preserveAspectRatio="none"
         aria-hidden="true"
-        style={{ opacity: isClosing ? 1 : 0 }}
+        style={{ opacity: rimOpacity }}
       >
         <path
           d={`M 0,${midY} Q 0.5,${lowerY} 1,${midY}`}
