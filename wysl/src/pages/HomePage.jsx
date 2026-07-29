@@ -575,10 +575,10 @@ const ComparisonShowcase = () => {
     };
   }, []);
 
-  const comparisonStart = 0.26;
-  const mondayHoldEnd = 0.42;
+  const comparisonStart = 0.34;
+  const mondayHoldEnd = 0.5;
   const introExited = sectionProgress >= comparisonStart;
-  const blinkProgress = clamp((sectionProgress - 0.1) / 0.16, 0, 1);
+  const blinkProgress = clamp((sectionProgress - 0.08) / 0.26, 0, 1);
   const comparisonProgress = mondayRevealComplete ? clamp((sectionProgress - mondayHoldEnd) / (1 - mondayHoldEnd), 0, 1) : 0;
   const scrollStep = Math.min(6, Math.floor(comparisonProgress * 7));
 
