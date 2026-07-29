@@ -359,7 +359,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
           <div className="relative z-10 mx-auto w-full max-w-[1300px] text-center md:px-10 lg:px-12">
             <div className="mx-auto max-w-[1100px]">
               <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-4xl font-black leading-[0.95] tracking-[-0.06em] text-transparent md:text-7xl lg:text-[6.2rem]">
-                Meet Your AI Receptionist
+                Welcome to the future of the front desk
               </h2>
               <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
                 Revolutionize your front desk by deploying an AI Receptionist that makes and receives calls, books appointments, processes payments, manages your CRM, and handles customers 24/7. Handle multiple conversations simultaneously with incredibly natural, human-like interactions that deliver a level of speed, availability, and consistency traditional staffing simply can't match—all at a fraction of the cost.
@@ -511,7 +511,7 @@ const ComparisonShowcase = () => {
         >
           <div className="mx-auto max-w-6xl px-2 text-center sm:px-4">
             <h2 id="comparison-section-title" className="homepage-copy-reveal is-visible mx-auto max-w-[980px] text-3xl font-medium leading-snug text-white md:text-5xl lg:text-6xl">
-              Experience what an entire week looks like when your front desk runs at its full potential.
+              What if your front desk never blinked?
             </h2>
           </div>
         </div>
