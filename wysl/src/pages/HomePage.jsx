@@ -460,19 +460,30 @@ const BlinkedWord = ({ progress }) => {
   const reactId = useId();
   const clipId = `blinked-word-${reactId.replace(/:/g, '')}`;
   const closingProgress = clamp(progress, 0, 1);
-  const eyeProgress = 0.5 + closingProgress * 0.5;
-  const baseOpen = Math.sin(eyeProgress * Math.PI);
-  let flutterOffset = 0;
+  const smoothStep = (value) => value * value * (3 - 2 * value);
+  let openAmount = 1;
 
-  if (eyeProgress > 0.62 && eyeProgress < 0.95) {
-    flutterOffset = Math.sin(eyeProgress * 75) * 0.14 * ((eyeProgress - 0.62) * 2.4);
+  if (closingProgress < 0.18) {
+    openAmount = 1;
+  } else if (closingProgress < 0.58) {
+    const eased = smoothStep((closingProgress - 0.18) / 0.4);
+    openAmount = 1 - eased * 0.68;
+  } else if (closingProgress < 0.78) {
+    const eased = smoothStep((closingProgress - 0.58) / 0.2);
+    openAmount = 0.32 + eased * 0.18;
+  } else {
+    const eased = smoothStep((closingProgress - 0.78) / 0.22);
+    openAmount = 0.5 - eased * 0.5;
   }
 
-  const effectiveOpen = clamp(baseOpen + flutterOffset, 0, 1);
+  const closingTension = smoothStep(clamp((closingProgress - 0.2) / 0.8, 0, 1));
+  const flutterStrength = Math.sin(closingProgress * Math.PI) * 0.035;
+  const flutterOffset = Math.sin(closingProgress * 54) * flutterStrength * closingTension;
+  const effectiveOpen = clamp(openAmount + flutterOffset, 0, 1);
   const midY = 0.5;
   const upperY = midY - effectiveOpen * 0.48;
   const lowerY = midY + effectiveOpen * 0.48;
-  const jitterX = flutterOffset * 0.08;
+  const jitterX = flutterOffset * 0.18;
   const pathD = `M 0,${midY} Q 0.5,${upperY} 1,${midY} Q 0.5,${lowerY} 0,${midY} Z`;
   const isClosing = closingProgress > 0.01;
 
@@ -576,7 +587,7 @@ const ComparisonShowcase = () => {
   }, []);
 
   const introExited = sectionProgress >= 0.26;
-  const blinkProgress = clamp((sectionProgress - 0.16) / 0.1, 0, 1);
+  const blinkProgress = clamp((sectionProgress - 0.1) / 0.16, 0, 1);
   const comparisonProgress = clamp((sectionProgress - 0.26) / 0.74, 0, 1);
   const scrollStep = Math.min(6, Math.floor(comparisonProgress * 7));
 
