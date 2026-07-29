@@ -198,25 +198,25 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
           </AnimatePresence>
         </motion.div>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={current.id}
-            variants={cascadeVariants}
-            initial="initial"
-            animate={contentReveal ? 'animate' : 'initial'}
-            exit="exit"
-            className="max-w-6xl mx-auto w-full flex flex-col lg:flex-row justify-center items-center lg:items-start relative z-10 pointer-events-none gap-12 lg:gap-24"
-          >
-            <motion.div variants={textVariants} className="flex-1 flex flex-col items-center lg:items-end text-center lg:text-right w-full">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/20 mb-4 lg:mb-6">Human Receptionist</span>
-              <p className="comparison-human-statement text-3xl lg:text-5xl text-white/40 font-light leading-snug">{current.human}</p>
-            </motion.div>
-            <motion.div variants={textVariants} className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
-              <span className="text-[10px] uppercase tracking-[0.24em] text-white/35 mb-4 lg:mb-6 flex items-center justify-center gap-2 font-semibold"><span className="bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text text-transparent drop-shadow-[0_0_10px_color-mix(in_srgb,var(--brandGradientStart)_28%,transparent)]">Nodemere</span> AI Receptionist</span>
-              <p className="comparison-ai-statement text-3xl lg:text-5xl text-white font-medium leading-snug">{current.ai}<svg className="inline-block w-6 h-6 lg:w-8 lg:h-8 ml-1 -mt-2 shrink-0 align-middle" fill="none" viewBox="0 0 24 24" strokeWidth={3}><defs><linearGradient id="comparison-check-gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient></defs><path stroke="url(#comparison-check-gradient)" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></p>
-            </motion.div>
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          variants={cascadeVariants}
+          initial="initial"
+          animate={contentReveal ? 'animate' : 'initial'}
+          className="max-w-6xl mx-auto w-full flex flex-col lg:flex-row justify-center items-center lg:items-start relative z-10 pointer-events-none gap-12 lg:gap-24"
+        >
+          <div className="flex-1 flex flex-col items-center lg:items-end text-center lg:text-right w-full">
+            <motion.span variants={textVariants} className="text-[10px] uppercase tracking-[0.2em] text-white/20 mb-4 lg:mb-6">Human Receptionist</motion.span>
+            <AnimatePresence mode="wait">
+              <motion.p key={`${current.id}-human`} variants={textVariants} initial="initial" animate="animate" exit="exit" className="comparison-human-statement text-3xl lg:text-5xl text-white/40 font-light leading-snug">{current.human}</motion.p>
+            </AnimatePresence>
+          </div>
+          <div className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
+            <motion.span variants={textVariants} className="text-[10px] uppercase tracking-[0.24em] text-white/35 mb-4 lg:mb-6 flex items-center justify-center gap-2 font-semibold"><span className="bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text text-transparent drop-shadow-[0_0_10px_color-mix(in_srgb,var(--brandGradientStart)_28%,transparent)]">Nodemere</span> AI Receptionist</motion.span>
+            <AnimatePresence mode="wait">
+              <motion.p key={`${current.id}-ai`} variants={textVariants} initial="initial" animate="animate" exit="exit" className="comparison-ai-statement text-3xl lg:text-5xl text-white font-medium leading-snug">{current.ai}<svg className="inline-block w-6 h-6 lg:w-8 lg:h-8 ml-1 -mt-2 shrink-0 align-middle" fill="none" viewBox="0 0 24 24" strokeWidth={3}><defs><linearGradient id="comparison-check-gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient></defs><path stroke="url(#comparison-check-gradient)" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></motion.p>
+            </AnimatePresence>
+          </div>
+        </motion.div>
       </main>
 
       <div className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap text-[10px] uppercase tracking-widest text-white/10">Scroll to advance • Arrow keys supported</div>
