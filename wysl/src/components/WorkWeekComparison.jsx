@@ -63,7 +63,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
 
   useEffect(() => {
     stepRef.current = activeStep;
-    setStats(TIMELINE.slice(0, step + 1).reduce((totals, item) => ({
+    setStats(TIMELINE.slice(0, activeStep + 1).reduce((totals, item) => ({
       time: totals.time + item.netTime,
       rev: totals.rev + item.netRev,
     }), { time: 0, rev: 0 }));
