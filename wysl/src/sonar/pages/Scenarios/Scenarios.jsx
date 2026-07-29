@@ -621,6 +621,10 @@ const getCategoryRailGradient = (categoryType) => (
   CATEGORY_RAIL_GRADIENTS[categoryType] || CATEGORY_RAIL_GRADIENTS.TRIGGERS
 );
 
+const getCategoryTextGradient = (categoryType) => (
+  getCategoryRailGradient(categoryType).replace('180deg', '90deg')
+);
+
 const getCategoryIconColor = (categoryType) => (
   CATEGORY_ICON_COLORS[categoryType] || CATEGORY_ICON_COLORS.TRIGGERS
 );
@@ -632,6 +636,7 @@ const getCategoryIconBackground = (categoryType) => (
 const PANEL_CATEGORIES = ['TRIGGERS', 'ACTIONS', 'UTILITIES'];
 
 const INITIAL_NODE = { id: 'node-1', x: 200, y: 300, configured: false, label: 'Start Flow' };
+const EDGE_ANCHOR_Y_OFFSET = -6;
 const PEOPLE_RECORD_TABLE = 'People';
 const LOCAL_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
@@ -1249,7 +1254,6 @@ export default function ScenariosPage() {
     : !hasConfiguredTrigger
       ? ['TRIGGERS']
       : PANEL_CATEGORIES.filter((category) => category !== 'TRIGGERS');
-  const BannerIcon = activeOption?.icon || categoryMeta.icon;
   const bannerCategoryLabel = (PANEL_CATEGORY_LABELS[panelCategory] || panelCategory).toUpperCase();
   const showNodeConfigText = !['subOptions', 'actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerFilter', 'triggerConfig', 'runNode'].includes(panelStage);
   const panelTitle = isPrimaryNode ? 'Add Trigger' : 'Add Action';
@@ -1530,7 +1534,7 @@ export default function ScenariosPage() {
     const node = nodeMap[nodeId];
     if (!node) return null;
     const measured = circleCenterRef.current[nodeId];
-    const y = !node.configured && measured ? measured.cy + measured.r : node.y;
+    const y = (!node.configured && measured ? measured.cy + measured.r : node.y) + EDGE_ANCHOR_Y_OFFSET;
     return { x: node.x, y };
   }, [nodeMap]);
 
@@ -4862,10 +4866,10 @@ export default function ScenariosPage() {
                 // Configured nodes already have node.y near sphere bottom due to label+connector below
                 const fromMeasured = circleCenterRef.current[edge.from];
                 const toMeasured = circleCenterRef.current[edge.to];
-                const fromY = !from.configured && fromMeasured ? fromMeasured.cy + fromMeasured.r : from.y;
+                const fromY = (!from.configured && fromMeasured ? fromMeasured.cy + fromMeasured.r : from.y) + EDGE_ANCHOR_Y_OFFSET;
                 const dragPoint = isDraggingEdge ? edgeDrag.point : null;
                 const toX = dragPoint?.x ?? to.x;
-                const toY = dragPoint?.y ?? (!to.configured && toMeasured ? toMeasured.cy + toMeasured.r : to.y);
+                const toY = dragPoint?.y ?? ((!to.configured && toMeasured ? toMeasured.cy + toMeasured.r : to.y) + EDGE_ANCHOR_Y_OFFSET);
                 const dx = toX - from.x;
                 const path = `M ${from.x} ${fromY} C ${from.x + dx/2} ${fromY}, ${from.x + dx/2} ${toY}, ${toX} ${toY}`;
 
@@ -4875,7 +4879,7 @@ export default function ScenariosPage() {
                     d={path}
                     className={`sb-edge-line ${isDraft ? 'sb-edge-draft' : ''} ${isFallback ? 'sb-edge-fallback' : ''} ${isDraggingEdge ? 'sb-edge-dragging' : ''} ${isActiveEdge ? 'is-run-active' : ''} ${isCompletedEdge ? 'is-run-complete' : ''} ${isFutureEdge ? 'is-run-future' : ''} ${isUnrelatedEdge ? 'is-run-unrelated' : ''}`}
                     fill="none"
-                    markerEnd={!isDraft ? (isDraggingEdge ? "url(#sb-arrowhead-active)" : "url(#sb-arrowhead)") : ""}
+                    markerEnd={isDraggingEdge ? "url(#sb-arrowhead-active)" : ""}
                     style={isFallback ? { stroke: '#f59e0b', strokeDasharray: '8 4', strokeWidth: '2px' } : {}}
                   />
                 );
@@ -5188,11 +5192,8 @@ export default function ScenariosPage() {
                     <div className="sb-cyber-inner">
                       <div className="sb-cyber-header">
                       <div
-                        className="sb-cyber-pill"
-                        style={{
-                          backgroundColor: `${getCategoryIconColor(panelCategory)}20`,
-                          color: getCategoryIconColor(panelCategory),
-                        }}
+                        className="sb-cyber-pill sb-cyber-pill--plain"
+                        style={{ backgroundImage: getCategoryTextGradient(panelCategory) }}
                       >
                         {bannerCategoryLabel}
                       </div>
@@ -5201,15 +5202,6 @@ export default function ScenariosPage() {
                         </button>
                       </div>
                       <div className="sb-cyber-main">
-                      <div
-                        className="sb-cyber-icon-box"
-                        style={{
-                            background: getCategoryIconBackground(panelCategory),
-                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
-                        }}
-                      >
-                          <BannerIcon size={24} style={{ color: getCategoryIconColor(panelCategory) }} />
-                        </div>
                         <div className="sb-cyber-title-group">
                           <h2 className="sb-cyber-title">{activeOption.option}</h2>
                           <p className="sb-cyber-desc">{activeOption.description}</p>
@@ -5261,13 +5253,10 @@ export default function ScenariosPage() {
                     <div className="sb-cyber-inner">
                     <div className="sb-cyber-header">
                       <div
-                        className="sb-cyber-pill"
-                        style={{
-                          backgroundColor: `${getCategoryIconColor(selectedNode.categoryType || panelCategory)}20`,
-                          color: getCategoryIconColor(selectedNode.categoryType || panelCategory),
-                        }}
+                        className="sb-cyber-pill sb-cyber-pill--plain"
+                        style={{ backgroundImage: getCategoryTextGradient(selectedNode.categoryType || panelCategory) }}
                       >
-                        {selectedNode.category || categoryMeta.detail}
+                        {(PANEL_CATEGORY_LABELS[selectedNode.categoryType || panelCategory] || selectedNode.categoryType || panelCategory).toUpperCase()}
                       </div>
                       <button
                         type="button"
@@ -5286,17 +5275,6 @@ export default function ScenariosPage() {
                       </button>
                     </div>
                     <div className="sb-cyber-main">
-                      <div
-                        className="sb-cyber-icon-box"
-                        style={{
-                          background: getCategoryIconBackground(selectedNode.categoryType || panelCategory),
-                          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
-                        }}
-                      >
-                        {selectedNode.icon && typeof selectedNode.icon === 'function'
-                          ? <selectedNode.icon size={24} style={{ color: getCategoryIconColor(selectedNode.categoryType || panelCategory) }} />
-                          : <Phone size={24} style={{ color: getCategoryIconColor(selectedNode.categoryType || panelCategory) }} />}
-                      </div>
                       <div className="sb-cyber-title-group">
                         <h2 className="sb-cyber-title">{selectedNode.label}</h2>
                         <p className="sb-cyber-desc">{getNodeHelperText(selectedNode)}</p>
@@ -5308,7 +5286,7 @@ export default function ScenariosPage() {
               <div className="sb-panel-actions">
                 {panelStage === 'triggerConfig' && triggerConfig ? (
                   <div className="sb-action-config-form">
-                    <div className="sb-action-config-header"><h4 className="sb-action-config-title">Trigger Criteria</h4><button type="button" className="sb-action-config-close" onClick={() => setPanelStage('options')}><X size={14} /></button></div>
+                    <div className="sb-action-config-header"><h4 className="sb-action-config-title">Trigger Criteria</h4></div>
                     <div className="sb-trigger-filter-copy">Only fire this trigger when the fields below match. Leave every field empty to run for any value.</div>
                     <div className="sb-record-fields-grid">
                       {(() => {
@@ -5328,9 +5306,6 @@ export default function ScenariosPage() {
                   <div className="sb-action-config-form">
                     <div className="sb-action-config-header">
                       <h4 className="sb-action-config-title">Filter</h4>
-                      <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); }}>
-                        <X size={14} />
-                      </button>
                     </div>
                     <div className="sb-trigger-filter-copy">
                       Only fire this trigger when the current time matches the selected offset before the appointment.
@@ -5383,18 +5358,6 @@ export default function ScenariosPage() {
                         <h4 className="sb-action-config-title">Run Node</h4>
                         <div className="sb-run-node-panel-subtitle">{runNodeModal.nodeLabel}</div>
                       </div>
-                      <button
-                        type="button"
-                        className="sb-action-config-close"
-                        onClick={() => {
-                          runNodeTargetRef.current = null;
-                          setRunNodeModal(null);
-                          setPanelStage(selectedNode?.actionConfig?._key ? 'actionConfig' : 'options');
-                        }}
-                        disabled={runNodeModal.isSubmitting}
-                      >
-                        <X size={14} />
-                      </button>
                     </div>
                     <div className="sb-run-node-panel-copy">
                       Enter values for the fields that still depend on scenario variables before this node can run.
@@ -5477,9 +5440,6 @@ export default function ScenariosPage() {
                     {!actionIntegrationMissing && (
                       <div className="sb-action-config-header">
                         <h4 className="sb-action-config-title">Action Details</h4>
-                        <button type="button" className="sb-action-config-close" onClick={() => { setPanelStage('options'); setActionConfig(null); }}>
-                          <X size={14} />
-                        </button>
                       </div>
                     )}
                     {actionRequiresEmailIntegration && !hasConnectedEmailIntegration ? (
