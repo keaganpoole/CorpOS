@@ -79,7 +79,7 @@ const statementVariants = {
   },
 };
 
-export default function WorkWeekComparison({ scrollStep = null, scrollDirection = 0 }) {
+export default function WorkWeekComparison({ scrollStep = null, scrollDirection = 0, comparisonActive = true }) {
   const [[step, direction], setPage] = useState([0, 0]);
   const [stats, setStats] = useState({ time: 0, rev: 0 });
   const [datePhase, setDatePhase] = useState('hidden');
@@ -98,6 +98,8 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
     setContentReveal(false);
     setStatsReveal(false);
 
+    if (!comparisonActive) return undefined;
+
     const dateCenterTimer = window.setTimeout(() => setDatePhase('centered'), 120);
     const dateLiftTimer = window.setTimeout(() => setDatePhase('lifted'), 920);
     const contentTimer = window.setTimeout(() => setContentReveal(true), 1320);
@@ -109,7 +111,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
       window.clearTimeout(contentTimer);
       window.clearTimeout(statsTimer);
     };
-  }, []);
+  }, [comparisonActive]);
 
   useEffect(() => {
     stepRef.current = activeStep;

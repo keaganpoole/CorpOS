@@ -526,7 +526,7 @@ const ComparisonShowcase = () => {
             transform: `translateY(${introExited ? 0 : 18}px)`,
           }}
         >
-          <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} />
+          <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} comparisonActive={introExited} />
         </div>
       </div>
     </section>
