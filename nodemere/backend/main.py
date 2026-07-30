@@ -9112,6 +9112,7 @@ async def create_user(auth_data: AuthSignUpRequest):
             "email": auth_data.email,
             "full_name": user_metadata.get("full_name") or user_metadata.get("name"),
             "phone": user_metadata.get("phone"),
+            "onboarded": False,
         }
         db_response = supabase_admin.table('users').insert(profile_data).execute()
         
@@ -9142,6 +9143,7 @@ async def read_current_user(current_user: dict = Depends(get_current_user)):
                 "email": user_email,
                 "full_name": user_metadata.get("full_name") or user_metadata.get("name"),
                 "phone": user_metadata.get("phone"),
+                "onboarded": False,
             }
             logging.info(f"Prepared profile_data for insertion: {profile_data}")
             

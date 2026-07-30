@@ -29,6 +29,7 @@ export const AuthProvider = ({ children }) => {
             email: user.email,
             full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
             phone: user.user_metadata?.phone || null,
+            onboarded: false,
         };
 
         const { data: createdProfile, error: upsertError } = await supabase

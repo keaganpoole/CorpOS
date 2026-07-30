@@ -35,6 +35,11 @@ const AuthPage = () => {
 
     useEffect(() => {
         if (session && !isAuthLoading) { // User is logged in
+            if (!profile?.onboarded) {
+                navigate('/onboarding');
+                return;
+            }
+
             const pendingPlan = localStorage.getItem('pendingPlan');
             if (pendingPlan) {
                 localStorage.removeItem('pendingPlan');
@@ -54,12 +59,12 @@ const AuthPage = () => {
                     } catch (error) {
                         console.error("Error creating checkout session after login:", error);
                         alert("Could not initiate checkout after login. Please try again.");
-                        navigate('/dashboard'); // Redirect to dashboard if checkout fails
+                        navigate('/dashboard');
                     }
                 };
                 initiateStripeCheckout();
             } else {
-                navigate(profile?.onboarded ? '/dashboard' : '/onboarding');
+                navigate('/dashboard');
             }
         }
     }, [session, profile, isAuthLoading, navigate]);
@@ -128,7 +133,7 @@ const AuthPage = () => {
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: FRONTEND_PUBLIC_URL + '/dashboard',
+                    redirectTo: FRONTEND_PUBLIC_URL + '/onboarding',
                 },
             });
             if (error) throw error;

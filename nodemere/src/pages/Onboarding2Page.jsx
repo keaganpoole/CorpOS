@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 import {
   ArrowRight,
   Building2,
@@ -70,6 +72,8 @@ const fieldClass =
 
 const smallFieldClass =
   'w-full rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-neutral-100 placeholder:text-neutral-600 focus:outline-none focus:border-neutral-700 transition-all [color-scheme:dark]';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const Field = ({ label, hint, children }) => (
   <div className="space-y-2">
@@ -147,9 +151,11 @@ const DayRow = ({ day, hours, onChange }) => (
 
 const Onboarding2Page = () => {
   const navigate = useNavigate();
+  const { session, refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [complete, setComplete] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [form, setForm] = useState({
     businessName: '',
     industry: '',
@@ -193,18 +199,54 @@ const Onboarding2Page = () => {
     return true;
   }, [form, step]);
 
-  const handleNext = () => {
+  const buildOnboardingPayload = () => ({
+    business_name: form.businessName.trim(),
+    industry: form.industry,
+    sub_industry: null,
+    business_email: form.email.trim() || null,
+    business_phone: form.phone.trim() || null,
+    business_street: null,
+    business_city: form.city.trim() || null,
+    business_state: form.state.trim() || null,
+    business_zip: null,
+    business_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
+    about_company: [form.about.trim(), form.services.trim() ? `Services:\n${form.services.trim()}` : '']
+      .filter(Boolean)
+      .join('\n\n'),
+    business_hours: form.hours,
+    appointment_settings: {
+      duration_minutes: form.appointmentDuration,
+      buffer_minutes: form.appointmentBuffer,
+    },
+  });
+
+  const handleNext = async () => {
     if (!canContinue && step < steps.length - 1) return;
+    setSubmitError('');
     if (step < steps.length - 1) {
       setStep((prev) => prev + 1);
       return;
     }
+
+    if (!session?.access_token) {
+      setSubmitError('Your session expired. Please sign in again to finish setup.');
+      return;
+    }
+
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      await axios.post(`${API_BASE_URL}/users/me/onboarding`, buildOnboardingPayload(), {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       localStorage.setItem('sonar-onboarding2-draft', JSON.stringify(form));
-      setIsSubmitting(false);
+      await refreshProfile?.();
       setComplete(true);
-    }, 1800);
+    } catch (error) {
+      console.error('Failed to save onboarding:', error);
+      setSubmitError(error.response?.data?.detail || 'Could not save onboarding. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleBack = () => {
@@ -520,13 +562,19 @@ const Onboarding2Page = () => {
                 </motion.div>
               </AnimatePresence>
             )}
+
+            {submitError ? (
+              <div className="mt-6 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+                {submitError}
+              </div>
+            ) : null}
           </div>
         </main>
 
         <footer className="flex flex-col items-center justify-between border-t border-neutral-900/60 py-8 text-xs text-neutral-500 sm:flex-row">
           <div className="mb-2 flex items-center space-x-1.5 sm:mb-0">
             <ShieldCheck className="h-3.5 w-3.5 text-neutral-600" />
-            <span>Workspace draft is saved locally for now</span>
+            <span>Workspace setup saves to your Nodemere account</span>
           </div>
           <div>
             <span>Sonar Setup · {new Date().getFullYear()}</span>

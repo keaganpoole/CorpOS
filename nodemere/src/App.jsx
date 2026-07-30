@@ -7,7 +7,6 @@ import { Toaster } from 'react-hot-toast';
 import HomePage from './pages/HomePage';
 import PricingPage from './pages/PricingPage';
 import AuthPage from './pages/AuthPage';
-import OnboardingPage from './pages/OnboardingPage';
 import Onboarding2Page from './pages/Onboarding2Page';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -51,7 +50,7 @@ function OnboardingGate() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <OnboardingPage />;
+  return <Onboarding2Page />;
 }
 
 
@@ -79,7 +78,7 @@ function AppContent() {
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/onboarding" element={<OnboardingGate />} />
-        <Route path="/onboarding2" element={<Onboarding2Page />} />
+        <Route path="/onboarding2" element={<Navigate to="/onboarding" replace />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/verify/:token" element={<VerificationPage />} />
