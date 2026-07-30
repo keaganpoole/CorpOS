@@ -74,13 +74,13 @@ const FEATURE_ITEMS = [
     copy: 'Handle the full appointment flow during the call, from new bookings to changes and cancellations.',
   },
   {
-    icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
-    colorClass: 'bg-blue-500',
-    glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    accentColor: '#f472b6',
-    title: 'Staff Matching',
-    copy: 'Intelligently match callers to the right service, staff member, or appointment type based on what they need.',
+  icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
+  colorClass: 'bg-blue-500',
+  glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
+  hoverTextClass: 'group-hover:text-pink-400',
+  accentColor: '#f472b6',
+  title: 'Staff Matching',
+  copy: 'Match every customer with the staff member who best fits their needs while checking availability in real time.'
   },
   {
     icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-amber-300" />,
@@ -335,7 +335,7 @@ function MonitoringHeadline({ playKey }) {
           style={{ animation: 'monitoring-rec-dot-sequence 1.8s ease-in-out forwards' }}
         />
         <h2
-          className="monitoring-merged-text relative inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.1rem] xl:text-[5.4rem]"
+          className="monitoring-merged-text relative inline-block bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-bold leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl lg:text-[5.1rem] xl:text-[5.4rem]"
           style={{
             animation: 'monitoring-rec-text-sequence 1.8s ease-in-out forwards',
             opacity: 0,
@@ -649,7 +649,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
 
           <div className="relative z-10 mx-auto w-full max-w-[1300px] px-6 text-center md:px-10 lg:px-12">
             <div className="mx-auto max-w-[1100px]">
-              <h2 className={`homepage-copy-reveal bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-4xl font-black leading-[0.95] tracking-[-0.06em] text-transparent md:text-7xl lg:text-[6.2rem] ${copyVisible ? 'is-visible' : ''}`}>
+              <h2 className={`homepage-copy-reveal bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-4xl font-bold leading-[0.95] tracking-[-0.06em] text-transparent md:text-7xl lg:text-[6.2rem] ${copyVisible ? 'is-visible' : ''}`}>
                 One. Stunning. CRM.
               </h2>
               <div className={`homepage-copy-reveal homepage-copy-reveal--delayed mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl ${copyVisible ? 'is-visible' : ''}`}>
@@ -828,7 +828,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   <div className="min-h-[10rem]" />
                 )
               ) : isCrmVariant ? (
-                <h2 className={`homepage-copy-reveal mx-auto max-w-[10ch] text-balance pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-white sm:max-w-[12ch] md:text-7xl lg:max-w-none lg:text-[5.1rem] xl:text-[5.4rem] ${copyVisible ? 'is-visible' : ''}`}>
+                <h2 className={`homepage-copy-reveal mx-auto max-w-[10ch] text-balance pb-2 text-5xl font-bold leading-[0.98] tracking-[-0.05em] text-white sm:max-w-[12ch] md:text-7xl lg:max-w-none lg:text-[5.1rem] xl:text-[5.4rem] ${copyVisible ? 'is-visible' : ''}`}>
                   <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent">
                     One.
                   </span>
@@ -840,7 +840,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   </span>
                 </h2>
               ) : (
-                <h2 className={`homepage-copy-reveal bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl ${copyVisible ? 'is-visible' : ''} ${isCrmVariant ? 'mx-auto max-w-[10ch] text-balance sm:max-w-[12ch] lg:max-w-none lg:text-[5.1rem] xl:text-[5.4rem]' : 'lg:text-[5.8rem]'}`}>
+                <h2 className={`homepage-copy-reveal bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-5xl font-bold leading-[0.98] tracking-[-0.05em] text-transparent md:text-7xl ${copyVisible ? 'is-visible' : ''} ${isCrmVariant ? 'mx-auto max-w-[10ch] text-balance sm:max-w-[12ch] lg:max-w-none lg:text-[5.1rem] xl:text-[5.4rem]' : 'lg:text-[5.8rem]'}`}>
                   {titleLines.map((line, index) => (
                     <React.Fragment key={line}>
                       {line}
@@ -923,7 +923,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 visibility: isMessageReset || isCrmMessageReset ? 'visible' : 'hidden',
               }}
             >
-              <div className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-center text-4xl font-black tracking-[-0.04em] text-transparent md:text-7xl">
+              <div className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-center text-4xl font-bold tracking-[-0.04em] text-transparent md:text-7xl">
                 You get the idea.
               </div>
             </div>
@@ -968,7 +968,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               }}
             >
               <div className="text-center lg:text-left">
-                <h2 className={`homepage-copy-reveal pb-1 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-white md:text-7xl lg:text-[4rem] lg:pb-2 ${copyVisible ? 'is-visible' : ''}`}>
+                <h2 className={`homepage-copy-reveal pb-1 text-5xl font-bold leading-[0.98] tracking-[-0.05em] text-white md:text-7xl lg:text-[4rem] lg:pb-2 ${copyVisible ? 'is-visible' : ''}`}>
                   {isScenariosVariant ? (
                     <>
                       Scenario
@@ -989,7 +989,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   {isScenariosVariant ? (
                     <>Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and <GradientWord>follow-ups</GradientWord>.</>
                   ) : (
-                    <>Turn conversations into booked appointments. Your AI receptionist answers every call instantly, checks real-time availability, books, reschedules, and confirms appointments while handling multiple conversations at once. No hold times, no missed <GradientWord>opportunities</GradientWord>, no smoke breaks — just a calendar that fills itself 24/7.</>
+                    <>Turn conversations into booked appointments. Your AI receptionist answers instantly, checks real-time staff availability, books and reschedules appointments, and more. No hold times, no missed opportunities, just a calendar that keeps filling itself.</>
                   )}
                 </div>
               </div>
@@ -1275,9 +1275,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
 
   return (
     <div className="relative flex h-full w-full items-center">
-      <div className={`relative isolate w-full overflow-hidden border border-white/5 bg-[#111113] shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] ${isCompact ? 'rounded-[22px] p-3 sm:p-4 md:p-5' : 'rounded-[28px] p-10'}`}>
-        <div className="pointer-events-none absolute left-1/2 top-[-220px] -z-10 h-[420px] w-[560px] -translate-x-1/2 rounded-full opacity-45 blur-[95px]" style={{ background: 'var(--modalBloom)' }} />
-        <div className="pointer-events-none absolute left-1/2 top-[-180px] -z-10 h-[340px] w-[460px] -translate-x-1/2 rounded-full opacity-30 blur-[85px]" style={{ background: 'var(--modalBloomSecondary)' }} />
+      <div className={`relative isolate w-full overflow-hidden border border-white/[0.08] bg-[#0b0b0c]/95 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] ${isCompact ? 'rounded-[22px] p-3 sm:p-4 md:p-5' : 'rounded-[28px] p-10'}`}>
         <div className={`relative z-10 border-b border-white/5 text-left ${isCompact ? 'mb-3 pb-3 md:mb-4 md:pb-4' : 'mb-6 pb-6'}`}>
           <span className={`flex items-center space-x-2 font-bold tracking-tight text-white ${isMobile ? 'text-[1rem]' : isCompact ? 'text-[1.25rem]' : 'text-[2rem]'}`}>
             <CalendarIcon className="text-zinc-300" size={22} />
@@ -1391,3 +1389,5 @@ function RightCalendarGrid({ hasAnimatedDots }) {
 }
 
 export default CalendarShowcase;
+
+

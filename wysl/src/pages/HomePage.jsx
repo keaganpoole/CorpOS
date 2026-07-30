@@ -358,11 +358,13 @@ const StackedHeroShowcase = ({ sectionRef }) => {
         >
           <div className="relative z-10 mx-auto w-full max-w-[1300px] text-center md:px-10 lg:px-12">
             <div className="mx-auto max-w-[1100px]">
-              <h2 className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text pb-2 text-4xl font-black leading-[0.95] tracking-[-0.06em] text-transparent md:text-7xl lg:text-[6.2rem]">
-                Welcome to the future of the front desk
+              <h2 className="pb-2 text-4xl font-semibold leading-[0.95] tracking-[-0.06em] md:text-7xl lg:text-[6.2rem]">
+                <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent">Welcome to the </span>
+                <span className="inline-block bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text pr-[0.04em] text-transparent [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">future</span>
+                <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent"> of the front desk</span>
               </h2>
               <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
-                Revolutionize your front desk by deploying an AI Receptionist that makes and receives calls, books appointments, processes payments, manages your CRM, and handles customers 24/7. Handle multiple conversations simultaneously with incredibly natural, human-like interactions that deliver a level of speed, availability, and consistency traditional staffing simply can't match—all at a fraction of the cost.
+                Deploy the world's most advanced AI receptionists and transform your front desk into a 24/7 operation that answers and places calls, books appointments, processes payments, manages your CRM, and handles every customer through astonishingly natural conversations with a level of speed, consistency, and availability human receptionists simply cannot match.
               </div>
             </div>
           </div>
@@ -418,7 +420,7 @@ const NumberOptionsShowcase = () => {
                 Keep Your Number
               </h2>
               <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
-                Keep your existing business number and route it into CorpOS. Your customers keep calling the same line, while CorpOS answers on the other end and handles the conversation for you.
+                Keep your existing business number and route it into Nodemere. Your customers keep calling the same line, while Nodemere answers on the other end and handles the conversation for you.
               </div>
             </div>
 
@@ -447,7 +449,7 @@ const NumberOptionsShowcase = () => {
                 Choose New Number
               </h2>
               <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
-                If you want a clean setup, claim a new number directly in CorpOS. It becomes your dedicated business line for calls handled by the receptionist from day one.
+                If you want a clean setup, claim a new number directly in Nodemere. It becomes your dedicated business line for calls handled by the receptionist from day one.
               </div>
             </div>
           </div>
@@ -829,7 +831,7 @@ const HomePage = () => {
       </AnimatePresence>
       <div className={`header${!navOnHero ? ' is-visible' : ''}`}>
         <nav className="nav-content">
-          <img src={logoImage} alt="CorpOS" className="header-logo" />
+          <img src={logoImage} alt="Nodemere" className="header-logo" />
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6 ml-auto">
@@ -916,7 +918,7 @@ const HomePage = () => {
       </main>
       <footer className="bg-black text-gray-400 py-8 text-center">
         <div className="container mx-auto px-4">
-          <p className="text-sm">&copy; 2025 CorpOS. All rights reserved.</p>
+          <p className="text-sm">&copy; 2025 Nodemere. All rights reserved.</p>
           <p className="text-sm mt-2">
             <Link to="/privacy-policy" className="text-gray-400 hover:text-white underline">Privacy Policy</Link>
           </p>
