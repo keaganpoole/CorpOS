@@ -27,22 +27,23 @@ const KNOWLEDGE_TEMPLATES = {
     label: 'About Us',
     placeholder: `Who are you? Tell your story. Your AI receptionist uses this to answer questions about your business.
 
-EXAMPLE — paste this and customize:
+EXAMPLE:
 
-We're Hartley Roofing, a family-owned roofing company based right here in Worcester, Massachusetts. My dad started this business back in 2006 with nothing but a truck and a ladder, and we've been keeping roofs tight ever since.
+We're Hartley Roofing, a family-owned roofing company based in Portland, Maine. My dad started this business back in 2006 with nothing but a truck and a ladder, and we've been keeping roofs tight ever since.
 
-We specialize in residential roofing — asphalt shingles, metal roofing, flat roofs, and repairs. If it's got a roof, we can fix it or replace it. We also do gutter installation and siding because, honestly, if we're already up there, we might as well.
+We specialize in residential roofing: asphalt shingles, metal roofing, flat roofs, and repairs. We also do gutter installation and siding.
 
-We're licensed and insured (Massachusetts License #RA-12345), and every job comes with a 10-year workmanship warranty on top of whatever the manufacturer gives you. We're not happy until you are — that's not a slogan, that's how we actually operate.
+We're licensed and insured, and every job comes with a workmanship warranty on top of the manufacturer warranty.
 
-We serve Worcester County and most of central Mass — Worcester, Shrewsbury, Framingham, and everywhere in between. We don't do a lot of marketing because most of our work comes from referrals. Neighbors telling neighbors. That's the best kind of advertising.`,
+We proudly serve the Greater Portland area and much of southern Maine, including Portland, South Portland, Scarborough, Westbrook, Falmouth, Cape Elizabeth, Gorham, Windham, Cumberland, Yarmouth, Freeport, and surrounding communities.
+`,
   },
   services: {
     icon: Zap,
     label: 'Services & Pricing',
     placeholder: `List your services and what they cost. Keep it clear and specific so the receptionist can answer pricing questions accurately.
 
-EXAMPLE — paste this and customize:
+EXAMPLE:
 
 SERVICES WE OFFER:
 
@@ -81,7 +82,7 @@ WHAT'S INCLUDED IN EVERY JOB:
     label: 'Policies',
     placeholder: `Your rules and how you do business. This helps the receptionist set expectations with callers.
 
-EXAMPLE — paste this and customize:
+EXAMPLE:
 
 CANCELLATION POLICY:
 We understand things come up. You can cancel or reschedule any appointment up to 24 hours before with no charge. Same-day cancellations for estimate appointments are fine — no fee. But if we've already started a job, we'll charge for materials and labor completed so far.
@@ -108,7 +109,7 @@ We work with insurance companies regularly. If you have storm damage, we can do 
     label: 'FAQ',
     placeholder: `Common questions your callers ask. Write them as they'd be asked, with clear answers.
 
-EXAMPLE — paste this and customize:
+EXAMPLE:
 
 Q: Do you give free estimates?
 A: Yes, absolutely. Roof repairs and full replacements both come with free inspections and estimates. Just call and we'll schedule a time.
@@ -123,10 +124,10 @@ Q: Do you work with insurance?
 A: Yes. We're experienced with insurance claims for storm and hail damage. We'll document everything, provide the reports your adjuster needs, and work with them directly.
 
 Q: What areas do you serve?
-A: We serve all of Worcester County and most of central Massachusetts — Worcester, Shrewsbury, Grafton, Westborough, Framingham, Marlborough, and surrounding towns. If you're not sure, just call — we probably cover your area.
+A: We serve all of Cumberland County and most of Southern Maine
 
 Q: Are you licensed and insured?
-A: Yes. We're fully licensed in Massachusetts (License #RA-12345) and carry both general liability and workers' compensation insurance. We're happy to provide proof of insurance.
+A: Yes. We're fully licensed in Maine (License #RA-12345) and carry both general liability and workers' compensation insurance. We're happy to provide proof of insurance.
 
 Q: Do you offer financing?
 A: Not currently, but we offer flexible payment plans on larger jobs. We can split payments into 3 installments across the project timeline.

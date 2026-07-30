@@ -32,17 +32,7 @@ export const AuthProvider = ({ children }) => {
             onboarded: false,
         };
 
-        const { data: createdProfile, error: upsertError } = await supabase
-            .from('users')
-            .upsert(fallbackProfile, { onConflict: 'id' })
-            .select()
-            .single();
-
-        if (upsertError) {
-            throw upsertError;
-        }
-
-        return createdProfile || fallbackProfile;
+        return fallbackProfile;
     }, []);
 
     useEffect(() => {
@@ -136,9 +126,16 @@ export const AuthProvider = ({ children }) => {
                 .select('*')
                 .eq('id', session.user.id)
                 .maybeSingle();
-            setProfile(data || null);
+            const nextProfile = data || {
+                id: session.user.id,
+                email: session.user.email,
+                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || null,
+                phone: session.user.user_metadata?.phone || null,
+                onboarded: true,
+            };
+            setProfile(nextProfile);
             setIsProfileLoaded(true);
-            return data || null;
+            return nextProfile;
         },
         login: async (email, password) => {
             const { error } = await supabase.auth.signInWithPassword({ email, password });

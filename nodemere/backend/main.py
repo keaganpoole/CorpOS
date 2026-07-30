@@ -2641,8 +2641,11 @@ class OnboardingRequest(BaseModel):
     business_hours: Optional[dict] = None
     appointment_settings: Optional[dict] = None
     about_company: Optional[str] = None
+    policies: Optional[str] = None
+    faq: Optional[str] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
+    services: Optional[list[dict]] = None
 
 class BusinessForwardingUpdateRequest(BaseModel):
     agent_id: Optional[str] = None
@@ -9808,6 +9811,8 @@ async def complete_onboarding(
             "state": onboarding_data.business_state,
             "zip": onboarding_data.business_zip,
             "about_us": onboarding_data.about_company or "",
+            "policies": onboarding_data.policies or "",
+            "faq": onboarding_data.faq or "",
             "business_hours": json.dumps(onboarding_data.business_hours or {}),
             "business_timezone": onboarding_data.business_timezone or "America/New_York",
             "industry": {
@@ -9831,9 +9836,48 @@ async def complete_onboarding(
         else:
             business_response = supabase.table('businesses').insert(business_payload).execute()
 
+        business = business_response.data[0] if business_response.data else None
+        business_id = business.get("id") if business else (existing_business or {}).get("id")
+
+        if business_id and onboarding_data.services:
+            service_rows = []
+            for index, service in enumerate(onboarding_data.services):
+                service_name = str(service.get("name") or "").strip()
+                if not service_name:
+                    continue
+
+                price_type = service.get("price_type") or "fixed"
+                price_min = service.get("price_min")
+                price_max = service.get("price_max")
+
+                if price_type in ("quote", "free"):
+                    price_min = None
+                    price_max = None
+                elif price_type != "range":
+                    price_max = None
+
+                service_rows.append({
+                    "id": str(uuid4()),
+                    "business_id": business_id,
+                    "user_id": current_user_id,
+                    "name": service_name,
+                    "description": service.get("description") or "",
+                    "category": str(service.get("category") or "General").strip() or "General",
+                    "unit": service.get("unit") or "",
+                    "price_type": price_type,
+                    "price_min": price_min,
+                    "price_max": price_max,
+                    "is_active": service.get("is_active") is not False,
+                    "sort_order": index,
+                })
+
+            if service_rows:
+                supabase.table("services").delete().eq("business_id", business_id).eq("user_id", current_user_id).execute()
+                supabase.table("services").insert(service_rows).execute()
+
         return {
             "onboarded": True,
-            "business": business_response.data[0] if business_response.data else None,
+            "business": business,
         }
     except Exception as e:
         logging.error(f"Failed to complete onboarding for user {current_user_id}: {e}", exc_info=True)
