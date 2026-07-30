@@ -1878,7 +1878,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   if (loading && loadingFallback) return loadingFallback;
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${hideIntro && hideToolbar ? 'h-full' : ''}`}>
       {!hideIntro && <div className="mb-4">
         <p className="text-[12px] leading-relaxed text-zinc-500">
           Add the real people your receptionist can book appointments for. Each staff record carries its own availability window so scheduling decisions are tied to actual staff hours, not just business hours.
@@ -1891,7 +1891,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className={`space-y-4 ${hideIntro && hideToolbar ? 'h-full' : ''}`}>
         {!hideToolbar && <div className="flex items-center justify-between rounded-[24px] border border-white/[0.05] bg-zinc-950/30 px-4 py-3">
           <div className="flex items-center gap-2.5">
             <Users size={14} className="settings-icon" />
@@ -1916,10 +1916,10 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
             <CubePreloader />
           </div>
         ) : staffMembers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-[28px] border border-white/[0.04] bg-gradient-to-b from-zinc-950/20 to-transparent py-16 opacity-50">
-            <Users size={36} className="mb-3 text-zinc-800" />
-            <p className="text-[11px] font-black uppercase tracking-[0.4em] text-zinc-800">No staff yet</p>
-            <p className="mt-1 text-[10px] text-zinc-900">Add your first bookable staff member</p>
+          <div className={`flex flex-col items-center justify-center pb-20 text-center ${hideIntro && hideToolbar ? 'min-h-full' : 'min-h-[420px]'}`}>
+            <Users size={30} strokeWidth={1.7} className="mb-4 text-zinc-500" />
+            <p className="text-[28px] font-semibold leading-none tracking-tight text-white">No staff on the schedule</p>
+            <p className="text-[13px] leading-none text-zinc-500 -translate-y-1.5">Add a staff member your receptionist can book with.</p>
           </div>
         ) : (
           <div className={cardGridClassName || 'grid grid-cols-1 gap-4 xl:grid-cols-2'}>
@@ -2961,12 +2961,7 @@ const SettingsPage = () => {
     <div className="settings-page-scope h-full flex flex-col bg-[#020202] text-zinc-400 font-sans selection:bg-indigo-500/20 overflow-hidden">
 
       {/* ─── Header ─────────────────────────────────────────────────────── */}
-      <header className="shrink-0 flex items-center justify-between border-b border-white/[0.02] bg-gradient-to-b from-zinc-950/20 to-transparent px-10 py-8">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">Settings</h2>
-          <p className="text-[13px] text-zinc-500 m-0">Account &amp; business configuration</p>
-        </div>
-
+      <header className="shrink-0 flex items-center justify-end px-8 pb-2 pt-8">
         <button
           onClick={handleSave}
           disabled={saving}
@@ -3008,7 +3003,7 @@ const SettingsPage = () => {
       )}
 
       {/* ─── Content ────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-hidden px-8 py-6">
+      <div className="flex-1 overflow-hidden px-8 pb-6 pt-3">
         <div className="mx-auto grid h-full max-w-6xl grid-cols-[260px_minmax(0,1fr)] gap-5">
           <aside className="rounded-[28px] border border-white/[0.05] bg-zinc-950/30 p-3">
             <nav className="space-y-1">

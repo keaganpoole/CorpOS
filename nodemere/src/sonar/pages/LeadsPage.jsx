@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useLeads } from '../hooks/useLeads';
 import LeadsTable from './LeadsTable';
 
-const PeoplePage = () => {
+const PeoplePage = ({ hideTitle = false, onToolbarMetaChange = null }) => {
   const {
     leads, allLeads, loading, error,
     justAddedLeadIds,
@@ -15,6 +15,10 @@ const PeoplePage = () => {
 
   const [creating, setCreating] = useState(false);
   const [tableSchema, setTableSchema] = useState(null);
+
+  useEffect(() => {
+    onToolbarMetaChange?.({ count: allLeads.length, loading });
+  }, [allLeads.length, loading, onToolbarMetaChange]);
 
   const handleInlineCreate = async () => {
     try {
@@ -69,6 +73,7 @@ const PeoplePage = () => {
         onDeleteMany={handleDeleteMany}
         onUpdateLead={handleInlineUpdate}
         onSchemaChange={setTableSchema}
+        hideTitle={hideTitle}
       />
     </div>
   );

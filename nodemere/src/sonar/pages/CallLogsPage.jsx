@@ -10,7 +10,6 @@ import {
   Clock,
   Frown,
   Meh,
-  Phone,
   Play,
   Pause,
   RefreshCw,
@@ -30,9 +29,39 @@ import CubePreloader from '../components/CubePreloader';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const AVATAR_BASE = 'https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges';
-const STATUS_OPTIONS = ['All statuses'];
-const CATEGORY_OPTIONS = ['All categories'];
-const SENTIMENT_OPTIONS = ['All sentiment', 'Positive', 'Neutral', 'Negative'];
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+const timeFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
+const weekdayTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  weekday: 'long',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
+const monthDayTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  month: 'long',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
+const monthDayYearTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
 
 const STATUS_STYLES = {
   completed: {
@@ -89,15 +118,38 @@ function formatDuration(seconds) {
   return `${minutes}:${String(remaining).padStart(2, '0')}`;
 }
 
-function formatCallTime(value) {
+function startOfLocalDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatCallTime(value, now = new Date()) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Unknown time';
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+
+  const safeNow = now instanceof Date && !Number.isNaN(now.getTime()) ? now : new Date();
+  const diffMs = safeNow.getTime() - date.getTime();
+  if (diffMs < MINUTE_MS) return 'Just now';
+
+  if (diffMs < HOUR_MS) {
+    const minutes = Math.floor(diffMs / MINUTE_MS);
+    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  }
+
+  if (diffMs < 12 * HOUR_MS) {
+    const hours = Math.floor(diffMs / HOUR_MS);
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  }
+
+  const today = startOfLocalDay(safeNow);
+  const callDay = startOfLocalDay(date);
+  const dayDiff = Math.round((today.getTime() - callDay.getTime()) / DAY_MS);
+  const timeText = timeFormatter.format(date);
+
+  if (dayDiff === 0) return `Today at ${timeText}`;
+  if (dayDiff === 1) return `Yesterday at ${timeText}`;
+  if (dayDiff > 1 && dayDiff < 7) return weekdayTimeFormatter.format(date).replace(',', ' at');
+  if (date.getFullYear() === safeNow.getFullYear()) return monthDayTimeFormatter.format(date).replace(',', ' at');
+  return monthDayYearTimeFormatter.format(date).replace(/, (\d{4}),/, ', $1 at');
 }
 
 function normalized(value) {
@@ -116,10 +168,10 @@ function titleize(value, fallback = 'General') {
 function sentimentFromCall(call) {
   const success = normalized(call.call_successful);
   const status = normalized(call.status);
-  if (['success', 'successful', 'completed', 'done'].includes(success) || ['completed', 'done', 'success'].includes(status)) {
+  if (['true', 'yes', 'success', 'successful', 'completed', 'done'].includes(success) || ['completed', 'done', 'success', 'successful'].includes(status)) {
     return 'Positive';
   }
-  if (['failure', 'failed', 'unsuccessful'].includes(success) || ['failed', 'error'].includes(status)) {
+  if (['false', 'no', 'failure', 'failed', 'unsuccessful'].includes(success) || ['failed', 'failure', 'error', 'unsuccessful'].includes(status)) {
     return 'Negative';
   }
   return 'Neutral';
@@ -206,25 +258,6 @@ export function normalizeCall(row) {
   };
 }
 
-function FilterSelect({ value, onChange, options, label }) {
-  return (
-    <label className="min-w-0 flex-1">
-      <span className="sr-only">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full rounded-lg bg-white/[0.045] px-3 text-[12px] font-medium text-zinc-300 outline-none transition [color-scheme:dark] hover:bg-white/[0.06] focus:bg-white/[0.07]"
-      >
-        {options.map((option) => (
-          <option key={option} value={option} className="bg-zinc-950 text-zinc-100">
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function SentimentIcon({ sentiment, compact = false }) {
   const config = SENTIMENT_STYLES[normalized(sentiment)] || SENTIMENT_STYLES.neutral;
   const Icon = config.icon;
@@ -235,7 +268,7 @@ function SentimentIcon({ sentiment, compact = false }) {
   );
 }
 
-function DirectionIcon({ direction, compact = false, withLabel = false }) {
+function DirectionIcon({ direction, compact = false, withLabel = false, gradient = false }) {
   const normalizedDirection = normalized(direction);
   const isOutbound = normalizedDirection === 'outbound';
   const isInbound = normalizedDirection === 'inbound';
@@ -250,7 +283,7 @@ function DirectionIcon({ direction, compact = false, withLabel = false }) {
   if (!withLabel) {
     return (
       <span className={cn('inline-flex items-center justify-center shrink-0 align-middle', className)}>
-        <Icon size={compact ? 15 : 18} />
+        <Icon size={compact ? 15 : 18} style={gradient ? { stroke: 'url(#callLogsArrowGradient)' } : undefined} />
       </span>
     );
   }
@@ -258,7 +291,7 @@ function DirectionIcon({ direction, compact = false, withLabel = false }) {
   return (
     <span className="inline-flex items-center gap-2 align-middle">
       <span className={cn('inline-flex items-center justify-center shrink-0', className)}>
-        <Icon size={15} />
+        <Icon size={15} style={gradient ? { stroke: 'url(#callLogsArrowGradient)' } : undefined} />
       </span>
       <span className="text-[12px] font-medium text-zinc-400">{label}</span>
     </span>
@@ -317,12 +350,12 @@ function DeleteConfirmModal({ count, onCancel, onConfirm, deleting }) {
 function CallLogsLoader() {
   return (
     <div className="flex min-h-[320px] items-center justify-center px-4 py-6">
-      <CubePreloader size={20} />
+      <CubePreloader size={18} />
     </div>
   );
 }
 
-function CallCard({ call, selected, checked, onClick, onToggleSelect, onToggleFavorite, onDelete }) {
+function CallCard({ call, selected, checked, onClick, onToggleSelect, onToggleFavorite, onDelete, now }) {
   return (
     <div
       onClick={onClick}
@@ -335,7 +368,7 @@ function CallCard({ call, selected, checked, onClick, onToggleSelect, onToggleFa
       role="button"
       tabIndex={0}
       className={cn(
-        'group relative w-full rounded-2xl py-4 pl-11 pr-11 text-left transition duration-200',
+        'group relative w-full rounded-2xl py-3 pl-11 pr-11 text-left transition duration-200',
         selected
           ? 'bg-transparent'
           : 'bg-transparent hover:bg-white/[0.025]'
@@ -408,29 +441,25 @@ function CallCard({ call, selected, checked, onClick, onToggleSelect, onToggleFa
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="truncate text-[15px] font-bold text-white">{call.name}</h3>
-            <DirectionIcon direction={call.direction} compact />
           </div>
           <div className="mt-1 flex items-center gap-1.5 text-[12px] text-zinc-500">
-            <Phone size={12} />
-            <span className="font-medium" style={brandPhoneTextStyle}>{call.phone}</span>
+            <DirectionIcon direction={call.direction} compact gradient />
+            <span className="font-medium text-zinc-400">{call.phone}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-white/[0.045] px-2 py-1 text-[11px] text-zinc-300">{call.purpose}</span>
           <SentimentIcon sentiment={call.sentiment} compact />
         </div>
       </div>
 
-      <p className="mt-4 line-clamp-2 text-[13px] leading-5 text-zinc-400">{call.summary}</p>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
         <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.03] px-2 py-1">
           <Timer size={11} />
           {formatDuration(call.duration)}
         </span>
         <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.03] px-2 py-1">
           <Clock size={11} />
-          {formatCallTime(call.time)}
+          {formatCallTime(call.time, now)}
         </span>
       </div>
     </div>
@@ -494,21 +523,14 @@ function TranscriptBubble({ entry, receptionistAvatar, receptionistName, custome
   );
 }
 
-const brandPhoneTextStyle = {
-  background: 'linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd))',
-  WebkitBackgroundClip: 'text',
-  backgroundClip: 'text',
-  color: 'transparent',
-};
-
-function AudioStrip({ call }) {
+function AudioStrip({ call, now }) {
   const hasAudio = Boolean(call.audioUrl);
   const audioPlayer = useAudioPlayer();
   const track = {
     id: call.id,
     src: call.audioUrl,
     title: call.name || 'Call recording',
-    subtitle: `${call.phone} - ${formatCallTime(call.time)}`,
+    subtitle: `${call.phone} - ${formatCallTime(call.time, now)}`,
     duration: call.duration || 0,
   };
   const isActiveTrack = audioPlayer.track?.id === call.id && audioPlayer.track?.src === call.audioUrl;
@@ -592,13 +614,16 @@ export default function CallLogsPage() {
     hasMore,
   } = useCallLogs();
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState(CATEGORY_OPTIONS[0]);
-  const [statusFilter, setStatusFilter] = useState(STATUS_OPTIONS[0]);
-  const [sentimentFilter, setSentimentFilter] = useState(SENTIMENT_OPTIONS[0]);
+  const [timeNow, setTimeNow] = useState(() => new Date());
   const [deleteTargetIds, setDeleteTargetIds] = useState([]);
   const [deleting, setDeleting] = useState(false);
   const listScrollRef = useRef(null);
   const searchReadyRef = useRef(false);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setTimeNow(new Date()), 30000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (!searchReadyRef.current) {
@@ -703,46 +728,34 @@ export default function CallLogsPage() {
     }
   };
 
-  const categoryOptions = useMemo(() => (
-    [CATEGORY_OPTIONS[0], ...Array.from(new Set(calls.map((call) => call.purpose).filter(Boolean))).sort()]
-  ), [calls]);
-
-  const statusOptions = useMemo(() => (
-    [STATUS_OPTIONS[0], ...Array.from(new Set(calls.map((call) => call.status).filter(Boolean))).sort()]
-  ), [calls]);
-
   const filteredCalls = useMemo(() => {
     const query = normalized(searchQuery);
     return calls.filter((call) => {
       const matchesSearch = !query || [call.name, call.phone, call.summary, call.purpose, call.status, call.receptionist, call.raw?.notes, call.raw?.agent_name]
         .some((value) => normalized(value).includes(query));
-      const matchesCategory = categoryFilter === CATEGORY_OPTIONS[0] || call.purpose === categoryFilter;
-      const matchesStatus = statusFilter === STATUS_OPTIONS[0] || call.status === statusFilter;
-      const matchesSentiment = sentimentFilter === SENTIMENT_OPTIONS[0] || call.sentiment === sentimentFilter;
-      return matchesSearch && matchesCategory && matchesStatus && matchesSentiment;
+      return matchesSearch;
     }).sort((a, b) => {
       if (a.isFavorited !== b.isFavorited) return a.isFavorited ? -1 : 1;
       return new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime();
     });
-  }, [calls, categoryFilter, searchQuery, sentimentFilter, statusFilter]);
+  }, [calls, searchQuery]);
 
   const selectedCall = filteredCalls.find((call) => call.id === selectedId) || filteredCalls[0] || null;
   const selectedDeleteCount = selectedForDelete.length;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#020202] text-zinc-100">
-      <div className="shrink-0 border-b border-white/[0.05] px-10 py-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">Call Logs</h2>
-            <p className="text-[13px] text-zinc-500 m-0">{loading ? 'Loading calls' : `${calls.length}${hasMore ? '+' : ''} recent calls`}</p>
-          </div>
-        </div>
-      </div>
-
+      <svg width="0" height="0" className="pointer-events-none absolute" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="callLogsArrowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--brandGradientStart)" />
+            <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+          </linearGradient>
+        </defs>
+      </svg>
       <div className="grid flex-1 min-h-0 grid-cols-1 xl:grid-cols-[430px_minmax(0,1fr)]">
         <aside className="relative flex min-h-0 flex-col border-b border-white/[0.05] bg-white/[0.02] after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/[0.05] xl:border-b-0 xl:border-r xl:border-white/[0.05]">
-          <div className="shrink-0 space-y-3 bg-transparent p-4">
+          <div className="shrink-0 space-y-3 bg-transparent px-4 pb-3 pt-8">
             <label className="relative block">
               <span className="sr-only">Search call logs</span>
               <div className="flex gap-2">
@@ -757,7 +770,10 @@ export default function CallLogsPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => loadCallLogs({ force: true, searchQuery })}
+                  onClick={() => {
+                    setSelectedForDelete([]);
+                    loadCallLogs({ force: true, searchQuery });
+                  }}
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/[0.045] text-zinc-500 transition hover:bg-white/[0.06] hover:text-white active:scale-95"
                   aria-label="Refresh call logs"
                   title="Refresh call logs"
@@ -766,11 +782,6 @@ export default function CallLogsPage() {
                 </button>
               </div>
             </label>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-              <FilterSelect label="Category" value={categoryFilter} onChange={setCategoryFilter} options={categoryOptions} />
-              <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
-              <FilterSelect label="Sentiment" value={sentimentFilter} onChange={setSentimentFilter} options={SENTIMENT_OPTIONS} />
-            </div>
             {selectedDeleteCount > 0 && (
               <div className="flex items-center justify-between rounded-xl bg-white/[0.035] px-3 py-2">
                 <span className="text-[12px] font-medium text-zinc-400">{selectedDeleteCount} selected</span>
@@ -786,7 +797,7 @@ export default function CallLogsPage() {
             )}
           </div>
 
-          <div ref={listScrollRef} onScroll={handleListScroll} className="custom-scrollbar min-h-[320px] flex-1 overflow-y-auto px-3 py-2">
+          <div ref={listScrollRef} onScroll={handleListScroll} className="custom-scrollbar min-h-[320px] flex-1 overflow-y-auto px-3 pb-2 pt-2">
             {loading && (
               <CallLogsLoader />
             )}
@@ -811,6 +822,7 @@ export default function CallLogsPage() {
                   onToggleSelect={toggleSelectCall}
                   onToggleFavorite={handleToggleFavorite}
                   onDelete={(callId) => openDeleteModal([callId])}
+                  now={timeNow}
                 />
               </div>
             ))}
@@ -831,13 +843,13 @@ export default function CallLogsPage() {
         <section className="relative flex min-h-0 flex-col after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/[0.05]">
           {selectedCall ? (
             <>
-          <div className="shrink-0 p-5 sm:p-6">
+          <div className="shrink-0 px-5 pb-5 pt-8 sm:px-6 sm:pb-6 sm:pt-8">
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-[24px] font-black leading-none text-white">{selectedCall.name}</h3>
-                    <DirectionIcon direction={selectedCall.direction} withLabel />
+                    <DirectionIcon direction={selectedCall.direction} compact gradient />
                     <span className="inline-flex items-center gap-1.5">
                       <SentimentIcon sentiment={selectedCall.sentiment} compact />
                       <span className="rounded-full bg-white/[0.045] px-2 py-1 text-[11px] text-zinc-300">{selectedCall.purpose}</span>
@@ -845,12 +857,12 @@ export default function CallLogsPage() {
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-[12px] text-zinc-500">
                     <span className="inline-flex items-center gap-1.5">
-                      <Phone size={13} />
-                      <span className="font-medium" style={brandPhoneTextStyle}>{selectedCall.phone}</span>
+                      <DirectionIcon direction={selectedCall.direction} compact gradient />
+                      <span className="font-medium text-zinc-400">{selectedCall.phone}</span>
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <Clock size={13} />
-                      {formatCallTime(selectedCall.time)}
+                      {formatCallTime(selectedCall.time, timeNow)}
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <Timer size={13} />
@@ -859,7 +871,7 @@ export default function CallLogsPage() {
                   </div>
                 </div>
                 <div className="w-full lg:w-[340px]">
-                  <AudioStrip call={selectedCall} />
+                  <AudioStrip call={selectedCall} now={timeNow} />
                 </div>
               </div>
               <div className="w-full">

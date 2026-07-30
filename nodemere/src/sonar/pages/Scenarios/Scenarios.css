@@ -43,7 +43,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 32px 40px;
+  padding: 32px 40px 12px;
 }
 
 .scenario-list-actions {
@@ -95,7 +95,7 @@
 .scenario-list-content {
   flex: 1;
   overflow-y: auto;
-  padding: 40px;
+  padding: 20px 40px 40px;
 }
 
 .scenario-empty-state {
@@ -1442,9 +1442,9 @@
 /* Panel */
 .sb-selection-panel {
   position: absolute;
-  width: 440px;
-  height: 800px;
-  max-width: min(440px, calc(100vw - 24px));
+  width: 500px;
+  height: 860px;
+  max-width: min(500px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
   background: var(--sb-bg-panel);
   backdrop-filter: blur(30px) saturate(150%);
@@ -4685,13 +4685,14 @@
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  background: color-mix(in srgb, var(--brandGradientStart) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brandGradientStart) 25%, transparent);
+  background: linear-gradient(135deg, #22d3ee 0%, #2dd4bf 100%);
+  border: 1px solid rgba(45, 212, 191, 0.46);
   border-radius: 8px;
-  color: var(--brandGradientStart);
+  color: #031312;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 8px 24px rgba(45, 212, 191, 0.16);
   transition: all 0.2s;
   white-space: nowrap;
   max-width: 280px;
@@ -4699,14 +4700,21 @@
 }
 
 .sb-toolbar-run-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--brandGradientStart) 20%, transparent);
-  border-color: color-mix(in srgb, var(--brandGradientStart) 40%, transparent);
+  background: linear-gradient(135deg, #67e8f9 0%, #5eead4 100%);
+  border-color: rgba(94, 234, 212, 0.68);
+  box-shadow: 0 10px 30px rgba(45, 212, 191, 0.24);
 }
 
 .sb-toolbar-run-btn.running {
-  background: color-mix(in srgb, var(--brandGradientStart) 8%, transparent);
-  border-color: color-mix(in srgb, var(--brandGradientStart) 20%, transparent);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.62) 0%, rgba(45, 212, 191, 0.62) 100%);
+  border-color: rgba(45, 212, 191, 0.34);
+  color: rgba(3, 19, 18, 0.84);
   cursor: wait;
+}
+
+.sb-toolbar-run-btn svg {
+  color: currentColor;
+  stroke-width: 2.4;
 }
 
 .sb-toolbar-run-btn:disabled {
@@ -4777,7 +4785,7 @@
 .sb-notes-modal {
   width: min(300px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
-  background: rgba(18, 18, 22, 0.97);
+  background: linear-gradient(180deg, rgba(18, 18, 20, 0.98), rgba(10, 10, 12, 0.98));
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
@@ -4881,15 +4889,99 @@
 }
 
 .sb-schedule-day-btn.active {
-  background: color-mix(in srgb, var(--brandGradientStart) 15%, transparent);
-  border-color: color-mix(in srgb, var(--brandGradientStart) 30%, transparent);
-  color: var(--brandGradientStart);
+  background: var(--buttonBackground);
+  border-color: var(--buttonBackground);
+  color: var(--buttonText);
 }
 
 .sb-schedule-day-btn:hover:not(.active) {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.7);
+}
+
+.sb-schedule-frequency-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.sb-schedule-frequency-trigger {
+  width: 100%;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e4e4e7;
+  font-family: var(--sb-font-main);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.sb-schedule-frequency-trigger:hover,
+.sb-schedule-frequency-trigger.open {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.sb-schedule-frequency-trigger svg {
+  color: rgba(255, 255, 255, 0.42);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.sb-schedule-frequency-trigger.open svg {
+  color: rgba(255, 255, 255, 0.72);
+  transform: rotate(180deg);
+}
+
+.sb-schedule-frequency-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 8;
+  overflow: hidden;
+  padding: 4px 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #080808;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.48);
+}
+
+.sb-schedule-frequency-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: #a1a1aa;
+  font-family: var(--sb-font-main);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.sb-schedule-frequency-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.sb-schedule-frequency-option.active {
+  color: #ffffff;
 }
 
 .sb-schedule-modal-footer,
@@ -5012,7 +5104,7 @@
 }
 
 .sb-json-modal {
-  background: #18181b;
+  background: linear-gradient(180deg, rgba(18, 18, 20, 0.98), rgba(10, 10, 12, 0.98));
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   width: min(600px, calc(100vw - 24px));
@@ -5020,6 +5112,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
 }
 
 .sb-json-modal-header {

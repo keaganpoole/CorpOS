@@ -36,7 +36,7 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
     loadingRef.current = true;
     activeQueryRef.current = normalizedQuery;
     const offset = append && !queryChanged ? calls.length : 0;
-    setLoading(!append && calls.length === 0 && (initial || force || queryChanged || !hasLoadedRef.current));
+    setLoading(!append && (initial || force || queryChanged || !hasLoadedRef.current));
     setLoadingMore(append);
     setError('');
     try {

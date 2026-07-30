@@ -1195,7 +1195,7 @@ const RowHeightPopover = ({ value, onChange }) => {
   );
 };
 
-const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateInline, creating = false, onDeleteMany, totalCount, onUpdateAppointment, onSchemaChange, people = [], services = [], receptionists = [] }) => {
+const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateInline, creating = false, onDeleteMany, totalCount, onUpdateAppointment, onSchemaChange, people = [], services = [], receptionists = [], hideTitle = false }) => {
   const [viewSettings, setViewSettings] = useState(() => ({
     rowHeight: 3,
     sortRules: [],
@@ -1960,7 +1960,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
 
   const renderAppointmentsLoader = () => (
     <div className="appointments-loader absolute inset-0 z-30 flex items-center justify-center px-6">
-      <CubePreloader size={24} />
+      <CubePreloader size={22} />
     </div>
   );
 
@@ -2205,12 +2205,14 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full">
-      <div className="shrink-0 px-10 py-8 flex items-center gap-3">
+      <div className={`shrink-0 flex items-center gap-3 ${hideTitle ? 'px-6 pb-3 pt-8' : 'px-10 py-8'}`}>
         <div className="flex items-center gap-3">
-          <div>
-            <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">Appointments</h2>
-            <p className="text-[13px] text-zinc-500 mt-1 mb-0">{totalCount} Appointments</p>
-          </div>
+          {!hideTitle && (
+            <div>
+              <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">Appointments</h2>
+              <p className="text-[13px] text-zinc-500 mt-1 mb-0">{totalCount} Appointments</p>
+            </div>
+          )}
           <button onClick={() => setShowColorbarStudio(true)} className="group/colorbar relative ml-2 flex items-center gap-2 rounded-xl px-4 py-2 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 transition-all hover:text-white">
             <div className="absolute rounded-xl opacity-0 group-hover/colorbar:opacity-100 transition-opacity duration-300 pointer-events-none overflow-hidden" style={{ inset: '-0.7px' }}>
               <div className="absolute inset-0 animate-[colorbarFlow_3s_linear_infinite]" style={{ background: 'linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd), var(--brandGradientStart))', backgroundSize: '300% 100%' }} />

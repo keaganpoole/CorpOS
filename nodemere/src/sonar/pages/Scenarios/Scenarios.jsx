@@ -8,6 +8,7 @@ import {
   Plus,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Search,
   X,
   MessageSquare,
@@ -662,6 +663,65 @@ const getDefaultSchedule = () => {
     daysOfWeek: [],
   };
 };
+
+const SCHEDULE_FREQUENCY_OPTIONS = [
+  { value: 'once', label: 'Run Once' },
+  { value: 'hourly', label: 'Hourly' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
+function ScheduleFrequencyDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = SCHEDULE_FREQUENCY_OPTIONS.find((option) => option.value === value) || SCHEDULE_FREQUENCY_OPTIONS[0];
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handlePointerDown = (event) => {
+      if (ref.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [open]);
+
+  return (
+    <div className="sb-schedule-frequency-dropdown" ref={ref}>
+      <button
+        type="button"
+        className={`sb-schedule-frequency-trigger ${open ? 'open' : ''}`}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>{selected.label}</span>
+        <ChevronDown size={13} />
+      </button>
+      {open && (
+        <div className="sb-schedule-frequency-menu">
+          {SCHEDULE_FREQUENCY_OPTIONS.map((option) => {
+            const active = option.value === selected.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`sb-schedule-frequency-option ${active ? 'active' : ''}`}
+                onClick={() => {
+                  setOpen(false);
+                  if (!active) onChange(option.value);
+                }}
+              >
+                <span>{option.label}</span>
+                {active && <Check size={11} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const sbLabelStyle = { fontSize: 9, fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 4, display: 'block' };
 const sbInputStyle = { width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: '#e4e4e7', outline: 'none', boxSizing: 'border-box' };
@@ -4728,10 +4788,7 @@ export default function ScenariosPage() {
   const renderListView = () => (
     <div className="scenario-list-page">
       <div className="scenario-list-header">
-        <div className="scenario-list-title-group">
-          <h1 className="scenario-list-title">Scenarios</h1>
-          <p className="scenario-list-subtitle">Automate your workflows with conditional logic</p>
-        </div>
+        <div className="scenario-list-title-group" aria-hidden="true" />
         <div className="scenario-list-actions">
           <button className="create-scenario-btn" onClick={handleCreateScenario}>
             Create Scenario
@@ -6365,7 +6422,7 @@ export default function ScenariosPage() {
               onClick={handleBackToList}
             >
               <ChevronLeft size={16} />
-              Back to Scenarios
+              My Scenarios
             </button>
           </div>
           <button 
@@ -6741,17 +6798,10 @@ export default function ScenariosPage() {
                 {/* Frequency dropdown */}
                 <div className="sb-schedule-field">
                   <label className="sb-schedule-label">Frequency</label>
-                  <select
-                    className="sb-input-field sb-select-field"
+                  <ScheduleFrequencyDropdown
                     value={recurringSchedule.frequency}
-                    onChange={e => setRecurringSchedule(prev => normalizeScenarioSchedule({ ...prev, frequency: e.target.value }))}
-                  >
-                    <option value="once">Run Once</option>
-                    <option value="hourly">Hourly</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
+                    onChange={(frequency) => setRecurringSchedule(prev => normalizeScenarioSchedule({ ...prev, frequency }))}
+                  />
                 </div>
                 {recurringSchedule.frequency === 'once' && (
                   <div className="sb-schedule-field">

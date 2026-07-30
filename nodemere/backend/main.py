@@ -6709,7 +6709,7 @@ async def elevenlabs_post_call_webhook(
     return {"ok": True, "call_log": saved}
 
 @app.get("/api/agents", tags=["Sonar Controller Compat"])
-async def get_sonar_agents(current_user: dict = Depends(get_current_user)):
+async def get_sonar_agents(include_archived: bool = False, current_user: dict = Depends(get_current_user)):
     try:
         current_user_id = str(current_user.id)
         response = (
@@ -6722,9 +6722,14 @@ async def get_sonar_agents(current_user: dict = Depends(get_current_user)):
         )
         agents = []
         for row in response.data or []:
+            is_archived = row.get("is_active") is False or str(row.get("status") or "").strip().lower() == "archived"
+            if not include_archived and is_archived:
+                continue
             row_direction = normalize_receptionist_direction(row.get("direction"))
             agents.append({
                 **row,
+                "is_archived": is_archived,
+                "raw_status": row.get("status"),
                 "direction": row_direction,
                 "name": row.get("full_name") or row.get("first_name") or "Receptionist",
                 "role": row.get("stereotype") or "Receptionist",
@@ -6740,6 +6745,49 @@ async def get_sonar_agents(current_user: dict = Depends(get_current_user)):
     except Exception as exc:
         logging.error("Failed to fetch Sonar agents: %s", exc, exc_info=True)
         return []
+
+@app.post("/api/agents/{agent_id}/restore", tags=["Sonar Controller Compat"])
+async def restore_agent(agent_id: str, current_user: dict = Depends(get_current_user)):
+    current_user_id = str(current_user.id)
+    existing_response = (
+        supabase
+        .table('hired_receptionists')
+        .select('id,user_id,full_name,first_name')
+        .eq('id', agent_id)
+        .eq('user_id', current_user_id)
+        .limit(1)
+        .execute()
+    )
+    existing_agent = (existing_response.data or [None])[0]
+    if not existing_agent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    restore_payload = {
+        "is_active": True,
+        "status": "active",
+        "direction": "all",
+    }
+    response = (
+        supabase
+        .table('hired_receptionists')
+        .update(restore_payload)
+        .eq('id', agent_id)
+        .eq('user_id', current_user_id)
+        .execute()
+    )
+    restored_agent = (response.data or [None])[0] or {"id": agent_id, **restore_payload}
+    push_live_event(
+        "Agent restored.",
+        actor="system",
+        severity="info",
+        event_type="agent_restored",
+        payload={
+            "agent_id": agent_id,
+            "user_id": current_user_id,
+            "name": existing_agent.get('full_name') or existing_agent.get('first_name') or "Receptionist",
+        },
+    )
+    return {"ok": True, "agent": restored_agent}
 
 @app.get("/api/system/summary", tags=["Sonar Controller Compat"])
 async def get_sonar_system_summary(current_user: dict = Depends(get_current_user)):
@@ -6959,6 +7007,36 @@ async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_u
     existing_agent = (existing_response.data or [None])[0]
     if not existing_agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    linked_appointments = (
+        supabase
+        .table('appointments')
+        .select('id')
+        .eq('receptionist_id', agent_id)
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+    if linked_appointments:
+        archive_payload = {
+            "is_active": False,
+            "status": "archived",
+            "direction": "none",
+        }
+        supabase.table('hired_receptionists').update(archive_payload).eq('id', agent_id).eq('user_id', current_user_id).execute()
+        push_live_event(
+            "Agent archived.",
+            actor="system",
+            severity="info",
+            event_type="agent_archived",
+            payload={
+                "agent_id": agent_id,
+                "user_id": current_user_id,
+                "name": existing_agent.get('full_name') or existing_agent.get('first_name') or "Receptionist",
+            },
+        )
+        return {"ok": True, "id": agent_id, "archived": True}
 
     supabase.table('hired_receptionists').delete().eq('id', agent_id).eq('user_id', current_user_id).execute()
     push_live_event(

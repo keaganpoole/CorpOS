@@ -43,7 +43,7 @@ async function fetchJSON(endpoint) {
 }
 
 export const api = {
-  getAgents: () => fetchJSON('/api/agents'),
+  getAgents: (options = {}) => fetchJSON(`/api/agents${options.includeArchived ? '?include_archived=true' : ''}`),
   getSystemSummary: () => fetchJSON('/api/system/summary'),
   getLivePulse: (limit = 30) => fetchJSON(`/api/events/live-pulse?limit=${limit}`),
   getLogs: (limit = 50) => fetchJSON(`/api/logs?limit=${limit}`),
@@ -59,6 +59,7 @@ export const api = {
   updateAgentModel: (agentId, model) => postJSON(`/api/agents/${agentId}/model`, { model }),
   patchAgent: (agentId, data) => patchJSON(`/api/agents/${agentId}`, data),
   deleteAgent: (agentId) => deleteJSON(`/api/agents/${agentId}`),
+  restoreAgent: (agentId) => postJSON(`/api/agents/${agentId}/restore`, {}),
   getPendingRestarts: () => fetchJSON('/api/pending-restarts'),
   clearPendingRestart: (id) => deleteJSON(`/api/pending-restarts/${id}`),
   hireReceptionist: (catalogId) => postJSON('/api/sonar/receptionists/hire', { catalog_id: catalogId }),

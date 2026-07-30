@@ -2694,7 +2694,7 @@ export default function LiveMonitoringPage() {
         }
       `}</style>
 
-      <div className="live-monitor-grid h-full overflow-auto custom-scrollbar px-7 py-5">
+      <div className="live-monitor-grid h-full overflow-auto custom-scrollbar px-7 pb-5 pt-8">
         <div className="min-h-full flex flex-col gap-4">
           <AnalyticsControls
             selectedKeys={selectedMetricKeys}

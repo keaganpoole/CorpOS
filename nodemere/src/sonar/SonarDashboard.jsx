@@ -2,7 +2,7 @@
  * SonarDashboard — Wraps the Sonar App component for use inside Nodemere routing.
  * Renders the full Sonar dashboard UI at /dashboard.
  */
-import React, { useState, useEffect, useRef, Component } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Component } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from './lib/supabase';
 import {
@@ -18,6 +18,7 @@ import {
   Cpu,
   Terminal,
   Clock,
+  Moon,
   Pause,
   Play,
   Volume2,
@@ -67,7 +68,7 @@ import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
 import CubePreloader from './components/CubePreloader';
 import { AudioPlayerProvider, PersistentAudioPlayer } from './contexts/AudioPlayerContext';
-import { CallLogsProvider } from './contexts/CallLogsContext';
+import { CallLogsProvider, useCallLogs } from './contexts/CallLogsContext';
 import { useAuth } from '../contexts/AuthContext';
 import logoImage from '../assets/logo.png';
 
@@ -186,6 +187,65 @@ const displayAgentDirection = (value) => {
   if (normalized === 'none') return 'Off';
   return 'All';
 };
+
+function CallLogsToolbarTitle({ active, action = null }) {
+  const { calls, loading, hasMore } = useCallLogs();
+  if (!active) return null;
+
+  return (
+    <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
+      <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">Call Logs</span>
+      <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />
+      <span className="text-[12px] font-medium text-zinc-500">
+        {loading ? 'Loading calls' : `${calls.length}${hasMore ? '+' : ''} recent calls`}
+      </span>
+      {action}
+    </div>
+  );
+}
+
+function PeopleToolbarTitle({ active, count, loading, action = null }) {
+  if (!active) return null;
+
+  return (
+    <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
+      <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">People</span>
+      <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />
+      <span className="text-[12px] font-medium text-zinc-500">
+        {loading ? 'Loading people' : `${count} People`}
+      </span>
+      {action}
+    </div>
+  );
+}
+
+function StaticToolbarTitle({ active, title, description, action = null }) {
+  if (!active) return null;
+
+  return (
+    <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
+      <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">{title}</span>
+      <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />
+      <span className="text-[12px] font-medium text-zinc-500">{description}</span>
+      {action}
+    </div>
+  );
+}
+
+function CalendarToolbarTitle({ active, count, loading, action = null }) {
+  if (!active) return null;
+
+  return (
+    <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
+      <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">Calendar</span>
+      <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />
+      <span className="text-[12px] font-medium text-zinc-500">
+        {loading ? 'Loading appointments' : `${count} Appointments`}
+      </span>
+      {action}
+    </div>
+  );
+}
 
 const CallHandlingIcon = ({ direction }) => {
   const normalized = normalizeAgentDirection(direction);
@@ -568,7 +628,11 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
         {item.label}
       </span>
       {isActive && (
-        <motion.div layoutId="nav-active" className="absolute left-0 w-1 h-5 bg-white rounded-r-full shadow-[0_0_4px_rgba(255,255,255,0.1)]" />
+        <motion.div
+          layoutId="nav-active"
+          className="absolute left-0 w-1 h-5 rounded-r-full shadow-[0_0_6px_color-mix(in_srgb,var(--brandGradientStart)_18%,transparent)]"
+          style={{ background: 'linear-gradient(180deg, var(--brandGradientStart), var(--brandGradientEnd))' }}
+        />
       )}
       {sweeping && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
@@ -830,6 +894,11 @@ const SonarDashboard = () => {
   const [businessUsage, setBusinessUsage] = useState(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [teamView, setTeamView] = useState('receptionists');
+  const [peopleToolbarMeta, setPeopleToolbarMeta] = useState({ count: 0, loading: true });
+  const [calendarToolbarMeta, setCalendarToolbarMeta] = useState({ count: 0, loading: true });
+  const [terminateAgentHasAppointments, setTerminateAgentHasAppointments] = useState(false);
+  const [archivedAgents, setArchivedAgents] = useState([]);
+  const [archivedAgentsLoading, setArchivedAgentsLoading] = useState(false);
   const userId = authSession?.user?.id || profile?.id || null;
 
   useEffect(() => {
@@ -911,6 +980,42 @@ const SonarDashboard = () => {
     if (currentRoute === 'receptionists') loadAgentScenarios();
   }, [currentRoute, userId]);
 
+  const loadArchivedAgents = useCallback(async () => {
+    setArchivedAgentsLoading(true);
+    try {
+      const allAgents = await api.getAgents({ includeArchived: true });
+      setArchivedAgents(Array.isArray(allAgents)
+        ? allAgents.filter((agent) => agent?.is_archived || agent?.is_active === false || String(agent?.raw_status || agent?.status || '').toLowerCase() === 'archived')
+        : []);
+    } finally {
+      setArchivedAgentsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentRoute === 'receptionists' && teamView === 'archived') {
+      loadArchivedAgents();
+    }
+  }, [currentRoute, teamView, loadArchivedAgents]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTerminateAgentHasAppointments(false);
+    if (!terminateAgent?.id) return undefined;
+    supabase
+      .from('appointments')
+      .select('id')
+      .eq('receptionist_id', terminateAgent.id)
+      .limit(1)
+      .then(({ data, error }) => {
+        if (cancelled || error) return;
+        setTerminateAgentHasAppointments((data || []).length > 0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [terminateAgent?.id]);
+
   const {
     tasks,
     agents,
@@ -926,6 +1031,14 @@ const SonarDashboard = () => {
     updateAgentDirection,
     refresh,
   } = useSonarState();
+
+  const handleRestoreAgent = useCallback(async (agentId) => {
+    const result = await api.restoreAgent(agentId);
+    if (!result?.ok) return;
+    setArchivedAgents((current) => current.filter((agent) => String(agent.id) !== String(agentId)));
+    await refresh();
+    await loadArchivedAgents();
+  }, [loadArchivedAgents, refresh]);
 
   const enrichedAgents = (agents || []).map(a => {
     const scenario = agentScenarios[a.name?.toLowerCase?.() || ''];
@@ -959,12 +1072,12 @@ const SonarDashboard = () => {
   }, []);
 
   const navItems = [
-    { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
     { id: 'receptionists', icon: <IdCardLanyard size={18} />, label: 'Team' },
-    { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios' },
-    { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
-    { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
     { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
+    { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
+    { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios' },
+    { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
+    { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
   ];
 
   const renderView = () => {
@@ -972,12 +1085,8 @@ const SonarDashboard = () => {
       case 'receptionists':
         return (
           <div className={`receptionists-page-scope h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
-            <div className="shrink-0 px-10 py-8 flex items-center justify-between">
+            <div className="shrink-0 px-10 pb-3 pt-8 flex items-center justify-between">
               <div className="flex items-center gap-5">
-                <div className="flex flex-col gap-1">
-                  <h2 className="text-[1.875rem] font-semibold tracking-[-0.045em] text-white leading-none m-0">Team</h2>
-                  <p className="text-[13px] text-zinc-500 m-0">Manage receptionists and staff</p>
-                </div>
                 <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
                   <button
                     onClick={() => setTeamView('receptionists')}
@@ -991,22 +1100,36 @@ const SonarDashboard = () => {
                   >
                     Staff
                   </button>
+                  <button
+                    onClick={() => setTeamView('archived')}
+                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'archived' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Archived
+                  </button>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 {teamView === 'receptionists' ? (
                   <button onClick={() => setShowHireModal(true)} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
-                ) : (
+                ) : teamView === 'staff' ? (
                   <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Staff Member</button>
-                )}
+                ) : null}
               </div>
             </div>
 
-            <div key={teamView} className="custom-scrollbar min-h-0 flex-1 overflow-auto px-12 py-8">
+            <div key={teamView} className="custom-scrollbar min-h-0 flex-1 overflow-auto px-12 pb-8 pt-5">
               {teamView === 'receptionists' ? (
                 agentsLoading ? (
                   <div className="flex min-h-full items-center justify-center pb-20">
                     <CubePreloader />
+                  </div>
+                ) : enrichedAgents.length === 0 ? (
+                  <div className="flex min-h-full items-center justify-center pb-20 text-center">
+                    <div className="flex flex-col items-center">
+                      <Moon size={30} strokeWidth={1.7} className="mx-auto mb-4 text-zinc-500" />
+                      <p className="text-[28px] font-semibold leading-none tracking-tight text-white">It's quiet in here</p>
+                      <p className="text-[13px] leading-none text-zinc-500 -translate-y-1.5">Hire an AI receptionist to put your front desk to work.</p>
+                    </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6">
@@ -1028,6 +1151,56 @@ const SonarDashboard = () => {
                         />
                       );
                     })}
+                  </div>
+                )
+              ) : teamView === 'archived' ? (
+                archivedAgentsLoading ? (
+                  <div className="flex min-h-full items-center justify-center pb-20">
+                    <CubePreloader />
+                  </div>
+                ) : archivedAgents.length > 0 ? (
+                  <div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6">
+                    {archivedAgents.map((agent) => (
+                      <div key={agent.id} className="box-border w-[340px] overflow-hidden rounded-[28px] border border-white/[0.04] bg-[#0A0A0A] opacity-80 transition hover:opacity-100">
+                        <div className="relative h-[220px] overflow-hidden rounded-t-[28px]">
+                          <img
+                            src={agent.avatar || `${AVATAR_BASE}/${(agent.name || 'receptionist').toLowerCase()}.jpg`}
+                            alt={agent.name || 'Receptionist'}
+                            className="h-full w-full object-cover grayscale transition duration-500"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/55 to-transparent" />
+                          <div className="absolute left-4 top-4 rounded-full border border-white/[0.06] bg-black/60 px-2.5 py-1 text-[8px] font-bold uppercase tracking-widest text-zinc-500 backdrop-blur-xl">
+                            Archived
+                          </div>
+                          <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
+                            <h3 className="text-2xl font-bold leading-none tracking-tight text-white">{agent.name || agent.full_name || agent.first_name || 'Receptionist'}</h3>
+                          </div>
+                        </div>
+                        <div className="space-y-4 p-6">
+                          <p className="text-[12px] leading-5 text-zinc-500">
+                            This receptionist is hidden from the active roster but appointment history remains intact.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreAgent(agent.id)}
+                            className="dashboard-neutral-button flex w-full items-center justify-center rounded-xl px-5 py-2.5 text-[11px] font-bold tracking-wider transition-all active:scale-95"
+                          >
+                            Restore Receptionist
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex min-h-full items-center justify-center pb-20 text-center">
+                    <div>
+                      <p className="text-[13px] font-semibold text-zinc-300">No archived receptionists</p>
+                      <p className="mt-2 text-[12px] text-zinc-600">Archived receptionists will appear here.</p>
+                    </div>
                   </div>
                 )
               ) : (
@@ -1094,7 +1267,9 @@ const SonarDashboard = () => {
                     className="w-full max-w-[400px] bg-[#0a0a0a] border border-white/[0.06] rounded-2xl overflow-hidden shadow-2xl"
                   >
                     <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04]">
-                      <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Terminate Receptionist</span>
+                      <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">
+                        {terminateAgentHasAppointments ? 'Archive Receptionist' : 'Delete Receptionist'}
+                      </span>
                       <button onClick={() => setTerminateAgent(null)} className="p-1 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-all">
                         <X size={14} />
                       </button>
@@ -1106,9 +1281,13 @@ const SonarDashboard = () => {
                         </div>
                         <div>
                           <p className="text-[13px] text-zinc-200 font-medium">
-                            Remove <span className="text-white font-bold">{terminateAgent?.first_name || terminateAgent?.name}</span> from active duty?
+                            {terminateAgentHasAppointments ? 'Archive' : 'Delete'} <span className="text-white font-bold">{terminateAgent?.first_name || terminateAgent?.name}</span>?
                           </p>
-                          <p className="text-[11px] text-zinc-600 mt-1">This action cannot be undone.</p>
+                          <p className="text-[11px] text-zinc-600 mt-1">
+                            {terminateAgentHasAppointments
+                              ? 'This keeps appointment history intact and removes them from the active roster.'
+                              : 'This action cannot be undone.'}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center justify-end gap-3">
@@ -1122,17 +1301,17 @@ const SonarDashboard = () => {
                           onClick={async () => {
                             try {
                               const result = await api.deleteAgent(terminateAgent.id);
-                              if (!result?.ok) throw new Error('Failed to delete receptionist');
+                              if (!result?.ok) throw new Error('Failed to remove receptionist');
                               setTerminateAgent(null);
                               await refresh();
                               await loadAgentScenarios();
                             } catch (err) {
-                              console.error('[Terminate] Failed:', err);
+                              console.error('[Receptionist Removal] Failed:', err);
                             }
                           }}
                           className="px-5 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-black uppercase tracking-wider hover:bg-rose-400 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)] active:scale-95"
                         >
-                          Terminate
+                          {terminateAgentHasAppointments ? 'Archive' : 'Delete'}
                         </button>
                       </div>
                     </div>
@@ -1149,17 +1328,30 @@ const SonarDashboard = () => {
       case 'settings':
         return <SettingsPage />;
       case 'calendar':
-        return <CalendarPage />;
+        return <CalendarPage onToolbarMetaChange={setCalendarToolbarMeta} />;
       case 'call-logs':
         return <CallLogsPage />;
       case 'pipeline':
-        return <LeadsPage />;
+        return <LeadsPage hideTitle onToolbarMetaChange={setPeopleToolbarMeta} />;
       default:
         return <PlaceholderView title={currentRoute} body="Coming soon" />;
     }
   };
 
   const displayZone = controlState?.zone || 1;
+  const toolbarAutonomyControl = (
+    <div className="absolute left-[calc(50%+210px)] top-1/2 z-10 -translate-y-1/2 no-drag" style={{ width: '120px', textAlign: 'center' }}>
+      <GradientBleed
+        trigger="Autonomy"
+        options={['1', '2', '3', '4', '5']}
+        variant="prism"
+        icon={<Gavel size={12} />}
+        value={String(displayZone)}
+        onSelect={(val) => setZone(parseInt(val))}
+        onOpenChange={(open) => setZoneOpen(open)}
+      />
+    </div>
+  );
 
   return (
     <AudioPlayerProvider>
@@ -1192,34 +1384,51 @@ const SonarDashboard = () => {
             </div>
           )}
         </div>
+        <CallLogsToolbarTitle active={currentRoute === 'call-logs'} />
+        <PeopleToolbarTitle
+          active={currentRoute === 'pipeline'}
+          count={peopleToolbarMeta.count}
+          loading={peopleToolbarMeta.loading}
+        />
+        <CalendarToolbarTitle
+          active={currentRoute === 'calendar'}
+          count={calendarToolbarMeta.count}
+          loading={calendarToolbarMeta.loading}
+        />
+        <StaticToolbarTitle
+          active={currentRoute === 'live-monitoring'}
+          title="Live Monitoring"
+          description="Realtime call activity"
+        />
+        <StaticToolbarTitle
+          active={currentRoute === 'receptionists'}
+          title="Team"
+          description="Manage receptionists and staff"
+        />
+        <StaticToolbarTitle
+          active={currentRoute === 'scenarios'}
+          title="Scenarios"
+          description="Automate workflows with conditional logic"
+        />
+        <StaticToolbarTitle
+          active={currentRoute === 'settings'}
+          title="Settings"
+          description="Account & business configuration"
+        />
 
-        {/* Center controls */}
+        {/* Center title */}
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center z-10">
-          <div className="relative" style={{ width: '120px', textAlign: 'center' }}>
-            <GradientBleed
-              trigger="Autonomy"
-              options={['1', '2', '3', '4', '5']}
-              variant="prism"
-              icon={<Gavel size={12} />}
-              value={String(displayZone)}
-              onSelect={(val) => setZone(parseInt(val))}
-              onOpenChange={(open) => setZoneOpen(open)}
-            />
-          </div>
-
-          <div 
-            className={`relative flex flex-col items-center transition-opacity duration-500 mx-20 ${zoneOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-          >
+          <div className="relative flex flex-col items-center">
             <div className={`relative transition-all duration-700 transform ${glitch ? 'opacity-10 scale-[1.05] blur-sm' : 'opacity-100 scale-100'}`}>
-              <div className="absolute -left-6 inset-y-0 w-[1px] bg-white/10" />
-              <div className="absolute -right-6 inset-y-0 w-[1px] bg-white/10" />
-              <h1 className="text-2xl font-light tracking-[0.6em] text-white/15 uppercase leading-none cursor-default">
+              <div className="absolute -left-6 top-1/2 h-5 w-[1px] -translate-y-1/2 bg-white/10" />
+              <div className="absolute -right-6 top-1/2 h-5 w-[1px] -translate-y-1/2 bg-white/10" />
+              <h1 className="text-[22px] font-light tracking-[0.52em] text-white/15 uppercase leading-none cursor-default">
                 NODEMERE
               </h1>
             </div>
           </div>
-
         </div>
+        {toolbarAutonomyControl}
         <AccountDropdown
           profile={profile}
           usage={businessUsage}

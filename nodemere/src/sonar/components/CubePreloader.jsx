@@ -1,6 +1,6 @@
 import React from 'react';
 
-const CubePreloader = ({ className = '', size = 28 }) => (
+const CubePreloader = ({ className = '', size = 26 }) => (
   <div className={`cube-preloader ${className}`}>
     <div className="boxes" style={{ '--cube-preloader-size': `${size}px` }}>
       <div className="box"><div></div><div></div><div></div><div></div></div>
@@ -12,7 +12,7 @@ const CubePreloader = ({ className = '', size = 28 }) => (
       .cube-preloader .boxes {
           --brandGradientStart: #ff32ac;
           --brandGradientEnd: #8B5CF6;
-          --size: var(--cube-preloader-size, 28px);
+          --size: var(--cube-preloader-size, 26px);
           --duration: 1000ms;
           --timing: cubic-bezier(0.65, 0, 0.35, 1);
           height: calc(var(--size) * 2);

@@ -1878,7 +1878,7 @@ const LeadsTable = ({
 
   const renderPeopleLoader = () => (
     <div className="absolute inset-0 z-30 flex items-center justify-center px-6">
-      <CubePreloader size={24} />
+      <CubePreloader size={22} />
     </div>
   );
 
@@ -2149,7 +2149,7 @@ const LeadsTable = ({
 
   return (
     <div className={`flex-1 flex flex-col min-w-0 h-full ${demoEntrance ? 'crm-demo-entrance-table' : ''}`}>
-      <div className={`shrink-0 px-10 py-8 flex items-center gap-3 ${demoEntrance ? 'crm-demo-entrance-topbar' : ''}`}>
+      <div className={`shrink-0 flex items-center gap-3 ${hideTitle ? 'px-6 pb-3 pt-5' : 'px-10 py-8'} ${demoEntrance ? 'crm-demo-entrance-topbar' : ''}`}>
         <div className="flex items-center gap-3">
           {!hideTitle && (
             <div className="flex flex-col gap-1">

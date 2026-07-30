@@ -1,8 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAppointments } from '../hooks/useAppointments';
 import AppointmentsTable from './AppointmentsTable';
 
-const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate = null }) => {
+const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate = null, hideTitle = false, onToolbarMetaChange = null }) => {
   const appointmentsData = useAppointments();
   const {
     appointments, allAppointments, people, services, receptionists, lookups, loading, error,
@@ -16,6 +16,10 @@ const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate 
 
   const [tableSchema, setTableSchema] = useState(null);
   const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    onToolbarMetaChange?.({ count: allAppointments.length, loading });
+  }, [allAppointments.length, loading, onToolbarMetaChange]);
 
   const handleInlineCreate = useCallback(async () => {
     if (creating) return;
@@ -81,6 +85,7 @@ const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate 
         services={services}
         receptionists={receptionists}
         lookups={lookups}
+        hideTitle={hideTitle}
       />
     </div>
   );
