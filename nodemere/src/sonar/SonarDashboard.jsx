@@ -1,5 +1,5 @@
 /**
- * SonarDashboard — Wraps the Sonar App component for use inside WYSL routing.
+ * SonarDashboard — Wraps the Sonar App component for use inside Nodemere routing.
  * Renders the full Sonar dashboard UI at /dashboard.
  */
 import React, { useState, useEffect, useRef, Component } from 'react';

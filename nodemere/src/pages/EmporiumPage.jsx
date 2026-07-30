@@ -11,7 +11,7 @@ import SplashScreen from '../components/SplashScreen';
 const RAPIDAPI_HOST = 'real-time-product-search.p.rapidapi.com';
 const RAPIDAPI_KEY = '631c8cadadmsh3922b228354268ep10bf9fjsn862faeeb3b51'; // Replace with your actual key
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://keyquarters.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://nodemere.onrender.com';
 
 
 // --- Helper Components & Icons ---

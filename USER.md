@@ -2,7 +2,7 @@
 
 - **Name:** Keagan Poole
 - **What to call them:** Keagan
-- **Role:** Founder / CEO of CorpOS
+- **Role:** Founder / CEO of Nodemere
 - **Timezone:** EST (America/New_York)
 
 ## What Keagan Cares About
@@ -18,7 +18,7 @@
 - Pronouns in documentation
 
 ## Communication Preferences
-- Uses Discord for all channels — Max Group Chat, Situation Room, and Team CorpOS
+- Uses Discord for all channels — Max Group Chat, Situation Room, and Team Nodemere
 - Issues `/start_day` to activate the system
 - Prefers direct messages with minimal fluff
 - Enjoys raw, honest banter and sharp wit

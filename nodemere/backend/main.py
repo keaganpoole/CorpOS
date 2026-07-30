@@ -128,7 +128,7 @@ except Exception:
 # --------------------------------------------------------------------------
 # App Initialization
 # --------------------------------------------------------------------------
-app = FastAPI(title="WYSL API")
+app = FastAPI(title="Nodemere API")
 # scheduler = AsyncIOScheduler()
 PAYMENT_TEST_MODE = TEST_MODE
 
@@ -2882,7 +2882,7 @@ if TEST_MODE:
     ]
 else:
     origins = [
-        "https://keyquarters.com",  # For production frontend
+        "https://nodemere.com",  # For production frontend
     ]
 
 app.add_middleware(
@@ -3039,7 +3039,7 @@ def get_payment_mode_label() -> str:
 def get_payment_frontend_base_url() -> str:
     if PAYMENT_TEST_MODE:
         return os.environ.get("PAYMENT_TEST_FRONTEND_URL", "http://localhost:5173")
-    return os.environ.get("PAYMENT_LIVE_FRONTEND_URL", "https://keyquarters.com")
+    return os.environ.get("PAYMENT_LIVE_FRONTEND_URL", "https://nodemere.com")
 
 def coerce_amount_to_cents(amount_value) -> int:
     try:
@@ -3056,7 +3056,7 @@ def ensure_no_unresolved_templates(*values):
             )
 
 def build_invoice_metadata(*, person_id: Optional[str] = None, appointment_id: Optional[str] = None, service_id: Optional[str] = None):
-    metadata = {"source": "wysl_scenarios"}
+    metadata = {"source": "nodemere_scenarios"}
     if person_id:
         metadata["person_id"] = str(person_id)
     if appointment_id:
@@ -5003,7 +5003,7 @@ def upsert_payment_from_stripe(
 
 @app.get("/", tags=["Health Check"])
 def root():
-    return {"status": "ok", "message": "Welcome to the WYSL API"}
+    return {"status": "ok", "message": "Welcome to the Nodemere API"}
 
 @app.get("/config/status", response_model=ConfigStatusResponse, tags=["Config"])
 async def get_config_status():
@@ -7836,7 +7836,7 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
     if TEST_MODE:
         base_url = "http://localhost:5173"
     else:
-        base_url = "https://keyquarters.com"
+        base_url = "https://nodemere.com"
 
     price_to_use = request.price_id
     checkout_session_data = {
@@ -8295,7 +8295,7 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
                 payment_intent=payment_intent_id,
                 **({"amount": request.amount} if request.amount else {}),
                 **({"reason": "requested_by_customer"} if request.refund_reason else {}),
-                metadata={"user_id": user_id, "source": "wysl_scenarios"},
+                metadata={"user_id": user_id, "source": "nodemere_scenarios"},
             )
         )
     except Exception as exc:

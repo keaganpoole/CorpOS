@@ -112,7 +112,7 @@ Never commit `.env` or client secrets to git.
 A helper script is provided:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/create-outlook-mail-app.ps1 -DisplayName "CorpOS Outlook Mail" -RedirectUri "http://localhost:7878/api/integrations/outlook/callback" -EnvPath ".env"
+powershell -ExecutionPolicy Bypass -File scripts/create-outlook-mail-app.ps1 -DisplayName "Nodemere Outlook Mail" -RedirectUri "http://localhost:7878/api/integrations/outlook/callback" -EnvPath ".env"
 ```
 
 The script uses Azure CLI (`az`). Run `az login` first. It creates an app registration, configures delegated Microsoft Graph mail permissions, creates a client secret, and appends the environment variables to the selected `.env` file.
@@ -182,7 +182,7 @@ Request body example:
 ```json
 {
   "message": {
-    "subject": "Hello from CorpOS",
+    "subject": "Hello from Nodemere",
     "body": {
       "contentType": "Text",
       "content": "This was sent through Microsoft Graph."

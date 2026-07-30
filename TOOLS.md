@@ -3,7 +3,7 @@
 ## Discord Configuration
 
 ### Channels
-- **Team CorpOS:** `1487477234401939546` — Primary hub. All briefings, updates, acks.
+- **Team Nodemere:** `1487477234401939546` — Primary hub. All briefings, updates, acks.
 - **Situation Room:** `1488327248154202156` — Retired. Do not post here.
 
 ### Discord Bot
@@ -12,7 +12,7 @@
 - **Username:** max#2325
 
 ### Discord Webhooks
-- **Yanna (Team CorpOS):** env var `DISCORD_WEBHOOK_YANNA`
+- **Yanna (Team Nodemere):** env var `DISCORD_WEBHOOK_YANNA`
 - **Yanna (Situation Room — legacy):** env var `DISCORD_WEBHOOK_YANNA_SITUATION_ROOM`
 - **Yanna Avatar:** env var `DISCORD_WEBHOOK_AVATAR_YANNA`
 
@@ -65,7 +65,7 @@ sessions_spawn(
 - supabase-api — campaigns, leads, tasks, agents CRUD
 - web-research — Google Search + Maps via agent-browser
 - website-audit — site evaluation, scoring, Discovery
-- discord — webhook posting to Team CorpOS
+- discord — webhook posting to Team Nodemere
 
 ### Dispatch Task Template
 
@@ -83,9 +83,9 @@ Workflow:
 2. Source businesses (web-research)
 3. Audit each site (website-audit)
 4. Save qualified leads (supabase-api)
-5. Post updates to Team CorpOS after every lead (discord)
+5. Post updates to Team Nodemere after every lead (discord)
 
-Start now. Post an ack to Team CorpOS before you begin.
+Start now. Post an ack to Team Nodemere before you begin.
 ```
 
 ## Zone and Stage Reference

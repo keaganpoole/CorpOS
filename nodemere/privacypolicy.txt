@@ -97,14 +97,14 @@ Receive your information in a portable format
 
 Opt-out of the sale of personal information (we do not sell personal data)
 
-To exercise these rights, contact us at support@keyquarters.com
+To exercise these rights, contact us at support@nodemere.com
 .
 
 7. Data Retention
 
 We retain personal information only as long as necessary to provide the Service, fulfill legal obligations, or resolve disputes.
 
-8. Children’s Privacy
+8. Childrenâ€™s Privacy
 
 Our Service is not intended for individuals under 13. We do not knowingly collect personal information from children under 13.
 
@@ -114,4 +114,4 @@ We may update this Privacy Policy to reflect changes in practices or legal requi
 
 10. Contact Us
 
-Email: support@keyquarters.com
+Email: support@nodemere.com

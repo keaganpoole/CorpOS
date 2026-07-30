@@ -1,6 +1,6 @@
 ---
 name: discord
-description: Send messages, reply, react, and read channel history in Discord using Max's bot. MANDATORY: All Team CorpOS messages must be human, conversational, and natural. No technical data dumps. Use when Max needs to post a briefing to Team CorpOS, respond to Yanna or Keagan, react to a message with emoji, or check recent messages in a channel. Triggers on "post to Discord", "send message", "reply", "brief Yanna", "check channel", "Team CorpOS", or any Discord messaging operation.
+description: Send messages, reply, react, and read channel history in Discord using Max's bot. MANDATORY: All Team Nodemere messages must be human, conversational, and natural. No technical data dumps. Use when Max needs to post a briefing to Team Nodemere, respond to Yanna or Keagan, react to a message with emoji, or check recent messages in a channel. Triggers on "post to Discord", "send message", "reply", "brief Yanna", "check channel", "Team Nodemere", or any Discord messaging operation.
 ---
 
 # Discord — Max Bot
@@ -36,7 +36,7 @@ powershell -ExecutionPolicy Bypass -File scripts/discord.ps1 -Action <action> [p
 
 ### Quick Reference
 
-**Post to Team CorpOS (Human tone):**
+**Post to Team Nodemere (Human tone):**
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/discord.ps1 -Action send -ChannelId "1487477234401939546" -Content "Kickstarter's live in Worcester. Yanna's on it. Let's get those leads."
 ```
@@ -60,17 +60,17 @@ powershell -ExecutionPolicy Bypass -File scripts/discord.ps1 -Action history -Ch
 
 See `skills/discord/references/channels.md` for channel IDs and purposes.
 
-**Primary channel:** Team CorpOS (`1487477234401939546`) — all daily ops happen here.
+**Primary channel:** Team Nodemere (`1487477234401939546`) — all daily ops happen here.
 
-## Channel Rules — Team CorpOS
+## Channel Rules — Team Nodemere
 
-**⚠️ ABSOLUTE RULE: Keagan is NOT in Team CorpOS. NEVER address Keagan in this channel.**
+**⚠️ ABSOLUTE RULE: Keagan is NOT in Team Nodemere. NEVER address Keagan in this channel.**
 
-Team CorpOS is a room for Max and Yanna ONLY. Keagan does not exist in this space. Every message must be written as if Keagan is not reading it. If you need to talk to Keagan, use DMs.
+Team Nodemere is a room for Max and Yanna ONLY. Keagan does not exist in this space. Every message must be written as if Keagan is not reading it. If you need to talk to Keagan, use DMs.
 
 **⚠️ MANDATORY: Every message must be human, natural, and conversational.**
 
-Team CorpOS is a **team chat**, not a technical dashboard. It's for:
+Team Nodemere is a **team chat**, not a technical dashboard. It's for:
 - Socializing and team cohesion
 - Coaching and motivation
 - Natural conversation
@@ -141,7 +141,7 @@ Start sourcing and audit every site. Post updates as you go.
 
 ## Posting Rules
 
-- **Briefings go to Team CorpOS.** Situation Room is retired from daily ops.
+- **Briefings go to Team Nodemere.** Situation Room is retired from daily ops.
 - **Keep it natural and human.** 1-3 sentences in conversational tone.
 - **No technical data dumps.** Summarize, don't list variables.
 - **React when appropriate.** ✅ for acks, 👍 for agreement.

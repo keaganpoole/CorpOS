@@ -17,7 +17,7 @@ except ImportError:
 # Leave TEST_TWILIO_NUMBER as None to automatically use the most recently purchased Twilio number.
 TEST_TWILIO_NUMBER = None
 TEST_DESTINATION_NUMBER = "12076801233"
-TEST_LABEL = "WYSL Test Number"
+TEST_LABEL = "Nodemere Test Number"
 
 
 def load_env() -> None:

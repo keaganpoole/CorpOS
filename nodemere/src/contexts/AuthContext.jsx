@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.jsx — Sonar Auth (simplified, no WYSL backend)
+// src/contexts/AuthContext.jsx — Sonar Auth (simplified, no Nodemere backend)
 
 import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
