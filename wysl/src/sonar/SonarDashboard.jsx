@@ -785,19 +785,11 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
 
             <div className="border-b border-white/[0.06] bg-white/[0.025] px-4 py-4">
               <div className="text-[11px] font-medium uppercase leading-none tracking-[0.18em] text-zinc-600">Current plan</div>
-              <div className="mt-4 flex items-end justify-between gap-3">
+              <div className="mt-4">
                 <div className="min-w-0">
                   <div className="truncate text-[18px] font-semibold leading-none tracking-tight text-zinc-100">{planName}</div>
                   <div className="mt-2 truncate text-[12px] font-medium leading-none text-zinc-500">{displayPlan}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={onUpgrade}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-black/80 text-zinc-200 transition-colors hover:border-white/15 hover:text-white"
-                  aria-label="Change plan"
-                >
-                  <ArrowUpDown size={14} />
-                </button>
               </div>
             </div>
 

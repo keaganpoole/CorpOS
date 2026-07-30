@@ -483,11 +483,13 @@ const createInitialRows = () => [
   }, '2026-06-07T18:16:10.433Z'),
 ];
 
-const HomepagePeopleCrmDemo = ({ className = '', onDemoLimitExceeded, onDemoSchemaChange }) => {
+const HomepagePeopleCrmDemo = ({ className = '', entranceActive = false, onDemoLimitExceeded, onDemoSchemaChange }) => {
   const [rows, setRows] = useState(() => createInitialRows());
   const [selectedId, setSelectedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [justAddedIds, setJustAddedIds] = useState([]);
+  const [entranceComplete, setEntranceComplete] = useState(false);
+  const [entranceStarted, setEntranceStarted] = useState(false);
 
   React.useEffect(() => {
     if (rows.length > 14) {
@@ -498,6 +500,15 @@ const HomepagePeopleCrmDemo = ({ className = '', onDemoLimitExceeded, onDemoSche
   React.useEffect(() => {
     onDemoSchemaChange?.({ customFields: DEMO_CUSTOM_FIELDS });
   }, [onDemoSchemaChange]);
+
+  React.useEffect(() => {
+    if (!entranceActive || entranceStarted) return undefined;
+    setEntranceStarted(true);
+    const timer = window.setTimeout(() => {
+      setEntranceComplete(true);
+    }, 5600);
+    return () => window.clearTimeout(timer);
+  }, [entranceActive, entranceStarted]);
 
   const filteredRows = useMemo(() => {
     if (!searchQuery.trim()) return rows;
@@ -545,7 +556,7 @@ const HomepagePeopleCrmDemo = ({ className = '', onDemoLimitExceeded, onDemoSche
   }, []);
 
   return (
-    <div className={`relative h-full w-full bg-[#020202] ${className}`}>
+    <div className={`relative h-full w-full bg-[#020202] crm-demo-entrance ${entranceStarted ? 'has-started' : 'is-waiting'} ${entranceComplete ? 'is-loaded' : 'is-entering'} ${className}`}>
       <LeadsTable
         leads={filteredRows}
         loading={false}
@@ -568,6 +579,7 @@ const HomepagePeopleCrmDemo = ({ className = '', onDemoLimitExceeded, onDemoSche
         demoInitialFieldConfig={DEMO_FIELD_CONFIG}
         demoInitialColorbarRules={DEMO_COLORBAR_RULES}
         demoInitialViewSettings={{ rowHeight: 3, sortRules: [], frozenCount: 0 }}
+        demoEntrance
         onSchemaChange={onDemoSchemaChange}
         hideTitle
         searchPlaceholder="Search records..."

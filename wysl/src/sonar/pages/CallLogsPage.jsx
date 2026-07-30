@@ -762,8 +762,8 @@ export default function CallLogsPage() {
       </div>
 
       <div className="grid flex-1 min-h-0 grid-cols-1 xl:grid-cols-[430px_minmax(0,1fr)]">
-        <aside className="relative flex min-h-0 flex-col border-b border-white/[0.05] after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/[0.05] xl:border-b-0 xl:border-r xl:border-white/[0.05]">
-          <div className="shrink-0 space-y-3 bg-[#020202]/95 p-4">
+        <aside className="relative flex min-h-0 flex-col border-b border-white/[0.05] bg-white/[0.02] after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/[0.05] xl:border-b-0 xl:border-r xl:border-white/[0.05]">
+          <div className="shrink-0 space-y-3 bg-transparent p-4">
             <label className="relative block">
               <span className="sr-only">Search call logs</span>
               <div className="flex gap-2">

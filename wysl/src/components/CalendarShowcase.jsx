@@ -887,6 +887,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 <HomepagePeopleCrmDemo
                   key={demoInstanceKey}
                   className="homepage-crm-demo"
+                  entranceActive={builderEntered && builderOpacity > 0.01}
                   onDemoLimitExceeded={handleDemoLimitExceeded}
                   onDemoSchemaChange={({ customFields } = {}) => {
                     setDemoPeopleCustomFields(Array.isArray(customFields) ? customFields : []);

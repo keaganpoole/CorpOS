@@ -95,7 +95,7 @@ const StudioSelect = ({ value, options, onChange, placeholder = 'Select...', cla
                   >
                     {option.color ? <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: option.color }} /> : null}
                     <span className="min-w-0 truncate">{option.label}</span>
-                    {active && <Check size={11} className="ml-auto shrink-0 brand-icon" />}
+                    {active && <Check size={11} className="ml-auto shrink-0 text-white" />}
                   </motion.button>
                 );
               })}

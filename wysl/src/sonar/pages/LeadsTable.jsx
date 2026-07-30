@@ -432,7 +432,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
               className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${current == null || current === '' ? 'text-white' : 'text-zinc-400'}`}>
               <div className="w-2 h-2 rounded-full bg-zinc-700" />
               <span className="invisible">.</span>
-              {(current == null || current === '') && <Check size={11} className="brand-icon ml-auto" />}
+              {(current == null || current === '') && <Check size={11} className="ml-auto text-white" />}
             </motion.button>
             {options.map((opt, idx) => {
               const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
@@ -444,7 +444,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
                   className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
                   {val}
-                  {isActive && <Check size={11} className="brand-icon ml-auto" />}
+                  {isActive && <Check size={11} className="ml-auto text-white" />}
                 </motion.button>
               );
             })}
@@ -568,7 +568,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
                   className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
                   <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(val) }} />
                   {val}
-                  {active && <Check size={11} className="brand-icon ml-auto" />}
+                  {active && <Check size={11} className="ml-auto text-white" />}
                 </motion.button>
               );
             })}
@@ -937,7 +937,7 @@ const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll
           const hidden = !!fieldConfig[column.id]?.hidden;
           return (
             <button key={column.id} type="button" onClick={() => onSetHidden(column.id, !hidden)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04]">
-              <span className="w-4">{!hidden && <Check size={12} className="brand-icon" />}</span>
+              <span className="w-4">{!hidden && <Check size={12} className="text-white" />}</span>
               <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${hidden ? 'text-zinc-500' : 'text-zinc-300'}`}>{getColumnLabel(column, fieldConfig)}</span>
             </button>
           );
@@ -993,7 +993,7 @@ const IntakeFieldsPopover = ({ columns, fieldConfig, onToggleField, onEnableAll,
               }}
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${locked ? 'cursor-not-allowed opacity-100' : 'hover:bg-white/[0.04]'}`}
             >
-              <span className="w-4">{enabled && <Check size={12} className="brand-icon" />}</span>
+              <span className="w-4">{enabled && <Check size={12} className="text-white" />}</span>
               <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${enabled ? 'text-zinc-300' : 'text-zinc-500'}`}>{getColumnLabel(column, fieldConfig)}</span>
               {locked && <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold tracking-[-0.02em] text-zinc-400">Required</span>}
             </button>
@@ -1044,7 +1044,7 @@ const RowHeightPopover = ({ value, onChange }) => {
     <div className="p-2">
       {options.map((option) => (
         <button key={option.key} type="button" onClick={() => onChange(option.key)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] transition-colors hover:bg-white/[0.04] ${value === option.key ? 'text-white' : 'text-zinc-500'}`}>
-          <span className="w-4">{value === option.key && <Check size={12} className="brand-icon" />}</span>
+          <span className="w-4">{value === option.key && <Check size={12} className="text-white" />}</span>
           {option.label}
         </button>
       ))}
@@ -1075,6 +1075,7 @@ const LeadsTable = ({
   demoInitialFieldConfig = null,
   demoInitialColorbarRules = [],
   demoInitialViewSettings = null,
+  demoEntrance = false,
   hideTitle = false,
   searchPlaceholder = 'Search people...',
   searchFieldClassName = '',
@@ -1771,8 +1772,12 @@ const LeadsTable = ({
   const renderLeadColumn = (col, lead) => (
     <div
       key={col.id}
-      style={{ width: col.width, minWidth: col.width }}
-      className={col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'}
+      style={{
+        width: col.width,
+        minWidth: col.width,
+        ...(demoEntrance ? { '--crm-cell-index': columns.findIndex((column) => column.id === col.id) } : {}),
+      }}
+      className={`${col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'} ${demoEntrance ? 'crm-demo-entrance-cell' : ''}`}
     >
       <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(lead.id), toggle: toggleSelectedId }} />
     </div>
@@ -1891,7 +1896,8 @@ const LeadsTable = ({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(idx * 0.012, 0.35) }}
                   onContextMenu={(event) => handleContextMenu(event, lead.id)}
-                  className={`group pl-5 pr-0 ${dc.row} flex items-center gap-3 transition-all duration-150 relative ${isRowSelected ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-white/[0.02]' : ''}`}
+                  className={`group pl-5 pr-0 ${dc.row} flex items-center gap-3 transition-all duration-150 relative ${demoEntrance ? 'crm-demo-entrance-row' : ''} ${isRowSelected ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-white/[0.02]' : ''}`}
+                  style={demoEntrance ? { '--crm-row-index': idx } : undefined}
                 >
                   {isJustAdded && (
                     <motion.div
@@ -1998,7 +2004,7 @@ const LeadsTable = ({
                       aria-label="Edit zone color"
                     >
                       <span
-                        className="absolute blur-[9px] opacity-26"
+                        className={`absolute blur-[9px] opacity-26 ${demoEntrance ? 'crm-demo-entrance-zone-glow' : ''}`}
                         style={{
                           left: '2%',
                           width: '96%',
@@ -2008,7 +2014,7 @@ const LeadsTable = ({
                         }}
                       />
                       <span
-                        className="absolute inset-x-0 h-px rounded-full"
+                        className={`absolute inset-x-0 h-px rounded-full ${demoEntrance ? 'crm-demo-entrance-zone-line' : ''}`}
                         style={{
                           top: zone.top - Math.max(zone.top - 6, 0),
                           background: `linear-gradient(90deg, ${zone.displayColor}AA 0%, ${zone.displayColor} 12%, ${zone.displayColor} 88%, ${zone.displayColor}AA 100%)`,
@@ -2091,8 +2097,11 @@ const LeadsTable = ({
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: Math.min(idx * 0.012, 0.35) }}
                         onContextMenu={(event) => handleContextMenu(event, lead.id)}
-                        className={`group pr-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${isRowSelected ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-white/[0.02]' : ''}`}
-                        style={{ paddingLeft: splitPaneScrollPadding }}
+                        className={`group pr-5 ${dc.row} flex items-center gap-3 min-w-max transition-all duration-150 relative ${demoEntrance ? 'crm-demo-entrance-row' : ''} ${isRowSelected ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'} ${isRowBulkSelected ? 'bg-white/[0.02]' : ''}`}
+                        style={{
+                          paddingLeft: splitPaneScrollPadding,
+                          ...(demoEntrance ? { '--crm-row-index': idx } : {}),
+                        }}
                       >
                         {isJustAdded && (
                           <motion.div
@@ -2132,8 +2141,8 @@ const LeadsTable = ({
   );
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full">
-      <div className="shrink-0 px-10 py-8 flex items-center gap-3">
+    <div className={`flex-1 flex flex-col min-w-0 h-full ${demoEntrance ? 'crm-demo-entrance-table' : ''}`}>
+      <div className={`shrink-0 px-10 py-8 flex items-center gap-3 ${demoEntrance ? 'crm-demo-entrance-topbar' : ''}`}>
         <div className="flex items-center gap-3">
           {!hideTitle && (
             <div className="flex flex-col gap-1">
@@ -2164,7 +2173,7 @@ const LeadsTable = ({
 
       <div className="flex-1 px-6 pb-6 min-h-0">
         <div className="relative group/table h-full flex flex-col">
-          <div className="mb-3 flex shrink-0 items-center gap-2 px-1">
+          <div className={`mb-3 flex shrink-0 items-center gap-2 px-1 ${demoEntrance ? 'crm-demo-entrance-controls' : ''}`}>
             <TableControlButton ref={sortButtonRef} active={activeControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setActiveControl((current) => (current === 'sort' ? null : 'sort'))}>
               Sort
             </TableControlButton>

@@ -373,6 +373,131 @@ main,
     padding-top: 36px;
     transform: translateY(10px);
 }
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.is-entering .crm-demo-entrance-topbar,
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.is-entering .crm-demo-entrance-controls {
+    opacity: 0;
+    transform: translateY(-8px);
+    pointer-events: none;
+}
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.is-waiting .crm-demo-entrance-table .crm-demo-entrance-row,
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.is-waiting .crm-demo-entrance-table .crm-demo-entrance-cell > *,
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.is-waiting .crm-demo-entrance-table .crm-demo-entrance-zone-line,
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.is-waiting .crm-demo-entrance-table .crm-demo-entrance-zone-glow {
+    opacity: 0;
+}
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.is-loaded .crm-demo-entrance-topbar,
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.is-loaded .crm-demo-entrance-controls {
+    animation: homepage-crm-controls-enter 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.has-started.is-entering .crm-demo-entrance-table .crm-demo-entrance-row {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: homepage-crm-record-shell 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--crm-row-index, 0) * 0.105s);
+}
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.has-started.is-entering .crm-demo-entrance-table .crm-demo-entrance-cell > * {
+    opacity: 0;
+    transform: translateX(-14px);
+    filter: blur(7px);
+    animation: homepage-crm-value-fill 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(1.05s + (var(--crm-row-index, 0) * 0.09s) + (var(--crm-cell-index, 0) * 0.045s));
+}
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.has-started.is-entering .crm-demo-entrance-table .crm-demo-entrance-zone-line,
+.scenario-demo-showcase .homepage-crm-demo.crm-demo-entrance.has-started.is-entering .crm-demo-entrance-table .crm-demo-entrance-zone-glow {
+    animation: homepage-crm-zone-bulb 2.55s linear backwards;
+    animation-delay: 3.35s;
+}
+
+@keyframes homepage-crm-value-fill {
+    0% {
+        opacity: 0;
+        transform: translateX(-18px);
+        filter: blur(8px);
+    }
+    58% {
+        opacity: 1;
+        transform: translateX(1px);
+        filter: blur(1px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+        filter: blur(0);
+    }
+}
+
+@keyframes homepage-crm-record-shell {
+    0% {
+        opacity: 0;
+        transform: translateY(14px);
+        filter: blur(7px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+@keyframes homepage-crm-zone-bulb {
+    0%, 7% {
+        opacity: 0;
+        filter: saturate(0.05) brightness(0.22) blur(1.1px);
+    }
+    8% {
+        opacity: 0.9;
+        filter: saturate(1.25) brightness(1.45) blur(0.2px);
+    }
+    10% {
+        opacity: 0.16;
+        filter: saturate(0.2) brightness(0.34) blur(0.8px);
+    }
+    13% {
+        opacity: 0.78;
+        filter: saturate(1.1) brightness(1.18) blur(0.25px);
+    }
+    16%, 28% {
+        opacity: 0.2;
+        filter: saturate(0.28) brightness(0.38) blur(0.85px);
+    }
+    31% {
+        opacity: 1;
+        filter: saturate(1.35) brightness(1.55) blur(0);
+    }
+    35% {
+        opacity: 0.42;
+        filter: saturate(0.48) brightness(0.62) blur(0.6px);
+    }
+    40% {
+        opacity: 0.96;
+        filter: saturate(1.15) brightness(1.18) blur(0.15px);
+    }
+    58% {
+        opacity: 0.82;
+        filter: saturate(1) brightness(0.82) blur(0.25px);
+    }
+    76% {
+        opacity: 0.9;
+        filter: saturate(1.08) brightness(0.94) blur(0.1px);
+    }
+    100% {
+        opacity: 1;
+        filter: none;
+    }
+}
+
+@keyframes homepage-crm-controls-enter {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+        filter: blur(7px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
 .scenario-demo-showcase .homepage-scenarios-builder .sb-canvas {
     min-height: 100vh;
 }
