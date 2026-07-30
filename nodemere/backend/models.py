@@ -195,6 +195,7 @@ class UserBase(BaseModel):
     started_trial: Optional[bool] = False # Added started_trial field
     pref_card_size: Optional[str] = None # Added for user's preferred card size
     hide_tutorial_modal: Optional[bool] = False # New field for tutorial modal
+    terms_of_service: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
     class Config:
         from_attributes = True
@@ -230,6 +231,7 @@ class UserUpdate(BaseModel):
     identity_questions: Optional[List[Dict[str, Any]]] = None
     pref_card_size: Optional[str] = None # Added for user's preferred card size
     hide_tutorial_modal: Optional[bool] = None # Added for tutorial modal
+    terms_of_service: Optional[Dict[str, Any]] = None
 
     class Config:
         populate_by_name = True

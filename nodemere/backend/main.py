@@ -3740,6 +3740,57 @@ def parse_business_hours(value):
     parsed = safe_json_loads(value)
     return parsed if parsed is not None else value
 
+SCHEDULE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+SCHEDULE_LAYERS = ["business", "inbound", "outbound"]
+
+def normalize_onboarding_schedule(value):
+    if not isinstance(value, dict):
+        raise ValueError("Business hours must be an object.")
+    if value.get("schema_version") != 1:
+        raise ValueError("Unsupported business hours schema.")
+    timeline = value.get("timeline") or {}
+    if float(timeline.get("start", -1)) != 0 or float(timeline.get("end", -1)) != 24:
+        raise ValueError("Business hours must use a 24-hour timeline.")
+    schedule_days = value.get("days")
+    if not isinstance(schedule_days, dict):
+        raise ValueError("Business hours days are missing.")
+
+    normalized_days = {}
+    for day in SCHEDULE_DAYS:
+        day_value = schedule_days.get(day)
+        if not isinstance(day_value, dict):
+            raise ValueError(f"Business hours are missing {day}.")
+        layers = day_value.get("layers")
+        if not isinstance(layers, dict):
+            raise ValueError(f"Business hours layers are missing for {day}.")
+        normalized_layers = {}
+        for layer_name in SCHEDULE_LAYERS:
+            layer = layers.get(layer_name)
+            if not isinstance(layer, dict):
+                raise ValueError(f"{layer_name} hours are missing for {day}.")
+            try:
+                start = float(layer.get("start"))
+                end = float(layer.get("end"))
+            except (TypeError, ValueError):
+                raise ValueError(f"{layer_name} hours are invalid for {day}.")
+            if start < 0 or end > 24 or start >= end:
+                raise ValueError(f"{layer_name} hours are invalid for {day}.")
+            normalized_layers[layer_name] = {
+                "enabled": bool(layer.get("enabled")),
+                "start": start,
+                "end": end,
+            }
+        normalized_days[day] = {
+            "enabled": bool(day_value.get("enabled")),
+            "layers": normalized_layers,
+        }
+
+    return {
+        "schema_version": 1,
+        "timeline": {"start": 0, "end": 24},
+        "days": normalized_days,
+    }
+
 def load_business_by_id(business_id: Optional[str]):
     if not business_id:
         return None
@@ -9796,6 +9847,7 @@ async def complete_onboarding(
     current_user_id = str(current_user.id)
 
     try:
+        normalized_business_hours = normalize_onboarding_schedule(onboarding_data.business_hours or {})
         user_update = {
             "onboarded": True,
             "phone": onboarding_data.business_phone,
@@ -9813,7 +9865,7 @@ async def complete_onboarding(
             "about_us": onboarding_data.about_company or "",
             "policies": onboarding_data.policies or "",
             "faq": onboarding_data.faq or "",
-            "business_hours": json.dumps(onboarding_data.business_hours or {}),
+            "business_hours": json.dumps(normalized_business_hours),
             "business_timezone": onboarding_data.business_timezone or "America/New_York",
             "industry": {
                 "industry": onboarding_data.industry,
@@ -9879,6 +9931,11 @@ async def complete_onboarding(
             "onboarded": True,
             "business": business,
         }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
     except Exception as e:
         logging.error(f"Failed to complete onboarding for user {current_user_id}: {e}", exc_info=True)
         raise HTTPException(

@@ -1,19 +1,43 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Settings, Clock, Building2, Phone, Bell, Calendar,
+  Settings, Building2, Phone, Bell, Calendar,
   Check, ChevronDown, ChevronUp, Sun, Moon,
   BookOpen, FileText, Shield, HelpCircle, Sparkles,
   Eye, EyeOff, Lightbulb, Zap, Star, Info,
-  Plus, Trash2, Tag, DollarSign,
+  Copy, Download, Layers, Plus, Trash2, Tag, DollarSign,
   ArrowRight, X, MessageSquareText, Users,
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil,
+  Loader2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const SCHEDULE_LAYER_TYPES = [
+  { id: 'business', label: 'Business Hours', color: '#06b6d4', gradient: 'from-cyan-500 to-blue-600', glow: '0 0 16px rgba(6, 182, 212, 0.4)' },
+  { id: 'inbound', label: 'Inbound Calls', color: '#14b8a6', gradient: 'from-teal-400 to-emerald-500', glow: '0 0 16px rgba(20, 184, 166, 0.4)' },
+  { id: 'outbound', label: 'Outbound Calls', color: '#f97316', gradient: 'from-orange-400 to-red-500', glow: '0 0 16px rgba(249, 115, 22, 0.38)' },
+];
+const COLORBLIND_SCHEDULE_LAYER_TYPES = [
+  { id: 'business', label: 'Business Hours', color: '#0072b2', gradient: 'from-[#0072b2] to-[#56b4e9]', glow: '0 0 16px rgba(0, 114, 178, 0.36)' },
+  { id: 'inbound', label: 'Inbound Calls', color: '#009e73', gradient: 'from-[#009e73] to-[#66c2a5]', glow: '0 0 16px rgba(0, 158, 115, 0.36)' },
+  { id: 'outbound', label: 'Outbound Calls', color: '#d55e00', gradient: 'from-[#d55e00] to-[#e69f00]', glow: '0 0 16px rgba(213, 94, 0, 0.36)' },
+];
+const getScheduleLayerTypes = (colorblindMode = false) => colorblindMode ? COLORBLIND_SCHEDULE_LAYER_TYPES : SCHEDULE_LAYER_TYPES;
+const OUTBOUND_LATE_HOURS_TERMS_KEY = 'outbound_late_hours_acknowledgment_v1';
+const OUTBOUND_LATE_HOURS_START = 20;
+const OUTBOUND_LATE_HOURS_END = 8;
+
+const hasAcceptedOutboundLateHoursTerms = (profile) => (
+  profile?.terms_of_service?.[OUTBOUND_LATE_HOURS_TERMS_KEY]?.accepted === true
+);
+
+const isOutboundLateHoursLayer = (layer) => (
+  Boolean(layer?.enabled)
+  && (Number(layer.start) < OUTBOUND_LATE_HOURS_END || Number(layer.end) >= OUTBOUND_LATE_HOURS_START)
+);
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
   'America/Phoenix', 'America/Anchorage', 'Pacific/Honolulu',
@@ -275,6 +299,102 @@ const createDefaultHours = (baseHours = null) => (
   }, {})
 );
 
+const timeToDecimalHour = (value, fallback = 9) => {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return fallback;
+  const hours = Math.max(0, Math.min(23, Number(match[1])));
+  const minutes = Math.max(0, Math.min(59, Number(match[2])));
+  return hours + (minutes / 60);
+};
+
+const decimalHourToTime = (value) => {
+  const totalMinutes = Math.round(Number(value || 0) * 60);
+  const hours = Math.max(0, Math.min(24, Math.floor(totalMinutes / 60)));
+  const minutes = hours === 24 ? 0 : Math.max(0, Math.min(59, totalMinutes % 60));
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+const isStructuredBusinessHours = (value) => (
+  value?.schema_version === 1
+  && value?.timeline
+  && value?.days
+  && DAYS.every((day) => SCHEDULE_LAYER_TYPES.every(({ id }) => value.days[day]?.layers?.[id]))
+);
+
+const createStructuredBusinessHours = (flatHours = null) => ({
+  schema_version: 1,
+  timeline: { start: 0, end: 24 },
+  days: DAYS.reduce((acc, day) => {
+    const hours = flatHours?.[day] || {};
+    const enabled = typeof hours.enabled === 'boolean' ? hours.enabled : !['Saturday', 'Sunday'].includes(day);
+    const open = hours.open || '09:00';
+    const close = hours.close || '17:00';
+    const start = timeToDecimalHour(open, 9);
+    const end = Math.max(start + 0.25, timeToDecimalHour(close, 17));
+    acc[day] = {
+      enabled,
+      layers: {
+        business: { enabled, start, end: Math.min(24, end) },
+        inbound: { enabled, start, end: Math.min(24, end) },
+        outbound: { enabled, start, end: Math.min(24, end) },
+      },
+    };
+    return acc;
+  }, {}),
+});
+
+const cleanStructuredBusinessHours = (businessHours) => {
+  const defaults = createStructuredBusinessHours();
+  const source = businessHours?.schema_version === 1 && businessHours?.days
+    ? businessHours
+    : createStructuredBusinessHours(businessHours);
+  return {
+    schema_version: 1,
+    timeline: { start: 0, end: 24 },
+    days: DAYS.reduce((acc, day) => {
+      const dayValue = source.days?.[day] || defaults.days[day];
+      acc[day] = {
+        enabled: Boolean(dayValue.enabled),
+        layers: SCHEDULE_LAYER_TYPES.reduce((layers, { id }) => {
+          const fallbackLayer = defaults.days[day].layers[id];
+          const layer = dayValue.layers?.[id] || fallbackLayer;
+          const start = Number(layer.start);
+          const end = Number(layer.end);
+          layers[id] = {
+            enabled: Boolean(layer.enabled),
+            start: Number.isFinite(start) ? Math.max(0, Math.min(23.75, start)) : fallbackLayer.start,
+            end: Number.isFinite(end) ? Math.max(0.25, Math.min(24, end)) : fallbackLayer.end,
+          };
+          if (layers[id].end <= layers[id].start) {
+            layers[id].end = Math.min(24, layers[id].start + 0.25);
+          }
+          return layers;
+        }, {}),
+      };
+      return acc;
+    }, {}),
+  };
+};
+
+const formatScheduleTime = (decimalHours) => {
+  const totalMinutes = Math.round(Number(decimalHours || 0) * 60) % (24 * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+};
+
+const formatScheduleDuration = (decimalHours) => {
+  const minutes = Math.round(Number(decimalHours || 0) * 60);
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours ? `${hours}h${remainder ? ` ${remainder}m` : ''}` : `${remainder}m`;
+};
+
+const formatWeeklyHours = (hours) => {
+  const rounded = Math.round(Number(hours || 0) * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}h`;
+};
+
 const DEFAULT_STAFF_KNOWLEDGE = `Staff Profile Knowledge Base
 
 Role and specialties:
@@ -458,43 +578,312 @@ const Toggle = ({ value, onChange }) => {
   );
 };
 
-// ─── Day Hours Row ──────────────────────────────────────────────────────────
-const DayHoursRow = ({ day, settings, onChange }) => {
-  const hours = settings.business_hours[day] || { enabled: false, open: '09:00', close: '17:00' };
+const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
+  const [secondsRemaining, setSecondsRemaining] = useState(10);
+  const canAccept = secondsRemaining === 0 && !isSaving;
 
-  const update = (field, val) => {
-    onChange({
-      ...settings,
-      business_hours: {
-        ...settings.business_hours,
-        [day]: { ...hours, [field]: val },
-      },
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSecondsRemaining((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[220] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
+    >
+      <motion.section
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 18, scale: 0.98 }}
+        transition={{ duration: 0.2 }}
+        className="w-full max-w-[560px] overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0a0a0a] shadow-[0_28px_90px_rgba(0,0,0,0.6)]"
+      >
+        <div className="border-b border-white/[0.06] px-7 py-6">
+          <div className="flex items-start justify-between gap-5">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-300/80">Outbound calling notice</p>
+              <h2 className="mt-2 text-[22px] font-black tracking-[-0.04em] text-white">Late-hours calling</h2>
+            </div>
+            <button type="button" onClick={onClose} className="mt-0.5 text-zinc-600 transition hover:text-white" aria-label="Close">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        <div className="px-7 py-6">
+          <p className="text-sm leading-6 text-zinc-300">
+            Calling customers outside normal business hours may lead to complaints, lower answer rates, and could be subject to local telemarketing or consumer protection regulations. Only enable overnight calling if it fits your business, you have appropriate customer consent, and you're confident it complies with applicable laws.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-white/[0.06] px-7 py-5">
+          <button type="button" onClick={onClose} className="h-10 rounded-full px-6 text-sm font-medium text-zinc-500 transition hover:text-white">
+            Review schedule
+          </button>
+          <button
+            type="button"
+            onClick={onAccept}
+            disabled={!canAccept}
+            className={`flex h-10 min-w-[168px] items-center justify-center gap-2 rounded-full px-6 text-sm font-bold transition disabled:cursor-wait ${
+              canAccept
+                ? 'bg-white text-black hover:bg-zinc-200'
+                : 'border border-white/[0.08] bg-white/[0.04] text-zinc-500'
+            }`}
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+              <>
+                <span>Yes, I accept</span>
+                {secondsRemaining > 0 ? <span className="text-[11px] text-zinc-500">({secondsRemaining})</span> : null}
+              </>
+            )}
+          </button>
+        </div>
+      </motion.section>
+    </motion.div>
+  );
+};
+
+const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, onOutboundLateHours }) => {
+  const fileInputRef = useRef(null);
+  const dragPreviewRef = useRef(null);
+  const [snapMinutes, setSnapMinutes] = useState(15);
+  const [visibleLayers, setVisibleLayers] = useState({ business: true, inbound: true, outbound: true });
+  const [colorblindMode, setColorblindMode] = useState(false);
+  const [drag, setDrag] = useState(null);
+  const [hoveredBar, setHoveredBar] = useState(null);
+  const [notice, setNotice] = useState('');
+  const schedule = cleanStructuredBusinessHours(value);
+  const activeLayerTypes = getScheduleLayerTypes(colorblindMode);
+  const timelineHours = 24;
+
+  const weeklyTotals = (() => {
+    const totals = { business: 0, inbound: 0, outbound: 0 };
+    DAYS.forEach((day) => {
+      const dayValue = schedule.days[day];
+      if (!dayValue?.enabled) return;
+      SCHEDULE_LAYER_TYPES.forEach(({ id }) => {
+        const layer = dayValue.layers[id];
+        if (layer?.enabled) totals[id] += Math.max(0, Number(layer.end) - Number(layer.start));
+      });
     });
+    return { coverage: totals.business, ...totals };
+  })();
+
+  const updateSchedule = (updater) => {
+    const next = typeof updater === 'function' ? updater(schedule) : updater;
+    onChange(cleanStructuredBusinessHours(next));
+  };
+
+  const updateLayer = (day, layerId, nextLayer) => {
+    updateSchedule((current) => ({
+      ...current,
+      days: {
+        ...current.days,
+        [day]: {
+          ...current.days[day],
+          layers: { ...current.days[day].layers, [layerId]: nextLayer },
+        },
+      },
+    }));
+  };
+
+  const handlePointerDown = (event, day, layerId, handle) => {
+    const layer = schedule.days[day].layers[layerId];
+    if (!schedule.days[day].enabled || !layer.enabled) return;
+    event.preventDefault();
+    dragPreviewRef.current = { day, layerId, layer };
+    setDrag({ day, layerId, handle, startX: event.clientX, startValue: handle === 'left' ? layer.start : handle === 'right' ? layer.end : layer.start });
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  useEffect(() => {
+    if (!drag) return undefined;
+    const handleMove = (event) => {
+      const track = document.querySelector(`[data-settings-schedule-track="${drag.day}"]`);
+      if (!track) return;
+      const width = track.getBoundingClientRect().width;
+      const delta = ((event.clientX - drag.startX) / width) * timelineHours;
+      const snap = snapMinutes / 60;
+      const layer = schedule.days[drag.day].layers[drag.layerId];
+      const duration = layer.end - layer.start;
+      let start = layer.start;
+      let end = layer.end;
+      if (drag.handle === 'left') start = Math.round((drag.startValue + delta) / snap) * snap;
+      if (drag.handle === 'right') end = Math.round((drag.startValue + delta) / snap) * snap;
+      if (drag.handle === 'center') {
+        start = Math.round((drag.startValue + delta) / snap) * snap;
+        end = start + duration;
+      }
+      start = Math.max(0, Math.min(start, 24 - snap));
+      end = Math.max(start + snap, Math.min(end, 24));
+      if (drag.handle === 'center') {
+        end = Math.min(24, start + duration);
+        start = end - duration;
+      }
+      const nextLayer = { ...layer, start, end };
+      dragPreviewRef.current = { day: drag.day, layerId: drag.layerId, layer: nextLayer };
+      updateLayer(drag.day, drag.layerId, nextLayer);
+    };
+    const stop = () => {
+      const preview = dragPreviewRef.current;
+      if (
+        preview?.layerId === 'outbound'
+        && !outboundLateHoursAccepted
+        && isOutboundLateHoursLayer(preview.layer)
+      ) {
+        onOutboundLateHours?.();
+      }
+      dragPreviewRef.current = null;
+      setDrag(null);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', stop);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', stop);
+    };
+  }, [drag, schedule, snapMinutes, onOutboundLateHours, outboundLateHoursAccepted]);
+
+  const copyDay = (sourceDay) => {
+    const source = schedule.days[sourceDay];
+    updateSchedule((current) => ({
+      ...current,
+      days: Object.fromEntries(DAYS.map((day) => [day, {
+        ...current.days[day],
+        layers: Object.fromEntries(SCHEDULE_LAYER_TYPES.map(({ id }) => [id, { ...source.layers[id] }])),
+      }])),
+    }));
+    setNotice(`${sourceDay} copied to all days`);
+  };
+
+  const exportSchedule = () => {
+    const blob = new Blob([JSON.stringify(schedule, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'nodemere-schedule.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importSchedule = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!isStructuredBusinessHours(parsed)) throw new Error('This file does not contain a complete schedule.');
+      onChange(cleanStructuredBusinessHours(parsed));
+      setNotice('Schedule imported');
+    } catch (error) {
+      setNotice(error.message || 'Could not import that schedule.');
+    }
   };
 
   return (
-    <div className="flex items-center gap-4 py-2.5 border-b border-white/[0.02] last:border-0">
-      <Toggle value={hours.enabled} onChange={(v) => update('enabled', v)} color="cyan" />
-      <span className={`text-[12px] font-medium w-24 ${hours.enabled ? 'text-zinc-300' : 'text-zinc-600'}`}>{day}</span>
-      {hours.enabled ? (
-        <div className="flex items-center gap-2 ml-auto">
-          <input
-            type="time"
-            value={hours.open}
-            onChange={(e) => update('open', e.target.value)}
-            className="time-input-no-icon bg-[#070707]/85 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
-          />
-          <span className="text-[11px] text-zinc-600">to</span>
-          <input
-            type="time"
-            value={hours.close}
-            onChange={(e) => update('close', e.target.value)}
-            className="time-input-no-icon bg-[#070707]/85 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
-          />
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="flex items-center gap-1.5 font-medium text-zinc-500"><Layers className="h-3.5 w-3.5" /> Layers:</span>
+          {activeLayerTypes.map((layer) => (
+            <button key={layer.id} type="button" onClick={() => setVisibleLayers((current) => ({ ...current, [layer.id]: !current[layer.id] }))} className={`flex items-center gap-1.5 text-[11px] font-medium transition ${visibleLayers[layer.id] ? 'text-zinc-300' : 'text-zinc-700'}`}>
+              <span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${layer.gradient} ${visibleLayers[layer.id] ? '' : 'opacity-30'}`} />{layer.label}
+            </button>
+          ))}
+          <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+            <span>Snap</span>
+            <select value={snapMinutes} onChange={(event) => setSnapMinutes(Number(event.target.value))} className="h-8 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 text-[11px] font-semibold text-white outline-none">
+              {[5, 15, 30, 60].map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}
+            </select>
+          </div>
         </div>
-      ) : (
-        <span className="text-[11px] text-zinc-700 ml-auto italic">Closed</span>
-      )}
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setColorblindMode((current) => !current)} className={`relative flex h-8 w-8 items-center justify-center rounded-lg border transition ${colorblindMode ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-200' : 'border-white/[0.07] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:text-white'}`} aria-label="Colorblind-friendly colors" title="Colorblind-friendly colors">
+            <Eye className="h-4 w-4" />
+            <span className="pointer-events-none absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[conic-gradient(from_90deg,#0072b2,#009e73,#d55e00,#56b4e9,#0072b2)] ring-1 ring-black/30" />
+          </button>
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.025] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:border-white/[0.14] hover:text-white"><Upload className="h-3.5 w-3.5" /> Import</button>
+          <button type="button" onClick={exportSchedule} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.025] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:border-white/[0.14] hover:text-white"><Download className="h-3.5 w-3.5" /> Export</button>
+        </div>
+      </div>
+      <input ref={fileInputRef} type="file" accept="application/json,.json" onChange={importSchedule} className="hidden" />
+
+      <div className="space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
+        <div className="flex pl-32 pr-12 text-[11px] font-mono text-zinc-600">
+          <div className="relative h-5 flex-1 select-none">{[0, 4, 8, 12, 16, 20, 24].map((hour) => <span key={hour} className="absolute -translate-x-1/2" style={{ left: `${(hour / timelineHours) * 100}%` }}>{formatScheduleTime(hour)}</span>)}</div>
+        </div>
+
+        <div className="space-y-1.5">
+          {DAYS.map((day) => {
+            const dayValue = schedule.days[day];
+            return (
+              <div key={day} className={`group relative flex items-center rounded-xl border px-3 py-2 transition-all duration-200 ${dayValue.enabled ? 'border-white/[0.06] bg-white/[0.018] hover:bg-white/[0.035]' : 'border-transparent bg-black/20 opacity-50 hover:opacity-75'}`}>
+                <div className="flex w-28 shrink-0 items-center gap-2.5">
+                  <button type="button" onClick={() => updateSchedule((current) => ({ ...current, days: { ...current.days, [day]: { ...current.days[day], enabled: !current.days[day].enabled } } }))} className={`flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-emerald-400/80' : 'bg-zinc-800'}`} aria-label={`Toggle ${day}`}><span className={`block h-3 w-3 rounded-full bg-white shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3' : 'translate-x-0'}`} /></button>
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${dayValue.enabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
+                </div>
+                <div data-settings-schedule-track={day} className="relative mx-2 flex h-14 min-w-0 flex-1 items-center">
+                  <div className="pointer-events-none absolute inset-0 flex justify-between opacity-10">{Array.from({ length: timelineHours + 1 }).map((_, index) => <span key={index} className="h-full w-px bg-white/40" />)}</div>
+                  <div className="relative flex w-full flex-col gap-1.5 py-1">
+                    {activeLayerTypes.map((layerType) => {
+                      const layer = dayValue.layers[layerType.id];
+                      const left = Math.max(0, Math.min(100, (layer.start / timelineHours) * 100));
+                      const width = Math.max(0, Math.min(100 - left, ((layer.end - layer.start) / timelineHours) * 100));
+                      const barKey = `${day}-${layerType.id}`;
+                      const isActiveBar = drag?.day === day && drag?.layerId === layerType.id;
+                      const isHovered = hoveredBar === barKey;
+                      const isDimmed = drag && !isActiveBar;
+                      if (!visibleLayers[layerType.id]) return <div key={layerType.id} className="h-2.5" />;
+                      return (
+                        <div key={layerType.id} className="group/bar relative h-2.5 w-full" onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)}>
+                          <div className="absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full border border-white/[0.03] bg-white/[0.04]" />
+                          {dayValue.enabled && layer.enabled ? (
+                            <div className={`absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} cursor-grab transition-all duration-75 active:cursor-grabbing ${isActiveBar ? 'z-20 scale-y-110 ring-2 ring-white/50' : 'z-10'} ${isDimmed ? 'opacity-30' : 'opacity-100'} ${isHovered ? 'brightness-125 shadow-lg' : ''}`} style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || isHovered ? layerType.glow : 'none' }} onPointerDown={(event) => handlePointerDown(event, day, layerType.id, 'center')}>
+                              <button type="button" aria-label={`Move ${layerType.label} start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'left'); }} className="absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30"><span className="h-0.5 w-4 rounded-full bg-white/60" /></div>
+                              <button type="button" aria-label={`Move ${layerType.label} end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'right'); }} className="absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
+                            </div>
+                          ) : null}
+                          {dayValue.enabled && layer.enabled && (isHovered || isActiveBar) ? (
+                            <div className="pointer-events-none absolute -top-7 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.08] bg-[#111] px-2 py-0.5 font-mono text-[11px] text-zinc-100 shadow-2xl" style={{ left: `${Math.min(92, Math.max(8, left + (width / 2)))}%` }}>
+                              <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: layerType.color }} />
+                              <span className="font-semibold text-white">{formatScheduleTime(layer.start)}</span>
+                              <span className="px-1 text-zinc-500">-</span>
+                              <span className="font-semibold text-white">{formatScheduleTime(layer.end)}</span>
+                              <span className="ml-1.5 rounded bg-white/10 px-1 text-[10px] text-zinc-400">{formatScheduleDuration(layer.end - layer.start)}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="flex w-10 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100">
+                  <button type="button" onClick={() => copyDay(day)} className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/10 hover:text-white" aria-label={`Copy ${day} schedule to all days`}><Copy className="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex min-h-[48px] items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.018] px-4 text-[11px] text-zinc-500">
+          <div className="flex flex-wrap items-center gap-4">
+            {activeLayerTypes.map((layer) => (
+              <span key={layer.id} className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: layer.color }} />
+                <span>{layer.label.replace(' Hours', '')}: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyTotals[layer.id])}</strong></span>
+              </span>
+            ))}
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-zinc-600">
+            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-zinc-600 text-[9px] font-bold">i</span>
+            <span>Drag handles or entire bar to resize and adjust schedules.</span>
+          </div>
+        </div>
+      </div>
+      {notice ? <div className="px-1 text-right text-[10px] text-emerald-300">{notice}</div> : null}
     </div>
   );
 };
@@ -2047,15 +2436,18 @@ const BusinessForwardingSettings = ({ authSession }) => {
 };
 
 const SettingsPage = () => {
-  const { session: authSession } = useAuth();
+  const { session: authSession, profile, refreshProfile } = useAuth();
   const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState(null);
+  const [lateHoursTermsOpen, setLateHoursTermsOpen] = useState(false);
+  const [lateHoursTermsSaving, setLateHoursTermsSaving] = useState(false);
   const [activeSection, setActiveSection] = useState('business');
   const [businessAvatarUploading, setBusinessAvatarUploading] = useState(false);
   const businessAvatarInputRef = useRef(null);
+  const outboundLateHoursAccepted = hasAcceptedOutboundLateHoursTerms(profile);
 
   useEffect(() => {
     loadSettings();
@@ -2081,7 +2473,11 @@ const SettingsPage = () => {
       city: settings.business_city || '',
       state: settings.business_state || '',
       zip: settings.business_zip || '',
-      business_hours: typeof settings.business_hours === 'object' ? JSON.stringify(settings.business_hours) : settings.business_hours,
+      business_hours: JSON.stringify(
+        isStructuredBusinessHours(settings.business_hours)
+          ? settings.business_hours
+          : createStructuredBusinessHours(settings.business_hours)
+      ),
       about_us: settings.knowledge_base?.about || '',
       policies: settings.knowledge_base?.policies || '',
       faq: settings.knowledge_base?.faq || '',
@@ -2191,9 +2587,12 @@ const SettingsPage = () => {
         business_zip: biz.zip || '',
         business_hours: (() => {
           const h = biz.business_hours;
-          if (!h) return {};
-          if (typeof h === 'object') return h;
-          try { return JSON.parse(h); } catch { return {}; }
+          const parsed = (() => {
+            if (!h) return null;
+            if (typeof h === 'object') return h;
+            try { return JSON.parse(h); } catch { return null; }
+          })();
+          return isStructuredBusinessHours(parsed) ? parsed : createStructuredBusinessHours(parsed);
         })(),
         business_timezone: config.business_timezone || 'America/New_York',
         // App config from account_settings
@@ -2293,6 +2692,42 @@ const SettingsPage = () => {
 
   const update = (field, value) => {
     setSettings(prev => ({ ...prev, [field]: value }));
+  };
+
+  const acceptOutboundLateHoursTerms = async () => {
+    if (!authSession?.access_token) {
+      setError('Your session expired. Please sign in again to continue.');
+      return;
+    }
+
+    setLateHoursTermsSaving(true);
+    try {
+      const response = await fetch(`${FORWARDING_API_BASE_URL}/users/me`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          terms_of_service: {
+            ...(profile?.terms_of_service || {}),
+            [OUTBOUND_LATE_HOURS_TERMS_KEY]: {
+              accepted: true,
+              accepted_at: new Date().toISOString(),
+              version: 1,
+            },
+          },
+        }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      await refreshProfile?.();
+      setLateHoursTermsOpen(false);
+    } catch (err) {
+      console.error('[SettingsPage] Failed to save late-hours terms:', err);
+      setError('Could not save that acknowledgment. Please try again.');
+    } finally {
+      setLateHoursTermsSaving(false);
+    }
   };
 
   const updatePreference = (section, field, value) => {
@@ -2396,17 +2831,12 @@ const SettingsPage = () => {
         );
       case 'appointments':
         return (
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Clock size={14} className="settings-icon" />
-              <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Business Hours</span>
-            </div>
-            <div className="flex flex-col">
-              {DAYS.map(day => (
-                <DayHoursRow key={day} day={day} settings={settings} onChange={setSettings} />
-              ))}
-            </div>
-          </div>
+          <SettingsScheduleBuilder
+            value={settings.business_hours}
+            onChange={(businessHours) => update('business_hours', businessHours)}
+            outboundLateHoursAccepted={outboundLateHoursAccepted}
+            onOutboundLateHours={() => setLateHoursTermsOpen(true)}
+          />
         );
       case 'services':
         return (
@@ -2658,6 +3088,16 @@ const SettingsPage = () => {
         </div>
       </div>
 
+      <AnimatePresence>
+        {lateHoursTermsOpen ? (
+          <LateHoursTermsModal
+            isSaving={lateHoursTermsSaving}
+            onAccept={acceptOutboundLateHoursTerms}
+            onClose={() => setLateHoursTermsOpen(false)}
+          />
+        ) : null}
+      </AnimatePresence>
+
       <div className="hidden">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
 
@@ -2713,15 +3153,12 @@ const SettingsPage = () => {
           {/* ── Calendar & Appointments ──────────────────────────────────── */}
           <Section title="Calendar & Appointments" icon={Calendar} color="bg-white/[0.04] text-white" defaultOpen={true}>
             <div className="border-t border-white/[0.03] pt-5 mt-1">
-              <div className="flex items-center gap-2 mb-4">
-                <Clock size={14} className="settings-icon" />
-                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Business Hours</span>
-              </div>
-              <div className="flex flex-col">
-                {DAYS.map(day => (
-                  <DayHoursRow key={day} day={day} settings={settings} onChange={setSettings} />
-                ))}
-              </div>
+              <SettingsScheduleBuilder
+                value={settings.business_hours}
+                onChange={(businessHours) => update('business_hours', businessHours)}
+                outboundLateHoursAccepted={outboundLateHoursAccepted}
+                onOutboundLateHours={() => setLateHoursTermsOpen(true)}
+              />
             </div>
           </Section>
 

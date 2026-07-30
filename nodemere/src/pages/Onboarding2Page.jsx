@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -6,17 +6,22 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   ArrowRight,
   Building2,
-  Calendar,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock3,
+  Copy,
+  Download,
   Edit3,
+  Eye,
+  HelpCircle,
+  Layers,
   Loader2,
   Mail,
   MapPin,
   Phone,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 
@@ -36,7 +41,7 @@ const steps = [
   {
     id: 'operations',
     title: 'How should scheduling work?',
-    description: 'A few defaults here make inbound calls and appointment handling feel much smoother immediately.',
+    description: 'Set when the business is open, when your receptionist should answer inbound calls, and when outbound calls can be made. Drag a bar to move a schedule, or drag either end to adjust its start and end time.',
   },
   {
     id: 'context',
@@ -74,15 +79,101 @@ const industries = [
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-const defaultHours = {
-  Monday: { enabled: true, open: '09:00', close: '17:00' },
-  Tuesday: { enabled: true, open: '09:00', close: '17:00' },
-  Wednesday: { enabled: true, open: '09:00', close: '17:00' },
-  Thursday: { enabled: true, open: '09:00', close: '17:00' },
-  Friday: { enabled: true, open: '09:00', close: '17:00' },
-  Saturday: { enabled: false, open: '10:00', close: '14:00' },
-  Sunday: { enabled: false, open: '10:00', close: '14:00' },
+const scheduleLayerTypes = [
+  {
+    id: 'business',
+    label: 'Business Hours',
+    color: '#06b6d4',
+    gradient: 'from-cyan-500 to-blue-600',
+    glow: '0 0 16px rgba(6, 182, 212, 0.4)',
+  },
+  {
+    id: 'inbound',
+    label: 'Inbound Calls',
+    color: '#14b8a6',
+    gradient: 'from-teal-400 to-emerald-500',
+    glow: '0 0 16px rgba(20, 184, 166, 0.4)',
+  },
+  {
+    id: 'outbound',
+    label: 'Outbound Calls',
+    color: '#f97316',
+    gradient: 'from-orange-400 to-red-500',
+    glow: '0 0 16px rgba(249, 115, 22, 0.38)',
+  },
+];
+
+const colorblindScheduleLayerTypes = [
+  {
+    id: 'business',
+    label: 'Business Hours',
+    color: '#0072b2',
+    gradient: 'from-[#0072b2] to-[#56b4e9]',
+    glow: '0 0 16px rgba(0, 114, 178, 0.36)',
+  },
+  {
+    id: 'inbound',
+    label: 'Inbound Calls',
+    color: '#009e73',
+    gradient: 'from-[#009e73] to-[#66c2a5]',
+    glow: '0 0 16px rgba(0, 158, 115, 0.36)',
+  },
+  {
+    id: 'outbound',
+    label: 'Outbound Calls',
+    color: '#d55e00',
+    gradient: 'from-[#d55e00] to-[#e69f00]',
+    glow: '0 0 16px rgba(213, 94, 0, 0.36)',
+  },
+];
+
+const getScheduleLayerTypes = (colorblindMode = false) => (
+  colorblindMode ? colorblindScheduleLayerTypes : scheduleLayerTypes
+);
+
+const scheduleTimeline = { start: 0, end: 24 };
+const OUTBOUND_LATE_HOURS_TERMS_KEY = 'outbound_late_hours_acknowledgment_v1';
+const OUTBOUND_LATE_HOURS_START = 20;
+const OUTBOUND_LATE_HOURS_END = 8;
+
+const hasAcceptedOutboundLateHoursTerms = (profile) => (
+  profile?.terms_of_service?.[OUTBOUND_LATE_HOURS_TERMS_KEY]?.accepted === true
+);
+
+const isOutboundLateHoursLayer = (layer) => (
+  Boolean(layer?.enabled)
+  && (Number(layer.start) < OUTBOUND_LATE_HOURS_END || Number(layer.end) >= OUTBOUND_LATE_HOURS_START)
+);
+
+const scheduleHasOutboundLateHours = (schedule) => {
+  const normalized = cleanScheduleForStorage(schedule);
+  return days.some((day) => {
+    const dayValue = normalized.days[day];
+    return Boolean(dayValue?.enabled) && isOutboundLateHoursLayer(dayValue.layers?.outbound);
+  });
 };
+
+const createDefaultSchedule = () => ({
+  schema_version: 1,
+  timeline: scheduleTimeline,
+  days: days.reduce((result, day) => {
+    const weekend = day === 'Saturday' || day === 'Sunday';
+    result[day] = {
+      enabled: !weekend,
+      layers: {
+        business: { start: 9, end: 17, enabled: true },
+        inbound: { start: 9, end: 17, enabled: true },
+        outbound: { start: 9.5, end: 16.5, enabled: true },
+      },
+    };
+    return result;
+  }, {}),
+  ...days.reduce((result, day) => {
+    const weekend = day === 'Saturday' || day === 'Sunday';
+    result[day] = { enabled: !weekend, open: weekend ? '10:00' : '09:00', close: weekend ? '14:00' : '17:00' };
+    return result;
+  }, {}),
+});
 
 const aboutTemplate = `Who are you? Tell your story. Your AI receptionist uses this to answer questions about your business.
 
@@ -250,24 +341,443 @@ const Toggle = ({ value, onChange }) => (
   </button>
 );
 
-const DayRow = ({ day, hours, onChange }) => (
-  <div className="flex flex-col gap-3 border-b border-white/[0.02] py-2.5 last:border-0 md:flex-row md:items-center">
-    <Toggle value={hours.enabled} onChange={(next) => onChange(day, 'enabled', next)} />
-    <div className="w-full md:w-28">
-      <div className={`text-[12px] font-medium ${hours.enabled ? 'text-zinc-300' : 'text-zinc-600'}`}>{day}</div>
-      <div className="text-[11px] text-zinc-700">{hours.enabled ? 'Answer inbound calls' : 'Closed'}</div>
-    </div>
-    {hours.enabled ? (
-      <div className="flex items-center gap-2 md:ml-auto">
-        <input type="time" value={hours.open} onChange={(e) => onChange(day, 'open', e.target.value)} className={smallFieldClass} />
-        <span className="text-[11px] text-zinc-600">to</span>
-        <input type="time" value={hours.close} onChange={(e) => onChange(day, 'close', e.target.value)} className={smallFieldClass} />
-      </div>
-    ) : (
-      <span className="text-[11px] italic text-zinc-700 md:ml-auto">Closed</span>
-    )}
-  </div>
+const formatScheduleTime = (decimalHours) => {
+  const totalMinutes = Math.round(Number(decimalHours || 0) * 60) % (24 * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+};
+
+const formatScheduleDuration = (decimalHours) => {
+  const minutes = Math.round(Number(decimalHours || 0) * 60);
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours ? `${hours}h${remainder ? ` ${remainder}m` : ''}` : `${remainder}m`;
+};
+
+const cleanScheduleForStorage = (schedule) => {
+  const source = scheduleIsValid(schedule) ? schedule : createDefaultSchedule();
+  return {
+    schema_version: 1,
+    timeline: { start: scheduleTimeline.start, end: scheduleTimeline.end },
+    days: Object.fromEntries(days.map((day) => [
+      day,
+      {
+        enabled: Boolean(source.days[day].enabled),
+        layers: Object.fromEntries(scheduleLayerTypes.map(({ id }) => [
+          id,
+          {
+            enabled: Boolean(source.days[day].layers[id].enabled),
+            start: Number(source.days[day].layers[id].start),
+            end: Number(source.days[day].layers[id].end),
+          },
+        ])),
+      },
+    ])),
+  };
+};
+
+const scheduleIsValid = (value) => (
+  value && value.schema_version === 1 && Number(value.timeline?.start) === scheduleTimeline.start && Number(value.timeline?.end) === scheduleTimeline.end && value.days && days.every((day) => {
+    const dayValue = value.days[day];
+    return dayValue && typeof dayValue.enabled === 'boolean' && scheduleLayerTypes.every(({ id }) => {
+      const layer = dayValue.layers?.[id];
+      const start = Number(layer?.start);
+      const end = Number(layer?.end);
+      return layer && typeof layer.enabled === 'boolean' && Number.isFinite(start) && Number.isFinite(end) && start >= scheduleTimeline.start && end <= scheduleTimeline.end && start < end;
+    });
+  })
 );
+
+const formatWeeklyHours = (hours) => {
+  const rounded = Math.round(Number(hours || 0) * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}h`;
+};
+
+const SnapDropdown = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const options = [5, 15, 30, 60];
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (event) => {
+      if (!ref.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((next) => !next)}
+        className="flex min-h-[34px] w-[104px] items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-left text-[11px] font-semibold tracking-[-0.02em] text-white transition hover:border-white/[0.14]"
+      >
+        <span className="truncate">{value} min</span>
+        <ChevronDown size={12} className={`shrink-0 text-zinc-600 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            className="absolute left-0 top-full z-50 mt-1.5 max-h-56 min-w-full overflow-y-auto rounded-xl border border-white/[0.08] bg-[#111] py-1 shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
+          >
+            {options.map((option) => {
+              const active = value === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => { onChange(option); setOpen(false); }}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{option} min</span>
+                  {active ? <Check size={11} className="text-white" /> : null}
+                </button>
+              );
+            })}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
+  const [secondsRemaining, setSecondsRemaining] = useState(10);
+  const canAccept = secondsRemaining === 0 && !isSaving;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSecondsRemaining((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
+    >
+      <motion.section
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 18, scale: 0.98 }}
+        transition={{ duration: 0.2 }}
+        className="w-full max-w-[560px] overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0a0a0a] shadow-[0_28px_90px_rgba(0,0,0,0.6)]"
+      >
+        <div className="border-b border-white/[0.06] px-7 py-6">
+          <div className="flex items-start justify-between gap-5">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-300/80">Outbound calling notice</p>
+              <h2 className="mt-2 text-[22px] font-black tracking-[-0.04em] text-white">Late-hours calling</h2>
+            </div>
+            <button type="button" onClick={onClose} className="mt-0.5 text-zinc-600 transition hover:text-white" aria-label="Close">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        <div className="px-7 py-6">
+          <p className="text-sm leading-6 text-zinc-300">
+            Calling customers outside normal business hours may lead to complaints, lower answer rates, and could be subject to local telemarketing or consumer protection regulations. Only enable overnight calling if it fits your business, you have appropriate customer consent, and you're confident it complies with applicable laws.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-white/[0.06] px-7 py-5">
+          <button type="button" onClick={onClose} className="h-10 rounded-full px-6 text-sm font-medium text-zinc-500 transition hover:text-white">
+            Review schedule
+          </button>
+          <button
+            type="button"
+            onClick={onAccept}
+            disabled={!canAccept}
+            className={`flex h-10 min-w-[168px] items-center justify-center gap-2 rounded-full px-6 text-sm font-bold transition disabled:cursor-wait ${
+              canAccept
+                ? 'bg-white text-black hover:bg-zinc-200'
+                : 'border border-white/[0.08] bg-white/[0.04] text-zinc-500'
+            }`}
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+              <>
+                <span>Yes, I accept</span>
+                {secondsRemaining > 0 ? <span className="text-[11px] text-zinc-500">({secondsRemaining})</span> : null}
+              </>
+            )}
+          </button>
+        </div>
+      </motion.section>
+    </motion.div>
+  );
+};
+
+const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeChange, outboundLateHoursAccepted, onOutboundLateHours }) => {
+  const fileInputRef = useRef(null);
+  const dragPreviewRef = useRef(null);
+  const [snapMinutes, setSnapMinutes] = useState(15);
+  const [visibleLayers, setVisibleLayers] = useState({ business: true, inbound: true, outbound: true });
+  const [drag, setDrag] = useState(null);
+  const [hoveredBar, setHoveredBar] = useState(null);
+  const [notice, setNotice] = useState('');
+
+  const schedule = scheduleIsValid(value) ? value : createDefaultSchedule();
+  const timelineHours = schedule.timeline?.end - schedule.timeline?.start || 24;
+  const activeLayerTypes = useMemo(() => getScheduleLayerTypes(colorblindMode), [colorblindMode]);
+  const weeklyTotals = useMemo(() => {
+    const totals = { business: 0, inbound: 0, outbound: 0 };
+    days.forEach((day) => {
+      const dayValue = schedule.days[day];
+      if (!dayValue?.enabled) return;
+      activeLayerTypes.forEach(({ id }) => {
+        const layer = dayValue.layers[id];
+        if (!layer?.enabled) return;
+        totals[id] += Math.max(0, Number(layer.end) - Number(layer.start));
+      });
+    });
+    return { coverage: totals.business, ...totals };
+  }, [activeLayerTypes, schedule]);
+
+  const updateSchedule = useCallback((updater) => {
+    const nextSchedule = typeof updater === 'function' ? updater(schedule) : updater;
+    onChange(cleanScheduleForStorage(nextSchedule));
+  }, [onChange, schedule]);
+
+  const updateLayer = useCallback((day, layerId, nextLayer) => {
+    updateSchedule((current) => ({
+      ...current,
+      days: {
+        ...current.days,
+        [day]: {
+          ...current.days[day],
+          layers: { ...current.days[day].layers, [layerId]: nextLayer },
+        },
+      },
+    }));
+  }, [updateSchedule]);
+
+  const handlePointerDown = (event, day, layerId, handle) => {
+    const layer = schedule.days[day].layers[layerId];
+    if (!schedule.days[day].enabled || !layer.enabled) return;
+    event.preventDefault();
+    dragPreviewRef.current = { day, layerId, layer };
+    setDrag({ day, layerId, handle, startX: event.clientX, startValue: handle === 'left' ? layer.start : handle === 'right' ? layer.end : layer.start });
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const handlePointerMove = useCallback((event) => {
+    if (!drag) return;
+    const track = document.querySelector(`[data-schedule-track="${drag.day}"]`);
+    if (!track) return;
+    const width = track.getBoundingClientRect().width;
+    const delta = ((event.clientX - drag.startX) / width) * timelineHours;
+    const snap = snapMinutes / 60;
+    const layer = schedule.days[drag.day].layers[drag.layerId];
+    const duration = layer.end - layer.start;
+    let start = layer.start;
+    let end = layer.end;
+    if (drag.handle === 'left') start = Math.round((drag.startValue + delta) / snap) * snap;
+    if (drag.handle === 'right') end = Math.round((drag.startValue + delta) / snap) * snap;
+    if (drag.handle === 'center') {
+      start = Math.round((drag.startValue + delta) / snap) * snap;
+      end = start + duration;
+    }
+    start = Math.max(schedule.timeline.start, Math.min(start, schedule.timeline.end - snap));
+    end = Math.max(start + snap, Math.min(end, schedule.timeline.end));
+    if (drag.handle === 'center') {
+      end = Math.min(schedule.timeline.end, start + duration);
+      start = end - duration;
+    }
+    const nextLayer = { ...layer, start, end };
+    dragPreviewRef.current = { day: drag.day, layerId: drag.layerId, layer: nextLayer };
+    updateLayer(drag.day, drag.layerId, nextLayer);
+  }, [drag, schedule, snapMinutes, timelineHours, updateLayer]);
+
+  useEffect(() => {
+    if (!drag) return undefined;
+    const stop = () => {
+      const preview = dragPreviewRef.current;
+      if (
+        preview?.layerId === 'outbound'
+        && !outboundLateHoursAccepted
+        && isOutboundLateHoursLayer(preview.layer)
+      ) {
+        onOutboundLateHours?.();
+      }
+      dragPreviewRef.current = null;
+      setDrag(null);
+    };
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stop);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stop);
+    };
+  }, [drag, handlePointerMove, onOutboundLateHours, outboundLateHoursAccepted]);
+
+  const copyDay = (sourceDay) => {
+    const source = schedule.days[sourceDay];
+    updateSchedule((current) => ({
+      ...current,
+      days: Object.fromEntries(days.map((day) => [day, {
+        ...current.days[day],
+        layers: Object.fromEntries(activeLayerTypes.map(({ id }) => [id, { ...source.layers[id] }]))
+      }])),
+    }));
+    setNotice(`${sourceDay} copied to all days`);
+  };
+
+  const exportSchedule = () => {
+    const blob = new Blob([JSON.stringify(schedule, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'nodemere-schedule.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importSchedule = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!scheduleIsValid(parsed)) throw new Error('This file does not contain a complete schedule.');
+      onChange(cleanScheduleForStorage(parsed));
+      setNotice('Schedule imported');
+    } catch (error) {
+      setNotice(error.message || 'Could not import that schedule.');
+    }
+  };
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="flex items-center gap-1.5 font-medium text-zinc-500"><Layers className="h-3.5 w-3.5" /> Layers:</span>
+          {activeLayerTypes.map((layer) => (
+            <button key={layer.id} type="button" onClick={() => setVisibleLayers((current) => ({ ...current, [layer.id]: !current[layer.id] }))} className={`flex items-center gap-1.5 text-[11px] font-medium transition ${visibleLayers[layer.id] ? 'text-zinc-300' : 'text-zinc-700'}`}>
+              <span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${layer.gradient} ${visibleLayers[layer.id] ? '' : 'opacity-30'}`} />{layer.label}
+            </button>
+          ))}
+          <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+            <span>Snap</span>
+            <SnapDropdown value={snapMinutes} onChange={setSnapMinutes} />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onColorblindModeChange(!colorblindMode)}
+            className={`relative flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+              colorblindMode ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-200' : 'border-white/[0.07] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:text-white'
+            }`}
+            aria-label="Colorblind-friendly colors"
+            title="Colorblind-friendly colors"
+          >
+            <Eye className="h-4 w-4" />
+            <span className="pointer-events-none absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[conic-gradient(from_90deg,#0072b2,#009e73,#d55e00,#56b4e9,#0072b2)] ring-1 ring-black/30" />
+          </button>
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.025] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:border-white/[0.14] hover:text-white"><Upload className="h-3.5 w-3.5" /> Import</button>
+          <button type="button" onClick={exportSchedule} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.025] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:border-white/[0.14] hover:text-white"><Download className="h-3.5 w-3.5" /> Export</button>
+        </div>
+      </div>
+      <input ref={fileInputRef} type="file" accept="application/json,.json" onChange={importSchedule} className="hidden" />
+
+      <div className="space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
+
+      <div className="flex pl-32 pr-12 text-[11px] font-mono text-zinc-600">
+        <div className="relative h-5 flex-1 select-none">{[0, 4, 8, 12, 16, 20, 24].map((hour) => <span key={hour} className="absolute -translate-x-1/2" style={{ left: `${((hour - schedule.timeline.start) / timelineHours) * 100}%` }}>{formatScheduleTime(hour)}</span>)}</div>
+      </div>
+
+      <div className="space-y-1.5">
+        {days.map((day) => {
+          const dayValue = schedule.days[day];
+          return (
+            <div key={day} className={`group relative flex items-center rounded-xl border px-3 py-2 transition-all duration-200 ${dayValue.enabled ? 'border-white/[0.06] bg-white/[0.018] hover:bg-white/[0.035]' : 'border-transparent bg-black/20 opacity-50 hover:opacity-75'}`}>
+              <div className="flex w-28 shrink-0 items-center gap-2.5">
+                <button type="button" onClick={() => updateSchedule((current) => ({ ...current, days: { ...current.days, [day]: { ...current.days[day], enabled: !current.days[day].enabled } } }))} className={`flex h-4 w-7 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-emerald-400/80' : 'bg-zinc-800'}`} aria-label={`Toggle ${day}`}><span className={`h-3 w-3 rounded-full bg-white shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3' : 'translate-x-0'}`} /></button>
+                <span className={`text-xs font-semibold uppercase tracking-wider ${dayValue.enabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
+              </div>
+              <div data-schedule-track={day} className="relative mx-2 flex h-14 min-w-0 flex-1 items-center">
+                <div className="pointer-events-none absolute inset-0 flex justify-between opacity-10">{Array.from({ length: timelineHours + 1 }).map((_, index) => <span key={index} className="h-full w-px bg-white/40" />)}</div>
+                <div className="relative flex w-full flex-col gap-1.5 py-1">
+                  {activeLayerTypes.map((layerType) => {
+                    const layer = dayValue.layers[layerType.id];
+                    const left = Math.max(0, Math.min(100, ((layer.start - schedule.timeline.start) / timelineHours) * 100));
+                    const width = Math.max(0, Math.min(100 - left, ((layer.end - layer.start) / timelineHours) * 100));
+                    const barKey = `${day}-${layerType.id}`;
+                    const isActiveBar = drag?.day === day && drag?.layerId === layerType.id;
+                    const isHovered = hoveredBar === barKey;
+                    const isDimmed = drag && !isActiveBar;
+                    if (!visibleLayers[layerType.id]) return <div key={layerType.id} className="h-2.5" />;
+                    return (
+                      <div key={layerType.id} className="group/bar relative h-2.5 w-full" onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)}>
+                        <div className="absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full border border-white/[0.03] bg-white/[0.04]" />
+                        {dayValue.enabled && layer.enabled ? (
+                          <div
+                            className={`absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} cursor-grab transition-all duration-75 active:cursor-grabbing ${
+                              isActiveBar ? 'z-20 scale-y-110 ring-2 ring-white/50' : 'z-10'
+                            } ${isDimmed ? 'opacity-30' : 'opacity-100'} ${isHovered ? 'brightness-125 shadow-lg' : ''}`}
+                            style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || isHovered ? layerType.glow : 'none' }}
+                            onPointerDown={(event) => handlePointerDown(event, day, layerType.id, 'center')}
+                          >
+                            <button type="button" aria-label={`Move ${layerType.label} start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'left'); }} className="absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100">
+                              <span className="h-2 w-0.5 rounded-full bg-zinc-600" />
+                            </button>
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30">
+                              <span className="h-0.5 w-4 rounded-full bg-white/60" />
+                            </div>
+                            <button type="button" aria-label={`Move ${layerType.label} end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'right'); }} className="absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100">
+                              <span className="h-2 w-0.5 rounded-full bg-zinc-600" />
+                            </button>
+                          </div>
+                        ) : null}
+                        {dayValue.enabled && layer.enabled && (isHovered || isActiveBar) ? (
+                          <div className="pointer-events-none absolute -top-7 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.08] bg-[#111] px-2 py-0.5 font-mono text-[11px] text-zinc-100 shadow-2xl" style={{ left: `${Math.min(92, Math.max(8, left + (width / 2)))}%` }}>
+                            <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: layerType.color }} />
+                            <span className="font-semibold text-white">{formatScheduleTime(layer.start)}</span>
+                            <span className="px-1 text-zinc-500">-</span>
+                            <span className="font-semibold text-white">{formatScheduleTime(layer.end)}</span>
+                            <span className="ml-1.5 rounded bg-white/10 px-1 text-[10px] text-zinc-400">{formatScheduleDuration(layer.end - layer.start)}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex w-10 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100">
+                <button type="button" onClick={() => copyDay(day)} className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/10 hover:text-white" aria-label={`Copy ${day} schedule to all days`}><Copy className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+        <div className="flex min-h-[48px] items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.018] px-4 text-[11px] text-zinc-500">
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="font-semibold text-zinc-400">Weekly Coverage: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyTotals.coverage)}</strong></span>
+            {activeLayerTypes.map((layer) => (
+              <span key={layer.id} className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: layer.color }} />
+                <span>{layer.label.replace(' Hours', '')}: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyTotals[layer.id])}</strong></span>
+              </span>
+            ))}
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-zinc-600">
+            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-zinc-600 text-[9px] font-bold">i</span>
+            <span>Drag handles or entire bar to resize and adjust schedules.</span>
+          </div>
+        </div>
+      </div>
+      {notice ? <div className="px-1 text-right text-[10px] text-emerald-300">{notice}</div> : null}
+    </div>
+  );
+};
 
 const BillingUnitCascade = ({ value, options, onChange }) => {
   const [open, setOpen] = useState(false);
@@ -398,12 +908,16 @@ const ServiceModal = ({ initialService, onClose, onSave }) => {
 
 const Onboarding2Page = () => {
   const navigate = useNavigate();
-  const { session, refreshProfile } = useAuth();
+  const { session, profile, refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [complete, setComplete] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [scheduleHelpOpen, setScheduleHelpOpen] = useState(false);
+  const [lateHoursTermsOpen, setLateHoursTermsOpen] = useState(false);
+  const [lateHoursTermsSaving, setLateHoursTermsSaving] = useState(false);
+  const [scheduleColorblindMode, setScheduleColorblindMode] = useState(false);
   const [editingService, setEditingService] = useState(null);
   const [form, setForm] = useState({
     businessName: '',
@@ -414,9 +928,7 @@ const Onboarding2Page = () => {
     city: '',
     state: '',
     zip: '',
-    hours: defaultHours,
-    appointmentDuration: 30,
-    appointmentBuffer: 10,
+    hours: createDefaultSchedule(),
     about: aboutTemplate,
     policies: policiesTemplate,
     faq: faqTemplate,
@@ -426,6 +938,8 @@ const Onboarding2Page = () => {
   const progress = ((step + 1) / steps.length) * 100;
   const current = steps[step];
   const stepLabel = current.id.charAt(0).toUpperCase() + current.id.slice(1);
+  const activeScheduleLayerTypes = useMemo(() => getScheduleLayerTypes(scheduleColorblindMode), [scheduleColorblindMode]);
+  const outboundLateHoursAccepted = hasAcceptedOutboundLateHoursTerms(profile);
 
   const update = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -473,23 +987,9 @@ const Onboarding2Page = () => {
     setEditingService(null);
   };
 
-  const updateHours = (day, key, value) => {
-    setForm((prev) => ({
-      ...prev,
-      hours: {
-        ...prev.hours,
-        [day]: {
-          ...prev.hours[day],
-          [key]: value,
-        },
-      },
-    }));
-  };
-
   const canContinue = useMemo(() => {
     if (step === 0) return form.businessName.trim() && form.industry.trim();
     if (step === 1) return isEmailComplete(form.email) && (form.email.trim() || form.phone.trim() || form.street.trim() || form.city.trim() || form.state.trim() || form.zip.trim());
-    if (step === 2) return form.appointmentDuration > 0;
     return true;
   }, [form, step]);
 
@@ -541,17 +1041,18 @@ const Onboarding2Page = () => {
     about_company: [form.about.trim(), servicesSummary ? `Services:\n${servicesSummary}` : ''].filter(Boolean).join('\n\n'),
     policies: form.policies.trim(),
     faq: form.faq.trim(),
-    business_hours: form.hours,
-    appointment_settings: {
-      duration_minutes: form.appointmentDuration,
-      buffer_minutes: form.appointmentBuffer,
-    },
+    business_hours: cleanScheduleForStorage(form.hours),
+    appointment_settings: {},
     services: normalizedServices,
   });
 
   const handleNext = async () => {
     if (!canContinue && step < steps.length - 1) return;
     setSubmitError('');
+    if (step === 2 && !outboundLateHoursAccepted && scheduleHasOutboundLateHours(form.hours)) {
+      setLateHoursTermsOpen(true);
+      return;
+    }
     if (step < steps.length - 1) {
       setStep((prev) => prev + 1);
       return;
@@ -584,6 +1085,10 @@ const Onboarding2Page = () => {
 
   const handleSkip = () => {
     setSubmitError('');
+    if (step === 2 && !outboundLateHoursAccepted && scheduleHasOutboundLateHours(form.hours)) {
+      setLateHoursTermsOpen(true);
+      return;
+    }
     if (step < steps.length - 1) {
       setStep((prev) => prev + 1);
     } else {
@@ -593,6 +1098,36 @@ const Onboarding2Page = () => {
 
   const handleLaunch = () => {
     navigate('/dashboard');
+  };
+
+  const acceptOutboundLateHoursTerms = async () => {
+    if (!session?.access_token) {
+      setSubmitError('Your session expired. Please sign in again to continue.');
+      return;
+    }
+
+    setLateHoursTermsSaving(true);
+    try {
+      await axios.put(`${API_BASE_URL}/users/me`, {
+        terms_of_service: {
+          ...(profile?.terms_of_service || {}),
+          [OUTBOUND_LATE_HOURS_TERMS_KEY]: {
+            accepted: true,
+            accepted_at: new Date().toISOString(),
+            version: 1,
+          },
+        },
+      }, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      await refreshProfile?.();
+      setLateHoursTermsOpen(false);
+    } catch (error) {
+      console.error('Failed to save late-hours terms:', error);
+      setSubmitError('Could not save that acknowledgment. Please try again.');
+    } finally {
+      setLateHoursTermsSaving(false);
+    }
   };
 
   return (
@@ -628,7 +1163,7 @@ const Onboarding2Page = () => {
       `}</style>
 
       <div className="mx-auto flex min-h-screen w-full items-center justify-center px-5 py-3 sm:px-8 lg:px-10">
-        <section className="relative max-h-[calc(100vh-20px)] w-full max-w-[960px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+        <section className={`relative max-h-[calc(100vh-20px)] w-full ${step === 2 && !complete && !isSubmitting ? 'max-w-[1120px]' : 'max-w-[960px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}>
           <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-white/[0.035] blur-[90px]" />
 
           <main className="relative flex max-h-[calc(100vh-20px)] min-h-[740px] flex-col overflow-auto p-6 sm:p-8">
@@ -704,7 +1239,7 @@ const Onboarding2Page = () => {
                         </div>
                         <div>
                           <span className="mb-1 block text-zinc-600">Scheduling</span>
-                          <span className="font-medium text-zinc-300">{form.appointmentDuration} min default</span>
+                          <span className="font-medium text-zinc-300">Custom schedule configured</span>
                         </div>
                       </div>
                     </div>
@@ -729,7 +1264,19 @@ const Onboarding2Page = () => {
                       className="mx-auto flex min-h-[620px] w-full flex-col"
                     >
                       <div className="mb-6">
-                        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">{current.title}</h1>
+                        <div className="flex items-start gap-2.5">
+                          <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">{current.title}</h1>
+                          {step === 2 ? (
+                            <button
+                              type="button"
+                              onClick={() => setScheduleHelpOpen(true)}
+                              className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
+                              aria-label="Schedule help"
+                            >
+                              <HelpCircle className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                        </div>
                         <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-500 sm:text-base">{current.description}</p>
                       </div>
 
@@ -798,32 +1345,14 @@ const Onboarding2Page = () => {
                         ) : null}
 
                         {step === 2 ? (
-                        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-                          <div>
-                            <div className="mb-3 flex items-center gap-2 text-[12px] font-medium text-zinc-500">
-                              <Clock3 className="h-4 w-4" />
-                              <span>Inbound hours</span>
-                            </div>
-                            <div className="custom-scrollbar max-h-[420px] overflow-auto rounded-[22px] border border-white/[0.06] bg-black/20 p-4 pr-3">
-                              {days.map((day) => (
-                                <DayRow key={day} day={day} hours={form.hours[day]} onChange={updateHours} />
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="space-y-5">
-                            <Field label="Default appointment duration">
-                              <div className="relative">
-                                <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
-                                <input type="text" inputMode="numeric" value={form.appointmentDuration || ''} onChange={(e) => update('appointmentDuration', Number(formatIntegerInput(e.target.value)) || 0)} className={`${fieldClass} pl-12`} />
-                              </div>
-                            </Field>
-
-                            <Field label="Buffer between appointments">
-                              <input type="text" inputMode="numeric" value={form.appointmentBuffer || ''} onChange={(e) => update('appointmentBuffer', Number(formatIntegerInput(e.target.value)) || 0)} className={fieldClass} />
-                            </Field>
-                          </div>
-                        </div>
+                          <ScheduleTimeline
+                            value={form.hours}
+                            onChange={(hours) => update('hours', hours)}
+                            colorblindMode={scheduleColorblindMode}
+                            onColorblindModeChange={setScheduleColorblindMode}
+                            outboundLateHoursAccepted={outboundLateHoursAccepted}
+                            onOutboundLateHours={() => setLateHoursTermsOpen(true)}
+                          />
                         ) : null}
 
                         {step === 3 ? (
@@ -952,6 +1481,14 @@ const Onboarding2Page = () => {
       </div>
 
       <AnimatePresence>
+        {lateHoursTermsOpen ? (
+          <LateHoursTermsModal
+            isSaving={lateHoursTermsSaving}
+            onAccept={acceptOutboundLateHoursTerms}
+            onClose={() => setLateHoursTermsOpen(false)}
+          />
+        ) : null}
+
         {serviceModalOpen ? (
           <ServiceModal
             initialService={editingService}
@@ -961,6 +1498,61 @@ const Onboarding2Page = () => {
             }}
             onSave={saveService}
           />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {scheduleHelpOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[220] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={() => setScheduleHelpOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-[620px] rounded-[30px] border border-white/[0.08] bg-[#070707] p-7 shadow-[0_28px_90px_rgba(0,0,0,0.62)] sm:p-8"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">Scheduling help</h2>
+                  <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">
+                    Use this slide to tell your receptionist when each type of schedule should be active across a full 24-hour day.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScheduleHelpOpen(false)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white"
+                  aria-label="Close schedule help"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-sm leading-6 text-zinc-400">
+                {activeScheduleLayerTypes.map((layer) => {
+                  const detail = layer.id === 'business'
+                    ? 'should match when the business is generally open.'
+                    : layer.id === 'inbound'
+                      ? 'controls when the receptionist should answer incoming calls.'
+                      : 'controls when the receptionist can place follow-up or return calls.';
+                  return (
+                    <p key={layer.id} className="flex gap-3">
+                      <span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} />
+                      <span><span className="font-semibold text-white">{layer.label}</span> {detail}</span>
+                    </p>
+                  );
+                })}
+                <p>Drag a whole bar to move that schedule. Drag either white handle to adjust the start or end time. Use the snap control to choose how precise each adjustment should be.</p>
+              </div>
+            </motion.div>
+          </motion.div>
         ) : null}
       </AnimatePresence>
     </div>
