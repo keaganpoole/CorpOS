@@ -69,6 +69,7 @@ import CubePreloader from './components/CubePreloader';
 import { AudioPlayerProvider, PersistentAudioPlayer } from './contexts/AudioPlayerContext';
 import { CallLogsProvider } from './contexts/CallLogsContext';
 import { useAuth } from '../contexts/AuthContext';
+import logoImage from '../assets/logo.png';
 
 const DASHBOARD_ROUTE_STORAGE_KEY = 'sonar-dashboard-route';
 const DEFAULT_DASHBOARD_ROUTE = 'live-monitoring';
@@ -1182,15 +1183,12 @@ const SonarDashboard = () => {
         <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
         {/* Logo */}
-        <div className={`relative z-10 transition-transform duration-75 ${glitch ? 'translate-x-[1px] skew-x-[1px]' : ''}`}>
-          <h1 className="text-[22px] font-bold tracking-tighter select-none leading-none">
-            <span className="text-white">Son</span>
-            <span className="bg-gradient-to-r from-[#22d3ee] via-[#a855f7] to-[#ec4899] bg-clip-text text-transparent" style={{ backgroundSize: '200% 200%', animation: 'gradientMove 3s ease infinite' }}>ar</span>
-          </h1>
+        <div className={`absolute left-[38px] z-10 -translate-x-1/2 transition-transform duration-75 ${glitch ? 'translate-x-[1px] skew-x-[1px]' : ''}`}>
+          <img src={logoImage} alt="Nodemere" className="h-8 w-auto select-none" />
           {glitch && (
-            <div className="absolute inset-0 text-[22px] font-bold tracking-tighter opacity-30 blur-[2px] pointer-events-none select-none leading-none">
-              <span className="text-[#ff00ff] absolute top-[-2px] left-[-2px]">Sonar</span>
-              <span className="text-[#00ffff] absolute top-[2px] left-[2px]">Sonar</span>
+            <div className="absolute inset-0 opacity-30 blur-[2px] pointer-events-none select-none">
+              <img src={logoImage} alt="" className="absolute left-[-2px] top-[-2px] h-8 w-auto" />
+              <img src={logoImage} alt="" className="absolute left-[2px] top-[2px] h-8 w-auto" />
             </div>
           )}
         </div>
@@ -1216,7 +1214,7 @@ const SonarDashboard = () => {
               <div className="absolute -left-6 inset-y-0 w-[1px] bg-white/10" />
               <div className="absolute -right-6 inset-y-0 w-[1px] bg-white/10" />
               <h1 className="text-2xl font-light tracking-[0.6em] text-white/15 uppercase leading-none cursor-default">
-                SONAR
+                NODEMERE
               </h1>
             </div>
           </div>
