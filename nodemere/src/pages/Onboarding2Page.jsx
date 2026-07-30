@@ -133,12 +133,22 @@ const getScheduleLayerTypes = (colorblindMode = false) => (
 
 const scheduleTimeline = { start: 0, end: 24 };
 const OUTBOUND_LATE_HOURS_TERMS_KEY = 'outbound_late_hours_acknowledgment_v1';
+const OUTBOUND_LATE_HOURS_TERMS_STORAGE_KEY = `nodemere-${OUTBOUND_LATE_HOURS_TERMS_KEY}`;
 const OUTBOUND_LATE_HOURS_START = 20;
 const OUTBOUND_LATE_HOURS_END = 8;
 
 const hasAcceptedOutboundLateHoursTerms = (profile) => (
   profile?.terms_of_service?.[OUTBOUND_LATE_HOURS_TERMS_KEY]?.accepted === true
 );
+
+const readStoredOutboundLateHoursTerms = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(OUTBOUND_LATE_HOURS_TERMS_STORAGE_KEY) || 'null');
+    return stored?.accepted === true ? stored : null;
+  } catch {
+    return null;
+  }
+};
 
 const isOutboundLateHoursLayer = (layer) => (
   Boolean(layer?.enabled)
@@ -917,6 +927,7 @@ const Onboarding2Page = () => {
   const [scheduleHelpOpen, setScheduleHelpOpen] = useState(false);
   const [lateHoursTermsOpen, setLateHoursTermsOpen] = useState(false);
   const [lateHoursTermsSaving, setLateHoursTermsSaving] = useState(false);
+  const [localLateHoursTerms, setLocalLateHoursTerms] = useState(() => readStoredOutboundLateHoursTerms());
   const [scheduleColorblindMode, setScheduleColorblindMode] = useState(false);
   const [editingService, setEditingService] = useState(null);
   const [form, setForm] = useState({
@@ -939,7 +950,15 @@ const Onboarding2Page = () => {
   const current = steps[step];
   const stepLabel = current.id.charAt(0).toUpperCase() + current.id.slice(1);
   const activeScheduleLayerTypes = useMemo(() => getScheduleLayerTypes(scheduleColorblindMode), [scheduleColorblindMode]);
-  const outboundLateHoursAccepted = hasAcceptedOutboundLateHoursTerms(profile);
+  const outboundLateHoursAccepted = hasAcceptedOutboundLateHoursTerms(profile) || localLateHoursTerms?.accepted === true;
+  const termsOfServiceForOnboarding = useMemo(() => {
+    if (hasAcceptedOutboundLateHoursTerms(profile)) return profile.terms_of_service;
+    if (!localLateHoursTerms?.accepted) return profile?.terms_of_service || {};
+    return {
+      ...(profile?.terms_of_service || {}),
+      [OUTBOUND_LATE_HOURS_TERMS_KEY]: localLateHoursTerms,
+    };
+  }, [localLateHoursTerms, profile]);
 
   const update = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -1043,6 +1062,7 @@ const Onboarding2Page = () => {
     faq: form.faq.trim(),
     business_hours: cleanScheduleForStorage(form.hours),
     appointment_settings: {},
+    terms_of_service: termsOfServiceForOnboarding,
     services: normalizedServices,
   });
 
@@ -1101,29 +1121,18 @@ const Onboarding2Page = () => {
   };
 
   const acceptOutboundLateHoursTerms = async () => {
-    if (!session?.access_token) {
-      setSubmitError('Your session expired. Please sign in again to continue.');
-      return;
-    }
-
     setLateHoursTermsSaving(true);
+    const acceptedTerms = {
+      accepted: true,
+      accepted_at: new Date().toISOString(),
+      version: 1,
+    };
     try {
-      await axios.put(`${API_BASE_URL}/users/me`, {
-        terms_of_service: {
-          ...(profile?.terms_of_service || {}),
-          [OUTBOUND_LATE_HOURS_TERMS_KEY]: {
-            accepted: true,
-            accepted_at: new Date().toISOString(),
-            version: 1,
-          },
-        },
-      }, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      await refreshProfile?.();
+      localStorage.setItem(OUTBOUND_LATE_HOURS_TERMS_STORAGE_KEY, JSON.stringify(acceptedTerms));
+      setLocalLateHoursTerms(acceptedTerms);
       setLateHoursTermsOpen(false);
     } catch (error) {
-      console.error('Failed to save late-hours terms:', error);
+      console.error('Failed to save late-hours terms locally:', error);
       setSubmitError('Could not save that acknowledgment. Please try again.');
     } finally {
       setLateHoursTermsSaving(false);

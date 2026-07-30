@@ -44,6 +44,7 @@ const [reactions, setReactions] = useState([]);
   const [wsStatus, setWsStatus] = useState('disconnected');
   const [isPaused, setIsPaused] = useState(false);
   const [accountSettingsId, setAccountSettingsId] = useState(null);
+  const [agentsLoading, setAgentsLoading] = useState(true);
 
   // Load initial data via REST
   const loadInitialData = useCallback(async () => {
@@ -51,12 +52,13 @@ const [reactions, setReactions] = useState([]);
     // request independently so a slow, unrelated dashboard widget cannot hold
     // the whole page behind one Promise.all barrier.
     const agentsRequest = api.getAgents();
+    setAgentsLoading(true);
     agentsRequest.then((agentsData) => {
       if (!Array.isArray(agentsData)) return;
       setAgents(agentsData);
       const activeAgents = agentsData.filter((agent) => agent?.is_active !== false).length;
       setSummary({ ok: activeAgents, warnings: 0, errors: 0, activeAgents, totalAgents: agentsData.length });
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setAgentsLoading(false));
 
     const [controlData, sessionData, pulseData, logsData, pipelineData, cronData, reactionsData, settingsResponse] = await Promise.all([
       api.getControlState(),
@@ -98,6 +100,7 @@ const [reactions, setReactions] = useState([]);
       case 'initial_state':
         setTasks(data.tasks || []);
         setAgents(data.agents || []);
+        setAgentsLoading(false);
         setControlState(prev => ({ ...prev, ...(data.control || {}), calls_filter: prev.calls_filter || 'all' }));
         setSession(data.session);
         setLivePulse(data.recentEvents || []);
@@ -517,6 +520,7 @@ const [reactions, setReactions] = useState([]);
     reactions,
     summary,
     wsStatus,
+    agentsLoading,
     isPaused,
     toggleRuntime,
     setZone,

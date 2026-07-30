@@ -127,10 +127,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
       }
       onClick={embedded ? undefined : onClose}
     >
-      {/* Background decoration — blurred indigo/purple orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-zinc-700/10 blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-zinc-800/12 blur-[120px] rounded-full" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.03]"
           style={{ backgroundImage: `radial-gradient(#ffffff 1px, transparent 1px)`, backgroundSize: '40px 40px' }} />
       </div>
@@ -160,7 +159,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
         {loading ? (
           <div className="flex flex-col items-center gap-4 py-20">
-            <Loader2 size={32} className="animate-spin text-indigo-400" />
+            <Loader2 size={32} className="animate-spin text-zinc-500" />
             <p className="text-[11px] text-zinc-600 font-bold uppercase tracking-widest">Loading receptionists...</p>
           </div>
         ) : receptionists.length === 0 ? (
@@ -194,7 +193,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                       if (isPrev) prevCard();
                     }}
                   >
-                    <div className="relative h-full w-full bg-[#0a0c10] border border-white/10 rounded-[40px] overflow-hidden shadow-2xl flex flex-col">
+                    <div className="relative h-full w-full bg-[#0a0a0a] border border-white/10 rounded-[40px] overflow-hidden shadow-2xl flex flex-col">
                       {/* Header Image Area */}
                       <div className="relative h-[75%] w-full group overflow-hidden">
                         {person.avatar ? (
@@ -204,11 +203,11 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-950 flex items-center justify-center">
+                          <div className="w-full h-full bg-gradient-to-br from-zinc-900 to-[#050505] flex items-center justify-center">
                             <User size={64} className="text-white/20" />
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0c10] via-[#0a0c10]/40 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/40 to-transparent" />
 
                         {/* Name Overlay */}
                         <div className="absolute bottom-6 left-8">
@@ -324,7 +323,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                       }}
                       className={`h-1.5 rounded-full transition-all duration-300 ${
                         i === currentIndex
-                          ? 'w-6 bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]'
+                          ? 'w-6 bg-zinc-300 shadow-[0_0_8px_rgba(212,212,216,0.28)]'
                           : 'w-1.5 bg-zinc-700 hover:bg-zinc-500'
                       }`}
                     />

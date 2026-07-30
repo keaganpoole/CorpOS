@@ -13,6 +13,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
+import CubePreloader from '../components/CubePreloader';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SCHEDULE_LAYER_TYPES = [
@@ -1561,7 +1562,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked })
   );
 };
 
-export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defaultHours, hideIntro = false, hideToolbar = false, cardGridClassName = '', compactCards = false }) => {
+export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defaultHours, hideIntro = false, hideToolbar = false, cardGridClassName = '', compactCards = false, loaderClassName = '', loadingFallback = null }) => {
   const [staffMembers, setStaffMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1874,6 +1875,8 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
   const activeCount = staffMembers.filter((member) => member.is_active !== false).length;
 
+  if (loading && loadingFallback) return loadingFallback;
+
   return (
     <div className="space-y-4">
       {!hideIntro && <div className="mb-4">
@@ -1909,8 +1912,8 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         </div>}
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-700 animate-pulse">Loading staff</span>
+          <div className={loaderClassName || 'flex min-h-[260px] items-center justify-center pb-20'}>
+            <CubePreloader />
           </div>
         ) : staffMembers.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-[28px] border border-white/[0.04] bg-gradient-to-b from-zinc-950/20 to-transparent py-16 opacity-50">

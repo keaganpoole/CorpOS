@@ -23,6 +23,7 @@ import {
 } from '../lib/customFields';
 import FieldSettingsModal from './FieldSettingsModal';
 import ColorbarConfigModal from './ColorbarConfigModal';
+import CubePreloader from '../components/CubePreloader';
 
 const ICONS = {
   building: Building2, user: User, briefcase: Briefcase, factory: Factory,
@@ -47,6 +48,7 @@ const FIELD_TYPE_ICONS = {
 const ZONE_META_KEY = '__zones';
 const ZONE_SWATCHES = ['var(--brandGradientStart)', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#f59e0b', '#10b981', '#14b8a6'];
 const isZoneEligibleColumn = (col) => Boolean(col?.label) && col.id !== 'select' && col.id !== 'avatar';
+const isColumnLocked = (column, fieldConfig = {}) => Boolean(column?.locked || fieldConfig[column?.id]?.locked);
 const sanitizeColorbarRuleList = (rules = []) => (
   (Array.isArray(rules) ? rules : [])
     .filter((rule) => rule && typeof rule === 'object')
@@ -918,7 +920,10 @@ const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
 
 const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll, onHideAll }) => {
   const [query, setQuery] = useState('');
-  const filtered = columns.filter((column) => getColumnLabel(column, fieldConfig).toLowerCase().includes(query.toLowerCase()));
+  const filtered = columns.filter((column) => (
+    !isColumnLocked(column, fieldConfig)
+    && getColumnLabel(column, fieldConfig).toLowerCase().includes(query.toLowerCase())
+  ));
   return (
     <div>
       <ControlPopoverHeader title="Hide / Show" caption="Choose visible table columns." />
@@ -1851,22 +1856,29 @@ const LeadsTable = ({
   };
 
   const renderNewRecordEmptyState = () => (
-    <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
-      <div className="mx-auto flex w-full max-w-[420px] flex-col items-center justify-center px-14 py-16 text-center">
-        <button
-          type="button"
-          onClick={onCreateInline}
-        className="group flex h-20 w-20 items-center justify-center rounded-[24px] border border-white/[0.08] bg-white/[0.02] text-white shadow-[0_0_30px_rgba(255,255,255,0.08)] transition-transform duration-300 hover:scale-105"
+    <div className="absolute inset-0 z-30 flex items-center justify-center px-6">
+      <button
+        type="button"
+        onClick={onCreateInline}
+        aria-label="Add your first record"
+        className="group flex max-w-[340px] flex-col items-center text-center focus:outline-none"
       >
-        <Plus size={40} strokeWidth={1.6} />
+        <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white text-slate-950 shadow-2xl transition-all duration-300 group-hover:-translate-y-1 group-hover:scale-[1.03] group-hover:shadow-white/25 group-active:scale-95">
+          <Plus className="h-12 w-12 transition-transform duration-500" strokeWidth={2.5} />
+        </span>
+        <span className="mt-5 text-lg font-semibold leading-6 tracking-[-0.035em] text-zinc-300 transition-colors duration-300 group-hover:text-white">
+          Add your first record
+        </span>
+        <span className="mt-2 max-w-[280px] text-xs leading-5 text-zinc-500">
+          Create a customer record your receptionist can recognize and assist.
+        </span>
       </button>
-        <div className="mt-5">
-          <p className="text-3xl font-semibold tracking-tight text-neutral-50">Create your first record</p>
-          <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">
-            {hideTitle ? 'Add your first record to start building out your database.' : 'Add your first person to start building out your database.'}
-          </p>
-        </div>
-      </div>
+    </div>
+  );
+
+  const renderPeopleLoader = () => (
+    <div className="absolute inset-0 z-30 flex items-center justify-center px-6">
+      <CubePreloader size={24} />
     </div>
   );
 
@@ -1935,7 +1947,7 @@ const LeadsTable = ({
           style={{ left: frozenCount > 0 ? frozenPaneWidth : frozenHandleLeft }}
         >
           {isDraggingFrozenDivider && (
-            <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-cyan-300/30" />
+            <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-zinc-300/35" />
           )}
           <button
             type="button"
@@ -1951,7 +1963,7 @@ const LeadsTable = ({
             <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
               <div className="relative">
                 <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
-                  {isDraggingFrozenDivider && <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-cyan-300/30" />}
+                  {isDraggingFrozenDivider && <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-zinc-300/35" />}
                 </div>
                 <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
                   <button
@@ -2077,14 +2089,7 @@ const LeadsTable = ({
             </div>
 
             <div className="divide-y divide-white/[0.02]">
-              {loading ? (
-                <div className="h-full flex flex-col items-center justify-center gap-4 pt-20">
-                  <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-cyan-500/60 animate-spin" />
-                  <p className="text-[11px] text-zinc-600 font-medium">Loading people...</p>
-                </div>
-              ) : leads.length === 0 ? (
-                renderNewRecordEmptyState()
-              ) : (
+              {loading ? null : leads.length === 0 ? null : (
                 <>
                   {sortedLeads.map((lead, idx) => {
                     const isJustAdded = justAddedLeadIds.includes(lead.id);
@@ -2137,6 +2142,8 @@ const LeadsTable = ({
           </div>
         </div>
       </div>
+      {!loading && leads.length === 0 ? renderNewRecordEmptyState() : null}
+      {loading ? renderPeopleLoader() : null}
     </div>
   );
 
@@ -2256,16 +2263,16 @@ const LeadsTable = ({
             initial={{ opacity: 0, scale: 0.96, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -4 }}
-            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#080808]/98"
+            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a]/95 backdrop-blur-sm"
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
               onClick={() => handleDeleteRecords(anySelected ? selectedIds : [contextMenu.leadId])}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-rose-400 hover:bg-rose-500/[0.08]"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-rose-400 opacity-100 hover:!bg-[#4a1722] hover:text-rose-300"
             >
-              <Trash2 size={11} className="text-rose-400" />
+              <Trash2 size={11} className="text-rose-400 opacity-100" />
               Delete record{(anySelected ? selectedIds : [contextMenu.leadId]).length > 1 ? 's' : ''}
             </button>
           </motion.div>

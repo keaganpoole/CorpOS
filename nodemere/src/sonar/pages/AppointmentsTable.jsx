@@ -20,6 +20,7 @@ import {
 } from '../lib/appointmentCustomFields';
 import FieldSettingsModal from './FieldSettingsModal';
 import AppointmentColorbarConfigModal from './AppointmentColorbarConfigModal';
+import CubePreloader from '../components/CubePreloader';
 
 const ICONS = {
   user: User, phone: Phone, mail: Mail, flag: Flag, compass: Compass, clock: Clock, tag: Tag,
@@ -491,7 +492,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
                 className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${current == null || current === '' ? 'text-white' : 'text-zinc-400'}`}>
                 <div className="w-2 h-2 rounded-full bg-zinc-700" />
                 <span className="invisible">.</span>
-                {(current == null || current === '') && <Check size={11} className="brand-icon ml-auto" />}
+                {(current == null || current === '') && <Check size={11} className="ml-auto text-white" />}
               </motion.button>
               {options.map((opt, idx) => {
                 const val = normalizeOptionValue(typeof opt === 'string' ? opt : opt.value);
@@ -512,7 +513,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
                     className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
                     {val}
-                    {isActive && <Check size={11} className="brand-icon ml-auto" />}
+                    {isActive && <Check size={11} className="ml-auto text-white" />}
                   </motion.button>
                 );
               })}
@@ -638,7 +639,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
                     className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
                     <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color(val) }} />
                     {val}
-                    {active && <Check size={11} className="brand-icon ml-auto" />}
+                    {active && <Check size={11} className="ml-auto text-white" />}
                   </motion.button>
                 );
               })}
@@ -741,7 +742,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
                       className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}
                     >
                       <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                      {isActive && <Check size={11} className="brand-icon ml-auto" />}
+                      {isActive && <Check size={11} className="ml-auto text-white" />}
                     </motion.button>
                   );
                 })}
@@ -1114,7 +1115,10 @@ const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
 
 const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll, onHideAll }) => {
   const [query, setQuery] = useState('');
-  const filtered = columns.filter((column) => getColumnLabel(column, fieldConfig).toLowerCase().includes(query.toLowerCase()));
+  const filtered = columns.filter((column) => (
+    !isColumnLocked(column.id)
+    && getColumnLabel(column, fieldConfig).toLowerCase().includes(query.toLowerCase())
+  ));
   return (
     <div>
       <ControlPopoverHeader title="Hide / Show" caption="Choose visible table columns." />
@@ -1131,12 +1135,10 @@ const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll
       <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
         {filtered.map((column) => {
           const hidden = !!fieldConfig[column.id]?.hidden;
-          const locked = isColumnLocked(column.id);
           return (
-            <button key={column.id} type="button" disabled={locked} onClick={() => onSetHidden(column.id, !hidden)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${locked ? 'cursor-not-allowed opacity-65' : 'hover:bg-white/[0.04]'}`}>
-              <span className="w-4">{!hidden && <Check size={12} className="brand-icon" />}</span>
+            <button key={column.id} type="button" onClick={() => onSetHidden(column.id, !hidden)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04]">
+              <span className="w-4">{!hidden && <Check size={12} className="text-white" />}</span>
               <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${hidden ? 'text-zinc-500' : 'text-zinc-300'}`}>{getColumnLabel(column, fieldConfig)}</span>
-              {locked && <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Locked</span>}
             </button>
           );
         })}
@@ -1185,7 +1187,7 @@ const RowHeightPopover = ({ value, onChange }) => {
     <div className="p-2">
       {options.map((option) => (
         <button key={option.key} type="button" onClick={() => onChange(option.key)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] transition-colors hover:bg-white/[0.04] ${value === option.key ? 'text-white' : 'text-zinc-500'}`}>
-          <span className="w-4">{value === option.key && <Check size={12} className="brand-icon" />}</span>
+          <span className="w-4">{value === option.key && <Check size={12} className="text-white" />}</span>
           {option.label}
         </button>
       ))}
@@ -1936,25 +1938,29 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   };
 
   const renderNewRecordEmptyState = () => (
-    <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
-      <div className="mx-auto flex w-full max-w-[420px] flex-col items-center justify-center px-14 py-16 text-center">
-        <button
-          type="button"
-          onClick={onCreateInline}
-          disabled={creating}
-          className="group flex h-20 w-20 items-center justify-center rounded-[24px] border border-white/[0.08] bg-white/[0.02] text-white shadow-[0_0_30px_rgba(255,255,255,0.08)] transition-transform duration-300 hover:scale-105"
-        >
-          {creating ? (
-            <div className="brand-gradient-spinner h-8 w-8 animate-spin rounded-full border-2" />
-          ) : (
-            <Plus size={40} strokeWidth={1.6} />
-          )}
-        </button>
-        <div className="mt-5">
-          <p className="text-3xl font-semibold tracking-tight text-neutral-50">Create your first appointment</p>
-          <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">Add your first appointment to start building out your schedule database.</p>
-        </div>
-      </div>
+    <div className="absolute inset-0 z-30 flex items-center justify-center px-6">
+      <button
+        type="button"
+        onClick={onCreateInline}
+        aria-label="Add your first appointment"
+        className="group flex max-w-[340px] flex-col items-center text-center focus:outline-none"
+      >
+        <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white text-slate-950 shadow-2xl transition-all duration-300 group-hover:-translate-y-1 group-hover:scale-[1.03] group-hover:shadow-white/25 group-active:scale-95">
+          <Plus className="h-12 w-12 transition-transform duration-500" strokeWidth={2.5} />
+        </span>
+        <span className="mt-5 text-lg font-semibold leading-6 tracking-[-0.035em] text-zinc-300 transition-colors duration-300 group-hover:text-white">
+          Add your first appointment
+        </span>
+        <span className="mt-2 max-w-[280px] text-xs leading-5 text-zinc-500">
+          Create an appointment your receptionist can schedule, update, and reference.
+        </span>
+      </button>
+    </div>
+  );
+
+  const renderAppointmentsLoader = () => (
+    <div className="appointments-loader absolute inset-0 z-30 flex items-center justify-center px-6">
+      <CubePreloader size={24} />
     </div>
   );
 
@@ -2014,7 +2020,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
           style={{ left: frozenCount > 0 ? frozenPaneWidth : frozenHandleLeft }}
         >
           {isDraggingFrozenDivider && (
-            <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-cyan-300/30" />
+            <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-zinc-300/35" />
           )}
           <button
             type="button"
@@ -2029,7 +2035,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
           <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
             <div className="relative">
               <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
-                {isDraggingFrozenDivider && <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-cyan-300/30" />}
+                {isDraggingFrozenDivider && <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-zinc-300/35" />}
               </div>
               <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
                 <button
@@ -2151,16 +2157,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
           </div>
 
           <div className="divide-y divide-white/[0.02]">
-            {loading ? (
-              <div className="flex min-h-[420px] w-full items-center justify-center px-6 py-20">
-                <div className="flex flex-col items-center justify-center gap-4">
-                <div className="brand-gradient-spinner w-8 h-8 rounded-full border-2 animate-spin" />
-                <p className="text-[11px] text-zinc-600 font-medium">Loading appointments...</p>
-                </div>
-              </div>
-            ) : appointments.length === 0 ? (
-              renderNewRecordEmptyState()
-            ) : (
+            {loading ? null : appointments.length === 0 ? null : (
               <>
                 {sortedAppointments.map((appointment, idx) => {
                   const isRowSelected = selectedId === appointment.id;
@@ -2201,6 +2198,8 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
           </div>
         </div>
       </div>
+      {!loading && appointments.length === 0 ? renderNewRecordEmptyState() : null}
+      {loading ? renderAppointmentsLoader() : null}
     </div>
   );
 
@@ -2218,7 +2217,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             </div>
             <div className="absolute rounded-[11px] bg-[#0a0a0a] pointer-events-none" style={{ inset: '0.7px' }} />
             <div className="absolute inset-0 rounded-xl border border-white/[0.06] group-hover/colorbar:opacity-0 transition-opacity duration-300 pointer-events-none" />
-            <Wand2 size={12} className="relative z-10 brand-icon group-hover/colorbar:text-white transition-colors group-hover/colorbar:rotate-12 duration-300" />
+            <Wand2 size={12} className="relative z-10 text-zinc-400 transition-colors group-hover/colorbar:rotate-12 group-hover/colorbar:text-white duration-300" />
             <span className="relative z-10">Colorbar</span>
           </button>
         </div>
@@ -2306,16 +2305,16 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             initial={{ opacity: 0, scale: 0.96, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -4 }}
-            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#080808]/98"
+            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a]/95 backdrop-blur-sm"
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
               onClick={() => handleDeleteRecords(anySelected ? selectedIds : [contextMenu.appointmentId])}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-rose-400 hover:bg-rose-500/[0.08]"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-rose-400 opacity-100 hover:!bg-[#4a1722] hover:text-rose-300"
             >
-              <Trash2 size={11} className="text-rose-400" />
+              <Trash2 size={11} className="text-rose-400 opacity-100" />
               Delete record{(anySelected ? selectedIds : [contextMenu.appointmentId]).length > 1 ? 's' : ''}
             </button>
           </motion.div>
@@ -2364,7 +2363,11 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
         )}
       </AnimatePresence>
 
-      <style>{`@keyframes colorbarFlow {0% { background-position: 0% 0; }100% { background-position: 300% 0; }} @keyframes colorbarSweep {0% { background-position: 0% 0%; }100% { background-position: 0% 300%; }} @keyframes colorbarPulse {0%,100% { opacity: 0.45; } 50% { opacity: 1; }}`}</style>
+      <style>{`
+        @keyframes colorbarFlow {0% { background-position: 0% 0; }100% { background-position: 300% 0; }}
+        @keyframes colorbarSweep {0% { background-position: 0% 0%; }100% { background-position: 0% 300%; }}
+        @keyframes colorbarPulse {0%,100% { opacity: 0.45; } 50% { opacity: 1; }}
+      `}</style>
     </div>
   );
 };

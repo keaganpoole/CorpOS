@@ -65,6 +65,7 @@ import { StaffManager } from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
+import CubePreloader from './components/CubePreloader';
 import { AudioPlayerProvider, PersistentAudioPlayer } from './contexts/AudioPlayerContext';
 import { CallLogsProvider } from './contexts/CallLogsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -919,6 +920,7 @@ const SonarDashboard = () => {
     reactions,
     summary,
     wsStatus,
+    agentsLoading,
     setZone,
     updateAgentDirection,
     refresh,
@@ -1001,26 +1003,32 @@ const SonarDashboard = () => {
 
             <div key={teamView} className="custom-scrollbar min-h-0 flex-1 overflow-auto px-12 py-8">
               {teamView === 'receptionists' ? (
-                <div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6">
-                  {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
-                    const reactionsMap = {};
-                    for (const r of (reactions || [])) reactionsMap[r.agent_name] = r;
-                    return (
-                      <AgentNode
-                        key={agent.id}
-                        agent={agent}
-                        isActive={false}
-                        reactions={reactionsMap[agent.name] || {}}
-                        pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
-                        onOpenMarketplace={setMarketplaceAgent}
-                        onOpenScenarios={setReceptionistsAgent}
-                        onUpdateDirection={(agent, nextDirection) => updateAgentDirection(agent.id, nextDirection)}
-                        onTerminate={(agent) => setTerminateAgent(agent)}
-                        slim
-                      />
-                    );
-                  })}
-                </div>
+                agentsLoading ? (
+                  <div className="flex min-h-full items-center justify-center pb-20">
+                    <CubePreloader />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6">
+                    {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
+                      const reactionsMap = {};
+                      for (const r of (reactions || [])) reactionsMap[r.agent_name] = r;
+                      return (
+                        <AgentNode
+                          key={agent.id}
+                          agent={agent}
+                          isActive={false}
+                          reactions={reactionsMap[agent.name] || {}}
+                          pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
+                          onOpenMarketplace={setMarketplaceAgent}
+                          onOpenScenarios={setReceptionistsAgent}
+                          onUpdateDirection={(agent, nextDirection) => updateAgentDirection(agent.id, nextDirection)}
+                          onTerminate={(agent) => setTerminateAgent(agent)}
+                          slim
+                        />
+                      );
+                    })}
+                  </div>
+                )
               ) : (
                 <StaffManager
                   businessId={staffBusinessId}
@@ -1029,6 +1037,11 @@ const SonarDashboard = () => {
                   hideIntro
                   hideToolbar
                   cardGridClassName="grid grid-cols-[repeat(auto-fill,380px)] items-start justify-start gap-8"
+                  loadingFallback={(
+                    <div className="flex min-h-full items-center justify-center pb-20">
+                      <CubePreloader />
+                    </div>
+                  )}
                 />
               )}
             </div>

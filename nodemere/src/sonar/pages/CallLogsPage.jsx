@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useCallLogs } from '../contexts/CallLogsContext';
+import CubePreloader from '../components/CubePreloader';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const AVATAR_BASE = 'https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges';
@@ -315,30 +316,8 @@ function DeleteConfirmModal({ count, onCancel, onConfirm, deleting }) {
 
 function CallLogsLoader() {
   return (
-    <div className="px-4 py-6">
-      <div className="flex items-center gap-3 text-zinc-500">
-        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center text-zinc-300">
-          <motion.div
-            animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.96, 1.04, 0.96] }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <AudioLines size={15} />
-          </motion.div>
-        </div>
-        <div className="flex items-center gap-2">
-          <p className="text-[13px] font-semibold text-zinc-400">Loading call logs</p>
-          <div className="flex items-center gap-1">
-            {[0, 1, 2].map((index) => (
-              <motion.span
-                key={index}
-                className="h-1 w-1 rounded-full bg-cyan-300/60"
-                animate={{ opacity: [0.25, 0.85, 0.25] }}
-                transition={{ duration: 1, repeat: Infinity, delay: index * 0.16, ease: 'easeInOut' }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+    <div className="flex min-h-[320px] items-center justify-center px-4 py-6">
+      <CubePreloader size={20} />
     </div>
   );
 }

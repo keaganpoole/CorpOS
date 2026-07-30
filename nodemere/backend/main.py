@@ -2643,6 +2643,7 @@ class OnboardingRequest(BaseModel):
     about_company: Optional[str] = None
     policies: Optional[str] = None
     faq: Optional[str] = None
+    terms_of_service: Optional[dict] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
     services: Optional[list[dict]] = None
@@ -9852,6 +9853,8 @@ async def complete_onboarding(
             "onboarded": True,
             "phone": onboarding_data.business_phone,
         }
+        if onboarding_data.terms_of_service:
+            user_update["terms_of_service"] = onboarding_data.terms_of_service
         supabase.table('users').update(user_update).eq('id', current_user_id).execute()
 
         business_payload = {
