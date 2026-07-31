@@ -1164,6 +1164,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
   const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
   const [activeAppointmentPrompt, setActiveAppointmentPrompt] = useState(null);
   const [showAvatarHint, setShowAvatarHint] = useState(false);
+  const [showAvatarHintReturn, setShowAvatarHintReturn] = useState(false);
   const [visibleDotAnimationsComplete, setVisibleDotAnimationsComplete] = useState(false);
   const [appointmentAnimationsComplete, setAppointmentAnimationsComplete] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
@@ -1470,7 +1471,6 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
     if (!shouldRevealCalendarDetails || visibleDotAnimationTotal === 0) return;
     setVisibleDotAnimationsComplete(false);
     completedVisibleDotAnimationsRef.current = new Set();
-    console.info('[Calendar avatar hint] day dot reveal started');
   }, [shouldRevealCalendarDetails, visibleDotAnimationTotal]);
 
   useEffect(() => {
@@ -1479,7 +1479,6 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
       completedAppointmentAnimationsRef.current = new Set();
       return;
     }
-    console.info('[Calendar avatar hint] calendar entered viewport and appointment reveal started');
     if (selectedAppointments.length === 0) {
       setAppointmentAnimationsComplete(true);
       return;
@@ -1498,24 +1497,25 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
 
     const avatarTarget = document.querySelector('.demo-calendar-avatar-trigger');
     const avatarRect = avatarTarget?.getBoundingClientRect();
-    console.info('[Calendar avatar hint] readiness', {
-      visibleDotAnimationsComplete,
-      appointmentAnimationsComplete,
-      avatarTargetFound: Boolean(avatarTarget),
-      avatarRect: avatarRect ? {
-        top: Math.round(avatarRect.top),
-        left: Math.round(avatarRect.left),
-        width: Math.round(avatarRect.width),
-        height: Math.round(avatarRect.height),
-      } : null,
-    });
 
     if (!avatarTarget || !avatarRect || avatarRect.width <= 0 || avatarRect.height <= 0) return undefined;
 
     avatarHintShownRef.current = true;
     setShowAvatarHint(true);
-    console.info('[Calendar avatar hint] ring animation started');
-    return undefined;
+    setShowAvatarHintReturn(false);
+    let avatarReturnTimer = null;
+    const textReturnTimer = window.setTimeout(() => {
+      setShowAvatarHint(false);
+      setShowAvatarHintReturn(true);
+      avatarReturnTimer = window.setTimeout(() => {
+        setShowAvatarHintReturn(false);
+      }, 420);
+    }, 1250);
+
+    return () => {
+      window.clearTimeout(textReturnTimer);
+      if (avatarReturnTimer !== null) window.clearTimeout(avatarReturnTimer);
+    };
   }, [appointmentAnimationsComplete, shouldRevealCalendarDetails, visibleDotAnimationsComplete]);
 
   const handleVisibleDotAnimationEnd = (dotKey, animationEvent) => {
@@ -1523,9 +1523,6 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
     completedVisibleDotAnimationsRef.current.add(dotKey);
     if (completedVisibleDotAnimationsRef.current.size >= visibleDotAnimationCountRef.current) {
       setVisibleDotAnimationsComplete(true);
-      console.info('[Calendar avatar hint] all visible day dots completed revealing', {
-        completed: completedVisibleDotAnimationsRef.current.size,
-      });
     }
   };
 
@@ -1534,15 +1531,11 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
     completedAppointmentAnimationsRef.current.add(appointmentId);
     if (completedAppointmentAnimationsRef.current.size >= selectedAppointments.length) {
       setAppointmentAnimationsComplete(true);
-      console.info('[Calendar avatar hint] appointment rows completed revealing', {
-        completed: completedAppointmentAnimationsRef.current.size,
-      });
     }
   };
 
   const handleAvatarHintAnimationEnd = (animationEvent) => {
-    if (animationEvent.animationName !== 'demoCalendarAvatarHint') return;
-    console.info('[Calendar avatar hint] ring animation completed');
+    if (animationEvent.animationName !== 'demoCalendarAvatarPeek') return;
     setShowAvatarHint(false);
   };
 
@@ -1620,6 +1613,9 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                 const activePromptAction = activeAppointmentPrompt?.appointmentId === event.id
                   ? activeAppointmentPrompt.action
                   : null;
+                const showAppointmentActions = activeAppointmentActionsId === event.id;
+                const showPeekReveal = showAvatarHint && hasAppointmentActions && !showAppointmentActions && !activePromptAction;
+                const showAvatarReturn = showAvatarHintReturn && hasAppointmentActions && !showAppointmentActions && !activePromptAction;
                 const toggleAppointmentActions = () => {
                   if (!hasAppointmentActions) return;
                   setActiveAppointmentActionsId((current) => {
@@ -1670,13 +1666,14 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                       className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-visible text-left"
                     >
                       <AnimatePresence initial={false}>
-                        {activeAppointmentActionsId === event.id && (
+                        {(showAppointmentActions || showPeekReveal) && (
                           <motion.div
                             initial={{ opacity: 0, x: -18, scale: 0.94 }}
                             animate={{ opacity: 1, x: 0, scale: 1 }}
                             exit={{ opacity: 0, x: -14, scale: 0.96 }}
                             transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
-                            className="absolute left-0 z-20 flex max-w-[calc(100%-4.5rem)] items-center gap-2.5"
+                            className={`absolute left-0 z-20 flex max-w-[calc(100%-4.5rem)] items-center gap-2.5 ${showPeekReveal ? 'demo-calendar-actions-peek pointer-events-none' : ''}`}
+                            onAnimationEnd={showPeekReveal ? handleAvatarHintAnimationEnd : undefined}
                           >
                             <AnimatePresence mode="wait" initial={false}>
                               {activePromptAction ? (
@@ -1731,6 +1728,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                                     <span
                                       key={action.label}
                                       onClick={(actionEvent) => {
+                                        if (showPeekReveal) return;
                                         actionEvent.preventDefault();
                                         actionEvent.stopPropagation();
                                         setActiveAppointmentPrompt({
@@ -1751,8 +1749,8 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                       </AnimatePresence>
                       <motion.div
                         animate={{
-                          opacity: activeAppointmentActionsId === event.id ? 0 : 1,
-                          x: activeAppointmentActionsId === event.id ? 28 : 0,
+                          opacity: showAppointmentActions ? 0 : 1,
+                          x: showAppointmentActions ? 28 : 0,
                         }}
                         transition={{ duration: 0.2, ease: 'easeOut' }}
                         className="flex min-w-0 flex-1 items-center space-x-2"
@@ -1774,8 +1772,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                               toggleAppointmentActions();
                             }
                           }}
-                          className={`demo-calendar-avatar-trigger flex h-5 w-5 items-center justify-center rounded-full ${hasAppointmentActions ? 'cursor-pointer' : ''} ${showAvatarHint && hasAppointmentActions ? 'demo-calendar-avatar-trigger--hint' : ''}`}
-                          onAnimationEnd={handleAvatarHintAnimationEnd}
+                          className={`demo-calendar-avatar-trigger flex h-5 w-5 items-center justify-center rounded-full ${hasAppointmentActions ? 'cursor-pointer' : ''} ${showPeekReveal ? 'demo-calendar-avatar-trigger--hint' : ''} ${showAvatarReturn ? 'demo-calendar-avatar-trigger--return' : ''}`}
                         >
                           <span className="demo-calendar-avatar-trigger__image flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900">
                             <img
@@ -1785,9 +1782,9 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                             />
                           </span>
                         </span>
-                        <span className={`truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
-                        {!isMobile && !isCompact && <span className="text-[10px] font-medium italic text-zinc-500">via</span>}
-                        <span className={`${isCompact ? 'hidden' : 'text-[10px]'} font-medium text-zinc-400`}>
+                        <span className={`demo-calendar-appointment-text ${showPeekReveal ? 'demo-calendar-appointment-text--peek-hidden' : ''} truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
+                        {!isMobile && !isCompact && <span className={`demo-calendar-appointment-text ${showPeekReveal ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium italic text-zinc-500`}>via</span>}
+                        <span className={`demo-calendar-appointment-text ${showPeekReveal ? 'demo-calendar-appointment-text--peek-hidden' : ''} ${isCompact ? 'hidden' : 'text-[10px]'} font-medium text-zinc-400`}>
                           {event.receptionistName}
                         </span>
                       </motion.div>
