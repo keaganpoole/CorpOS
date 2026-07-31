@@ -1172,7 +1172,6 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
   const visibleDotAnimationCountRef = useRef(0);
   const completedVisibleDotAnimationsRef = useRef(new Set());
   const completedAppointmentAnimationsRef = useRef(new Set());
-  const avatarHintStartRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -1192,61 +1191,6 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
     completedVisibleDotAnimationsRef.current = new Set();
     completedAppointmentAnimationsRef.current = new Set();
   }, [selectedDay]);
-
-  useEffect(() => {
-    if (!calendarVisible) return undefined;
-    console.info('[Calendar avatar hint] calendar entered viewport and is visible');
-    return undefined;
-  }, [calendarVisible]);
-
-  useEffect(() => {
-    if (!calendarVisible || !hasAnimatedDots) return undefined;
-    console.info('[Calendar avatar hint] day dot reveal started');
-    return undefined;
-  }, [calendarVisible, hasAnimatedDots]);
-
-  useEffect(() => {
-    if (
-      !shouldRevealCalendarDetails
-      || !calendarVisible
-      || !visibleDotAnimationsComplete
-      || !appointmentAnimationsComplete
-      || avatarHintShownRef.current
-    ) return undefined;
-
-    const avatarTarget = document.querySelector('.demo-calendar-avatar-trigger');
-    const avatarRect = avatarTarget?.getBoundingClientRect();
-    console.info('[Calendar avatar hint] readiness', {
-      calendarVisible,
-      visibleDotAnimationsComplete,
-      appointmentAnimationsComplete,
-      avatarTargetFound: Boolean(avatarTarget),
-      avatarRect: avatarRect ? {
-        top: Math.round(avatarRect.top),
-        left: Math.round(avatarRect.left),
-        width: Math.round(avatarRect.width),
-        height: Math.round(avatarRect.height),
-      } : null,
-    });
-
-    if (!avatarTarget || !avatarRect || avatarRect.width <= 0 || avatarRect.height <= 0) return undefined;
-
-    avatarHintShownRef.current = true;
-    setShowAvatarHint(true);
-    avatarHintStartRef.current = window.setTimeout(() => {
-      setShowAvatarHint(false);
-      avatarHintStartRef.current = null;
-    }, 2400);
-
-    console.info('[Calendar avatar hint] ring animation started');
-
-    return () => {
-      if (avatarHintStartRef.current !== null) {
-        window.clearTimeout(avatarHintStartRef.current);
-        avatarHintStartRef.current = null;
-      }
-    };
-  }, [appointmentAnimationsComplete, calendarVisible, shouldRevealCalendarDetails, visibleDotAnimationsComplete]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1526,6 +1470,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
     if (!shouldRevealCalendarDetails || visibleDotAnimationTotal === 0) return;
     setVisibleDotAnimationsComplete(false);
     completedVisibleDotAnimationsRef.current = new Set();
+    console.info('[Calendar avatar hint] day dot reveal started');
   }, [shouldRevealCalendarDetails, visibleDotAnimationTotal]);
 
   useEffect(() => {
@@ -1534,6 +1479,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
       completedAppointmentAnimationsRef.current = new Set();
       return;
     }
+    console.info('[Calendar avatar hint] calendar entered viewport and appointment reveal started');
     if (selectedAppointments.length === 0) {
       setAppointmentAnimationsComplete(true);
       return;
@@ -1541,6 +1487,36 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
     setAppointmentAnimationsComplete(false);
     completedAppointmentAnimationsRef.current = new Set();
   }, [calendarVisible, selectedAppointments]);
+
+  useEffect(() => {
+    if (
+      !shouldRevealCalendarDetails
+      || !visibleDotAnimationsComplete
+      || !appointmentAnimationsComplete
+      || avatarHintShownRef.current
+    ) return undefined;
+
+    const avatarTarget = document.querySelector('.demo-calendar-avatar-trigger');
+    const avatarRect = avatarTarget?.getBoundingClientRect();
+    console.info('[Calendar avatar hint] readiness', {
+      visibleDotAnimationsComplete,
+      appointmentAnimationsComplete,
+      avatarTargetFound: Boolean(avatarTarget),
+      avatarRect: avatarRect ? {
+        top: Math.round(avatarRect.top),
+        left: Math.round(avatarRect.left),
+        width: Math.round(avatarRect.width),
+        height: Math.round(avatarRect.height),
+      } : null,
+    });
+
+    if (!avatarTarget || !avatarRect || avatarRect.width <= 0 || avatarRect.height <= 0) return undefined;
+
+    avatarHintShownRef.current = true;
+    setShowAvatarHint(true);
+    console.info('[Calendar avatar hint] ring animation started');
+    return undefined;
+  }, [appointmentAnimationsComplete, shouldRevealCalendarDetails, visibleDotAnimationsComplete]);
 
   const handleVisibleDotAnimationEnd = (dotKey, animationEvent) => {
     if (animationEvent.animationName !== 'starlightShimmer') return;
