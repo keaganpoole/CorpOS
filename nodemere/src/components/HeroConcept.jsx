@@ -227,6 +227,19 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   const active = receptionists[index] || receptionists[0];
   const activeGradient = HERO_GRADIENT;
   const activeIcon = pickTraitIcon(active.traits, active.stereotype);
+  const traitsPill = (className = '') => (
+    <div className={`max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-2 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md md:px-2.5 md:py-2 lg:gap-2 lg:px-2.5 lg:py-1.5 ${className}`}>
+      <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
+      <div className="flex min-w-0 items-center gap-1 text-[8px] font-black tracking-[0.14em] text-white/60 md:text-[9px] lg:gap-1.5 lg:text-[9px] lg:tracking-[0.16em]">
+        {active.traits.map((trait, i) => (
+          <React.Fragment key={`${active.id}-${trait}-${i}`}>
+            <span className="truncate">{toTitleCase(trait)}</span>
+            {i < active.traits.length - 1 && <span className="text-white/30">&bull;</span>}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
 
   const nextSlide = () => {
     setDirection(1);
@@ -336,56 +349,33 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                   className="w-full"
                 >
                   <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:max-w-[34rem] lg:items-start lg:gap-5 lg:text-left">
-                    <div className="-mb-5 inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-2 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md md:-mb-6 md:px-2.5 md:py-2 lg:mx-0 lg:-mb-6 lg:gap-2 lg:px-2.5 lg:py-1.5">
-                      <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
-                      <div className="flex min-w-0 items-center gap-1 text-[8px] font-black tracking-[0.14em] text-white/60 md:text-[9px] lg:gap-1.5 lg:text-[9px] lg:tracking-[0.16em]">
-                        {active.traits.map((trait, i) => (
-                          <React.Fragment key={`${active.id}-${trait}-${i}`}>
-                            <span className="truncate">{toTitleCase(trait)}</span>
-                            {i < active.traits.length - 1 && <span className="text-white/30">&bull;</span>}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    </div>
+                    {traitsPill('-mb-5 hidden lg:mx-0 lg:-mb-6 lg:inline-flex')}
 
                     <h1
                       aria-label={active.name}
                       className={`hero-concept-name homepage-copy-reveal lg:self-start ${copyVisible ? 'is-visible' : ''}`}
                       style={{
-                        position: 'relative',
                         display: 'inline-block',
                         fontSize: 'clamp(5rem, 12vw, 11rem)',
-                        lineHeight: 0.82,
+                        lineHeight: 0.9,
                         letterSpacing: '-0.04em',
                         fontWeight: 400,
                         margin: 0,
-                        overflow: 'visible',
+                        background: `linear-gradient(90deg, ${activeGradient[0]}, ${activeGradient[1]}, ${activeGradient[2]}, ${activeGradient[0]})`,
+                        backgroundSize: '200% auto',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        animation: 'miami-flow 8s linear infinite',
                       }}
                     >
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          position: 'absolute',
-                          inset: '-0.06em 0 -0.58em 0',
-                          display: 'block',
-                          lineHeight: 1.42,
-                          paddingBottom: '0.22em',
-                          background: `linear-gradient(90deg, ${activeGradient[0]}, ${activeGradient[1]}, ${activeGradient[2]}, ${activeGradient[0]})`,
-                          backgroundSize: '200% auto',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          animation: 'miami-flow 8s linear infinite',
-                          overflow: 'visible',
-                        }}
-                      >
-                        {active.name}
-                      </span>
-                      <span aria-hidden="true" style={{ visibility: 'hidden' }}>{active.name}</span>
+                      {active.name}
                     </h1>
 
-                    <div className="flex flex-col items-center gap-5 pt-16 text-center md:gap-6 md:pt-18 lg:items-start lg:gap-5 lg:pt-16 lg:text-left">
+                    {traitsPill('inline-flex lg:hidden')}
+
+                    <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:items-start lg:gap-5 lg:pt-16 lg:text-left">
                       {active.description && (
-                        <p className={`homepage-copy-reveal homepage-copy-reveal--delayed max-w-md text-base font-light leading-relaxed text-white/60 md:max-w-[36rem] md:text-[1.22rem] md:leading-[1.75] lg:mx-0 lg:max-w-md lg:text-lg lg:leading-relaxed ${copyVisible ? 'is-visible' : ''}`}>
+                        <p className={`homepage-copy-reveal homepage-copy-reveal--delayed max-w-md text-[0.95rem] font-light leading-[1.55] text-white/60 md:max-w-[36rem] md:text-[1.16rem] md:leading-[1.62] lg:mx-0 lg:max-w-md lg:text-[1.06rem] lg:leading-[1.55] ${copyVisible ? 'is-visible' : ''}`}>
                           {active.description}
                         </p>
                       )}

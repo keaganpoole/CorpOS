@@ -1072,7 +1072,7 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
           </linearGradient>
         </defs>
       </svg>
-      <div className="mx-auto w-full max-w-[820px] text-left md:max-w-[940px] lg:max-w-[820px]">
+      <div className="homepage-feature-list mx-auto w-full max-w-[820px] text-left md:max-w-[940px] lg:max-w-[820px]">
         <div className="flex flex-col">
           {items.map((item, index) => {
             const rowVisible = shouldUseScrollHighlight ? isVisible : isVisible && featureProgress > 0.12 + index * 0.11;
@@ -1101,11 +1101,11 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
                 />
 
                 <div
-                  className={`flex items-center gap-4 transition-transform duration-300 ease-out md:min-w-[280px] md:gap-5 lg:min-w-0 ${
+                  className={`feature-reveal-row__heading flex items-center gap-4 transition-transform duration-300 ease-out md:min-w-[280px] md:gap-5 lg:min-w-0 ${
                     isHighlighted ? 'translate-x-1.5' : ''
                   }`}
                 >
-                  <div className="relative flex h-3 w-3 items-center justify-center">
+                  <div className="feature-reveal-row__dot-wrap relative flex h-3 w-3 items-center justify-center">
                     <span
                       className={`feature-reveal-row__dot absolute h-1.5 w-1.5 rounded-full transition-all duration-300 ease-out ${
                         isHighlighted ? 'is-highlighted scale-110 opacity-100' : 'scale-75 opacity-30'
@@ -1129,7 +1129,7 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
                 </div>
 
                 <div
-                  className={`mt-2 w-full pl-7 transition-transform duration-300 ease-out md:mt-0 md:max-w-[26rem] md:pl-0 lg:max-w-sm ${
+                  className={`feature-reveal-row__copy-wrap mt-2 w-full pl-7 transition-transform duration-300 ease-out md:mt-0 md:max-w-[26rem] md:pl-0 lg:max-w-sm ${
                     isHighlighted ? 'translate-x-1' : ''
                   }`}
                 >
