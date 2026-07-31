@@ -176,10 +176,10 @@ export default function CalendarMonthView({ data = null, className = '', selecte
     : `${MONTHS[month]} 1`;
 
   return (
-    <div className={`relative flex h-full min-h-0 w-full items-start justify-center bg-transparent p-3 pt-2 sm:p-4 sm:pt-3 md:p-5 md:pt-4 ${className}`.trim()}>
-      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[22px] border border-white/[0.05] bg-[#0a0a0a] p-3 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] sm:p-4 md:rounded-[28px] md:p-5 xl:p-10">
-        <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/5 pb-3 text-left md:mb-4 md:pb-4 xl:mb-6 xl:pb-6">
-          <span className="flex items-center space-x-2 font-bold tracking-tight text-white text-[1rem] md:text-[1.25rem] xl:text-[2rem]">
+    <div className={`relative flex h-full min-h-0 w-full items-start justify-center bg-transparent p-4 pt-3 md:p-5 md:pt-4 2xl:p-5 2xl:pt-4 ${className}`.trim()}>
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-[#0a0a0a] p-5 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] md:p-6 lg:p-7 2xl:p-10">
+        <div className="mb-4 flex items-center justify-between gap-2 border-b border-white/5 pb-4 text-left lg:mb-5 lg:pb-5 2xl:mb-6 2xl:pb-6">
+          <span className="flex items-center space-x-2 font-bold tracking-tight text-white text-[1.5rem] md:text-[1.65rem] lg:text-[1.75rem] 2xl:text-[2rem]">
             <CalendarIcon className="text-zinc-300" size={22} />
             <span>{MONTHS[month]} {year}</span>
           </span>
@@ -206,18 +206,18 @@ export default function CalendarMonthView({ data = null, className = '', selecte
           </div>
         </div>
 
-        <div className="mb-2 grid grid-cols-7 text-center gap-1 md:gap-1.5 xl:gap-2">
+        <div className="mb-2 grid grid-cols-7 gap-2 text-center">
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
             <span
               key={`${day}-${index}`}
-              className="py-1 font-bold uppercase tracking-widest text-zinc-500 text-[8px] md:text-[9px] xl:text-[10px]"
+              className="py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500"
             >
               {day}
             </span>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-1 md:gap-1.5 xl:gap-2">
+        <div className="grid grid-cols-7 gap-2">
           {Array.from({ length: firstDay }).map((_, index) => (
             <div key={`empty-${index}`} className="aspect-square bg-transparent opacity-5" />
           ))}
@@ -236,9 +236,9 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                   isSelected
                     ? 'z-10 border-transparent bg-gradient-to-tr from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-[0_0_18px_rgba(139,92,246,0.3)]'
                     : 'border-white/5 bg-zinc-950/60 text-zinc-400 hover:border-white/20'
-                } rounded-lg p-1.5 md:rounded-lg md:p-2 xl:rounded-xl xl:p-2`}
+                } rounded-xl p-2`}
               >
-                <span className={`font-bold ${isSelected ? 'text-white' : 'text-zinc-500'} text-[8px] md:text-[9px] xl:text-[10px]`}>
+                <span className={`text-[10px] font-bold ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
                   {day}
                 </span>
 
@@ -246,7 +246,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                   {dayAppointments.slice(0, 3).map((appointment, dotIndex) => (
                     <div
                       key={appointment.id}
-                      className="dot-item rounded-full h-[2.5px] w-[2.5px] md:h-[3px] md:w-[3px] xl:h-1 xl:w-1"
+                      className="dot-item h-1 w-1 rounded-full"
                       style={{
                         backgroundColor: isSelected ? '#ffffff' : getAppointmentColor(appointment, servicesById),
                         animationDelay: hasAnimatedDots ? `${day * 24 + dotIndex * 80 + appointmentIndexSeed(appointment.id)}ms` : '0ms',
@@ -260,8 +260,8 @@ export default function CalendarMonthView({ data = null, className = '', selecte
           })}
         </div>
 
-        <div className="mt-3 flex min-h-0 flex-1 flex-col border-t border-white/5 pt-3 md:mt-4 md:pt-4 xl:mt-8 xl:pt-5">
-          <span className="mb-3 flex items-center space-x-1.5 font-bold tracking-widest text-zinc-400 text-[8px] md:text-[9px]">
+        <div className="mt-5 flex min-h-0 flex-1 flex-col border-t border-white/5 pt-5 lg:mt-6 2xl:mt-8">
+          <span className="mb-3 flex items-center space-x-1.5 text-[9px] font-bold tracking-widest text-zinc-400">
             <Activity size={10} className="text-zinc-300" />
             <span>Appointments for {selectedDateLabel}</span>
           </span>
@@ -271,12 +271,12 @@ export default function CalendarMonthView({ data = null, className = '', selecte
               {Array.from({ length: 2 }).map((_, index) => (
                 <div
                   key={index}
-                  className="agenda-item rounded-lg border border-white/[0.08] bg-[#070707]/92 animate-pulse h-[42px] md:h-[46px] xl:h-[52px]"
+                  className="agenda-item h-[52px] rounded-lg border border-white/[0.08] bg-[#070707]/92 animate-pulse"
                 />
               ))}
             </div>
           ) : selectedDateAppointments.length > 0 ? (
-            <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-1.5 md:space-y-2">
+            <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {selectedDateAppointments.map((appointment, index) => {
                 const tagColor = getAppointmentColor(appointment, servicesById);
                 const category = getAppointmentCategory(appointment, servicesById);
@@ -299,12 +299,12 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                       onClick={() => setExpandedAppointmentId((current) => (current === appointment.id ? null : appointment.id))}
                       initial={false}
                       animate={{ opacity: 1, y: 0 }}
-                      className="agenda-item flex w-full items-center justify-between rounded-lg border border-white/[0.08] bg-[#070707]/92 text-left gap-2 p-2 md:gap-2.5 md:p-2.5 xl:gap-3 xl:p-3"
+                      className="agenda-item flex w-full items-center justify-between gap-3 rounded-lg border border-white/[0.08] bg-[#070707]/92 p-3 text-left"
                       style={{ animationDelay: `${index * 90}ms` }}
                     >
                       <div className="flex min-w-0 flex-1 items-center space-x-2">
-                        <span className="rounded-full h-[5px] w-[5px] md:h-[6px] md:w-[6px] xl:h-2 xl:w-2" style={{ backgroundColor: tagColor }} />
-                        <span className="truncate font-semibold text-zinc-200 text-[10px] md:text-[11px] xl:text-xs">{title}</span>
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tagColor }} />
+                        <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
                         <span className="text-[10px] font-medium italic text-zinc-500">via</span>
                         <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[8px] font-bold text-zinc-300">
                           {avatarSrc ? (
@@ -317,13 +317,13 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                             avatarLabel
                           )}
                         </span>
-                        <span className="font-medium text-zinc-400 hidden xl:inline text-[10px]">
+                        <span className="hidden text-[10px] font-medium text-zinc-400 sm:inline">
                           {receptionist}
                         </span>
                       </div>
                       <div className="flex shrink-0 items-center space-x-1.5">
                         <span
-                          className="rounded border font-bold uppercase tracking-wider px-1.5 py-0.5 text-[7px] md:text-[8px] xl:px-2 xl:text-[9px]"
+                          className="rounded border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
                           style={{
                             color: tagColor,
                             borderColor: `${tagColor}33`,
@@ -332,7 +332,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                         >
                           {category}
                         </span>
-                        <span className="font-mono text-zinc-400 text-[8px] md:text-[9px] xl:text-[10px]">{formatTime(appointment.time)}</span>
+                        <span className="font-mono text-[10px] text-zinc-400">{formatTime(appointment.time)}</span>
                       </div>
                     </motion.button>
                     <AnimatePresence initial={false}>

@@ -195,8 +195,8 @@ function CallLogsToolbarTitle({ active, action = null }) {
   return (
     <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
       <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">Call Logs</span>
-      <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />
-      <span className="text-[12px] font-medium text-zinc-500">
+      <span className="hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
+      <span className="hidden text-[12px] font-medium text-zinc-500 md:inline">
         {loading ? 'Loading calls' : `${calls.length}${hasMore ? '+' : ''} recent calls`}
       </span>
       {action}
@@ -210,8 +210,8 @@ function PeopleToolbarTitle({ active, count, loading, action = null }) {
   return (
     <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
       <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">People</span>
-      <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />
-      <span className="text-[12px] font-medium text-zinc-500">
+      <span className="hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
+      <span className="hidden text-[12px] font-medium text-zinc-500 md:inline">
         {loading ? 'Loading people' : `${count} People`}
       </span>
       {action}
@@ -225,8 +225,8 @@ function StaticToolbarTitle({ active, title, description, action = null }) {
   return (
     <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
       <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">{title}</span>
-      <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />
-      <span className="text-[12px] font-medium text-zinc-500">{description}</span>
+      <span className="hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
+      <span className="hidden text-[12px] font-medium text-zinc-500 md:inline">{description}</span>
       {action}
     </div>
   );
@@ -238,8 +238,8 @@ function CalendarToolbarTitle({ active, count, loading, action = null }) {
   return (
     <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
       <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">Calendar</span>
-      <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />
-      <span className="text-[12px] font-medium text-zinc-500">
+      <span className="hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
+      <span className="hidden text-[12px] font-medium text-zinc-500 md:inline">
         {loading ? 'Loading appointments' : `${count} Appointments`}
       </span>
       {action}
@@ -458,9 +458,11 @@ const GradientBleed = ({
   underlineOffsetClassName = 'bottom-0',
   showUnderline = true,
   showSweep = true,
+  orientation = 'horizontal',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
+  const isVertical = orientation === 'vertical';
 
   const toggleOpen = () => {
     const next = !isOpen;
@@ -515,8 +517,8 @@ const GradientBleed = ({
   const sweepBackground = `linear-gradient(to right, transparent 0%, ${activeColor}22 45%, ${activeColor}66 50%, ${activeColor}22 55%, transparent 100%)`;
 
   return (
-    <div className="relative inline-flex items-center">
-      <div className="flex items-center">
+    <div className={`relative inline-flex ${isVertical ? 'items-center justify-center' : 'items-center'}`}>
+      <div className={`flex ${isVertical ? 'flex-col-reverse items-center' : 'items-center'}`}>
         <button
           onClick={() => toggleOpen()}
           className={`no-drag flex items-center gap-2 font-bold transition-colors duration-500 z-10 ${buttonPaddingClassName} ${textClassName} ${isOpen ? '' : 'hover:text-zinc-200'}`}
@@ -529,8 +531,8 @@ const GradientBleed = ({
         </button>
 
         <div
-          className={`flex ${optionsGapClassName} items-center overflow-hidden transition-all z-10 ${getExpansionClass()} ${
-            isOpen ? `${optionsOpenClassName} opacity-100` : 'max-w-0 opacity-0'
+          className={`flex ${isVertical ? 'flex-col-reverse' : ''} ${optionsGapClassName} items-center overflow-hidden transition-all z-10 ${getExpansionClass()} ${
+            isOpen ? `${optionsOpenClassName} opacity-100` : `${isVertical ? 'max-h-0' : 'max-w-0'} opacity-0`
           }`}
           style={{
             filter: variant === 'elastic' && !isOpen ? 'blur(10px)' : 'blur(0px)',
@@ -554,8 +556,10 @@ const GradientBleed = ({
 
       {showUnderline && (
         <div
-          className={`absolute ${underlineOffsetClassName} left-0 h-[2px] transition-all z-20 ${getExpansionClass()} ${
-            isOpen ? 'w-full opacity-100' : 'w-0 opacity-0'
+          className={`absolute ${underlineOffsetClassName} transition-all z-20 ${getExpansionClass()} ${
+            isVertical
+              ? `right-0 top-0 w-[2px] ${isOpen ? 'h-full opacity-100' : 'h-0 opacity-0'}`
+              : `left-0 h-[2px] ${isOpen ? 'w-full opacity-100' : 'w-0 opacity-0'}`
           } ${variant === 'prism' && isOpen ? 'animate-skyPrism' : ''}`}
           style={borderStyle}
         />
@@ -1073,8 +1077,8 @@ const SonarDashboard = () => {
 
   const navItems = [
     { id: 'receptionists', icon: <IdCardLanyard size={18} />, label: 'Team' },
-    { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
+    { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
     { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios' },
     { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
@@ -1339,16 +1343,39 @@ const SonarDashboard = () => {
   };
 
   const displayZone = controlState?.zone || 1;
+  const renderAutonomyControl = () => (
+    <GradientBleed
+      trigger="Autonomy"
+      options={['1', '2', '3', '4', '5']}
+      variant="prism"
+      icon={<Gavel size={12} />}
+      value={String(displayZone)}
+      onSelect={(val) => setZone(parseInt(val))}
+      onOpenChange={(open) => setZoneOpen(open)}
+    />
+  );
   const toolbarAutonomyControl = (
-    <div className="absolute left-[calc(50%+210px)] top-1/2 z-10 -translate-y-1/2 no-drag" style={{ width: '120px', textAlign: 'center' }}>
+    <div className="absolute left-[calc(50%+210px)] top-1/2 z-10 hidden -translate-y-1/2 no-drag xl:block" style={{ width: '120px', textAlign: 'center' }}>
+      {renderAutonomyControl()}
+    </div>
+  );
+  const mobileSidebarAutonomyControl = (
+    <div className="no-drag relative flex flex-col items-center xl:hidden">
       <GradientBleed
         trigger="Autonomy"
         options={['1', '2', '3', '4', '5']}
         variant="prism"
-        icon={<Gavel size={12} />}
+        icon={<Gavel size={14} />}
         value={String(displayZone)}
         onSelect={(val) => setZone(parseInt(val))}
         onOpenChange={(open) => setZoneOpen(open)}
+        showTrigger={false}
+        textClassName="text-[11px] tracking-widest"
+        buttonPaddingClassName="h-10 w-10 justify-center text-zinc-300"
+        optionsGapClassName="gap-3"
+        optionsOpenClassName="max-h-64 pb-3"
+        underlineOffsetClassName="-right-1"
+        orientation="vertical"
       />
     </div>
   );
@@ -1417,7 +1444,7 @@ const SonarDashboard = () => {
         />
 
         {/* Center title */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center z-10">
+        <div className="absolute left-1/2 z-10 hidden -translate-x-1/2 items-center xl:flex">
           <div className="relative flex flex-col items-center">
             <div className={`relative transition-all duration-700 transform ${glitch ? 'opacity-10 scale-[1.05] blur-sm' : 'opacity-100 scale-100'}`}>
               <div className="absolute -left-6 top-1/2 h-5 w-[1px] -translate-y-1/2 bg-white/10" />
@@ -1468,6 +1495,20 @@ const SonarDashboard = () => {
                 />
               ))}
             </nav>
+          </div>
+          <div className="relative mt-auto h-[220px] px-3 pb-4">
+            <div
+              className={`pointer-events-none absolute bottom-[92px] left-1/2 flex h-[118px] w-10 -translate-x-1/2 items-center justify-center transition-[opacity,filter] duration-700 xl:hidden ${
+                zoneOpen ? 'opacity-10 blur-sm' : 'opacity-100 blur-0'
+              }`}
+            >
+              <span className="-rotate-90 whitespace-nowrap text-[17px] font-light uppercase leading-none tracking-[0.46em] text-white/15">
+                NODEMERE
+              </span>
+            </div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+              {mobileSidebarAutonomyControl}
+            </div>
           </div>
         </aside>
 
