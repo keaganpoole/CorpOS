@@ -883,11 +883,44 @@ main,
     background:
         linear-gradient(rgba(7, 7, 7, 0.92), rgba(7, 7, 7, 0.92)) padding-box,
         linear-gradient(135deg, var(--brandGradientStart), var(--brandGradientEnd), #a855f7, var(--brandGradientStart)) border-box;
-    background-size: 100% 100%, 320% 320%;
+    background-size: 320% 320%;
     box-shadow:
         0 0 0 1px color-mix(in srgb, var(--brandGradientStart) 16%, transparent),
         0 0 14px color-mix(in srgb, var(--brandGradientEnd) 14%, transparent);
     animation: demoCallStatusGradient 4.8s ease-in-out infinite;
+}
+.demo-calendar-appointment-record {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+.demo-call-agenda-item.demo-calendar-appointment-record::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background-image: var(--demo-receptionist-banner);
+    background-position: 58% center;
+    background-repeat: no-repeat;
+    background-size: auto 180%;
+    opacity: 0.24;
+    filter: saturate(0.88) brightness(0.92);
+    mix-blend-mode: screen;
+    pointer-events: none;
+}
+.demo-call-agenda-item.demo-calendar-appointment-record::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+        linear-gradient(90deg, rgba(12, 12, 16, 0.94) 0%, rgba(12, 12, 16, 0.88) 40%, rgba(12, 12, 16, 0.64) 68%, rgba(12, 12, 16, 0.74) 100%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 58%);
+    pointer-events: none;
+}
+.demo-calendar-appointment-record > * {
+    position: relative;
+    z-index: 1;
 }
 .features-grid-section { padding: 80px 20px; background-color: var(--color-white); display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; max-width: 1300px; margin: 0 auto; position: relative; overflow: hidden; }
 .feature-card {

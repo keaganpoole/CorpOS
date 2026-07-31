@@ -37,8 +37,8 @@ const TAG_COLORS = {
 const DEMO_APPOINTMENT_STATUS_COLORS = {
   Completed: '#22c55e',
   Cancelled: '#f43f5e',
-  Confirmed: '#60a5fa',
-  Booked: '#71717a',
+  Confirmed: '#a78bfa',
+  Booked: '#f59e0b',
 };
 
 const getDemoAppointmentActions = (status) => {
@@ -78,6 +78,12 @@ const getDemoActionPrompt = (action, customerFirstName) => {
   if (action === 'Cancel') return `Call ${customerFirstName} to cancel?`;
   return `Call ${customerFirstName} to reschedule?`;
 };
+
+const getReceptionistBannerUrl = (bannerId) => (
+  bannerId
+    ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${bannerId}.png`
+    : null
+);
 
 const FALLBACK_RECEPTIONISTS = [
   {
@@ -1180,7 +1186,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
       try {
         const { data, error } = await supabase
           .from('receptionist_catalog')
-          .select('id, full_name, first_name, avatar')
+          .select('id, full_name, first_name, avatar, banner_id')
           .order('full_name', { ascending: true });
 
         if (cancelled) return;
@@ -1348,11 +1354,17 @@ function RightCalendarGrid({ hasAnimatedDots }) {
 
   const displayItemsDatabase = useMemo(() => {
     const todayItems = itemsDatabase[24] || [];
-    return {
+    const displayedItems = {
       ...itemsDatabase,
       [currentDay]: todayItems,
     };
-  }, [itemsDatabase, currentDay]);
+
+    return Object.fromEntries(
+      Object.entries(displayedItems).filter(([day]) => (
+        new Date(currentYear, currentMonth, Number(day)).getDay() !== 0
+      ))
+    );
+  }, [itemsDatabase, currentDay, currentMonth, currentYear]);
 
   const assignedItemsDatabase = useMemo(() => {
     const pool = receptionists.length > 0 ? receptionists : FALLBACK_RECEPTIONISTS;
@@ -1365,6 +1377,17 @@ function RightCalendarGrid({ hasAnimatedDots }) {
       }
       return hash;
     };
+    const findReceptionistByName = (name) => (
+      pool.find((receptionist) => {
+        const firstName = String(receptionist?.first_name || '').trim().toLowerCase();
+        const fullName = String(receptionist?.full_name || '').trim().toLowerCase();
+        return firstName === name || fullName === name;
+      })
+    );
+    const defaultReceptionistAssignments = [
+      findReceptionistByName('maggie'),
+      findReceptionistByName('bonnie'),
+    ];
     const getAppointmentNote = (event, day, index) => {
       const notesByTitle = {
         'Color Consultation': 'New guest is deciding between warm brunette gloss and a low-maintenance balayage. Mention patch test timing and take before photos.',
@@ -1401,7 +1424,9 @@ function RightCalendarGrid({ hasAnimatedDots }) {
           const seedDay = Number(day) === currentDay ? 24 : day;
           const poolIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}`) % pool.length;
           const customerIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer`) % DEMO_CUSTOMER_FIRST_NAMES.length;
-          const receptionist = pool[poolIndex];
+          const receptionist = Number(seedDay) === 24
+            ? (defaultReceptionistAssignments[index] || pool[poolIndex])
+            : pool[poolIndex];
           const status = getAppointmentStatus(event, seedDay, index);
           return {
             ...event,
@@ -1413,6 +1438,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
             customerFirstName: DEMO_CUSTOMER_FIRST_NAMES[customerIndex],
             receptionistName: receptionist?.first_name || receptionist?.full_name || 'Receptionist',
             receptionistAvatar: receptionist?.avatar || '',
+            receptionistBannerUrl: receptionist?.banner_url || getReceptionistBannerUrl(receptionist?.banner_id) || receptionist?.avatar || '',
           };
         }),
       ])
@@ -1498,8 +1524,11 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                   <motion.div
                     initial={false}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`agenda-item flex w-full items-center rounded-lg border bg-[#070707]/92 text-left ${activePromptAction ? 'demo-call-agenda-item' : 'border-white/[0.08]'} ${isMobile ? 'gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
-                    style={{ animationDelay: `${index * 90}ms` }}
+                    className={`agenda-item demo-calendar-appointment-record flex w-full items-center rounded-lg border bg-[#070707]/92 text-left ${activePromptAction ? 'demo-call-agenda-item' : 'border-white/[0.08]'} ${isMobile ? 'gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
+                    style={{
+                      animationDelay: `${index * 90}ms`,
+                      '--demo-receptionist-banner': `url(${event.receptionistBannerUrl || event.receptionistAvatar})`,
+                    }}
                   >
                     <button
                       type="button"
@@ -1516,7 +1545,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                       className={`relative z-10 flex shrink-0 items-center justify-center rounded-full p-1 transition-transform duration-200 focus:outline-none ${hasAppointmentActions ? 'hover:scale-110' : 'cursor-default'}`}
                     >
                       <span
-                        className={`${isMobile ? 'h-1.5 w-1.5' : isCompact ? 'h-2 w-2' : 'h-2.5 w-2.5'} rounded-full ${activePromptAction ? 'demo-call-status-dot' : 'shadow-[0_0_5px_currentColor]'}`}
+                        className={`${isMobile ? 'h-1.5 w-1.5' : isCompact ? 'h-2 w-2' : 'h-2.5 w-2.5'} rounded-full ${activePromptAction ? 'demo-call-status-dot' : 'shadow-[0_0_4px_currentColor]'}`}
                         style={activePromptAction
                           ? undefined
                           : { color: event.statusColor, backgroundColor: event.statusColor }}
@@ -1561,7 +1590,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                                       actionEvent.preventDefault();
                                       actionEvent.stopPropagation();
                                     }}
-                                    className={`shrink-0 font-bold tracking-[-0.02em] text-emerald-300 drop-shadow-[0_0_10px_rgba(110,231,183,0.14)] ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}
+                                    className={`shrink-0 cursor-pointer font-bold tracking-[-0.02em] text-emerald-300 drop-shadow-[0_0_10px_rgba(110,231,183,0.14)] ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}
                                   >
                                     Call
                                   </span>
@@ -1571,7 +1600,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                                       actionEvent.stopPropagation();
                                       setActiveAppointmentPrompt(null);
                                     }}
-                                    className={`shrink-0 font-bold tracking-[-0.02em] text-zinc-500 drop-shadow-[0_0_10px_rgba(113,113,122,0.14)] ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}
+                                    className={`shrink-0 cursor-pointer font-bold tracking-[-0.02em] text-zinc-500 drop-shadow-[0_0_10px_rgba(113,113,122,0.14)] ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}
                                   >
                                     Cancel
                                   </span>
@@ -1596,7 +1625,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                                           action: action.label,
                                         });
                                       }}
-                                      className={`font-bold tracking-[-0.02em] drop-shadow-[0_0_10px_rgba(255,255,255,0.08)] ${action.className} ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}
+                                      className={`cursor-pointer font-bold tracking-[-0.02em] drop-shadow-[0_0_10px_rgba(255,255,255,0.08)] ${action.className} ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}
                                     >
                                       {action.label}
                                     </span>
@@ -1615,8 +1644,6 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                         transition={{ duration: 0.2, ease: 'easeOut' }}
                         className="flex min-w-0 flex-1 items-center space-x-2"
                       >
-                        <span className={`truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
-                        {!isMobile && !isCompact && <span className="text-[10px] font-medium italic text-zinc-500">via</span>}
                         <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900">
                           <img
                             src={event.receptionistAvatar}
@@ -1624,18 +1651,15 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                             className="h-full w-full object-cover"
                           />
                         </span>
+                        <span className={`truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
+                        {!isMobile && !isCompact && <span className="text-[10px] font-medium italic text-zinc-500">via</span>}
                         <span className={`${isCompact ? 'hidden' : 'text-[10px]'} font-medium text-zinc-400`}>
                           {event.receptionistName}
                         </span>
                       </motion.div>
                       <div className="flex shrink-0 items-center space-x-1.5">
                         <span
-                        className={`rounded border font-bold uppercase tracking-wider ${isMobile ? 'px-1.5 py-0.5 text-[7px]' : isCompact ? 'px-1.5 py-0.5 text-[8px]' : 'px-2 py-0.5 text-[9px]'}`}
-                        style={{
-                          color: '#a1a1aa',
-                          borderColor: 'rgba(113, 113, 122, 0.24)',
-                          backgroundColor: 'rgba(39, 39, 42, 0.52)',
-                        }}
+                        className={`font-bold uppercase tracking-wider text-zinc-500 ${isMobile ? 'text-[7px]' : isCompact ? 'text-[8px]' : 'text-[9px]'}`}
                       >
                           {event.category}
                         </span>
