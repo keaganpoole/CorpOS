@@ -1069,7 +1069,7 @@ export default function ScenariosPage({
     if (!selectedNodeId) return;
     const defaultCategory = isPrimaryNode ? selectedNode?.categoryType || 'TRIGGERS' : 'ACTIONS';
     const node = nodeMap[selectedNodeId];
-    const hasSavedConfig = node?.configured || node?.appointmentConfig?.key || node?.scheduleConfig?.key || node?.triggerFilter?.key;
+    const hasSavedConfig = node?.configured || node?.appointmentConfig?.key || node?.scheduleConfig?.key || node?.triggerFilter?.key || node?.triggerConfig?.key;
     // If node has saved config, let openSelectionPanel restore it — preserve config stages
     if (hasSavedConfig) {
       setPanelStage(prev => {
@@ -1085,6 +1085,10 @@ export default function ScenariosPage({
         if (['appointmentConfig', 'scheduleConfig'].includes(prev)) return prev;
         if (prev === 'triggerFilter') {
           if (node?.triggerFilter?.key === 'appointment_soon') return prev;
+          return 'options';
+        }
+        if (prev === 'triggerConfig') {
+          if (node?.triggerConfig?.key) return prev;
           return 'options';
         }
         return 'options';

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Activity,
   AudioLines,
@@ -7,12 +8,10 @@ import {
   Calendar as CalendarIcon,
   ClipboardList,
   CreditCard,
-  Database,
   GitBranch,
   Layers,
   Phone,
   PlayCircle,
-  Search,
   TimerReset,
   Users,
   Workflow,
@@ -34,6 +33,50 @@ const TAG_COLORS = {
   Styling: HERO_COLORS[3],
   Haircut: HERO_COLORS[4],
   Blowout: HERO_COLORS[5],
+};
+const DEMO_APPOINTMENT_STATUS_COLORS = {
+  Completed: '#22c55e',
+  Cancelled: '#f43f5e',
+  Confirmed: '#60a5fa',
+  Booked: '#71717a',
+};
+
+const getDemoAppointmentActions = (status) => {
+  if (status === 'Completed') return [];
+  if (status === 'Cancelled') return [{ label: 'Reschedule', className: 'text-zinc-300' }];
+  if (status === 'Confirmed') {
+    return [
+      { label: 'Reschedule', className: 'text-zinc-300' },
+      { label: 'Cancel', className: 'text-rose-300' },
+    ];
+  }
+
+  return [
+    { label: 'Confirm', className: 'text-emerald-300' },
+    { label: 'Reschedule', className: 'text-zinc-300' },
+    { label: 'Cancel', className: 'text-rose-300' },
+  ];
+};
+
+const DEMO_CUSTOMER_FIRST_NAMES = [
+  'Ava',
+  'Maya',
+  'Sofia',
+  'Harper',
+  'Ella',
+  'Nora',
+  'Isla',
+  'Grace',
+  'Lena',
+  'Ruby',
+  'Claire',
+  'Mia',
+];
+
+const getDemoActionPrompt = (action, customerFirstName) => {
+  if (action === 'Confirm') return `Call ${customerFirstName} to confirm?`;
+  if (action === 'Cancel') return `Call ${customerFirstName} to cancel?`;
+  return `Call ${customerFirstName} to reschedule?`;
 };
 
 const FALLBACK_RECEPTIONISTS = [
@@ -58,52 +101,27 @@ const FALLBACK_RECEPTIONISTS = [
 ];
 const FEATURE_ITEMS = [
   {
-    icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
-    colorClass: 'bg-emerald-500',
-    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
-    hoverTextClass: 'group-hover:text-emerald-400',
+    icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
     title: 'Booking CRM',
     copy: 'Create beautifully organized appointment records that bring together customer details, history, notes, and everything else surrounding each visit.',
   },
   {
-    icon: <CalendarIcon className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
-    colorClass: 'bg-pink-500',
-    glowClass: 'shadow-[0_0_12px_rgba(236,72,153,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    title: 'Fully Managed',
-    copy: 'Handle the full appointment flow during the call, from new bookings to changes and cancellations.',
-  },
-  {
-  icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
-  colorClass: 'bg-blue-500',
-  glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
-  hoverTextClass: 'group-hover:text-pink-400',
-  accentColor: '#f472b6',
+  icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
   title: 'Staff Matching',
   copy: 'Match every customer with the staff member who best fits their needs while checking availability in real time.'
   },
   {
-    icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-amber-300" />,
-    colorClass: 'bg-amber-400',
-    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
-    hoverTextClass: 'group-hover:text-amber-400',
+    icon: <CalendarIcon className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
+    title: 'Fully Managed',
+    copy: 'Handle the full appointment flow during the call, from new bookings to changes and cancellations.',
+  },
+  {
+    icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12" />,
     title: 'Follow-Ups',
     copy: 'Send confirmations, reminders, and appointment updates so customers know exactly what was booked and what happens next.',
   },
   {
-    icon: <Search className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-pink-300" />,
-    colorClass: 'bg-cyan-400',
-    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    accentColor: '#f472b6',
-    title: 'Manual Edits',
-    copy: 'Review and adjust the appointment records your receptionist creates whenever staff need to update details, notes, or status.',
-  },
-  {
-    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-indigo-300" />,
-    colorClass: 'bg-indigo-400',
-    glowClass: 'shadow-[0_0_12px_rgba(129,140,248,0.6)]',
-    hoverTextClass: 'group-hover:text-indigo-400',
+    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
     title: 'Deposits & Payments',
     copy: 'Collect payment or send deposit links during booking when an appointment needs to be secured.',
   },
@@ -111,52 +129,27 @@ const FEATURE_ITEMS = [
 
 const SCENARIO_FEATURE_ITEMS = [
   {
-    icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-pink-300" />,
-    colorClass: 'bg-cyan-400',
-    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    accentColor: '#f472b6',
+    icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12" />,
     title: 'Call Automation',
     copy: 'Have your receptionist make phone calls as part of the workflow, so calls happen exactly when they should, at the perfect moment.',
   },
   {
-    icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-emerald-300" />,
-    colorClass: 'bg-emerald-500',
-    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
-    hoverTextClass: 'group-hover:text-emerald-400',
+    icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1" />,
     title: 'Automated Follow-Ups',
     copy: 'Stay on top of every customer by following up at the right time based on specific triggers within your business.',
   },
   {
-    icon: <Database className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-amber-300" />,
-    colorClass: 'bg-amber-400',
-    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
-    hoverTextClass: 'group-hover:text-amber-400',
-    title: 'Live Data',
-    copy: 'Use live variables to carry useful data through the workflow, so later steps can continue with full context.',
-  },
-  {
-    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-pink-300" />,
-    colorClass: 'bg-blue-500',
-    glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    accentColor: '#f472b6',
+    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
     title: 'Built-In Payments',
     copy: 'Automate billing tasks like payment collection, invoice creation, and payment links as part of the conversation.',
   },
   {
-    icon: <PlayCircle className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-rose-300" />,
-    colorClass: 'bg-rose-500',
-    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
-    hoverTextClass: 'group-hover:text-rose-400',
+    icon: <PlayCircle className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
     title: 'Workflow Resume',
     copy: 'Scenarios can carry forward the latest details from earlier steps, letting your receptionist continue the workflow instead of starting over.',
   },
   {
-    icon: <Workflow className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6 group-hover:stroke-indigo-300" />,
-    colorClass: 'bg-indigo-400',
-    glowClass: 'shadow-[0_0_12px_rgba(129,140,248,0.6)]',
-    hoverTextClass: 'group-hover:text-indigo-400',
+    icon: <Workflow className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6" />,
     title: 'Schedules',
     copy: 'Set scenarios to run at specific times, on recurring intervals, or before important events.',
   },
@@ -164,95 +157,50 @@ const SCENARIO_FEATURE_ITEMS = [
 
 const CRM_FEATURE_ITEMS = [
   {
-    icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:stroke-violet-300" />,
-    colorClass: 'bg-violet-500',
-    glowClass: 'shadow-[0_0_12px_rgba(139,92,246,0.6)]',
-    hoverTextClass: 'group-hover:text-violet-400',
+    icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1" />,
     title: 'Fully Customizable',
     copy: 'Build a CRM tailored to your business with custom fields and flexible data structures designed around the way your team operates.',
   },
   {
-    icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
-    colorClass: 'bg-emerald-500',
-    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
-    hoverTextClass: 'group-hover:text-emerald-400',
-    title: 'Colorbar',
-    copy: 'Turn your data into a visual, animated workspace by automatically coloring records based on custom conditions',
+    icon: <ClipboardList className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
+    title: 'Custom Intake Fields',
+    copy: 'Tell your receptionist which details matter most, and it will prioritize collecting them during the call before saving them to the customer record.',
   },
   {
-    icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6 group-hover:stroke-fuchsia-300" />,
-    colorClass: 'bg-fuchsia-500',
-    glowClass: 'shadow-[0_0_12px_rgba(217,70,239,0.6)]',
-    hoverTextClass: 'group-hover:text-fuchsia-400',
-    title: 'Zones',
-    copy: 'Organize records with beautiful, personalized color-coded columns for faster scanning and easier management.',
-  },
-  {
-    icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-amber-300" />,
-    colorClass: 'bg-amber-400',
-    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
-    hoverTextClass: 'group-hover:text-amber-400',
+    icon: <TimerReset className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12" />,
     title: 'Organization Tools',
     copy: 'Sort, filter, hide, freeze, and arrange data to create the perfect workspace for your business.',
   },
   {
-    icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-rose-300" />,
-    colorClass: 'bg-rose-500',
-    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
-    hoverTextClass: 'group-hover:text-rose-400',
+    icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
     title: 'Real-Time Updates',
     copy: 'See live customer activity as it happens, making every record more useful and every decision faster.',
   },
   {
-    icon: <ClipboardList className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
-    colorClass: 'bg-cyan-400',
-    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    accentColor: '#f472b6',
-    title: 'Custom Intake Fields',
-    copy: 'Tell your receptionist which details matter most, and it will prioritize collecting them during the call before saving them to the customer record.',
+    icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6" />,
+    title: 'Zones',
+    copy: 'Organize records with beautiful, personalized color-coded columns for faster scanning and easier management.',
   },
 ];
 
 const MONITORING_FEATURE_ITEMS = [
   {
-    icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
-    colorClass: 'bg-emerald-500',
-    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
-    hoverTextClass: 'group-hover:text-emerald-400',
+    icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
     title: 'Real-Time Analytics',
     copy: 'Track calls, appointments, customers, revenue, and payment activity in real time from one live dashboard.',
   },
   {
-    icon: <AudioLines className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-rose-300" />,
-    colorClass: 'bg-rose-500',
-    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
-    hoverTextClass: 'group-hover:text-rose-400',
+    icon: <AudioLines className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
     title: 'Call Listening',
     copy: 'Access recorded conversations so finding important information is always simple.',
   },
   {
-    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
-    colorClass: 'bg-cyan-400',
-    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    accentColor: '#f472b6',
+    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
     title: 'Live Call Visibility',
     copy: 'Experience every call as it happens with a live visual flow that reveals the path your AI receptionist takes from start to finish.',
   },
   {
-    icon: <GitBranch className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-6 group-hover:stroke-fuchsia-300" />,
-    colorClass: 'bg-fuchsia-500',
-    glowClass: 'shadow-[0_0_12px_rgba(217,70,239,0.6)]',
-    hoverTextClass: 'group-hover:text-fuchsia-400',
-    title: 'Flow Tracking',
-    copy: 'See how each conversation moves through records, appointments, and payments with a clear visual path instead of guessing.',
-  },
-  {
-    icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-amber-300" />,
-    colorClass: 'bg-amber-400',
-    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
-    hoverTextClass: 'group-hover:text-amber-400',
+    icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
     title: 'Full Transcripts',
     copy: 'Review what mattered fast with transcripts, summaries, direction, duration, and outcomes attached to every call.',
   },
@@ -678,7 +626,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     : calendarOpacity;
   const bookingFeatureOpacity = isCompactBookingViewport ? (mobileFeatureEntered ? 1 : 0) : featureOpacity;
   const bookingFeatureProgress = isCompactBookingViewport
-    ? Math.min(1, Math.max(0, (sectionProgress - 0.58) / 0.42))
+    ? Math.min(1, Math.max(0, (sectionProgress - 0.62) / 0.3))
     : featureProgress;
 
   useEffect(() => {
@@ -1041,10 +989,11 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   );
 };
 
-export function RightFeatureList({ featureProgress, items, useScrollHighlight = false }) {
+export function RightFeatureList({ featureProgress, items, useScrollHighlight = false, mobilePageSize = null, mobileMaxItems = null }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const isVisible = featureProgress > 0.12;
+  const [isMobileFeatureViewport, setIsMobileFeatureViewport] = useState(false);
+  const isVisible = featureProgress > 0.01;
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -1057,10 +1006,98 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
     return () => mediaQuery.removeEventListener?.('change', updateTouchState);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateViewport = () => {
+      setIsMobileFeatureViewport(window.innerWidth < 768);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, []);
+
   const shouldUseScrollHighlight = useScrollHighlight || isTouchDevice;
+  const visibleItems = mobileMaxItems && isMobileFeatureViewport ? items.slice(0, mobileMaxItems) : items;
+  const isMobilePagedList = Boolean(mobilePageSize && isMobileFeatureViewport && visibleItems.length > mobilePageSize);
+  const pageCount = isMobilePagedList ? Math.ceil(visibleItems.length / mobilePageSize) : 1;
+  const activeItemCount = isMobilePagedList ? visibleItems.length : items.length;
   const touchActiveIndex = shouldUseScrollHighlight && isVisible
-    ? Math.min(items.length - 1, Math.max(0, Math.floor(featureProgress * items.length)))
+    ? Math.min(activeItemCount - 1, Math.max(0, Math.floor(featureProgress * activeItemCount)))
     : null;
+  const activePageIndex = isMobilePagedList
+    ? Math.min(pageCount - 1, Math.max(0, Math.floor(touchActiveIndex / mobilePageSize)))
+    : 0;
+  const renderFeatureRow = (item, index) => {
+    const rowVisible = shouldUseScrollHighlight ? isVisible : isVisible && featureProgress > 0.12 + index * 0.11;
+    const isHovered = hoveredIndex === index;
+    const isTouchHighlighted = shouldUseScrollHighlight && touchActiveIndex === index;
+    const isHighlighted = isHovered || isTouchHighlighted;
+
+    return (
+      <div
+        key={item.title}
+        onMouseEnter={() => !shouldUseScrollHighlight && setHoveredIndex(index)}
+        onMouseLeave={() => !shouldUseScrollHighlight && setHoveredIndex(null)}
+        className="feature-reveal-row group relative flex cursor-pointer flex-col justify-between border-b border-zinc-900/40 py-4 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-10 md:py-5 lg:gap-0"
+        style={{
+          opacity: rowVisible ? 1 : 0,
+          transform: rowVisible ? 'translateY(0)' : 'translateY(18px)',
+          transition: shouldUseScrollHighlight
+            ? `opacity 420ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 80}ms, transform 420ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 80}ms`
+            : `opacity 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms, transform 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms`,
+        }}
+      >
+        <div
+          className={`feature-reveal-row__bg absolute inset-y-0.5 -inset-x-3 -z-10 rounded-lg bg-zinc-900/[0.12] opacity-0 transition-all duration-300 ease-out ${
+            isHighlighted ? 'scale-100 opacity-100' : 'scale-[0.98]'
+          }`}
+        />
+
+        <div
+          className={`feature-reveal-row__heading flex items-center gap-4 transition-transform duration-300 ease-out md:min-w-[280px] md:gap-5 lg:min-w-0 ${
+            isHighlighted ? 'translate-x-1.5' : ''
+          }`}
+        >
+          <div className="feature-reveal-row__dot-wrap relative flex h-3 w-3 items-center justify-center">
+            <span
+              className={`feature-reveal-row__dot absolute h-1.5 w-1.5 rounded-full transition-all duration-300 ease-out ${
+                isHighlighted ? 'is-highlighted scale-110 opacity-100' : 'scale-75 opacity-30'
+              }`}
+            />
+          </div>
+
+          <div
+            className={`feature-reveal-row__icon flex items-center justify-center overflow-visible transition-all duration-300 ${
+              isHighlighted ? 'scale-110' : 'text-zinc-600'
+            } ${isHighlighted ? 'is-highlighted' : ''}`}
+          >
+            {item.icon}
+          </div>
+
+          <div
+            className={`feature-reveal-row__title text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-[1.35rem] lg:text-2xl ${isHighlighted ? 'is-highlighted' : ''}`}
+          >
+            {item.title}
+          </div>
+        </div>
+
+        <div
+          className={`feature-reveal-row__copy-wrap mt-2 w-full pl-7 transition-transform duration-300 ease-out md:mt-0 md:max-w-[26rem] md:pl-0 lg:max-w-sm ${
+            isHighlighted ? 'translate-x-1' : ''
+          }`}
+        >
+          <div className="homepage-feature-copy text-xs font-medium leading-relaxed tracking-tight text-zinc-400 md:text-[13px] lg:text-xs">
+            {item.copy}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-full w-full items-center">
@@ -1073,73 +1110,21 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
         </defs>
       </svg>
       <div className="homepage-feature-list mx-auto w-full max-w-[820px] text-left md:max-w-[940px] lg:max-w-[820px]">
-        <div className="flex flex-col">
-          {items.map((item, index) => {
-            const rowVisible = shouldUseScrollHighlight ? isVisible : isVisible && featureProgress > 0.12 + index * 0.11;
-            const isHovered = hoveredIndex === index;
-            const isTouchHighlighted = shouldUseScrollHighlight && touchActiveIndex === index;
-            const isHighlighted = isHovered || isTouchHighlighted;
-
-            return (
-              <div
-                key={item.title}
-                onMouseEnter={() => !shouldUseScrollHighlight && setHoveredIndex(index)}
-                onMouseLeave={() => !shouldUseScrollHighlight && setHoveredIndex(null)}
-                className="feature-reveal-row group relative flex cursor-pointer flex-col justify-between border-b border-zinc-900/40 py-4 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-10 md:py-5 lg:gap-0"
-                style={{
-                  opacity: rowVisible ? 1 : 0,
-                  transform: rowVisible ? 'translateY(0)' : 'translateY(18px)',
-                  transition: shouldUseScrollHighlight
-                    ? `opacity 420ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 80}ms, transform 420ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 80}ms`
-                    : `opacity 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms, transform 520ms cubic-bezier(0.16, 1, 0.3, 1) ${index * 120}ms`,
-                }}
-              >
+        <div className={isMobilePagedList ? 'homepage-feature-pages' : 'flex flex-col'}>
+          {isMobilePagedList
+            ? Array.from({ length: pageCount }, (_, pageIndex) => {
+              const pageItems = visibleItems.slice(pageIndex * mobilePageSize, pageIndex * mobilePageSize + mobilePageSize);
+              return (
                 <div
-                  className={`feature-reveal-row__bg absolute inset-y-0.5 -inset-x-3 -z-10 rounded-lg bg-zinc-900/[0.12] opacity-0 transition-all duration-300 ease-out ${
-                    isHighlighted ? 'scale-100 opacity-100' : 'scale-[0.98]'
-                  }`}
-                />
-
-                <div
-                  className={`feature-reveal-row__heading flex items-center gap-4 transition-transform duration-300 ease-out md:min-w-[280px] md:gap-5 lg:min-w-0 ${
-                    isHighlighted ? 'translate-x-1.5' : ''
-                  }`}
+                  key={`feature-page-${pageIndex}`}
+                  className={`homepage-feature-page flex flex-col ${activePageIndex === pageIndex ? 'is-active' : ''}`}
+                  aria-hidden={activePageIndex !== pageIndex}
                 >
-                  <div className="feature-reveal-row__dot-wrap relative flex h-3 w-3 items-center justify-center">
-                    <span
-                      className={`feature-reveal-row__dot absolute h-1.5 w-1.5 rounded-full transition-all duration-300 ease-out ${
-                        isHighlighted ? 'is-highlighted scale-110 opacity-100' : 'scale-75 opacity-30'
-                      }`}
-                    />
-                  </div>
-
-                  <div
-                    className={`feature-reveal-row__icon flex items-center justify-center overflow-visible transition-all duration-300 ${
-                      isHighlighted ? 'scale-110 text-white' : 'text-zinc-600'
-                    } ${isHighlighted ? 'is-highlighted' : ''}`}
-                  >
-                    {item.icon}
-                  </div>
-
-                  <div
-                    className={`feature-reveal-row__title text-xl font-black tracking-tighter uppercase text-zinc-100 transition-colors duration-300 md:text-[1.35rem] lg:text-2xl ${isHighlighted ? 'is-highlighted' : ''}`}
-                  >
-                    {item.title}
-                  </div>
+                  {pageItems.map((item, itemIndex) => renderFeatureRow(item, pageIndex * mobilePageSize + itemIndex))}
                 </div>
-
-                <div
-                  className={`feature-reveal-row__copy-wrap mt-2 w-full pl-7 transition-transform duration-300 ease-out md:mt-0 md:max-w-[26rem] md:pl-0 lg:max-w-sm ${
-                    isHighlighted ? 'translate-x-1' : ''
-                  }`}
-                >
-                  <div className="homepage-feature-copy text-xs font-medium leading-relaxed tracking-tight text-zinc-400 md:text-[13px] lg:text-xs">
-                    {item.copy}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+            : items.map((item, index) => renderFeatureRow(item, index))}
         </div>
       </div>
     </div>
@@ -1147,7 +1132,30 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
 }
 
 function RightCalendarGrid({ hasAnimatedDots }) {
-  const [selectedDay, setSelectedDay] = useState(17);
+  const today = useMemo(() => new Date(), []);
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const currentDay = today.getDate();
+  const daysInCurrentMonth = useMemo(
+    () => new Date(currentYear, currentMonth + 1, 0).getDate(),
+    [currentYear, currentMonth]
+  );
+  const firstDayOffset = useMemo(
+    () => (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7,
+    [currentYear, currentMonth]
+  );
+  const monthYearLabel = useMemo(
+    () => today.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+    [today]
+  );
+  const monthLabel = useMemo(
+    () => today.toLocaleDateString(undefined, { month: 'long' }),
+    [today]
+  );
+  const [selectedDay, setSelectedDay] = useState(currentDay);
+  const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
+  const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
+  const [activeAppointmentPrompt, setActiveAppointmentPrompt] = useState(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
   const [receptionists, setReceptionists] = useState(FALLBACK_RECEPTIONISTS);
 
@@ -1158,6 +1166,12 @@ function RightCalendarGrid({ hasAnimatedDots }) {
     window.addEventListener('resize', updateViewportWidth);
     return () => window.removeEventListener('resize', updateViewportWidth);
   }, []);
+
+  useEffect(() => {
+    setExpandedAppointmentId(null);
+    setActiveAppointmentActionsId(null);
+    setActiveAppointmentPrompt(null);
+  }, [selectedDay]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1192,59 +1206,153 @@ function RightCalendarGrid({ hasAnimatedDots }) {
 
   const itemsDatabase = useMemo(
     () => ({
-      1: [{ title: 'Color Consultation', category: 'Color', time: '9:00 AM', tagColor: getTagColor('Color') }],
-      2: [{ title: 'Styling Appointment', category: 'Styling', time: '11:00 AM', tagColor: getTagColor('Styling') }],
+      1: [
+        { title: 'Color Consultation', category: 'Color', time: '9:00 AM', tagColor: getTagColor('Color') },
+        { title: 'Haircut Appointment', category: 'Haircut', time: '1:30 PM', tagColor: getTagColor('Haircut') },
+      ],
+      2: [
+        { title: 'Styling Appointment', category: 'Styling', time: '11:00 AM', tagColor: getTagColor('Styling') },
+        { title: 'Blowout Appointment', category: 'Blowout', time: '4:15 PM', tagColor: getTagColor('Blowout') },
+      ],
       3: [
         { title: 'Root Touch-Up', category: 'Color', time: '9:30 AM', tagColor: getTagColor('Color') },
         { title: 'Styling Consult', category: 'Styling', time: '1:00 PM', tagColor: getTagColor('Styling') },
+        { title: 'Trim Appointment', category: 'Haircut', time: '5:00 PM', tagColor: getTagColor('Haircut') },
       ],
-      5: [{ title: 'Haircut Appointment', category: 'Haircut', time: '10:15 AM', tagColor: getTagColor('Haircut') }],
+      4: [
+        { title: 'Gloss Refresh', category: 'Color', time: '12:30 PM', tagColor: getTagColor('Color') },
+        { title: 'Event Styling', category: 'Styling', time: '3:45 PM', tagColor: getTagColor('Styling') },
+      ],
+      5: [
+        { title: 'Haircut Appointment', category: 'Haircut', time: '10:15 AM', tagColor: getTagColor('Haircut') },
+        { title: 'Color Refresh', category: 'Color', time: '2:45 PM', tagColor: getTagColor('Color') },
+      ],
       6: [
+        { title: 'Root Touch-Up', category: 'Color', time: '8:45 AM', tagColor: getTagColor('Color') },
         { title: 'Blowout Appointment', category: 'Blowout', time: '10:00 AM', tagColor: getTagColor('Blowout') },
         { title: 'Haircut & Style', category: 'Styling', time: '3:00 PM', tagColor: getTagColor('Styling') },
       ],
-      7: [{ title: 'Blowout Appointment', category: 'Blowout', time: '12:00 PM', tagColor: getTagColor('Blowout') }],
+      7: [
+        { title: 'Blowout Appointment', category: 'Blowout', time: '12:00 PM', tagColor: getTagColor('Blowout') },
+        { title: 'Bridal Trial', category: 'Bridal', time: '2:30 PM', tagColor: getTagColor('Bridal') },
+      ],
       8: [
+        { title: 'Haircut Appointment', category: 'Haircut', time: '9:15 AM', tagColor: getTagColor('Haircut') },
         { title: 'Color Refresh', category: 'Color', time: '11:15 AM', tagColor: getTagColor('Color') },
         { title: 'Trim Appointment', category: 'Haircut', time: '4:45 PM', tagColor: getTagColor('Haircut') },
       ],
-      9: [{ title: 'Color Appointment', category: 'Color', time: '10:30 AM', tagColor: getTagColor('Color') }],
+      9: [
+        { title: 'Color Appointment', category: 'Color', time: '10:30 AM', tagColor: getTagColor('Color') },
+        { title: 'Blowout Appointment', category: 'Blowout', time: '3:30 PM', tagColor: getTagColor('Blowout') },
+      ],
       10: [
         { title: 'Balayage Session', category: 'Color', time: '9:00 AM', tagColor: getTagColor('Color') },
+        { title: 'Haircut Appointment', category: 'Haircut', time: '11:45 AM', tagColor: getTagColor('Haircut') },
         { title: 'Styling Appointment', category: 'Styling', time: '2:00 PM', tagColor: getTagColor('Styling') },
         { title: 'Blowout Appointment', category: 'Blowout', time: '5:15 PM', tagColor: getTagColor('Blowout') },
       ],
-      12: [{ title: 'Haircut Appointment', category: 'Haircut', time: '10:00 AM', tagColor: getTagColor('Haircut') }],
+      11: [
+        { title: 'Color Consultation', category: 'Color', time: '9:45 AM', tagColor: getTagColor('Color') },
+        { title: 'Trim Appointment', category: 'Haircut', time: '1:15 PM', tagColor: getTagColor('Haircut') },
+      ],
+      12: [
+        { title: 'Haircut Appointment', category: 'Haircut', time: '10:00 AM', tagColor: getTagColor('Haircut') },
+        { title: 'Styling Appointment', category: 'Styling', time: '4:00 PM', tagColor: getTagColor('Styling') },
+      ],
       13: [
         { title: 'Bridal Trial', category: 'Bridal', time: '11:00 AM', tagColor: getTagColor('Bridal') },
         { title: 'Color Appointment', category: 'Color', time: '3:15 PM', tagColor: getTagColor('Color') },
+        { title: 'Blowout Appointment', category: 'Blowout', time: '5:30 PM', tagColor: getTagColor('Blowout') },
       ],
-      14: [{ title: 'Styling Appointment', category: 'Styling', time: '9:30 AM', tagColor: getTagColor('Styling') }],
+      14: [
+        { title: 'Styling Appointment', category: 'Styling', time: '9:30 AM', tagColor: getTagColor('Styling') },
+        { title: 'Root Touch-Up', category: 'Color', time: '1:45 PM', tagColor: getTagColor('Color') },
+      ],
       15: [
         { title: 'Hair Coloring Appointment', category: 'Color', time: '11:00 AM', tagColor: getTagColor('Color') },
+        { title: 'Trim Appointment', category: 'Haircut', time: '12:45 PM', tagColor: getTagColor('Haircut') },
         { title: 'Haircut & Style', category: 'Styling', time: '2:30 PM', tagColor: getTagColor('Styling') },
         { title: 'Blowout Appointment', category: 'Blowout', time: '5:30 PM', tagColor: getTagColor('Blowout') },
       ],
-      16: [{ title: 'Root Touch-Up', category: 'Color', time: '11:45 AM', tagColor: getTagColor('Color') }],
-      17: [{ title: 'Hair Styling Appointment', category: 'Styling', time: 'All Day', tagColor: getTagColor('Styling') }],
-      19: [{ title: 'Haircut & Style', category: 'Styling', time: '10:00 AM', tagColor: getTagColor('Styling') }],
-      20: [{ title: 'Blowout Appointment', category: 'Blowout', time: '1:00 PM', tagColor: getTagColor('Blowout') }],
-      21: [{ title: 'Color Refresh', category: 'Color', time: '3:30 PM', tagColor: getTagColor('Color') }],
-      22: [{ title: 'Hair Color Appointment', category: 'Color', time: '9:00 AM', tagColor: getTagColor('Color') }],
-      23: [{ title: 'Styling Appointment', category: 'Styling', time: '9:15 AM', tagColor: getTagColor('Styling') }],
+      16: [
+        { title: 'Root Touch-Up', category: 'Color', time: '11:45 AM', tagColor: getTagColor('Color') },
+        { title: 'Blowout Appointment', category: 'Blowout', time: '3:15 PM', tagColor: getTagColor('Blowout') },
+      ],
+      17: [
+        { title: 'Hair Styling Appointment', category: 'Styling', time: 'All Day', tagColor: getTagColor('Styling') },
+        { title: 'Color Refresh', category: 'Color', time: '10:30 AM', tagColor: getTagColor('Color') },
+      ],
+      18: [
+        { title: 'Haircut Appointment', category: 'Haircut', time: '9:30 AM', tagColor: getTagColor('Haircut') },
+        { title: 'Event Styling', category: 'Styling', time: '2:15 PM', tagColor: getTagColor('Styling') },
+      ],
+      19: [
+        { title: 'Haircut & Style', category: 'Styling', time: '10:00 AM', tagColor: getTagColor('Styling') },
+        { title: 'Gloss Refresh', category: 'Color', time: '3:00 PM', tagColor: getTagColor('Color') },
+      ],
+      20: [
+        { title: 'Blowout Appointment', category: 'Blowout', time: '1:00 PM', tagColor: getTagColor('Blowout') },
+        { title: 'Trim Appointment', category: 'Haircut', time: '4:30 PM', tagColor: getTagColor('Haircut') },
+      ],
+      21: [
+        { title: 'Root Touch-Up', category: 'Color', time: '9:15 AM', tagColor: getTagColor('Color') },
+        { title: 'Color Refresh', category: 'Color', time: '3:30 PM', tagColor: getTagColor('Color') },
+      ],
+      22: [
+        { title: 'Hair Color Appointment', category: 'Color', time: '9:00 AM', tagColor: getTagColor('Color') },
+        { title: 'Haircut Appointment', category: 'Haircut', time: '12:15 PM', tagColor: getTagColor('Haircut') },
+        { title: 'Styling Consult', category: 'Styling', time: '4:45 PM', tagColor: getTagColor('Styling') },
+      ],
+      23: [
+        { title: 'Styling Appointment', category: 'Styling', time: '9:15 AM', tagColor: getTagColor('Styling') },
+        { title: 'Blowout Appointment', category: 'Blowout', time: '1:30 PM', tagColor: getTagColor('Blowout') },
+      ],
       24: [
         { title: 'Blowout Appointment', category: 'Blowout', time: '9:45 AM', tagColor: getTagColor('Blowout') },
         { title: 'Root Touch-Up', category: 'Color', time: '2:15 PM', tagColor: getTagColor('Color') },
       ],
-      26: [{ title: 'Haircut Appointment', category: 'Haircut', time: '10:30 AM', tagColor: getTagColor('Haircut') }],
-      27: [{ title: 'Haircut Appointment', category: 'Haircut', time: '4:00 PM', tagColor: getTagColor('Haircut') }],
+      25: [
+        { title: 'Balayage Session', category: 'Color', time: '9:30 AM', tagColor: getTagColor('Color') },
+        { title: 'Haircut & Style', category: 'Styling', time: '1:00 PM', tagColor: getTagColor('Styling') },
+        { title: 'Blowout Appointment', category: 'Blowout', time: '5:00 PM', tagColor: getTagColor('Blowout') },
+      ],
+      26: [
+        { title: 'Haircut Appointment', category: 'Haircut', time: '10:30 AM', tagColor: getTagColor('Haircut') },
+        { title: 'Color Consultation', category: 'Color', time: '2:00 PM', tagColor: getTagColor('Color') },
+      ],
+      27: [
+        { title: 'Root Touch-Up', category: 'Color', time: '11:00 AM', tagColor: getTagColor('Color') },
+        { title: 'Haircut Appointment', category: 'Haircut', time: '4:00 PM', tagColor: getTagColor('Haircut') },
+      ],
       28: [
+        { title: 'Bridal Trial', category: 'Bridal', time: '8:45 AM', tagColor: getTagColor('Bridal') },
         { title: 'Styling Appointment', category: 'Styling', time: '10:45 AM', tagColor: getTagColor('Styling') },
         { title: 'Color Appointment', category: 'Color', time: '4:30 PM', tagColor: getTagColor('Color') },
+      ],
+      29: [
+        { title: 'Haircut Appointment', category: 'Haircut', time: '9:45 AM', tagColor: getTagColor('Haircut') },
+        { title: 'Color Refresh', category: 'Color', time: '12:30 PM', tagColor: getTagColor('Color') },
+      ],
+      30: [
+        { title: 'Blowout Appointment', category: 'Blowout', time: '10:15 AM', tagColor: getTagColor('Blowout') },
+        { title: 'Styling Appointment', category: 'Styling', time: '3:45 PM', tagColor: getTagColor('Styling') },
+      ],
+      31: [
+        { title: 'Root Touch-Up', category: 'Color', time: '9:00 AM', tagColor: getTagColor('Color') },
+        { title: 'Haircut & Style', category: 'Styling', time: '1:15 PM', tagColor: getTagColor('Styling') },
+        { title: 'Blowout Appointment', category: 'Blowout', time: '4:30 PM', tagColor: getTagColor('Blowout') },
       ],
     }),
     []
   );
+
+  const displayItemsDatabase = useMemo(() => {
+    const todayItems = itemsDatabase[24] || [];
+    return {
+      ...itemsDatabase,
+      [currentDay]: todayItems,
+    };
+  }, [itemsDatabase, currentDay]);
 
   const assignedItemsDatabase = useMemo(() => {
     const pool = receptionists.length > 0 ? receptionists : FALLBACK_RECEPTIONISTS;
@@ -1257,22 +1365,59 @@ function RightCalendarGrid({ hasAnimatedDots }) {
       }
       return hash;
     };
+    const getAppointmentNote = (event, day, index) => {
+      const notesByTitle = {
+        'Color Consultation': 'New guest is deciding between warm brunette gloss and a low-maintenance balayage. Mention patch test timing and take before photos.',
+        'Styling Appointment': 'Client is attending a work dinner after the appointment. Prefers polished waves with soft volume and no heavy finishing spray.',
+        'Root Touch-Up': 'Use saved formula from the last color visit and focus on the hairline. Client is sensitive to toner sitting too long.',
+        'Styling Consult': 'Wants help choosing a style for engagement photos. Bring up humidity-friendly options and pin one reference photo.',
+        'Haircut Appointment': 'Prefers keeping length through the front with light face framing. Confirm before removing more than one inch.',
+        'Blowout Appointment': 'Client likes long-lasting volume at the crown and a smooth finish. Offer round-brush curls instead of flat iron waves.',
+        'Haircut & Style': 'Usually books before travel. Keep layers blended and leave enough length for easy ponytails.',
+        'Color Refresh': 'Refresh gloss and brighten around the face only. Avoid pulling color through dry ends unless needed.',
+        'Color Appointment': 'Client asked for a natural result that grows out softly. Review maintenance schedule before mixing color.',
+        'Balayage Session': 'Returning guest wants brighter ribbons around the face while keeping depth underneath. Schedule enough time for a careful gloss.',
+        'Bridal Trial': 'Bride wants soft romantic texture with pieces left around the face. Take photos from front, side, and back for wedding-day notes.',
+        'Hair Coloring Appointment': 'Client mentioned previous color faded warm. Use cooler gloss and recommend color-safe shampoo at checkout.',
+        'Hair Color Appointment': 'Confirm whether client wants full refresh or root-only service before starting. Add extra time if ends need gloss.',
+        'Trim Appointment': 'Client is growing hair out and only wants a cleanup. Keep the perimeter full.',
+      };
+
+      return notesByTitle[event.title] || `Demo note ${index + 1} for day ${day}: confirm service goals, timing, and any customer preferences before starting.`;
+    };
+    const getAppointmentStatus = (event, day, index) => {
+      const statuses = ['Completed', 'Booked', 'Confirmed', 'Cancelled'];
+      if (Number(day) === 24) {
+        return index === 0 ? 'Booked' : 'Confirmed';
+      }
+
+      return statuses[hashSeed(`${day}-${event.title}-${event.time}-${index}-status`) % statuses.length];
+    };
 
     return Object.fromEntries(
-      Object.entries(itemsDatabase).map(([day, events]) => [
+      Object.entries(displayItemsDatabase).map(([day, events]) => [
         day,
         (events || []).map((event, index) => {
-          const poolIndex = hashSeed(`${day}-${event.title}-${event.time}-${index}`) % pool.length;
+          const seedDay = Number(day) === currentDay ? 24 : day;
+          const poolIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}`) % pool.length;
+          const customerIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer`) % DEMO_CUSTOMER_FIRST_NAMES.length;
           const receptionist = pool[poolIndex];
+          const status = getAppointmentStatus(event, seedDay, index);
           return {
             ...event,
+            id: `demo-${day}-${index}`,
+            serviceName: event.title,
+            status,
+            statusColor: DEMO_APPOINTMENT_STATUS_COLORS[status] || DEMO_APPOINTMENT_STATUS_COLORS.Booked,
+            notes: getAppointmentNote(event, seedDay, index),
+            customerFirstName: DEMO_CUSTOMER_FIRST_NAMES[customerIndex],
             receptionistName: receptionist?.first_name || receptionist?.full_name || 'Receptionist',
             receptionistAvatar: receptionist?.avatar || '',
           };
         }),
       ])
     );
-  }, [itemsDatabase, receptionists]);
+  }, [currentDay, displayItemsDatabase, receptionists]);
 
   return (
     <div className="relative flex h-full w-full items-center">
@@ -1280,7 +1425,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
         <div className={`relative z-10 border-b border-white/5 text-left ${isCompact ? 'mb-3 pb-3 md:mb-4 md:pb-4' : 'mb-6 pb-6'}`}>
           <span className={`flex items-center space-x-2 font-bold tracking-tight text-white ${isMobile ? 'text-[1rem]' : isCompact ? 'text-[1.25rem]' : 'text-[2rem]'}`}>
             <CalendarIcon className="text-zinc-300" size={22} />
-            <span>October 2026</span>
+            <span>{monthYearLabel}</span>
           </span>
         </div>
 
@@ -1293,11 +1438,11 @@ function RightCalendarGrid({ hasAnimatedDots }) {
         </div>
 
         <div className={`relative z-10 grid grid-cols-7 ${isCompact ? 'gap-1 md:gap-1.5' : 'gap-2'}`}>
-          {Array.from({ length: 3 }).map((_, index) => (
+          {Array.from({ length: firstDayOffset }).map((_, index) => (
             <div key={`empty-${index}`} className="aspect-square bg-transparent opacity-5" />
           ))}
 
-          {Array.from({ length: 28 }).map((_, index) => {
+          {Array.from({ length: daysInCurrentMonth }).map((_, index) => {
             const dayNum = index + 1;
             const isSelected = selectedDay === dayNum;
             const eventsList = assignedItemsDatabase[dayNum] || [];
@@ -1322,7 +1467,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                       key={`${dayNum}-${event.title}`}
                       className={`dot-item rounded-full ${isMobile ? 'h-[3px] w-[3px]' : isCompact ? 'h-1 w-1' : 'h-1.5 w-1.5'}`}
                       style={{
-                        backgroundColor: isSelected ? '#ffffff' : event.tagColor,
+                        backgroundColor: isSelected ? '#ffffff' : event.statusColor,
                         animationDelay: hasAnimatedDots ? `${dayNum * 24 + dotIndex * 80}ms` : '0ms',
                         animationDuration: '720ms',
                       }}
@@ -1337,46 +1482,193 @@ function RightCalendarGrid({ hasAnimatedDots }) {
         <div className={`relative z-10 border-t border-white/5 ${isMobile ? 'mt-3 min-h-[118px] pt-3' : isCompact ? 'mt-4 min-h-[138px] pt-4' : 'mt-8 min-h-[170px] pt-5'}`}>
           <span className={`mb-3 flex items-center space-x-1.5 font-bold tracking-widest text-zinc-400 ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}>
             <Activity size={10} className="text-zinc-300" />
-            <span>Appointments for October {selectedDay}</span>
+            <span>Appointments for {monthLabel} {selectedDay}</span>
           </span>
           {assignedItemsDatabase[selectedDay] ? (
             <div className={isMobile ? 'space-y-1.5' : 'space-y-2'}>
-              {assignedItemsDatabase[selectedDay].map((event, index) => (
-                <div
-                  key={event.title}
-                  className={`agenda-item flex items-center justify-between rounded-lg border border-white/5 bg-zinc-950 text-left ${isMobile ? 'gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
-                  style={{ animationDelay: `${index * 90}ms` }}
-                >
-                  <div className="flex min-w-0 flex-1 items-center space-x-2">
-                    <span className={`${isMobile ? 'h-1.5 w-1.5' : isCompact ? 'h-2 w-2' : 'h-2.5 w-2.5'} rounded-full`} style={{ backgroundColor: event.tagColor }} />
-                    <span className={`truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
-                    {!isMobile && !isCompact && <span className="text-[10px] font-medium italic text-zinc-500">via</span>}
-                    <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900">
-                      <img
-                        src={event.receptionistAvatar}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    </span>
-                    <span className={`${isCompact ? 'hidden' : 'text-[10px]'} font-medium text-zinc-400`}>
-                      {event.receptionistName}
-                    </span>
-                  </div>
-                  <div className="flex shrink-0 items-center space-x-1.5">
-                    <span
-                      className={`rounded border font-bold uppercase tracking-wider ${isMobile ? 'px-1.5 py-0.5 text-[7px]' : isCompact ? 'px-1.5 py-0.5 text-[8px]' : 'px-2 py-0.5 text-[9px]'}`}
-                      style={{
-                        color: event.tagColor,
-                        borderColor: `${event.tagColor}33`,
-                        backgroundColor: `${event.tagColor}14`,
+              {assignedItemsDatabase[selectedDay].map((event, index) => {
+                const appointmentActions = getDemoAppointmentActions(event.status);
+                const hasAppointmentActions = appointmentActions.length > 0;
+                const activePromptAction = activeAppointmentPrompt?.appointmentId === event.id
+                  ? activeAppointmentPrompt.action
+                  : null;
+
+                return (
+                <div key={event.id} className="space-y-1">
+                  <motion.div
+                    initial={false}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`agenda-item flex w-full items-center rounded-lg border bg-[#070707]/92 text-left ${activePromptAction ? 'demo-call-agenda-item' : 'border-white/[0.08]'} ${isMobile ? 'gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
+                    style={{ animationDelay: `${index * 90}ms` }}
+                  >
+                    <button
+                      type="button"
+                      aria-label={`${activeAppointmentActionsId === event.id ? 'Hide' : 'Show'} appointment actions`}
+                      onClick={(clickEvent) => {
+                        clickEvent.stopPropagation();
+                        if (!hasAppointmentActions) return;
+                        setActiveAppointmentActionsId((current) => {
+                          const next = current === event.id ? null : event.id;
+                          if (next !== event.id) setActiveAppointmentPrompt(null);
+                          return next;
+                        });
                       }}
+                      className={`relative z-10 flex shrink-0 items-center justify-center rounded-full p-1 transition-transform duration-200 focus:outline-none ${hasAppointmentActions ? 'hover:scale-110' : 'cursor-default'}`}
                     >
-                      {event.category}
-                    </span>
-                    <span className={`${isMobile ? 'text-[8px]' : isCompact ? 'text-[9px]' : 'text-[10px]'} font-mono text-zinc-400`}>{event.time}</span>
-                  </div>
+                      <span
+                        className={`${isMobile ? 'h-1.5 w-1.5' : isCompact ? 'h-2 w-2' : 'h-2.5 w-2.5'} rounded-full ${activePromptAction ? 'demo-call-status-dot' : 'shadow-[0_0_5px_currentColor]'}`}
+                        style={activePromptAction
+                          ? undefined
+                          : { color: event.statusColor, backgroundColor: event.statusColor }}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedAppointmentId((current) => (current === event.id ? null : event.id))}
+                      className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden text-left"
+                    >
+                      <AnimatePresence initial={false}>
+                        {activeAppointmentActionsId === event.id && (
+                          <motion.div
+                            initial={{ opacity: 0, x: -18, scale: 0.94 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: -14, scale: 0.96 }}
+                            transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
+                            className="absolute left-0 z-20 flex max-w-[calc(100%-4.5rem)] items-center gap-2.5"
+                          >
+                            <AnimatePresence mode="wait" initial={false}>
+                              {activePromptAction ? (
+                                <motion.div
+                                  key="action-prompt"
+                                  initial={{ opacity: 0, x: -14, scale: 0.96 }}
+                                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                                  exit={{ opacity: 0, x: -12, scale: 0.97 }}
+                                  transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
+                                  className="flex min-w-0 items-center gap-2"
+                                >
+                                  <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900">
+                                    <img
+                                      src={event.receptionistAvatar}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </span>
+                                  <span className={`truncate font-bold tracking-[-0.02em] text-zinc-200 drop-shadow-[0_0_10px_rgba(255,255,255,0.08)] ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}>
+                                    {getDemoActionPrompt(activePromptAction, event.customerFirstName)}
+                                  </span>
+                                  <span
+                                    onClick={(actionEvent) => {
+                                      actionEvent.preventDefault();
+                                      actionEvent.stopPropagation();
+                                    }}
+                                    className={`shrink-0 font-bold tracking-[-0.02em] text-emerald-300 drop-shadow-[0_0_10px_rgba(110,231,183,0.14)] ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}
+                                  >
+                                    Call
+                                  </span>
+                                  <span
+                                    onClick={(actionEvent) => {
+                                      actionEvent.preventDefault();
+                                      actionEvent.stopPropagation();
+                                      setActiveAppointmentPrompt(null);
+                                    }}
+                                    className={`shrink-0 font-bold tracking-[-0.02em] text-zinc-500 drop-shadow-[0_0_10px_rgba(113,113,122,0.14)] ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}
+                                  >
+                                    Cancel
+                                  </span>
+                                </motion.div>
+                              ) : (
+                                <motion.div
+                                  key="action-list"
+                                  initial={{ opacity: 0, x: -14, scale: 0.96 }}
+                                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                                  exit={{ opacity: 0, x: -12, scale: 0.97 }}
+                                  transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
+                                  className="flex items-center gap-2.5"
+                                >
+                                  {appointmentActions.map((action) => (
+                                    <span
+                                      key={action.label}
+                                      onClick={(actionEvent) => {
+                                        actionEvent.preventDefault();
+                                        actionEvent.stopPropagation();
+                                        setActiveAppointmentPrompt({
+                                          appointmentId: event.id,
+                                          action: action.label,
+                                        });
+                                      }}
+                                      className={`font-bold tracking-[-0.02em] drop-shadow-[0_0_10px_rgba(255,255,255,0.08)] ${action.className} ${isMobile ? 'text-[8px]' : 'text-[9px]'}`}
+                                    >
+                                      {action.label}
+                                    </span>
+                                  ))}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      <motion.div
+                        animate={{
+                          opacity: activeAppointmentActionsId === event.id ? 0 : 1,
+                          x: activeAppointmentActionsId === event.id ? 28 : 0,
+                        }}
+                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        className="flex min-w-0 flex-1 items-center space-x-2"
+                      >
+                        <span className={`truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
+                        {!isMobile && !isCompact && <span className="text-[10px] font-medium italic text-zinc-500">via</span>}
+                        <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900">
+                          <img
+                            src={event.receptionistAvatar}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </span>
+                        <span className={`${isCompact ? 'hidden' : 'text-[10px]'} font-medium text-zinc-400`}>
+                          {event.receptionistName}
+                        </span>
+                      </motion.div>
+                      <div className="flex shrink-0 items-center space-x-1.5">
+                        <span
+                        className={`rounded border font-bold uppercase tracking-wider ${isMobile ? 'px-1.5 py-0.5 text-[7px]' : isCompact ? 'px-1.5 py-0.5 text-[8px]' : 'px-2 py-0.5 text-[9px]'}`}
+                        style={{
+                          color: '#a1a1aa',
+                          borderColor: 'rgba(113, 113, 122, 0.24)',
+                          backgroundColor: 'rgba(39, 39, 42, 0.52)',
+                        }}
+                      >
+                          {event.category}
+                        </span>
+                        <span className={`${isMobile ? 'text-[8px]' : isCompact ? 'text-[9px]' : 'text-[10px]'} font-mono text-zinc-400`}>{event.time}</span>
+                      </div>
+                    </button>
+                  </motion.div>
+                  <AnimatePresence initial={false}>
+                    {expandedAppointmentId === event.id && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.18, ease: 'easeOut' }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pl-4 pr-2 pt-2">
+                          <div className="relative pl-4 text-left">
+                            <span className="absolute left-0 top-0 h-full w-px bg-white/[0.08]" />
+                            <div className="mb-1 text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-600">
+                              Notes
+                            </div>
+                            <div className="text-left text-[11px] leading-5 text-zinc-400">
+                              {event.notes || ''}
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              ))}
+              );
+              })}
             </div>
           ) : (
             <p className="text-xs italic text-zinc-500">

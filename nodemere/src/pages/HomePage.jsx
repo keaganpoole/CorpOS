@@ -75,60 +75,37 @@ const NumberGradientIcon = ({ icon = 'transfer', colors = ['var(--brandGradientS
 
 const HERO_RECEPTIONIST_FEATURE_ITEMS = [
   {
-    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-pink-300" />,
-    colorClass: 'bg-cyan-400',
-    glowClass: 'shadow-[0_0_12px_rgba(34,211,238,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    accentColor: '#f472b6',
+    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
     title: '24/7 Call Handling',
     copy: 'Answer inbound calls instantly, day or night, so customers reach your business instead of voicemail.',
   },
   {
-    icon: <ShieldCheck className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-emerald-300" />,
-    colorClass: 'bg-emerald-500',
-    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]',
-    hoverTextClass: 'group-hover:text-emerald-400',
-    title: 'Secure Verification',
-    copy: 'Optionally send authentication links during inbound calls so customers can verify identity before account details or account changes are handled.',
-  },
-  {
-    icon: <FileUp className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:stroke-amber-300" />,
-    colorClass: 'bg-amber-400',
-    glowClass: 'shadow-[0_0_12px_rgba(251,191,36,0.6)]',
-    hoverTextClass: 'group-hover:text-amber-400',
-    title: 'Real-time Docs',
-    copy: 'Allow customers to securely upload documents by texting them a secure upload link during the call, eliminating the need to email files or call back later.',
-  },
-  {
-    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3 group-hover:stroke-pink-300" />,
-    colorClass: 'bg-blue-500',
-    glowClass: 'shadow-[0_0_12px_rgba(59,130,246,0.6)]',
-    hoverTextClass: 'group-hover:text-pink-400',
-    accentColor: '#f472b6',
-    title: 'Payments',
-    copy: 'Collect deposits, send payment links, process payments, and answer billing questions without handing the call to staff.',
-  },
-  {
-    icon: <PhoneOutgoing className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:stroke-rose-300" />,
-    colorClass: 'bg-rose-500',
-    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.6)]',
-    hoverTextClass: 'group-hover:text-rose-400',
-    title: 'Outbound Calling',
-    copy: 'Have your AI receptionist place calls for reminders, confirmations, updates, and any custom tasks you desire, without tying up your team.',
-  },
-  {
-    icon: <MessagesSquare className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110 group-hover:stroke-violet-300" />,
-    colorClass: 'bg-violet-500',
-    glowClass: 'shadow-[0_0_12px_rgba(139,92,246,0.6)]',
-    hoverTextClass: 'group-hover:text-violet-400',
+    icon: <MessagesSquare className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
     title: 'Multiple Conversations',
     copy: 'Handle multiple conversations simultaneously, making hold queues virtually nonexistent.',
   },
   {
-    icon: <Globe2 className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12 group-hover:stroke-indigo-300" />,
-    colorClass: 'bg-indigo-400',
-    glowClass: 'shadow-[0_0_12px_rgba(129,140,248,0.6)]',
-    hoverTextClass: 'group-hover:text-indigo-400',
+    icon: <FileUp className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
+    title: 'Real-time Docs',
+    copy: 'Allow customers to securely upload documents by texting them a secure upload link during the call, eliminating the need to email files or call back later.',
+  },
+  {
+    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
+    title: 'Payments',
+    copy: 'Collect deposits, send payment links, process payments, and answer billing questions without handing the call to staff.',
+  },
+  {
+    icon: <PhoneOutgoing className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:-translate-y-1" />,
+    title: 'Outbound Calling',
+    copy: 'Have your AI receptionist place calls for reminders, confirmations, updates, and any custom tasks you desire, without tying up your team.',
+  },
+  {
+    icon: <ShieldCheck className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
+    title: 'Secure Verification',
+    copy: 'Optionally send authentication links during inbound calls so customers can verify identity before account details or account changes are handled.',
+  },
+  {
+    icon: <Globe2 className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12" />,
     title: '30+ Languages',
     copy: "Detect a caller's language automatically and respond fluently without transfers, translators, or awkward misunderstandings.",
   },
@@ -300,6 +277,9 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   const rootRef = useRef(null);
   const stickyRef = useRef(null);
   const [sectionProgress, setSectionProgress] = useState(0);
+  const [isCompactFeatureViewport, setIsCompactFeatureViewport] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
 
   useEffect(() => {
     const root = rootRef.current;
@@ -331,6 +311,21 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateViewport = () => {
+      setIsCompactFeatureViewport(window.innerWidth < 1024);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, []);
+
   const heroIntroExited = sectionProgress >= 0.26;
   const receptionistEntered = sectionProgress >= 0.22;
   const heroFeaturesEntered = sectionProgress >= 0.64;
@@ -338,7 +333,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   const receptionistOpacity = receptionistEntered ? (heroFeaturesEntered ? 0.11 : 1) : 0;
   const receptionistBlur = heroFeaturesEntered ? 13 : 0;
   const receptionistBrightness = heroFeaturesEntered ? 0.46 : 1;
-  const heroFeatureProgress = heroFeaturesEntered ? 1 : 0;
+  const heroFeatureProgress = Math.min(1, Math.max(0, (sectionProgress - 0.64) / 0.3));
   const heroFeatureOpacity = heroFeaturesEntered ? 1 : 0;
 
   return (
@@ -394,7 +389,9 @@ const StackedHeroShowcase = ({ sectionRef }) => {
             <RightFeatureList
               featureProgress={heroFeatureProgress}
               items={HERO_RECEPTIONIST_FEATURE_ITEMS}
-              useScrollHighlight={false}
+              useScrollHighlight={isCompactFeatureViewport}
+              mobilePageSize={3}
+              mobileMaxItems={6}
             />
           </div>
         </div>
