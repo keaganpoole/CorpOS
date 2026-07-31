@@ -967,6 +967,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   <RightCalendarGrid
                     key={isCompactBookingViewport ? `compact-calendar-${compactCalendarCycle}` : 'desktop-calendar'}
                     hasAnimatedDots={hasAnimatedDots}
+                    calendarVisible={bookingCalendarOpacity > 0.98}
                   />
                 </div>
 
@@ -1137,7 +1138,7 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
   );
 }
 
-function RightCalendarGrid({ hasAnimatedDots }) {
+function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
   const today = useMemo(() => new Date(), []);
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
@@ -1162,8 +1163,16 @@ function RightCalendarGrid({ hasAnimatedDots }) {
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
   const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
   const [activeAppointmentPrompt, setActiveAppointmentPrompt] = useState(null);
+  const [showAvatarHint, setShowAvatarHint] = useState(false);
+  const [visibleDotAnimationsComplete, setVisibleDotAnimationsComplete] = useState(false);
+  const [appointmentAnimationsComplete, setAppointmentAnimationsComplete] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
   const [receptionists, setReceptionists] = useState(FALLBACK_RECEPTIONISTS);
+  const avatarHintShownRef = useRef(false);
+  const visibleDotAnimationCountRef = useRef(0);
+  const completedVisibleDotAnimationsRef = useRef(new Set());
+  const completedAppointmentAnimationsRef = useRef(new Set());
+  const avatarHintStartRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -1177,7 +1186,67 @@ function RightCalendarGrid({ hasAnimatedDots }) {
     setExpandedAppointmentId(null);
     setActiveAppointmentActionsId(null);
     setActiveAppointmentPrompt(null);
+    setVisibleDotAnimationsComplete(false);
+    setAppointmentAnimationsComplete(false);
+    setShowAvatarHint(false);
+    completedVisibleDotAnimationsRef.current = new Set();
+    completedAppointmentAnimationsRef.current = new Set();
   }, [selectedDay]);
+
+  useEffect(() => {
+    if (!calendarVisible) return undefined;
+    console.info('[Calendar avatar hint] calendar entered viewport and is visible');
+    return undefined;
+  }, [calendarVisible]);
+
+  useEffect(() => {
+    if (!calendarVisible || !hasAnimatedDots) return undefined;
+    console.info('[Calendar avatar hint] day dot reveal started');
+    return undefined;
+  }, [calendarVisible, hasAnimatedDots]);
+
+  useEffect(() => {
+    if (
+      !shouldRevealCalendarDetails
+      || !calendarVisible
+      || !visibleDotAnimationsComplete
+      || !appointmentAnimationsComplete
+      || avatarHintShownRef.current
+    ) return undefined;
+
+    const avatarTarget = document.querySelector('.demo-calendar-avatar-trigger');
+    const avatarRect = avatarTarget?.getBoundingClientRect();
+    console.info('[Calendar avatar hint] readiness', {
+      calendarVisible,
+      visibleDotAnimationsComplete,
+      appointmentAnimationsComplete,
+      avatarTargetFound: Boolean(avatarTarget),
+      avatarRect: avatarRect ? {
+        top: Math.round(avatarRect.top),
+        left: Math.round(avatarRect.left),
+        width: Math.round(avatarRect.width),
+        height: Math.round(avatarRect.height),
+      } : null,
+    });
+
+    if (!avatarTarget || !avatarRect || avatarRect.width <= 0 || avatarRect.height <= 0) return undefined;
+
+    avatarHintShownRef.current = true;
+    setShowAvatarHint(true);
+    avatarHintStartRef.current = window.setTimeout(() => {
+      setShowAvatarHint(false);
+      avatarHintStartRef.current = null;
+    }, 2400);
+
+    console.info('[Calendar avatar hint] ring animation started');
+
+    return () => {
+      if (avatarHintStartRef.current !== null) {
+        window.clearTimeout(avatarHintStartRef.current);
+        avatarHintStartRef.current = null;
+      }
+    };
+  }, [appointmentAnimationsComplete, calendarVisible, shouldRevealCalendarDetails, visibleDotAnimationsComplete]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1209,6 +1278,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
 
   const isMobile = viewportWidth < 768;
   const isCompact = viewportWidth < 1180;
+  const shouldRevealCalendarDetails = hasAnimatedDots && calendarVisible;
 
   const itemsDatabase = useMemo(
     () => ({
@@ -1445,6 +1515,61 @@ function RightCalendarGrid({ hasAnimatedDots }) {
     );
   }, [currentDay, displayItemsDatabase, receptionists]);
 
+  const selectedAppointments = assignedItemsDatabase[selectedDay] || [];
+  const visibleDotAnimationTotal = useMemo(
+    () => Object.values(assignedItemsDatabase).reduce((total, events) => total + (events?.length || 0), 0),
+    [assignedItemsDatabase]
+  );
+
+  useEffect(() => {
+    visibleDotAnimationCountRef.current = visibleDotAnimationTotal;
+    if (!shouldRevealCalendarDetails || visibleDotAnimationTotal === 0) return;
+    setVisibleDotAnimationsComplete(false);
+    completedVisibleDotAnimationsRef.current = new Set();
+  }, [shouldRevealCalendarDetails, visibleDotAnimationTotal]);
+
+  useEffect(() => {
+    if (!calendarVisible) {
+      setAppointmentAnimationsComplete(false);
+      completedAppointmentAnimationsRef.current = new Set();
+      return;
+    }
+    if (selectedAppointments.length === 0) {
+      setAppointmentAnimationsComplete(true);
+      return;
+    }
+    setAppointmentAnimationsComplete(false);
+    completedAppointmentAnimationsRef.current = new Set();
+  }, [calendarVisible, selectedAppointments]);
+
+  const handleVisibleDotAnimationEnd = (dotKey, animationEvent) => {
+    if (animationEvent.animationName !== 'starlightShimmer') return;
+    completedVisibleDotAnimationsRef.current.add(dotKey);
+    if (completedVisibleDotAnimationsRef.current.size >= visibleDotAnimationCountRef.current) {
+      setVisibleDotAnimationsComplete(true);
+      console.info('[Calendar avatar hint] all visible day dots completed revealing', {
+        completed: completedVisibleDotAnimationsRef.current.size,
+      });
+    }
+  };
+
+  const handleAppointmentAnimationEnd = (appointmentId, animationEvent) => {
+    if (animationEvent.animationName !== 'agendaCascade') return;
+    completedAppointmentAnimationsRef.current.add(appointmentId);
+    if (completedAppointmentAnimationsRef.current.size >= selectedAppointments.length) {
+      setAppointmentAnimationsComplete(true);
+      console.info('[Calendar avatar hint] appointment rows completed revealing', {
+        completed: completedAppointmentAnimationsRef.current.size,
+      });
+    }
+  };
+
+  const handleAvatarHintAnimationEnd = (animationEvent) => {
+    if (animationEvent.animationName !== 'demoCalendarAvatarHint') return;
+    console.info('[Calendar avatar hint] ring animation completed');
+    setShowAvatarHint(false);
+  };
+
   return (
     <div className="relative flex h-full w-full items-center">
       <div className={`relative isolate w-full overflow-hidden border border-white/[0.08] bg-[#0b0b0c]/95 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] ${isCompact ? 'rounded-[22px] p-3 sm:p-4 md:p-5' : 'rounded-[28px] p-10'}`}>
@@ -1487,14 +1612,15 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                   {dayNum}
                 </span>
 
-                <div className={`mt-auto flex w-full justify-center space-x-1 ${hasAnimatedDots ? 'anim-starlight-shimmer' : ''}`}>
+                <div className={`mt-auto flex w-full justify-center space-x-1 ${shouldRevealCalendarDetails ? 'anim-starlight-shimmer' : ''}`}>
                   {eventsList.map((event, dotIndex) => (
                     <div
                       key={`${dayNum}-${event.title}`}
                       className={`dot-item rounded-full ${isMobile ? 'h-[3px] w-[3px]' : isCompact ? 'h-1 w-1' : 'h-1.5 w-1.5'}`}
+                      onAnimationEnd={(animationEvent) => handleVisibleDotAnimationEnd(`${dayNum}-${dotIndex}`, animationEvent)}
                       style={{
                         backgroundColor: isSelected ? '#ffffff' : event.statusColor,
-                        animationDelay: hasAnimatedDots ? `${dayNum * 24 + dotIndex * 80}ms` : '0ms',
+                        animationDelay: shouldRevealCalendarDetails ? `${dayNum * 24 + dotIndex * 80}ms` : '0ms',
                         animationDuration: '720ms',
                       }}
                     />
@@ -1510,21 +1636,30 @@ function RightCalendarGrid({ hasAnimatedDots }) {
             <Activity size={10} className="text-zinc-300" />
             <span>Appointments for {monthLabel} {selectedDay}</span>
           </span>
-          {assignedItemsDatabase[selectedDay] ? (
+          {selectedAppointments.length > 0 ? (
             <div className={isMobile ? 'space-y-1.5' : 'space-y-2'}>
-              {assignedItemsDatabase[selectedDay].map((event, index) => {
+              {selectedAppointments.map((event, index) => {
                 const appointmentActions = getDemoAppointmentActions(event.status);
                 const hasAppointmentActions = appointmentActions.length > 0;
                 const activePromptAction = activeAppointmentPrompt?.appointmentId === event.id
                   ? activeAppointmentPrompt.action
                   : null;
+                const toggleAppointmentActions = () => {
+                  if (!hasAppointmentActions) return;
+                  setActiveAppointmentActionsId((current) => {
+                    const next = current === event.id ? null : event.id;
+                    if (next !== event.id) setActiveAppointmentPrompt(null);
+                    return next;
+                  });
+                };
 
                 return (
                 <div key={event.id} className="space-y-1">
                   <motion.div
                     initial={false}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`agenda-item demo-calendar-appointment-record flex w-full items-center rounded-lg border bg-[#070707]/92 text-left ${activePromptAction ? 'demo-call-agenda-item' : 'border-white/[0.08]'} ${isMobile ? 'gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
+                    onAnimationEnd={(animationEvent) => handleAppointmentAnimationEnd(event.id, animationEvent)}
+                    className={`agenda-item ${calendarVisible ? 'agenda-item--visible' : ''} demo-calendar-appointment-record flex w-full items-center rounded-lg border bg-[#070707]/92 text-left ${activePromptAction ? 'demo-call-agenda-item' : 'border-white/[0.08]'} ${isMobile ? 'gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
                     style={{
                       animationDelay: `${index * 90}ms`,
                       '--demo-receptionist-banner': `url(${event.receptionistBannerUrl || event.receptionistAvatar})`,
@@ -1535,12 +1670,7 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                       aria-label={`${activeAppointmentActionsId === event.id ? 'Hide' : 'Show'} appointment actions`}
                       onClick={(clickEvent) => {
                         clickEvent.stopPropagation();
-                        if (!hasAppointmentActions) return;
-                        setActiveAppointmentActionsId((current) => {
-                          const next = current === event.id ? null : event.id;
-                          if (next !== event.id) setActiveAppointmentPrompt(null);
-                          return next;
-                        });
+                        toggleAppointmentActions();
                       }}
                       className={`relative z-10 flex shrink-0 items-center justify-center rounded-full p-1 transition-transform duration-200 focus:outline-none ${hasAppointmentActions ? 'hover:scale-110' : 'cursor-default'}`}
                     >
@@ -1553,8 +1683,15 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setExpandedAppointmentId((current) => (current === event.id ? null : event.id))}
-                      className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden text-left"
+                      onClick={() => {
+                        if (activeAppointmentActionsId === event.id) {
+                          setActiveAppointmentActionsId(null);
+                          setActiveAppointmentPrompt(null);
+                          return;
+                        }
+                        setExpandedAppointmentId((current) => (current === event.id ? null : event.id));
+                      }}
+                      className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-visible text-left"
                     >
                       <AnimatePresence initial={false}>
                         {activeAppointmentActionsId === event.id && (
@@ -1644,12 +1781,33 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                         transition={{ duration: 0.2, ease: 'easeOut' }}
                         className="flex min-w-0 flex-1 items-center space-x-2"
                       >
-                        <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900">
-                          <img
-                            src={event.receptionistAvatar}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
+                        <span
+                          role={hasAppointmentActions ? 'button' : undefined}
+                          tabIndex={hasAppointmentActions ? 0 : undefined}
+                          aria-label={`${activeAppointmentActionsId === event.id ? 'Hide' : 'Show'} appointment actions`}
+                          onClick={(avatarEvent) => {
+                            avatarEvent.preventDefault();
+                            avatarEvent.stopPropagation();
+                            toggleAppointmentActions();
+                          }}
+                          onKeyDown={(avatarEvent) => {
+                            if (!hasAppointmentActions) return;
+                            if (avatarEvent.key === 'Enter' || avatarEvent.key === ' ') {
+                              avatarEvent.preventDefault();
+                              avatarEvent.stopPropagation();
+                              toggleAppointmentActions();
+                            }
+                          }}
+                          className={`demo-calendar-avatar-trigger flex h-5 w-5 items-center justify-center rounded-full ${hasAppointmentActions ? 'cursor-pointer' : ''} ${showAvatarHint && hasAppointmentActions ? 'demo-calendar-avatar-trigger--hint' : ''}`}
+                          onAnimationEnd={handleAvatarHintAnimationEnd}
+                        >
+                          <span className="demo-calendar-avatar-trigger__image flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900">
+                            <img
+                              src={event.receptionistAvatar}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          </span>
                         </span>
                         <span className={`truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
                         {!isMobile && !isCompact && <span className="text-[10px] font-medium italic text-zinc-500">via</span>}
@@ -1660,9 +1818,10 @@ function RightCalendarGrid({ hasAnimatedDots }) {
                       <div className="flex shrink-0 items-center space-x-1.5">
                         <span
                         className={`font-bold uppercase tracking-wider text-zinc-500 ${isMobile ? 'text-[7px]' : isCompact ? 'text-[8px]' : 'text-[9px]'}`}
-                      >
+                        >
                           {event.category}
                         </span>
+                        <span className={`${isMobile ? 'h-3' : 'h-4'} w-px bg-white/[0.12]`} aria-hidden="true" />
                         <span className={`${isMobile ? 'text-[8px]' : isCompact ? 'text-[9px]' : 'text-[10px]'} font-mono text-zinc-400`}>{event.time}</span>
                       </div>
                     </button>
@@ -1706,5 +1865,3 @@ function RightCalendarGrid({ hasAnimatedDots }) {
 }
 
 export default CalendarShowcase;
-
-
