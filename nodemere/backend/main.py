@@ -65,7 +65,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from jose import JWTError, jwt
 from postgrest.exceptions import APIError
-from config import (
+from .config import (
     supabase,
     supabase_admin,
     stripe_webhook_secret,
@@ -100,7 +100,7 @@ from config import (
 )
 
  
-from models import (
+from .models import (
     UserUpdate, UserResponse, AuthSignUpRequest, LeadCreate,
     LeadResponse, AuthLoginRequest, LeadUpdate, PurchaseCreate,
     PurchaseUpdate, PurchaseResponse, CampaignItemResponse,
@@ -110,15 +110,15 @@ from models import (
     TierResponse, HelpdeskMessage, OAuthAccountCreate, OAuthAccountResponse,
     UserIntegrationUpdate, UserIntegrationResponse,
 )
-from dependencies import get_current_user, get_current_rep
-from scenario_engine import ScenarioEngine
-from verification_service import (
+from .dependencies import get_current_user, get_current_rep
+from .scenario_engine import ScenarioEngine
+from .verification_service import (
     complete_verification,
     create_verification_session,
     get_public_verification,
     get_verification_status,
 )
-from document_service import create_document_request, get_document_request, get_document_request_status, store_document
+from .document_service import create_document_request, get_document_request, get_document_request_status, store_document
 
 try:
     from elevenlabs.client import ElevenLabs
@@ -2878,16 +2878,17 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     logging.error(f"Validation error for request {request.url}: {exc}")
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
-# --- CORS Configuration based on TEST_MODE ---
-if TEST_MODE:
-    origins = [
-        "http://localhost:5173",  # For local development
-        "http://172.20.10.2:5173", # For local network access
-    ]
-else:
-    origins = [
-        "https://nodemere.com",  # For production frontend
-    ]
+# --- CORS Configuration ---
+configured_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+origins = configured_origins or [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://nodemere.com",
+]
 
 app.add_middleware(
     CORSMiddleware,

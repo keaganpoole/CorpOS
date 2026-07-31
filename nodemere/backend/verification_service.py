@@ -6,7 +6,7 @@ the session lifecycle reusable when a real delivery provider is added later.
 
 from typing import Optional
 
-from request_service import (
+from .request_service import (
     REQUEST_TTL_MINUTES,
     complete_request,
     create_request,

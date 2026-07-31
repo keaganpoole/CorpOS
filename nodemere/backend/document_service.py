@@ -6,7 +6,7 @@ import os
 from pathlib import PurePosixPath
 from uuid import uuid4
 
-from request_service import complete_request, create_request, get_public_request, get_request_status, load_request_by_token
+from .request_service import complete_request, create_request, get_public_request, get_request_status, load_request_by_token
 
 DOCUMENT_REQUEST_TYPE = "document_upload"
 DOCUMENT_BUCKET = os.environ.get("DOCUMENT_UPLOAD_BUCKET", "caller-documents")
@@ -67,7 +67,7 @@ def store_document(supabase, *, token: str, filename: str, content_type: str, co
     request = load_request_by_token(supabase, token, DOCUMENT_REQUEST_TYPE)
     if not request:
         return {"success": False, "status": "not_found", "message": "This upload link is invalid."}
-    from request_service import expire_if_needed
+    from .request_service import expire_if_needed
     request = expire_if_needed(supabase, request)
     if request.get("status") == "expired":
         return {"success": False, "status": "expired", "message": "This upload link has expired."}

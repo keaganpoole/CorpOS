@@ -11,9 +11,9 @@ except ImportError:
 
 
 
-#General
-TEST_MODE = True
-UPDATE2 = False
+# General
+TEST_MODE = os.environ.get("TEST_MODE", "false").strip().lower() in {"1", "true", "yes", "on"}
+UPDATE2 = os.environ.get("UPDATE2", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 

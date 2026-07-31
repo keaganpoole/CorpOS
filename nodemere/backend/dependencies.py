@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel # type: ignore
-from config import ALGORITHM, SECRET_KEY, supabase_auth
+from .config import ALGORITHM, SECRET_KEY, supabase_auth
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 http_bearer = HTTPBearer()

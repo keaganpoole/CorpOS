@@ -604,7 +604,7 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
   return (
     <button
       onClick={handleClick}
-      className={`no-drag w-full flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] relative group overflow-hidden ${isActive ? 'text-zinc-100 bg-white/5' : 'text-zinc-500 hover:text-white'}`}
+      className={`no-drag w-full flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] relative group overflow-hidden ${isActive ? 'text-zinc-100 bg-white/5' : 'text-zinc-500 hover:bg-white/5 hover:text-white'}`}
       title={collapsed ? item.label : undefined}
     >
       <span className={`relative w-5 shrink-0 ${isActive ? '' : 'text-zinc-600 group-hover:text-white'} transition-colors duration-300`}>
