@@ -1123,6 +1123,12 @@ main,
     }
 }
 @media (max-width: 1023px) {
+    .scenario-demo-showcase .homepage-scenarios-builder .sb-canvas {
+        touch-action: pan-y;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .sb-canvas.sb-canvas--touch-active {
+        touch-action: none;
+    }
     .calendar-booking-layout {
         position: relative;
         display: block;

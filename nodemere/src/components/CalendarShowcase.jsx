@@ -19,6 +19,7 @@ import {
 import { Link } from 'react-router-dom';
 import HomepageScenariosDemo from '../sonar/pages/Scenarios/HomepageScenariosDemo';
 import HomepagePeopleCrmDemo, { DEMO_CUSTOM_FIELDS } from '../sonar/pages/HomepagePeopleCrmDemo';
+import useSectionScrollProgress from '../hooks/useSectionScrollProgress';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -431,9 +432,8 @@ function BookingReelWord({ playState }) {
 }
 
 const CalendarShowcase = ({ variant = 'calendar' }) => {
-  const rootRef = useRef(null);
+  const { rootRef, progress: sectionProgress } = useSectionScrollProgress({ mobileMinDelta: 0.0025 });
   const stickyRef = useRef(null);
-  const [sectionProgress, setSectionProgress] = useState(0);
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [bookingPlayState, setBookingPlayState] = useState('idle');
   const [demoResetState, setDemoResetState] = useState(null);
@@ -510,36 +510,6 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             : 1
       )
     : 1;
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-
-    let frame = null;
-
-    const updateProgress = () => {
-      frame = null;
-      const rect = root.getBoundingClientRect();
-      const scrollableDistance = Math.max(root.offsetHeight - window.innerHeight, 1);
-      const nextProgress = clamp((-rect.top) / scrollableDistance, 0, 1);
-      setSectionProgress(nextProgress);
-    };
-
-    const onScroll = () => {
-      if (frame !== null) return;
-      frame = window.requestAnimationFrame(updateProgress);
-    };
-
-    updateProgress();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-
-    return () => {
-      if (frame !== null) window.cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-    };
-  }, []);
 
   useEffect(() => {
     const sticky = stickyRef.current;

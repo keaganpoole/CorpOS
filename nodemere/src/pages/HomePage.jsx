@@ -45,6 +45,7 @@ import HeroConcept from '../components/HeroConcept';
 import CalendarShowcase, { RightFeatureList } from '../components/CalendarShowcase';
 import WorkWeekComparison from '../components/WorkWeekComparison';
 import { trackVisitor } from '../services/apiService';
+import useSectionScrollProgress from '../hooks/useSectionScrollProgress';
 
 const NUMBER_ICON_MASKS = {
   transfer: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.5 5.5a.75.75 0 0 1 1.06 0l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.75.75 0 1 1-1.06-1.06L16.47 10.5H8.5a.75.75 0 0 1 0-1.5h7.97l-1.97-1.97a.75.75 0 0 1 0-1.06Zm-5 8a.75.75 0 0 1 1.06 0A.75.75 0 0 1 10 14.56l-1.97 1.97H16a.75.75 0 0 1 0 1.5H8.03L10 19.97a.75.75 0 1 1-1.06 1.06L5.69 17.78a.75.75 0 0 1 0-1.06l3.81-3.81Z"/></svg>')}`,
@@ -274,42 +275,11 @@ const CyclingImageGrid = ({ allExpandedImages }) => {
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const StackedHeroShowcase = ({ sectionRef }) => {
-  const rootRef = useRef(null);
+  const { rootRef, progress: sectionProgress } = useSectionScrollProgress({ mobileMinDelta: 0.0025 });
   const stickyRef = useRef(null);
-  const [sectionProgress, setSectionProgress] = useState(0);
   const [isCompactFeatureViewport, setIsCompactFeatureViewport] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 1024 : false
   );
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-
-    let frame = null;
-
-    const updateProgress = () => {
-      frame = null;
-      const rect = root.getBoundingClientRect();
-      const scrollableDistance = Math.max(root.offsetHeight - window.innerHeight, 1);
-      const nextProgress = clamp((-rect.top) / scrollableDistance, 0, 1);
-      setSectionProgress(nextProgress);
-    };
-
-    const onScroll = () => {
-      if (frame !== null) return;
-      frame = window.requestAnimationFrame(updateProgress);
-    };
-
-    updateProgress();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-
-    return () => {
-      if (frame !== null) window.cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -538,47 +508,61 @@ const BlinkedWord = ({ progress }) => {
 };
 
 const ComparisonShowcase = () => {
-  const rootRef = useRef(null);
-  const previousProgressRef = useRef(0);
-  const [sectionProgress, setSectionProgress] = useState(0);
-  const [direction, setDirection] = useState(0);
+  const { rootRef, progress: sectionProgress, direction } = useSectionScrollProgress({ mobileMinDelta: 0.0025 });
   const [mondayRevealComplete, setMondayRevealComplete] = useState(false);
+  const [cinematicStarted, setCinematicStarted] = useState(false);
+  const [blinkProgress, setBlinkProgress] = useState(0);
+  const [introExited, setIntroExited] = useState(false);
+  const [timelineStartProgress, setTimelineStartProgress] = useState(0.3);
+  const liveProgressRef = useRef(sectionProgress);
 
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
+    liveProgressRef.current = sectionProgress;
+  }, [sectionProgress]);
 
+  useEffect(() => {
+    if (sectionProgress >= 0.025 && !cinematicStarted) {
+      setCinematicStarted(true);
+    }
+  }, [cinematicStarted, sectionProgress]);
+
+  useEffect(() => {
+    if (!cinematicStarted) return undefined;
+
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setBlinkProgress(1);
+      setTimelineStartProgress(Math.max(0.3, liveProgressRef.current));
+      setIntroExited(true);
+      return undefined;
+    }
+
+    const duration = 1750;
+    const startedAt = performance.now();
     let frame = null;
-    const updateProgress = () => {
-      frame = null;
-      const rect = root.getBoundingClientRect();
-      const scrollableDistance = Math.max(root.offsetHeight - window.innerHeight, 1);
-      const nextProgress = clamp((-rect.top) / scrollableDistance, 0, 1);
-      setDirection(nextProgress >= previousProgressRef.current ? 1 : -1);
-      previousProgressRef.current = nextProgress;
-      setSectionProgress(nextProgress);
+    let revealTimer = null;
+    const animateBlink = (now) => {
+      const progress = clamp((now - startedAt) / duration, 0, 1);
+      setBlinkProgress(progress);
+      if (progress < 1) {
+        frame = window.requestAnimationFrame(animateBlink);
+        return;
+      }
+      revealTimer = window.setTimeout(() => {
+        setTimelineStartProgress(Math.max(0.3, liveProgressRef.current));
+        setIntroExited(true);
+      }, 170);
     };
 
-    const onScroll = () => {
-      if (frame !== null) return;
-      frame = window.requestAnimationFrame(updateProgress);
-    };
-
-    updateProgress();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+    frame = window.requestAnimationFrame(animateBlink);
     return () => {
       if (frame !== null) window.cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      if (revealTimer !== null) window.clearTimeout(revealTimer);
     };
-  }, []);
+  }, [cinematicStarted]);
 
-  const comparisonStart = 0.26;
-  const mondayHoldEnd = 0.42;
-  const introExited = sectionProgress >= comparisonStart;
-  const blinkProgress = clamp((sectionProgress - 0.1) / 0.16, 0, 1);
-  const comparisonProgress = mondayRevealComplete ? clamp((sectionProgress - mondayHoldEnd) / (1 - mondayHoldEnd), 0, 1) : 0;
+  const comparisonProgress = mondayRevealComplete
+    ? clamp((sectionProgress - timelineStartProgress) / Math.max(1 - timelineStartProgress, 0.01), 0, 1)
+    : 0;
   const timelineProgress = clamp(comparisonProgress / 0.62, 0, 1);
   const scrollStep = Math.min(6, Math.floor(timelineProgress * 7));
   const finaleProgress = clamp((comparisonProgress - 0.62) / 0.38, 0, 1);
@@ -597,6 +581,10 @@ const ComparisonShowcase = () => {
   useEffect(() => {
     if (sectionProgress < 0.02) {
       setMondayRevealComplete(false);
+      setCinematicStarted(false);
+      setBlinkProgress(0);
+      setIntroExited(false);
+      setTimelineStartProgress(0.3);
     }
   }, [sectionProgress]);
 

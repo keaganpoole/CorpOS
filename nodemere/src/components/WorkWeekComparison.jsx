@@ -293,14 +293,18 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
         <div className="absolute inset-y-0 left-0 z-20 w-1/4 cursor-w-resize" onClick={() => !isScrollDriven && !isScrollingRef.current && step > 0 && setPage([step - 1, -1])} />
         <div className="absolute inset-y-0 right-0 z-20 w-3/4 cursor-e-resize" onClick={() => !isScrollDriven && !isScrollingRef.current && step < TIMELINE.length - 1 && setPage([step + 1, 1])} />
 
-        <motion.div
-          className="absolute inset-0 z-30 flex items-center justify-center px-8 md:px-24"
+      <motion.div
+        className={`absolute inset-0 z-30 flex items-center px-8 md:px-24 ${
+          finaleActive && !finaleComplete
+            ? 'justify-end pb-8 pt-32 lg:justify-center lg:py-0'
+            : 'justify-center'
+        }`}
           initial={false}
           animate={{ opacity: finaleActive ? 1 : 0, pointerEvents: finaleActive ? 'auto' : 'none' }}
           transition={{ duration: 0.45 }}
         >
           <div className="relative flex w-full max-w-xl flex-col items-center">
-            <div className="flex w-full flex-col items-center">
+            <div className="flex h-[48dvh] w-full flex-col items-center justify-end overflow-hidden [mask-image:linear-gradient(to_bottom,transparent_0%,black_14%,black_100%)] lg:h-auto lg:max-h-none lg:overflow-visible lg:[mask-image:none]">
               <AnimatePresence mode="popLayout">
                 {!finaleComplete ? FINALE_ITEMS.slice(0, revealedFinaleItems).map((item, index) => (
                 <motion.div
