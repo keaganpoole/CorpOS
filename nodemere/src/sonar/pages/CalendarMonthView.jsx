@@ -26,6 +26,35 @@ const STATUS_COLORS = {
   Cancelled: '#f43f5e',
 };
 
+const getAppointmentActions = (status) => {
+  const normalized = titleCase(status);
+  if (normalized === 'Completed') return [];
+  if (normalized === 'Cancelled') return [{ label: 'Reschedule', className: 'text-zinc-300' }];
+  if (normalized === 'Confirmed') {
+    return [
+      { label: 'Reschedule', className: 'text-zinc-300' },
+      { label: 'Cancel', className: 'text-rose-300' },
+    ];
+  }
+
+  return [
+    { label: 'Confirm', className: 'text-emerald-300' },
+    { label: 'Reschedule', className: 'text-zinc-300' },
+    { label: 'Cancel', className: 'text-rose-300' },
+  ];
+};
+
+const getCustomerFirstName = (appointment) => {
+  const source = appointment._personName || appointment.client_name || 'customer';
+  return String(source).trim().split(/\s+/).filter(Boolean)[0] || 'customer';
+};
+
+const getAppointmentActionPrompt = (action, customerFirstName) => {
+  if (action === 'Confirm') return `Call ${customerFirstName} to confirm?`;
+  if (action === 'Cancel') return `Call ${customerFirstName} to cancel?`;
+  return `Call ${customerFirstName} to reschedule?`;
+};
+
 const appointmentFieldClass =
   'w-full rounded-2xl border border-neutral-800 bg-neutral-900 px-5 py-4 text-base text-neutral-100 placeholder:text-neutral-600 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus:border-neutral-700 transition-all [color-scheme:dark]';
 
@@ -103,6 +132,8 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
+  const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
+  const [activeAppointmentPrompt, setActiveAppointmentPrompt] = useState(null);
 
   const servicesById = useMemo(
     () => new Map((services || []).map((service) => [String(service.id), service])),
@@ -291,37 +322,193 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                   || receptionistCatalogRow?.avatar
                   || (receptionistCatalogRow?.banner_id ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${receptionistCatalogRow.banner_id}.png` : '')
                   || '';
+                const receptionistBannerUrl = appointment._receptionistBannerUrl
+                  || (receptionistCatalogRow?.banner_id ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${receptionistCatalogRow.banner_id}.png` : '')
+                  || avatarSrc;
                 const isExpanded = expandedAppointmentId === appointment.id;
+                const appointmentActions = getAppointmentActions(appointment.status);
+                const hasAppointmentActions = appointmentActions.length > 0;
+                const activePromptAction = activeAppointmentPrompt?.appointmentId === appointment.id
+                  ? activeAppointmentPrompt.action
+                  : null;
+                const showAppointmentActions = activeAppointmentActionsId === appointment.id;
+                const toggleAppointmentActions = () => {
+                  if (!hasAppointmentActions) return;
+                  setActiveAppointmentActionsId((current) => {
+                    const next = current === appointment.id ? null : appointment.id;
+                    if (next !== appointment.id) setActiveAppointmentPrompt(null);
+                    return next;
+                  });
+                };
                 return (
                   <div key={appointment.id} className="space-y-1">
-                    <motion.button
-                      type="button"
-                      onClick={() => setExpandedAppointmentId((current) => (current === appointment.id ? null : appointment.id))}
+                    <motion.div
                       initial={false}
                       animate={{ opacity: 1, y: 0 }}
-                      className="agenda-item flex w-full items-center justify-between gap-3 rounded-lg border border-white/[0.08] bg-[#070707]/92 p-3 text-left"
-                      style={{ animationDelay: `${index * 90}ms` }}
+                      className={`agenda-item real-calendar-appointment-record flex w-full items-center justify-between gap-3 rounded-lg border bg-[#070707]/92 p-3 text-left ${activePromptAction ? 'demo-call-agenda-item' : 'border-white/[0.08]'}`}
+                      style={{
+                        animationDelay: `${index * 90}ms`,
+                        '--demo-receptionist-banner': `url(${receptionistBannerUrl || avatarSrc})`,
+                      }}
                     >
-                      <div className="flex min-w-0 flex-1 items-center space-x-2">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tagColor }} />
-                        <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
-                        <span className="text-[10px] font-medium italic text-zinc-500">via</span>
-                        <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[8px] font-bold text-zinc-300">
-                          {avatarSrc ? (
-                            <img
-                              src={avatarSrc}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            avatarLabel
+                      <button
+                        type="button"
+                        aria-label={`${activeAppointmentActionsId === appointment.id ? 'Hide' : 'Show'} appointment actions`}
+                        onClick={(clickEvent) => {
+                          clickEvent.stopPropagation();
+                          toggleAppointmentActions();
+                        }}
+                        className={`relative z-10 flex shrink-0 items-center justify-center rounded-full p-1 transition-transform duration-200 focus:outline-none ${hasAppointmentActions ? 'hover:scale-110' : 'cursor-default'}`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${activePromptAction ? 'demo-call-status-dot' : 'shadow-[0_0_4px_currentColor]'}`}
+                          style={activePromptAction
+                            ? undefined
+                            : { color: tagColor, backgroundColor: tagColor }}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (activeAppointmentActionsId === appointment.id) {
+                            setActiveAppointmentActionsId(null);
+                            setActiveAppointmentPrompt(null);
+                            return;
+                          }
+                          setExpandedAppointmentId((current) => (current === appointment.id ? null : appointment.id));
+                        }}
+                        className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-visible text-left"
+                      >
+                        <AnimatePresence initial={false}>
+                          {showAppointmentActions && (
+                            <motion.div
+                              initial={{ opacity: 0, x: -18, scale: 0.94 }}
+                              animate={{ opacity: 1, x: 0, scale: 1 }}
+                              exit={{ opacity: 0, x: -14, scale: 0.96 }}
+                              transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
+                              className="absolute left-0 z-20 flex max-w-[calc(100%-4.5rem)] items-center gap-2.5"
+                            >
+                              <AnimatePresence mode="wait" initial={false}>
+                                {activePromptAction ? (
+                                  <motion.div
+                                    key="action-prompt"
+                                    initial={{ opacity: 0, x: -14, scale: 0.96 }}
+                                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                                    exit={{ opacity: 0, x: -12, scale: 0.97 }}
+                                    transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
+                                    className="flex min-w-0 items-center gap-2"
+                                  >
+                                    <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[7px] font-bold text-zinc-300">
+                                      {avatarSrc ? (
+                                        <img
+                                          src={avatarSrc}
+                                          alt=""
+                                          className="h-full w-full object-cover"
+                                        />
+                                      ) : (
+                                        avatarLabel
+                                      )}
+                                    </span>
+                                    <span className="truncate text-[9px] font-bold tracking-[-0.02em] text-zinc-200 drop-shadow-[0_0_10px_rgba(255,255,255,0.08)]">
+                                      {getAppointmentActionPrompt(activePromptAction, getCustomerFirstName(appointment))}
+                                    </span>
+                                    <span
+                                      onClick={(actionEvent) => {
+                                        actionEvent.preventDefault();
+                                        actionEvent.stopPropagation();
+                                      }}
+                                      className="shrink-0 cursor-pointer text-[9px] font-bold tracking-[-0.02em] text-emerald-300 drop-shadow-[0_0_10px_rgba(110,231,183,0.14)]"
+                                    >
+                                      Call
+                                    </span>
+                                    <span
+                                      onClick={(actionEvent) => {
+                                        actionEvent.preventDefault();
+                                        actionEvent.stopPropagation();
+                                        setActiveAppointmentPrompt(null);
+                                      }}
+                                      className="shrink-0 cursor-pointer text-[9px] font-bold tracking-[-0.02em] text-zinc-500 drop-shadow-[0_0_10px_rgba(113,113,122,0.14)]"
+                                    >
+                                      Cancel
+                                    </span>
+                                  </motion.div>
+                                ) : (
+                                  <motion.div
+                                    key="action-list"
+                                    initial={{ opacity: 0, x: -14, scale: 0.96 }}
+                                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                                    exit={{ opacity: 0, x: -12, scale: 0.97 }}
+                                    transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
+                                    className="flex items-center gap-2.5"
+                                  >
+                                    {appointmentActions.map((action) => (
+                                      <span
+                                        key={action.label}
+                                        onClick={(actionEvent) => {
+                                          actionEvent.preventDefault();
+                                          actionEvent.stopPropagation();
+                                          setActiveAppointmentPrompt({
+                                            appointmentId: appointment.id,
+                                            action: action.label,
+                                          });
+                                        }}
+                                        className={`cursor-pointer text-[9px] font-bold tracking-[-0.02em] drop-shadow-[0_0_10px_rgba(255,255,255,0.08)] ${action.className}`}
+                                      >
+                                        {action.label}
+                                      </span>
+                                    ))}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </motion.div>
                           )}
-                        </span>
-                        <span className="hidden text-[10px] font-medium text-zinc-400 sm:inline">
-                          {receptionist}
-                        </span>
-                      </div>
-                      <div className="flex shrink-0 items-center space-x-1.5">
+                        </AnimatePresence>
+                        <motion.div
+                          animate={{
+                            opacity: showAppointmentActions ? 0 : 1,
+                            x: showAppointmentActions ? 28 : 0,
+                          }}
+                          transition={{ duration: 0.2, ease: 'easeOut' }}
+                          className="flex min-w-0 flex-1 items-center space-x-2"
+                        >
+                          <span
+                            role={hasAppointmentActions ? 'button' : undefined}
+                            tabIndex={hasAppointmentActions ? 0 : undefined}
+                            aria-label={`${activeAppointmentActionsId === appointment.id ? 'Hide' : 'Show'} appointment actions`}
+                            onClick={(avatarEvent) => {
+                              avatarEvent.preventDefault();
+                              avatarEvent.stopPropagation();
+                              toggleAppointmentActions();
+                            }}
+                            onKeyDown={(avatarEvent) => {
+                              if (!hasAppointmentActions) return;
+                              if (avatarEvent.key === 'Enter' || avatarEvent.key === ' ') {
+                                avatarEvent.preventDefault();
+                                avatarEvent.stopPropagation();
+                                toggleAppointmentActions();
+                              }
+                            }}
+                            className={`demo-calendar-avatar-trigger flex h-5 w-5 items-center justify-center rounded-full ${hasAppointmentActions ? 'cursor-pointer' : ''}`}
+                          >
+                            <span className="demo-calendar-avatar-trigger__image flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[8px] font-bold text-zinc-300">
+                              {avatarSrc ? (
+                                <img
+                                  src={avatarSrc}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                avatarLabel
+                              )}
+                            </span>
+                          </span>
+                          <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
+                          <span className="text-[10px] font-medium italic text-zinc-500">via</span>
+                          <span className="hidden text-[10px] font-medium text-zinc-400 sm:inline">
+                            {receptionist}
+                          </span>
+                        </motion.div>
+                        <div className="flex shrink-0 items-center space-x-1.5">
                         <span
                           className="rounded border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
                           style={{
@@ -334,7 +521,8 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                         </span>
                         <span className="font-mono text-[10px] text-zinc-400">{formatTime(appointment.time)}</span>
                       </div>
-                    </motion.button>
+                      </button>
+                    </motion.div>
                     <AnimatePresence initial={false}>
                       {isExpanded && (
                         <motion.div
@@ -375,6 +563,94 @@ export default function CalendarMonthView({ data = null, className = '', selecte
           )}
         </div>
       </div>
+      <style>{`
+        @keyframes demoCallStatusGradient {
+          0% {
+            background-position: 0% 50%;
+            filter: brightness(1.02);
+          }
+          50% {
+            background-position: 100% 50%;
+            filter: brightness(1.18);
+          }
+          100% {
+            background-position: 0% 50%;
+            filter: brightness(1.02);
+          }
+        }
+
+        .demo-call-status-dot {
+          background: linear-gradient(135deg, var(--brandGradientStart) 0%, #ff5fc4 24%, var(--brandGradientEnd) 52%, #a855f7 74%, var(--brandGradientStart) 100%);
+          background-size: 420% 420%;
+          box-shadow:
+            0 0 7px color-mix(in srgb, var(--brandGradientStart) 48%, transparent),
+            0 0 12px color-mix(in srgb, var(--brandGradientEnd) 38%, transparent);
+          animation: demoCallStatusGradient 1.85s ease-in-out infinite;
+        }
+
+        .demo-call-agenda-item {
+          border-color: transparent;
+          background:
+            linear-gradient(rgba(7, 7, 7, 0.92), rgba(7, 7, 7, 0.92)) padding-box,
+            linear-gradient(135deg, var(--brandGradientStart), var(--brandGradientEnd), #a855f7, var(--brandGradientStart)) border-box;
+          background-size: 320% 320%;
+          box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--brandGradientStart) 16%, transparent),
+            0 0 14px color-mix(in srgb, var(--brandGradientEnd) 14%, transparent);
+          animation: demoCallStatusGradient 4.8s ease-in-out infinite;
+        }
+
+        .real-calendar-appointment-record {
+          position: relative;
+          isolation: isolate;
+          overflow: visible;
+        }
+
+        .demo-call-agenda-item.real-calendar-appointment-record::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: -2;
+          border-radius: inherit;
+          background-image: var(--demo-receptionist-banner);
+          background-position: 58% center;
+          background-repeat: no-repeat;
+          background-size: auto 180%;
+          opacity: 0.24;
+          filter: saturate(0.88) brightness(0.92);
+          mix-blend-mode: screen;
+          pointer-events: none;
+        }
+
+        .demo-call-agenda-item.real-calendar-appointment-record::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: -1;
+          border-radius: inherit;
+          background:
+            linear-gradient(90deg, rgba(12, 12, 16, 0.94) 0%, rgba(12, 12, 16, 0.88) 40%, rgba(12, 12, 16, 0.64) 68%, rgba(12, 12, 16, 0.74) 100%),
+            linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 58%);
+          pointer-events: none;
+        }
+
+        .real-calendar-appointment-record > * {
+          position: relative;
+          z-index: 1;
+        }
+
+        .demo-calendar-avatar-trigger {
+          position: relative;
+          isolation: isolate;
+          overflow: visible;
+          flex-shrink: 0;
+        }
+
+        .demo-calendar-avatar-trigger__image {
+          position: relative;
+          z-index: 2;
+        }
+      `}</style>
     </div>
   );
 }
