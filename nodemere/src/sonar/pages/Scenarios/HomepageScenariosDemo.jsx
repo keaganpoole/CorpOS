@@ -6390,7 +6390,7 @@ export default function ScenariosPage({
         {demoMode && (
           <div className="sb-demo-watermark" aria-hidden="true">
             <span className="homepage-demo-watermark__primary">DEMONSTRATION PURPOSES ONLY</span>
-            <span className="homepage-demo-watermark__desktop">View on desktop for the full experience.</span>
+            <span className="homepage-demo-watermark__desktop">VIEW ON DESKTOP FOR THE FULL EXPERIENCE.</span>
           </div>
         )}
 

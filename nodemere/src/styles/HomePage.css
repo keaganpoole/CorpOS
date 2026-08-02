@@ -703,7 +703,6 @@ main,
 }
 .homepage-demo-watermark__desktop {
     letter-spacing: 0.14em;
-    text-transform: none;
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-trigger-filter-form,
 .scenario-demo-showcase .homepage-scenarios-builder .sb-action-config-form:not(.sb-action-config-form--empty) {

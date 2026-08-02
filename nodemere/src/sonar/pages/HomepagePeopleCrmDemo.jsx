@@ -586,7 +586,7 @@ const HomepagePeopleCrmDemo = ({ className = '', entranceActive = false, onDemoL
       />
       <div className="homepage-demo-watermark pointer-events-none absolute bottom-[120px] left-0 right-0 px-8 text-center font-semibold uppercase text-zinc-700/80">
         <span className="homepage-demo-watermark__primary">Demonstration purposes only</span>
-        <span className="homepage-demo-watermark__desktop">View on desktop for the full experience.</span>
+        <span className="homepage-demo-watermark__desktop">VIEW ON DESKTOP FOR THE FULL EXPERIENCE.</span>
       </div>
     </div>
   );
