@@ -1942,22 +1942,24 @@ const LeadsTable = ({
             )}
           </div>
         </div>
-        <div
-          className="pointer-events-none absolute top-0 z-[80] h-0 w-0"
-          style={{ left: frozenCount > 0 ? frozenPaneWidth : frozenHandleLeft }}
-        >
-          {isDraggingFrozenDivider && (
-            <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-zinc-300/35" />
-          )}
-          <button
-            type="button"
-            onPointerDown={handleFrozenPointerDown}
-            className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-zinc-500 transition-colors hover:border-white/20 hover:text-white"
-            aria-label="Drag frozen column divider"
+        {!demoMode && (
+          <div
+            className="pointer-events-none absolute top-0 z-[80] h-0 w-0"
+            style={{ left: frozenCount > 0 ? frozenPaneWidth : frozenHandleLeft }}
           >
-            <GripVertical size={10} />
-          </button>
-        </div>
+            {isDraggingFrozenDivider && (
+              <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-zinc-300/35" />
+            )}
+            <button
+              type="button"
+              onPointerDown={handleFrozenPointerDown}
+              className="pointer-events-auto absolute -left-[10px] top-[18px] flex h-5 w-5 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-white/[0.08] bg-[#101010]/95 text-zinc-500 transition-colors hover:border-white/20 hover:text-white"
+              aria-label="Drag frozen column divider"
+            >
+              <GripVertical size={10} />
+            </button>
+          </div>
+        )}
         <div ref={horizontalScrollRef} className="crm-horizontal-scroll min-w-0 flex-1 overflow-x-auto overflow-y-visible custom-scrollbar">
           <div className="min-w-max">
             <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">

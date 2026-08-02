@@ -686,6 +686,26 @@ main,
     pointer-events: none;
     user-select: none;
 }
+.homepage-demo-watermark,
+.scenario-demo-showcase .homepage-scenarios-builder .sb-demo-watermark {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.32rem;
+    font-size: 10px;
+    line-height: 1.15;
+    letter-spacing: 0.22em;
+    text-align: center;
+}
+.homepage-demo-watermark__primary,
+.homepage-demo-watermark__desktop {
+    display: block;
+}
+.homepage-demo-watermark__desktop {
+    font-size: 0.78em;
+    letter-spacing: 0.14em;
+    text-transform: none;
+}
 .scenario-demo-showcase .homepage-scenarios-builder .sb-trigger-filter-form,
 .scenario-demo-showcase .homepage-scenarios-builder .sb-action-config-form:not(.sb-action-config-form--empty) {
     padding-bottom: 8px;
@@ -926,76 +946,82 @@ main,
     position: relative;
     z-index: 1;
 }
-@keyframes demoCalendarAvatarHint {
-    0% {
-        transform: scale(1) translateZ(0);
-    }
-    20% {
-        transform: scale(1.42) translateZ(0);
-    }
-    42% {
-        transform: scale(1.28) translateZ(0);
-    }
-    84% {
-        transform: scale(1.28) translateZ(0);
-    }
-    100% {
-        transform: scale(1.12) translateZ(0);
-    }
-}
-@keyframes demoCalendarAvatarReturn {
-    0% {
-        transform: scale(1.28) translateZ(0);
-    }
-    46% {
-        transform: scale(0.94) translateZ(0);
-    }
-    100% {
-        transform: scale(1) translateZ(0);
-    }
-}
-@keyframes demoCalendarAvatarHintGlow {
+@keyframes demoCalendarTextReturn {
     0% {
         opacity: 0;
-        transform: scale(0.82);
+        transform: translateX(6px) translateZ(0);
+        filter: blur(3px);
     }
-    22% {
+    62% {
         opacity: 1;
-        transform: scale(1.62);
+        transform: translateX(0) translateZ(0);
+        filter: blur(0);
     }
-    82% {
-        opacity: 0.72;
-        transform: scale(1.48);
+    100% {
+        opacity: 1;
+        transform: translateX(0) translateZ(0);
+        filter: blur(0);
+    }
+}
+@keyframes demoCalendarTextExit {
+    0% {
+        opacity: 1;
+        transform: translateX(0) translateZ(0);
+        filter: blur(0);
     }
     100% {
         opacity: 0;
-        transform: scale(1.18);
+        transform: translateX(6px) translateZ(0);
+        filter: blur(3px);
+    }
+}
+@keyframes demoCalendarAvatarCuePop {
+    0% {
+        transform: scale(1) translateZ(0);
+    }
+    16% {
+        transform: scale(1.34) translateZ(0);
+    }
+    30% {
+        transform: scale(1.16) translateZ(0);
+    }
+    70% {
+        transform: scale(1.16) translateZ(0);
+    }
+    100% {
+        transform: scale(1) translateZ(0);
     }
 }
 @keyframes demoCalendarAvatarPeek {
     0% {
         opacity: 0;
-        transform: translateX(-18px) scale(0.82);
+        transform: translateX(-8px) scale(0.98);
+        filter: blur(5px);
+    }
+    28% {
+        opacity: 0;
+        transform: translateX(-8px) scale(0.98);
+        filter: blur(5px);
+    }
+    42% {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        filter: blur(0);
+    }
+    70% {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        filter: blur(0);
+    }
+    88% {
+        opacity: 0;
+        transform: translateX(-8px) scale(0.98);
         filter: blur(6px);
-        clip-path: inset(0 78% 0 0 round 999px);
-    }
-    24% {
-        opacity: 1;
-        transform: translateX(-2px) scale(1);
-        filter: blur(0);
-        clip-path: inset(0 34% 0 0 round 999px);
-    }
-    84% {
-        opacity: 1;
-        transform: translateX(-2px) scale(1);
-        filter: blur(0);
-        clip-path: inset(0 34% 0 0 round 999px);
     }
     100% {
         opacity: 0;
-        transform: translateX(-16px) scale(0.86);
-        filter: blur(5px);
-        clip-path: inset(0 82% 0 0 round 999px);
+        transform: translateX(-8px) scale(0.98);
+        filter: blur(6px);
     }
 }
 .demo-calendar-avatar-trigger {
@@ -1012,6 +1038,15 @@ main,
     transform-origin: center;
     will-change: transform;
 }
+.demo-calendar-appointment-foreground {
+    will-change: transform;
+}
+.demo-calendar-avatar-trigger--peek-pop .demo-calendar-avatar-trigger__image {
+    animation: demoCalendarAvatarCuePop 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+}
+.demo-calendar-avatar-trigger--return .demo-calendar-avatar-trigger__image {
+    animation: demoCalendarAvatarCuePop 520ms cubic-bezier(0.22, 1, 0.36, 1) 1 reverse both;
+}
 .demo-calendar-appointment-text {
     transition:
         opacity 190ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -1020,35 +1055,32 @@ main,
     will-change: opacity, transform, filter;
 }
 .demo-calendar-appointment-text--peek-hidden {
-    opacity: 0;
-    transform: translateX(10px);
-    filter: blur(3px);
-}
-.demo-calendar-avatar-trigger--hint::after {
-    content: "";
-    position: absolute;
-    inset: -4px;
-    z-index: 0;
-    border-radius: inherit;
     pointer-events: none;
-    background:
-        radial-gradient(circle, color-mix(in srgb, var(--brandGradientStart) 34%, transparent) 0%, transparent 68%),
-        radial-gradient(circle, color-mix(in srgb, var(--brandGradientEnd) 24%, transparent) 0%, transparent 72%);
-    filter: blur(3px);
-    animation: demoCalendarAvatarHintGlow 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+    animation: demoCalendarTextExit 240ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
 }
-.demo-calendar-avatar-trigger--hint .demo-calendar-avatar-trigger__image {
-    animation: demoCalendarAvatarHint 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+.demo-calendar-appointment-text--return {
+    animation: demoCalendarTextReturn 480ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
 }
-.demo-calendar-avatar-trigger--return .demo-calendar-avatar-trigger__image {
-    animation: demoCalendarAvatarReturn 420ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+.demo-calendar-actions-layer {
+    min-height: 1.7rem;
+}
+.demo-calendar-peek-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    max-width: min(16rem, calc(100vw - 14rem));
+}
+.demo-calendar-peek-action {
+    position: relative;
+    z-index: 1;
+    white-space: nowrap;
 }
 .demo-calendar-actions-peek {
     transform-origin: left center;
     animation: demoCalendarAvatarPeek 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
 }
 .demo-calendar-actions-peek span {
-    text-shadow: 0 0 12px rgba(255, 255, 255, 0.12);
+    text-shadow: none;
 }
 .features-grid-section { padding: 80px 20px; background-color: var(--color-white); display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; max-width: 1300px; margin: 0 auto; position: relative; overflow: hidden; }
 .feature-card {
@@ -1086,7 +1118,25 @@ main,
 .footer-legal { border-top: 1px solid rgba(0, 0, 0, 0.04); padding-top: 25px; margin-top: 25px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; }
 .footer-legal p { margin: 5px 0; font-size: 0.8em; color: var(--color-medium-gray); }
 .footer-legal-links { color: var(--color-medium-gray); font-size: 0.8em; }
-@media (max-width: 768px) { .nav-menu { display: none; } .nav-content { justify-content: center; } .hero-section { padding: 200px 15px 60px; min-height: 550px; } .hero-section h1 { font-size: 3.5em; } .hero-section .hero-headline { font-size: 1.8em; } .hero-section .hero-subheadline { font-size: 1.2em; } .content-section { padding: 70px 15px; } .content-section--showcase { padding: 0; min-height: auto; overflow-x: clip; overflow-y: visible; } .content-section h3 { font-size: 2.8em; } .content-section p { font-size: 1.2em; } .homepage-number-title { font-size: 2.1rem; } .homepage-number-card { padding: 16px 14px 14px; } .homepage-number-step { font-size: 0.8rem; } .homepage-number-copy { max-width: none; font-size: 0.92rem; } .features-grid-section { grid-template-columns: 1fr; } .feature-card { min-height: auto; padding: 40px 25px; } .feature-card h4 { font-size: 2em; } .feature-card p { font-size: 1.05em; } .footer-legal { flex-direction: column; align-items: flex-start; } .footer-legal-links { margin-top: 15px; margin-left: 0; margin-right: 15px; } }
+@media (max-width: 1023px) {
+    .homepage-number-title {
+        font-size: 2.05rem;
+    }
+    .content-section--showcase .calendar-showcase-description {
+        font-size: 0.84rem;
+        line-height: 1.42;
+    }
+    .homepage-demo-watermark,
+    .scenario-demo-showcase .homepage-scenarios-builder .sb-demo-watermark {
+        font-size: 8px;
+        gap: 0.24rem;
+    }
+    .homepage-demo-watermark__desktop {
+        font-size: 0.7em;
+        letter-spacing: 0.1em;
+    }
+}
+@media (max-width: 768px) { .nav-menu { display: none; } .nav-content { justify-content: center; } .hero-section { padding: 200px 15px 60px; min-height: 550px; } .hero-section h1 { font-size: 3.5em; } .hero-section .hero-headline { font-size: 1.8em; } .hero-section .hero-subheadline { font-size: 1.2em; } .content-section { padding: 70px 15px; } .content-section--showcase { padding: 0; min-height: auto; overflow-x: clip; overflow-y: visible; } .content-section h3 { font-size: 2.8em; } .content-section p { font-size: 1.2em; } .homepage-number-title { font-size: 1.82rem; } .content-section--showcase .calendar-showcase-description { font-size: 0.76rem; line-height: 1.38; } .homepage-number-card { padding: 16px 14px 14px; } .homepage-number-step { font-size: 0.8rem; } .homepage-number-copy { max-width: none; font-size: 0.92rem; } .homepage-demo-watermark, .scenario-demo-showcase .homepage-scenarios-builder .sb-demo-watermark { font-size: 7px; gap: 0.2rem; } .features-grid-section { grid-template-columns: 1fr; } .feature-card { min-height: auto; padding: 40px 25px; } .feature-card h4 { font-size: 2em; } .feature-card p { font-size: 1.05em; } .footer-legal { flex-direction: column; align-items: flex-start; } .footer-legal-links { margin-top: 15px; margin-left: 0; margin-right: 15px; } }
 @media (max-width: 480px) { .hero-section { padding: 200px 10px 40px; min-height: 400px; } .hero-section h1 { font-size: 2.5em; } .hero-section .hero-headline { font-size: 1.4em; } .hero-section .hero-subheadline { font-size: 1.1em; } .content-section { padding: 50px 10px; } .content-section--showcase { padding: 0; min-height: auto; overflow-x: clip; overflow-y: visible; } .content-section h3 { font-size: 2.2em; } .content-section p { font-size: 1em; } .feature-card { padding: 30px 20px; } }
 @media (max-width: 1180px) {
     .content-section--booking {
@@ -1385,5 +1435,5 @@ main,
   50% { opacity: 0; }
 }
 .animate-blink {
-  animation: blink 0.7s infinite;
+  animation: blink 0.55s infinite;
 }

@@ -483,82 +483,6 @@ const createInitialRows = () => [
   }, '2026-06-07T18:16:10.433Z'),
 ];
 
-const HomepagePeopleCrmMobilePreview = ({ rows, selectedId, onSelect }) => {
-  const previewRows = rows.slice(0, 4);
-  const activeRow = previewRows.find((row) => row.id === selectedId) || previewRows[0];
-
-  if (!activeRow) return null;
-
-  const fields = activeRow.custom_fields || {};
-  const initials = `${activeRow.first_name?.[0] || ''}${activeRow.last_name?.[0] || ''}`.toUpperCase();
-  const lifetimeValue = Number(fields.custom_number_1782003711752);
-  const recordDetails = [
-    { label: 'Membership', value: fields.custom_membership_status || 'Active' },
-    { label: 'Stylist', value: fields.custom_preferred_stylist || 'No preference' },
-    { label: 'Service', value: fields.custom_primary_service_category || 'Client profile' },
-    { label: 'Lifetime value', value: Number.isFinite(lifetimeValue) ? `$${lifetimeValue.toLocaleString()}` : '—' },
-  ];
-
-  return (
-    <div className="flex h-full w-full items-center justify-center px-5 pt-8 sm:px-8">
-      <section className="w-full max-w-[42rem] rounded-[26px] border border-white/[0.08] bg-[#0b0b0c]/95 p-4 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] sm:p-5">
-        <header className="flex items-center justify-between border-b border-white/[0.06] pb-3 text-left">
-          <div>
-            <div className="text-[9px] font-bold uppercase tracking-[0.22em] text-zinc-500">Customer records</div>
-            <div className="mt-1 text-sm font-semibold tracking-[-0.02em] text-zinc-100">A closer view of every client</div>
-          </div>
-          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-400">Live profile</span>
-        </header>
-
-        <div className="relative mt-4 overflow-hidden rounded-[20px] border border-white/[0.08] bg-gradient-to-br from-zinc-900 via-[#101012] to-zinc-950 p-4 text-left shadow-[0_18px_42px_-26px_rgba(217,70,239,0.36)] sm:p-5">
-          <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-[var(--brandGradientStart)] to-transparent" />
-          <div className="absolute -right-16 -top-20 h-44 w-44 rounded-full bg-[var(--brandGradientEnd)] opacity-[0.09] blur-3xl" />
-          <div className="relative flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.12] bg-white/[0.05] text-sm font-bold tracking-tight text-white shadow-[0_0_22px_rgba(255,255,255,0.06)]">{initials}</span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-lg font-semibold tracking-[-0.04em] text-white">{activeRow.first_name} {activeRow.last_name}</div>
-              <div className="mt-1 truncate text-[11px] font-medium text-zinc-500">{activeRow.email || activeRow.phone || 'Client record'}</div>
-            </div>
-            <span className="rounded-full border border-emerald-300/15 bg-emerald-300/[0.07] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-200">Active</span>
-          </div>
-
-          <div className="relative mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-white/[0.06] pt-4">
-            {recordDetails.map((detail) => (
-              <div key={detail.label} className="min-w-0">
-                <div className="text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-600">{detail.label}</div>
-                <div className="mt-1 truncate text-xs font-semibold tracking-[-0.02em] text-zinc-200">{detail.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2" role="listbox" aria-label="Choose a customer record">
-          {previewRows.map((row) => {
-            const isActive = row.id === activeRow.id;
-            return (
-              <button
-                key={row.id}
-                type="button"
-                role="option"
-                aria-selected={isActive}
-                onClick={() => onSelect(row.id)}
-                className={`min-h-[46px] rounded-xl border px-3 py-2 text-left transition-colors ${
-                  isActive
-                    ? 'border-white/[0.18] bg-white/[0.08] text-white shadow-[0_0_18px_rgba(217,70,239,0.12)]'
-                    : 'border-white/[0.06] bg-white/[0.025] text-zinc-500 active:bg-white/[0.06]'
-                }`}
-              >
-                <span className="block truncate text-[11px] font-semibold tracking-[-0.02em]">{row.first_name} {row.last_name}</span>
-                <span className="mt-0.5 block text-[8px] font-bold uppercase tracking-[0.15em] text-zinc-600">View record</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-    </div>
-  );
-};
-
 const HomepagePeopleCrmDemo = ({ className = '', entranceActive = false, onDemoLimitExceeded, onDemoSchemaChange }) => {
   const [rows, setRows] = useState(() => createInitialRows());
   const [selectedId, setSelectedId] = useState(null);
@@ -566,16 +490,6 @@ const HomepagePeopleCrmDemo = ({ className = '', entranceActive = false, onDemoL
   const [justAddedIds, setJustAddedIds] = useState([]);
   const [entranceComplete, setEntranceComplete] = useState(false);
   const [entranceStarted, setEntranceStarted] = useState(false);
-  const [isCompactViewport, setIsCompactViewport] = useState(() => (
-    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
-  ));
-
-  React.useEffect(() => {
-    const updateViewport = () => setIsCompactViewport(window.innerWidth < 1024);
-    updateViewport();
-    window.addEventListener('resize', updateViewport);
-    return () => window.removeEventListener('resize', updateViewport);
-  }, []);
 
   React.useEffect(() => {
     if (rows.length > 14) {
@@ -643,39 +557,36 @@ const HomepagePeopleCrmDemo = ({ className = '', entranceActive = false, onDemoL
 
   return (
     <div className={`relative h-full w-full bg-[#020202] crm-demo-entrance ${entranceStarted ? 'has-started' : 'is-waiting'} ${entranceComplete ? 'is-loaded' : 'is-entering'} ${className}`}>
-      {isCompactViewport ? (
-        <HomepagePeopleCrmMobilePreview rows={filteredRows} selectedId={selectedId} onSelect={setSelectedId} />
-      ) : (
-        <LeadsTable
-          leads={filteredRows}
-          loading={false}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          justAddedLeadIds={justAddedIds}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          sourceFilter="All"
-          onSourceFilterChange={() => {}}
-          sortBy="updated_at"
-          sortDir="desc"
-          onSort={() => {}}
-          totalCount={rows.length}
-          onCreateInline={handleCreate}
-          onDeleteMany={handleDeleteMany}
-          onUpdateLead={handleUpdate}
-          demoMode
-          demoInitialCustomFields={DEMO_CUSTOM_FIELDS}
-          demoInitialFieldConfig={DEMO_FIELD_CONFIG}
-          demoInitialColorbarRules={DEMO_COLORBAR_RULES}
-          demoInitialViewSettings={{ rowHeight: 3, sortRules: [], frozenCount: 0 }}
-          demoEntrance
-          onSchemaChange={onDemoSchemaChange}
-          hideTitle
-          searchPlaceholder="Search records..."
-        />
-      )}
-      <div className={`pointer-events-none absolute left-0 right-0 px-8 text-center text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-700/80 ${isCompactViewport ? 'bottom-8' : 'bottom-[120px]'}`}>
-        Demonstration purposes only
+      <LeadsTable
+        leads={filteredRows}
+        loading={false}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        justAddedLeadIds={justAddedIds}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        sourceFilter="All"
+        onSourceFilterChange={() => {}}
+        sortBy="updated_at"
+        sortDir="desc"
+        onSort={() => {}}
+        totalCount={rows.length}
+        onCreateInline={handleCreate}
+        onDeleteMany={handleDeleteMany}
+        onUpdateLead={handleUpdate}
+        demoMode
+        demoInitialCustomFields={DEMO_CUSTOM_FIELDS}
+        demoInitialFieldConfig={DEMO_FIELD_CONFIG}
+        demoInitialColorbarRules={DEMO_COLORBAR_RULES}
+        demoInitialViewSettings={{ rowHeight: 3, sortRules: [], frozenCount: 0 }}
+        demoEntrance
+        onSchemaChange={onDemoSchemaChange}
+        hideTitle
+        searchPlaceholder="Search records..."
+      />
+      <div className="homepage-demo-watermark pointer-events-none absolute bottom-[120px] left-0 right-0 px-8 text-center font-semibold uppercase text-zinc-700/80">
+        <span className="homepage-demo-watermark__primary">Demonstration purposes only</span>
+        <span className="homepage-demo-watermark__desktop">View on desktop for the full experience.</span>
       </div>
     </div>
   );
