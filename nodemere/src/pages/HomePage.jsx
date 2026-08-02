@@ -536,7 +536,7 @@ const ComparisonShowcase = () => {
       return undefined;
     }
 
-    const duration = 1750;
+    const duration = 1400;
     const startedAt = performance.now();
     let frame = null;
     let revealTimer = null;
@@ -563,9 +563,9 @@ const ComparisonShowcase = () => {
   const comparisonProgress = mondayRevealComplete
     ? clamp((sectionProgress - timelineStartProgress) / Math.max(1 - timelineStartProgress, 0.01), 0, 1)
     : 0;
-  const timelineProgress = clamp(comparisonProgress / 0.62, 0, 1);
+  const timelineProgress = clamp(comparisonProgress / 0.72, 0, 1);
   const scrollStep = Math.min(6, Math.floor(timelineProgress * 7));
-  const finaleProgress = clamp((comparisonProgress - 0.62) / 0.38, 0, 1);
+  const finaleProgress = clamp((comparisonProgress - 0.72) / 0.28, 0, 1);
 
   useEffect(() => {
     if (!introExited || mondayRevealComplete) return undefined;
@@ -589,7 +589,7 @@ const ComparisonShowcase = () => {
   }, [sectionProgress]);
 
   return (
-    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[430vh]">
+    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[560vh]">
       <div className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
         <div
           className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${

@@ -410,7 +410,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
         </motion.div>
       </main>
 
-      <div className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap text-[10px] uppercase tracking-widest text-white/10">Results may vary</div>
+      <div className="comparison-results-disclaimer pointer-events-none fixed left-1/2 z-50 -translate-x-1/2 whitespace-nowrap uppercase text-white/10">Results may vary</div>
     </div>
   );
 }

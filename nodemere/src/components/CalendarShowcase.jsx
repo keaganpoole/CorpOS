@@ -730,7 +730,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     );
 
     return (
-      <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[170vh]' : 'h-[250vh]'}`}>
+      <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[230vh]' : 'h-[340vh]'}`}>
         <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
           <div
             className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
@@ -878,7 +878,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   }
 
   return (
-    <div ref={rootRef} className="calendar-showcase relative h-[225vh] w-full lg:h-[225vh]">
+    <div ref={rootRef} className="calendar-showcase relative h-[285vh] w-full lg:h-[285vh]">
       <div ref={stickyRef} className="sticky top-0 flex h-screen items-center overflow-hidden">
         <div className="relative z-10 mx-auto w-full max-w-[1300px] px-6 md:px-10 lg:px-12">
           <div className="calendar-booking-layout grid min-h-[700px] grid-cols-1 items-center gap-8 md:gap-10 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] lg:gap-24">

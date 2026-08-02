@@ -176,6 +176,18 @@
 .header {
     width: 100%; background: transparent !important; background-image: none !important; position: fixed; top: 0; left: 0; z-index: 1000; border-bottom: none; padding: 0 55px;
 }
+.header.is-visible {
+    background: #020202 !important;
+    background-image: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+}
+.comparison-results-disclaimer {
+    bottom: 10px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+}
 .nav-content {
     display: flex; align-items: center; max-width: 980px; margin: 0 auto; height: 50px; position: relative;
 }
@@ -1170,6 +1182,9 @@ main,
     }
 }
 @media (max-width: 1023px) {
+    .comparison-section > header {
+        padding-top: 4rem !important;
+    }
     .scenario-demo-showcase .homepage-scenarios-builder .sb-canvas {
         touch-action: pan-y;
     }
@@ -1199,6 +1214,14 @@ main,
     }
 }
 @media (max-width: 767px) {
+    .comparison-results-disclaimer {
+        bottom: 6px;
+        font-size: 7px;
+        letter-spacing: 0.18em;
+    }
+    .comparison-section > header {
+        padding-top: 4.75rem !important;
+    }
     .content-section--booking {
         padding-top: clamp(5.5rem, 12vh, 8.5rem);
     }
