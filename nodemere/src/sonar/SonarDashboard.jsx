@@ -39,6 +39,7 @@ import {
   Navigation,
   Search,
   Star,
+  Info,
   X,
   Trash2,
   Webhook,
@@ -46,6 +47,7 @@ import {
   Phone,
   Copy,
   CheckCircle2,
+  Check,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -75,6 +77,362 @@ import logoImage from '../assets/logo.png';
 const DASHBOARD_ROUTE_STORAGE_KEY = 'sonar-dashboard-route';
 const DEFAULT_DASHBOARD_ROUTE = 'live-monitoring';
 const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'settings'];
+const POPUP_DISMISS_PERSISTS_SHOWN = false;
+
+const formatPlanName = (plan) => {
+  const rawPlanName = String(plan || 'Free').trim() || 'Free';
+  return rawPlanName
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(' ') || 'Free';
+};
+
+const PLAN_SUMMARIES = {
+  free: 'a simple way to start exploring your AI front desk',
+  essentials: 'the core setup for a 24/7 AI front desk',
+  pro: 'more automation and flexibility for busier teams',
+  ultra: 'maximum scale, support, and front desk power',
+};
+
+const getPlanSummary = (plan) => {
+  const key = String(plan || 'free').trim().toLowerCase().replace(/\s+/g, '_');
+  return PLAN_SUMMARIES[key] || PLAN_SUMMARIES.free;
+};
+
+const POPUP_DEFINITIONS = [
+  {
+    id: 'dashboard_welcome',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Welcome to Nodemere',
+    emoji: '🎉',
+    getDescription: ({ profile }) => {
+      const planName = formatPlanName(profile?.plan);
+      return `Welcome to Nodemere. You're on the ${planName} plan, which gives your front desk ${getPlanSummary(planName)}. This dashboard is where your AI receptionists, calls, calendar, people, and workflows come together so you can start building a sharper front desk operation.`;
+    },
+    primaryActionLabel: 'Got it!',
+  },
+  {
+    id: 'tasklist_intro',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Getting Started',
+    manualOnly: true,
+    getDescription: () => '',
+    renderContent: () => (
+      <div className="mt-5 space-y-3 text-left">
+        <p className="text-center text-sm leading-6 text-zinc-500">
+          Getting Started keeps the account focused on the setup work that makes the front desk ready to operate.
+        </p>
+        <div className="grid gap-2">
+          {[
+            ['Tracks readiness', 'Business details, receptionists, staff, phone forwarding, and intake setup are grouped into a short path.'],
+            ['Updates automatically', 'The checklist is read-only. Once backend wiring is added, items will complete from real account activity.'],
+            ['Guides each step', 'Use the small info buttons beside subtasks to open video help and written instructions.'],
+          ].map(([label, body]) => (
+            <div key={label} className="rounded-2xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
+              <p className="text-[12px] font-semibold tracking-[-0.02em] text-white">{label}</p>
+              <p className="mt-1 text-[12px] leading-5 text-zinc-500">{body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+    primaryActionLabel: 'Got it!',
+  },
+  {
+    id: 'receptionists_team_welcome',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Meet Your Team',
+    emoji: '👥',
+    getDescription: () => 'This is your front desk roster. Hire AI receptionists, review who is active, and keep the people handling your calls organized in one place so your operation stays clean and easy to manage.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute }) => currentRoute === 'receptionists',
+  },
+  {
+    id: 'receptionists_empty_roster',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Hire Your First Receptionist',
+    emoji: '✨',
+    getDescription: () => 'Your roster is empty right now. Add your first AI receptionist so Nodemere has someone ready to answer calls, represent your business, and start taking real work off your front desk.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute, teamView, agentsLoading, receptionistCount }) => (
+      currentRoute === 'receptionists' &&
+      teamView === 'receptionists' &&
+      !agentsLoading &&
+      receptionistCount === 0
+    ),
+  },
+  {
+    id: 'receptionists_staff_tab',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Add Your Staff',
+    emoji: '🪪',
+    getDescription: () => 'Staff are the real people your AI receptionist can book with, recommend, or route calls to. Add them here so scheduling, availability, and call handling match how your team actually works.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute, teamView }) => (
+      currentRoute === 'receptionists' &&
+      teamView === 'staff'
+    ),
+  },
+  {
+    id: 'receptionists_archived_tab',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Archived Receptionists',
+    emoji: '🗂️',
+    getDescription: () => 'Archived receptionists are removed from active use without erasing their history. This keeps your live roster focused while preserving the context you may need later.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute, teamView }) => (
+      currentRoute === 'receptionists' &&
+      teamView === 'archived'
+    ),
+  },
+  {
+    id: 'receptionists_first_hire',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Receptionist Hired',
+    emoji: '🎉',
+    getDescription: () => 'Your AI receptionist is now on the team. Next, give them the right instructions and connect the workflows that help them turn calls into real outcomes.',
+    primaryActionLabel: 'Got it!',
+    shouldShow: ({ currentRoute, recentlyHiredReceptionist, showHireModal }) => (
+      currentRoute === 'receptionists' &&
+      recentlyHiredReceptionist &&
+      !showHireModal
+    ),
+  },
+  {
+    id: 'calendar_intro',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Calendar',
+    emoji: '📅',
+    getDescription: () => 'This is where appointments live across your business. As your receptionists book, reschedule, or update appointments, the calendar becomes the operational source of truth for your front desk.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute }) => currentRoute === 'calendar',
+  },
+  {
+    id: 'calendar_first_appointment',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'First Appointment Booked',
+    emoji: '🎉',
+    getDescription: () => 'Your calendar has started filling up. Open appointments to review the details, confirm the booking context, and keep your front desk schedule clean.',
+    primaryActionLabel: 'Got it!',
+    shouldShow: ({ currentRoute, calendarCount, calendarLoading }) => currentRoute === 'calendar' && !calendarLoading && calendarCount > 0,
+  },
+  {
+    id: 'people_intro',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'People CRM',
+    emoji: '👤',
+    getDescription: () => 'People is your customer memory layer. Caller details, appointment history, notes, and records live here so your receptionists can recognize customers instead of starting from scratch.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute }) => currentRoute === 'pipeline',
+  },
+  {
+    id: 'people_first_contact',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'First Contact Added',
+    emoji: '🎉',
+    getDescription: () => 'Your CRM is starting to build. As more people are added, your receptionists get better context for calls, bookings, follow-ups, and customer-specific service.',
+    primaryActionLabel: 'Got it!',
+    shouldShow: ({ currentRoute, peopleCount, peopleLoading }) => currentRoute === 'pipeline' && !peopleLoading && peopleCount > 0,
+  },
+  {
+    id: 'scenarios_trigger_intro',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Triggers Start The Workflow',
+    emoji: '🔔',
+    getDescription: () => 'A trigger is the event that starts a scenario. Choose the moment carefully: incoming calls, appointment changes, record updates, or scheduled timing determine when the rest of the workflow runs.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute, scenarioTriggerPlaced }) => currentRoute === 'scenarios' && scenarioTriggerPlaced,
+  },
+  {
+    id: 'scenarios_action_intro',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Actions Do The Work',
+    emoji: '🧩',
+    getDescription: () => 'Actions are the steps that happen after the trigger fires. Use them to call, message, update records, create appointments, process payments, or branch the workflow into the right outcome.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute, scenarioActionPlaced }) => currentRoute === 'scenarios' && scenarioActionPlaced,
+  },
+  {
+    id: 'live_monitoring_intro',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Live Monitoring',
+    emoji: '📡',
+    getDescription: () => 'Live Monitoring is where you watch front desk activity as it happens. When calls are active, this page helps you understand what your receptionists are doing in real time.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute }) => currentRoute === 'live-monitoring',
+  },
+  {
+    id: 'live_monitoring_first_call',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'First Live Call Seen',
+    emoji: '🎉',
+    getDescription: () => 'You have seen your front desk in motion. Use live activity to understand how calls flow, where customers need help, and where automation can get sharper.',
+    primaryActionLabel: 'Got it!',
+    shouldShow: ({ currentRoute, liveCallSeen }) => currentRoute === 'live-monitoring' && liveCallSeen,
+  },
+  {
+    id: 'call_logs_intro',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'Call Logs',
+    emoji: '☎️',
+    getDescription: () => 'Call Logs are the permanent record of your front desk conversations. Use them to review outcomes, understand customer context, and spot patterns across inbound and outbound calls.',
+    primaryActionLabel: 'Got it!',
+    showDontRemindMe: true,
+    shouldShow: ({ currentRoute }) => currentRoute === 'call-logs',
+  },
+  {
+    id: 'call_logs_first_logged',
+    type: 'general',
+    placement: 'dashboard',
+    title: 'First Call Logged',
+    emoji: '🎉',
+    getDescription: () => 'Your call history is now building. Open a log to review the conversation, check the outcome, and use the record to improve how your front desk handles future calls.',
+    primaryActionLabel: 'Got it!',
+    shouldShow: ({ currentRoute, callLogsCount, callLogsLoading }) => currentRoute === 'call-logs' && !callLogsLoading && callLogsCount > 0,
+  },
+];
+
+const getPopupState = (profilePopups, popupId) => {
+  const popupState = profilePopups && typeof profilePopups === 'object' ? profilePopups[popupId] : null;
+  return {
+    type: popupState?.type || POPUP_DEFINITIONS.find((popup) => popup.id === popupId)?.type || 'general',
+    shown: popupState?.shown === true,
+    hide: popupState?.hide === true,
+  };
+};
+
+const TASKLIST_VIDEO_PLACEHOLDER = 'https://www.youtube.com/embed/ysz5S6PUM-U';
+
+const TASKLIST_DEFINITIONS = [
+  {
+    id: 'business_setup',
+    title: 'Complete business setup',
+    subtasks: [
+      {
+        id: 'basic_info',
+        title: 'Add basic info',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Add Basic Business Info',
+        instruction:
+          'Open Settings, go to Business, and fill in the core details customers expect your receptionist to know. Add the business name, phone, email, and location details, then save the page so calls, bookings, and records can reference the right account information.',
+      },
+      {
+        id: 'business_hours',
+        title: 'Set business hours',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Set Business Hours',
+        instruction:
+          'Open Settings and update the Hours section to match when your business is available. These hours help your receptionist understand when to book appointments, when to route calls, and when customers should expect a response.',
+      },
+    ],
+  },
+  {
+    id: 'first_receptionist',
+    title: 'Hire your first receptionist',
+    subtasks: [
+      {
+        id: 'hire_receptionist',
+        title: 'Hire a receptionist',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Hire A Receptionist',
+        instruction:
+          'Open Receptionists and click New Receptionist. Choose the receptionist that best fits your front desk, complete the hire flow, and confirm they appear in your active team before moving on.',
+      },
+      {
+        id: 'set_role',
+        title: 'Set role',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Set The Receptionist Role',
+        instruction:
+          'Use the receptionist card controls to define whether this receptionist handles inbound calls, outbound calls, or both. The role should match how you expect them to operate day to day.',
+      },
+    ],
+  },
+  {
+    id: 'staff_setup',
+    title: 'Add staff',
+    subtasks: [
+      {
+        id: 'add_staff_member',
+        title: 'Add a staff member',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Add A Staff Member',
+        instruction:
+          'Open Receptionists, switch to Staff, and add a real team member your receptionist can book with or route callers to. Include the basic contact details so the staff record is useful during scheduling and handoff.',
+      },
+      {
+        id: 'staff_availability',
+        title: 'Set staff availability',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Set Staff Availability',
+        instruction:
+          'Inside the staff modal, open the schedule step and set the days and times this person can accept appointments. Accurate availability keeps bookings aligned with how the team actually works.',
+      },
+    ],
+  },
+  {
+    id: 'phone_setup',
+    title: 'Connect a phone number',
+    subtasks: [
+      {
+        id: 'assign_receptionist_number',
+        title: 'Choose or assign the receptionist number',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Choose The Receptionist Number',
+        instruction:
+          'Open the forwarding setup and choose the number your business line will forward into. This becomes the receptionist number that receives calls after forwarding is enabled.',
+      },
+      {
+        id: 'forward_business_line',
+        title: 'Forward the business line to that number',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Forward The Business Line',
+        instruction:
+          'Open your phone provider settings, enable call forwarding, and forward your business line to the receptionist number shown in Nodemere. Save the provider settings so incoming calls can reach the AI receptionist.',
+      },
+    ],
+  },
+  {
+    id: 'intake_fields',
+    title: 'Set intake fields',
+    subtasks: [
+      {
+        id: 'set_intake_field',
+        title: 'Set an intake field',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Set An Intake Field',
+        instruction:
+          'Open People and configure the field you want captured during intake. Start with one important field your receptionist should collect consistently, then expand the intake setup once the core flow feels right.',
+      },
+    ],
+  },
+];
 
 function getInitialDashboardRoute() {
   if (typeof window === 'undefined') return DEFAULT_DASHBOARD_ROUTE;
@@ -694,6 +1052,339 @@ const PlaceholderView = ({ title, body }) => (
 );
 
 // ─── Main SonarDashboard Component ────────────────────────────────────────
+const PopupModal = ({ popup, profile, onClose }) => {
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {popup && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
+          onClick={onClose}
+        >
+          <motion.section
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 16, scale: 0.98 }}
+          onClick={(event) => event.stopPropagation()}
+          className="relative flex max-h-[calc(100vh-24px)] w-full max-w-[520px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+        >
+          <div className="relative flex flex-1 flex-col p-6 sm:p-8">
+            <div className="mb-6 flex items-start justify-between gap-5">
+              <div className="min-w-0 flex-1 pl-8 text-center">
+                <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
+                  {popup.title}{popup.emoji ? ` ${popup.emoji}` : ''}
+                </h2>
+                {typeof popup.renderContent === 'function' ? (
+                  popup.renderContent({ profile })
+                ) : (
+                  <p className="mt-3 w-full max-w-none text-sm leading-6 text-zinc-500">
+                    {popup.getDescription({ profile })}
+                  </p>
+                )}
+                </div>
+                <button type="button" onClick={onClose} className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white">
+                  <X size={16} />
+              </button>
+            </div>
+
+              {popup.showDontRemindMe && (
+                <label className="mx-auto mt-8 flex items-center justify-center gap-2 text-[11px] font-normal text-zinc-500">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border-white/[0.12] bg-white/[0.035] accent-white"
+                    onClick={(event) => event.stopPropagation()}
+                    onChange={() => {}}
+                  />
+                  <span>Don't remind me again</span>
+                </label>
+              )}
+              <div className={`${popup.showDontRemindMe ? 'mt-4' : 'mt-8'} flex justify-center`}>
+                <button type="button" onClick={onClose} className="h-12 rounded-full bg-white px-10 text-sm font-bold text-black transition hover:bg-zinc-200">
+                  {popup.primaryActionLabel || 'Got it!'}
+                </button>
+              </div>
+            </div>
+          </motion.section>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  );
+};
+
+const TasklistInstructionModal = ({ subtask, onClose }) => {
+  if (typeof document === 'undefined' || !subtask) return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {subtask && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
+          onClick={onClose}
+        >
+          <motion.section
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
+            onClick={(event) => event.stopPropagation()}
+            className="relative w-full max-w-[620px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          >
+            <div className="flex items-start justify-between gap-5 p-6 pb-4 sm:p-8 sm:pb-5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-600">Task guide</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
+                  {subtask.instructionTitle}
+                </h2>
+              </div>
+              <button type="button" onClick={onClose} className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-6 pb-6 sm:px-8 sm:pb-8">
+              <div className="aspect-video overflow-hidden rounded-2xl border border-white/[0.08] bg-black">
+                <iframe
+                  className="h-full w-full"
+                  src={subtask.videoUrl}
+                  title={subtask.instructionTitle}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+              <p className="mt-5 text-sm leading-6 text-zinc-500">
+                {subtask.instruction}
+              </p>
+            </div>
+          </motion.section>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  );
+};
+
+const TasklistWidget = ({ tasklistState = null, onOpenIntro = null }) => {
+  const [open, setOpen] = useState(false);
+  const [activeTaskIndex, setActiveTaskIndex] = useState(0);
+  const [previewCompletedSubtasks, setPreviewCompletedSubtasks] = useState(() => new Set());
+  const [activeInstruction, setActiveInstruction] = useState(null);
+  const tasklist = tasklistState && typeof tasklistState === 'object' ? tasklistState : {};
+  const activeTask = TASKLIST_DEFINITIONS[activeTaskIndex] || TASKLIST_DEFINITIONS[0];
+
+  const isSubtaskComplete = useCallback((taskId, subtaskId) => {
+    const taskState = tasklist[taskId] || {};
+    const subtaskState = taskState.subtasks?.[subtaskId] || {};
+    return subtaskState.completed === true || previewCompletedSubtasks.has(`${taskId}.${subtaskId}`);
+  }, [previewCompletedSubtasks, tasklist]);
+
+  const completedCount = TASKLIST_DEFINITIONS.reduce((count, task) => (
+    count + task.subtasks.filter((subtask) => isSubtaskComplete(task.id, subtask.id)).length
+  ), 0);
+  const totalCount = TASKLIST_DEFINITIONS.reduce((count, task) => count + task.subtasks.length, 0);
+  const overallProgress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+  const activeTaskCompletedSubtasks = activeTask.subtasks.filter((subtask) => isSubtaskComplete(activeTask.id, subtask.id)).length;
+  const activeTaskCompletionRatio = activeTask.subtasks.length > 0 ? activeTaskCompletedSubtasks / activeTask.subtasks.length : 0;
+  const taskRingRadius = 13;
+  const taskRingCircumference = 2 * Math.PI * taskRingRadius;
+  const taskRingDashOffset = taskRingCircumference - (activeTaskCompletionRatio * taskRingCircumference);
+
+  const goToPreviousTask = () => setActiveTaskIndex((index) => Math.max(0, index - 1));
+  const goToNextTask = () => setActiveTaskIndex((index) => Math.min(TASKLIST_DEFINITIONS.length - 1, index + 1));
+  const activeTaskComplete = activeTask.subtasks.every((subtask) => isSubtaskComplete(activeTask.id, subtask.id));
+
+  const togglePreviewSubtask = (taskId, subtaskId) => {
+    const key = `${taskId}.${subtaskId}`;
+    setPreviewCompletedSubtasks((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const checkFirstTwoPreviewSubtasks = () => {
+    setPreviewCompletedSubtasks((current) => {
+      const next = new Set(current);
+      activeTask.subtasks.slice(0, 2).forEach((subtask) => {
+        next.add(`${activeTask.id}.${subtask.id}`);
+      });
+      return next;
+    });
+  };
+
+  return (
+    <>
+      <svg width="0" height="0" className="absolute">
+        <defs>
+          <linearGradient id="tasklistCheckGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--brandGradientStart)" />
+            <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="fixed bottom-6 right-6 z-[1100] flex w-[min(328px,calc(100vw-48px))] flex-col items-end">
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="mb-3 w-full overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_22px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+            >
+              <div className="h-[3px] w-full overflow-hidden bg-white/[0.06]">
+                <div className="h-full brand-gradient transition-all duration-500" style={{ width: `${overallProgress}%` }} />
+              </div>
+              <div className="px-4 py-4">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={activeTask.id}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ duration: 0.16, ease: 'easeOut' }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center">
+                        <svg className="absolute inset-0 h-8 w-8 -rotate-90" viewBox="0 0 32 32" aria-hidden="true">
+                          <circle
+                            cx="16"
+                            cy="16"
+                            r={taskRingRadius}
+                            fill="none"
+                            stroke="rgba(255,255,255,0.10)"
+                            strokeWidth="1.5"
+                          />
+                          <circle
+                            cx="16"
+                            cy="16"
+                            r={taskRingRadius}
+                            fill="none"
+                            stroke="url(#tasklistCheckGradient)"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeDasharray={taskRingCircumference}
+                            strokeDashoffset={taskRingDashOffset}
+                            className="transition-[stroke-dashoffset] duration-500"
+                          />
+                        </svg>
+                        <Check
+                          size={14}
+                          className={activeTaskComplete ? '' : 'text-white/10'}
+                          style={activeTaskComplete ? { stroke: 'url(#tasklistCheckGradient)' } : undefined}
+                        />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Getting Started</p>
+                        <h2 className={`mt-0.5 text-[15px] font-semibold tracking-[-0.03em] ${activeTaskComplete ? 'text-zinc-600 line-through' : 'text-white'}`}>{activeTask.title}</h2>
+                        <p className="mt-1 text-[11px] font-medium text-zinc-500">{completedCount}/{totalCount} completed</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={checkFirstTwoPreviewSubtasks}
+                        className="shrink-0 rounded-full border border-white/[0.08] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-300"
+                      >
+                        Test
+                      </button>
+                    </div>
+                    <div className="mt-4">
+                      {activeTask.subtasks.map((subtask) => {
+                        const complete = isSubtaskComplete(activeTask.id, subtask.id);
+                        return (
+                          <div key={subtask.id} className="flex items-center gap-2 rounded-xl px-1.5 py-1">
+                            <button
+                              type="button"
+                              onClick={() => togglePreviewSubtask(activeTask.id, subtask.id)}
+                              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition hover:bg-white/[0.04]"
+                              aria-label={`Preview ${subtask.title} as ${complete ? 'incomplete' : 'complete'}`}
+                            >
+                              <Check
+                                size={11}
+                                strokeWidth={3}
+                                className={complete ? '' : 'text-white/10'}
+                                style={complete ? { stroke: 'url(#tasklistCheckGradient)' } : undefined}
+                              />
+                            </button>
+                            <span className={`min-w-0 flex-1 truncate text-[12px] leading-5 ${complete ? 'text-zinc-600 line-through' : 'text-zinc-400'}`}>
+                              {subtask.title}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setActiveInstruction(subtask);
+                              }}
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-zinc-600 transition hover:bg-white/[0.04] hover:text-zinc-300"
+                              aria-label={`Open instructions for ${subtask.title}`}
+                            >
+                              <Info size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+                <div className="mt-4 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={goToPreviousTask}
+                    disabled={activeTaskIndex === 0}
+                    className="rounded-full px-3 py-2 text-[11px] font-semibold text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-300 disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goToNextTask}
+                    disabled={activeTaskIndex === TASKLIST_DEFINITIONS.length - 1}
+                    className="rounded-full bg-white px-4 py-2 text-[11px] font-bold text-black transition hover:bg-zinc-200 disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((value) => !value);
+            onOpenIntro?.();
+          }}
+          className="w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#070707]/95 text-left shadow-[0_14px_44px_rgba(0,0,0,0.38)] backdrop-blur-xl transition hover:bg-white/[0.035]"
+          aria-expanded={open}
+        >
+          <div className="flex h-9 items-center gap-3 px-3">
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.02em] text-white">Getting Started</span>
+            <span className="shrink-0 text-[10px] font-medium text-zinc-500">{completedCount}/{totalCount}</span>
+            {open ? <ChevronDown size={14} className="shrink-0 text-zinc-500" /> : <ChevronUp size={14} className="shrink-0 text-zinc-500" />}
+          </div>
+          <div className="h-[3px] w-full overflow-hidden bg-white/[0.06]">
+            <div className="h-full brand-gradient transition-all duration-500" style={{ width: `${overallProgress}%` }} />
+          </div>
+          {!open && (
+            <div className="px-3 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-600">Next task</p>
+              <p className={`mt-0.5 truncate text-[12px] font-medium tracking-[-0.01em] ${activeTaskComplete ? 'text-zinc-600 line-through' : 'text-zinc-400'}`}>
+                {activeTask.title}
+              </p>
+            </div>
+          )}
+        </button>
+      </div>
+      <TasklistInstructionModal subtask={activeInstruction} onClose={() => setActiveInstruction(null)} />
+    </>
+  );
+};
+
 const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSettings, onUpgrade }) => {
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
@@ -887,7 +1578,7 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
 };
 
 const SonarDashboard = () => {
-  const { session: authSession, profile } = useAuth();
+  const { session: authSession, profile, refreshProfile } = useAuth();
   const [currentRoute, setCurrentRoute] = useState(getInitialDashboardRoute);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [glitch, setGlitch] = useState(false);
@@ -906,10 +1597,73 @@ const SonarDashboard = () => {
   const [teamView, setTeamView] = useState('receptionists');
   const [peopleToolbarMeta, setPeopleToolbarMeta] = useState({ count: 0, loading: true });
   const [calendarToolbarMeta, setCalendarToolbarMeta] = useState({ count: 0, loading: true });
+  const [scenariosToolbarMeta, setScenariosToolbarMeta] = useState({ count: 0, loading: true });
+  const [callLogsToolbarMeta, setCallLogsToolbarMeta] = useState({ count: 0, loading: true });
   const [terminateAgentHasAppointments, setTerminateAgentHasAppointments] = useState(false);
   const [archivedAgents, setArchivedAgents] = useState([]);
   const [archivedAgentsLoading, setArchivedAgentsLoading] = useState(false);
+  const [dismissedPopupIds, setDismissedPopupIds] = useState([]);
+  const [manualPopupId, setManualPopupId] = useState(null);
+  const [recentlyHiredReceptionist, setRecentlyHiredReceptionist] = useState(false);
+  const [scenarioTriggerPlaced, setScenarioTriggerPlaced] = useState(false);
+  const [scenarioActionPlaced, setScenarioActionPlaced] = useState(false);
   const userId = authSession?.user?.id || profile?.id || null;
+
+  const dismissPopup = useCallback(async (popup) => {
+    if (!popup) return;
+    setManualPopupId((currentId) => (currentId === popup.id ? null : currentId));
+    const nextDismissedPopupIds = dismissedPopupIds.includes(popup.id)
+      ? dismissedPopupIds
+      : [...dismissedPopupIds, popup.id];
+    setDismissedPopupIds(nextDismissedPopupIds);
+
+    if (!POPUP_DISMISS_PERSISTS_SHOWN || !userId) return;
+
+    const currentPopups = profile?.popups && typeof profile.popups === 'object' ? profile.popups : {};
+    const nextPopups = nextDismissedPopupIds.reduce((popups, popupId) => {
+      const definition = POPUP_DEFINITIONS.find((candidate) => candidate.id === popupId);
+      const currentPopupState = getPopupState(popups, popupId);
+      return {
+        ...popups,
+        [popupId]: {
+          ...currentPopupState,
+          type: definition?.type || currentPopupState.type,
+          shown: true,
+        },
+      };
+    }, currentPopups);
+
+    const { error } = await supabase
+      .from('users')
+      .update({ popups: nextPopups })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('[Popups] Failed to update popup state:', error);
+      return;
+    }
+
+    refreshProfile?.();
+  }, [dismissedPopupIds, profile?.popups, refreshProfile, userId]);
+
+  useEffect(() => {
+    setDismissedPopupIds([]);
+    setManualPopupId(null);
+    setRecentlyHiredReceptionist(false);
+    setScenarioTriggerPlaced(false);
+    setScenarioActionPlaced(false);
+  }, [userId]);
+
+  useEffect(() => {
+    const handleTriggerPlaced = () => setScenarioTriggerPlaced(true);
+    const handleActionPlaced = () => setScenarioActionPlaced(true);
+    window.addEventListener('sonar:scenario-trigger-placed', handleTriggerPlaced);
+    window.addEventListener('sonar:scenario-action-placed', handleActionPlaced);
+    return () => {
+      window.removeEventListener('sonar:scenario-trigger-placed', handleTriggerPlaced);
+      window.removeEventListener('sonar:scenario-action-placed', handleActionPlaced);
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -1041,6 +1795,9 @@ const SonarDashboard = () => {
     updateAgentDirection,
     refresh,
   } = useSonarState();
+  const liveCallSeen = Array.isArray(session?.calls)
+    ? session.calls.length > 0
+    : Boolean(session?.active_call || session?.current_call || session?.call);
 
   const handleRestoreAgent = useCallback(async (agentId) => {
     const result = await api.restoreAgent(agentId);
@@ -1056,6 +1813,39 @@ const SonarDashboard = () => {
       return { ...a, _scenario: scenario, scenario_name: scenario.name, scenario_id: scenario.id };
     }
     return { ...a, _scenario: null, scenario_name: null, scenario_id: null };
+  });
+  const popupContext = {
+    currentRoute,
+    teamView,
+    agentsLoading,
+    receptionistCount: enrichedAgents.length,
+    recentlyHiredReceptionist,
+    showHireModal,
+    calendarCount: calendarToolbarMeta.count,
+    calendarLoading: calendarToolbarMeta.loading,
+    peopleCount: peopleToolbarMeta.count,
+    peopleLoading: peopleToolbarMeta.loading,
+    scenariosCount: scenariosToolbarMeta.count,
+    scenariosLoading: scenariosToolbarMeta.loading,
+    callLogsCount: callLogsToolbarMeta.count,
+    callLogsLoading: callLogsToolbarMeta.loading,
+    liveCallSeen,
+    scenarioTriggerPlaced,
+    scenarioActionPlaced,
+  };
+  const manualPopup = manualPopupId ? POPUP_DEFINITIONS.find((popup) => popup.id === manualPopupId) : null;
+  const activeManualPopup = manualPopup && (() => {
+    if (dismissedPopupIds.includes(manualPopup.id)) return null;
+    const popupState = getPopupState(profile?.popups, manualPopup.id);
+    if (popupState.shown !== false || popupState.hide !== false) return null;
+    return manualPopup;
+  })();
+  const activePopup = activeManualPopup || POPUP_DEFINITIONS.find((popup) => {
+    if (popup.manualOnly) return false;
+    if (popup.placement !== 'dashboard' || dismissedPopupIds.includes(popup.id)) return false;
+    const popupState = getPopupState(profile?.popups, popup.id);
+    if (popupState.shown !== false || popupState.hide !== false) return false;
+    return typeof popup.shouldShow === 'function' ? popup.shouldShow(popupContext) : true;
   });
 
   useEffect(() => {
@@ -1240,6 +2030,7 @@ const SonarDashboard = () => {
                       if (!result) throw new Error('Failed to hire receptionist');
                       await refresh();
                       await loadAgentScenarios();
+                      setRecentlyHiredReceptionist(true);
                       return result;
                     } catch (err) {
                       console.error('[Hire] Failed:', err.message);
@@ -1332,7 +2123,7 @@ const SonarDashboard = () => {
           </div>
         );
       case 'scenarios':
-        return <ScenariosPage />;
+        return <ScenariosPage onToolbarMetaChange={setScenariosToolbarMeta} />;
       case 'live-monitoring':
         return <LiveMonitoringPage />;
       case 'settings':
@@ -1340,7 +2131,7 @@ const SonarDashboard = () => {
       case 'calendar':
         return <CalendarPage onToolbarMetaChange={setCalendarToolbarMeta} />;
       case 'call-logs':
-        return <CallLogsPage />;
+        return <CallLogsPage onToolbarMetaChange={setCallLogsToolbarMeta} />;
       case 'pipeline':
         return <LeadsPage hideTitle onToolbarMetaChange={setPeopleToolbarMeta} />;
       default:
@@ -1531,6 +2322,12 @@ const SonarDashboard = () => {
           </div>
         </main>
       </div>
+      <PopupModal
+        popup={activePopup}
+        profile={profile}
+        onClose={() => dismissPopup(activePopup)}
+      />
+      <TasklistWidget tasklistState={profile?.tasklist} onOpenIntro={() => setManualPopupId('tasklist_intro')} />
       <PersistentAudioPlayer />
     </div>
     </CallLogsProvider>

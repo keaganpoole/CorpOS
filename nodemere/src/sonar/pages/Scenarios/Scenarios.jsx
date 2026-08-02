@@ -56,6 +56,10 @@ const API_ORIGIN = (() => {
     return window.location.origin;
   }
 })();
+const emitScenarioPopupEvent = (eventName) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(eventName));
+};
 const INTEGRATION_PROVIDERS = [
   {
     key: 'gmail',
@@ -746,7 +750,7 @@ const sbModeToggleActiveStyle = {
   background: 'rgba(24,24,27,0.9)',
 };
 
-export default function ScenariosPage() {
+export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
   const { session } = useAuth();
   const userId = session?.user?.id || null;
@@ -754,6 +758,10 @@ export default function ScenariosPage() {
   const [scenarios, setScenarios] = useState([]); // List of saved scenarios
   const [nodes, setNodes] = useState([INITIAL_NODE]);
   const [edges, setEdges] = useState([]);
+
+  useEffect(() => {
+    onToolbarMetaChange?.({ count: scenarios.length, loading: false });
+  }, [onToolbarMetaChange, scenarios.length]);
   const [edgeDrag, setEdgeDrag] = useState(null);
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const [viewportReady, setViewportReady] = useState(false);
@@ -2175,6 +2183,9 @@ export default function ScenariosPage() {
       setNoTriggerActive(true);
     } else if (categoryType === 'TRIGGERS') {
       setNoTriggerActive(false);
+      emitScenarioPopupEvent('sonar:scenario-trigger-placed');
+    } else if (categoryType === 'ACTIONS') {
+      emitScenarioPopupEvent('sonar:scenario-action-placed');
     }
   };
 
@@ -2256,6 +2267,7 @@ export default function ScenariosPage() {
       setActiveOption(null);
       setPanelSearch('');
       setPanelStage('triggerConfig');
+      emitScenarioPopupEvent('sonar:scenario-trigger-placed');
       return;
     }
 
@@ -2291,6 +2303,7 @@ export default function ScenariosPage() {
       setPanelSearch('');
       setTriggerFilter(triggerFilterConfig);
       setPanelStage('triggerFilter');
+      emitScenarioPopupEvent('sonar:scenario-trigger-placed');
       return;
     }
     
@@ -2365,6 +2378,9 @@ export default function ScenariosPage() {
         setActionConfig(initialConfig);
         setNodes(prev => prev.map(n => n.id === currentNodeId ? { ...n, actionConfig: initialConfig } : n));
         setPanelStage('actionConfig');
+      }
+      if (panelCategory === 'ACTIONS') {
+        emitScenarioPopupEvent('sonar:scenario-action-placed');
       }
       // Keep panel open — don't call finalizeSelection
       return;

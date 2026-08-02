@@ -54,6 +54,10 @@ const API_ORIGIN = (() => {
     return window.location.origin;
   }
 })();
+const emitScenarioPopupEvent = (eventName) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(eventName));
+};
 const INTEGRATION_PROVIDERS = [
   {
     key: 'gmail',
@@ -2217,6 +2221,9 @@ export default function ScenariosPage({
       setNoTriggerActive(true);
     } else if (categoryType === 'TRIGGERS') {
       setNoTriggerActive(false);
+      emitScenarioPopupEvent('sonar:scenario-trigger-placed');
+    } else if (categoryType === 'ACTIONS') {
+      emitScenarioPopupEvent('sonar:scenario-action-placed');
     }
   };
 
@@ -2274,6 +2281,7 @@ export default function ScenariosPage({
       setActiveOption(null);
       setPanelSearch('');
       setPanelStage('triggerConfig');
+      emitScenarioPopupEvent('sonar:scenario-trigger-placed');
       return;
     }
 
@@ -2309,6 +2317,7 @@ export default function ScenariosPage({
       setPanelSearch('');
       setTriggerFilter(triggerFilterConfig);
       setPanelStage('triggerFilter');
+      emitScenarioPopupEvent('sonar:scenario-trigger-placed');
       return;
     }
     
@@ -2383,6 +2392,9 @@ export default function ScenariosPage({
         setActionConfig(initialConfig);
         setNodes(prev => prev.map(n => n.id === currentNodeId ? { ...n, actionConfig: initialConfig } : n));
         setPanelStage('actionConfig');
+      }
+      if (panelCategory === 'ACTIONS') {
+        emitScenarioPopupEvent('sonar:scenario-action-placed');
       }
       // Keep panel open — don't call finalizeSelection
       return;

@@ -597,7 +597,7 @@ function AudioStrip({ call, now }) {
   );
 }
 
-export default function CallLogsPage() {
+export default function CallLogsPage({ onToolbarMetaChange = null }) {
   const { session } = useAuth();
   const {
     calls,
@@ -619,6 +619,10 @@ export default function CallLogsPage() {
   const [deleting, setDeleting] = useState(false);
   const listScrollRef = useRef(null);
   const searchReadyRef = useRef(false);
+
+  useEffect(() => {
+    onToolbarMetaChange?.({ count: calls.length, loading });
+  }, [calls.length, loading, onToolbarMetaChange]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setTimeNow(new Date()), 30000);
