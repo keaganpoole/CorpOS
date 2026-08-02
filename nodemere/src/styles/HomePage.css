@@ -283,7 +283,7 @@ main,
     overflow-wrap: anywhere;
 }
 .content-section--booking {
-    padding-top: clamp(3.5rem, 8vh, 7rem);
+    padding-top: clamp(2.5rem, 6vh, 5.5rem);
 }
 .content-section--showcase > * {
     width: 100%;
@@ -1149,7 +1149,7 @@ main,
 @media (max-width: 480px) { .hero-section { padding: 200px 10px 40px; min-height: 400px; } .hero-section h1 { font-size: 2.5em; } .hero-section .hero-headline { font-size: 1.4em; } .hero-section .hero-subheadline { font-size: 1.1em; } .content-section { padding: 50px 10px; } .content-section--showcase { padding: 0; min-height: auto; overflow-x: clip; overflow-y: visible; } .content-section h3 { font-size: 2.2em; } .content-section p { font-size: 1em; } .feature-card { padding: 30px 20px; } }
 @media (max-width: 1180px) {
     .content-section--booking {
-        padding-top: clamp(5rem, 10vh, 8rem);
+        padding-top: clamp(4rem, 8vh, 6.5rem);
     }
     .content-section--booking .calendar-showcase-description {
         margin-left: auto;
@@ -1223,7 +1223,7 @@ main,
         padding-top: 4.75rem !important;
     }
     .content-section--booking {
-        padding-top: clamp(5.5rem, 12vh, 8.5rem);
+        padding-top: clamp(4.25rem, 9vh, 6.75rem);
     }
     .calendar-booking-layout {
         min-height: calc(100vh - 1rem);

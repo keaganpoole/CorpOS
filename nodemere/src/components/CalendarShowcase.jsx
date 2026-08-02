@@ -732,7 +732,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     );
 
     return (
-      <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[230vh]' : 'h-[340vh]'}`}>
+      <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[215vh]' : 'h-[340vh]'}`}>
         <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
           <div
             className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
