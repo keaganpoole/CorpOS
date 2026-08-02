@@ -1043,7 +1043,7 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
           style={{ top: position.top, bottom: position.bottom, left: position.left, width, maxHeight: position.maxHeight }}
-          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#080808]/98 shadow-[0_14px_36px_rgba(0,0,0,0.56)] backdrop-blur-xl"
+          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0a]/95 shadow-[0_14px_36px_rgba(0,0,0,0.66)] [&_input:focus]:!outline-none [&_input:focus-visible]:!outline-none [&_input:focus]:!ring-0 [&_input:focus]:!shadow-none"
         >
           <div className="max-h-full overflow-y-auto custom-scrollbar">
             {children}
@@ -2307,7 +2307,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             initial={{ opacity: 0, scale: 0.96, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -4 }}
-            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a]/95 backdrop-blur-sm"
+            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a]/95 shadow-[0_12px_28px_rgba(0,0,0,0.64)]"
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2328,7 +2328,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{ top: columnOptionsPosition.top, bottom: columnOptionsPosition.bottom, left: columnOptionsPosition.left }}
-            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#080808]/98 shadow-[0_12px_28px_rgba(0,0,0,0.52)] backdrop-blur-xl"
+            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a]/95 shadow-[0_12px_28px_rgba(0,0,0,0.64)]"
           >
             <div className="py-1">
               {column_options.map((option, idx) => {

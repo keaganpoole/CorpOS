@@ -304,12 +304,18 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
             {/* Navigation arrows */}
             {receptionists.length > 1 && (
               <div className="flex items-center gap-4 mb-6">
+                <svg width="0" height="0" aria-hidden="true" focusable="false">
+                  <linearGradient id="hireReceptionistArrowGradient" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="16">
+                    <stop offset="0%" stopColor="var(--brandGradientStart)" />
+                    <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+                  </linearGradient>
+                </svg>
                 <button
                   onClick={prevCard}
                   disabled={isAnimating}
-                  className="p-2 rounded-full bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30"
+                  className="p-2 rounded-full bg-white/5 border border-white/10 text-zinc-400 hover:bg-white/10 transition-all disabled:opacity-30"
                 >
-                  <ChevronLeft size={16} />
+                  <ChevronLeft size={16} style={{ stroke: 'url(#hireReceptionistArrowGradient)' }} />
                 </button>
                 <div className="flex gap-2">
                   {receptionists.map((_, i) => (
@@ -332,9 +338,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                 <button
                   onClick={nextCard}
                   disabled={isAnimating}
-                  className="p-2 rounded-full bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30"
+                  className="p-2 rounded-full bg-white/5 border border-white/10 text-zinc-400 hover:bg-white/10 transition-all disabled:opacity-30"
                 >
-                  <ChevronRight size={16} />
+                  <ChevronRight size={16} style={{ stroke: 'url(#hireReceptionistArrowGradient)' }} />
                 </button>
               </div>
             )}

@@ -459,6 +459,7 @@ const GradientBleed = ({
   showUnderline = true,
   showSweep = true,
   orientation = 'horizontal',
+  prismAxis = 'horizontal',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
@@ -506,12 +507,12 @@ const GradientBleed = ({
   };
 
   const borderBackground = variant === 'prism'
-    ? `linear-gradient(to right, ${activeColor}, #00ffff, #ff00ff, ${activeColor})`
+    ? `linear-gradient(to ${prismAxis === 'vertical' ? 'bottom' : 'right'}, ${activeColor}, #00ffff, #ff00ff, ${activeColor})`
     : `linear-gradient(to right, ${activeColor}, #a855f7, #ec4899)`;
 
   const borderStyle = {
     backgroundImage: borderBackground,
-    backgroundSize: variant === 'prism' ? '200% 100%' : 'auto',
+    backgroundSize: variant === 'prism' ? (prismAxis === 'vertical' ? '100% 200%' : '200% 100%') : 'auto',
   };
 
   const sweepBackground = `linear-gradient(to right, transparent 0%, ${activeColor}22 45%, ${activeColor}66 50%, ${activeColor}22 55%, transparent 100%)`;
@@ -560,7 +561,7 @@ const GradientBleed = ({
             isVertical
               ? `right-0 top-0 w-[2px] ${isOpen ? 'h-full opacity-100' : 'h-0 opacity-0'}`
               : `left-0 h-[2px] ${isOpen ? 'w-full opacity-100' : 'w-0 opacity-0'}`
-          } ${variant === 'prism' && isOpen ? 'animate-skyPrism' : ''}`}
+          } ${variant === 'prism' && isOpen ? (prismAxis === 'vertical' ? 'animate-skyPrismVertical' : 'animate-skyPrism') : ''}`}
           style={borderStyle}
         />
       )}
@@ -583,8 +584,13 @@ const GradientBleed = ({
           0% { background-position: 0% 50%; }
           100% { background-position: 200% 50%; }
         }
+        @keyframes skyPrismVertical {
+          0% { background-position: 50% 0%; }
+          100% { background-position: 50% 200%; }
+        }
         .animate-skySweep { animation: skySweep 0.8s ease-in-out forwards; }
         .animate-skyPrism { animation: skyPrism 2s linear infinite; }
+        .animate-skyPrismVertical { animation: skyPrismVertical 2s linear infinite; }
       `}} />
     </div>
   );
@@ -1352,6 +1358,7 @@ const SonarDashboard = () => {
       value={String(displayZone)}
       onSelect={(val) => setZone(parseInt(val))}
       onOpenChange={(open) => setZoneOpen(open)}
+      prismAxis="vertical"
     />
   );
   const toolbarAutonomyControl = (

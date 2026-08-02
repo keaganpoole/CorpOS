@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Plus, Trash2, Play, Palette, Sparkles, Check, GripVertical,
-  ChevronDown, ChevronUp, Wand2, Zap, ArrowRight,
+  ChevronDown, ChevronUp, Zap, ArrowRight,
 } from 'lucide-react';
 import {
   COLORBAR_PRESETS, OPERATORS, loadColorbarRules, saveColorbarRules,
@@ -518,9 +518,6 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
         <div className="shrink-0 border-b border-white/[0.04] px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                <Wand2 size={14} className="settings-icon" />
-              </div>
               <div className="min-w-0">
                 <h3 className="flex items-center gap-2 text-[14px] font-semibold leading-none tracking-[-0.03em] text-white">
                   Colorbar Studio

@@ -5,7 +5,7 @@ import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSens
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  X, Palette, Type, Sparkles, Check, RotateCcw, Trash2,
+  X, Palette, Type, Check, RotateCcw, Trash2,
   Building2, User, Briefcase, Factory, Flag, Compass, Target,
   DollarSign, TrendingUp, Mail, Phone, Globe, MapPin, Map,
   Calendar, Clock, MessageSquare, Search, FileText, Gauge,
@@ -36,6 +36,9 @@ const OPTION_COLORS = [
   '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
   '#71717a', '#a1a1aa', '#d4d4d8',
 ];
+
+const BRAND_GRADIENT_ID = 'field-settings-brand-gradient';
+const brandGradientStroke = `url(#${BRAND_GRADIENT_ID})`;
 
 const hexToRgba = (hex, alpha = 0.15) => {
   const value = hex?.replace('#', '') || '';
@@ -139,7 +142,7 @@ const SortableOptionRow = ({
       data-color-popover-root="true"
       className={`relative flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 transition-colors ${
         isDragging
-          ? 'border-cyan-400/40 bg-white/[0.06] shadow-[0_12px_24px_rgba(0,0,0,0.25)]'
+          ? 'border-white/[0.18] bg-white/[0.06] shadow-[0_12px_24px_rgba(0,0,0,0.25)]'
           : 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.035]'
       }`}
     >
@@ -411,6 +414,14 @@ const FieldSettingsModal = ({
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
       onClick={onClose}
     >
+      <svg width="0" height="0" className="absolute">
+        <defs>
+          <linearGradient id={BRAND_GRADIENT_ID} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--brandGradientStart)" />
+            <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+          </linearGradient>
+        </defs>
+      </svg>
       <motion.div
         initial={{ opacity: 0, scale: 0.92, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -421,9 +432,6 @@ const FieldSettingsModal = ({
       >
         <div className="flex items-center justify-between border-b border-white/[0.04] px-6 pt-5 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="rounded-xl border border-indigo-500/15 bg-indigo-500/10 p-2">
-              <Sparkles size={14} className="text-indigo-400" />
-            </div>
             <div>
               <h3 className="text-[14px] font-semibold tracking-[-0.03em] text-white">Edit Field</h3>
             </div>
@@ -452,13 +460,20 @@ const FieldSettingsModal = ({
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`-mb-px flex items-center gap-1.5 border-b px-3 pb-2 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
+              className={`relative -mb-px flex items-center gap-1.5 border-b border-transparent px-3 pb-2 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
                 activeTab === tab.key
-                  ? 'border-white text-white'
-                  : 'border-transparent text-zinc-600 hover:text-zinc-400'
+                  ? 'text-white'
+                  : 'text-zinc-600 hover:text-zinc-400'
               }`}
             >
               {tab.icon} {tab.label}
+              {activeTab === tab.key && (
+                <motion.span
+                  layoutId="field-settings-active-tab"
+                  className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)]"
+                  transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+                />
+              )}
             </button>
           ))}
         </div>
@@ -474,7 +489,7 @@ const FieldSettingsModal = ({
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[14px] font-semibold text-white transition-colors focus:border-indigo-500/30 focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-white/[0.18] focus:outline-none"
                     placeholder="Field name..."
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-mono tracking-[-0.01em] text-zinc-700">
@@ -493,7 +508,7 @@ const FieldSettingsModal = ({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
-                    className="w-full resize-none rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-indigo-500/30 focus:outline-none"
+                    className="w-full resize-none rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-white/[0.18] focus:outline-none"
                     placeholder="Give your receptionist more context into what this is for."
                   />
                   <p className="mt-1.5 text-[8px] text-zinc-700">Used in AI collection instructions and custom-field metadata.</p>
@@ -513,11 +528,11 @@ const FieldSettingsModal = ({
                         onClick={() => setIcon(iconName)}
                         className={`flex items-center justify-center rounded-lg p-2 transition-all ${
                           isActive
-                            ? 'border border-indigo-500/30 bg-indigo-500/20 text-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.15)]'
+                            ? 'border border-white/[0.16] bg-white/[0.03]'
                             : 'border border-transparent bg-white/[0.02] text-zinc-600 hover:bg-white/[0.05] hover:text-zinc-300'
                         }`}
                       >
-                        <IconComp size={14} />
+                        <IconComp size={14} style={isActive ? { stroke: brandGradientStroke } : undefined} />
                       </button>
                     );
                   })}
@@ -528,65 +543,57 @@ const FieldSettingsModal = ({
           )}
 
           {activeTab === 'intake' && (
-            <div className="space-y-5">
-              <div className={`rounded-2xl border px-4 py-4 ${intakeStyles.panel}`}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Intake Fields Enabled</div>
-                    <div className="mt-2 flex items-end gap-2">
-                      <span className={`text-[28px] font-semibold leading-none tracking-[-0.05em] ${intakeStyles.accent}`}>{intakeEnabledCount}</span>
-                      <span className="pb-1 text-[11px] font-medium text-zinc-500">recommended under 6</span>
-                    </div>
+            <div className="space-y-6">
+              <div className="flex items-end justify-between gap-4 border-b border-white/[0.05] pb-5">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Intake Fields Enabled</div>
+                  <div className="mt-2 flex items-end gap-2">
+                    <span className={`text-[30px] font-semibold leading-none tracking-[-0.05em] ${intakeStyles.accent}`}>{intakeEnabledCount}</span>
+                    <span className="pb-1 text-[11px] font-medium text-zinc-500">recommended under 6</span>
                   </div>
-                  <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-semibold tracking-[-0.02em] ${intakeStyles.pill}`}>
-                    <span className={`h-2 w-2 rounded-full ${intakeStyles.dot}`} />
-                    {intakeEnabledCount >= 8 ? 'Heavy' : intakeEnabledCount >= 6 ? 'Balanced' : 'Lean'}
-                  </div>
+                </div>
+                <div className={`flex items-center gap-2 pb-1 text-[10px] font-semibold tracking-[-0.02em] ${intakeStyles.accent}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${intakeStyles.dot}`} />
+                  {intakeEnabledCount >= 8 ? 'Heavy' : intakeEnabledCount >= 6 ? 'Balanced' : 'Lean'}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="pr-2">
-                    <label className="block text-[12px] font-semibold tracking-[-0.02em] text-white">Prioritize this field during intake</label>
-                    <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
-                      When enabled, this field can be treated as required context for the inbound agent when creating a new person record.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (intakeLocked) return;
-                      setIntakeEnabled((current) => !current);
-                    }}
-                    disabled={intakeLocked}
-                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
-                      intakeLocked || intakeEnabled
-                        ? 'border-cyan-400/35 bg-cyan-500/20'
-                        : 'border-white/[0.08] bg-black/35'
-                    } ${intakeLocked ? 'cursor-not-allowed opacity-100' : ''}`}
-                    aria-pressed={intakeEnabled}
-                    aria-disabled={intakeLocked}
-                  >
-                    <span
-                      className={`inline-block h-5 w-5 rounded-full transition-transform ${
-                        intakeLocked || intakeEnabled ? 'translate-x-6 bg-cyan-300' : 'translate-x-1 bg-zinc-500'
-                      }`}
-                    />
-                  </button>
-                </div>
-                {intakeLocked && (
-                  <p className="mt-2 text-[10px] text-cyan-300/80">
-                    Phone is always included in intake.
+              <div className="flex items-start gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (intakeLocked) return;
+                    setIntakeEnabled((current) => !current);
+                  }}
+                  disabled={intakeLocked}
+                  className={`mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-all ${
+                    intakeLocked || intakeEnabled ? 'dashboard-toggle-active' : 'bg-zinc-800 border border-white/[0.06]'
+                  } ${intakeLocked ? 'cursor-not-allowed opacity-100' : ''}`}
+                  aria-pressed={intakeEnabled}
+                  aria-disabled={intakeLocked}
+                >
+                  <span
+                    className="block h-4 w-4 rounded-full bg-white transition-transform"
+                    style={{ transform: intakeLocked || intakeEnabled ? 'translateX(16px)' : 'translateX(0px)' }}
+                  />
+                </button>
+                <div className="min-w-0">
+                  <label className="block text-[12px] font-semibold tracking-[-0.02em] text-white">Prioritize this field during intake</label>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
+                    When enabled, this field can be treated as required context for the inbound agent when creating a new person record.
                   </p>
-                )}
+                </div>
               </div>
 
-              <div className="rounded-2xl border border-white/[0.06] bg-black/30 px-4 py-3.5">
-                <p className="text-[10px] leading-relaxed text-zinc-500">
-                  A smaller intake list usually gives the agent a cleaner path through new-record creation. Keeping the total under six helps reduce prompt size and token usage without stripping out the fields that actually matter.
+              {intakeLocked && (
+                <p className="-mt-4 text-[10px] text-cyan-300/80">
+                  Phone is always included in intake.
                 </p>
-              </div>
+              )}
+
+              <p className="border-t border-white/[0.04] pt-4 text-[10px] leading-relaxed text-zinc-600">
+                A smaller intake list gives the agent a cleaner path through new-record creation. Keeping the total under six helps reduce prompt size and token usage without stripping out the fields that matter.
+              </p>
             </div>
           )}
 
@@ -683,7 +690,7 @@ const FieldSettingsModal = ({
           <button
             onClick={handleSave}
             className={`rounded-xl px-5 py-2.5 text-[11px] font-semibold tracking-[-0.02em] transition-all active:scale-95 ${
-              saved ? 'border border-emerald-500/30 bg-emerald-500/20 text-emerald-400' : 'bg-white text-black hover:bg-cyan-400'
+              saved ? 'border border-emerald-500/30 bg-emerald-500/20 text-emerald-400' : 'bg-white text-black hover:bg-zinc-200'
             }`}
           >
             {saved ? <><Check size={11} className="mr-1 inline" /> Saved</> : 'Save'}

@@ -881,7 +881,7 @@ function AnalyticsControls({ selectedKeys, periodKey, dateRange, onDateRangeChan
                     onClick={() => onToggleMetric(metric.key)}
                   >
                     <span className="live-metric-option-icon">
-                      {selected ? <Check size={12} className="brand-icon" /> : <Icon size={14} />}
+                      {selected ? <Check size={12} className="text-white" /> : <Icon size={14} />}
                     </span>
                     <span className="live-metric-option-copy">
                       <span className="live-metric-option-title">{metric.label}</span>
