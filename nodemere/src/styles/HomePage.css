@@ -702,7 +702,6 @@ main,
     display: block;
 }
 .homepage-demo-watermark__desktop {
-    font-size: 0.78em;
     letter-spacing: 0.14em;
     text-transform: none;
 }
@@ -1132,7 +1131,6 @@ main,
         gap: 0.24rem;
     }
     .homepage-demo-watermark__desktop {
-        font-size: 0.7em;
         letter-spacing: 0.1em;
     }
 }
