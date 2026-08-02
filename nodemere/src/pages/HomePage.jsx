@@ -516,6 +516,7 @@ const ComparisonShowcase = () => {
   const [introExited, setIntroExited] = useState(false);
   const [timelineStartProgress, setTimelineStartProgress] = useState(0.3);
   const liveProgressRef = useRef(sectionProgress);
+  const cinematicStartedRef = useRef(false);
 
   useEffect(() => {
     liveProgressRef.current = sectionProgress;
@@ -526,6 +527,41 @@ const ComparisonShowcase = () => {
       setCinematicStarted(true);
     }
   }, [cinematicStarted, sectionProgress]);
+
+  useEffect(() => {
+    cinematicStartedRef.current = cinematicStarted;
+  }, [cinematicStarted]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof window === 'undefined') return undefined;
+
+    let frame = null;
+    const checkIntroPosition = () => {
+      frame = null;
+      if (cinematicStartedRef.current) return;
+      const rect = root.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
+      if (rect.top <= viewportHeight * 0.08 && rect.bottom >= viewportHeight * 0.55) {
+        setCinematicStarted(true);
+      }
+    };
+    const scheduleCheck = () => {
+      if (frame === null) frame = window.requestAnimationFrame(checkIntroPosition);
+    };
+
+    scheduleCheck();
+    window.addEventListener('scroll', scheduleCheck, { passive: true });
+    window.addEventListener('resize', scheduleCheck);
+    window.visualViewport?.addEventListener('resize', scheduleCheck);
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', scheduleCheck);
+      window.removeEventListener('resize', scheduleCheck);
+      window.visualViewport?.removeEventListener('resize', scheduleCheck);
+    };
+  }, [rootRef]);
 
   useEffect(() => {
     if (!cinematicStarted) return undefined;

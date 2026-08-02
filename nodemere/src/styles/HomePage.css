@@ -1052,7 +1052,7 @@ main,
     will-change: transform;
 }
 .demo-calendar-avatar-trigger--peek-pop .demo-calendar-avatar-trigger__image {
-    animation: demoCalendarAvatarCuePop 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+    animation: demoCalendarAvatarCuePop 1s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
 }
 .demo-calendar-avatar-trigger--return .demo-calendar-avatar-trigger__image {
     animation: demoCalendarAvatarCuePop 520ms cubic-bezier(0.22, 1, 0.36, 1) 1 reverse both;
@@ -1087,7 +1087,7 @@ main,
 }
 .demo-calendar-actions-peek {
     transform-origin: left center;
-    animation: demoCalendarAvatarPeek 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+    animation: demoCalendarAvatarPeek 1s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
 }
 .demo-calendar-actions-peek span {
     text-shadow: none;
