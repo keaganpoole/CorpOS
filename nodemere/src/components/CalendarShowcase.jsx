@@ -586,16 +586,18 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     );
   }
 
-  const calendarExited = sectionProgress >= 0.31;
-  const featureEntered = sectionProgress >= 0.365;
+  const featureStartProgress = 0.31;
+  const calendarExited = sectionProgress >= featureStartProgress;
+  const featureEntered = sectionProgress >= featureStartProgress;
   const featureProgress = featureEntered ? 1 : 0;
   const calendarOpacity = calendarExited ? 0 : 1;
   const featureOpacity = featureEntered ? 1 : 0;
   const isCompactBookingViewport = viewportSize.width < 1024;
   const mobileIntroExited = sectionProgress >= 0.24;
   const mobileCalendarEntered = sectionProgress >= 0.18;
-  const mobileCalendarExited = sectionProgress >= 0.56;
-  const mobileFeatureEntered = sectionProgress >= 0.62;
+  const mobileFeatureStartProgress = 0.56;
+  const mobileCalendarExited = sectionProgress >= mobileFeatureStartProgress;
+  const mobileFeatureEntered = sectionProgress >= mobileFeatureStartProgress;
   const bookingIntroOpacity = isCompactBookingViewport ? (mobileIntroExited ? 0 : 1) : 1;
   const bookingCalendarOpacity = isCompactBookingViewport
     ? (mobileCalendarEntered && !mobileCalendarExited ? 1 : 0)

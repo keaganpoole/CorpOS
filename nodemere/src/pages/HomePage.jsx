@@ -296,8 +296,9 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     };
   }, []);
 
-  const heroIntroExited = sectionProgress >= 0.26;
-  const receptionistEntered = sectionProgress >= 0.22;
+  const receptionistStartProgress = 0.26;
+  const heroIntroExited = sectionProgress >= receptionistStartProgress;
+  const receptionistEntered = sectionProgress >= receptionistStartProgress;
   const heroFeaturesEntered = sectionProgress >= 0.64;
   const crmOpacity = heroIntroExited ? 0 : 1;
   const receptionistOpacity = receptionistEntered ? (heroFeaturesEntered ? 0.11 : 1) : 0;
