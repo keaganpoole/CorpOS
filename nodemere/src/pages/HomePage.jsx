@@ -44,6 +44,7 @@ import TypingAnimation from '../components/TypingAnimation';
 import HeroConcept from '../components/HeroConcept';
 import CalendarShowcase, { RightFeatureList } from '../components/CalendarShowcase';
 import WorkWeekComparison from '../components/WorkWeekComparison';
+import JitterDebugOverlay from '../components/JitterDebugOverlay';
 import { trackVisitor } from '../services/apiService';
 import useSectionScrollProgress from '../hooks/useSectionScrollProgress';
 
@@ -277,6 +278,9 @@ const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const StackedHeroShowcase = ({ sectionRef }) => {
   const { rootRef, progress: sectionProgress } = useSectionScrollProgress({ mobileMinDelta: 0.0025 });
   const stickyRef = useRef(null);
+  const jitterDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('jitterDebug') === '1';
+  const jitterRenderCount = useRef(0);
+  if (jitterDebugEnabled) jitterRenderCount.current += 1;
   const [isCompactFeatureViewport, setIsCompactFeatureViewport] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 1024 : false
   );
@@ -306,10 +310,18 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   const receptionistBrightness = heroFeaturesEntered ? 0.46 : 1;
   const heroFeatureProgress = Math.min(1, Math.max(0, (sectionProgress - 0.64) / 0.3));
   const heroFeatureOpacity = heroFeaturesEntered ? 1 : 0;
+  const jitterState = sectionProgress < 0.64 ? 'inactive' : heroFeatureProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
 
   return (
-    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[280vh] bg-[#020202]">
-      <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
+    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[280vh] bg-[#020202]"
+      data-jitter-debug-root={jitterDebugEnabled ? 'hero' : undefined}
+      data-jitter-section-progress={jitterDebugEnabled ? sectionProgress : undefined}
+      data-jitter-feature-progress={jitterDebugEnabled ? heroFeatureProgress : undefined}
+      data-jitter-state={jitterDebugEnabled ? jitterState : undefined}
+      data-jitter-render-count={jitterDebugEnabled ? jitterRenderCount.current : undefined}
+      data-jitter-viewport={jitterDebugEnabled ? 'not-stored' : undefined}
+    >
+      <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]" data-jitter-debug-sticky={jitterDebugEnabled ? 'hero' : undefined}>
         <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]" />
@@ -350,6 +362,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
 
         <div
           className={`absolute inset-0 z-30 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${heroFeatureOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
+          data-jitter-debug-overlay={jitterDebugEnabled ? 'hero' : undefined}
           style={{
             opacity: heroFeatureOpacity,
             visibility: heroFeatureOpacity <= 0.01 ? 'hidden' : 'visible',
@@ -363,6 +376,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
               useScrollHighlight={isCompactFeatureViewport}
               mobilePageSize={3}
               mobileMaxItems={6}
+              debugId={jitterDebugEnabled ? 'hero' : null}
             />
           </div>
         </div>
@@ -686,6 +700,7 @@ const HomePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const hasTrackedVisitor = useRef(false);
+  const jitterTest = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('jitterTest') : null;
 
   const phoneHelperCollageImages = [phonehelper1, phonehelper2];
   const slimImages = [slimYahoo, slimHulu, slimChime, slimBumble, slimVerizon, slimFacebook];
@@ -840,7 +855,7 @@ const HomePage = () => {
   };
 
   return (
-    <div id="myHtmlContent">
+    <div id="myHtmlContent" data-jitter-test={jitterTest || undefined}>
       <AnimatePresence>
         {showSplash && (
           <motion.div
@@ -948,6 +963,7 @@ const HomePage = () => {
           </p>
         </div>
       </footer>
+      <JitterDebugOverlay />
     </div>
   );
 };

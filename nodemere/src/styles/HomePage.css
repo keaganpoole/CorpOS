@@ -268,10 +268,17 @@
 }
 #myHtmlContent,
 main,
-.content-section,
-.content-section--showcase {
+.content-section:not(.content-section--showcase) {
     width: 100%;
     max-width: 100%;
+    overflow-x: clip;
+}
+/* Match the hero's sticky ancestor chain. Each showcase scene clips its own pixels. */
+main > section.content-section--showcase:not(.comparison-host) {
+    overflow-x: visible;
+}
+/* JITTER-TEST-04A: restore only the former clipping boundary for device A/B. */
+[data-jitter-test="restore-showcase-clip"] main > section.content-section--showcase:not(.comparison-host) {
     overflow-x: clip;
 }
 .content-section:not(.comparison-host) :is(h1, h2, h3, h4, h5, h6, p),

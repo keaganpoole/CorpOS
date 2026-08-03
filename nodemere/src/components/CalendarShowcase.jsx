@@ -440,6 +440,9 @@ function BookingReelWord({ playState }) {
 const CalendarShowcase = ({ variant = 'calendar' }) => {
   const { rootRef, progress: sectionProgress } = useSectionScrollProgress({ mobileMinDelta: 0.0025 });
   const stickyRef = useRef(null);
+  const jitterDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('jitterDebug') === '1';
+  const jitterRenderCount = useRef(0);
+  if (jitterDebugEnabled) jitterRenderCount.current += 1;
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [bookingPlayState, setBookingPlayState] = useState('idle');
   const [demoResetState, setDemoResetState] = useState(null);
@@ -724,6 +727,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     const scenariosFeatureOpacity = isMonitoringVariant ? (featuresEntered ? 1 : 0) : isScenariosVariant && demoResetState ? 0 : holdScenarioIntro || holdCrmIntro ? 0 : featuresEntered ? 1 : 0;
     const builderBlur = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 3.5 + scenariosFeatureProgress * 7.5 : 0;
     const builderBrightness = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 0.82 - scenariosFeatureProgress * 0.58 : 1;
+    const jitterState = sectionProgress < 0.68 ? 'inactive' : compactFeaturesListProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
     const titleLines = isMonitoringVariant
       ? ['Live Call Monitoring']
       : isCrmVariant
@@ -738,8 +742,15 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     );
 
     return (
-      <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[215vh]' : 'h-[340vh]'}`}>
-        <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
+      <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[215vh]' : 'h-[340vh]'}`}
+        data-jitter-debug-root={jitterDebugEnabled && isCrmVariant ? 'crm' : undefined}
+        data-jitter-section-progress={jitterDebugEnabled && isCrmVariant ? sectionProgress : undefined}
+        data-jitter-feature-progress={jitterDebugEnabled && isCrmVariant ? compactFeaturesListProgress : undefined}
+        data-jitter-state={jitterDebugEnabled && isCrmVariant ? jitterState : undefined}
+        data-jitter-render-count={jitterDebugEnabled && isCrmVariant ? jitterRenderCount.current : undefined}
+        data-jitter-viewport={jitterDebugEnabled && isCrmVariant ? `${viewportSize.width}×${viewportSize.height}` : undefined}
+      >
+        <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]" data-jitter-debug-sticky={jitterDebugEnabled && isCrmVariant ? 'crm' : undefined}>
           <div
             className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
               introOpacity <= 0.01 ? 'pointer-events-none' : ''
@@ -866,6 +877,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-500 ease-out ${
               scenariosFeatureOpacity <= 0.01 ? 'pointer-events-none' : ''
             }`}
+            data-jitter-debug-overlay={jitterDebugEnabled && isCrmVariant ? 'crm' : undefined}
             style={{
               opacity: scenariosFeatureOpacity,
               visibility: scenariosFeatureOpacity <= 0.01 ? 'hidden' : 'visible',
@@ -877,6 +889,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 featureProgress={compactFeaturesListProgress}
                 items={featureItems}
                 useScrollHighlight={isCompactFeatureViewport}
+                debugId={jitterDebugEnabled && isCrmVariant ? 'crm' : null}
               />
             </div>
           </div>
@@ -992,10 +1005,11 @@ const areFeatureListPropsEqual = (previous, next) => (
   && previous.useScrollHighlight === next.useScrollHighlight
   && previous.mobilePageSize === next.mobilePageSize
   && previous.mobileMaxItems === next.mobileMaxItems
+  && previous.debugId === next.debugId
   && getFeatureListVisualState(previous) === getFeatureListVisualState(next)
 );
 
-export const RightFeatureList = memo(function RightFeatureList({ featureProgress, items, useScrollHighlight = false, mobilePageSize = null, mobileMaxItems = null }) {
+export const RightFeatureList = memo(function RightFeatureList({ featureProgress, items, useScrollHighlight = false, mobilePageSize = null, mobileMaxItems = null, debugId = null }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [isMobileFeatureViewport, setIsMobileFeatureViewport] = useState(false);
@@ -1115,7 +1129,7 @@ export const RightFeatureList = memo(function RightFeatureList({ featureProgress
           </linearGradient>
         </defs>
       </svg>
-      <div className="homepage-feature-list mx-auto w-full max-w-[820px] text-left md:max-w-[940px] lg:max-w-[820px]">
+      <div className="homepage-feature-list mx-auto w-full max-w-[820px] text-left md:max-w-[940px] lg:max-w-[820px]" data-jitter-debug-list={debugId || undefined}>
         <div className={isMobilePagedList ? 'homepage-feature-pages' : 'flex flex-col'}>
           {isMobilePagedList
             ? Array.from({ length: pageCount }, (_, pageIndex) => {

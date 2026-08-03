@@ -21,6 +21,14 @@ export default function useSectionScrollProgress({ mobileMinDelta = 0 } = {}) {
     if (!root || typeof window === 'undefined') return undefined;
 
     let frame = null;
+    const jitterDebugEnabled = new URLSearchParams(window.location.search).get('jitterDebug') === '1';
+    const writeDebugGeometry = (rawProgress = null) => {
+      if (!jitterDebugEnabled) return;
+      const { top, distance } = geometryRef.current;
+      root.dataset.jitterCachedTop = String(top);
+      root.dataset.jitterScrollableDistance = String(distance);
+      if (rawProgress !== null) root.dataset.jitterRawProgress = String(rawProgress);
+    };
 
     const refreshGeometry = () => {
       const rect = root.getBoundingClientRect();
@@ -28,12 +36,15 @@ export default function useSectionScrollProgress({ mobileMinDelta = 0 } = {}) {
         top: rect.top + window.scrollY,
         distance: Math.max(root.offsetHeight - window.innerHeight, 1),
       };
+      writeDebugGeometry();
     };
 
     const commitProgress = () => {
       frame = null;
       const { top, distance } = geometryRef.current;
-      const nextProgress = clamp((window.scrollY - top) / distance, 0, 1);
+      const rawProgress = (window.scrollY - top) / distance;
+      const nextProgress = clamp(rawProgress, 0, 1);
+      writeDebugGeometry(rawProgress);
       const previousProgress = progressRef.current;
       const minDelta = window.innerWidth < 1024 ? mobileMinDelta : 0;
 
