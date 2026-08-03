@@ -21,7 +21,6 @@ import {
   Moon,
   Pause,
   Play,
-  Volume2,
   Maximize2,
   RefreshCw,
   Layers,
@@ -34,6 +33,7 @@ import {
   ChevronRight,
   GripHorizontal,
   AlertCircle,
+  CircleQuestionMark,
   Repeat,
   Timer,
   Navigation,
@@ -53,6 +53,7 @@ import {
   ArrowUpDown,
   Minus,
   BookUser,
+  Cake,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
@@ -434,6 +435,140 @@ const TASKLIST_DEFINITIONS = [
   },
 ];
 
+const hasText = (value) => String(value ?? '').trim().length > 0;
+
+const parseJsonObject = (value) => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value !== 'string' || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const isValidTimeRange = (open, close) => {
+  if (!hasText(open) || !hasText(close)) return false;
+  return String(open) !== String(close);
+};
+
+const hasUsableHours = (value) => {
+  const hours = parseJsonObject(value);
+  if (hours.schema_version === 1 && hours.days && typeof hours.days === 'object') {
+    return Object.values(hours.days).some((day) => {
+      if (!day?.enabled || !day.layers || typeof day.layers !== 'object') return false;
+      return Object.values(day.layers).some((layer) => {
+        const start = Number(layer?.start);
+        const end = Number(layer?.end);
+        return layer?.enabled && Number.isFinite(start) && Number.isFinite(end) && end > start;
+      });
+    });
+  }
+
+  return Object.values(hours).some((day) => (
+    day?.enabled === true && isValidTimeRange(day.open, day.close)
+  ));
+};
+
+const normalizeDirection = (value) => {
+  const direction = String(value || '').trim().toLowerCase();
+  if (direction === 'incoming') return 'inbound';
+  if (direction === 'outgoing') return 'outbound';
+  if (direction === 'off' || direction === 'disabled') return 'none';
+  return direction;
+};
+
+const isActiveReceptionist = (agent) => {
+  if (!agent || agent.is_active === false) return false;
+  const status = String(agent.status || '').trim().toLowerCase();
+  return !['archived', 'deleted', 'terminated'].includes(status);
+};
+
+const isActiveStaff = (staff) => {
+  if (!staff || staff.is_active === false) return false;
+  const status = String(staff.status || '').trim().toLowerCase();
+  return !['archived', 'deleted', 'terminated'].includes(status);
+};
+
+const hasStaffName = (staff) => (
+  hasText(staff?.full_name) || hasText(staff?.first_name) || hasText(staff?.last_name)
+);
+
+const getForwardingEntries = (business) => {
+  const config = parseJsonObject(business?.forwarding_config);
+  return Array.isArray(config.numbers) ? config.numbers : [];
+};
+
+const hasAssignedReceptionistNumber = (purchasedNumbers = []) => (
+  (Array.isArray(purchasedNumbers) ? purchasedNumbers : []).some((number) => (
+    number?.is_active !== false
+    && String(number?.kind || 'assigned_line').toLowerCase() === 'assigned_line'
+    && String(number?.status || '').toLowerCase() === 'active'
+    && hasText(number?.phone_number)
+  ))
+);
+
+const hasVerifiedForwarding = (business) => (
+  getForwardingEntries(business).some((entry) => String(entry?.status || '').toLowerCase() === 'verified')
+);
+
+const hasConfiguredIntakeField = (business, activeCustomFieldKeys = []) => {
+  const config = parseJsonObject(business?.people_field_config);
+  const activeCustomKeys = new Set(activeCustomFieldKeys.map((key) => String(key)));
+  return Object.entries(config).some(([fieldKey, fieldSettings]) => {
+    if (fieldKey === 'phone' || fieldSettings?.intakeEnabled !== true) return false;
+    if (fieldKey.startsWith('custom_')) return activeCustomKeys.has(fieldKey);
+    return true;
+  });
+};
+
+const createTasklistState = ({ business = null, agents = [], staff = [], purchasedNumbers = [], activeCustomFieldKeys = [] }) => {
+  const activeReceptionists = (Array.isArray(agents) ? agents : []).filter(isActiveReceptionist);
+  const activeStaff = (Array.isArray(staff) ? staff : []).filter(isActiveStaff);
+  const completions = {
+    business_setup: {
+      basic_info: Boolean(
+        business?.id
+        && hasText(business.name)
+        && [business.phone, business.email, business.address, business.city, business.state, business.zip].some(hasText)
+      ),
+      business_hours: Boolean(business?.id && hasUsableHours(business.business_hours)),
+    },
+    first_receptionist: {
+      hire_receptionist: activeReceptionists.length > 0,
+      set_role: activeReceptionists.some((agent) => ['inbound', 'outbound', 'all'].includes(normalizeDirection(agent.direction))),
+    },
+    staff_setup: {
+      add_staff_member: activeStaff.some(hasStaffName),
+      staff_availability: activeStaff.some((staffRow) => hasUsableHours(staffRow.working_hours)),
+    },
+    phone_setup: {
+      assign_receptionist_number: Boolean(business?.id && hasAssignedReceptionistNumber(purchasedNumbers)),
+      forward_business_line: Boolean(business?.id && hasVerifiedForwarding(business)),
+    },
+    intake_fields: {
+      set_intake_field: Boolean(business?.id && hasConfiguredIntakeField(business, activeCustomFieldKeys)),
+    },
+  };
+
+  return TASKLIST_DEFINITIONS.reduce((tasklist, task) => {
+    const subtaskStates = task.subtasks.reduce((subtasks, subtask) => ({
+      ...subtasks,
+      [subtask.id]: {
+        completed: completions[task.id]?.[subtask.id] === true,
+      },
+    }), {});
+    return {
+      ...tasklist,
+      [task.id]: {
+        completed: task.subtasks.every((subtask) => subtaskStates[subtask.id]?.completed === true),
+        subtasks: subtaskStates,
+      },
+    };
+  }, {});
+};
+
 function getInitialDashboardRoute() {
   if (typeof window === 'undefined') return DEFAULT_DASHBOARD_ROUTE;
   const savedRoute = window.localStorage.getItem(DASHBOARD_ROUTE_STORAGE_KEY);
@@ -704,8 +839,9 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
           <h3 className={`${nameClass} font-bold text-white tracking-tight leading-none`}>{agent.name}</h3>
           {agent.age && (
-            <p className="mt-1 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
-              🎂 {agent.age} years old
+            <p className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
+              <Cake size={11} />
+              <span>{agent.age} years old</span>
             </p>
           )}
         </div>
@@ -1062,7 +1198,7 @@ const PopupModal = ({ popup, profile, onClose }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/45 p-6 backdrop-blur-[1px]"
           onClick={onClose}
         >
           <motion.section
@@ -1126,7 +1262,7 @@ const TasklistInstructionModal = ({ subtask, onClose }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6 backdrop-blur-[1px]"
           onClick={onClose}
         >
           <motion.section
@@ -1169,10 +1305,9 @@ const TasklistInstructionModal = ({ subtask, onClose }) => {
   );
 };
 
-const TasklistWidget = ({ tasklistState = null, onOpenIntro = null }) => {
+const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = null }) => {
   const [open, setOpen] = useState(false);
   const [activeTaskIndex, setActiveTaskIndex] = useState(0);
-  const [previewCompletedSubtasks, setPreviewCompletedSubtasks] = useState(() => new Set());
   const [activeInstruction, setActiveInstruction] = useState(null);
   const tasklist = tasklistState && typeof tasklistState === 'object' ? tasklistState : {};
   const activeTask = TASKLIST_DEFINITIONS[activeTaskIndex] || TASKLIST_DEFINITIONS[0];
@@ -1180,8 +1315,8 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null }) => {
   const isSubtaskComplete = useCallback((taskId, subtaskId) => {
     const taskState = tasklist[taskId] || {};
     const subtaskState = taskState.subtasks?.[subtaskId] || {};
-    return subtaskState.completed === true || previewCompletedSubtasks.has(`${taskId}.${subtaskId}`);
-  }, [previewCompletedSubtasks, tasklist]);
+    return subtaskState.completed === true;
+  }, [tasklist]);
 
   const completedCount = TASKLIST_DEFINITIONS.reduce((count, task) => (
     count + task.subtasks.filter((subtask) => isSubtaskComplete(task.id, subtask.id)).length
@@ -1193,50 +1328,35 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null }) => {
   const taskRingRadius = 13;
   const taskRingCircumference = 2 * Math.PI * taskRingRadius;
   const taskRingDashOffset = taskRingCircumference - (activeTaskCompletionRatio * taskRingCircumference);
+  const nextIncompleteTask = TASKLIST_DEFINITIONS.find((task) => (
+    !task.subtasks.every((subtask) => isSubtaskComplete(task.id, subtask.id))
+  )) || activeTask;
+  const nextIncompleteTaskComplete = nextIncompleteTask.subtasks.every((subtask) => isSubtaskComplete(nextIncompleteTask.id, subtask.id));
 
   const goToPreviousTask = () => setActiveTaskIndex((index) => Math.max(0, index - 1));
   const goToNextTask = () => setActiveTaskIndex((index) => Math.min(TASKLIST_DEFINITIONS.length - 1, index + 1));
   const activeTaskComplete = activeTask.subtasks.every((subtask) => isSubtaskComplete(activeTask.id, subtask.id));
-
-  const togglePreviewSubtask = (taskId, subtaskId) => {
-    const key = `${taskId}.${subtaskId}`;
-    setPreviewCompletedSubtasks((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const checkFirstTwoPreviewSubtasks = () => {
-    setPreviewCompletedSubtasks((current) => {
-      const next = new Set(current);
-      activeTask.subtasks.slice(0, 2).forEach((subtask) => {
-        next.add(`${activeTask.id}.${subtask.id}`);
-      });
-      return next;
-    });
-  };
 
   return (
     <>
       <svg width="0" height="0" className="absolute">
         <defs>
           <linearGradient id="tasklistCheckGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="var(--brandGradientStart)" />
-            <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="100%" stopColor="#a1a1aa" />
           </linearGradient>
         </defs>
       </svg>
       <div className="fixed bottom-6 right-6 z-[1100] flex w-[min(328px,calc(100vw-48px))] flex-col items-end">
-        <AnimatePresence>
-          {open && (
+        <AnimatePresence mode="wait" initial={false}>
+          {open ? (
             <motion.div
+              key="getting-started-expanded"
               initial={{ opacity: 0, y: 16, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="mb-3 w-full overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_22px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+              className="w-full overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_10px_28px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-xl"
             >
               <div className="h-[3px] w-full overflow-hidden bg-white/[0.06]">
                 <div className="h-full brand-gradient transition-all duration-500" style={{ width: `${overallProgress}%` }} />
@@ -1282,15 +1402,16 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null }) => {
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Getting Started</p>
-                        <h2 className={`mt-0.5 text-[15px] font-semibold tracking-[-0.03em] ${activeTaskComplete ? 'text-zinc-600 line-through' : 'text-white'}`}>{activeTask.title}</h2>
+                        <h2 className={`mt-0.5 truncate text-[15px] font-semibold tracking-[-0.03em] ${activeTaskComplete ? 'text-zinc-600 line-through' : 'text-white'}`}>{activeTask.title}</h2>
                         <p className="mt-1 text-[11px] font-medium text-zinc-500">{completedCount}/{totalCount} completed</p>
                       </div>
                       <button
                         type="button"
-                        onClick={checkFirstTwoPreviewSubtasks}
-                        className="shrink-0 rounded-full border border-white/[0.08] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-300"
+                        onClick={() => setOpen(false)}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-600 transition hover:bg-white/[0.04] hover:text-zinc-300"
+                        aria-label="Collapse Getting Started"
                       >
-                        Test
+                        <ChevronDown size={14} />
                       </button>
                     </div>
                     <div className="mt-4">
@@ -1300,9 +1421,9 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null }) => {
                           <div key={subtask.id} className="flex items-center gap-2 rounded-xl px-1.5 py-1">
                             <button
                               type="button"
-                              onClick={() => togglePreviewSubtask(activeTask.id, subtask.id)}
-                              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition hover:bg-white/[0.04]"
-                              aria-label={`Preview ${subtask.title} as ${complete ? 'incomplete' : 'complete'}`}
+                              tabIndex={-1}
+                              className="flex h-4 w-4 shrink-0 cursor-default items-center justify-center rounded-full"
+                              aria-label={`${subtask.title} is ${complete ? 'complete' : 'incomplete'}`}
                             >
                               <Check
                                 size={11}
@@ -1314,17 +1435,6 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null }) => {
                             <span className={`min-w-0 flex-1 truncate text-[12px] leading-5 ${complete ? 'text-zinc-600 line-through' : 'text-zinc-400'}`}>
                               {subtask.title}
                             </span>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setActiveInstruction(subtask);
-                              }}
-                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-zinc-600 transition hover:bg-white/[0.04] hover:text-zinc-300"
-                              aria-label={`Open instructions for ${subtask.title}`}
-                            >
-                              <Info size={12} />
-                            </button>
                           </div>
                         );
                       })}
@@ -1340,45 +1450,79 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null }) => {
                   >
                     Back
                   </button>
-                  <button
-                    type="button"
-                    onClick={goToNextTask}
-                    disabled={activeTaskIndex === TASKLIST_DEFINITIONS.length - 1}
-                    className="rounded-full bg-white px-4 py-2 text-[11px] font-bold text-black transition hover:bg-zinc-200 disabled:pointer-events-none disabled:opacity-30"
-                  >
-                    Next
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setActiveInstruction(activeTask.subtasks[0]);
+                      }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-600 transition hover:bg-white/[0.04] hover:text-zinc-300"
+                      aria-label={`Open instructions for ${activeTask.title}`}
+                    >
+                      <CircleQuestionMark size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goToNextTask}
+                      disabled={activeTaskIndex === TASKLIST_DEFINITIONS.length - 1}
+                      className="rounded-full bg-white px-4 py-2 text-[11px] font-bold text-black transition hover:bg-zinc-200 disabled:pointer-events-none disabled:opacity-30"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
-          )}
-        </AnimatePresence>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen((value) => !value);
-            onOpenIntro?.();
-          }}
-          className="w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#070707]/95 text-left shadow-[0_14px_44px_rgba(0,0,0,0.38)] backdrop-blur-xl transition hover:bg-white/[0.035]"
-          aria-expanded={open}
-        >
-          <div className="flex h-9 items-center gap-3 px-3">
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.02em] text-white">Getting Started</span>
-            <span className="shrink-0 text-[10px] font-medium text-zinc-500">{completedCount}/{totalCount}</span>
-            {open ? <ChevronDown size={14} className="shrink-0 text-zinc-500" /> : <ChevronUp size={14} className="shrink-0 text-zinc-500" />}
-          </div>
-          <div className="h-[3px] w-full overflow-hidden bg-white/[0.06]">
-            <div className="h-full brand-gradient transition-all duration-500" style={{ width: `${overallProgress}%` }} />
-          </div>
-          {!open && (
-            <div className="px-3 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-600">Next task</p>
-              <p className={`mt-0.5 truncate text-[12px] font-medium tracking-[-0.01em] ${activeTaskComplete ? 'text-zinc-600 line-through' : 'text-zinc-400'}`}>
-                {activeTask.title}
+          ) : (
+          <motion.button
+            key="getting-started-collapsed"
+            type="button"
+            onClick={() => {
+              setOpen(true);
+              onOpenIntro?.();
+            }}
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#070707]/95 text-left shadow-[0_6px_18px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-xl transition hover:bg-white/[0.035]"
+            aria-expanded={open}
+          >
+            <div className="flex h-9 items-center gap-3 px-3">
+              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.02em] text-white">Getting Started</span>
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onHide?.();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onHide?.();
+                }}
+                className="shrink-0 text-[10px] font-medium text-zinc-600 transition hover:text-zinc-300"
+              >
+                Hide
+              </span>
+              <span className="shrink-0 text-[10px] font-medium text-zinc-500">{completedCount}/{totalCount}</span>
+              <ChevronUp size={14} className="shrink-0 text-zinc-500" />
+            </div>
+            <div className="h-[3px] w-full overflow-hidden bg-white/[0.06]">
+              <div className="h-full brand-gradient transition-all duration-500" style={{ width: `${overallProgress}%` }} />
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2">
+              <p className="shrink-0 text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-600">Next task</p>
+              <p className={`min-w-0 flex-1 truncate text-[12px] font-medium tracking-[-0.01em] ${nextIncompleteTaskComplete ? 'text-zinc-600 line-through' : 'text-zinc-400'}`}>
+                {nextIncompleteTask.title}
               </p>
             </div>
+          </motion.button>
           )}
-        </button>
+        </AnimatePresence>
       </div>
       <TasklistInstructionModal subtask={activeInstruction} onClose={() => setActiveInstruction(null)} />
     </>
@@ -1607,6 +1751,9 @@ const SonarDashboard = () => {
   const [recentlyHiredReceptionist, setRecentlyHiredReceptionist] = useState(false);
   const [scenarioTriggerPlaced, setScenarioTriggerPlaced] = useState(false);
   const [scenarioActionPlaced, setScenarioActionPlaced] = useState(false);
+  const [backendTasklistState, setBackendTasklistState] = useState(null);
+  const [showSetupGuide, setShowSetupGuide] = useState(true);
+  const tasklistPersistRef = useRef('');
   const userId = authSession?.user?.id || profile?.id || null;
 
   const dismissPopup = useCallback(async (popup) => {
@@ -1652,7 +1799,84 @@ const SonarDashboard = () => {
     setRecentlyHiredReceptionist(false);
     setScenarioTriggerPlaced(false);
     setScenarioActionPlaced(false);
+    setBackendTasklistState(null);
+    setShowSetupGuide(true);
+    tasklistPersistRef.current = '';
   }, [userId]);
+
+  const saveShowSetupGuidePreference = useCallback(async (value) => {
+    setShowSetupGuide(value);
+    if (!userId) return;
+
+    try {
+      const { data: existingSettings, error: existingSettingsError } = await supabase
+        .from('account_settings')
+        .select('id,preferences,business_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (existingSettingsError && existingSettingsError.code !== 'PGRST116') throw existingSettingsError;
+
+      const nextPreferences = {
+        ...(existingSettings?.preferences || {}),
+        general: {
+          ...((existingSettings?.preferences || {}).general || {}),
+          show_setup_guide: value,
+        },
+      };
+
+      if (existingSettings?.id) {
+        const { error } = await supabase
+          .from('account_settings')
+          .update({ preferences: nextPreferences })
+          .eq('id', existingSettings.id)
+          .eq('user_id', userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('account_settings')
+          .insert({ user_id: userId, business_id: staffBusinessId || null, preferences: nextPreferences });
+        if (error) throw error;
+      }
+
+      window.dispatchEvent(new CustomEvent('sonar:preferences-updated', {
+        detail: { preferences: nextPreferences },
+      }));
+    } catch (error) {
+      console.error('[Tasklist] Failed to save setup guide preference:', error);
+    }
+  }, [staffBusinessId, userId]);
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    let cancelled = false;
+    supabase
+      .from('account_settings')
+      .select('preferences')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error && error.code !== 'PGRST116') {
+          console.error('[Tasklist] Failed to load setup guide preference:', error);
+          return;
+        }
+        setShowSetupGuide(data?.preferences?.general?.show_setup_guide !== false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    const handlePreferencesUpdated = (event) => {
+      const nextValue = event.detail?.preferences?.general?.show_setup_guide;
+      if (typeof nextValue === 'boolean') setShowSetupGuide(nextValue);
+    };
+    window.addEventListener('sonar:preferences-updated', handlePreferencesUpdated);
+    return () => window.removeEventListener('sonar:preferences-updated', handlePreferencesUpdated);
+  }, []);
 
   useEffect(() => {
     const handleTriggerPlaced = () => setScenarioTriggerPlaced(true);
@@ -1798,6 +2022,131 @@ const SonarDashboard = () => {
   const liveCallSeen = Array.isArray(session?.calls)
     ? session.calls.length > 0
     : Boolean(session?.active_call || session?.current_call || session?.call);
+
+  const loadTasklistState = useCallback(async () => {
+    if (!userId) {
+      setBackendTasklistState(null);
+      return;
+    }
+
+    try {
+      const { data: business, error: businessError } = await supabase
+        .from('businesses')
+        .select('id,name,phone,email,address,city,state,zip,business_hours,forwarding_config,people_field_config')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (businessError) throw businessError;
+
+      let staffRows = [];
+      let purchasedNumberRows = [];
+      let activeCustomFieldKeys = [];
+
+      if (business?.id) {
+        const [staffResponse, purchasedNumbersResponse, customFieldsResponse] = await Promise.all([
+          supabase
+            .from('staff')
+            .select('id,full_name,first_name,last_name,is_active,working_hours')
+            .eq('business_id', business.id),
+          supabase
+            .from('purchased_numbers')
+            .select('phone_number,status,is_active,kind')
+            .eq('business_id', business.id),
+          supabase
+            .from('people_schema')
+            .select('field_key,is_active')
+            .eq('business_id', business.id)
+            .eq('is_active', true),
+        ]);
+
+        if (staffResponse.error) {
+          console.error('[Tasklist] Failed to load staff state:', staffResponse.error);
+        } else {
+          staffRows = staffResponse.data || [];
+        }
+
+        if (purchasedNumbersResponse.error) {
+          console.error('[Tasklist] Failed to load purchased number state:', purchasedNumbersResponse.error);
+        } else {
+          purchasedNumberRows = purchasedNumbersResponse.data || [];
+        }
+
+        if (customFieldsResponse.error) {
+          console.error('[Tasklist] Failed to load intake field state:', customFieldsResponse.error);
+        } else {
+          activeCustomFieldKeys = (customFieldsResponse.data || [])
+            .map((field) => field.field_key)
+            .filter(hasText);
+        }
+      }
+
+      const nextTasklist = createTasklistState({
+        business,
+        agents,
+        staff: staffRows,
+        purchasedNumbers: purchasedNumberRows,
+        activeCustomFieldKeys,
+      });
+
+      setBackendTasklistState(nextTasklist);
+
+      const serialized = JSON.stringify(nextTasklist);
+      if (tasklistPersistRef.current === serialized) return;
+      tasklistPersistRef.current = serialized;
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ tasklist: nextTasklist })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('[Tasklist] Failed to persist tasklist state:', updateError);
+        return;
+      }
+
+      refreshProfile?.();
+    } catch (error) {
+      console.error('[Tasklist] Failed to load tasklist state:', error);
+    }
+  }, [agents, refreshProfile, userId]);
+
+  useEffect(() => {
+    loadTasklistState();
+  }, [loadTasklistState]);
+
+  useEffect(() => {
+    if (!userId || !staffBusinessId) return undefined;
+    const reload = () => loadTasklistState();
+    const channel = supabase
+      .channel(`tasklist-source-${userId}-${staffBusinessId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'businesses', filter: `id=eq.${staffBusinessId}` },
+        reload
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staff', filter: `business_id=eq.${staffBusinessId}` },
+        reload
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'purchased_numbers', filter: `business_id=eq.${staffBusinessId}` },
+        reload
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'people_schema', filter: `business_id=eq.${staffBusinessId}` },
+        reload
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadTasklistState, staffBusinessId, userId]);
 
   const handleRestoreAgent = useCallback(async (agentId) => {
     const result = await api.restoreAgent(agentId);
@@ -2327,7 +2676,13 @@ const SonarDashboard = () => {
         profile={profile}
         onClose={() => dismissPopup(activePopup)}
       />
-      <TasklistWidget tasklistState={profile?.tasklist} onOpenIntro={() => setManualPopupId('tasklist_intro')} />
+      {showSetupGuide && (
+        <TasklistWidget
+          tasklistState={backendTasklistState || profile?.tasklist}
+          onOpenIntro={() => setManualPopupId('tasklist_intro')}
+          onHide={() => saveShowSetupGuidePreference(false)}
+        />
+      )}
       <PersistentAudioPlayer />
     </div>
     </CallLogsProvider>
