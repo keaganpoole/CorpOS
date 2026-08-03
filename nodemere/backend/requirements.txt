@@ -10,3 +10,4 @@ pydantic[email]
 openai
 requests
 elevenlabs
+reportlab

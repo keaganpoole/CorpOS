@@ -10,6 +10,7 @@ import asyncio
 import requests
 import base64
 import binascii
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, timezone, timedelta
@@ -119,6 +120,12 @@ from .verification_service import (
     get_verification_status,
 )
 from .document_service import create_document_request, get_document_request, get_document_request_status, store_document
+from .contract_service import (
+    clone_voice,
+    create_contract,
+    get_contract_public_state,
+    sign_contract,
+)
 
 try:
     from elevenlabs.client import ElevenLabs
@@ -5193,6 +5200,136 @@ async def check_document_upload_status_tool(request: Request):
         request_id=request_id,
         business_id=context.get("business_id"),
     )
+
+
+class ContractCreateRequest(BaseModel):
+    signer_name: Optional[str] = None
+    signer_email: Optional[EmailStr] = None
+    voice_display_name: Optional[str] = None
+    business_id: Optional[int] = None
+    person_id: Optional[int] = None
+    user_id: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class ContractSignRequest(BaseModel):
+    signer_name: str = Field(..., min_length=1, max_length=160)
+    signer_email: EmailStr
+    signature_data_url: str
+    consent: Optional[dict] = None
+
+
+def get_client_ip(request: Request) -> Optional[str]:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
+@app.post("/api/contracts", tags=["Voice Contracts"])
+async def create_voice_contract(payload: ContractCreateRequest):
+    return create_contract(
+        supabase_admin,
+        base_url=verification_base_url,
+        signer_name=payload.signer_name or "",
+        signer_email=str(payload.signer_email or ""),
+        voice_display_name=payload.voice_display_name or "",
+        business_id=payload.business_id,
+        person_id=payload.person_id,
+        user_id=payload.user_id,
+        metadata=payload.metadata or {},
+    )
+
+
+@app.post("/api/tools/create-contract-link", tags=["Server Tools"])
+@app.post("/api/tools/request-contract", tags=["Server Tools"])
+async def create_voice_contract_tool(request: Request):
+    payload = await parse_request_payload(request)
+    context = build_verification_request_context(payload)
+    metadata = first_present(payload, "metadata") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    business = context.get("business") or {}
+    if business.get("name") and not metadata.get("business_name"):
+        metadata["business_name"] = business.get("name")
+    return create_contract(
+        supabase_admin,
+        base_url=verification_base_url,
+        signer_name=first_present(payload, "signer_name", "name", "full_name") or "",
+        signer_email=first_present(payload, "signer_email", "email") or "",
+        voice_display_name=first_present(payload, "voice_display_name", "voice_name") or "",
+        business_id=context.get("business_id"),
+        person_id=context.get("person_id"),
+        user_id=context.get("user_id"),
+        metadata=metadata,
+    )
+
+
+@app.get("/api/contracts/{token}", tags=["Voice Contracts"])
+async def get_voice_contract_state(token: str):
+    return get_contract_public_state(supabase_admin, token)
+
+
+@app.post("/api/contracts/{token}/sign", tags=["Voice Contracts"])
+async def sign_voice_contract(token: str, payload: ContractSignRequest, request: Request):
+    result = sign_contract(
+        supabase_admin,
+        token=token,
+        signer_name=payload.signer_name,
+        signer_email=str(payload.signer_email),
+        signature_data_url=payload.signature_data_url,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+        consent=payload.consent or {},
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+    return result
+
+
+@app.get("/api/contracts/{token}/clone", tags=["Voice Contracts"])
+async def get_voice_clone_state(token: str):
+    result = get_contract_public_state(supabase_admin, token)
+    if not result.get("success"):
+        return result
+    if result.get("status") not in {"signed", "cloned"}:
+        return {**result, "clone_ready": False, "message": "Sign the agreement before cloning your voice."}
+    return {**result, "clone_ready": True}
+
+
+@app.post("/api/contracts/{token}/clone", tags=["Voice Contracts"])
+async def create_instant_voice_clone(token: str, request: Request):
+    try:
+        form = await request.form()
+        voice_name = str(form.get("voice_name") or "").strip()
+        remove_background_noise = str(form.get("remove_background_noise") or "true").lower() in {"1", "true", "yes", "on"}
+        raw_files = form.getlist("files")
+        uploaded_files = []
+        for uploaded in raw_files:
+            if uploaded is None or not hasattr(uploaded, "read"):
+                continue
+            content = await uploaded.read()
+            uploaded_files.append(SimpleNamespace(
+                filename=getattr(uploaded, "filename", "sample.webm"),
+                content_type=getattr(uploaded, "content_type", None),
+                content=content,
+            ))
+        result = clone_voice(
+            supabase_admin,
+            token=token,
+            api_key=elevenlabs_api_key,
+            voice_name=voice_name,
+            uploaded_files=uploaded_files,
+            remove_background_noise=remove_background_noise,
+        )
+        if not result.get("success"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Voice clone request failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": "Voice cloning failed. Please try again.", "debug": str(exc)}) from exc
 
 
 @app.get("/api/upload/{token}", tags=["Document Upload"])
