@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -974,7 +974,28 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   );
 };
 
-export function RightFeatureList({ featureProgress, items, useScrollHighlight = false, mobilePageSize = null, mobileMaxItems = null }) {
+const getFeatureListVisualState = ({ featureProgress, items, useScrollHighlight, mobilePageSize, mobileMaxItems }) => {
+  const isVisible = featureProgress > 0.01;
+  const visibleItemCount = mobileMaxItems && items.length > mobileMaxItems ? mobileMaxItems : items.length;
+  const activeItemIndex = useScrollHighlight && isVisible
+    ? Math.min(visibleItemCount - 1, Math.max(0, Math.floor(featureProgress * visibleItemCount)))
+    : null;
+  const visibleRows = useScrollHighlight
+    ? null
+    : items.map((_, index) => isVisible && featureProgress > 0.12 + index * 0.11);
+
+  return `${isVisible ? 1 : 0}:${activeItemIndex ?? '-'}:${mobilePageSize ?? '-'}:${visibleRows ? visibleRows.join('') : '-'}`;
+};
+
+const areFeatureListPropsEqual = (previous, next) => (
+  previous.items === next.items
+  && previous.useScrollHighlight === next.useScrollHighlight
+  && previous.mobilePageSize === next.mobilePageSize
+  && previous.mobileMaxItems === next.mobileMaxItems
+  && getFeatureListVisualState(previous) === getFeatureListVisualState(next)
+);
+
+export const RightFeatureList = memo(function RightFeatureList({ featureProgress, items, useScrollHighlight = false, mobilePageSize = null, mobileMaxItems = null }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [isMobileFeatureViewport, setIsMobileFeatureViewport] = useState(false);
@@ -1114,7 +1135,7 @@ export function RightFeatureList({ featureProgress, items, useScrollHighlight = 
       </div>
     </div>
   );
-}
+}, areFeatureListPropsEqual);
 
 function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
   const today = useMemo(() => new Date(), []);
