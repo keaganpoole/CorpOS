@@ -463,6 +463,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const isCrmVariant = variant === 'people-crm';
   const isCrmHeroVariant = variant === 'people-crm-hero';
   const isMonitoringVariant = variant === 'live-monitoring';
+  const jitterDebugId = isMonitoringVariant ? 'monitoring' : isScenariosVariant ? 'scenarios' : isCrmVariant ? 'crm' : null;
   const featureItems = isMonitoringVariant
     ? MONITORING_FEATURE_ITEMS
     : isCrmVariant
@@ -727,7 +728,10 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     const scenariosFeatureOpacity = isMonitoringVariant ? (featuresEntered ? 1 : 0) : isScenariosVariant && demoResetState ? 0 : holdScenarioIntro || holdCrmIntro ? 0 : featuresEntered ? 1 : 0;
     const builderBlur = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 3.5 + scenariosFeatureProgress * 7.5 : 0;
     const builderBrightness = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 0.82 - scenariosFeatureProgress * 0.58 : 1;
-    const jitterState = sectionProgress < 0.68 ? 'inactive' : compactFeaturesListProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
+    const featureLockStartProgress = isMonitoringVariant ? 0.44 : 0.68;
+    const jitterState = sectionProgress < featureLockStartProgress
+      ? 'inactive'
+      : compactFeaturesListProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
     const titleLines = isMonitoringVariant
       ? ['Live Call Monitoring']
       : isCrmVariant
@@ -743,14 +747,14 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
 
     return (
       <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[215vh]' : 'h-[340vh]'}`}
-        data-jitter-debug-root={jitterDebugEnabled && isCrmVariant ? 'crm' : undefined}
-        data-jitter-section-progress={jitterDebugEnabled && isCrmVariant ? sectionProgress : undefined}
-        data-jitter-feature-progress={jitterDebugEnabled && isCrmVariant ? compactFeaturesListProgress : undefined}
-        data-jitter-state={jitterDebugEnabled && isCrmVariant ? jitterState : undefined}
-        data-jitter-render-count={jitterDebugEnabled && isCrmVariant ? jitterRenderCount.current : undefined}
-        data-jitter-viewport={jitterDebugEnabled && isCrmVariant ? `${viewportSize.width}×${viewportSize.height}` : undefined}
+        data-jitter-debug-root={jitterDebugEnabled ? jitterDebugId : undefined}
+        data-jitter-section-progress={jitterDebugEnabled ? sectionProgress : undefined}
+        data-jitter-feature-progress={jitterDebugEnabled ? compactFeaturesListProgress : undefined}
+        data-jitter-state={jitterDebugEnabled ? jitterState : undefined}
+        data-jitter-render-count={jitterDebugEnabled ? jitterRenderCount.current : undefined}
+        data-jitter-viewport={jitterDebugEnabled ? `${viewportSize.width}x${viewportSize.height}` : undefined}
       >
-        <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]" data-jitter-debug-sticky={jitterDebugEnabled && isCrmVariant ? 'crm' : undefined}>
+        <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]" data-jitter-debug-sticky={jitterDebugEnabled ? jitterDebugId : undefined}>
           <div
             className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
               introOpacity <= 0.01 ? 'pointer-events-none' : ''
@@ -877,7 +881,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-500 ease-out ${
               scenariosFeatureOpacity <= 0.01 ? 'pointer-events-none' : ''
             }`}
-            data-jitter-debug-overlay={jitterDebugEnabled && isCrmVariant ? 'crm' : undefined}
+            data-jitter-debug-overlay={jitterDebugEnabled ? jitterDebugId : undefined}
             style={{
               opacity: scenariosFeatureOpacity,
               visibility: scenariosFeatureOpacity <= 0.01 ? 'hidden' : 'visible',
@@ -889,7 +893,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 featureProgress={compactFeaturesListProgress}
                 items={featureItems}
                 useScrollHighlight={isCompactFeatureViewport}
-                debugId={jitterDebugEnabled && isCrmVariant ? 'crm' : null}
+                debugId={jitterDebugEnabled ? jitterDebugId : null}
               />
             </div>
           </div>

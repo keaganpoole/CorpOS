@@ -274,11 +274,11 @@ main,
     overflow-x: clip;
 }
 /* Match the hero's sticky ancestor chain. Each showcase scene clips its own pixels. */
-main > section.content-section--showcase:not(.comparison-host) {
+main > section.content-section--showcase {
     overflow-x: visible;
 }
-/* JITTER-TEST-04A: restore only the former clipping boundary for device A/B. */
-[data-jitter-test="restore-showcase-clip"] main > section.content-section--showcase:not(.comparison-host) {
+/* JITTER-TEST-04A: restore the former clipping boundary for device A/B. */
+[data-jitter-test="restore-showcase-clip"] main > section.content-section--showcase {
     overflow-x: clip;
 }
 .content-section:not(.comparison-host) :is(h1, h2, h3, h4, h5, h6, p),

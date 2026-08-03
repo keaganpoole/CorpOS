@@ -124,7 +124,7 @@ export default function JitterDebugOverlay() {
 
     const events = { scroll: 0, resize: 0, visualViewportResize: 0, touchMove: 0 };
     const capture = [];
-    const previousRenderCounts = { hero: -1, crm: -1 };
+    const previousRenderCounts = { hero: -1, monitoring: -1, crm: -1, comparison: -1, scenarios: -1 };
     let frame = 0;
     let raf = null;
     const log = new URLSearchParams(window.location.search).get('jitterLog') === '1';
@@ -134,7 +134,7 @@ export default function JitterDebugOverlay() {
     const onTouchMove = () => { events.touchMove += 1; };
 
     const sample = (timestamp) => {
-      const sections = ['hero', 'crm'].map((name) => {
+      const sections = ['hero', 'monitoring', 'crm', 'comparison', 'scenarios'].map((name) => {
         const result = sectionSnapshot(name, events, previousRenderCounts[name]);
         if (result) previousRenderCounts[name] = result.reactRenderCount;
         return result;

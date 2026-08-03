@@ -101,7 +101,7 @@ const FINALE_ITEMS = [
 
 const FINALE_ROI_MULTIPLE = 14;
 
-export default function WorkWeekComparison({ scrollStep = null, scrollDirection = 0, comparisonActive = true, finaleProgress = 0 }) {
+export default function WorkWeekComparison({ scrollStep = null, scrollDirection = 0, comparisonActive = true, finaleProgress = 0, jitterDebugEnabled = false }) {
   const [[step, direction], setPage] = useState([0, 0]);
   const [stats, setStats] = useState({ time: 0, rev: 0 });
   const [datePhase, setDatePhase] = useState('hidden');
@@ -279,7 +279,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
   };
 
   return (
-    <div ref={containerRef} className="comparison-section relative flex h-[100dvh] flex-col overflow-hidden bg-[#050505] font-sans text-white selection:bg-white selection:text-black">
+    <div ref={containerRef} className="comparison-section relative flex h-[100dvh] flex-col overflow-hidden bg-[#050505] font-sans text-white selection:bg-white selection:text-black" data-jitter-debug-list={jitterDebugEnabled ? 'comparison' : undefined}>
       <header className="pointer-events-none absolute left-0 top-0 z-50 flex w-full items-start justify-between p-8 md:p-12">
         <motion.div className={finaleComplete ? 'pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : 'pointer-events-auto'} animate={finaleComplete ? { opacity: 0, scale: 0.9 } : { opacity: 1, scale: 1 }} transition={{ duration: 0.55 }}>
           <AnimatedStat value={displayStats.time} suffix=" mins" label="Time Recovered" shouldReveal={statsReveal} />

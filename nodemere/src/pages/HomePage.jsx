@@ -524,6 +524,9 @@ const BlinkedWord = ({ progress }) => {
 
 const ComparisonShowcase = () => {
   const { rootRef, progress: sectionProgress, direction } = useSectionScrollProgress({ mobileMinDelta: 0.0025 });
+  const jitterDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('jitterDebug') === '1';
+  const jitterRenderCount = useRef(0);
+  if (jitterDebugEnabled) jitterRenderCount.current += 1;
   const [mondayRevealComplete, setMondayRevealComplete] = useState(false);
   const [cinematicStarted, setCinematicStarted] = useState(false);
   const [blinkProgress, setBlinkProgress] = useState(0);
@@ -617,6 +620,11 @@ const ComparisonShowcase = () => {
   const timelineProgress = clamp(comparisonProgress / 0.72, 0, 1);
   const scrollStep = Math.min(6, Math.floor(timelineProgress * 7));
   const finaleProgress = clamp((comparisonProgress - 0.72) / 0.28, 0, 1);
+  const jitterState = sectionProgress < 0.025
+    ? 'inactive'
+    : !introExited || comparisonProgress < 1
+      ? 'entering'
+      : sectionProgress < 1 ? 'locked' : 'exiting';
 
   useEffect(() => {
     if (!introExited || mondayRevealComplete) return undefined;
@@ -640,8 +648,15 @@ const ComparisonShowcase = () => {
   }, [sectionProgress]);
 
   return (
-    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[560vh]">
-      <div className="sticky top-0 h-screen overflow-hidden bg-[#020202]">
+    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[560vh]"
+      data-jitter-debug-root={jitterDebugEnabled ? 'comparison' : undefined}
+      data-jitter-section-progress={jitterDebugEnabled ? sectionProgress : undefined}
+      data-jitter-feature-progress={jitterDebugEnabled ? comparisonProgress : undefined}
+      data-jitter-state={jitterDebugEnabled ? jitterState : undefined}
+      data-jitter-render-count={jitterDebugEnabled ? jitterRenderCount.current : undefined}
+      data-jitter-viewport={jitterDebugEnabled ? 'not-stored' : undefined}
+    >
+      <div className="sticky top-0 h-screen overflow-hidden bg-[#020202]" data-jitter-debug-sticky={jitterDebugEnabled ? 'comparison' : undefined}>
         <div
           className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
             introExited ? 'pointer-events-none' : ''
@@ -663,13 +678,14 @@ const ComparisonShowcase = () => {
           className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${
             !introExited ? 'pointer-events-none' : ''
           }`}
+          data-jitter-debug-overlay={jitterDebugEnabled ? 'comparison' : undefined}
           style={{
             opacity: introExited ? 1 : 0,
             visibility: introExited ? 'visible' : 'hidden',
             transform: `translateY(${introExited ? 0 : 18}px)`,
           }}
         >
-          <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} comparisonActive={introExited} finaleProgress={finaleProgress} />
+          <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} comparisonActive={introExited} finaleProgress={finaleProgress} jitterDebugEnabled={jitterDebugEnabled} />
         </div>
       </div>
     </section>
