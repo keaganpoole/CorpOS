@@ -1198,7 +1198,7 @@ const PopupModal = ({ popup, profile, onClose }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/45 p-6 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]"
           onClick={onClose}
         >
           <motion.section
@@ -1262,7 +1262,7 @@ const TasklistInstructionModal = ({ subtask, onClose }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]"
           onClick={onClose}
         >
           <motion.section
