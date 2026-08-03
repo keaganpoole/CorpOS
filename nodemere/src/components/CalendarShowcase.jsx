@@ -877,6 +877,8 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 featureProgress={compactFeaturesListProgress}
                 items={featureItems}
                 useScrollHighlight={isCompactFeatureViewport}
+                mobilePageSize={3}
+                mobileMaxItems={6}
               />
             </div>
           </div>
