@@ -1363,13 +1363,27 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
 
     return Object.fromEntries(
       Object.entries(displayedItems).filter(([day]) => (
-        new Date(currentYear, currentMonth, Number(day)).getDay() !== 0
+        Number(day) === currentDay || new Date(currentYear, currentMonth, Number(day)).getDay() !== 0
       ))
     );
   }, [itemsDatabase, currentDay, currentMonth, currentYear]);
 
   const assignedItemsDatabase = useMemo(() => {
-    const pool = receptionists.length > 0 ? receptionists : FALLBACK_RECEPTIONISTS;
+    const requiredDemoNames = ['bonnie', 'maggie', 'brian'];
+    const pool = [...(receptionists.length > 0 ? receptionists : FALLBACK_RECEPTIONISTS)];
+    requiredDemoNames.forEach((requiredName) => {
+      const hasRequiredReceptionist = pool.some((receptionist) => {
+        const firstName = String(receptionist?.first_name || '').trim().toLowerCase();
+        const fullName = String(receptionist?.full_name || '').trim().toLowerCase();
+        return firstName === requiredName || fullName === requiredName;
+      });
+      const fallbackReceptionist = FALLBACK_RECEPTIONISTS.find((receptionist) => (
+        String(receptionist.first_name || '').trim().toLowerCase() === requiredName
+      ));
+      if (!hasRequiredReceptionist && fallbackReceptionist) {
+        pool.push(fallbackReceptionist);
+      }
+    });
 
     const hashSeed = (value) => {
       const text = String(value || '');
@@ -1414,7 +1428,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
     const getAppointmentStatus = (event, day, index) => {
       const statuses = ['Completed', 'Booked', 'Confirmed', 'Cancelled'];
       if (Number(day) === currentDay) {
-        return index === 0 ? 'Booked' : 'Confirmed';
+        return index === 2 ? 'Completed' : (index === 0 ? 'Booked' : 'Confirmed');
       }
 
       return statuses[hashSeed(`${day}-${event.title}-${event.time}-${index}-status`) % statuses.length];
@@ -1611,8 +1625,14 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                   ? activeAppointmentPrompt.action
                   : null;
                 const showAppointmentActions = activeAppointmentActionsId === event.id;
-                const showPeekReveal = showAvatarHint && hasAppointmentActions && !showAppointmentActions && !activePromptAction;
-                const showAvatarReturn = showAvatarHintReturn && hasAppointmentActions && !showAppointmentActions && !activePromptAction;
+                const peekActions = hasAppointmentActions
+                  ? appointmentActions
+                  : event.status === 'Completed'
+                    ? [{ label: 'Completed', className: 'text-emerald-300' }]
+                    : [];
+                const hasPeekActions = peekActions.length > 0;
+                const showPeekReveal = showAvatarHint && hasPeekActions && !showAppointmentActions && !activePromptAction;
+                const showAvatarReturn = showAvatarHintReturn && hasPeekActions && !showAppointmentActions && !activePromptAction;
                 const showActionLane = showAppointmentActions || showPeekReveal || Boolean(activePromptAction);
                 const toggleAppointmentActions = () => {
                   if (!hasAppointmentActions) return;
@@ -1712,7 +1732,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                                   transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
                                   className={showPeekReveal ? 'demo-calendar-peek-actions' : 'flex items-center gap-2.5'}
                                 >
-                                  {appointmentActions.map((action) => (
+                                  {(showPeekReveal ? peekActions : appointmentActions).map((action) => (
                                     <span
                                       key={action.label}
                                       onClick={(actionEvent) => {

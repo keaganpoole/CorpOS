@@ -666,14 +666,16 @@ const HomePage = () => {
   const [showSplash, setShowSplash] = useState(true);
   useLegacyAnimation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [navOnHero, setNavOnHero] = useState(true);
+  const [headerHasAppeared, setHeaderHasAppeared] = useState(false);
   const heroRef = useRef(null);
 
   useEffect(() => {
     if (!heroRef.current) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setNavOnHero(entry.isIntersecting);
+        if (!entry.isIntersecting) {
+          setHeaderHasAppeared(true);
+        }
       },
       { threshold: 0 }
     );
@@ -851,7 +853,7 @@ const HomePage = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      <div className={`header${!navOnHero ? ' is-visible' : ''}`}>
+      <div className={`header${headerHasAppeared ? ' is-visible' : ''}`}>
         <nav className="nav-content">
           <img src={logoImage} alt="Nodemere" className="header-logo" />
 
@@ -894,7 +896,7 @@ const HomePage = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.2 }}
-              className="md:hidden absolute top-full left-0 w-full bg-[var(--color-black)] shadow-lg py-4 z-50"
+              className="md:hidden absolute top-full left-0 w-full bg-[#020202] shadow-lg py-4 z-50"
             >
               <div className="flex flex-col items-center space-y-4">
                 {session && (
