@@ -105,6 +105,12 @@ const FALLBACK_RECEPTIONISTS = [
     first_name: 'Maggie',
     avatar: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie.png',
   },
+  {
+    id: 'fallback-brian',
+    full_name: 'Brian',
+    first_name: 'Brian',
+    avatar: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/brian2.png',
+  },
 ];
 const FEATURE_ITEMS = [
   {
@@ -912,7 +918,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                     </>
                   )}
                 </h2>
-                <div className={`homepage-copy-reveal homepage-copy-reveal--delayed calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:mx-auto md:max-w-[36rem] md:text-center md:text-[1.1rem] md:leading-[1.55] lg:mx-0 lg:max-w-[24rem] lg:text-left lg:text-base lg:leading-[1.45] ${copyVisible ? 'is-visible' : ''}`}>
+                <div className={`homepage-copy-reveal ${variant === 'calendar' ? '' : 'homepage-copy-reveal--delayed'} calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:mx-auto md:max-w-[36rem] md:text-center md:text-[1.1rem] md:leading-[1.55] lg:mx-0 lg:max-w-[24rem] lg:text-left lg:text-base lg:leading-[1.45] ${copyVisible ? 'is-visible' : ''}`}>
                   {isScenariosVariant ? (
                     <>Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and <GradientWord>follow-ups</GradientWord>.</>
                   ) : (
@@ -1179,7 +1185,11 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
         if (cancelled) return;
         if (error) throw error;
 
-        const catalogReceptionists = (data || []).filter((row) => row?.avatar);
+        const catalogReceptionists = (data || []).filter((row) => {
+          if (!row?.avatar) return false;
+          const firstName = String(row.first_name || row.full_name || '').trim().toLowerCase();
+          return firstName !== 'kayla' && firstName !== 'nikki';
+        });
         if (catalogReceptionists.length > 0) {
           setReceptionists(catalogReceptionists);
         }
@@ -1341,7 +1351,11 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
   );
 
   const displayItemsDatabase = useMemo(() => {
-    const todayItems = itemsDatabase[24] || [];
+    const todayItems = [
+      { title: 'Color Consultation', category: 'Color', time: '9:45 AM', tagColor: getTagColor('Color') },
+      { title: 'Haircut Appointment', category: 'Haircut', time: '1:15 PM', tagColor: getTagColor('Haircut') },
+      { title: 'Blowout Appointment', category: 'Blowout', time: '4:30 PM', tagColor: getTagColor('Blowout') },
+    ];
     const displayedItems = {
       ...itemsDatabase,
       [currentDay]: todayItems,
@@ -1373,8 +1387,9 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
       })
     );
     const defaultReceptionistAssignments = [
-      findReceptionistByName('maggie'),
       findReceptionistByName('bonnie'),
+      findReceptionistByName('maggie'),
+      findReceptionistByName('brian'),
     ];
     const getAppointmentNote = (event, day, index) => {
       const notesByTitle = {
@@ -1398,7 +1413,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
     };
     const getAppointmentStatus = (event, day, index) => {
       const statuses = ['Completed', 'Booked', 'Confirmed', 'Cancelled'];
-      if (Number(day) === 24) {
+      if (Number(day) === currentDay) {
         return index === 0 ? 'Booked' : 'Confirmed';
       }
 
@@ -1409,10 +1424,10 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
       Object.entries(displayItemsDatabase).map(([day, events]) => [
         day,
         (events || []).map((event, index) => {
-          const seedDay = Number(day) === currentDay ? 24 : day;
+          const seedDay = Number(day);
           const poolIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}`) % pool.length;
           const customerIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer`) % DEMO_CUSTOMER_FIRST_NAMES.length;
-          const receptionist = Number(seedDay) === 24
+          const receptionist = Number(day) === currentDay
             ? (defaultReceptionistAssignments[index] || pool[poolIndex])
             : pool[poolIndex];
           const status = getAppointmentStatus(event, seedDay, index);
