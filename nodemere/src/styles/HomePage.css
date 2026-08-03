@@ -269,9 +269,7 @@
 #myHtmlContent,
 main,
 .content-section,
-.content-section--showcase,
-.calendar-showcase,
-.scenario-demo-showcase {
+.content-section--showcase {
     width: 100%;
     max-width: 100%;
     overflow-x: clip;
