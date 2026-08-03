@@ -215,6 +215,9 @@ const defaultSettings = {
   cancellation_window_hours: 24,
   autonomy_index: 1,
   preferences: {
+    general: {
+      show_setup_guide: true,
+    },
     calls: {
       allow_caller_authentication: false,
     },
@@ -417,14 +420,34 @@ Important knowledge for the receptionist:
 - If the requested service timing is unclear, choose the longer appointment option and add a note for the staff member.
 - For new color clients, collect current hair color, desired result, hair history, and whether they have inspiration photos.`;
 
+const STAFF_NAME_PATTERN = /[^a-zA-Z\s.'-]/g;
+const STAFF_ROLE_PATTERN = /[^a-zA-Z0-9\s&/.,'-]/g;
+
+const maskStaffName = (value) => String(value || '').replace(STAFF_NAME_PATTERN, '').replace(/\s{2,}/g, ' ');
+const maskStaffRole = (value) => String(value || '').replace(STAFF_ROLE_PATTERN, '').replace(/\s{2,}/g, ' ');
+const maskStaffEmail = (value) => String(value || '').toLowerCase().replace(/\s/g, '').replace(/[^a-z0-9._%+-@]/g, '');
+const isValidStaffEmail = (value) => {
+  const email = String(value || '').trim();
+  if (!email) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+};
+const maskStaffPhone = (value) => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
+
+const staffInputClass = 'h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0';
+
 const createStaffFormState = (staff, baseHours = null) => ({
   id: staff?.id || null,
-  full_name: staff?.full_name || '',
-  first_name: staff?.first_name || '',
-  last_name: staff?.last_name || '',
-  role: staff?.role || '',
-  email: staff?.email || '',
-  phone: staff?.phone || '',
+  full_name: maskStaffName(staff?.full_name || ''),
+  first_name: maskStaffName(staff?.first_name || ''),
+  last_name: maskStaffName(staff?.last_name || ''),
+  role: maskStaffRole(staff?.role || ''),
+  email: maskStaffEmail(staff?.email || ''),
+  phone: maskStaffPhone(staff?.phone || ''),
   avatar: staff?.avatar || '',
   is_active: staff?.is_active !== false,
   knowledge: staff ? (staff.knowledge || '') : DEFAULT_STAFF_KNOWLEDGE,
@@ -1660,6 +1683,10 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       setError('Full name is required.');
       return false;
     }
+    if (!isValidStaffEmail(form.email)) {
+      setError('Enter a valid email address.');
+      return false;
+    }
     return true;
   };
 
@@ -1713,6 +1740,12 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
     if (!fullName) {
       setError('Full name is required.');
+      return;
+    }
+
+    if (!isValidStaffEmail(form.email)) {
+      setError('Enter a valid email address.');
+      setStaffSlide(0);
       return;
     }
 
@@ -1818,27 +1851,27 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block space-y-2 md:col-span-2">
             <span className="text-[13px] font-normal text-zinc-400">Full Name</span>
-            <input type="text" value={form.full_name} onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))} placeholder="e.g. Olivia Hart" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
+            <input type="text" value={form.full_name} onChange={(e) => setForm((prev) => ({ ...prev, full_name: maskStaffName(e.target.value) }))} placeholder="e.g. Olivia Hart" className={staffInputClass} />
           </label>
           <label className="block space-y-2">
             <span className="text-[13px] font-normal text-zinc-400">First Name</span>
-            <input type="text" value={form.first_name} onChange={(e) => setForm((prev) => ({ ...prev, first_name: e.target.value }))} placeholder="Olivia" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
+            <input type="text" value={form.first_name} onChange={(e) => setForm((prev) => ({ ...prev, first_name: maskStaffName(e.target.value) }))} placeholder="Olivia" className={staffInputClass} />
           </label>
           <label className="block space-y-2">
             <span className="text-[13px] font-normal text-zinc-400">Last Name</span>
-            <input type="text" value={form.last_name} onChange={(e) => setForm((prev) => ({ ...prev, last_name: e.target.value }))} placeholder="Hart" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
+            <input type="text" value={form.last_name} onChange={(e) => setForm((prev) => ({ ...prev, last_name: maskStaffName(e.target.value) }))} placeholder="Hart" className={staffInputClass} />
           </label>
           <label className="block space-y-2">
             <span className="text-[13px] font-normal text-zinc-400">Role</span>
-            <input type="text" value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))} placeholder="Senior Stylist" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
+            <input type="text" value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: maskStaffRole(e.target.value) }))} placeholder="Senior Stylist" className={staffInputClass} />
           </label>
           <label className="block space-y-2">
             <span className="text-[13px] font-normal text-zinc-400">Phone</span>
-            <input type="text" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="(555) 000-0000" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
+            <input type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: maskStaffPhone(e.target.value) }))} placeholder="(555) 000-0000" className={staffInputClass} />
           </label>
           <label className="block space-y-2 md:col-span-2">
             <span className="text-[13px] font-normal text-zinc-400">Email</span>
-            <input type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="olivia@business.com" className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700" />
+            <input type="email" inputMode="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: maskStaffEmail(e.target.value) }))} placeholder="olivia@business.com" className={staffInputClass} />
           </label>
         </div>
       );
@@ -1856,7 +1889,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
     if (staffSlide === 2) {
       return (
-        <textarea value={form.knowledge} onChange={(e) => setForm((prev) => ({ ...prev, knowledge: e.target.value }))} className="custom-scrollbar h-[410px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 pr-5 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-700" />
+        <textarea value={form.knowledge} onChange={(e) => setForm((prev) => ({ ...prev, knowledge: e.target.value }))} className="custom-scrollbar h-[410px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 pr-5 text-sm leading-6 text-white outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0" />
       );
     }
 
@@ -1918,7 +1951,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         ) : staffMembers.length === 0 ? (
           <div className={`flex flex-col items-center justify-center pb-20 text-center ${hideIntro && hideToolbar ? 'min-h-full' : 'min-h-[420px]'}`}>
             <Users size={30} strokeWidth={1.7} className="mb-4 text-zinc-500" />
-            <p className="text-[28px] font-semibold leading-none tracking-tight text-white">No staff on the schedule</p>
+            <p className="text-[28px] font-semibold leading-none tracking-tight text-white">No staff</p>
             <p className="text-[13px] leading-none text-zinc-500 -translate-y-1.5">Add a staff member your receptionist can book with.</p>
           </div>
         ) : (
@@ -2600,6 +2633,18 @@ const SettingsPage = () => {
         business_timezone: config.business_timezone || 'America/New_York',
         // App config from account_settings
         ...config,
+        preferences: {
+          ...defaultSettings.preferences,
+          ...(config.preferences || {}),
+          general: {
+            ...defaultSettings.preferences.general,
+            ...((config.preferences || {}).general || {}),
+          },
+          calls: {
+            ...defaultSettings.preferences.calls,
+            ...((config.preferences || {}).calls || {}),
+          },
+        },
         // Knowledge base from businesses table
         knowledge_base: {
           about: biz.about_us ?? '',
@@ -2681,6 +2726,10 @@ const SettingsPage = () => {
         ...prev,
         _business_id: normalizedBusinessId,
         id: savedSettings?.id || prev.id,
+      }));
+
+      window.dispatchEvent(new CustomEvent('sonar:preferences-updated', {
+        detail: { preferences: scopedAppConfig.preferences || {} },
       }));
 
       setSavedFlash(true);
@@ -2877,6 +2926,29 @@ const SettingsPage = () => {
       case 'preferences':
         return (
           <div className="space-y-4">
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">General</p>
+              <div className="rounded-2xl border border-white/[0.05] bg-zinc-950/40 p-5">
+                <div className="flex items-start justify-between gap-5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <ListChecks size={15} className="settings-icon" />
+                      <h4 className="text-[13px] font-semibold text-zinc-100">Show Setup Guide</h4>
+                    </div>
+                    <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
+                      Shows the Getting Started checklist in the lower-right corner of the dashboard.
+                    </p>
+                  </div>
+                  <Toggle
+                    value={settings.preferences?.general?.show_setup_guide !== false}
+                    onChange={(value) => updatePreference('general', 'show_setup_guide', value)}
+                    color="cyan"
+                  />
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Calls</p>
             <div className="rounded-2xl border border-white/[0.05] bg-zinc-950/40 p-5">
               <div className="flex items-start justify-between gap-5">
                 <div className="min-w-0">
@@ -2906,6 +2978,7 @@ const SettingsPage = () => {
                   color="cyan"
                 />
               </div>
+            </div>
             </div>
           </div>
         );

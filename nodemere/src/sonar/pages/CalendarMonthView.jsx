@@ -3,11 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
   Calendar as CalendarIcon,
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Search,
 } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
-import { formatTime, titleCase } from '../lib/appointmentSchema';
+import { APPOINTMENT_FIELDS, formatDate, formatTime, formatTimestampFull, titleCase } from '../lib/appointmentSchema';
+import { DEFAULT_FIELD_CONFIG, fetchBusinessFieldConfig, migrateLegacyFieldConfig } from '../lib/appointmentFieldConfig';
+import { fetchCustomFields, getCurrentBusinessId, getCustomValue, isCustomFieldKey } from '../lib/appointmentCustomFields';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const HOMEPAGE_TAG_COLORS = {
@@ -61,6 +66,26 @@ const appointmentFieldClass =
 const appointmentSmallFieldClass =
   'w-full rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-neutral-100 placeholder:text-neutral-600 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus:border-neutral-700 transition-all [color-scheme:dark]';
 
+const DETAIL_FIELD_SELECTION_KEY = 'SONAR_calendar_detail_fields';
+const DEFAULT_DETAIL_FIELD_IDS = ['service_id', 'notes'];
+
+const loadDetailFieldSelection = () => {
+  try {
+    const stored = localStorage.getItem(DETAIL_FIELD_SELECTION_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return DEFAULT_DETAIL_FIELD_IDS;
+};
+
+const saveDetailFieldSelection = (fieldIds) => {
+  try {
+    localStorage.setItem(DETAIL_FIELD_SELECTION_KEY, JSON.stringify(fieldIds));
+  } catch {}
+};
+
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -88,11 +113,91 @@ function getAppointmentColor(appointment, servicesById) {
 
 function getAppointmentTitle(appointment, servicesById) {
   const service = servicesById.get(String(appointment.service_id || ''));
-  return service?.name || appointment._serviceName || appointment._personName || appointment.client_name || 'Appointment';
+  return service?.name || appointment._serviceName || 'Appointment';
+}
+
+function getFieldLabel(field, fieldConfig = {}) {
+  return fieldConfig[field.key || field.id]?.name || field.label || field.key || field.id;
+}
+
+function hasFieldValue(value) {
+  if (value == null) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return true;
+}
+
+function formatDetailValue(field, appointment, { servicesById, receptionistsById }) {
+  const fieldKey = field.key || field.id;
+  const rawValue = isCustomFieldKey(fieldKey) ? getCustomValue(appointment.custom_fields, fieldKey) : appointment[fieldKey];
+
+  if (fieldKey === 'service_id') {
+    const serviceName = servicesById.get(String(rawValue || ''))?.name || appointment._serviceName || '';
+    return hasFieldValue(serviceName) ? serviceName : '';
+  }
+  if (fieldKey === 'person_id') return appointment._personName || appointment.client_name || '';
+  if (fieldKey === 'receptionist_id') {
+    const receptionist = receptionistsById.get(String(rawValue || ''));
+    return receptionist?.full_name || appointment._receptionistName || '';
+  }
+  if (field.type === 'date') return rawValue ? formatDate(rawValue) : '';
+  if (field.type === 'time') return rawValue ? formatTime(rawValue) : '';
+  if (field.type === 'timestamp') return rawValue ? formatTimestampFull(rawValue) : '';
+  if (field.type === 'boolean') return rawValue === true ? 'Yes' : rawValue === false ? 'No' : '';
+  if (Array.isArray(rawValue)) return rawValue.join(', ');
+  return rawValue;
+}
+
+function CalendarDetailFieldsPopover({ fields, fieldConfig, selectedFieldIds, onToggleField }) {
+  const [query, setQuery] = useState('');
+  const filtered = fields.filter((field) => getFieldLabel(field, fieldConfig).toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -4, scale: 0.96 }}
+      className="absolute right-[4.5rem] top-9 z-40 w-[250px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[rgba(10,10,10,0.985)] shadow-[0_14px_36px_rgba(0,0,0,0.66)]"
+    >
+      <div className="border-b border-white/[0.05] px-4 py-3">
+        <p className="text-[12px] font-semibold tracking-[-0.03em] text-white">Appointment Details</p>
+        <p className="mt-0.5 text-[10px] font-medium tracking-[-0.01em] text-zinc-600">Choose fields shown when a booking opens.</p>
+      </div>
+      <div className="border-b border-white/[0.05] p-3">
+        <div className="relative">
+          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search columns..."
+            className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:border-white/15"
+          />
+        </div>
+      </div>
+      <div className="custom-scrollbar max-h-[320px] overflow-y-auto p-2">
+        {filtered.map((field) => {
+          const selected = selectedFieldIds.includes(field.key);
+          return (
+            <button
+              key={field.key}
+              type="button"
+              onClick={() => onToggleField(field.key)}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04]"
+            >
+              <span className="w-4">{selected && <Check size={12} className="text-white" />}</span>
+              <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${selected ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                {getFieldLabel(field, fieldConfig)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
 }
 
 function getAvatarLabel(appointment) {
-  const source = appointment._receptionistName || appointment._personName || appointment.client_name || 'A';
+  const source = appointment._receptionistName || 'R';
   return source
     .split(/\s+/)
     .filter(Boolean)
@@ -134,6 +239,11 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
   const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
   const [activeAppointmentPrompt, setActiveAppointmentPrompt] = useState(null);
+  const [showDetailFieldPicker, setShowDetailFieldPicker] = useState(false);
+  const [detailFieldIds, setDetailFieldIds] = useState(loadDetailFieldSelection);
+  const [customFields, setCustomFields] = useState([]);
+  const [fieldConfig, setFieldConfig] = useState(DEFAULT_FIELD_CONFIG);
+  const detailFieldPickerRef = useRef(null);
 
   const servicesById = useMemo(
     () => new Map((services || []).map((service) => [String(service.id), service])),
@@ -141,6 +251,17 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   );
   const receptionistCatalogById = lookups?.receptionistCatalogById || new Map();
   const receptionistsById = lookups?.receptionistsById || new Map();
+  const detailFields = useMemo(
+    () => [
+      ...APPOINTMENT_FIELDS.filter((field) => field.table),
+      ...customFields,
+    ],
+    [customFields],
+  );
+  const detailFieldsByKey = useMemo(
+    () => new Map(detailFields.map((field) => [field.key, field])),
+    [detailFields],
+  );
 
   const year = currentYear;
   const month = currentMonth;
@@ -171,6 +292,37 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   }, [hasAnimatedDots]);
 
   useEffect(() => {
+    let active = true;
+    const loadSchema = async () => {
+      try {
+        const businessId = await getCurrentBusinessId();
+        const [{ rawConfig }, nextCustomFields] = await Promise.all([
+          fetchBusinessFieldConfig(businessId),
+          fetchCustomFields(businessId),
+        ]);
+        const nextFieldConfig = await migrateLegacyFieldConfig(businessId, rawConfig);
+        if (!active) return;
+        setFieldConfig(nextFieldConfig);
+        setCustomFields(nextCustomFields);
+      } catch (err) {
+        console.error('[CalendarMonthView] Failed to load appointment fields:', err.message);
+      }
+    };
+    loadSchema();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!showDetailFieldPicker) return undefined;
+    const close = (event) => {
+      if (detailFieldPickerRef.current?.contains(event.target)) return;
+      setShowDetailFieldPicker(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showDetailFieldPicker]);
+
+  useEffect(() => {
     const fallbackDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
     const selected = new Date(`${selectedDate}T12:00:00`);
     if (selected.getFullYear() === currentYear && selected.getMonth() === currentMonth) return;
@@ -195,10 +347,14 @@ export default function CalendarMonthView({ data = null, className = '', selecte
     setCurrentMonth((value) => value + 1);
   };
 
-  const goToToday = () => {
-    setCurrentYear(today.getFullYear());
-    setCurrentMonth(today.getMonth());
-    setSelectedDate(todayStr);
+  const toggleDetailField = (fieldId) => {
+    setDetailFieldIds((current) => {
+      const next = current.includes(fieldId)
+        ? current.filter((id) => id !== fieldId)
+        : [...current, fieldId];
+      saveDetailFieldSelection(next);
+      return next;
+    });
   };
 
   const calendarDays = Array.from({ length: daysInMonth }, (_, index) => index + 1);
@@ -215,13 +371,25 @@ export default function CalendarMonthView({ data = null, className = '', selecte
             <span>{MONTHS[month]} {year}</span>
           </span>
 
-          <div className="flex items-center gap-1.5">
+          <div className="relative flex items-center gap-1.5" ref={detailFieldPickerRef}>
             <button
-              onClick={goToToday}
-              className="rounded-lg border border-transparent bg-white/[0.04] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-400 transition-all hover:bg-white/[0.08] hover:text-white"
+              type="button"
+              onClick={() => setShowDetailFieldPicker((current) => !current)}
+              aria-label="Choose appointment detail fields"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white"
             >
-              Today
+              <ChevronDown size={14} />
             </button>
+            <AnimatePresence>
+              {showDetailFieldPicker && (
+                <CalendarDetailFieldsPopover
+                  fields={detailFields}
+                  fieldConfig={fieldConfig}
+                  selectedFieldIds={detailFieldIds}
+                  onToggleField={toggleDetailField}
+                />
+              )}
+            </AnimatePresence>
             <button
               onClick={goToPrevMonth}
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white"
@@ -312,10 +480,8 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                 const tagColor = getAppointmentColor(appointment, servicesById);
                 const category = getAppointmentCategory(appointment, servicesById);
                 const title = getAppointmentTitle(appointment, servicesById);
-                const serviceName = servicesById.get(String(appointment.service_id || ''))?.name || appointment._serviceName || 'Unassigned';
                 const receptionistRow = receptionistsById.get(String(appointment.receptionist_id || '')) || null;
                 const receptionistCatalogRow = receptionistRow?.catalog_id ? receptionistCatalogById.get(String(receptionistRow.catalog_id)) : null;
-                const receptionist = appointment._receptionistName || receptionistRow?.full_name || 'Unassigned';
                 const avatarLabel = getAvatarLabel(appointment);
                 const avatarSrc = appointment._receptionistAvatar
                   || receptionistRow?.avatar
@@ -326,6 +492,14 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                   || (receptionistCatalogRow?.banner_id ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${receptionistCatalogRow.banner_id}.png` : '')
                   || avatarSrc;
                 const isExpanded = expandedAppointmentId === appointment.id;
+                const visibleDetailFields = detailFieldIds
+                  .map((fieldId) => detailFieldsByKey.get(fieldId))
+                  .filter(Boolean)
+                  .map((field) => ({
+                    field,
+                    value: formatDetailValue(field, appointment, { servicesById, receptionistsById }),
+                  }))
+                  .filter((item) => hasFieldValue(item.value));
                 const appointmentActions = getAppointmentActions(appointment.status);
                 const hasAppointmentActions = appointmentActions.length > 0;
                 const activePromptAction = activeAppointmentPrompt?.appointmentId === appointment.id
@@ -361,7 +535,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                         className={`relative z-10 flex shrink-0 items-center justify-center rounded-full p-1 transition-transform duration-200 focus:outline-none ${hasAppointmentActions ? 'hover:scale-110' : 'cursor-default'}`}
                       >
                         <span
-                          className={`h-2 w-2 rounded-full ${activePromptAction ? 'demo-call-status-dot' : 'shadow-[0_0_4px_currentColor]'}`}
+                          className={`h-1.5 w-1.5 rounded-full ${activePromptAction ? 'demo-call-status-dot' : 'shadow-[0_0_4px_currentColor]'}`}
                           style={activePromptAction
                             ? undefined
                             : { color: tagColor, backgroundColor: tagColor }}
@@ -503,10 +677,6 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                             </span>
                           </span>
                           <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
-                          <span className="text-[10px] font-medium italic text-zinc-500">via</span>
-                          <span className="hidden text-[10px] font-medium text-zinc-400 sm:inline">
-                            {receptionist}
-                          </span>
                         </motion.div>
                         <div className="flex shrink-0 items-center space-x-1.5">
                         <span
@@ -535,18 +705,16 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                           <div className="pl-4 pr-2 pt-2">
                             <div className="relative pl-4">
                               <span className="absolute left-0 top-0 h-full w-px bg-white/[0.08]" />
-                              <div className="mb-1 text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-600">
-                                Service
-                              </div>
-                              <div className="mb-2 text-[11px] leading-5 text-zinc-400">
-                                {serviceName}
-                              </div>
-                              <div className="mb-1 text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-600">
-                                Notes
-                              </div>
-                              <div className="text-[11px] leading-5 text-zinc-400">
-                                {appointment.notes || ''}
-                              </div>
+                              {visibleDetailFields.map(({ field, value }, detailIndex) => (
+                                <div key={field.key} className={detailIndex < visibleDetailFields.length - 1 ? 'mb-2' : ''}>
+                                  <div className="mb-1 text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-600">
+                                    {getFieldLabel(field, fieldConfig)}
+                                  </div>
+                                  <div className="text-[11px] leading-5 text-zinc-400">
+                                    {String(value)}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         </motion.div>

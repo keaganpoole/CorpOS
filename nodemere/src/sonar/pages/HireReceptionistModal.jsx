@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Play, Pause, Volume2, Sparkles,
+  X, Play, Pause, Sparkles,
   User, ChevronLeft, ChevronRight, Loader2,
+  Cake,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -15,6 +16,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
   const [hiringId, setHiringId] = useState(null);
   const [hireError, setHireError] = useState('');
   const audioRef = useRef(null);
+  const carouselTransitionMs = 620;
   const hiredCatalogKey = (hiredCatalogIds || [])
     .filter(Boolean)
     .map((value) => String(value))
@@ -53,14 +55,14 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
     if (isAnimating || receptionists.length === 0) return;
     setIsAnimating(true);
     setCurrentIndex((prev) => (prev + 1) % receptionists.length);
-    setTimeout(() => setIsAnimating(false), 700);
+    setTimeout(() => setIsAnimating(false), carouselTransitionMs);
   };
 
   const prevCard = () => {
     if (isAnimating || receptionists.length === 0) return;
     setIsAnimating(true);
     setCurrentIndex((prev) => (prev - 1 + receptionists.length) % receptionists.length);
-    setTimeout(() => setIsAnimating(false), 700);
+    setTimeout(() => setIsAnimating(false), carouselTransitionMs);
   };
 
   // Keyboard navigation
@@ -177,7 +179,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                 const isNext = hasNeighbors && index === (currentIndex + 1) % receptionists.length;
                 const isPrev = hasNeighbors && index === (currentIndex - 1 + receptionists.length) % receptionists.length;
 
-                const baseClasses = "absolute top-0 left-0 w-full h-full transition-all duration-700 ease-in-out transform";
+                const baseClasses = "absolute top-0 left-0 w-full h-full transition-all duration-[620ms] ease-[cubic-bezier(0.16,1,0.3,1)] transform";
                 let stateClasses = "opacity-0 scale-90 pointer-events-none";
 
                 if (isActive) stateClasses = "opacity-100 scale-100 translate-x-0 z-20";
@@ -216,8 +218,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                           </h2>
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
                             {person.age && (
-                              <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-white/50 tracking-wide">
-                                🎂 {person.age} years old
+                              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
+                                <Cake size={11} />
+                                <span>{person.age} years old</span>
                               </span>
                             )}
                           </div>
@@ -228,10 +231,6 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                       <div className="flex-1 p-8 pt-2 flex flex-col gap-6">
                         <div className="border-b border-white/5 pb-6">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-white/30">
-                              <Volume2 size={12} />
-                              <span>Voice Profile</span>
-                            </div>
                             {person.voice ? (
                               <button
                                 onClick={(e) => {
@@ -275,7 +274,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
                         {/* Description */}
                         {(person.description || person.bio) && (
-                          <p className="text-xs text-white/40 leading-relaxed mt-2 italic">
+                          <p className="mt-2 text-xs leading-relaxed text-white/40">
                             "{person.description || person.bio}"
                           </p>
                         )}
@@ -325,7 +324,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                         if (isAnimating) return;
                         setIsAnimating(true);
                         setCurrentIndex(i);
-                        setTimeout(() => setIsAnimating(false), 700);
+                        setTimeout(() => setIsAnimating(false), carouselTransitionMs);
                       }}
                       className={`h-1.5 rounded-full transition-all duration-300 ${
                         i === currentIndex

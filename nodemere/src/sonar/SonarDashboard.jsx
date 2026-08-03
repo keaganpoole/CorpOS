@@ -832,7 +832,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
             onClick={(e) => { e.stopPropagation(); onTerminate && onTerminate(agent); }}
             className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-xl border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:border-rose-500/40 transition-all opacity-0 group-hover:opacity-100"
           >
-            <X size={13} />
+            <Trash2 size={13} />
           </button>
         </div>
 
@@ -1083,8 +1083,8 @@ const GradientBleed = ({
           100% { background-position: 50% 200%; }
         }
         .animate-skySweep { animation: skySweep 0.8s ease-in-out forwards; }
-        .animate-skyPrism { animation: skyPrism 2s linear infinite; }
-        .animate-skyPrismVertical { animation: skyPrismVertical 2s linear infinite; }
+        .animate-skyPrism { animation: skyPrism 1.25s linear infinite; }
+        .animate-skyPrismVertical { animation: skyPrismVertical 1.25s linear infinite; }
       `}} />
     </div>
   );
