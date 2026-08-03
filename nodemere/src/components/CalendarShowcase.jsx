@@ -863,7 +863,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
           )}
 
           <div
-            className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
+            className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-opacity duration-500 ease-out ${
               scenariosFeatureOpacity <= 0.01 ? 'pointer-events-none' : ''
             }`}
             style={{
