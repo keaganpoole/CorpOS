@@ -219,9 +219,13 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   const [mobileTimelineOpacity, setMobileTimelineOpacity] = useState(1);
   const [copyVisible, setCopyVisible] = useState(false);
   const [isInView, setIsInView] = useState(false);
+  const [isSwipeViewport, setIsSwipeViewport] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
   const autoPlayRef = useRef(null);
   const audioRef = useRef(null);
   const innerRef = useRef(null);
+  const touchStartRef = useRef(null);
   const shouldPause = isPlaying !== null || isHoveringVoice;
 
   const active = receptionists[index] || receptionists[0];
@@ -245,6 +249,23 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
     setDirection(1);
     setIndex((prev) => (prev + 1) % receptionists.length);
   };
+
+  const prevSlide = () => {
+    setDirection(-1);
+    setIndex((prev) => (prev - 1 + receptionists.length) % receptionists.length);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateViewport = () => {
+      setIsSwipeViewport(window.innerWidth < 1024);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
 
   useEffect(() => {
     if (!isInView || shouldPause) {
@@ -325,9 +346,32 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
     };
   }, []);
 
+  const handleTouchStart = (event) => {
+    if (!isSwipeViewport) return;
+    const touch = event.touches?.[0];
+    touchStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+
+  const handleTouchEnd = (event) => {
+    if (!isSwipeViewport || !touchStartRef.current) return;
+
+    const touch = event.changedTouches?.[0];
+    const endX = touch?.clientX ?? touchStartRef.current.x;
+    const endY = touch?.clientY ?? touchStartRef.current.y;
+    const deltaX = endX - touchStartRef.current.x;
+    const deltaY = endY - touchStartRef.current.y;
+    touchStartRef.current = null;
+
+    if (Math.abs(deltaX) < 44 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
+    if (deltaX < 0) nextSlide();
+    else prevSlide();
+  };
+
   const sliderFrame = (
     <motion.div
       className="relative isolate h-full w-full origin-bottom bg-black"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
           <motion.div
             style={{ opacity: 0 }}

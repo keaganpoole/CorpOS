@@ -222,6 +222,12 @@
     transform: translateY(-1px);
     box-shadow: 0 18px 36px rgba(139, 92, 246, 0.28);
 }
+.dashboard-gradient-button {
+    box-shadow: 0 10px 22px rgba(139, 92, 246, 0.14);
+}
+.dashboard-gradient-button:hover {
+    box-shadow: 0 13px 28px rgba(139, 92, 246, 0.2);
+}
 
 .homepage-brand-cta {
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

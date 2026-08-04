@@ -899,7 +899,7 @@ const HomePage = () => {
                 >
                   Logout
                 </button>
-                <Link to="/dashboard" className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Dashboard</Link>
+                <Link to="/dashboard" className="text-sm font-semibold gradient-button dashboard-gradient-button btn-shine hover:opacity-90 transition-opacity">Dashboard</Link>
               </>
             ) : (
               <>
