@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
-  FileSignature,
   LoaderCircle,
   Mic,
   Pause,
@@ -74,9 +73,9 @@ function isSupportedAudioFile(file) {
   return /\.(aac|m4a|mp3|ogg|wav|webm)$/i.test(file.name || '');
 }
 
-function getInitialStage(mode, locationState) {
+function getInitialStage(locationState) {
   if (locationState?.voiceFlowStage === 'sample') return 2;
-  return mode === 'clone' ? 0 : 0;
+  return 0;
 }
 
 function FlowProgress({ stage }) {
@@ -486,14 +485,13 @@ function FlowCard({ children, stage, onBack, canContinue, onContinue, submitting
   );
 }
 
-export default function VoiceCloneExperience({ mode = 'contract' }) {
+export default function VoiceCloneExperience() {
   const { token } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
-  const [showAlternateSplash, setShowAlternateSplash] = useState(() => mode === 'contract');
-  const [stage, setStage] = useState(() => getInitialStage(mode, location.state));
-  const [contract, setContract] = useState({ loading: true, status: null, message: '' });
+  const [showAlternateSplash, setShowAlternateSplash] = useState(true);
+  const [stage, setStage] = useState(() => getInitialStage(location.state));
   const [cloneState, setCloneState] = useState({ loading: true, status: null, message: '' });
   const [form, setForm] = useState({ signer_name: '', signer_email: '' });
   const [accepted, setAccepted] = useState({ voice: false, identity: false, usage: false });
@@ -520,30 +518,15 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
   const animationFrameRef = useRef(null);
   const cloneRequestedRef = useRef(false);
 
+  const isSigned = ['signed', 'cloned', 'ready', 'requires_verification'].includes(cloneState.status);
+  const unavailable = ['not_found', 'expired', 'revoked', 'error'].includes(cloneState.status);
+  const needsSignature = !isSigned;
+  const activeError = cloneState.message;
+
   const finishAlternateSplash = useCallback(() => {
     setShowAlternateSplash(false);
-    if (mode === 'contract') setStage(1);
-  }, [mode]);
-
-  const isSigned = cloneState.status === 'signed' || cloneState.status === 'cloned' || contract.status === 'signed' || contract.status === 'cloned';
-  const unavailable = ['not_found', 'expired', 'revoked', 'error'].includes(contract.status) || ['not_found', 'expired', 'revoked'].includes(cloneState.status);
-  const needsSignature = mode === 'contract' && !isSigned;
-  const contractLoading = mode === 'contract' ? contract.loading : cloneState.loading;
-  const activeError = mode === 'contract' ? contract.message : cloneState.message;
-
-  const loadContract = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/contracts/${encodeURIComponent(token || '')}`);
-      const data = await response.json();
-      setContract({ ...data, loading: false });
-      setForm({ signer_name: data.signer_name || '', signer_email: data.signer_email || '' });
-      setAccepted((current) => data.status === 'signed' || data.status === 'cloned' ? { voice: true, identity: true, usage: true } : current);
-      setVoiceName(data.voice_display_name || data.signer_name || 'Nodemere Custom Voice');
-      if (data.status === 'signed' || data.status === 'cloned') setCloneState((current) => ({ ...current, loading: false, status: data.status, clone_ready: true }));
-    } catch {
-      setContract({ loading: false, status: 'error', message: 'We could not load this agreement. Please try again.' });
-    }
-  }, [token]);
+    setStage(isSigned ? 2 : 1);
+  }, [isSigned]);
 
   const loadCloneState = useCallback(async () => {
     try {
@@ -559,9 +542,8 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
   }, [token]);
 
   useEffect(() => {
-    if (mode === 'contract') loadContract();
-    else loadCloneState();
-  }, [loadCloneState, loadContract, mode]);
+    loadCloneState();
+  }, [loadCloneState]);
 
   useEffect(() => {
     samplesRef.current = samples;
@@ -826,11 +808,10 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail?.message || 'The agreement could not be signed.');
-      setContract((current) => ({ ...current, ...data, status: 'signed', message: '' }));
       setCloneState((current) => ({ ...current, status: 'signed', clone_ready: true, loading: false }));
-      navigate(`/clone/${token}`, { replace: true, state: { voiceFlowStage: 'sample' } });
+      setStage(2);
     } catch (error) {
-      setContract((current) => ({ ...current, message: error.message || 'The agreement could not be signed. Please try again.' }));
+      setCloneState((current) => ({ ...current, message: error.message || 'The agreement could not be signed. Please try again.' }));
     } finally {
       setSubmitting(false);
     }
@@ -848,17 +829,17 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
     setStage(2);
   };
 
-  const pageReady = mode === 'contract' ? !contractLoading : !cloneState.loading;
+  const pageReady = !cloneState.loading;
   const canAgreementContinue = isSigned || (form.signer_name.trim() && form.signer_email.trim() && hasSignature && Object.values(accepted).every(Boolean));
   const canSampleContinue = samples.length > 0 && !isRecording;
   const cloneComplete = ['ready', 'requires_verification', 'cloned'].includes(cloneState.status);
   const hasPreview = samples.length > 0;
 
   const content = useMemo(() => {
-    if (stage === 1) return <AgreementSlide form={form} setForm={setForm} accepted={accepted} setAccepted={setAccepted} signed={!needsSignature || isSigned} hasSignature={hasSignature} canvasRef={canvasRef} onSignatureBegin={beginSignature} onSignatureDraw={drawSignature} onSignatureEnd={endSignature} onClearSignature={clearSignature} errorMessage={contract.message} />;
+    if (stage === 1) return <AgreementSlide form={form} setForm={setForm} accepted={accepted} setAccepted={setAccepted} signed={!needsSignature || isSigned} hasSignature={hasSignature} canvasRef={canvasRef} onSignatureBegin={beginSignature} onSignatureDraw={drawSignature} onSignatureEnd={endSignature} onClearSignature={clearSignature} errorMessage={cloneState.message} />;
     if (stage === 2) return <CaptureSlide samples={samples} isRecording={isRecording} recordingSeconds={recordingSeconds} inputLevel={inputLevel} onStartRecording={startRecording} onStopRecording={stopRecording} onUpload={handleUpload} onRemove={removeSample} onReplace={() => document.getElementById('voice-replace-upload')?.click()} onAddAnother={() => document.getElementById('voice-add-upload')?.click()} onPlay={togglePlayback} playingSampleId={playingSampleId} onDuration={updateDuration} reduceMotion={reduceMotion} mediaError={mediaError} />;
     return <CloneSlide cloneState={cloneState} voiceName={voiceName} setVoiceName={setVoiceName} submitting={submitting} processingIndex={processingIndex} onRetry={retryClone} onBack={() => setStage(2)} onPreview={togglePreview} hasPreview={hasPreview} previewUrl={samples[samples.length - 1]?.url} reduceMotion={reduceMotion} />;
-  }, [accepted, canAgreementContinue, cloneState, contract, form, hasPreview, hasSignature, inputLevel, isRecording, isSigned, mediaError, needsSignature, playingSampleId, processingIndex, recordingSeconds, reduceMotion, samples, stage, submitting, voiceName]);
+  }, [accepted, cloneState, form, hasPreview, hasSignature, inputLevel, isRecording, isSigned, mediaError, needsSignature, playingSampleId, processingIndex, recordingSeconds, reduceMotion, samples, stage, submitting, voiceName]);
 
   if (showAlternateSplash) {
     return <SplashScreenAlternate onAnimationEnd={finishAlternateSplash} />;
@@ -872,14 +853,6 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
     return (
       <main className="voice-flow-page">
         <div className="voice-flow-status voice-flow-status-card"><CircleAlert size={25} /><h1>Voice session unavailable</h1><p>{activeError || 'This voice session is no longer active.'}</p></div>
-      </main>
-    );
-  }
-
-  if (mode === 'clone' && !isSigned) {
-    return (
-      <main className="voice-flow-page">
-        <div className="voice-flow-status voice-flow-status-card"><CircleAlert size={25} /><h1>Agreement required</h1><p>{activeError || 'Sign the agreement before creating the clone.'}</p><button type="button" className="voice-primary-button" onClick={() => navigate(`/contract/${token}`)}><FileSignature size={16} /> Return to agreement</button></div>
       </main>
     );
   }

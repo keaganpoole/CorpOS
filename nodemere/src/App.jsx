@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
 
@@ -12,7 +12,6 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import VerificationPage from './pages/VerificationPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
-import VoiceContractPage from './pages/VoiceContractPage';
 import VoiceClonePage from './pages/VoiceClonePage';
 import SplashScreen from './components/SplashScreen';
 
@@ -58,8 +57,10 @@ function OnboardingGate() {
 
 function AppContent() {
   const { isLoading, isAppLoading } = useAuth();
+  const location = useLocation();
+  const isVoiceCloneEntry = location.pathname.startsWith('/clone');
 
-  if (isLoading || isAppLoading) {
+  if ((isLoading || isAppLoading) && !isVoiceCloneEntry) {
     return <SplashScreen />;
   }
 
@@ -85,7 +86,6 @@ function AppContent() {
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/verify/:token" element={<VerificationPage />} />
         <Route path="/upload/:token" element={<DocumentUploadPage />} />
-        <Route path="/contract/:token" element={<VoiceContractPage />} />
         <Route path="/clone/:token" element={<VoiceClonePage />} />
         <Route path="/clone" element={<VoiceClonePage />} />
 
