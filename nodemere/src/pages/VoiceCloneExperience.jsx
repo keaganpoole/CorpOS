@@ -13,16 +13,16 @@ import {
   Play,
   RotateCcw,
   Sparkles,
+  Trash2,
   Upload,
-  X,
 } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import ScenarioIntroNode from '../components/ScenarioIntroNode';
 import SplashScreenAlternate from '../components/SplashScreenAlternate';
 import './VoiceCloneExperience.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const MAX_SAMPLES = 6;
-const INTRO_EASE = [0.16, 1, 0.3, 1];
 const FLOW_EASE = [0.22, 1, 0.36, 1];
 
 const stages = [
@@ -98,48 +98,13 @@ function FlowProgress({ stage }) {
   );
 }
 
-function IntroNode({ onBegin, reduceMotion }) {
-  const [isExiting, setIsExiting] = useState(false);
-
-  const begin = () => {
-    if (isExiting) return;
-    setIsExiting(true);
-    window.setTimeout(onBegin, reduceMotion ? 0 : 460);
-  };
-
+function IntroNode({ onBegin }) {
   return (
-    <motion.section
-      className="voice-flow-intro"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: isExiting ? 0 : 1 }}
-      transition={{ duration: reduceMotion ? 0 : 0.55, ease: INTRO_EASE }}
-      aria-label="Begin voice cloning"
-    >
-      <motion.button
-        type="button"
-        className="voice-flow-intro-node"
-        onClick={begin}
-        aria-label="Begin creating your voice clone"
-        initial={{ scale: 0.86, opacity: 0, filter: 'blur(4px)' }}
-        animate={isExiting
-          ? { scale: 0.76, y: -18, opacity: 0, filter: 'blur(10px)' }
-          : { scale: 1, y: 0, opacity: 1, filter: 'blur(0px)' }}
-        transition={{ duration: reduceMotion ? 0 : 0.92, ease: INTRO_EASE }}
-        whileHover={reduceMotion ? undefined : { scale: 1.012, filter: 'brightness(1.04)' }}
-        whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-      >
-        <span className="voice-flow-intro-orbits" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-        </span>
-        <span className="voice-flow-intro-core" aria-hidden="true">
-          <Mic size={38} strokeWidth={1.35} />
-        </span>
-        <span className="voice-flow-intro-pointer" aria-hidden="true" />
-        <span className="voice-flow-intro-copy">Click it. Click it real good.</span>
-      </motion.button>
-    </motion.section>
+    <ScenarioIntroNode
+      nodeId="voice-clone-intro"
+      onActivate={onBegin}
+      ariaLabel="Begin creating your voice clone"
+    />
   );
 }
 
@@ -270,6 +235,51 @@ function VoiceObject({ mode, level = 0, reduceMotion }) {
   );
 }
 
+function WhiteBrandOrb({ size = 140, finishMode = 'alabaster-brand', isRecording = false }) {
+  const [glow, setGlow] = useState({ active: false, x: 50, y: 50 });
+  const finishStyles = {
+    'smoked-violet': 'radial-gradient(circle at 45% 40%, #2e1038 0%, #170b24 75%, #09030f 100%)',
+    'platinum-aurora': 'radial-gradient(circle at 45% 40%, #f1f5f9 0%, #cbd5e1 45%, #8B5CF6 80%, #311042 100%)',
+    'alabaster-brand': 'radial-gradient(circle at 45% 40%, #f8fafc 0%, #cbd5e1 38%, #3b2149 82%, #180e25 100%)',
+  };
+
+  const updateGlow = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setGlow({
+      active: true,
+      x: ((event.clientX - rect.left) / rect.width) * 100,
+      y: ((event.clientY - rect.top) / rect.height) * 100,
+    });
+  };
+
+  return (
+    <div
+      className={`voice-brand-orb ${glow.active ? 'is-glowing' : ''} ${isRecording ? 'is-recording' : ''}`}
+      style={{ '--voice-brand-orb-size': `${size}px`, '--voice-orb-glow-x': `${glow.x}%`, '--voice-orb-glow-y': `${glow.y}%` }}
+      onPointerMove={updateGlow}
+      onPointerEnter={updateGlow}
+      onPointerLeave={() => setGlow((current) => ({ ...current, active: false }))}
+      aria-hidden="true"
+    >
+      <div className="voice-brand-orb-shadow" />
+      <div className="voice-brand-orb-body">
+        <div className="voice-brand-orb-depth" style={{ background: finishStyles[finishMode] || finishStyles['alabaster-brand'] }} />
+        <div className="voice-brand-orb-swirl" />
+        <div className="voice-brand-orb-ring-wrap">
+          <div className="voice-brand-orb-ring" />
+        </div>
+        <div className="voice-brand-orb-core" />
+        <div className="voice-brand-orb-specks">
+          <span />
+          <span />
+        </div>
+        <div className="voice-brand-orb-rim" />
+        <div className="voice-brand-orb-sheen" />
+      </div>
+    </div>
+  );
+}
+
 function CaptureSlide({
   samples,
   isRecording,
@@ -297,7 +307,7 @@ function CaptureSlide({
         <p>{hasSamples ? `${samples.length === 1 ? '1 voice sample ready.' : `${samples.length} voice samples ready.`} You can continue when it sounds clean.` : 'Speak naturally for 30–90 seconds. One clean recording is enough, but additional samples can improve the result.'}</p>
       </div>
 
-      <VoiceObject mode={isRecording ? 'recording' : hasSamples ? 'review' : 'idle'} level={inputLevel} reduceMotion={reduceMotion} />
+      <WhiteBrandOrb size={140} isRecording={isRecording} />
 
       {isRecording ? (
         <div className="voice-capture-active" role="status" aria-live="polite">
@@ -306,32 +316,43 @@ function CaptureSlide({
           <span className="voice-recording-label">Listening</span>
         </div>
       ) : hasSamples ? (
-        <div className="voice-sample-review" aria-label="Recorded voice sample">
+        <div className="voice-sample-review" aria-label="Recorded voice samples">
           <div className="voice-sample-review-top">
             <div>
               <span className="voice-flow-eyebrow">Ready to continue</span>
-              <strong>{latestSample?.name || 'Voice sample'}</strong>
+              <strong>{samples.length === 1 ? '1 sample' : `${samples.length} samples`}</strong>
             </div>
-            <span className="voice-sample-duration">{latestSample?.duration ? formatTime(latestSample.duration) : 'Sample ready'}</span>
           </div>
-          {latestSample ? (
-            <>
-              <audio
-                src={latestSample.url}
-                preload="metadata"
-                onLoadedMetadata={(event) => onDuration(latestSample.id, event.currentTarget.duration)}
-                onEnded={() => onPlay(null)}
-                ref={(node) => { if (node) node.dataset.sampleId = latestSample.id; }}
-              />
-              <button type="button" className="voice-sample-playback" onClick={() => onPlay(latestSample.id)}>
-                {playingSampleId === latestSample.id ? <Pause size={16} /> : <Play size={16} />}
-                <span>{playingSampleId === latestSample.id ? 'Pause sample' : 'Preview sample'}</span>
-              </button>
-            </>
-          ) : null}
+          <div className="voice-sample-list">
+            {samples.map((sample) => (
+              <div className="voice-sample-row" key={sample.id}>
+                <audio
+                  src={sample.url}
+                  preload="metadata"
+                  onLoadedMetadata={(event) => onDuration(sample.id, event.currentTarget.duration)}
+                  onEnded={() => onPlay(null)}
+                  ref={(node) => { if (node) node.dataset.sampleId = sample.id; }}
+                />
+                <button type="button" className="voice-sample-playback" onClick={() => onPlay(sample.id)} aria-label={`${playingSampleId === sample.id ? 'Pause' : 'Preview'} ${sample.name || 'voice sample'}`}>
+                  {playingSampleId === sample.id ? <Pause size={14} /> : <Play size={14} />}
+                </button>
+                <div className="voice-sample-row-copy">
+                  <strong>{sample.name || 'Voice sample'}</strong>
+                  <span>{sample.duration ? formatTime(sample.duration) : 'Sample ready'}</span>
+                </div>
+                <button type="button" className="voice-sample-delete" onClick={() => onRemove(sample.id)} aria-label={`Remove ${sample.name || 'voice sample'}`}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
           <div className="voice-sample-actions">
-            <button type="button" className="voice-quiet-action" onClick={onReplace}>Replace</button>
-            <button type="button" className="voice-quiet-action" onClick={onAddAnother} disabled={samples.length >= MAX_SAMPLES}>Add another sample</button>
+            <button type="button" className="voice-quiet-action" onClick={onStartRecording} disabled={samples.length >= MAX_SAMPLES}>
+              <Mic size={13} /> Record another
+            </button>
+            <button type="button" className="voice-quiet-action" onClick={onAddAnother} disabled={samples.length >= MAX_SAMPLES}>
+              <Upload size={13} /> Upload more
+            </button>
           </div>
         </div>
       ) : (
@@ -352,16 +373,6 @@ function CaptureSlide({
         </button>
       ) : null}
       {mediaError ? <p className="voice-flow-error" role="alert">{mediaError}</p> : null}
-      {samples.length > 1 ? (
-        <div className="voice-extra-samples" aria-label="Additional samples">
-          {samples.slice(0, -1).map((sample) => (
-            <div className="voice-extra-sample" key={sample.id}>
-              <span>{sample.name}</span>
-              <button type="button" onClick={() => onRemove(sample.id)} aria-label={`Remove ${sample.name}`}><X size={13} /></button>
-            </div>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -444,8 +455,11 @@ function FlowCard({ children, stage, onBack, canContinue, onContinue, submitting
       transition={{ duration: 0.68, ease: FLOW_EASE }}
       aria-live="polite"
     >
+      <div className="voice-flow-studio-mark" aria-hidden="true">
+        Nodemere <span>Studio</span>
+      </div>
       <FlowProgress stage={stage} />
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="wait">
         <motion.div
           key={stage}
           className="voice-flow-stage-content"
@@ -461,10 +475,12 @@ function FlowCard({ children, stage, onBack, canContinue, onContinue, submitting
         <button type="button" className="voice-back-button" onClick={onBack} disabled={stage <= 1 || submitting}>
           <ChevronLeft size={15} /> Back
         </button>
-        <button type="button" className="voice-primary-button voice-continue-button" onClick={onContinue} disabled={!canContinue || submitting}>
-          {submitting ? <LoaderCircle className="voice-spin" size={16} /> : null}
-          {submitting ? 'Saving' : continueLabel}<ChevronRight size={15} />
-        </button>
+        {canContinue || submitting ? (
+          <button type="button" className="voice-primary-button voice-continue-button" onClick={onContinue} disabled={!canContinue || submitting}>
+            {submitting ? <LoaderCircle className="voice-spin" size={16} /> : null}
+            {submitting ? 'Saving' : continueLabel}<ChevronRight size={15} />
+          </button>
+        ) : null}
       </div>
     </motion.section>
   );
@@ -504,7 +520,10 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
   const animationFrameRef = useRef(null);
   const cloneRequestedRef = useRef(false);
 
-  const finishAlternateSplash = useCallback(() => setShowAlternateSplash(false), []);
+  const finishAlternateSplash = useCallback(() => {
+    setShowAlternateSplash(false);
+    if (mode === 'contract') setStage(1);
+  }, [mode]);
 
   const isSigned = cloneState.status === 'signed' || cloneState.status === 'cloned' || contract.status === 'signed' || contract.status === 'cloned';
   const unavailable = ['not_found', 'expired', 'revoked', 'error'].includes(contract.status) || ['not_found', 'expired', 'revoked'].includes(cloneState.status);
@@ -869,7 +888,7 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
     <main className={`voice-flow-page ${stage === 0 ? 'is-intro' : ''}`}>
       <AnimatePresence mode="wait" initial={false}>
         {stage === 0 ? (
-          <IntroNode key="intro" onBegin={() => setStage(1)} reduceMotion={reduceMotion} />
+          <IntroNode key="intro" onBegin={() => setStage(1)} />
         ) : (
           <FlowCard
             key="flow"

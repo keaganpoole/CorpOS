@@ -32,11 +32,11 @@ const SplashScreenAlternate = ({ onAnimationEnd }) => {
     const enterFrame = window.requestAnimationFrame(() => setPhase('logo-enter'));
     const timers = [
       window.setTimeout(() => setPhase('logo-hold'), 560),
-      window.setTimeout(() => setPhase('logo-exit'), 1260),
-      window.setTimeout(() => setPhase('studio-enter'), 1700),
-      window.setTimeout(() => setPhase('studio-hold'), 2260),
-      window.setTimeout(() => setPhase('studio-exit'), 5900),
-      window.setTimeout(() => onAnimationEnd?.(), 6380),
+      window.setTimeout(() => setPhase('logo-exit'), 1950),
+      window.setTimeout(() => setPhase('studio-enter'), 2390),
+      window.setTimeout(() => setPhase('studio-hold'), 2950),
+      window.setTimeout(() => setPhase('studio-exit'), 4400),
+      window.setTimeout(() => onAnimationEnd?.(), 4880),
     ];
 
     return () => {
