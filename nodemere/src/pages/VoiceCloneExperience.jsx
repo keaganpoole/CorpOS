@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import SplashScreenAlternate from '../components/SplashScreenAlternate';
 import './VoiceCloneExperience.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -474,6 +475,7 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
   const location = useLocation();
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
+  const [showAlternateSplash, setShowAlternateSplash] = useState(() => mode === 'contract');
   const [stage, setStage] = useState(() => getInitialStage(mode, location.state));
   const [contract, setContract] = useState({ loading: true, status: null, message: '' });
   const [cloneState, setCloneState] = useState({ loading: true, status: null, message: '' });
@@ -501,6 +503,8 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
   const audioContextRef = useRef(null);
   const animationFrameRef = useRef(null);
   const cloneRequestedRef = useRef(false);
+
+  const finishAlternateSplash = useCallback(() => setShowAlternateSplash(false), []);
 
   const isSigned = cloneState.status === 'signed' || cloneState.status === 'cloned' || contract.status === 'signed' || contract.status === 'cloned';
   const unavailable = ['not_found', 'expired', 'revoked', 'error'].includes(contract.status) || ['not_found', 'expired', 'revoked'].includes(cloneState.status);
@@ -836,6 +840,10 @@ export default function VoiceCloneExperience({ mode = 'contract' }) {
     if (stage === 2) return <CaptureSlide samples={samples} isRecording={isRecording} recordingSeconds={recordingSeconds} inputLevel={inputLevel} onStartRecording={startRecording} onStopRecording={stopRecording} onUpload={handleUpload} onRemove={removeSample} onReplace={() => document.getElementById('voice-replace-upload')?.click()} onAddAnother={() => document.getElementById('voice-add-upload')?.click()} onPlay={togglePlayback} playingSampleId={playingSampleId} onDuration={updateDuration} reduceMotion={reduceMotion} mediaError={mediaError} />;
     return <CloneSlide cloneState={cloneState} voiceName={voiceName} setVoiceName={setVoiceName} submitting={submitting} processingIndex={processingIndex} onRetry={retryClone} onBack={() => setStage(2)} onPreview={togglePreview} hasPreview={hasPreview} previewUrl={samples[samples.length - 1]?.url} reduceMotion={reduceMotion} />;
   }, [accepted, canAgreementContinue, cloneState, contract, form, hasPreview, hasSignature, inputLevel, isRecording, isSigned, mediaError, needsSignature, playingSampleId, processingIndex, recordingSeconds, reduceMotion, samples, stage, submitting, voiceName]);
+
+  if (showAlternateSplash) {
+    return <SplashScreenAlternate onAnimationEnd={finishAlternateSplash} />;
+  }
 
   if (!pageReady) {
     return <main className="voice-flow-page"><div className="voice-flow-status"><LoaderCircle className="voice-spin" size={24} /><span>Preparing your voice session</span></div></main>;
