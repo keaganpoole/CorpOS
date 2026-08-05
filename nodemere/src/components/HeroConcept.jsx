@@ -298,6 +298,27 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   }, [receptionists.length, shouldPause, isInView, autoPlayResetKey]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const preloadedImages = receptionists
+      .map((receptionist) => receptionist.avatar)
+      .filter(Boolean)
+      .map((avatar) => {
+        const image = new Image();
+        image.decoding = 'async';
+        image.src = avatar;
+        return image;
+      });
+
+    return () => {
+      preloadedImages.forEach((image) => {
+        image.onload = null;
+        image.onerror = null;
+      });
+    };
+  }, [receptionists]);
+
+  useEffect(() => {
     if (!isSwipeViewport || !isInView || receptionists.length <= 1) {
       setShowArrowHint(false);
       return undefined;
@@ -570,18 +591,19 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                       >
                         <MetamorphicFluidAura colors={activeGradient} />
                       </div>
-                      <AnimatePresence mode="wait">
+                      <AnimatePresence initial={false}>
                         <motion.div
                           key={`${active.id}-visual-compact`}
-                          initial={{ opacity: 0, scale: 0.95, y: 28 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 1.03, filter: 'blur(24px)' }}
-                          transition={{ duration: 0.9, ease: [0.19, 1, 0.22, 1] }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1, transition: { duration: 0.18, ease: 'easeOut' } }}
+                          exit={{ opacity: 0, transition: { duration: 0.12, ease: 'easeIn' } }}
                           className="relative z-10 flex h-[15.5rem] w-full items-end justify-center sm:h-[16.75rem] md:h-[27rem]"
                         >
                           <img
                             src={active.avatar}
                             alt={active.name}
+                            loading="eager"
+                            decoding="async"
                             className="max-h-full w-auto max-w-[88vw] select-none object-contain object-bottom"
                           />
                         </motion.div>
@@ -600,18 +622,19 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
               >
                 <MetamorphicFluidAura colors={activeGradient} />
               </div>
-              <AnimatePresence mode="wait">
+              <AnimatePresence initial={false}>
                 <motion.div
                   key={`${active.id}-visual`}
-                  initial={{ opacity: 0, scale: 0.95, x: 50 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 1.05, filter: 'blur(40px)' }}
-                  transition={{ duration: 1.2, ease: [0.19, 1, 0.22, 1] }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1, transition: { duration: 0.18, ease: 'easeOut' } }}
+                  exit={{ opacity: 0, transition: { duration: 0.12, ease: 'easeIn' } }}
                   className="relative flex h-[88%] w-full items-end justify-center xl:h-[90%]"
                 >
                   <img
                     src={active.avatar}
                     alt={active.name}
+                    loading="eager"
+                    decoding="async"
                     className="z-10 h-full w-auto select-none object-contain object-bottom"
                   />
                 </motion.div>
