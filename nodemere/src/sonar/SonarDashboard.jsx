@@ -2373,9 +2373,10 @@ const SonarDashboard = () => {
                 <HireReceptionistModal
                   onClose={() => setShowHireModal(false)}
                   hiredCatalogIds={enrichedAgents.map((agent) => agent.catalog_id).filter(Boolean)}
+                  hiredVoiceIds={enrichedAgents.map((agent) => agent.elevenlabs_voice_id).filter(Boolean)}
                   onHire={async (receptionist) => {
                     try {
-                      const result = await api.hireReceptionist(receptionist.id);
+                      const result = await api.hireReceptionist(receptionist);
                       if (!result) throw new Error('Failed to hire receptionist');
                       await refresh();
                       await loadAgentScenarios();

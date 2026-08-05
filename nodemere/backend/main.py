@@ -55,7 +55,7 @@ for handler in logging.getLogger("uvicorn.access").handlers:
 # --- End Logging Configuration ---
 
 from pydantic import BaseModel, Field, EmailStr
-from fastapi import FastAPI, HTTPException, status, Depends, Request, Header, UploadFile, File
+from fastapi import FastAPI, HTTPException, status, Depends, Request, Header, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
@@ -124,6 +124,8 @@ from .contract_service import (
     clone_voice,
     create_contract,
     get_contract_public_state,
+    record_checkbox_consent,
+    save_cloned_receptionist_profile,
     sign_contract,
 )
 
@@ -5219,6 +5221,10 @@ class ContractSignRequest(BaseModel):
     consent: Optional[dict] = None
 
 
+class ContractConsentRequest(BaseModel):
+    consent_key: str = Field(..., pattern="^(voice|identity|usage)$")
+
+
 def get_client_ip(request: Request) -> Optional[str]:
     forwarded_for = request.headers.get("x-forwarded-for")
     if forwarded_for:
@@ -5287,6 +5293,20 @@ async def sign_voice_contract(token: str, payload: ContractSignRequest, request:
     return result
 
 
+@app.post("/api/contracts/{token}/consents", tags=["Voice Contracts"])
+async def accept_voice_contract_consent(token: str, payload: ContractConsentRequest, request: Request):
+    result = record_checkbox_consent(
+        supabase_admin,
+        token=token,
+        consent_key=payload.consent_key,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+    return result
+
+
 @app.get("/api/contracts/{token}/clone", tags=["Voice Contracts"])
 async def get_voice_clone_state(token: str):
     result = get_contract_public_state(supabase_admin, token)
@@ -5330,6 +5350,42 @@ async def create_instant_voice_clone(token: str, request: Request):
     except Exception as exc:
         logging.error("Voice clone request failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": "Voice cloning failed. Please try again.", "debug": str(exc)}) from exc
+
+
+@app.post("/api/contracts/{token}/receptionist-profile", tags=["Voice Contracts"])
+async def complete_cloned_receptionist_profile(
+    token: str,
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    age: str = Form(...),
+    description: str = Form(...),
+    traits: str = Form(...),
+    image: Optional[UploadFile] = File(None),
+):
+    try:
+        content = await image.read() if image else None
+        result = save_cloned_receptionist_profile(
+            supabase_admin,
+            token=token,
+            first_name=first_name,
+            last_name=last_name,
+            age=age,
+            description=description,
+            traits=traits,
+            image_filename=getattr(image, "filename", None),
+            image_content_type=getattr(image, "content_type", None),
+            image_content=content,
+        )
+        if not result.get("success"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+        return result
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": str(exc)}) from exc
+    except Exception as exc:
+        logging.error("Cloned receptionist profile save failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"message": "Could not save the cloned receptionist."}) from exc
 
 
 @app.get("/api/upload/{token}", tags=["Document Upload"])
@@ -7586,24 +7642,74 @@ async def list_hired_receptionists(current_user: dict = Depends(get_current_user
     )
     return response.data or []
 
+
+def normalize_custom_voice_receptionist(row: dict) -> dict:
+    metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    profile = metadata.get("receptionist_profile") if isinstance(metadata.get("receptionist_profile"), dict) else {}
+    voice_name = profile.get("full_name") or row.get("voice_name") or row.get("speaker_name") or "Cloned Voice"
+    first_name = profile.get("first_name") or (str(voice_name).strip().split(" ")[0] if str(voice_name).strip() else "Voice")
+    last_name = profile.get("last_name")
+    if not last_name and str(voice_name).strip() and " " in str(voice_name).strip():
+        last_name = " ".join(str(voice_name).strip().split(" ")[1:])
+    traits = profile.get("traits") if isinstance(profile.get("traits"), list) else ["Voice Clone", "Custom"]
+    return {
+        "id": f"voice-clone:{row.get('id')}",
+        "source": "voice_clone",
+        "custom_voice_id": row.get("id"),
+        "provider_voice_id": row.get("provider_voice_id"),
+        "elevenlabs_voice_id": row.get("provider_voice_id"),
+        "full_name": voice_name,
+        "first_name": first_name,
+        "last_name": last_name,
+        "description": profile.get("description") or "Custom cloned voice.",
+        "stereotype": profile.get("stereotype") or "Custom Voice Clone",
+        "avatar": profile.get("avatar") or profile.get("profile_image"),
+        "traits": traits,
+        "voice": profile.get("voice"),
+        "age": profile.get("age"),
+        "gender": profile.get("gender"),
+        "is_active": True,
+    }
+
+
 @app.post("/api/sonar/receptionists/hire", tags=["Sonar Receptionists"])
 async def hire_receptionist(payload: dict, current_user: dict = Depends(get_current_user)):
     catalog_id = payload.get("catalog_id") or payload.get("id")
-    if not catalog_id:
+    custom_voice_id = payload.get("custom_voice_id") or payload.get("voice_clone_id")
+    source = str(payload.get("source") or "").strip().lower()
+    is_voice_clone_hire = source in {"voice_clone", "custom_voice"} or bool(custom_voice_id)
+    if not catalog_id and not custom_voice_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="catalog_id is required")
 
     current_user_id = str(current_user.id)
     try:
-        catalog_response = (
-            supabase.table("receptionist_catalog")
-            .select("*")
-            .eq("id", str(catalog_id))
-            .limit(1)
-            .execute()
-        )
-        catalog_row = (catalog_response.data or [None])[0]
-        if not catalog_row:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catalog receptionist not found")
+        if is_voice_clone_hire:
+            voice_response = (
+                supabase.table("custom_voices")
+                .select("*")
+                .eq("id", str(custom_voice_id or str(catalog_id).replace("voice-clone:", "", 1)))
+                .limit(1)
+                .execute()
+            )
+            catalog_row = (voice_response.data or [None])[0]
+            if not catalog_row:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voice clone not found")
+            if not catalog_row.get("provider_voice_id"):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Voice clone is missing a voice id")
+            owner_id = catalog_row.get("user_id")
+            if owner_id and str(owner_id) != current_user_id:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voice clone not found")
+        else:
+            catalog_response = (
+                supabase.table("receptionist_catalog")
+                .select("*")
+                .eq("id", str(catalog_id))
+                .limit(1)
+                .execute()
+            )
+            catalog_row = (catalog_response.data or [None])[0]
+            if not catalog_row:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catalog receptionist not found")
 
         business_response = (
             supabase.table("businesses")
@@ -7614,23 +7720,43 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
         )
         business_row = (business_response.data or [None])[0]
 
-        insert_payload = {
-            "catalog_id": catalog_row.get("id"),
-            "full_name": catalog_row.get("full_name"),
-            "description": catalog_row.get("description"),
-            "stereotype": catalog_row.get("stereotype"),
-            "avatar": catalog_row.get("avatar"),
-            "traits": catalog_row.get("traits"),
-            "voice": catalog_row.get("voice"),
-            "age": catalog_row.get("age"),
-            "first_name": catalog_row.get("first_name"),
-            "gender": catalog_row.get("gender"),
-            "is_active": True,
-            "direction": "all",
-            "user_id": current_user_id,
-            "business_id": business_row.get("id") if business_row else None,
-            "elevenlabs_voice_id": catalog_row.get("elevenlabs_voice_id") or catalog_row.get("elevenlabs_agent_id"),
-        }
+        if is_voice_clone_hire:
+            normalized = normalize_custom_voice_receptionist(catalog_row)
+            insert_payload = {
+                "catalog_id": None,
+                "full_name": normalized.get("full_name"),
+                "description": normalized.get("description"),
+                "stereotype": normalized.get("stereotype"),
+                "avatar": normalized.get("avatar"),
+                "traits": normalized.get("traits"),
+                "voice": normalized.get("voice"),
+                "age": normalized.get("age"),
+                "first_name": normalized.get("first_name"),
+                "gender": normalized.get("gender"),
+                "is_active": True,
+                "direction": "all",
+                "user_id": current_user_id,
+                "business_id": business_row.get("id") if business_row else None,
+                "elevenlabs_voice_id": catalog_row.get("provider_voice_id"),
+            }
+        else:
+            insert_payload = {
+                "catalog_id": catalog_row.get("id"),
+                "full_name": catalog_row.get("full_name"),
+                "description": catalog_row.get("description"),
+                "stereotype": catalog_row.get("stereotype"),
+                "avatar": catalog_row.get("avatar"),
+                "traits": catalog_row.get("traits"),
+                "voice": catalog_row.get("voice"),
+                "age": catalog_row.get("age"),
+                "first_name": catalog_row.get("first_name"),
+                "gender": catalog_row.get("gender"),
+                "is_active": True,
+                "direction": "all",
+                "user_id": current_user_id,
+                "business_id": business_row.get("id") if business_row else None,
+                "elevenlabs_voice_id": catalog_row.get("elevenlabs_voice_id") or catalog_row.get("elevenlabs_agent_id"),
+            }
         response = supabase.table("hired_receptionists").insert(insert_payload).execute()
         created = response.data[0] if response.data else insert_payload
         push_live_event(
@@ -7648,15 +7774,30 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to hire receptionist")
 
 @app.get("/api/sonar/receptionists/catalog", tags=["Sonar Receptionists"])
-async def list_receptionist_catalog():
+async def list_receptionist_catalog(current_user: dict = Depends(get_current_user)):
     response = (
         supabase.table("receptionist_catalog")
         .select("*")
-        .eq("is_active", True)
         .order("full_name")
         .execute()
     )
-    return response.data or []
+    catalog_rows = response.data or []
+    clone_rows = []
+    try:
+        custom_voice_response = (
+            supabase.table("custom_voices")
+            .select("id,user_id,provider_voice_id,voice_name,speaker_name,status,created_at,metadata")
+            .in_("status", ["ready", "requires_verification"])
+            .not_.is_("provider_voice_id", "null")
+            .or_(f"user_id.eq.{current_user.id},user_id.is.null")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        for row in custom_voice_response.data or []:
+            clone_rows.append(normalize_custom_voice_receptionist(row))
+    except Exception as exc:
+        logging.warning("Failed to append custom voices to receptionist catalog: %s", exc)
+    return [*catalog_rows, *clone_rows]
 
 @app.get("/api/sonar/call-logs", tags=["Sonar Calls"])
 async def list_call_logs(

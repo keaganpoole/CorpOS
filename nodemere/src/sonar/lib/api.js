@@ -50,6 +50,7 @@ export const api = {
   getControlState: () => fetchJSON('/api/control-state'),
   getSession: () => fetchJSON('/api/session'),
   getPipeline: () => fetchJSON('/api/pipeline'),
+  getReceptionistCatalog: () => fetchJSON('/api/sonar/receptionists/catalog'),
   getCronJobs: () => fetchJSON('/api/cron'),
   createCronJob: (job) => postJSON('/api/cron', job),
   deleteCronJob: (id) => deleteJSON(`/api/cron/${id}`),
@@ -62,7 +63,16 @@ export const api = {
   restoreAgent: (agentId) => postJSON(`/api/agents/${agentId}/restore`, {}),
   getPendingRestarts: () => fetchJSON('/api/pending-restarts'),
   clearPendingRestart: (id) => deleteJSON(`/api/pending-restarts/${id}`),
-  hireReceptionist: (catalogId) => postJSON('/api/sonar/receptionists/hire', { catalog_id: catalogId }),
+  hireReceptionist: (receptionist) => {
+    if (receptionist && typeof receptionist === 'object') {
+      return postJSON('/api/sonar/receptionists/hire', {
+        catalog_id: receptionist.id,
+        source: receptionist.source,
+        custom_voice_id: receptionist.custom_voice_id,
+      });
+    }
+    return postJSON('/api/sonar/receptionists/hire', { catalog_id: receptionist });
+  },
 
   // Control commands via REST (fallback when IPC unavailable)
   setRuntime: (mode) => postJSON('/api/control/runtime', { mode }),

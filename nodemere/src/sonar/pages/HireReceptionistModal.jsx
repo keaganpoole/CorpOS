@@ -5,9 +5,9 @@ import {
   User, ChevronLeft, ChevronRight, Loader2,
   Cake,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
 
-const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalogIds = [] }) => {
+const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalogIds = [], hiredVoiceIds = [] }) => {
   const [receptionists, setReceptionists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -22,21 +22,22 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
     .map((value) => String(value))
     .sort()
     .join('|');
+  const hiredVoiceKey = (hiredVoiceIds || [])
+    .filter(Boolean)
+    .map((value) => String(value))
+    .sort()
+    .join('|');
 
   const loadReceptionists = async () => {
     setLoading(true);
     try {
-      const { data: catalogData, error: catalogError } = await supabase
-        .from('receptionist_catalog')
-        .select('*')
-        .order('full_name', { ascending: true });
-
-      if (catalogError) throw catalogError;
+      const catalogData = await api.getReceptionistCatalog();
 
       const hiredIds = new Set((hiredCatalogIds || []).filter(Boolean).map((value) => String(value)));
+      const hiredVoices = new Set((hiredVoiceIds || []).filter(Boolean).map((value) => String(value)));
 
       const availableReceptionists = (catalogData || []).filter(
-        (row) => !hiredIds.has(String(row.id))
+        (row) => !hiredIds.has(String(row.id)) && !hiredVoices.has(String(row.elevenlabs_voice_id || row.provider_voice_id || ''))
       );
 
       setReceptionists(availableReceptionists);
@@ -49,7 +50,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
   useEffect(() => {
     loadReceptionists();
-  }, [hiredCatalogKey]);
+  }, [hiredCatalogKey, hiredVoiceKey]);
 
   const nextCard = () => {
     if (isAnimating || receptionists.length === 0) return;
@@ -231,6 +232,11 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                       <div className="flex-1 p-8 pt-2 flex flex-col gap-6">
                         <div className="border-b border-white/5 pb-6">
                           <div className="space-y-1">
+                            {person.source === 'voice_clone' && person.elevenlabs_voice_id && (
+                              <p className="mb-3 break-all text-[10px] font-semibold uppercase tracking-wider text-white/35">
+                                Voice ID: {person.elevenlabs_voice_id}
+                              </p>
+                            )}
                             {person.voice ? (
                               <button
                                 onClick={(e) => {

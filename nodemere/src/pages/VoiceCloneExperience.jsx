@@ -6,14 +6,16 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  FileText,
+  ImagePlus,
   LoaderCircle,
   Mic,
   Pause,
   Play,
   RotateCcw,
-  Sparkles,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ScenarioIntroNode from '../components/ScenarioIntroNode';
@@ -28,23 +30,40 @@ const stages = [
   { id: 'agreement', label: 'Agreement', title: 'Review and confirm' },
   { id: 'sample', label: 'Voice Sample', title: 'Give your voice a foundation' },
   { id: 'clone', label: 'Instant Clone', title: 'Your voice, made ready' },
+  { id: 'profile', label: 'Profile', title: 'Shape the receptionist' },
+  { id: 'image', label: 'Image', title: 'Add the profile image' },
+  { id: 'complete', label: 'Complete', title: 'Receptionist saved' },
+];
+
+const receptionistTraitOptions = [
+  'Warm',
+  'Professional',
+  'Calm',
+  'Friendly',
+  'Efficient',
+  'Confident',
+  'Detail-Oriented',
+  'Empathetic',
 ];
 
 const consentRows = [
   {
     id: 'voice',
-    title: 'This is my voice',
-    copy: 'I confirm that I am submitting recordings of my own voice and have the authority to provide this consent.',
+    title: 'I confirm this is my voice',
+    copy: 'I confirm that the recordings contain my own voice and that I have the legal authority to submit them.',
+    overview: 'You are confirming that the recordings contain your own voice and that you have the authority to submit them. This personal flow cannot be used to submit another person\'s voice. False or unauthorized certifications can lead to removal of the voice and account action.',
   },
   {
     id: 'identity',
-    title: 'Create an AI version of my voice',
-    copy: 'I authorize Nodemere to create an AI-generated voice from the recordings I provide.',
+    title: 'I authorize creation of my AI voice',
+    copy: 'I authorize Nodemere and its voice technology provider to process my recordings and create a synthetic version of my voice.',
+    overview: 'Your recordings will be transmitted to Nodemere\'s authorized voice technology provider to create a synthetic version of your voice. That voice can speak words you never personally recorded. You can request future-use removal through support@nodemere.ai; the process may take up to seven calendar days after a valid request is acknowledged and confirmed.',
   },
   {
     id: 'usage',
-    title: 'Use it for approved business interactions',
-    copy: 'I authorize the generated voice to be used for the business purposes described in the agreement.',
+    title: 'I authorize its defined business use',
+    copy: 'I authorize Nodemere to use my AI voice for the approved business interactions described in the agreement.',
+    overview: 'Your cloned voice may be used by Nodemere for the approved business interactions described in this agreement. Nodemere may generate dialogue through the service that you did not personally record or speak. This authorization does not permit deceptive, abusive, or unlawful calls.',
   },
 ];
 
@@ -71,6 +90,12 @@ function isSupportedAudioFile(file) {
   if (!file) return false;
   if (file.type?.startsWith('audio/')) return true;
   return /\.(aac|m4a|mp3|ogg|wav|webm)$/i.test(file.name || '');
+}
+
+function isSupportedImageFile(file) {
+  if (!file) return false;
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return true;
+  return /\.(jpe?g|png|webp)$/i.test(file.name || '');
 }
 
 function getInitialStage(locationState) {
@@ -107,21 +132,104 @@ function IntroNode({ onBegin }) {
   );
 }
 
-function ConsentRow({ row, checked, onChange, disabled }) {
+function ConsentRow({ row, checked, onOpen, disabled }) {
   return (
-    <label className={`voice-consent-row ${checked ? 'is-checked' : ''} ${disabled ? 'is-disabled' : ''}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        disabled={disabled}
-      />
+    <button
+      type="button"
+      className={`voice-consent-row ${checked ? 'is-checked' : ''} ${disabled ? 'is-disabled' : ''}`}
+      role="checkbox"
+      aria-checked={checked}
+      onClick={onOpen}
+      disabled={disabled}
+    >
       <span className="voice-consent-check" aria-hidden="true"><Check size={13} strokeWidth={3} /></span>
       <span className="voice-consent-copy">
         <strong>{row.title}</strong>
         <small>{row.copy}</small>
       </span>
-    </label>
+    </button>
+  );
+}
+
+function LegalConsentModal({ row, agreementSection, agreementTitle, accepted, saving, onClose, onAccept }) {
+  const [slide, setSlide] = useState(1);
+  const modalRef = useRef(null);
+  const headingRef = useRef(null);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const focusTimer = window.setTimeout(() => headingRef.current?.focus(), 0);
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = modalRef.current?.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])');
+      if (!focusable?.length) return;
+      const items = Array.from(focusable);
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
+  const paragraphs = (agreementSection || 'The selected agreement text is unavailable. Close this dialog and try again.').split('\n\n');
+  const isReview = Boolean(accepted);
+  return (
+    <div className="voice-consent-modal-backdrop" role="presentation">
+      <motion.section
+        ref={modalRef}
+        className="voice-consent-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="voice-consent-modal-title"
+        aria-describedby="voice-consent-modal-description"
+        initial={{ opacity: 0, y: 12, scale: 0.99 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 12, scale: 0.99 }}
+        transition={{ duration: 0.22, ease: FLOW_EASE }}
+      >
+        <header className="voice-consent-modal-header">
+          <div>
+            <p className="voice-flow-eyebrow">{slide === 1 ? 'Overview' : 'Legal agreement'} {isReview ? '· Previously accepted' : ''}</p>
+            <h2 id="voice-consent-modal-title" ref={headingRef} tabIndex="-1">{row.title}</h2>
+          </div>
+          <button type="button" className="voice-consent-close" onClick={onClose} aria-label="Close authorization dialog"><X size={18} /></button>
+        </header>
+        {slide === 1 ? (
+          <div className="voice-consent-modal-overview" id="voice-consent-modal-description">
+            <FileText size={18} aria-hidden="true" />
+            <p>{row.overview}</p>
+          </div>
+        ) : (
+          <div className="voice-consent-modal-body" id="voice-consent-modal-description">
+            <p className="voice-consent-agreement-name">{agreementTitle}</p>
+            {paragraphs.map((paragraph, index) => (
+              paragraph.match(/^\d+\. /) ? <h3 key={index}>{paragraph}</h3> : <p key={index}>{paragraph}</p>
+            ))}
+          </div>
+        )}
+        <footer className="voice-consent-modal-footer">
+          {slide === 1 ? <button type="button" className="voice-back-button" onClick={onClose}>Cancel</button> : <button type="button" className="voice-back-button" onClick={() => setSlide(1)}>Back</button>}
+          {slide === 1 ? <button type="button" className="voice-primary-button" onClick={() => setSlide(2)}>Continue <ChevronRight size={15} /></button> : isReview ? <button type="button" className="voice-primary-button" onClick={onClose}>Close</button> : <button type="button" className="voice-primary-button" onClick={onAccept} disabled={saving}>{saving ? <LoaderCircle className="voice-spin" size={16} /> : null}I Agree</button>}
+        </footer>
+      </motion.section>
+    </div>
   );
 }
 
@@ -154,7 +262,7 @@ function AgreementSlide({
   form,
   setForm,
   accepted,
-  setAccepted,
+  onOpenConsent,
   signed,
   hasSignature,
   canvasRef,
@@ -190,8 +298,8 @@ function AgreementSlide({
             key={row.id}
             row={row}
             checked={accepted[row.id]}
-            onChange={(checked) => setAccepted((current) => ({ ...current, [row.id]: checked }))}
-            disabled={!canEdit}
+            onOpen={(event) => onOpenConsent(row, event.currentTarget)}
+            disabled={false}
           />
         ))}
       </div>
@@ -211,25 +319,6 @@ function AgreementSlide({
         />
       )}
       {errorMessage ? <p className="voice-flow-error" role="alert">{errorMessage}</p> : null}
-    </div>
-  );
-}
-
-function VoiceObject({ mode, level = 0, reduceMotion }) {
-  const icon = mode === 'complete' ? <Check size={34} strokeWidth={1.55} /> : mode === 'processing' ? <Sparkles size={32} strokeWidth={1.35} /> : <Mic size={34} strokeWidth={1.45} />;
-  return (
-    <div className={`voice-object-wrap is-${mode}`} style={{ '--voice-level': level }}>
-      <motion.div
-        className="voice-object"
-        animate={reduceMotion ? undefined : { scale: 1 + Math.min(level, 1) * 0.045 }}
-        transition={{ type: 'spring', stiffness: 190, damping: 24, mass: 0.7 }}
-      >
-        <span className="voice-object-aura" aria-hidden="true" />
-        <span className="voice-object-ring voice-object-ring-one" aria-hidden="true" />
-        <span className="voice-object-ring voice-object-ring-two" aria-hidden="true" />
-        <span className="voice-object-surface" aria-hidden="true" />
-        <span className="voice-object-glyph" aria-hidden="true">{icon}</span>
-      </motion.div>
     </div>
   );
 }
@@ -399,7 +488,11 @@ function CloneSlide({
         <p>{complete ? 'Your voice can now be used for the approved business interactions in the agreement.' : failed ? (cloneState.message || 'We could not complete the clone. Your recordings are still here to try again.') : processingStatuses[processingIndex]}</p>
       </div>
 
-      <VoiceObject mode={complete ? 'complete' : 'processing'} level={complete ? 0 : 0.2 + processingIndex * 0.08} reduceMotion={reduceMotion} />
+      {!failed ? (
+        <div className="voice-clone-orb-wrap">
+          <WhiteBrandOrb size={150} isRecording={!complete} />
+        </div>
+      ) : null}
 
       {complete ? (
         <div className="voice-complete-card">
@@ -440,6 +533,127 @@ function CloneSlide({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ReceptionistProfileSlide({ profile, setProfile, errorMessage, onAddTrait, onRemoveTrait }) {
+  const selectedTraits = new Set(profile.traits || []);
+  return (
+    <div className="voice-flow-slide voice-profile-slide">
+      <div className="voice-slide-intro">
+        <p className="voice-flow-eyebrow">Receptionist profile</p>
+        <h1>Shape the receptionist</h1>
+        <p>Give the cloned voice the same presentation data used by the receptionist catalog.</p>
+      </div>
+
+      <div className="voice-profile-fields">
+        <div className="voice-identity-fields">
+          <label>
+            <span className="voice-field-label">First name</span>
+            <input value={profile.first_name} onChange={(event) => setProfile((current) => ({ ...current, first_name: event.target.value }))} autoComplete="given-name" />
+          </label>
+          <label>
+            <span className="voice-field-label">Last name</span>
+            <input value={profile.last_name} onChange={(event) => setProfile((current) => ({ ...current, last_name: event.target.value }))} autoComplete="family-name" />
+          </label>
+        </div>
+        <label className="voice-clone-name-field">
+          <span className="voice-field-label">Age</span>
+          <input type="number" min="18" max="99" value={profile.age} onChange={(event) => setProfile((current) => ({ ...current, age: event.target.value }))} />
+        </label>
+        <label className="voice-clone-name-field">
+          <span className="voice-field-label">Description</span>
+          <textarea value={profile.description} onChange={(event) => setProfile((current) => ({ ...current, description: event.target.value }))} rows={4} />
+        </label>
+        <div className="voice-trait-system">
+          <span className="voice-field-label">Traits</span>
+          <div className="voice-trait-grid">
+            {receptionistTraitOptions.map((trait) => {
+              const active = selectedTraits.has(trait);
+              return (
+                <button key={trait} type="button" className={`voice-trait-chip ${active ? 'is-active' : ''}`} onClick={() => active ? onRemoveTrait(trait) : onAddTrait(trait)}>
+                  {active ? <Check size={12} /> : null}{trait}
+                </button>
+              );
+            })}
+          </div>
+          <div className="voice-custom-trait-row">
+            <input value={profile.customTrait} onChange={(event) => setProfile((current) => ({ ...current, customTrait: event.target.value }))} onKeyDown={(event) => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              onAddTrait(profile.customTrait);
+            }} />
+            <button type="button" className="voice-secondary-button" onClick={() => onAddTrait(profile.customTrait)}>Add trait</button>
+          </div>
+        </div>
+      </div>
+
+      {errorMessage ? <p className="voice-flow-error" role="alert">{errorMessage}</p> : null}
+    </div>
+  );
+}
+
+function ReceptionistImageSlide({ profile, imagePreview, onUpload, errorMessage, saving }) {
+  const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Cloned Receptionist';
+  return (
+    <div className="voice-flow-slide voice-image-slide">
+      <div className="voice-slide-intro">
+        <p className="voice-flow-eyebrow">Receptionist image</p>
+        <h1>Add the profile image</h1>
+        <p>This image is used in the same card treatment as the receptionist catalog.</p>
+      </div>
+
+      <label className={`voice-image-uploader ${imagePreview ? 'has-image' : ''}`}>
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onUpload} disabled={saving} />
+        {imagePreview ? (
+          <img src={imagePreview} alt={fullName} />
+        ) : (
+          <span>
+            <ImagePlus size={30} />
+            <strong>Upload image</strong>
+            <small>JPEG, PNG, or WEBP</small>
+          </span>
+        )}
+      </label>
+
+      <div className="voice-image-card-preview">
+        <div className="voice-image-card-art">
+          {imagePreview ? <img src={imagePreview} alt="" /> : <UserPlaceholder />}
+        </div>
+        <div>
+          <strong>{fullName}</strong>
+          <span>{profile.age ? `${profile.age} years old` : 'Receptionist'}</span>
+        </div>
+      </div>
+
+      {errorMessage ? <p className="voice-flow-error" role="alert">{errorMessage}</p> : null}
+    </div>
+  );
+}
+
+function UserPlaceholder() {
+  return <Mic size={34} aria-hidden="true" />;
+}
+
+function ReceptionistSuccessSlide({ profile, cloneState }) {
+  const savedProfile = cloneState.receptionist_profile || profile;
+  const fullName = `${savedProfile.first_name || ''} ${savedProfile.last_name || ''}`.trim() || savedProfile.full_name || 'Cloned Receptionist';
+  return (
+    <div className="voice-flow-slide voice-success-slide">
+      <div className="voice-slide-intro voice-slide-intro-centered">
+        <p className="voice-flow-eyebrow">Ready to hire</p>
+        <h1>{fullName} is ready</h1>
+        <p>The cloned receptionist has been saved and will appear in the Hire a Receptionist catalog with the standard card, traits, image, and hiring flow.</p>
+      </div>
+      <div className="voice-success-card">
+        {savedProfile.avatar || savedProfile.profile_image ? <img src={savedProfile.avatar || savedProfile.profile_image} alt={fullName} /> : null}
+        <div>
+          <CheckCircle2 size={18} />
+          <strong>{fullName}</strong>
+          <span>{cloneState.voice_id || cloneState.elevenlabs_voice_id || 'Voice saved'}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -505,6 +719,14 @@ export default function VoiceCloneExperience() {
   const [processingIndex, setProcessingIndex] = useState(0);
   const [mediaError, setMediaError] = useState('');
   const [playingSampleId, setPlayingSampleId] = useState(null);
+  const [activeConsent, setActiveConsent] = useState(null);
+  const [consentSaving, setConsentSaving] = useState(false);
+  const [agreementError, setAgreementError] = useState('');
+  const [profile, setProfile] = useState({ first_name: '', last_name: '', age: '', description: '', traits: ['Professional', 'Friendly'], customTrait: '' });
+  const [profileError, setProfileError] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [imageError, setImageError] = useState('');
 
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
@@ -517,16 +739,17 @@ export default function VoiceCloneExperience() {
   const audioContextRef = useRef(null);
   const animationFrameRef = useRef(null);
   const cloneRequestedRef = useRef(false);
+  const consentOriginRef = useRef(null);
 
   const isSigned = ['signed', 'cloned', 'ready', 'requires_verification'].includes(cloneState.status);
-  const unavailable = ['not_found', 'expired', 'revoked', 'error'].includes(cloneState.status);
+  const unavailable = ['not_found', 'expired', 'revoked'].includes(cloneState.status);
   const needsSignature = !isSigned;
   const activeError = cloneState.message;
 
   const finishAlternateSplash = useCallback(() => {
     setShowAlternateSplash(false);
-    setStage(isSigned ? 2 : 1);
-  }, [isSigned]);
+    setStage(cloneState.receptionist_profile?.completed_at ? 6 : cloneState.status === 'cloned' && cloneState.custom_voice_id ? 4 : isSigned ? 2 : 1);
+  }, [cloneState.custom_voice_id, cloneState.receptionist_profile?.completed_at, cloneState.status, isSigned]);
 
   const loadCloneState = useCallback(async () => {
     try {
@@ -535,7 +758,25 @@ export default function VoiceCloneExperience() {
       setCloneState({ ...data, loading: false });
       setVoiceName(data.voice_display_name || data.signer_name || 'Nodemere Custom Voice');
       setForm({ signer_name: data.signer_name || '', signer_email: data.signer_email || '' });
-      if (data.status === 'signed' || data.status === 'cloned') setAccepted({ voice: true, identity: true, usage: true });
+      if (data.receptionist_profile) {
+        setProfile((current) => ({
+          ...current,
+          first_name: data.receptionist_profile.first_name || current.first_name,
+          last_name: data.receptionist_profile.last_name || current.last_name,
+          age: data.receptionist_profile.age || current.age,
+          description: data.receptionist_profile.description || current.description,
+          traits: Array.isArray(data.receptionist_profile.traits) && data.receptionist_profile.traits.length ? data.receptionist_profile.traits : current.traits,
+        }));
+        if (data.receptionist_profile.avatar || data.receptionist_profile.profile_image) {
+          setImagePreview(data.receptionist_profile.avatar || data.receptionist_profile.profile_image);
+        }
+      }
+      const acceptedKeys = new Set((data.accepted_consents || []).map((consent) => consent.consent_key));
+      if (data.status === 'signed' || data.status === 'cloned') {
+        setAccepted({ voice: true, identity: true, usage: true });
+      } else {
+        setAccepted({ voice: acceptedKeys.has('voice'), identity: acceptedKeys.has('identity'), usage: acceptedKeys.has('usage') });
+      }
     } catch {
       setCloneState({ loading: false, status: 'error', message: 'We could not load this clone link. Please try again.' });
     }
@@ -555,6 +796,7 @@ export default function VoiceCloneExperience() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     audioContextRef.current?.close?.();
     samplesRef.current.forEach((sample) => URL.revokeObjectURL(sample.url));
+    if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
   }, []);
 
   useEffect(() => {
@@ -789,11 +1031,47 @@ export default function VoiceCloneExperience() {
     setHasSignature(false);
   };
 
+  const openConsent = (row, origin) => {
+    consentOriginRef.current = origin;
+    setActiveConsent(row);
+  };
+
+  const closeConsent = useCallback(() => {
+    setActiveConsent(null);
+    window.setTimeout(() => consentOriginRef.current?.focus?.(), 0);
+  }, []);
+
+  const acceptConsent = async () => {
+    if (!activeConsent || consentSaving) return;
+    setConsentSaving(true);
+    setAgreementError('');
+    try {
+      const response = await fetch(`${API_BASE}/api/contracts/${encodeURIComponent(token)}/consents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consent_key: activeConsent.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail?.message || data.message || 'The authorization could not be recorded.');
+      setAccepted((current) => ({ ...current, [activeConsent.id]: true }));
+      closeConsent();
+    } catch (error) {
+      setAgreementError(error.message || 'The authorization could not be recorded.');
+    } finally {
+      setConsentSaving(false);
+    }
+  };
+
   const submitAgreement = async () => {
     if (isSigned) {
       setStage(2);
       return;
     }
+    if (!form.signer_name.trim() || !form.signer_email.trim() || !hasSignature || !Object.values(accepted).every(Boolean)) {
+      setAgreementError('Review each authorization and sign the agreement to continue.');
+      return;
+    }
+    setAgreementError('');
     setSubmitting(true);
     try {
       const response = await fetch(`${API_BASE}/api/contracts/${encodeURIComponent(token)}/sign`, {
@@ -829,17 +1107,135 @@ export default function VoiceCloneExperience() {
     setStage(2);
   };
 
+  const normalizeTrait = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 32);
+
+  const addTrait = (value) => {
+    const trait = normalizeTrait(value);
+    if (!trait) return;
+    setProfile((current) => {
+      const exists = current.traits.some((item) => item.toLowerCase() === trait.toLowerCase());
+      if (exists || current.traits.length >= 6) return { ...current, customTrait: '' };
+      return { ...current, traits: [...current.traits, trait], customTrait: '' };
+    });
+  };
+
+  const removeTrait = (trait) => {
+    setProfile((current) => ({ ...current, traits: current.traits.filter((item) => item !== trait) }));
+  };
+
+  const validateProfile = () => {
+    const firstName = profile.first_name.trim();
+    const lastName = profile.last_name.trim();
+    const age = Number(profile.age);
+    const description = profile.description.trim();
+    if (!firstName || !lastName) return 'First and last name are required.';
+    if (!Number.isInteger(age) || age < 18 || age > 99) return 'Age must be between 18 and 99.';
+    if (description.length < 20) return 'Description must be at least 20 characters.';
+    if (!profile.traits.length) return 'Add at least one trait.';
+    return '';
+  };
+
+  const continueFromProfile = () => {
+    const error = validateProfile();
+    setProfileError(error);
+    if (error) return;
+    setStage(5);
+  };
+
+  const handleImageUpload = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!isSupportedImageFile(file)) {
+      setImageError('Upload a JPEG, PNG, or WEBP image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError('Image must be 5 MB or smaller.');
+      return;
+    }
+    if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setImageError('');
+  };
+
+  const saveReceptionistProfile = async () => {
+    const profileValidation = validateProfile();
+    if (profileValidation) {
+      setProfileError(profileValidation);
+      setStage(4);
+      return;
+    }
+    if (!imageFile && !cloneState.receptionist_profile?.avatar && !cloneState.receptionist_profile?.profile_image) {
+      setImageError('Upload a receptionist image.');
+      return;
+    }
+    setSubmitting(true);
+    setImageError('');
+    try {
+      const body = new FormData();
+      body.append('first_name', profile.first_name.trim());
+      body.append('last_name', profile.last_name.trim());
+      body.append('age', String(Number(profile.age)));
+      body.append('description', profile.description.trim());
+      body.append('traits', profile.traits.join(','));
+      if (imageFile) body.append('image', imageFile, imageFile.name);
+      const response = await fetch(`${API_BASE}/api/contracts/${encodeURIComponent(token)}/receptionist-profile`, { method: 'POST', body });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail?.message || data.message || 'The receptionist could not be saved.');
+      setCloneState((current) => ({ ...current, ...data, status: data.status || current.status, message: data.message || 'Cloned receptionist saved.' }));
+      if (data.receptionist_profile?.avatar) setImagePreview(data.receptionist_profile.avatar);
+      setStage(6);
+    } catch (error) {
+      setImageError(error.message || 'The receptionist could not be saved.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const pageReady = !cloneState.loading;
-  const canAgreementContinue = isSigned || (form.signer_name.trim() && form.signer_email.trim() && hasSignature && Object.values(accepted).every(Boolean));
   const canSampleContinue = samples.length > 0 && !isRecording;
   const cloneComplete = ['ready', 'requires_verification', 'cloned'].includes(cloneState.status);
   const hasPreview = samples.length > 0;
+  const canContinue = stage === 1
+    ? true
+    : stage === 2
+      ? canSampleContinue
+      : stage === 3
+        ? cloneComplete
+        : true;
+  const continueAction = stage === 1
+    ? submitAgreement
+    : stage === 2
+      ? continueFromSample
+      : stage === 3
+        ? () => setStage(4)
+        : stage === 4
+          ? continueFromProfile
+          : stage === 5
+            ? saveReceptionistProfile
+            : () => navigate('/sonar');
+  const continueLabel = stage === 1
+    ? (isSigned ? 'Continue to sample' : 'Sign and continue')
+    : stage === 2
+      ? 'Continue to clone'
+      : stage === 3
+        ? 'Continue to profile'
+        : stage === 4
+          ? 'Continue to image'
+          : stage === 5
+            ? 'Save receptionist'
+            : 'Finish';
 
   const content = useMemo(() => {
-    if (stage === 1) return <AgreementSlide form={form} setForm={setForm} accepted={accepted} setAccepted={setAccepted} signed={!needsSignature || isSigned} hasSignature={hasSignature} canvasRef={canvasRef} onSignatureBegin={beginSignature} onSignatureDraw={drawSignature} onSignatureEnd={endSignature} onClearSignature={clearSignature} errorMessage={cloneState.message} />;
+    if (stage === 1) return <AgreementSlide form={form} setForm={setForm} accepted={accepted} onOpenConsent={openConsent} signed={!needsSignature || isSigned} hasSignature={hasSignature} canvasRef={canvasRef} onSignatureBegin={beginSignature} onSignatureDraw={drawSignature} onSignatureEnd={endSignature} onClearSignature={clearSignature} errorMessage={agreementError || cloneState.message} />;
     if (stage === 2) return <CaptureSlide samples={samples} isRecording={isRecording} recordingSeconds={recordingSeconds} inputLevel={inputLevel} onStartRecording={startRecording} onStopRecording={stopRecording} onUpload={handleUpload} onRemove={removeSample} onReplace={() => document.getElementById('voice-replace-upload')?.click()} onAddAnother={() => document.getElementById('voice-add-upload')?.click()} onPlay={togglePlayback} playingSampleId={playingSampleId} onDuration={updateDuration} reduceMotion={reduceMotion} mediaError={mediaError} />;
-    return <CloneSlide cloneState={cloneState} voiceName={voiceName} setVoiceName={setVoiceName} submitting={submitting} processingIndex={processingIndex} onRetry={retryClone} onBack={() => setStage(2)} onPreview={togglePreview} hasPreview={hasPreview} previewUrl={samples[samples.length - 1]?.url} reduceMotion={reduceMotion} />;
-  }, [accepted, cloneState, form, hasPreview, hasSignature, inputLevel, isRecording, isSigned, mediaError, needsSignature, playingSampleId, processingIndex, recordingSeconds, reduceMotion, samples, stage, submitting, voiceName]);
+    if (stage === 3) return <CloneSlide cloneState={cloneState} voiceName={voiceName} setVoiceName={setVoiceName} submitting={submitting} processingIndex={processingIndex} onRetry={retryClone} onBack={() => setStage(2)} onPreview={togglePreview} hasPreview={hasPreview} previewUrl={samples[samples.length - 1]?.url} reduceMotion={reduceMotion} />;
+    if (stage === 4) return <ReceptionistProfileSlide profile={profile} setProfile={setProfile} errorMessage={profileError} onAddTrait={addTrait} onRemoveTrait={removeTrait} />;
+    if (stage === 5) return <ReceptionistImageSlide profile={profile} imagePreview={imagePreview} onUpload={handleImageUpload} errorMessage={imageError} saving={submitting} />;
+    return <ReceptionistSuccessSlide profile={profile} cloneState={cloneState} />;
+  }, [accepted, agreementError, cloneState, form, hasPreview, hasSignature, imageError, imagePreview, inputLevel, isRecording, isSigned, mediaError, needsSignature, playingSampleId, processingIndex, profile, profileError, recordingSeconds, reduceMotion, samples, stage, submitting, voiceName]);
 
   if (showAlternateSplash) {
     return <SplashScreenAlternate onAnimationEnd={finishAlternateSplash} />;
@@ -867,10 +1263,10 @@ export default function VoiceCloneExperience() {
             key="flow"
             stage={stage}
             onBack={() => setStage((current) => Math.max(1, current - 1))}
-            canContinue={stage === 1 ? canAgreementContinue : stage === 2 ? canSampleContinue : cloneComplete}
-            onContinue={stage === 1 ? submitAgreement : stage === 2 ? continueFromSample : () => navigate('/')}
+            canContinue={canContinue}
+            onContinue={continueAction}
             submitting={submitting}
-            continueLabel={stage === 1 ? (isSigned ? 'Continue to sample' : 'Sign and continue') : stage === 2 ? 'Continue to clone' : 'Finish'}
+            continueLabel={continueLabel}
           >
             {content}
           </FlowCard>
@@ -879,6 +1275,9 @@ export default function VoiceCloneExperience() {
       <input id="voice-replace-upload" className="voice-hidden-upload" type="file" accept="audio/*" multiple onChange={handleUpload} />
       <input id="voice-add-upload" className="voice-hidden-upload" type="file" accept="audio/*" multiple onChange={handleUpload} />
       {stage === 3 && cloneComplete ? <button type="button" className="voice-secondary-floating-action" onClick={() => setStage(2)}><Upload size={13} /> Replace samples</button> : null}
+      <AnimatePresence>
+        {activeConsent ? <LegalConsentModal row={activeConsent} agreementSection={cloneState.agreement_sections?.[activeConsent.id] || cloneState.agreement_body} agreementTitle={cloneState.agreement_title || 'Voice Clone Consent, Authorization, Biometric Notice, and Limited License Agreement'} accepted={accepted[activeConsent.id]} saving={consentSaving} onClose={closeConsent} onAccept={acceptConsent} /> : null}
+      </AnimatePresence>
     </main>
   );
 }
