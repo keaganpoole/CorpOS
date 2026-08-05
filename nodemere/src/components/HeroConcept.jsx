@@ -441,10 +441,9 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                 <motion.div
                   key={`${active.id}-content`}
                   custom={direction}
-                  initial={{ opacity: 0, x: -30, filter: 'blur(10px)' }}
-                  animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, x: 20, filter: 'blur(10px)' }}
-                  transition={{ duration: 0.8, ease: [0.19, 1, 0.22, 1] }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1, transition: { duration: 0.18, ease: 'easeOut' } }}
+                  exit={{ opacity: 0, transition: { duration: 0.12, ease: 'easeIn' } }}
                   className="w-full"
                 >
                   <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:max-w-[34rem] lg:items-start lg:gap-5 lg:text-left">
