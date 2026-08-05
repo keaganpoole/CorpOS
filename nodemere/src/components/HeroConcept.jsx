@@ -458,7 +458,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                       <motion.h1
                         key={`${active.id}-name`}
                         aria-label={active.name}
-                        className={`hero-concept-name homepage-copy-reveal lg:self-start ${copyVisible ? 'is-visible' : ''}`}
+                        className="hero-concept-name lg:self-start"
                         style={{
                           display: 'inline-block',
                           fontSize: 'clamp(5rem, 12vw, 11rem)',
