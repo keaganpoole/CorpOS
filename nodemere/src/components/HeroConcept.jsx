@@ -233,17 +233,30 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   const active = receptionists[index] || receptionists[0];
   const activeGradient = HERO_GRADIENT;
   const activeIcon = pickTraitIcon(active.traits, active.stereotype);
+  const receptionistTextTransition = {
+    initial: { opacity: 0 },
+    animate: { opacity: 1, transition: { duration: 0.18, ease: 'easeOut' } },
+    exit: { opacity: 0, transition: { duration: 0.12, ease: 'easeIn' } },
+  };
   const traitsPill = (className = '') => (
     <div className={`max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-2 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md md:px-2.5 md:py-2 lg:gap-2 lg:px-2.5 lg:py-1.5 ${className}`}>
-      <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
-      <div className="flex min-w-0 items-center gap-1 text-[8px] font-black tracking-[0.14em] text-white/60 md:text-[9px] lg:gap-1.5 lg:text-[9px] lg:tracking-[0.16em]">
-        {active.traits.map((trait, i) => (
-          <React.Fragment key={`${active.id}-${trait}-${i}`}>
-            <span className="truncate">{toTitleCase(trait)}</span>
-            {i < active.traits.length - 1 && <span className="text-white/30">&bull;</span>}
-          </React.Fragment>
-        ))}
-      </div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={`${active.id}-traits`}
+          className="flex min-w-0 items-center gap-1.5 lg:gap-2"
+          {...receptionistTextTransition}
+        >
+          <GradientIcon iconKey={activeIcon} colors={activeGradient} className="h-5 w-5" />
+          <div className="flex min-w-0 items-center gap-1 text-[8px] font-black tracking-[0.14em] text-white/60 md:text-[9px] lg:gap-1.5 lg:text-[9px] lg:tracking-[0.16em]">
+            {active.traits.map((trait, i) => (
+              <React.Fragment key={`${active.id}-${trait}-${i}`}>
+                <span className="truncate">{toTitleCase(trait)}</span>
+                {i < active.traits.length - 1 && <span className="text-white/30">&bull;</span>}
+              </React.Fragment>
+            ))}
+          </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 
@@ -437,85 +450,89 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
 
           <div className="relative mx-auto flex h-full max-w-7xl items-center px-8 lg:px-20">
             <div className="relative z-30 flex w-full items-center lg:w-[46%] lg:justify-start xl:w-1/2">
-              <AnimatePresence mode="wait" custom={direction}>
-                <motion.div
-                  key={`${active.id}-content`}
-                  custom={direction}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { duration: 0.18, ease: 'easeOut' } }}
-                  exit={{ opacity: 0, transition: { duration: 0.12, ease: 'easeIn' } }}
-                  className="w-full"
-                >
+              <div className="w-full">
                   <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:max-w-[34rem] lg:items-start lg:gap-5 lg:text-left">
                     {traitsPill('-mb-5 hidden lg:mx-0 lg:-mb-6 lg:inline-flex')}
 
-                    <h1
-                      aria-label={active.name}
-                      className={`hero-concept-name homepage-copy-reveal lg:self-start ${copyVisible ? 'is-visible' : ''}`}
-                      style={{
-                        display: 'inline-block',
-                        fontSize: 'clamp(5rem, 12vw, 11rem)',
-                        lineHeight: 0.9,
-                        letterSpacing: '-0.04em',
-                        fontWeight: 400,
-                        margin: 0,
-                        background: `linear-gradient(90deg, ${activeGradient[0]}, ${activeGradient[1]}, ${activeGradient[2]}, ${activeGradient[0]})`,
-                        backgroundSize: '200% auto',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        animation: 'miami-flow 8s linear infinite',
-                      }}
-                    >
-                      {active.name}
-                    </h1>
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.h1
+                        key={`${active.id}-name`}
+                        aria-label={active.name}
+                        className={`hero-concept-name homepage-copy-reveal lg:self-start ${copyVisible ? 'is-visible' : ''}`}
+                        style={{
+                          display: 'inline-block',
+                          fontSize: 'clamp(5rem, 12vw, 11rem)',
+                          lineHeight: 0.9,
+                          letterSpacing: '-0.04em',
+                          fontWeight: 400,
+                          margin: 0,
+                          background: `linear-gradient(90deg, ${activeGradient[0]}, ${activeGradient[1]}, ${activeGradient[2]}, ${activeGradient[0]})`,
+                          backgroundSize: '200% auto',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          animation: 'miami-flow 8s linear infinite',
+                        }}
+                        {...receptionistTextTransition}
+                      >
+                        {active.name}
+                      </motion.h1>
+                    </AnimatePresence>
 
                     {traitsPill('inline-flex lg:hidden')}
 
                     <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:items-start lg:gap-5 lg:pt-16 lg:text-left">
-                      {active.description && (
-                        <p className={`homepage-copy-reveal homepage-copy-reveal--delayed max-w-md text-[0.95rem] font-light leading-[1.55] text-white/60 md:max-w-[36rem] md:text-[1.16rem] md:leading-[1.62] lg:mx-0 lg:max-w-md lg:text-[1.06rem] lg:leading-[1.55] ${copyVisible ? 'is-visible' : ''}`}>
-                          {active.description}
-                        </p>
-                      )}
-
-                      {active.voice && (
-                        <button
-                          onClick={() => playVoice(active.voice, active.id)}
-                          onMouseEnter={() => setIsHoveringVoice(true)}
-                          onMouseLeave={() => setIsHoveringVoice(false)}
-                          className="relative flex cursor-pointer items-center gap-2 overflow-hidden rounded-full border border-white/10 px-4 py-2.5 transition-all duration-500 hover:-translate-y-[1px]"
-                          style={{
-                            backgroundImage: `linear-gradient(135deg, ${activeGradient[0]}, ${activeGradient[1]} 52%, ${activeGradient[2]})`,
-                            boxShadow: `0 0 0 1px rgba(255,255,255,0.05), 0 10px 36px ${activeGradient[1]}33, 0 0 30px ${activeGradient[2]}22`,
-                            animation: 'voice-button-float 6.5s ease-in-out infinite',
-                          }}
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.div
+                          key={`${active.id}-supporting-copy`}
+                          className="flex flex-col items-center gap-5 text-center md:gap-6 lg:items-start lg:gap-5 lg:text-left"
+                          {...receptionistTextTransition}
                         >
-                          <span
-                            aria-hidden="true"
-                            className="pointer-events-none absolute inset-0 rounded-full opacity-70 blur-xl"
-                            style={{
-                              backgroundImage: `radial-gradient(circle at 30% 50%, ${activeGradient[0]}66, transparent 58%), radial-gradient(circle at 75% 45%, ${activeGradient[2]}55, transparent 62%)`,
-                              animation: 'voice-button-glow 7s ease-in-out infinite',
-                            }}
-                          />
-                          <span className="absolute inset-[1px] rounded-full bg-white/[0.02]" aria-hidden="true" />
-                          <span className="relative z-10 flex items-center gap-2">
-                            {isPlaying === active.id ? (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                                <rect x="6" y="4" width="4" height="16" rx="1" />
-                                <rect x="14" y="4" width="4" height="16" rx="1" />
-                              </svg>
-                            ) : (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                                <polygon points="5,3 19,12 5,21" />
-                              </svg>
-                            )}
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-white md:text-[11px] lg:text-[10px]">
-                              {isPlaying === active.id ? 'Pause' : 'Preview Voice'}
-                            </span>
-                          </span>
-                        </button>
-                      )}
+                          {active.description && (
+                            <p className={`homepage-copy-reveal homepage-copy-reveal--delayed max-w-md text-[0.95rem] font-light leading-[1.55] text-white/60 md:max-w-[36rem] md:text-[1.16rem] md:leading-[1.62] lg:mx-0 lg:max-w-md lg:text-[1.06rem] lg:leading-[1.55] ${copyVisible ? 'is-visible' : ''}`}>
+                              {active.description}
+                            </p>
+                          )}
+
+                          {active.voice && (
+                            <button
+                              onClick={() => playVoice(active.voice, active.id)}
+                              onMouseEnter={() => setIsHoveringVoice(true)}
+                              onMouseLeave={() => setIsHoveringVoice(false)}
+                              className="relative flex cursor-pointer items-center gap-2 overflow-hidden rounded-full border border-white/10 px-4 py-2.5 transition-all duration-500 hover:-translate-y-[1px]"
+                              style={{
+                                backgroundImage: `linear-gradient(135deg, ${activeGradient[0]}, ${activeGradient[1]} 52%, ${activeGradient[2]})`,
+                                boxShadow: `0 0 0 1px rgba(255,255,255,0.05), 0 10px 36px ${activeGradient[1]}33, 0 0 30px ${activeGradient[2]}22`,
+                                animation: 'voice-button-float 6.5s ease-in-out infinite',
+                              }}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className="pointer-events-none absolute inset-0 rounded-full opacity-70 blur-xl"
+                                style={{
+                                  backgroundImage: `radial-gradient(circle at 30% 50%, ${activeGradient[0]}66, transparent 58%), radial-gradient(circle at 75% 45%, ${activeGradient[2]}55, transparent 62%)`,
+                                  animation: 'voice-button-glow 7s ease-in-out infinite',
+                                }}
+                              />
+                              <span className="absolute inset-[1px] rounded-full bg-white/[0.02]" aria-hidden="true" />
+                              <span className="relative z-10 flex items-center gap-2">
+                                {isPlaying === active.id ? (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                                    <rect x="6" y="4" width="4" height="16" rx="1" />
+                                    <rect x="14" y="4" width="4" height="16" rx="1" />
+                                  </svg>
+                                ) : (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="5,3 19,12 5,21" />
+                                  </svg>
+                                )}
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-white md:text-[11px] lg:text-[10px]">
+                                  {isPlaying === active.id ? 'Pause' : 'Preview Voice'}
+                                </span>
+                              </span>
+                            </button>
+                          )}
+                        </motion.div>
+                      </AnimatePresence>
                     </div>
 
                     <div className="relative flex h-[18rem] w-full items-end justify-center md:h-[29rem] lg:hidden">
@@ -571,8 +588,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                       </AnimatePresence>
                     </div>
                   </div>
-                </motion.div>
-              </AnimatePresence>
+              </div>
             </div>
 
             <div className="pointer-events-none absolute right-0 top-0 bottom-0 hidden w-[54%] items-end justify-center overflow-hidden lg:flex">
