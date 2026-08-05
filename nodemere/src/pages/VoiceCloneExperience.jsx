@@ -191,10 +191,10 @@ function LegalConsentModal({ row, agreementSection, agreementTitle, accepted, sa
   const paragraphs = (agreementSection || 'The selected agreement text is unavailable. Close this dialog and try again.').split('\n\n');
   const isReview = Boolean(accepted);
   return (
-    <div className="voice-consent-modal-backdrop" role="presentation">
+    <div className={`voice-consent-modal-backdrop ${slide === 1 ? 'is-overview' : ''}`} role="presentation">
       <motion.section
         ref={modalRef}
-        className="voice-consent-modal"
+        className={`voice-consent-modal ${slide === 1 ? 'is-overview' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="voice-consent-modal-title"

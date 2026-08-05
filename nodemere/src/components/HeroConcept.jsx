@@ -219,6 +219,8 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   const [mobileTimelineOpacity, setMobileTimelineOpacity] = useState(1);
   const [copyVisible, setCopyVisible] = useState(false);
   const [isInView, setIsInView] = useState(false);
+  const [showArrowHint, setShowArrowHint] = useState(false);
+  const [autoPlayResetKey, setAutoPlayResetKey] = useState(0);
   const [isSwipeViewport, setIsSwipeViewport] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 1024 : false
   );
@@ -245,14 +247,20 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
     </div>
   );
 
-  const nextSlide = () => {
-    setDirection(1);
-    setIndex((prev) => (prev + 1) % receptionists.length);
+  const resetAutoPlayTimer = () => {
+    setAutoPlayResetKey((prev) => prev + 1);
   };
 
-  const prevSlide = () => {
+  const nextSlide = ({ manual = false } = {}) => {
+    setDirection(1);
+    setIndex((prev) => (prev + 1) % receptionists.length);
+    if (manual) resetAutoPlayTimer();
+  };
+
+  const prevSlide = ({ manual = false } = {}) => {
     setDirection(-1);
     setIndex((prev) => (prev - 1 + receptionists.length) % receptionists.length);
+    if (manual) resetAutoPlayTimer();
   };
 
   useEffect(() => {
@@ -272,9 +280,29 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
       clearInterval(autoPlayRef.current);
       return undefined;
     }
-    autoPlayRef.current = setInterval(nextSlide, 9000);
+    autoPlayRef.current = setInterval(() => nextSlide(), 9000);
     return () => clearInterval(autoPlayRef.current);
-  }, [receptionists.length, shouldPause, isInView]);
+  }, [receptionists.length, shouldPause, isInView, autoPlayResetKey]);
+
+  useEffect(() => {
+    if (!isSwipeViewport || !isInView || receptionists.length <= 1) {
+      setShowArrowHint(false);
+      return undefined;
+    }
+
+    let hideTimeout = null;
+    const revealHint = () => {
+      setShowArrowHint(true);
+      hideTimeout = window.setTimeout(() => setShowArrowHint(false), 2200);
+    };
+
+    revealHint();
+    const interval = window.setInterval(revealHint, 5000);
+    return () => {
+      window.clearInterval(interval);
+      if (hideTimeout) window.clearTimeout(hideTimeout);
+    };
+  }, [isSwipeViewport, isInView, receptionists.length]);
 
   const playVoice = (voiceUrl, id) => {
     if (isPlaying === id) {
@@ -363,8 +391,8 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
     touchStartRef.current = null;
 
     if (Math.abs(deltaX) < 44 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
-    if (deltaX < 0) nextSlide();
-    else prevSlide();
+    if (deltaX < 0) nextSlide({ manual: true });
+    else prevSlide({ manual: true });
   };
 
   const sliderFrame = (
@@ -379,6 +407,33 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
           />
 
           <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
+
+          {receptionists.length > 1 && (
+            <>
+              <motion.div
+                aria-hidden="true"
+                className="hero-concept-edge-arrow hero-concept-edge-arrow--left hidden lg:flex"
+                initial={false}
+                animate={{ opacity: isInView ? 1 : 0 }}
+                transition={{ duration: 1.1, ease: 'easeOut' }}
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </motion.div>
+              <motion.div
+                aria-hidden="true"
+                className="hero-concept-edge-arrow hero-concept-edge-arrow--right hidden lg:flex"
+                initial={false}
+                animate={{ opacity: isInView ? 1 : 0 }}
+                transition={{ duration: 1.1, ease: 'easeOut', delay: 0.08 }}
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
+              </motion.div>
+            </>
+          )}
 
           <div className="relative mx-auto flex h-full max-w-7xl items-center px-8 lg:px-20">
             <div className="relative z-30 flex w-full items-center lg:w-[46%] lg:justify-start xl:w-1/2">
@@ -465,6 +520,32 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                     </div>
 
                     <div className="relative flex h-[18rem] w-full items-end justify-center md:h-[29rem] lg:hidden">
+                      {isSwipeViewport && receptionists.length > 1 && (
+                        <>
+                          <motion.div
+                            aria-label="Previous receptionist"
+                            className="hero-concept-edge-arrow hero-concept-edge-arrow--compact-left"
+                            initial={false}
+                            animate={{ opacity: showArrowHint ? 1 : 0 }}
+                            transition={{ duration: 0.85, ease: 'easeOut' }}
+                          >
+                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M15 18l-6-6 6-6" />
+                            </svg>
+                          </motion.div>
+                          <motion.div
+                            aria-label="Next receptionist"
+                            className="hero-concept-edge-arrow hero-concept-edge-arrow--compact-right"
+                            initial={false}
+                            animate={{ opacity: showArrowHint ? 1 : 0 }}
+                            transition={{ duration: 0.85, ease: 'easeOut' }}
+                          >
+                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M9 6l6 6-6 6" />
+                            </svg>
+                          </motion.div>
+                        </>
+                      )}
                       <div
                         className="absolute left-1/2 top-3 h-[11.75rem] w-[11.75rem] -translate-x-1/2 rounded-full opacity-90 sm:h-[12.75rem] sm:w-[12.75rem] md:top-5 md:h-[19rem] md:w-[19rem]"
                         style={{
@@ -534,6 +615,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                   onClick={() => {
                     setDirection(i > index ? 1 : -1);
                     setIndex(i);
+                    resetAutoPlayTimer();
                   }}
                   className={`relative h-0.5 cursor-pointer overflow-hidden rounded-full transition-all duration-500 ${
                     i === index ? 'w-16 bg-white/20' : 'w-3 bg-white/10 hover:bg-white/30'
@@ -623,6 +705,65 @@ const HeroConcept = React.forwardRef(({ embedded = false }, ref) => {
         @keyframes voice-button-float {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-2px); }
+        }
+
+        .hero-concept-edge-arrow {
+          pointer-events: none;
+          position: absolute;
+          top: 50%;
+          z-index: 25;
+          align-items: center;
+          justify-content: center;
+          width: 34px;
+          height: 34px;
+          color: rgba(255, 255, 255, 0.22);
+          transform: translateY(-50%);
+          animation: hero-edge-arrow-hover 7s ease-in-out infinite;
+          filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.08));
+        }
+
+        .hero-concept-edge-arrow--left {
+          left: clamp(18px, 2.8vw, 48px);
+          top: 54%;
+        }
+
+        .hero-concept-edge-arrow--right {
+          right: clamp(18px, 2.8vw, 48px);
+          top: 54%;
+          animation-delay: -3.5s;
+        }
+
+        .hero-concept-edge-arrow--compact-left,
+        .hero-concept-edge-arrow--compact-right {
+          display: flex;
+          width: 28px;
+          height: 28px;
+          z-index: 20;
+          color: rgba(255, 255, 255, 0.26);
+        }
+
+        .hero-concept-edge-arrow--compact-left {
+          left: 12px;
+        }
+
+        .hero-concept-edge-arrow--compact-right {
+          right: 12px;
+          animation-delay: -3.5s;
+        }
+
+        @media (min-width: 768px) {
+          .hero-concept-edge-arrow--compact-left {
+            left: 32px;
+          }
+
+          .hero-concept-edge-arrow--compact-right {
+            right: 32px;
+          }
+        }
+
+        @keyframes hero-edge-arrow-hover {
+          0%, 100% { transform: translateY(-50%) translateX(0); }
+          50% { transform: translateY(calc(-50% - 2px)) translateX(0); }
         }
       `}</style>
     </>
