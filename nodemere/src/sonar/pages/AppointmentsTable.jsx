@@ -110,7 +110,7 @@ const ZoneColorPalette = ({ position, activeColor, onPreviewColor, onClearPrevie
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 6, scale: 0.96 }}
         transition={{ duration: 0.16, ease: 'easeOut' }}
-        className="rounded-2xl border border-white/[0.08] bg-[#0b0b0d]/98 p-2 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+        className="rounded-2xl border border-white/[0.08] bg-[#0b0b0d] p-2 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl"
       >
         <div className="flex items-center gap-1.5">
           <span className="h-5 w-5 shrink-0 opacity-0" aria-hidden="true" />
@@ -164,7 +164,7 @@ const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
     <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={save}
       onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
       onClick={(e) => e.stopPropagation()}
-      className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-full min-w-[60px]" />
+      className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:!outline-none w-full min-w-[60px]" />
   ) : (
     <span
       tabIndex={0}
@@ -196,7 +196,7 @@ const InlineCurrency = ({ value, onSave }) => {
       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">$</span>
       <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^0-9.]/g, ''))}
         onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
-        className="bg-white/[0.06] border border-cyan-500/30 rounded-lg pl-6 pr-2 py-1 text-[12px] text-white focus:outline-none w-[110px]" />
+        className="bg-white/[0.06] border border-cyan-500/30 rounded-lg pl-6 pr-2 py-1 text-[12px] text-white focus:!outline-none w-[110px]" />
     </div>
   ) : (
     <span onClick={(e) => { e.stopPropagation(); setEditing(true); }} className="block w-full cursor-pointer hover:text-white transition-colors tabular-nums">
@@ -225,7 +225,7 @@ const InlineNumber = ({ value, onSave, min = null, max = null }) => {
   return editing ? (
     <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))}
       onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
-      onClick={(e) => e.stopPropagation()} className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:outline-none w-[70px] text-left" />
+      onClick={(e) => e.stopPropagation()} className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:!outline-none w-[70px] text-left" />
   ) : (
     <span
       tabIndex={0}
@@ -483,7 +483,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
               width: menuPosition?.width ?? 170,
               maxHeight: menuPosition?.maxHeight ?? 300,
             }}
-            className="fixed z-[280] bg-[#080808] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
+            className="fixed z-[280] bg-[#0a0a0a] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             <div className="max-h-full overflow-y-auto custom-scrollbar py-1">
               <motion.button initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0 }}
@@ -596,7 +596,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               width: Math.min(Math.max(menuPosition?.width ?? 190, 190), 260),
               maxHeight: Math.min(menuPosition?.maxHeight ?? 180, 180),
             }}
-            className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#080808] px-2 py-2 shadow-[0_10px_26px_rgba(0,0,0,0.42)]"
+            className="fixed z-[270] rounded-xl border border-white/[0.08] bg-[#0a0a0a] px-2 py-2 shadow-[0_10px_26px_rgba(0,0,0,0.42)]"
           >
             <div className="flex flex-wrap gap-1.5">
               {selected.map((tag) => (
@@ -626,7 +626,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
               width: menuPosition?.width ?? 190,
               maxHeight: menuPosition?.maxHeight ?? 320,
             }}
-            className="fixed z-[280] bg-[#080808] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
+            className="fixed z-[280] bg-[#0a0a0a] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}>
             <div className="max-h-full overflow-y-auto custom-scrollbar py-1">
               {options.map((opt, idx) => {
@@ -711,7 +711,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
                 width: menuPosition?.width ?? 200,
                 maxHeight: menuPosition?.maxHeight ?? 360,
               }}
-              className="fixed z-[280] bg-[#080808] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden"
+              className="fixed z-[280] bg-[#0a0a0a] border border-white/[0.08] rounded-xl shadow-[0_10px_28px_rgba(0,0,0,0.48)] overflow-hidden"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="border-b border-white/[0.04] p-2.5">
@@ -719,7 +719,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={`Search ${placeholder.toLowerCase()}...`}
-                  className="w-full rounded-lg border border-white/[0.06] bg-black/35 px-2.5 py-2 text-[11px] text-white outline-none placeholder:text-zinc-700 focus:border-white/15"
+                  className="w-full rounded-lg border border-white/[0.06] bg-[#0a0a0a] px-2.5 py-2 text-[11px] text-white outline-none placeholder:text-zinc-700 focus:!border-white/[0.06] focus:!outline-none"
                 />
               </div>
               <div className="max-h-full overflow-y-auto custom-scrollbar py-1">
@@ -1043,7 +1043,7 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
           style={{ top: position.top, bottom: position.bottom, left: position.left, width, maxHeight: position.maxHeight }}
-          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0a]/95 shadow-[0_14px_36px_rgba(0,0,0,0.66)] [&_input:focus]:!outline-none [&_input:focus-visible]:!outline-none [&_input:focus]:!ring-0 [&_input:focus]:!shadow-none"
+          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_14px_36px_rgba(0,0,0,0.66)] [&_input:focus]:!border-white/[0.06] [&_input:focus]:!outline-none [&_input:focus-visible]:!outline-none [&_input:focus]:!ring-0 [&_input:focus]:!shadow-none"
         >
           <div className="max-h-full overflow-y-auto custom-scrollbar">
             {children}
@@ -1095,7 +1095,7 @@ const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
               <button type="button" onClick={() => moveRule(index, 1)} className="text-zinc-700 hover:text-white disabled:opacity-20" disabled={index === rules.length - 1}><ChevronDown size={11} /></button>
             </div>
             <select value={rule.field} onChange={(event) => updateRule(index, { field: event.target.value })} className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none">
-              {sortableColumns.map((column) => <option key={column.id} value={column.id} className="bg-[#080808]">{getColumnLabel(column, fieldConfig)}</option>)}
+              {sortableColumns.map((column) => <option key={column.id} value={column.id} className="bg-[#0a0a0a]">{getColumnLabel(column, fieldConfig)}</option>)}
             </select>
             <button type="button" onClick={() => updateRule(index, { direction: rule.direction === 'asc' ? 'desc' : 'asc' })} className="w-[78px] rounded-lg border border-white/[0.06] bg-black/30 px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 hover:text-white">
               {rule.direction === 'asc' ? 'Asc' : 'Desc'}
@@ -1125,7 +1125,7 @@ const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll
       <div className="border-b border-white/[0.05] p-3">
         <div className="relative">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:border-white/15" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!border-white/[0.06] focus:!outline-none" />
         </div>
         <div className="mt-2 flex gap-2">
           <button type="button" onClick={onShowAll} className="flex-1 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 hover:text-white">Show All</button>
@@ -1156,7 +1156,7 @@ const ColumnOrderPopover = ({ columns, fieldConfig, onMove, onReset }) => {
       <div className="border-b border-white/[0.05] p-3">
         <div className="relative">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:border-white/15" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!border-white/[0.06] focus:!outline-none" />
         </div>
       </div>
       <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
@@ -2226,7 +2226,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
         <div className="flex-1" />
         <div className="relative w-[260px]">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search appointments..." className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-[var(--focusOutline)] transition-colors" />
+          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search appointments..." className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)] transition-colors" />
           {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
         </div>
       </div>
@@ -2307,7 +2307,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             initial={{ opacity: 0, scale: 0.96, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -4 }}
-            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a]/95 shadow-[0_12px_28px_rgba(0,0,0,0.64)]"
+            className="fixed z-[240] min-w-[160px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_12px_28px_rgba(0,0,0,0.64)]"
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2328,7 +2328,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{ top: columnOptionsPosition.top, bottom: columnOptionsPosition.bottom, left: columnOptionsPosition.left }}
-            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a]/95 shadow-[0_12px_28px_rgba(0,0,0,0.64)]"
+            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_12px_28px_rgba(0,0,0,0.64)]"
           >
             <div className="py-1">
               {column_options.map((option, idx) => {

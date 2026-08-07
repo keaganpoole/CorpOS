@@ -53,7 +53,7 @@ import {
   ArrowUpDown,
   Minus,
   BookUser,
-  Cake,
+  CakeSlice,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
@@ -106,13 +106,10 @@ const POPUP_DEFINITIONS = [
     id: 'dashboard_welcome',
     type: 'general',
     placement: 'dashboard',
-    title: 'Welcome to Nodemere',
+    title: 'Welcome',
     emoji: '🎉',
-    getDescription: ({ profile }) => {
-      const planName = formatPlanName(profile?.plan);
-      return `Welcome to Nodemere. You're on the ${planName} plan, which gives your front desk ${getPlanSummary(planName)}. This dashboard is where your AI receptionists, calls, calendar, people, and workflows come together so you can start building a sharper front desk operation.`;
-    },
-    primaryActionLabel: 'Got it!',
+    getDescription: () => 'You made it! Your front desk just took its first step toward running itself. Nodemere brings autonomy to the heart of your business and a new standard to every first impression. You’re stepping into the future early. Welcome to the autonomous front desk.',
+    primaryActionLabel: 'Got it',
   },
   {
     id: 'tasklist_intro',
@@ -140,16 +137,15 @@ const POPUP_DEFINITIONS = [
         </div>
       </div>
     ),
-    primaryActionLabel: 'Got it!',
+    primaryActionLabel: 'Got it',
   },
   {
     id: 'receptionists_team_welcome',
     type: 'general',
     placement: 'dashboard',
     title: 'Meet Your Team',
-    emoji: '👥',
-    getDescription: () => 'This is your front desk roster. Hire AI receptionists, review who is active, and keep the people handling your calls organized in one place so your operation stays clean and easy to manage.',
-    primaryActionLabel: 'Got it!',
+    getDescription: () => 'This is where your front line comes together. Choose from a catalog of AI receptionists, each with a distinct personality, and assemble a team ready to carry your name, represent your business, and stand ready for every call.',
+    primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'receptionists',
   },
@@ -160,7 +156,7 @@ const POPUP_DEFINITIONS = [
     title: 'Hire Your First Receptionist',
     emoji: '✨',
     getDescription: () => 'Your roster is empty right now. Add your first AI receptionist so Nodemere has someone ready to answer calls, represent your business, and start taking real work off your front desk.',
-    primaryActionLabel: 'Got it!',
+    primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute, teamView, agentsLoading, receptionistCount }) => (
       currentRoute === 'receptionists' &&
@@ -174,27 +170,12 @@ const POPUP_DEFINITIONS = [
     type: 'general',
     placement: 'dashboard',
     title: 'Add Your Staff',
-    emoji: '🪪',
-    getDescription: () => 'Staff are the real people your AI receptionist can book with, recommend, or route calls to. Add them here so scheduling, availability, and call handling match how your team actually works.',
-    primaryActionLabel: 'Got it!',
+    getDescription: () => 'These are the real people your AI receptionist can book with, recommend, or route calls to. Add them here so scheduling, availability, and call handling match how your team actually works.',
+    primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute, teamView }) => (
       currentRoute === 'receptionists' &&
       teamView === 'staff'
-    ),
-  },
-  {
-    id: 'receptionists_archived_tab',
-    type: 'general',
-    placement: 'dashboard',
-    title: 'Archived Receptionists',
-    emoji: '🗂️',
-    getDescription: () => 'Archived receptionists are removed from active use without erasing their history. This keeps your live roster focused while preserving the context you may need later.',
-    primaryActionLabel: 'Got it!',
-    showDontRemindMe: true,
-    shouldShow: ({ currentRoute, teamView }) => (
-      currentRoute === 'receptionists' &&
-      teamView === 'archived'
     ),
   },
   {
@@ -204,7 +185,7 @@ const POPUP_DEFINITIONS = [
     title: 'Receptionist Hired',
     emoji: '🎉',
     getDescription: () => 'Your AI receptionist is now on the team. Next, give them the right instructions and connect the workflows that help them turn calls into real outcomes.',
-    primaryActionLabel: 'Got it!',
+    primaryActionLabel: 'Got it',
     shouldShow: ({ currentRoute, recentlyHiredReceptionist, showHireModal }) => (
       currentRoute === 'receptionists' &&
       recentlyHiredReceptionist &&
@@ -216,9 +197,8 @@ const POPUP_DEFINITIONS = [
     type: 'general',
     placement: 'dashboard',
     title: 'Calendar',
-    emoji: '📅',
     getDescription: () => 'This is where appointments live across your business. As your receptionists book, reschedule, or update appointments, the calendar becomes the operational source of truth for your front desk.',
-    primaryActionLabel: 'Got it!',
+    primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'calendar',
   },
@@ -229,7 +209,7 @@ const POPUP_DEFINITIONS = [
     title: 'First Appointment Booked',
     emoji: '🎉',
     getDescription: () => 'Your calendar has started filling up. Open appointments to review the details, confirm the booking context, and keep your front desk schedule clean.',
-    primaryActionLabel: 'Got it!',
+    primaryActionLabel: 'Got it',
     shouldShow: ({ currentRoute, calendarCount, calendarLoading }) => currentRoute === 'calendar' && !calendarLoading && calendarCount > 0,
   },
   {
@@ -237,9 +217,8 @@ const POPUP_DEFINITIONS = [
     type: 'general',
     placement: 'dashboard',
     title: 'People CRM',
-    emoji: '👤',
-    getDescription: () => 'People is your customer memory layer. Caller details, appointment history, notes, and records live here so your receptionists can recognize customers instead of starting from scratch.',
-    primaryActionLabel: 'Got it!',
+    getDescription: () => 'People is where customer history lives, giving your AI receptionists the context to recognize people and handle every conversation with more confidence.',
+    primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'pipeline',
   },
@@ -250,7 +229,7 @@ const POPUP_DEFINITIONS = [
     title: 'First Contact Added',
     emoji: '🎉',
     getDescription: () => 'Your CRM is starting to build. As more people are added, your receptionists get better context for calls, bookings, follow-ups, and customer-specific service.',
-    primaryActionLabel: 'Got it!',
+    primaryActionLabel: 'Got it',
     shouldShow: ({ currentRoute, peopleCount, peopleLoading }) => currentRoute === 'pipeline' && !peopleLoading && peopleCount > 0,
   },
   {
@@ -258,9 +237,8 @@ const POPUP_DEFINITIONS = [
     type: 'general',
     placement: 'dashboard',
     title: 'Triggers Start The Workflow',
-    emoji: '🔔',
     getDescription: () => 'A trigger is the event that starts a scenario. Choose the moment carefully: incoming calls, appointment changes, record updates, or scheduled timing determine when the rest of the workflow runs.',
-    primaryActionLabel: 'Got it!',
+    primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute, scenarioTriggerPlaced }) => currentRoute === 'scenarios' && scenarioTriggerPlaced,
   },
@@ -269,9 +247,8 @@ const POPUP_DEFINITIONS = [
     type: 'general',
     placement: 'dashboard',
     title: 'Actions Do The Work',
-    emoji: '🧩',
     getDescription: () => 'Actions are the steps that happen after the trigger fires. Use them to call, message, update records, create appointments, process payments, or branch the workflow into the right outcome.',
-    primaryActionLabel: 'Got it!',
+    primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute, scenarioActionPlaced }) => currentRoute === 'scenarios' && scenarioActionPlaced,
   },
@@ -280,9 +257,8 @@ const POPUP_DEFINITIONS = [
     type: 'general',
     placement: 'dashboard',
     title: 'Live Monitoring',
-    emoji: '📡',
-    getDescription: () => 'Live Monitoring is where you watch front desk activity as it happens. When calls are active, this page helps you understand what your receptionists are doing in real time.',
-    primaryActionLabel: 'Got it!',
+    getDescription: () => 'See your front desk in motion. Follow active calls as they unfold and see how your receptionists are handling conversations in real time.',
+    primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'live-monitoring',
   },
@@ -293,7 +269,7 @@ const POPUP_DEFINITIONS = [
     title: 'First Live Call Seen',
     emoji: '🎉',
     getDescription: () => 'You have seen your front desk in motion. Use live activity to understand how calls flow, where customers need help, and where automation can get sharper.',
-    primaryActionLabel: 'Got it!',
+    primaryActionLabel: 'Got it',
     shouldShow: ({ currentRoute, liveCallSeen }) => currentRoute === 'live-monitoring' && liveCallSeen,
   },
   {
@@ -301,21 +277,10 @@ const POPUP_DEFINITIONS = [
     type: 'general',
     placement: 'dashboard',
     title: 'Call Logs',
-    emoji: '☎️',
-    getDescription: () => 'Call Logs are the permanent record of your front desk conversations. Use them to review outcomes, understand customer context, and spot patterns across inbound and outbound calls.',
-    primaryActionLabel: 'Got it!',
+    getDescription: () => 'Review and play back past calls whenever you need them. See what happened, check outcomes, and keep customer context easy to find.',
+    primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'call-logs',
-  },
-  {
-    id: 'call_logs_first_logged',
-    type: 'general',
-    placement: 'dashboard',
-    title: 'First Call Logged',
-    emoji: '🎉',
-    getDescription: () => 'Your call history is now building. Open a log to review the conversation, check the outcome, and use the record to improve how your front desk handles future calls.',
-    primaryActionLabel: 'Got it!',
-    shouldShow: ({ currentRoute, callLogsCount, callLogsLoading }) => currentRoute === 'call-logs' && !callLogsLoading && callLogsCount > 0,
   },
 ];
 
@@ -840,7 +805,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           <h3 className={`${nameClass} font-bold text-white tracking-tight leading-none`}>{agent.name}</h3>
           {agent.age && (
             <p className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
-              <Cake size={11} />
+              <CakeSlice size={11} />
               <span>{agent.age} years old</span>
             </p>
           )}
@@ -1211,13 +1176,13 @@ const PopupModal = ({ popup, profile, onClose }) => {
           <div className="relative flex flex-1 flex-col p-6 sm:p-8">
             <div className="mb-6 flex items-start justify-between gap-5">
               <div className="min-w-0 flex-1 pl-8 text-center">
-                <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
+                <h2 className="text-[26px] font-semibold tracking-[-0.01em] text-white sm:text-[34px]">
                   {popup.title}{popup.emoji ? ` ${popup.emoji}` : ''}
                 </h2>
                 {typeof popup.renderContent === 'function' ? (
                   popup.renderContent({ profile })
                 ) : (
-                  <p className="mt-3 w-full max-w-none text-sm leading-6 text-zinc-500">
+                  <p className="mt-4 w-full max-w-none text-sm leading-[1.55] text-zinc-300 sm:text-[15px]">
                     {popup.getDescription({ profile })}
                   </p>
                 )}
@@ -1240,7 +1205,7 @@ const PopupModal = ({ popup, profile, onClose }) => {
               )}
               <div className={`${popup.showDontRemindMe ? 'mt-4' : 'mt-8'} flex justify-center`}>
                 <button type="button" onClick={onClose} className="h-12 rounded-full bg-white px-10 text-sm font-bold text-black transition hover:bg-zinc-200">
-                  {popup.primaryActionLabel || 'Got it!'}
+                  {popup.primaryActionLabel || 'Got it'}
                 </button>
               </div>
             </div>

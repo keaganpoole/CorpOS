@@ -21,7 +21,7 @@ import {
   MapPin,
   Phone,
   Trash2,
-  Upload,
+  FileText,
   X,
 } from 'lucide-react';
 
@@ -526,12 +526,13 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
 };
 
 const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeChange, outboundLateHoursAccepted, onOutboundLateHours }) => {
-  const fileInputRef = useRef(null);
   const dragPreviewRef = useRef(null);
   const [snapMinutes, setSnapMinutes] = useState(15);
   const [visibleLayers, setVisibleLayers] = useState({ business: true, inbound: true, outbound: true });
   const [drag, setDrag] = useState(null);
   const [hoveredBar, setHoveredBar] = useState(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
   const [notice, setNotice] = useState('');
 
   const schedule = scheduleIsValid(value) ? value : createDefaultSchedule();
@@ -650,14 +651,19 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
     URL.revokeObjectURL(url);
   };
 
-  const importSchedule = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
+  const openImportModal = () => {
+    setImportText('');
+    setNotice('');
+    setImportModalOpen(true);
+  };
+
+  const importSchedule = () => {
     try {
-      const parsed = JSON.parse(await file.text());
+      const parsed = JSON.parse(importText);
       if (!scheduleIsValid(parsed)) throw new Error('This file does not contain a complete schedule.');
       onChange(cleanScheduleForStorage(parsed));
+      setImportModalOpen(false);
+      setImportText('');
       setNotice('Schedule imported');
     } catch (error) {
       setNotice(error.message || 'Could not import that schedule.');
@@ -692,11 +698,47 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
             <Eye className="h-4 w-4" />
             <span className="pointer-events-none absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[conic-gradient(from_90deg,#0072b2,#009e73,#d55e00,#56b4e9,#0072b2)] ring-1 ring-black/30" />
           </button>
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.025] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:border-white/[0.14] hover:text-white"><Upload className="h-3.5 w-3.5" /> Import</button>
+          <button type="button" onClick={openImportModal} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.025] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:border-white/[0.14] hover:text-white"><FileText className="h-3.5 w-3.5" /> Import</button>
           <button type="button" onClick={exportSchedule} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.025] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:border-white/[0.14] hover:text-white"><Download className="h-3.5 w-3.5" /> Export</button>
         </div>
       </div>
-      <input ref={fileInputRef} type="file" accept="application/json,.json" onChange={importSchedule} className="hidden" />
+      <AnimatePresence>
+        {importModalOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="w-full max-w-xl rounded-2xl border border-white/[0.08] bg-[#080808] p-5 shadow-2xl"
+              initial={{ y: 18, scale: 0.98, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 18, scale: 0.98, opacity: 0 }}
+            >
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Import schedule</h3>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">Paste the exported schedule text below.</p>
+                </div>
+                <button type="button" onClick={() => setImportModalOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/10 hover:text-white" aria-label="Close import schedule">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <textarea
+                value={importText}
+                onChange={(event) => setImportText(event.target.value)}
+                className="h-64 w-full resize-none rounded-xl border border-white/[0.08] bg-black/50 p-3 font-mono text-xs text-zinc-100 outline-none transition placeholder:text-zinc-700 focus:border-white/[0.18]"
+                placeholder=""
+              />
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button type="button" onClick={() => setImportModalOpen(false)} className="h-9 rounded-lg border border-white/[0.07] px-3 text-xs font-semibold text-zinc-400 transition hover:border-white/[0.14] hover:text-white">Cancel</button>
+                <button type="button" onClick={importSchedule} className="h-9 rounded-lg bg-white px-3 text-xs font-semibold text-black transition hover:bg-zinc-200">Import schedule</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <div className="space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
 
@@ -710,7 +752,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
           return (
             <div key={day} className={`group relative flex items-center rounded-xl border px-3 py-2 transition-all duration-200 ${dayValue.enabled ? 'border-white/[0.06] bg-white/[0.018] hover:bg-white/[0.035]' : 'border-transparent bg-black/20 opacity-50 hover:opacity-75'}`}>
               <div className="flex w-28 shrink-0 items-center gap-2.5">
-                <button type="button" onClick={() => updateSchedule((current) => ({ ...current, days: { ...current.days, [day]: { ...current.days[day], enabled: !current.days[day].enabled } } }))} className={`flex h-4 w-7 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-emerald-400/80' : 'bg-zinc-800'}`} aria-label={`Toggle ${day}`}><span className={`h-3 w-3 rounded-full bg-white shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3' : 'translate-x-0'}`} /></button>
+                <button type="button" onClick={() => updateSchedule((current) => ({ ...current, days: { ...current.days, [day]: { ...current.days[day], enabled: !current.days[day].enabled } } }))} className={`flex h-4 w-7 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle ${day}`}><span className={`h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
                 <span className={`text-xs font-semibold uppercase tracking-wider ${dayValue.enabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
               </div>
               <div data-schedule-track={day} className="relative mx-2 flex h-14 min-w-0 flex-1 items-center">
