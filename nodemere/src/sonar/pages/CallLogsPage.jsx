@@ -853,7 +853,6 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-[24px] font-black leading-none text-white">{selectedCall.name}</h3>
-                    <DirectionIcon direction={selectedCall.direction} compact gradient />
                     <span className="inline-flex items-center gap-1.5">
                       <SentimentIcon sentiment={selectedCall.sentiment} compact />
                       <span className="rounded-full bg-white/[0.045] px-2 py-1 text-[11px] text-zinc-300">{selectedCall.purpose}</span>
