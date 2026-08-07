@@ -1202,6 +1202,10 @@ main > section.content-section--showcase {
     .scenario-demo-showcase .homepage-scenarios-builder .sb-canvas.sb-canvas--touch-active {
         touch-action: none;
     }
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--demo .sb-node-output-handle,
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--demo .sb-edge-end-handle {
+        pointer-events: none;
+    }
     .calendar-booking-layout {
         position: relative;
         display: block;

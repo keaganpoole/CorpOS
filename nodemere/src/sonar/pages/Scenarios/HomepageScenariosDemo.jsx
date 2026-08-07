@@ -1968,6 +1968,14 @@ export default function ScenariosPage({
   }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, isValidConnectionTarget, nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
 
   const handleNodePointerDown = (nodeId, event) => {
+    if (needsTouchInteractionMode && event.pointerType === 'touch') {
+      event.stopPropagation();
+      event.preventDefault();
+      edgeDragRef.current = null;
+      setEdgeDrag(null);
+      openSelectionPanel(nodeId);
+      return;
+    }
     if (!canvasInteractionEnabled && event.pointerType === 'touch') return;
     if (event.button !== 0) return;
     event.stopPropagation();

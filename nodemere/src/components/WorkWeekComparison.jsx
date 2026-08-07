@@ -279,7 +279,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
   };
 
   return (
-    <div ref={containerRef} className="comparison-section relative flex h-[100dvh] flex-col overflow-hidden bg-[#050505] font-sans text-white selection:bg-white selection:text-black" data-jitter-debug-list={jitterDebugEnabled ? 'comparison' : undefined}>
+    <div ref={containerRef} className="comparison-section relative flex h-[100dvh] flex-col overflow-hidden bg-[#020202] font-sans text-white selection:bg-white selection:text-black" data-jitter-debug-list={jitterDebugEnabled ? 'comparison' : undefined}>
       <header className="pointer-events-none absolute left-0 top-0 z-50 flex w-full items-start justify-between p-8 md:p-12">
         <motion.div className={finaleComplete ? 'pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : 'pointer-events-auto'} animate={finaleComplete ? { opacity: 0, scale: 0.9 } : { opacity: 1, scale: 1 }} transition={{ duration: 0.55 }}>
           <AnimatedStat value={displayStats.time} suffix=" mins" label="Time Recovered" shouldReveal={statsReveal} />
@@ -313,10 +313,10 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
                   animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                   exit={{ opacity: 0, y: -18, filter: 'blur(8px)' }}
                   transition={{ duration: 0.65, delay: index === revealedFinaleItems - 1 ? 0.05 : 0, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex w-full items-baseline justify-between border-b border-white/10 py-3 text-left"
+                  className="flex w-full items-baseline justify-between border-b border-white/10 py-2 text-left md:py-3"
                 >
-                  <span className="text-sm uppercase tracking-[0.18em] text-white/45 md:text-base">{item.label}</span>
-                  <span className="ml-8 text-xl font-light tracking-tight text-white md:text-2xl">+${item.amount}<span className="ml-1 text-xs text-white/30">/wk</span></span>
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-white/45 md:text-base md:tracking-[0.18em]">{item.label}</span>
+                  <span className="ml-6 text-base font-light tracking-tight text-white md:ml-8 md:text-2xl">+${item.amount}<span className="ml-1 text-[10px] text-white/30 md:text-xs">/wk</span></span>
                 </motion.div>
                 )) : null}
               </AnimatePresence>

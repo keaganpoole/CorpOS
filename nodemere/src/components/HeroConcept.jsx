@@ -238,6 +238,11 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
     animate: { opacity: 1, transition: { duration: 0.18, ease: 'easeOut' } },
     exit: { opacity: 0, transition: { duration: 0.12, ease: 'easeIn' } },
   };
+  const receptionistImageTransition = {
+    initial: { opacity: 0 },
+    animate: { opacity: 1, transition: { duration: 0.55, ease: [0.19, 1, 0.22, 1] } },
+    exit: { opacity: 0, transition: { duration: 0.55, ease: [0.19, 1, 0.22, 1] } },
+  };
   const traitsPill = (className = '') => (
     <div className={`max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-2 py-1.5 shadow-[0_14px_40px_rgba(3,7,18,0.28)] backdrop-blur-md md:px-2.5 md:py-2 lg:gap-2 lg:px-2.5 lg:py-1.5 ${className}`}>
       <AnimatePresence mode="wait" initial={false}>
@@ -501,7 +506,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
 
                     {traitsPill('inline-flex lg:hidden')}
 
-                    <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:items-start lg:gap-5 lg:pt-16 lg:text-left">
+                    <div className="flex flex-col items-center gap-5 text-center md:gap-6 lg:items-start lg:gap-5 lg:pt-0 lg:text-left">
                       <AnimatePresence mode="wait" initial={false}>
                         <motion.div
                           key={`${active.id}-supporting-copy`}
@@ -594,10 +599,8 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
                       <AnimatePresence initial={false}>
                         <motion.div
                           key={`${active.id}-visual-compact`}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1, transition: { duration: 0.18, ease: 'easeOut' } }}
-                          exit={{ opacity: 0, transition: { duration: 0.12, ease: 'easeIn' } }}
-                          className="relative z-10 flex h-[15.5rem] w-full items-end justify-center sm:h-[16.75rem] md:h-[27rem]"
+                          {...receptionistImageTransition}
+                          className="absolute inset-x-0 bottom-0 z-10 flex h-[15.5rem] w-full items-end justify-center sm:h-[16.75rem] md:h-[27rem]"
                         >
                           <img
                             src={active.avatar}
@@ -622,23 +625,23 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
               >
                 <MetamorphicFluidAura colors={activeGradient} />
               </div>
-              <AnimatePresence initial={false}>
-                <motion.div
-                  key={`${active.id}-visual`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { duration: 0.18, ease: 'easeOut' } }}
-                  exit={{ opacity: 0, transition: { duration: 0.12, ease: 'easeIn' } }}
-                  className="relative flex h-[88%] w-full items-end justify-center xl:h-[90%]"
-                >
-                  <img
-                    src={active.avatar}
-                    alt={active.name}
-                    loading="eager"
-                    decoding="async"
-                    className="z-10 h-full w-auto select-none object-contain object-bottom"
-                  />
-                </motion.div>
-              </AnimatePresence>
+              <div className="relative h-[88%] w-full xl:h-[90%]">
+                <AnimatePresence initial={false}>
+                  <motion.div
+                    key={`${active.id}-visual`}
+                    {...receptionistImageTransition}
+                    className="absolute inset-0 flex items-end justify-center"
+                  >
+                    <img
+                      src={active.avatar}
+                      alt={active.name}
+                      loading="eager"
+                      decoding="async"
+                      className="z-10 h-full w-auto select-none object-contain object-bottom"
+                    />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 
