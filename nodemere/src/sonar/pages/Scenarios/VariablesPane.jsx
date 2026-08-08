@@ -751,6 +751,26 @@ export const getAgentFieldsForTable = (tableKey) => {
   return getTableFields(tableKey);
 };
 
+const normalizeReceptionistDirection = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'incoming') return 'inbound';
+  if (normalized === 'outgoing') return 'outbound';
+  if (normalized === 'off' || normalized === 'disabled') return 'none';
+  return normalized;
+};
+
+const isOutboundReceptionistEligible = (receptionist) => {
+  if (!receptionist || receptionist.is_active === false) return false;
+  const status = String(receptionist.raw_status || receptionist.status || '').trim().toLowerCase();
+  if (['archived', 'deleted', 'terminated', 'disabled', 'inactive'].includes(status)) return false;
+
+  const direction = normalizeReceptionistDirection(receptionist.direction);
+  if (direction) return direction === 'outbound' || direction === 'all';
+
+  const callTypes = String(receptionist.call_types || 'both').trim().toLowerCase();
+  return callTypes === 'both' || callTypes === 'outbound' || callTypes === 'all';
+};
+
 const getFocusedTableKeyForNode = (node) => {
   if (!node) return null;
   const actionKey = node.actionConfig?._key || node.subOptionKey || node.triggerKey || '';
@@ -1384,7 +1404,7 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
         scenarioLog('log', '[VariablesPane] loadActiveReceptionist:agents', agents);
 
         const activeAgents = Array.isArray(agents)
-          ? agents.filter((agent) => agent && agent.is_active !== false)
+          ? agents.filter(isOutboundReceptionistEligible)
           : [];
 
         if (activeAgents.length > 0) {
@@ -1453,13 +1473,7 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
 
         if (cancelled) return;
 
-        const outboundRows = (rows || []).filter((row) => {
-          const direction = String(row.direction || '').toLowerCase();
-          if (direction) return direction === 'outbound' || direction === 'all';
-          const callTypes = String(row.call_types || 'both').toLowerCase();
-          return callTypes === 'both' || callTypes === 'outbound';
-        });
-        const eligibleRows = outboundRows.length > 0 ? outboundRows : (rows || []);
+        const eligibleRows = (rows || []).filter(isOutboundReceptionistEligible);
 
         const upstreamCallNode = findNearestUpstreamCallNode(currentNodeId, nodes, edges);
         const assignedReceptionist = String(upstreamCallNode?.actionConfig?.assigned_receptionist || '').trim().toLowerCase();

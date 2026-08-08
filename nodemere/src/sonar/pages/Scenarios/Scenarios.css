@@ -2111,6 +2111,7 @@
   border-radius: 10px;
   padding: 10px 14px;
   color: #fff;
+  caret-color: #fff;
   font-size: 13px;
   outline: none;
   transition: border-color 0.25s ease, background 0.2s, box-shadow 0.25s ease;
@@ -2125,6 +2126,12 @@
   border-color: rgba(255, 255, 255, 0.25);
   background: rgba(14, 14, 16, 0.98);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color: #fff !important;
+}
+
+.sb-input-field:focus + .sb-var-chip-overlay,
+.aether-rule-select:focus + .sb-var-chip-overlay {
+  display: none !important;
 }
 
 .rule-card .sb-input-field:last-of-type {
@@ -2468,7 +2475,12 @@
 .aether-rule-value:has(.sb-var-chip-overlay) .sb-input-field,
 .aether-rule-row:has(.sb-var-chip-overlay) > input.aether-rule-select {
   color: transparent;
-  caret-color: transparent;
+  caret-color: #fff;
+}
+
+.aether-rule-value:has(.sb-var-chip-overlay) .sb-input-field:focus,
+.aether-rule-row:has(.sb-var-chip-overlay) > input.aether-rule-select:focus {
+  color: #fff;
 }
 
 .aether-rule-value .sb-input-field,

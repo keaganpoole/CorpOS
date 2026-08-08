@@ -42,7 +42,7 @@ import {
 import './Scenarios.css';
 import ScenarioIntroNode from '../../../components/ScenarioIntroNode';
 import AetherEdgeLogic from './AetherEdgeLogic';
-import VariablesPane, { getFieldDisplayLabel, getTableFields, getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields, TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
+import VariablesPane, { getFieldDisplayLabel, getTableFields, getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields } from './VariablesPane';
 import { supabase } from '../../lib/supabase';
 import { fetchCustomFields, getCurrentBusinessId, isCustomFieldKey } from '../../lib/customFields';
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
@@ -1417,6 +1417,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
   // Get the action key from the current action config
   const currentActionKey = actionConfig?._key || null;
+  const stripSmartActionDelimiters = (value) => (
+    typeof value === 'string' ? value.replace(/\x1E([^\x1E]*)\x1E/g, '$1').replace(/\x1E/g, '') : value
+  );
   const inferredReceptionistRequirements = useMemo(() => {
     if (currentActionKey !== 'call_customer') return [];
     return inferReceptionistRequirements(selectedNodeId, nodes, edges);
@@ -1425,11 +1428,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   // Handle smart action insertion — inserts delimited token into raw value,
   // overlay renders the display text as a styled chip
   const handleInsertSmartAction = (smartAction, fieldKey) => {
-    const token = `{smart:${smartAction.key}}`;
     setActionConfig(prev => {
       const base = prev || {};
-      const current = base[fieldKey] || '';
-      const newVal = current ? `${current} \x1E${smartAction.instruction}\x1E` : `\x1E${smartAction.instruction}\x1E`;
+      const current = stripSmartActionDelimiters(base[fieldKey] || '');
+      const newVal = current ? `${current} ${smartAction.instruction}` : smartAction.instruction;
       return { ...base, [fieldKey]: newVal };
     });
   };
@@ -1495,18 +1497,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       } else if (value.substring(i, i + 2) === '{{') {
         const end = value.indexOf('}}', i);
         if (end !== -1) {
-          const ref = value.substring(i + 2, end);
-          const parts = ref.split('.');
-          if (parts.length === 2) {
-            const color = TABLE_COLORS[parts[0]] || '#a78bfa';
-            const tableLabel = TABLE_LABELS[parts[0]] || parts[0];
-            result += `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;line-height:1.6;vertical-align:baseline;">${tableLabel}.${parts[1]}</span>`;
-          } else if (parts.length >= 3 && /^\d+$/.test(parts[1])) {
-            const tableKey = parts[0];
-            const color = TABLE_COLORS[tableKey] || '#a78bfa';
-            const tableLabel = TABLE_LABELS[tableKey] || tableKey;
-            result += `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;line-height:1.6;vertical-align:baseline;">${tableLabel}.${parts.slice(2).join('.')}</span>`;
-          } else { result += escapeHTML(value.substring(i, end + 2)); }
+          result += renderVarChipsHTML(value.substring(i, end + 2));
           i = end + 2;
         } else { result += escapeHTML(value[i]); i++; }
       } else {
@@ -3026,7 +3017,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
               display: 'flex', alignItems: 'center', padding: '0 10px',
-              fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+              fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
               whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
             }}
             dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(val) }}
@@ -3134,7 +3125,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         {String(value).includes('{{') && (
           <div
             className="sb-var-chip-overlay"
-            style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
+            style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
             dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }}
           />
         )}
@@ -5390,7 +5381,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                             : [{ key: 'id', label: 'Record ID', type: 'text' }, { key: 'person_id', label: 'Person ID', type: 'text' }, { key: 'service_id', label: 'Service ID', type: 'text' }, { key: 'staff_id', label: 'Staff ID', type: 'text' }, ...getTableFields('appointments').filter((field) => field.key !== 'id')];
                         return definitions.map((field) => {
                           const value = triggerConfig.fields?.[field.key] || '';
-                          return <div key={field.key} className="sb-record-field"><label className="sb-record-label">{field.label}</label><div style={{ position: 'relative' }}><input className="sb-input-field" type="text" value={value} onChange={(event) => setTriggerConfig((prev) => ({ ...prev, fields: { ...(prev?.fields || {}), [field.key]: event.target.value } }))} onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type || 'text' })} style={value.includes('{{') ? { color: 'transparent' } : {}} />{value.includes('{{') && <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }} />}</div></div>;
+                          return <div key={field.key} className="sb-record-field"><label className="sb-record-label">{field.label}</label><div style={{ position: 'relative' }}><input className="sb-input-field" type="text" value={value} onChange={(event) => setTriggerConfig((prev) => ({ ...prev, fields: { ...(prev?.fields || {}), [field.key]: event.target.value } }))} onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type || 'text' })} style={value.includes('{{') ? { color: 'transparent' } : {}} />{value.includes('{{') && <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }} />}</div></div>;
                         });
                       })()}
                     </div>
@@ -5636,7 +5627,14 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                     className={`sb-input-field${varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
                                     value={rawVal}
                                     onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                    onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                    onFocus={() => {
+                                      setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type });
+                                      setActionConfig(prev => {
+                                        const current = prev?.[field.key];
+                                        if (typeof current !== 'string' || !current.includes('\x1E')) return prev;
+                                        return { ...prev, [field.key]: stripSmartActionDelimiters(current) };
+                                      });
+                                    }}
 
                                     rows={4}
                                     style={{
@@ -5657,7 +5655,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                       style={{
                                         position: 'absolute', inset: 0, pointerEvents: 'none',
                                         display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
-                                        fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                        fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
                                         fontFamily: 'Inter, sans-serif', lineHeight: '1.5', wordBreak: 'break-word',
                                         whiteSpace: 'pre-wrap',
                                       }}
@@ -5720,7 +5718,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                           style={{
                                             position: 'absolute', inset: 0, pointerEvents: 'none',
                                             display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
-                                            fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                            fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
                                             fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                                           }}
                                           dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
@@ -5755,7 +5753,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                     style={{
                                       position: 'absolute', inset: 0, pointerEvents: 'none',
                                       display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
-                                      fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                      fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
                                       fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                                     }}
                                     dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
@@ -5786,7 +5784,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                     style={{
                                       position: 'absolute', inset: 0, pointerEvents: 'none',
                                       display: 'flex', alignItems: 'center', padding: '0 10px',
-                                      fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                      fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
                                       whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
                                     }}
                                     dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
@@ -5829,7 +5827,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                 style={{
                                   position: 'absolute', inset: 0, pointerEvents: 'none',
                                   display: 'flex', alignItems: 'center', padding: '0 10px',
-                                  fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                  fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
                                   whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
                                 }}
                                 dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(actionConfig.record_id) }}
@@ -5888,7 +5886,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                             />
                             {(appointmentConfig.person_id || '').includes('{{') && (
                               <div className="sb-var-chip-overlay"
-                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
+                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
                                 dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.person_id) }} />
                             )}
                           </div>
@@ -5923,7 +5921,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
@@ -5963,7 +5961,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
@@ -5996,7 +5994,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                             />
                             {(appointmentConfig.appointment_id || '').includes('{{') && (
                               <div className="sb-var-chip-overlay"
-                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
+                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
                                 dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.appointment_id) }} />
                             )}
                           </div>
@@ -6045,7 +6043,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
@@ -6081,7 +6079,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                             />
                             {(appointmentConfig.notes || '').includes('{{') && (
                               <div className="sb-var-chip-overlay"
-                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'flex-start', padding: '10px 14px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'flex-start', padding: '10px 14px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                                 dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.notes) }} />
                             )}
                           </div>
@@ -6142,7 +6140,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
@@ -6191,7 +6189,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
