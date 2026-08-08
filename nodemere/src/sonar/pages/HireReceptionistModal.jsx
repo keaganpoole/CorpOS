@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Play, Pause, Sparkles,
   User, ChevronLeft, ChevronRight, Loader2,
-  Cake,
+  CalendarDays,
 } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -220,7 +220,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
                             {person.age && (
                               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
-                                <Cake size={11} />
+                                <CalendarDays size={11} />
                                 <span>{person.age} years old</span>
                               </span>
                             )}
@@ -309,18 +309,12 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
             {/* Navigation arrows */}
             {receptionists.length > 1 && (
               <div className="flex items-center gap-4 mb-6">
-                <svg width="0" height="0" aria-hidden="true" focusable="false">
-                  <linearGradient id="hireReceptionistArrowGradient" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="16">
-                    <stop offset="0%" stopColor="var(--brandGradientStart)" />
-                    <stop offset="100%" stopColor="var(--brandGradientEnd)" />
-                  </linearGradient>
-                </svg>
                 <button
                   onClick={prevCard}
                   disabled={isAnimating}
                   className="p-2 rounded-full bg-white/5 border border-white/10 text-zinc-400 hover:bg-white/10 transition-all disabled:opacity-30"
                 >
-                  <ChevronLeft size={16} style={{ stroke: 'url(#hireReceptionistArrowGradient)' }} />
+                  <ChevronLeft size={16} className="text-zinc-300" />
                 </button>
                 <div className="flex gap-2">
                   {receptionists.map((_, i) => (
@@ -345,7 +339,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                   disabled={isAnimating}
                   className="p-2 rounded-full bg-white/5 border border-white/10 text-zinc-400 hover:bg-white/10 transition-all disabled:opacity-30"
                 >
-                  <ChevronRight size={16} style={{ stroke: 'url(#hireReceptionistArrowGradient)' }} />
+                  <ChevronRight size={16} className="text-zinc-300" />
                 </button>
               </div>
             )}

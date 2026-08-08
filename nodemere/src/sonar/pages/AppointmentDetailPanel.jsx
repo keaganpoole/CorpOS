@@ -74,7 +74,7 @@ const SelectEditor = ({ field, value, onChange, fieldConfig }) => {
             initial={{ opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            className="absolute left-0 top-full z-50 mt-1.5 max-h-56 min-w-full overflow-y-auto rounded-xl border border-white/[0.08] bg-[#111] py-1 shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
+            className="absolute left-0 top-full z-50 mt-1.5 max-h-56 min-w-full overflow-y-auto rounded-xl border border-white/[0.08] bg-[#0a0a0a] py-1 shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
           >
             <button type="button" onClick={() => { onChange(null); setOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:bg-white/[0.06]">
               <span className="h-2 w-2 rounded-full bg-zinc-700" />
@@ -126,14 +126,14 @@ const LookupEditor = ({ value, options = [], onChange, placeholder = 'Search...'
             initial={{ opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            className="absolute left-0 top-full z-50 mt-1.5 min-w-full overflow-hidden rounded-xl border border-white/[0.08] bg-[#111] shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
+            className="absolute left-0 top-full z-50 mt-1.5 min-w-full overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
           >
             <div className="border-b border-white/[0.04] p-2.5">
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={placeholder}
-                className="w-full rounded-lg border border-white/[0.06] bg-black/35 px-2.5 py-2 text-[11px] text-white outline-none placeholder:text-zinc-700 focus:border-white/15"
+                className="w-full rounded-lg border border-white/[0.06] bg-[#0a0a0a] px-2.5 py-2 text-[11px] text-white outline-none placeholder:text-zinc-700 focus:!border-white/[0.06] focus:!outline-none"
               />
             </div>
             <div className="max-h-56 overflow-y-auto py-1">
@@ -236,7 +236,7 @@ const buildPanelFields = (tableSchema) => {
 
 const FieldEditor = ({ field, value, onChange, errors, fieldConfig, lookupOptions }) => {
   const error = errors?.[field.key];
-  const baseClass = `w-full rounded-lg border bg-white/[0.025] px-2.5 py-2 text-[12px] text-zinc-300 outline-none transition placeholder:text-zinc-700 ${error ? 'border-rose-500/40' : 'border-white/[0.06] focus:border-cyan-500/30'}`;
+  const baseClass = `w-full rounded-lg border bg-white/[0.025] px-2.5 py-2 text-[12px] text-zinc-300 outline-none transition placeholder:text-zinc-700 focus:!outline-none ${error ? 'border-rose-500/40' : 'border-white/[0.06] focus:border-cyan-500/30'}`;
 
   if (!field.editable) {
     let display = value || '';

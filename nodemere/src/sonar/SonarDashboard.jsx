@@ -25,7 +25,6 @@ import {
   RefreshCw,
   Layers,
   Eye,
-  Sparkles,
   Heart,
   AlertTriangle,
   ChevronDown,
@@ -54,6 +53,7 @@ import {
   Minus,
   BookUser,
   CakeSlice,
+  Bed,
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useSonarState } from './hooks/useSonarState';
@@ -233,24 +233,54 @@ const POPUP_DEFINITIONS = [
     shouldShow: ({ currentRoute, peopleCount, peopleLoading }) => currentRoute === 'pipeline' && !peopleLoading && peopleCount > 0,
   },
   {
-    id: 'scenarios_trigger_intro',
+    id: 'scenarios_intro',
     type: 'general',
     placement: 'dashboard',
-    title: 'Triggers Start The Workflow',
-    getDescription: () => 'A trigger is the event that starts a scenario. Choose the moment carefully: incoming calls, appointment changes, record updates, or scheduled timing determine when the rest of the workflow runs.',
+    title: 'Scenarios',
+    getDescription: () => '',
+    renderContent: () => (
+      <div className="mt-5 text-center">
+        <p className="mx-auto max-w-[620px] text-[15px] leading-7 text-zinc-300">
+          Scenarios are automated workflows. Choose what starts the workflow, then add the actions Nodemere should run after it happens.
+        </p>
+
+        <div className="mx-auto mt-6 w-full max-w-[650px] overflow-hidden rounded-[22px] border border-white/[0.06] bg-black shadow-[0_8px_22px_rgba(0,0,0,0.16)]">
+          <iframe
+            className="aspect-video block w-full"
+            src={TASKLIST_VIDEO_PLACEHOLDER}
+            title="Scenarios overview"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+
+        <div className="mt-8 grid gap-7 text-left sm:grid-cols-3 sm:gap-8">
+          <div className="relative">
+            <p className="text-[11px] font-bold uppercase leading-4 tracking-[0.18em] text-zinc-500">Build</p>
+            <p className="mt-4 text-[13px] leading-5 text-zinc-400">
+              Start with a trigger like a call, new person, appointment update, payment event, or scheduled time.
+            </p>
+          </div>
+
+          <div className="relative">
+            <p className="text-[11px] font-bold uppercase leading-4 tracking-[0.18em] text-zinc-500">Automate</p>
+            <p className="mt-4 text-[13px] leading-5 text-zinc-400">
+              Add actions to call customers, update records, create appointments, send links, or branch the workflow.
+            </p>
+          </div>
+
+          <div className="relative">
+            <p className="text-[11px] font-bold uppercase leading-4 tracking-[0.18em] text-zinc-500">Run</p>
+            <p className="mt-4 text-[13px] leading-5 text-zinc-400">
+              Test the workflow in the builder, then keep it manual or schedule it to run automatically.
+            </p>
+          </div>
+        </div>
+      </div>
+    ),
     primaryActionLabel: 'Got it',
     showDontRemindMe: true,
-    shouldShow: ({ currentRoute, scenarioTriggerPlaced }) => currentRoute === 'scenarios' && scenarioTriggerPlaced,
-  },
-  {
-    id: 'scenarios_action_intro',
-    type: 'general',
-    placement: 'dashboard',
-    title: 'Actions Do The Work',
-    getDescription: () => 'Actions are the steps that happen after the trigger fires. Use them to call, message, update records, create appointments, process payments, or branch the workflow into the right outcome.',
-    primaryActionLabel: 'Got it',
-    showDontRemindMe: true,
-    shouldShow: ({ currentRoute, scenarioActionPlaced }) => currentRoute === 'scenarios' && scenarioActionPlaced,
+    shouldShow: ({ currentRoute }) => currentRoute === 'scenarios',
   },
   {
     id: 'live_monitoring_intro',
@@ -707,7 +737,7 @@ function CalendarToolbarTitle({ active, count, loading, action = null }) {
 
 const CallHandlingIcon = ({ direction }) => {
   const normalized = normalizeAgentDirection(direction);
-  const Icon = normalized === 'inbound' ? ArrowDown : normalized === 'outbound' ? ArrowUp : normalized === 'none' ? Minus : ArrowUpDown;
+  const Icon = normalized === 'inbound' ? ArrowDown : normalized === 'outbound' ? ArrowUp : normalized === 'none' ? Bed : ArrowUpDown;
   const motionProps = normalized === 'inbound'
     ? {
         initial: { y: -5, scale: 0.9, opacity: 0.45 },
@@ -729,7 +759,7 @@ const CallHandlingIcon = ({ direction }) => {
   return (
     <motion.span
       key={normalized}
-      className="brand-icon inline-flex h-[14px] w-[14px] items-center justify-center"
+      className={`${normalized === 'none' ? 'text-zinc-500' : 'brand-icon'} inline-flex h-[14px] w-[14px] items-center justify-center`}
       {...motionProps}
     >
       <Icon size={14} />
@@ -1155,6 +1185,7 @@ const PlaceholderView = ({ title, body }) => (
 // ─── Main SonarDashboard Component ────────────────────────────────────────
 const PopupModal = ({ popup, profile, onClose }) => {
   if (typeof document === 'undefined') return null;
+  const isScenariosIntro = popup?.id === 'scenarios_intro';
 
   return createPortal(
     <AnimatePresence>
@@ -1171,29 +1202,30 @@ const PopupModal = ({ popup, profile, onClose }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.98 }}
           onClick={(event) => event.stopPropagation()}
-          className="relative flex max-h-[calc(100vh-24px)] w-full max-w-[520px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          className={`relative flex max-h-[calc(100vh-48px)] w-full overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl ${isScenariosIntro ? 'max-w-[900px]' : 'max-w-[520px]'}`}
         >
           <div className="relative flex flex-1 flex-col p-6 sm:p-8">
-            <div className="mb-6 flex items-start justify-between gap-5">
-              <div className="min-w-0 flex-1 pl-8 text-center">
+            <div className={`relative flex items-start gap-5 ${isScenariosIntro ? 'mb-0 justify-center' : 'mb-6 justify-between'}`}>
+              <div className={`min-w-0 flex-1 ${isScenariosIntro ? 'px-10 text-center' : 'pl-8 text-center'}`}>
                 <h2 className="text-[26px] font-semibold tracking-[-0.01em] text-white sm:text-[34px]">
                   {popup.title}{popup.emoji ? ` ${popup.emoji}` : ''}
                 </h2>
-                {typeof popup.renderContent === 'function' ? (
-                  popup.renderContent({ profile })
-                ) : (
+                {!isScenariosIntro && typeof popup.renderContent !== 'function' && (
                   <p className="mt-4 w-full max-w-none text-sm leading-[1.55] text-zinc-300 sm:text-[15px]">
                     {popup.getDescription({ profile })}
                   </p>
                 )}
-                </div>
-                <button type="button" onClick={onClose} className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white">
-                  <X size={16} />
+              </div>
+              <button type="button" onClick={onClose} className={`${isScenariosIntro ? 'absolute right-0 top-0' : 'shrink-0'} rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white`}>
+                <X size={16} />
               </button>
             </div>
 
+            {isScenariosIntro && typeof popup.renderContent === 'function' && popup.renderContent({ profile })}
+            {!isScenariosIntro && typeof popup.renderContent === 'function' && popup.renderContent({ profile })}
+
               {popup.showDontRemindMe && (
-                <label className="mx-auto mt-8 flex items-center justify-center gap-2 text-[11px] font-normal text-zinc-500">
+                <label className={`mx-auto flex items-center justify-center gap-2 text-[11px] font-normal text-zinc-500 ${isScenariosIntro ? 'mt-6' : 'mt-8'}`}>
                   <input
                     type="checkbox"
                     className="h-3.5 w-3.5 rounded border-white/[0.12] bg-white/[0.035] accent-white"
@@ -1203,7 +1235,7 @@ const PopupModal = ({ popup, profile, onClose }) => {
                   <span>Don't remind me again</span>
                 </label>
               )}
-              <div className={`${popup.showDontRemindMe ? 'mt-4' : 'mt-8'} flex justify-center`}>
+              <div className={`${popup.showDontRemindMe ? (isScenariosIntro ? 'mt-4' : 'mt-4') : 'mt-8'} flex justify-center`}>
                 <button type="button" onClick={onClose} className="h-12 rounded-full bg-white px-10 text-sm font-bold text-black transition hover:bg-zinc-200">
                   {popup.primaryActionLabel || 'Got it'}
                 </button>
@@ -1714,8 +1746,6 @@ const SonarDashboard = () => {
   const [dismissedPopupIds, setDismissedPopupIds] = useState([]);
   const [manualPopupId, setManualPopupId] = useState(null);
   const [recentlyHiredReceptionist, setRecentlyHiredReceptionist] = useState(false);
-  const [scenarioTriggerPlaced, setScenarioTriggerPlaced] = useState(false);
-  const [scenarioActionPlaced, setScenarioActionPlaced] = useState(false);
   const [backendTasklistState, setBackendTasklistState] = useState(null);
   const [showSetupGuide, setShowSetupGuide] = useState(true);
   const tasklistPersistRef = useRef('');
@@ -1762,8 +1792,6 @@ const SonarDashboard = () => {
     setDismissedPopupIds([]);
     setManualPopupId(null);
     setRecentlyHiredReceptionist(false);
-    setScenarioTriggerPlaced(false);
-    setScenarioActionPlaced(false);
     setBackendTasklistState(null);
     setShowSetupGuide(true);
     tasklistPersistRef.current = '';
@@ -1841,17 +1869,6 @@ const SonarDashboard = () => {
     };
     window.addEventListener('sonar:preferences-updated', handlePreferencesUpdated);
     return () => window.removeEventListener('sonar:preferences-updated', handlePreferencesUpdated);
-  }, []);
-
-  useEffect(() => {
-    const handleTriggerPlaced = () => setScenarioTriggerPlaced(true);
-    const handleActionPlaced = () => setScenarioActionPlaced(true);
-    window.addEventListener('sonar:scenario-trigger-placed', handleTriggerPlaced);
-    window.addEventListener('sonar:scenario-action-placed', handleActionPlaced);
-    return () => {
-      window.removeEventListener('sonar:scenario-trigger-placed', handleTriggerPlaced);
-      window.removeEventListener('sonar:scenario-action-placed', handleActionPlaced);
-    };
   }, []);
 
   useEffect(() => {
@@ -2144,8 +2161,6 @@ const SonarDashboard = () => {
     callLogsCount: callLogsToolbarMeta.count,
     callLogsLoading: callLogsToolbarMeta.loading,
     liveCallSeen,
-    scenarioTriggerPlaced,
-    scenarioActionPlaced,
   };
   const manualPopup = manualPopupId ? POPUP_DEFINITIONS.find((popup) => popup.id === manualPopupId) : null;
   const activeManualPopup = manualPopup && (() => {
@@ -2438,7 +2453,12 @@ const SonarDashboard = () => {
           </div>
         );
       case 'scenarios':
-        return <ScenariosPage onToolbarMetaChange={setScenariosToolbarMeta} />;
+        return (
+          <ScenariosPage
+            onToolbarMetaChange={setScenariosToolbarMeta}
+            hideInitialIntroNode={activePopup?.id === 'scenarios_intro'}
+          />
+        );
       case 'live-monitoring':
         return <LiveMonitoringPage />;
       case 'settings':

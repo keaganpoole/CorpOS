@@ -170,7 +170,7 @@ function CalendarDetailFieldsPopover({ fields, fieldConfig, selectedFieldIds, on
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search columns..."
-            className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:border-white/15"
+            className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!border-white/[0.06] focus:!outline-none"
           />
         </div>
       </div>
@@ -679,16 +679,18 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                           <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
                         </motion.div>
                         <div className="flex shrink-0 items-center space-x-1.5">
-                        <span
-                          className="rounded border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
-                          style={{
-                            color: tagColor,
-                            borderColor: `${tagColor}33`,
-                            backgroundColor: `${tagColor}14`,
-                          }}
-                        >
-                          {category}
-                        </span>
+                        {!showAppointmentActions && (
+                          <span
+                            className="rounded border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                            style={{
+                              color: tagColor,
+                              borderColor: `${tagColor}33`,
+                              backgroundColor: `${tagColor}14`,
+                            }}
+                          >
+                            {category}
+                          </span>
+                        )}
                         <span className="font-mono text-[10px] text-zinc-400">{formatTime(appointment.time)}</span>
                       </div>
                       </button>

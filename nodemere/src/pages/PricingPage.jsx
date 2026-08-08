@@ -15,9 +15,9 @@ const plansConfig = [
         name: "Ultra",
         description: "Built for high-scale operations, deeper customization, and maximum control.",
         prices: {
-            Standard: { monthly: 999, annually: 799 },
-            Sales: { monthly: 1249, annually: 999 },
-            Social: { monthly: 999, annually: 799 },
+            Standard: { monthly: 900, annually: 810 },
+            Sales: { monthly: 900, annually: 810 },
+            Social: { monthly: 900, annually: 810 },
         },
         features: [
             { label: "Everything in Pro", description: "Includes every Pro feature with more room to grow." },
@@ -33,9 +33,9 @@ const plansConfig = [
         name: "Pro",
         description: "Advanced AI receptionist infrastructure designed to operate beyond the limitations of traditional staffing.",
         prices: {
-            Standard: { monthly: 499, annually: 399 },
-            Sales: { monthly: 624, annually: 499 },
-            Social: { monthly: 499, annually: 399 },
+            Standard: { monthly: 400, annually: 360 },
+            Sales: { monthly: 400, annually: 360 },
+            Social: { monthly: 400, annually: 360 },
         },
         features: [
             { label: "Everything in Essentials", description: "Starts with all Essentials features already included." },
@@ -55,9 +55,9 @@ const plansConfig = [
         name: "Essentials",
         description: "Launch a fully operational AI receptionist that answers calls, books appointments, and handles customers 24/7.",
         prices: {
-            Standard: { monthly: 99, annually: 79 },
-            Sales: { monthly: 124, annually: 99 },
-            Social: { monthly: 99, annually: 79 },
+            Standard: { monthly: 100, annually: 90 },
+            Sales: { monthly: 100, annually: 90 },
+            Social: { monthly: 100, annually: 90 },
         },
         features: [
             { label: "3 AI Receptionists", description: "Use up to three receptionists for different call styles or duties." },
@@ -146,6 +146,9 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
     const isCurrent = plan.name.toLowerCase() === currentUserPlan.toLowerCase();
     const isUpgrade = planHierarchy[plan.name] > planHierarchy[currentUserPlan];
     const annualSavings = ((plan.price?.monthly || 0) * 12) - ((plan.price?.annually || 0) * 12);
+    const hasOverages = Boolean(plan.entitlements?.overage_enabled);
+    const overageCents = Number(plan.entitlements?.overage_price_per_minute_cents ?? 30);
+    const overageRate = overageCents / 100;
 
     const priceRef = useRef(null);
     const scrambleFx = useTextScramble(priceRef);
@@ -268,6 +271,11 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
                 </ul>
             </div>
             <div className="mt-8">
+                {hasOverages && (
+                    <p className="mb-3 text-center text-[11px] text-gray-500">
+                        Additional minutes billed at ${overageRate.toFixed(2)}/min.
+                    </p>
+                )}
                 {isCurrent ? (
                     <div className="w-full mt-auto font-semibold py-3 text-gray-500 cursor-default text-center">Your current plan</div>
                 ) : (
@@ -409,11 +417,14 @@ const PricingPage = () => {
         const monthlyPriceObj = getPrice('month');
         const annualPriceObj = getPrice('year');
 
+        const monthlyAmount = monthlyPriceObj ? monthlyPriceObj.unit_amount / 100 : (plan.prices[source]?.monthly || plan.prices.Standard?.monthly || 0);
+        const annualAmount = annualPriceObj ? annualPriceObj.unit_amount / 1200 : (plan.prices[source]?.annually || plan.prices.Standard?.annually || 0);
+
         return {
             ...plan,
             price: {
-                monthly: monthlyPriceObj ? monthlyPriceObj.unit_amount / 100 : (plan.prices[source]?.monthly || plan.prices.Standard?.monthly || 0),
-                annually: annualPriceObj ? annualPriceObj.unit_amount / 100 : (plan.prices[source]?.annually || plan.prices.Standard?.annually || 0)
+                monthly: monthlyAmount,
+                annually: annualAmount
             },
             priceIds: {
                 monthly: monthlyPriceObj?.id,

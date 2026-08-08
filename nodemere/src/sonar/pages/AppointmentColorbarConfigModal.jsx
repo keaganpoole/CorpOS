@@ -273,7 +273,7 @@ const ConditionRow = ({ condition, index, onChange, onRemove, canRemove, fields 
         ) : (
           <input type={field?.type === 'number' || field?.type === 'currency' ? 'number' : 'text'} value={condition.value} onChange={e => onChange(index, { ...condition, value: e.target.value })}
             placeholder={field?.type === 'number' || field?.type === 'currency' ? '100000' : 'Value...'}
-            className="bg-black/40 border border-white/[0.06] rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none w-[100px]" />
+            className="bg-black/40 border border-white/[0.06] rounded-lg px-2 py-1 text-[11px] text-white focus:!outline-none w-[100px]" />
         )
       )}
 
@@ -322,7 +322,7 @@ const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
           <input type="text" value={rule.name || ''} onChange={e => { e.stopPropagation(); updateRule({ name: e.target.value }); }}
             onClick={e => e.stopPropagation()}
             placeholder="Rule name..."
-            className="w-full bg-transparent text-[12px] font-semibold tracking-[-0.02em] text-white focus:outline-none placeholder:text-zinc-700" />
+            className="w-full bg-transparent text-[12px] font-semibold tracking-[-0.02em] text-white focus:!outline-none placeholder:text-zinc-700" />
           <p className="text-[9px] text-zinc-600 mt-0.5">
             {(rule.conditions || []).length} condition{(rule.conditions || []).length !== 1 ? 's' : ''} · {rule.animation || 'static'}
           </p>

@@ -78,7 +78,7 @@ const SelectEditor = ({ field, value, onChange, fieldConfig }) => {
             initial={{ opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            className="absolute left-0 top-full z-50 mt-1.5 max-h-56 min-w-full overflow-y-auto rounded-xl border border-white/[0.08] bg-[#111] py-1 shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
+            className="absolute left-0 top-full z-50 mt-1.5 max-h-56 min-w-full overflow-y-auto rounded-xl border border-white/[0.08] bg-[#0a0a0a] py-1 shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
           >
             <button
               type="button"
@@ -191,7 +191,7 @@ const DateEditor = ({ value, onChange, dateOnly = false }) => {
 
 const FieldEditor = ({ field, value, onChange, errors, fieldConfig }) => {
   const error = errors?.[field.key];
-  const baseClass = `w-full rounded-lg border bg-white/[0.025] px-2.5 py-2 text-[12px] text-zinc-300 outline-none transition placeholder:text-zinc-700 ${error ? 'border-rose-500/40' : 'border-white/[0.06] focus:border-cyan-500/30'}`;
+  const baseClass = `w-full rounded-lg border bg-white/[0.025] px-2.5 py-2 text-[12px] text-zinc-300 outline-none transition placeholder:text-zinc-700 focus:!outline-none ${error ? 'border-rose-500/40' : 'border-white/[0.06] focus:border-cyan-500/30'}`;
 
   if (!field.editable) {
     const display = field.type === 'timestamp' ? formatTimestampFull(value) : field.type === 'currency' ? formatCurrency(value) : (value || '');

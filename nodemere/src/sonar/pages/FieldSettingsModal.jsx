@@ -171,7 +171,7 @@ const SortableOptionRow = ({
                   draft.id === optionId ? { ...draft, name: nextName } : draft
                 )));
               }}
-              className="w-[220px] max-w-full rounded-md border border-transparent bg-transparent px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white transition-colors placeholder:text-zinc-600 focus:border-white/[0.08] focus:bg-black/30 focus:outline-none"
+              className="w-[220px] max-w-full rounded-md border border-transparent bg-transparent px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white transition-colors placeholder:text-zinc-600 focus:border-white/[0.08] focus:bg-black/30 focus:!outline-none"
               placeholder="Option name"
               style={{
                 backgroundColor: hexToRgba(currentColor, 0.12),
@@ -489,7 +489,7 @@ const FieldSettingsModal = ({
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-white/[0.18] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-white/[0.18] focus:!outline-none"
                     placeholder="Field name..."
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-mono tracking-[-0.01em] text-zinc-700">
@@ -508,7 +508,7 @@ const FieldSettingsModal = ({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
-                    className="w-full resize-none rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-white/[0.18] focus:outline-none"
+                    className="w-full resize-none rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-white/[0.18] focus:!outline-none"
                     placeholder="Give your receptionist more context into what this is for."
                   />
                   <p className="mt-1.5 text-[8px] text-zinc-700">Used in AI collection instructions and custom-field metadata.</p>

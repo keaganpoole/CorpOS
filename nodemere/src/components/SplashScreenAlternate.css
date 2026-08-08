@@ -25,16 +25,20 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(460px, 56vw);
-  height: min(190px, 26vh);
+  width: min(680px, 76vw);
+  height: min(280px, 36vh);
   background:
-    radial-gradient(ellipse at 50% 52%, rgba(255, 255, 255, 0.038), transparent 60%),
-    radial-gradient(ellipse at 67% 52%, color-mix(in srgb, var(--brandGradientEnd) 5%, transparent), transparent 64%),
-    radial-gradient(ellipse at 35% 50%, color-mix(in srgb, var(--brandGradientStart) 4%, transparent), transparent 66%);
+    radial-gradient(ellipse at 50% 51%, rgba(255, 255, 255, 0.052) 0%, rgba(255, 255, 255, 0.021) 25%, transparent 54%),
+    radial-gradient(ellipse at 61% 51%, color-mix(in srgb, var(--brandGradientEnd) 5.5%, transparent) 0%, color-mix(in srgb, var(--brandGradientEnd) 1.5%, transparent) 38%, transparent 72%),
+    radial-gradient(ellipse at 39% 50%, color-mix(in srgb, var(--brandGradientStart) 4.5%, transparent) 0%, color-mix(in srgb, var(--brandGradientStart) 1.2%, transparent) 40%, transparent 74%),
+    radial-gradient(ellipse at 50% 52%, rgba(255, 255, 255, 0.009), transparent 80%);
+  background-position: 50% 50%, 58% 50%, 42% 50%, 50% 50%;
+  background-size: 72% 68%, 88% 82%, 88% 82%, 100% 100%;
+  background-repeat: no-repeat;
   content: '';
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.94);
-  filter: blur(38px);
+  filter: blur(42px);
   transition: opacity 760ms cubic-bezier(0.22, 1, 0.36, 1), transform 860ms cubic-bezier(0.22, 1, 0.36, 1);
   pointer-events: none;
   z-index: 0;
@@ -42,8 +46,9 @@
 
 .splash-alternate--studio-enter::after,
 .splash-alternate--studio-hold::after {
-  opacity: 0.8;
+  opacity: 0.76;
   transform: translate(-50%, -50%) scale(1);
+  animation: splash-studio-glow-drift 11s cubic-bezier(0.37, 0, 0.19, 1) infinite;
 }
 
 .splash-alternate--studio-exit::after {
@@ -137,6 +142,17 @@
   100% { background-position: 12% 34%, 82% 66%, 0% 50%; background-size: 170% 170%, 180% 180%, 260% 260%; }
 }
 
+@keyframes splash-studio-glow-drift {
+  0%, 100% {
+    background-position: 50% 50%, 58% 50%, 42% 50%, 50% 50%;
+    background-size: 72% 68%, 88% 82%, 88% 82%, 100% 100%;
+  }
+  50% {
+    background-position: 50% 51%, 43% 48%, 57% 53%, 50% 50%;
+    background-size: 75% 70%, 92% 86%, 91% 85%, 100% 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .splash-alternate-mark,
   .splash-alternate-studio {
@@ -144,6 +160,11 @@
   }
 
   .splash-alternate-studio span {
+    animation: none;
+  }
+
+  .splash-alternate--studio-enter::after,
+  .splash-alternate--studio-hold::after {
     animation: none;
   }
 }

@@ -764,13 +764,23 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
               <span className="sr-only">Search call logs</span>
               <div className="flex gap-2">
                 <div className="relative min-w-0 flex-1">
-                  <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                  <Search size={12} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
                   <input
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search calls"
-                    className="h-11 w-full rounded-lg bg-white/[0.045] pl-10 pr-4 text-[13px] text-white outline-none transition placeholder:text-zinc-700 hover:bg-white/[0.06] focus:bg-white/[0.07]"
+                    className="w-full rounded-md border border-white/[0.06] bg-white/[0.02] py-2 pl-9 pr-8 text-[12px] text-zinc-300 outline-none transition-colors placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)]"
                   />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 transition-colors hover:text-white"
+                      aria-label="Clear call log search"
+                    >
+                      <X size={11} />
+                    </button>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -778,7 +788,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                     setSelectedForDelete([]);
                     loadCallLogs({ force: true, searchQuery });
                   }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/[0.045] text-zinc-500 transition hover:bg-white/[0.06] hover:text-white active:scale-95"
+                  className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-zinc-500 transition-colors hover:border-white/[0.10] hover:bg-white/[0.035] hover:text-white active:scale-95"
                   aria-label="Refresh call logs"
                   title="Refresh call logs"
                 >

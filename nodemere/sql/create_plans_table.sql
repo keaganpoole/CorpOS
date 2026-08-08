@@ -46,45 +46,45 @@ values
   'free',
   'Free',
   'Free',
-  4,
+  1,
   true,
   false,
-  '{"description":"Try Sonar risk-free","cta":"Choose plan"}'::jsonb,
-  '{"included_call_minutes":30,"max_receptionists":1,"max_scenarios":2,"max_contacts":100,"inbound_calling":true,"outbound_calling":false,"texting":false,"overage_enabled":false}'::jsonb,
-  '[{"label":"30 included call minutes","description":"Use up to thirty minutes of AI call time during each billing cycle."},{"label":"1 AI Receptionist","description":"Try one receptionist before upgrading."},{"label":"2 Scenarios","description":"Build up to two basic workflows."},{"label":"Store 100 Contacts","description":"Keep up to one hundred contacts in your CRM."},{"label":"24/7 AI Inbound Call Handling","description":"Answer incoming calls with your AI receptionist."}]'::jsonb
+  '{"description":"For testing the product with light usage.","cta":"Get started"}'::jsonb,
+  '{"included_call_minutes":20,"max_receptionists":1,"max_scenarios":3,"max_contacts":100,"inbound_calling":true,"outbound_calling":false,"sms":false,"overage_enabled":false}'::jsonb,
+  '["20 call minutes","1 receptionist","100 contacts","3 scenarios","Inbound calling"]'::jsonb
 ),
 (
   'essentials',
   'Essentials',
   'Essentials',
-  3,
+  2,
   true,
   false,
-  '{"description":"Launch a fully operational AI receptionist that answers calls, books appointments, and handles customers 24/7","cta":"Try for 14 days"}'::jsonb,
-  '{"included_call_minutes":300,"max_receptionists":3,"max_scenarios":10,"max_contacts":1000,"inbound_calling":true,"outbound_calling":false,"texting":false,"overage_enabled":false}'::jsonb,
-  '[{"label":"300 included call minutes","description":"Use up to three hundred minutes of AI call time during each billing cycle."},{"label":"3 AI Receptionists","description":"Use up to three receptionists for different call styles or duties."},{"label":"24/7 AI Inbound Call Handling","description":"Answer incoming calls around the clock without missing opportunities."},{"label":"10 Scenarios","description":"Build up to ten workflows for calls, appointments, records, and more."},{"label":"Appointment Booking","description":"Book, update, and manage appointments during live conversations."},{"label":"Store 1,000 Contacts","description":"Keep up to one thousand contacts in your CRM."},{"label":"Live Call Monitoring","description":"Watch live call activity and follow what your system is doing."},{"label":"Call Analytics","description":"See summaries and performance data from your calls."}]'::jsonb
+  '{"description":"For businesses that need a solid front desk without the complexity.","cta":"Try for 14 days"}'::jsonb,
+  '{"included_call_minutes":300,"max_receptionists":3,"max_scenarios":null,"max_contacts":1000,"inbound_calling":true,"outbound_calling":false,"sms":false,"overage_enabled":true,"overage_price_per_minute_cents":30}'::jsonb,
+  '["300 call minutes","3 receptionists","1,000 contacts","Unlimited scenarios","Inbound calling"]'::jsonb
 ),
 (
   'pro',
   'Pro',
   'Pro',
-  2,
+  3,
   true,
   true,
-  '{"description":"Advanced AI receptionist infrastructure designed to operate beyond the limitations of traditional staffing","cta":"Try for 14 days"}'::jsonb,
-  '{"included_call_minutes":1500,"max_receptionists":25,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"texting":true,"overage_enabled":false}'::jsonb,
-  '[{"label":"1,500 included call minutes","description":"Use up to one thousand five hundred minutes of AI call time during each billing cycle."},{"label":"Everything in Essentials","description":"Starts with all Essentials features already included."},{"label":"25 Receptionists","description":"Run a larger receptionist team for different roles or workflows."},{"label":"AI Outbound Calling","description":"Place outgoing calls for follow-ups, reminders, or outreach."},{"label":"Payments & Invoicing","description":"Receptionists can take payments, send invoices to customers, and more."},{"label":"Unlock All Receptionists","description":"Full access to the entire receptionist marketplace."},{"label":"AI Texting Automation","description":"Receptionists can send texts to customers."},{"label":"Unlimited Contacts","description":"Keep your full contact list without contact-based restrictions."},{"label":"Unlimited Scenarios","description":"Create as many workflow scenarios as your business needs."},{"label":"Train Receptionists","description":"Customize your receptionist with business context and behavioral instructions."}]'::jsonb
+  '{"description":"For growing businesses that need serious call capacity.","cta":"Try for 14 days"}'::jsonb,
+  '{"included_call_minutes":1500,"max_receptionists":null,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"sms":true,"overage_enabled":true,"overage_price_per_minute_cents":30}'::jsonb,
+  '["1,500 call minutes","Unlimited receptionists","Unlimited contacts","Unlimited scenarios","Outbound calling","Inbound calling","Voice cloning","SMS support"]'::jsonb
 ),
 (
   'ultra',
   'Ultra',
   'Ultra',
-  1,
+  4,
   true,
   false,
-  '{"description":"Built for high-scale operations, deeper customization, and maximum control","cta":"Try for 14 days"}'::jsonb,
-  '{"included_call_minutes":5000,"max_receptionists":null,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"texting":true,"overage_enabled":false}'::jsonb,
-  '[{"label":"5,000 included call minutes","description":"Use up to five thousand minutes of AI call time during each billing cycle."},{"label":"Everything in Pro","description":"Includes every Pro feature with more room to grow."},{"label":"Advanced AI Reasoning","description":"Gives receptionists stronger decision-making for more complex conversations."},{"label":"Voice Studio","description":"Customize voice experience more deeply for your team and brand."},{"label":"Professional Business Setup","description":"A dedicated onboarding specialist handles setup, configuration, and optimization."},{"label":"24/7 Human Support","description":"Reach real support anytime when you need help fast."}]'::jsonb
+  '{"description":"For high-volume teams running advanced voice operations.","cta":"Try for 14 days"}'::jsonb,
+  '{"included_call_minutes":3000,"max_receptionists":null,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"sms":true,"overage_enabled":true,"overage_price_per_minute_cents":30}'::jsonb,
+  '["3,000 call minutes","Unlimited receptionists","Unlimited contacts","Unlimited scenarios","Inbound calling","Outbound calling","Voice cloning","SMS support","Dedicated onboarding specialist"]'::jsonb
 )
 on conflict (slug) do update set
   name = excluded.name,

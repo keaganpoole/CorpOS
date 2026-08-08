@@ -850,7 +850,7 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
           style={{ top: position.top, left: position.left, width }}
-          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_14px_36px_rgba(0,0,0,0.66)] [&_input:focus]:!border-white/[0.06] [&_input:focus]:!outline-none [&_input:focus-visible]:!outline-none [&_input:focus]:!ring-0 [&_input:focus]:!shadow-none"
+          className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_14px_36px_rgba(0,0,0,0.66)] [&_input:focus]:!outline-none [&_input:focus-visible]:!outline-none [&_input:focus]:!ring-0 [&_input:focus]:!shadow-none"
         >
           {children}
         </motion.div>
@@ -886,15 +886,14 @@ const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
 
   return (
     <div>
-      <ControlPopoverHeader title="Sort" caption="Apply rules top to bottom." />
-      <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-3 space-y-2">
+      <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2 space-y-2">
         {rules.length === 0 && (
           <div className="rounded-xl border border-dashed border-white/[0.06] px-3 py-6 text-center">
             <p className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-500">No sort rules</p>
           </div>
         )}
         {rules.map((rule, index) => (
-          <div key={rule.id || index} className="flex items-center gap-2 rounded-xl border border-white/[0.05] bg-white/[0.025] px-2 py-2">
+          <div key={rule.id || index} className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04]">
             <div className="flex flex-col">
               <button type="button" onClick={() => moveRule(index, -1)} className="text-zinc-700 hover:text-white disabled:opacity-20" disabled={index === 0}><ChevronUp size={11} /></button>
               <button type="button" onClick={() => moveRule(index, 1)} className="text-zinc-700 hover:text-white disabled:opacity-20" disabled={index === rules.length - 1}><ChevronDown size={11} /></button>
@@ -902,7 +901,7 @@ const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
             <select value={rule.field} onChange={(event) => updateRule(index, { field: event.target.value })} className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none">
               {sortableColumns.map((column) => <option key={column.id} value={column.id} className="bg-[#0a0a0a]">{getColumnLabel(column, fieldConfig)}</option>)}
             </select>
-            <button type="button" onClick={() => updateRule(index, { direction: rule.direction === 'asc' ? 'desc' : 'asc' })} className="w-[78px] rounded-lg border border-white/[0.06] bg-black/30 px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 hover:text-white">
+            <button type="button" onClick={() => updateRule(index, { direction: rule.direction === 'asc' ? 'desc' : 'asc' })} className="w-[78px] rounded-xl px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white">
               {rule.direction === 'asc' ? 'Asc' : 'Desc'}
             </button>
             <button type="button" onClick={() => removeRule(index)} className="rounded-lg p-1 text-zinc-700 hover:bg-rose-500/10 hover:text-rose-400"><X size={12} /></button>
@@ -930,7 +929,7 @@ const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll
       <div className="border-b border-white/[0.05] p-3">
         <div className="relative">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!border-white/[0.06] focus:!outline-none" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)]" />
         </div>
         <div className="mt-2 flex gap-2">
           <button type="button" onClick={onShowAll} className="flex-1 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 hover:text-white">Show All</button>
@@ -973,7 +972,7 @@ const IntakeFieldsPopover = ({ columns, fieldConfig, onToggleField, onEnableAll,
         </div>
         <div className="relative">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search intake fields..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!border-white/[0.06] focus:!outline-none" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search intake fields..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)]" />
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">
           Leaner intake usually performs better. Keeping this list under six fields helps the agent stay focused and keeps token usage tighter.
@@ -1018,7 +1017,7 @@ const ColumnOrderPopover = ({ columns, fieldConfig, onMove, onReset }) => {
       <div className="border-b border-white/[0.05] p-3">
         <div className="relative">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!border-white/[0.06] focus:!outline-none" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)]" />
         </div>
       </div>
       <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">

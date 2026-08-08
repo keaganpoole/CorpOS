@@ -26,6 +26,7 @@ import {
   Check,
   Eye,
   EyeOff,
+  Copy,
   Pencil,
   GitBranch,
   Sparkles,
@@ -36,8 +37,10 @@ import {
   RectangleEllipsis,
   ShieldCheck,
   Upload,
+  CircleHelp,
 } from 'lucide-react';
 import './Scenarios.css';
+import ScenarioIntroNode from '../../../components/ScenarioIntroNode';
 import AetherEdgeLogic from './AetherEdgeLogic';
 import VariablesPane, { getFieldDisplayLabel, getTableFields, getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields, TABLE_COLORS, TABLE_LABELS } from './VariablesPane';
 import { supabase } from '../../lib/supabase';
@@ -49,6 +52,7 @@ import microsoftIcon from '../../../assets/microsofticon.png';
 import stripeIcon from '../../../assets/stripe.svg';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const SCENARIOS_HELP_VIDEO_URL = 'https://www.youtube.com/watch?v=ysz5S6PUM-U';
 const API_ORIGIN = (() => {
   try {
     return new URL(API_BASE_URL, window.location.origin).origin;
@@ -750,7 +754,7 @@ const sbModeToggleActiveStyle = {
   background: 'rgba(24,24,27,0.9)',
 };
 
-export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
+export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialIntroNode = false } = {}) {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
   const { session } = useAuth();
   const userId = session?.user?.id || null;
@@ -808,23 +812,6 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
   const edgeRulesRef = useRef(edgeRules);
   const restoringFromNodeRef = useRef(false);
 
-  // Trigger quantum orbit rings on an unconfigured node
-  const triggerQuantumOrbit = useCallback((nodeId) => {
-    const rings = Array.from({ length: 8 }, (_, i) => ({
-      id: Date.now() + i,
-      size: 140 + i * 18,
-      delay: i * 0.05,
-    }));
-    setQuantumOrbits(prev => ({ ...prev, [nodeId]: rings }));
-    setTimeout(() => {
-      setQuantumOrbits(prev => {
-        const next = { ...prev };
-        delete next[nodeId];
-        return next;
-      });
-    }, 1500);
-  }, []);
-  
   // Save scenario modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [scenarioName, setScenarioName] = useState('');
@@ -841,6 +828,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showJsonModal, setShowJsonModal] = useState(false);
+  const [jsonCopied, setJsonCopied] = useState(false);
   const [showImportJsonModal, setShowImportJsonModal] = useState(false);
   const [importJsonValue, setImportJsonValue] = useState('');
   const [importJsonError, setImportJsonError] = useState('');
@@ -861,8 +849,6 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
 
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
-  const [quantumOrbits, setQuantumOrbits] = useState({}); // { [nodeId]: [ring configs] }
-
   const applyScenarioOwnershipFilter = useCallback((query) => {
     if (!userId) return query;
     return query.or(`user_id.eq.${userId},created_by.eq.${userId}`);
@@ -1237,14 +1223,6 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
     setInitialFocusSet(true);
     setViewportReady(true);
   }, [initialFocusSet]);
-
-  // Fire orbit rings once as intro — rings FIRST, then circle fades in
-  useEffect(() => {
-    if (nodes.length === 1 && !nodes[0].configured) {
-      const timer = setTimeout(() => triggerQuantumOrbit(nodes[0].id), 200);
-      return () => clearTimeout(timer);
-    }
-  }, [nodes.length]);
 
   const formatScheduleDisplay = (config) => {
     if (!config || config.mode === 'manual') return 'Manual';
@@ -1938,7 +1916,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, isValidConnectionTarget, nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
+  }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, isValidConnectionTarget, nodeMap, openSelectionPanel, view.x, view.y, view.scale]);
 
   const handleNodePointerDown = (nodeId, event) => {
     if (event.button !== 0) return;
@@ -2752,6 +2730,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
     setScenarioName(`Scenario ${scenarios.length + 1}`);
     setScenarioDescription('');
     setShowSaveModal(true);
+  };
+
+  const handleOpenScenariosHelp = () => {
+    window.open(SCENARIOS_HELP_VIDEO_URL, '_blank', 'noopener,noreferrer');
   };
 
   const buildCurrentScenarioPayload = useCallback((overrides = {}) => {
@@ -4800,6 +4782,52 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
     await loadScenarios();
   };
 
+  const getScenarioJsonText = () => JSON.stringify({
+    name: scenarioName || currentScenario?.name || '',
+    description: scenarioDescription || currentScenario?.description || '',
+    nodes_data: nodes.map(n => ({
+      id: n.id,
+      x: n.x,
+      y: n.y,
+      type: n.type,
+      label: n.label,
+      detail: n.detail,
+      configured: n.configured,
+      accent: n.accent,
+      icon: n.icon?.name || n.icon,
+      appointmentConfig: n.appointmentConfig || null,
+      triggerFilter: n.triggerFilter || null,
+      triggerConfig: n.triggerConfig || null,
+      isCommunication: n.isCommunication || false,
+      firstMessage: n.firstMessage || '',
+      mainBox: n.mainBox || '',
+      focus: n.focus || 'prompt',
+      actionConfig: n.actionConfig ? Object.fromEntries(Object.entries(n.actionConfig).filter(([k]) => k !== '_fields')) : null,
+      subOptionKey: n.subOptionKey || null,
+      categoryKey: n.categoryKey || null,
+      categoryType: n.categoryType || null,
+    })),
+    edges_data: edges.map(e => ({
+      id: e.id,
+      from: e.from,
+      to: e.to,
+      filter: e.filter,
+    })),
+    schedule_config: normalizeScenarioSchedule(recurringSchedule),
+    notes: scenarioNotes,
+    is_active: scenarioIsActive,
+  }, null, 2);
+
+  const handleCopyScenarioJson = async () => {
+    try {
+      await navigator.clipboard.writeText(getScenarioJsonText());
+      setJsonCopied(true);
+      window.setTimeout(() => setJsonCopied(false), 1400);
+    } catch (error) {
+      console.error('[Scenarios] Failed to copy scenario JSON:', error);
+    }
+  };
+
   // List View Component
   const renderListView = () => (
     <div className="scenario-list-page">
@@ -5184,28 +5212,13 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
           </div>
 
           {/* Centered overlay for initial unconfigured node */}
-          {nodes.length === 1 && !nodes[0].configured && (
-            <div className="sb-quantum-centering">
-              <div className="sb-quantum-container-fade">
-              <div
-                className={`sb-builder-node ${selectedNodeId === nodes[0].id ? 'sb-active-node' : ''}`}
-                ref={(el) => { if (el) nodeRefs.current[nodes[0].id] = el; }}
-                onPointerDown={(event) => handleNodePointerDown(nodes[0].id, event)}
-              >
-                <div className="sb-quantum-composition">
-                  <div className="sb-quantum-orbits">
-                    {(quantumOrbits[nodes[0].id] || []).map(ring => (
-                      <div key={ring.id} className="sb-quantum-orbit-ring"
-                        style={{ width: ring.size, height: ring.size, animationDelay: `${ring.delay}s` }} />
-                    ))}
-                  </div>
-                  <div className="sb-quantum-circle" ref={introCircleRef} />
-                  <div className="sb-quantum-arrow" />
-                  <div className="sb-quantum-cta-text">Click it. Click it real good.</div>
-                </div>
-              </div>
-              </div>
-            </div>
+          {nodes.length === 1 && !nodes[0].configured && !hideInitialIntroNode && (
+            <ScenarioIntroNode
+              nodeId={nodes[0].id}
+              nodeRef={(el) => { if (el) nodeRefs.current[nodes[0].id] = el; }}
+              circleRef={introCircleRef}
+              onPointerDown={(event) => handleNodePointerDown(nodes[0].id, event)}
+            />
           )}
         </div>
 
@@ -6441,13 +6454,22 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
               My Scenarios
             </button>
           </div>
-          <button 
-            className="save-scenario-btn" 
-            onClick={handleSaveScenario}
-          >
-            <Check size={16} />
-            {currentScenario ? 'Save' : 'Save Scenario'}
-          </button>
+          <div className="sb-builder-topbar-actions">
+            <button
+              className="scenario-help-btn"
+              onClick={handleOpenScenariosHelp}
+            >
+              <CircleHelp size={16} />
+              Help
+            </button>
+            <button
+              className="save-scenario-btn"
+              onClick={handleSaveScenario}
+            >
+              <Check size={16} />
+              {currentScenario ? 'Save' : 'Save Scenario'}
+            </button>
+          </div>
         </div>
         
         {/* Bottom Toolbar — shown after intro node is configured */}
@@ -6957,47 +6979,19 @@ export default function ScenariosPage({ onToolbarMetaChange = null } = {}) {
             <div className="sb-json-modal" onClick={e => e.stopPropagation()}>
               <div className="sb-json-modal-header">
                 <h3 className="sb-json-modal-title">Scenario JSON</h3>
-                <button type="button" className="sb-json-modal-close" onClick={() => setShowJsonModal(false)}>
-                  <X size={16} />
-                </button>
+                <div className="sb-json-modal-actions">
+                  <button type="button" className="sb-json-modal-copy" onClick={handleCopyScenarioJson}>
+                    <Copy size={14} />
+                    <span>{jsonCopied ? 'Copied' : 'Copy'}</span>
+                  </button>
+                  <button type="button" className="sb-json-modal-close" onClick={() => setShowJsonModal(false)}>
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
               <div className="sb-json-modal-body">
                 <pre className="sb-json-content">
-                  {JSON.stringify({
-                    name: scenarioName || currentScenario?.name || '',
-                    description: scenarioDescription || currentScenario?.description || '',
-                    nodes_data: nodes.map(n => ({
-                      id: n.id,
-                      x: n.x,
-                      y: n.y,
-                      type: n.type,
-                      label: n.label,
-                      detail: n.detail,
-                      configured: n.configured,
-                      accent: n.accent,
-                      icon: n.icon?.name || n.icon,
-                      appointmentConfig: n.appointmentConfig || null,
-                      triggerFilter: n.triggerFilter || null,
-                      triggerConfig: n.triggerConfig || null,
-                      isCommunication: n.isCommunication || false,
-                      firstMessage: n.firstMessage || '',
-                      mainBox: n.mainBox || '',
-                      focus: n.focus || 'prompt',
-                      actionConfig: n.actionConfig ? Object.fromEntries(Object.entries(n.actionConfig).filter(([k]) => k !== '_fields')) : null,
-                      subOptionKey: n.subOptionKey || null,
-                      categoryKey: n.categoryKey || null,
-                      categoryType: n.categoryType || null,
-                    })),
-                    edges_data: edges.map(e => ({
-                      id: e.id,
-                      from: e.from,
-                      to: e.to,
-                      filter: e.filter,
-                    })),
-                    schedule_config: normalizeScenarioSchedule(recurringSchedule),
-                    notes: scenarioNotes,
-                    is_active: scenarioIsActive,
-                  }, null, 2)}
+                  {getScenarioJsonText()}
                 </pre>
               </div>
             </div>

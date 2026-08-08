@@ -14,7 +14,7 @@ load_project_env()
 STRIPE_TEST_KEY = os.getenv("STRIPE_SECRET_TEST_KEY")
 STRIPE_LIVE_KEY = os.getenv("STRIPE_API_SECRET_KEY")
 
-# ---- Pricing Matrix (EDIT THESE TO YOUR REAL NUMBERS IN CENTS) ----
+# ---- Pricing Matrix (amounts are in cents; annual amounts are total yearly charges) ----
 pricing_matrix = {
     "free": {
         "monthly": {
@@ -30,38 +30,38 @@ pricing_matrix = {
     },
     "essentials": {
         "monthly": {
-            "standard": 99,
-            "sales": 124,
-            "social": 99
+            "standard": 10000,
+            "sales": 10000,
+            "social": 10000
         },
         "annual": {
-            "standard": 948,   # 79 * 12
-            "sales": 1188,     # 99 * 12
-            "social": 948
+            "standard": 108000,  # 90 * 12
+            "sales": 108000,
+            "social": 108000
         }
     },
     "pro": {
         "monthly": {
-            "standard": 499,
-            "sales": 624,
-            "social": 499
+            "standard": 40000,
+            "sales": 40000,
+            "social": 40000
         },
         "annual": {
-            "standard": 4788,  # 399 * 12
-            "sales": 5988,     # 499 * 12
-            "social": 4788
+            "standard": 432000,  # 360 * 12
+            "sales": 432000,
+            "social": 432000
         }
     },
     "ultra": {
         "monthly": {
-            "standard": 999,
-            "sales": 1249,
-            "social": 999
+            "standard": 90000,
+            "sales": 90000,
+            "social": 90000
         },
         "annual": {
-            "standard": 9588,  # 799 * 12
-            "sales": 11988,    # 999 * 12
-            "social": 9588
+            "standard": 972000,  # 810 * 12
+            "sales": 972000,
+            "social": 972000
         }
     }
 }
