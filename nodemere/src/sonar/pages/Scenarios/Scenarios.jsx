@@ -397,7 +397,6 @@ const AUTOMATION_HIERARCHY = {
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
-          { key: 'first_message', label: 'First Message', type: 'first_message_textarea', smartActions: true, toggleLabel: 'Override First Message' },
         ]},
       ],
     },
@@ -3795,7 +3794,6 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
           body: JSON.stringify({
             person_id: getValue('person_id') || null,
             main_content: getValue('main_content') || '',
-            first_message: getValue('first_message') || '',
           }),
         });
         const result = await resp.json();
@@ -5058,12 +5056,11 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                     {isFallback ? (
                       <><GitBranch size={10} /> Fallback</>
                     ) : edge.filter ? (
-                      <Zap size={10} />
+                      <Filter size={14} />
                     ) : (
-                      <Filter size={12} />
+                      <Filter size={14} />
                     )}
                   </div>
-                  <div className="sb-filter-dot" />
                 </div>
               );
             })}
@@ -5465,7 +5462,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                   return <option key={optionValue} value={optionValue}>{optionLabel}</option>;
                                 })}
                               </select>
-                            ) : field.type === 'textarea' || field.type === 'prompt_textarea' || field.type === 'first_message_textarea' ? (
+                            ) : field.type === 'textarea' || field.type === 'prompt_textarea' ? (
                               <textarea
                                 className="sb-input-field sb-run-node-panel-textarea"
                                 value={value}
@@ -5663,70 +5660,6 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                     />
                                   )}
                                 </div>
-                              </div>
-                            ) : field.type === 'first_message_textarea' ? (
-                              /* First Message — hidden behind a toggle */
-                              <div className="sb-first-message-wrap">
-                                <label className="sb-first-message-toggle">
-                                  <input
-                                    type="checkbox"
-                                    checked={!!actionConfig[`${field.key}_enabled`]}
-                                    onChange={e => setActionConfig(prev => ({ ...prev, [`${field.key}_enabled`]: e.target.checked }))}
-                                  />
-                                  <span className="sb-first-message-toggle-label">{field.toggleLabel || 'Override First Message'}</span>
-                                </label>
-                                {actionConfig[`${field.key}_enabled`] && (
-                                  <div style={{ marginTop: 8 }}>
-                                    {/* Business variable buttons */}
-                                    <div className="sb-suggested-actions-row" style={{ marginBottom: 6 }}>
-                                      {['name', 'city', 'state'].map(fKey => (
-                                        <button
-                                          key={fKey}
-                                          type="button"
-                                          className="sb-suggested-action-chip sb-chip-grey"
-                                          onClick={() => {
-                                            const varRef = `{{businesses.${fKey}}}`;
-                                            setActionConfig(prev => {
-                                              const current = prev[field.key] || '';
-                                              return { ...prev, [field.key]: current ? `${current} ${varRef}` : varRef };
-                                            });
-                                          }}
-                                        >
-                                          {{ name: 'Name', city: 'City', state: 'State' }[fKey]}
-                                        </button>
-                                      ))}
-                                    </div>
-                                    <div style={{ position: 'relative' }}>
-                                      <textarea
-                                        className={`sb-input-field${varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
-                                        value={rawVal}
-                                        onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                        onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
-                                        rows={3}
-                                        style={{
-                                          resize: 'none',
-                                          ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
-                                          ...(varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? {
-                                            borderColor: hoveredTableColor,
-                                            boxShadow: `0 0 0 1px ${hoveredTableColor}`,
-                                          } : {}),
-                                        }}
-                                      />
-                                      {rawVal.includes('{{') && (
-                                        <div
-                                          className="sb-var-chip-overlay"
-                                          style={{
-                                            position: 'absolute', inset: 0, pointerEvents: 'none',
-                                            display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
-                                            fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
-                                            fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                                          }}
-                                          dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
-                                        />
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
                               </div>
                             ) : field.type === 'textarea' ? (
                               <div style={{ position: 'relative' }}>
@@ -6763,7 +6696,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                   <div className="sb-integrations-action-group">
                     <button
                       type="button"
-                      className="sb-integrations-secondary"
+                      className={`sb-integrations-secondary ${integrationStep === 0 ? 'sb-integrations-dismiss' : ''}`}
                       onClick={() => setShowIntegrationsModal(false)}
                     >
                       {integrationStep === 1 && selectedIntegration.status === 'connected'

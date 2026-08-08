@@ -8324,7 +8324,6 @@ async def call_customer(payload: dict, current_user: dict = Depends(get_current_
         payload.get("person_id"),
         payload.get("to_phone"),
         payload.get("main_content"),
-        payload.get("first_message"),
     )
 
     user_id = str(current_user.id)
@@ -8355,7 +8354,6 @@ async def call_customer(payload: dict, current_user: dict = Depends(get_current_
             "_key": "call_customer",
             "to_phone": payload.get("to_phone") or "",
             "main_content": payload.get("main_content") or "",
-            "first_message": payload.get("first_message") or "",
         },
     }
     context = {
