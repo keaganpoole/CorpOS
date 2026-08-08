@@ -1416,6 +1416,66 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
   // Get the action key from the current action config
   const currentActionKey = actionConfig?._key || null;
+  const renderCrmStyleSelect = ({ menuKey, value, options = [], onChange }) => {
+    const current = String(value || '').trim();
+    const normalizedOptions = (options || []).map((opt) => ({
+      value: typeof opt === 'string' ? opt : opt?.value,
+      label: typeof opt === 'string' ? opt : (opt?.label || opt?.value),
+    })).filter((opt) => opt.value !== undefined && opt.value !== null);
+
+    return (
+      <div className="sb-crm-select-shell">
+        <button
+          type="button"
+          className={`sb-crm-select-trigger ${current ? 'has-value' : ''}`}
+          onClick={() => setRecordFieldMenu(recordFieldMenu === menuKey ? null : menuKey)}
+        >
+          {current ? (
+            <>
+              <span className="sb-crm-dot" style={{ backgroundColor: '#71717a' }} />
+              <span>{normalizedOptions.find((option) => String(option.value) === current)?.label || current}</span>
+            </>
+          ) : (
+            <>
+              <span className="sb-crm-dot" style={{ backgroundColor: '#71717a' }} />
+              <span className="sb-crm-empty-label">Blank</span>
+            </>
+          )}
+        </button>
+        {recordFieldMenu === menuKey && (
+          <div className="sb-crm-menu">
+            <button
+              type="button"
+              className="sb-crm-menu-item"
+              onClick={() => { onChange(''); setRecordFieldMenu(null); }}
+            >
+              <span className="sb-crm-dot" style={{ backgroundColor: '#3f3f46' }} />
+              <span className="sb-crm-empty">&nbsp;</span>
+              {!current && <Check size={11} className="sb-crm-check" />}
+            </button>
+            {normalizedOptions.map((option) => {
+              const selectedOption = current === String(option.value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`sb-crm-menu-item ${selectedOption ? 'is-active' : ''}`}
+                  onClick={() => {
+                    onChange(option.value);
+                    setRecordFieldMenu(null);
+                  }}
+                >
+                  <span className="sb-crm-dot" style={{ backgroundColor: '#71717a' }} />
+                  {option.label}
+                  {selectedOption && <Check size={11} className="sb-crm-check" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
   const stripSmartActionDelimiters = (value) => (
     typeof value === 'string' ? value.replace(/\x1E([^\x1E]*)\x1E/g, '$1').replace(/\x1E/g, '') : value
   );
@@ -5446,22 +5506,32 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                     <div className="sb-action-config-fields">
                       {runNodeModal.fields.map((field) => {
                         const value = runNodeModal.values[field.key] || '';
+                        const runNodeActionKey = nodeMap[runNodeModal.nodeId]?.actionConfig?._key || '';
                         return (
                           <div key={field.key} className="sb-action-config-field">
                             <label className="sb-action-field-label">{field.label}</label>
                             {field.type === 'select' ? (
-                              <select
-                                className="sb-input-field sb-select-field"
-                                value={value}
-                                onChange={(e) => setRunNodeModal((prev) => ({ ...prev, values: { ...prev.values, [field.key]: e.target.value } }))}
-                              >
-                                <option value="">Select...</option>
-                                {(field.options || []).map((opt) => {
-                                  const optionValue = typeof opt === 'string' ? opt : opt?.value;
-                                  const optionLabel = typeof opt === 'string' ? opt : (opt?.label || opt?.value);
-                                  return <option key={optionValue} value={optionValue}>{optionLabel}</option>;
-                                })}
-                              </select>
+                              STRIPE_ACTION_KEYS.has(runNodeActionKey) ? (
+                                renderCrmStyleSelect({
+                                  menuKey: `run_payment_${runNodeModal.nodeId}_${field.key}`,
+                                  value,
+                                  options: field.options || [],
+                                  onChange: (nextValue) => setRunNodeModal((prev) => ({ ...prev, values: { ...prev.values, [field.key]: nextValue } })),
+                                })
+                              ) : (
+                                <select
+                                  className="sb-input-field sb-select-field"
+                                  value={value}
+                                  onChange={(e) => setRunNodeModal((prev) => ({ ...prev, values: { ...prev.values, [field.key]: e.target.value } }))}
+                                >
+                                  <option value="">Select...</option>
+                                  {(field.options || []).map((opt) => {
+                                    const optionValue = typeof opt === 'string' ? opt : opt?.value;
+                                    const optionLabel = typeof opt === 'string' ? opt : (opt?.label || opt?.value);
+                                    return <option key={optionValue} value={optionValue}>{optionLabel}</option>;
+                                  })}
+                                </select>
+                              )
                             ) : field.type === 'textarea' || field.type === 'prompt_textarea' ? (
                               <textarea
                                 className="sb-input-field sb-run-node-panel-textarea"
@@ -5591,16 +5661,25 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                               {field.label}
                             </label>
                             {field.type === 'select' ? (
-                              <select
-                                className="sb-input-field sb-select-field"
-                                value={actionConfig[field.key] || ''}
-                                onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                              >
-                                <option value="">Select...</option>
-                                {(field.options || []).map(opt => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
+                              STRIPE_ACTION_KEYS.has(currentActionKey) ? (
+                                renderCrmStyleSelect({
+                                  menuKey: `payment_action_${field.key}`,
+                                  value: actionConfig[field.key] || '',
+                                  options: field.options || [],
+                                  onChange: (nextValue) => setActionConfig(prev => ({ ...prev, [field.key]: nextValue })),
+                                })
+                              ) : (
+                                <select
+                                  className="sb-input-field sb-select-field"
+                                  value={actionConfig[field.key] || ''}
+                                  onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                >
+                                  <option value="">Select...</option>
+                                  {(field.options || []).map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              )
                             ) : field.type === 'prompt_textarea' ? (
                               /* Prompt textarea — no toggle, suggested smart actions above */
                               <div className="sb-prompt-textarea-wrap">

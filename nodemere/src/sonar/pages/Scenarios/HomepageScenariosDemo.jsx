@@ -406,7 +406,6 @@ const AUTOMATION_HIERARCHY = {
         { key: 'call_customer', name: 'Call Customer', description: 'Call an existing customer', configFields: [
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'main_content', label: 'Prompt', type: 'prompt_textarea', smartActions: true },
-          { key: 'first_message', label: 'First Message', type: 'first_message_textarea', smartActions: true, toggleLabel: 'Override First Message' },
         ]},
       ],
     },
@@ -731,7 +730,7 @@ const getDemoNodeResult = (actionKey, nodeLabel = 'Node') => {
 };
 
 const sbLabelStyle = { fontSize: 9, fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 4, display: 'block' };
-const sbInputStyle = { width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: '#e4e4e7', outline: 'none', boxSizing: 'border-box' };
+const sbInputStyle = { width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '7px 10px', fontSize: 13, color: '#e4e4e7', outline: 'none', boxSizing: 'border-box' };
 const sbModeToggleStyle = {
   border: '1px solid rgba(255,255,255,0.08)',
   background: 'rgba(0,0,0,0.45)',
@@ -1470,10 +1469,73 @@ export default function ScenariosPage({
 
   // Get the action key from the current action config
   const currentActionKey = actionConfig?._key || null;
+  const renderCrmStyleSelect = ({ menuKey, value, options = [], onChange }) => {
+    const current = String(value || '').trim();
+    const normalizedOptions = (options || []).map((opt) => ({
+      value: typeof opt === 'string' ? opt : opt?.value,
+      label: typeof opt === 'string' ? opt : (opt?.label || opt?.value),
+    })).filter((opt) => opt.value !== undefined && opt.value !== null);
+
+    return (
+      <div className="sb-crm-select-shell">
+        <button
+          type="button"
+          className={`sb-crm-select-trigger ${current ? 'has-value' : ''}`}
+          onClick={() => setRecordFieldMenu(recordFieldMenu === menuKey ? null : menuKey)}
+        >
+          {current ? (
+            <>
+              <span className="sb-crm-dot" style={{ backgroundColor: '#71717a' }} />
+              <span>{normalizedOptions.find((option) => String(option.value) === current)?.label || current}</span>
+            </>
+          ) : (
+            <>
+              <span className="sb-crm-dot" style={{ backgroundColor: '#71717a' }} />
+              <span className="sb-crm-empty-label">Blank</span>
+            </>
+          )}
+        </button>
+        {recordFieldMenu === menuKey && (
+          <div className="sb-crm-menu">
+            <button
+              type="button"
+              className="sb-crm-menu-item"
+              onClick={() => { onChange(''); setRecordFieldMenu(null); }}
+            >
+              <span className="sb-crm-dot" style={{ backgroundColor: '#3f3f46' }} />
+              <span className="sb-crm-empty">&nbsp;</span>
+              {!current && <Check size={11} className="sb-crm-check" />}
+            </button>
+            {normalizedOptions.map((option) => {
+              const selectedOption = current === String(option.value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`sb-crm-menu-item ${selectedOption ? 'is-active' : ''}`}
+                  onClick={() => {
+                    onChange(option.value);
+                    setRecordFieldMenu(null);
+                  }}
+                >
+                  <span className="sb-crm-dot" style={{ backgroundColor: '#71717a' }} />
+                  {option.label}
+                  {selectedOption && <Check size={11} className="sb-crm-check" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
   const inferredReceptionistRequirements = useMemo(() => {
     if (currentActionKey !== 'call_customer') return [];
     return inferReceptionistRequirements(selectedNodeId, nodes, edges);
   }, [currentActionKey, selectedNodeId, nodes, edges]);
+  const stripSmartActionDelimiters = (value) => (
+    typeof value === 'string' ? value.replace(/\x1E([^\x1E]*)\x1E/g, '$1').replace(/\x1E/g, '') : value
+  );
 
   // Handle smart action insertion — inserts delimited token into raw value,
   // overlay renders the display text as a styled chip
@@ -1481,7 +1543,7 @@ export default function ScenariosPage({
     const token = `{smart:${smartAction.key}}`;
     setActionConfig(prev => {
       const base = prev || {};
-      const current = base[fieldKey] || '';
+      const current = stripSmartActionDelimiters(base[fieldKey] || '');
       const newVal = current ? `${current} \x1E${smartAction.instruction}\x1E` : `\x1E${smartAction.instruction}\x1E`;
       return { ...base, [fieldKey]: newVal };
     });
@@ -3038,7 +3100,7 @@ export default function ScenariosPage({
             style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
               display: 'flex', alignItems: 'center', padding: '0 10px',
-              fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+              fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
               whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
             }}
             dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(val) }}
@@ -3146,7 +3208,7 @@ export default function ScenariosPage({
         {String(value).includes('{{') && (
           <div
             className="sb-var-chip-overlay"
-            style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
+            style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
             dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }}
           />
         )}
@@ -5002,12 +5064,11 @@ export default function ScenariosPage({
                     {isFallback ? (
                       <><GitBranch size={10} /> Fallback</>
                     ) : edge.filter ? (
-                      <Zap size={10} />
+                      <Filter size={14} />
                     ) : (
-                      <Filter size={12} />
+                      <Filter size={14} />
                     )}
                   </div>
-                  <div className="sb-filter-dot" />
                 </div>
               );
             })}
@@ -5331,7 +5392,7 @@ export default function ScenariosPage({
                     <div className="sb-action-config-header"><h4 className="sb-action-config-title">Trigger Criteria</h4></div>
                     <div className="sb-trigger-filter-copy">Only fire this trigger when the fields below match. Leave every field empty to run for any value.</div>
                     <div className="sb-record-fields-grid">
-                      {(() => { const definitions = triggerConfig.key === 'incoming_call' ? [{ key: 'phone_number', label: 'Phone Number', type: 'phone' }] : triggerConfig.key === 'record_updated' ? getRecordFieldsForTable(PEOPLE_RECORD_TABLE).filter((field) => field.key !== 'id') : [{ key: 'id', label: 'Record ID', type: 'text' }, { key: 'person_id', label: 'Person ID', type: 'text' }, { key: 'service_id', label: 'Service ID', type: 'text' }, { key: 'staff_id', label: 'Staff ID', type: 'text' }, ...getTableFields('appointments').filter((field) => field.key !== 'id')]; return definitions.map((field) => { const value = triggerConfig.fields?.[field.key] || ''; return <div key={field.key} className="sb-record-field"><label className="sb-record-label">{field.label}</label><div style={{ position: 'relative' }}><input className="sb-input-field" type="text" value={value} onChange={(event) => setTriggerConfig((prev) => ({ ...prev, fields: { ...(prev?.fields || {}), [field.key]: event.target.value } }))} onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type || 'text' })} style={value.includes('{{') ? { color: 'transparent' } : {}} />{value.includes('{{') && <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }} />}</div></div>; }); })()}
+                      {(() => { const definitions = triggerConfig.key === 'incoming_call' ? [{ key: 'phone_number', label: 'Phone Number', type: 'phone' }] : triggerConfig.key === 'record_updated' ? getRecordFieldsForTable(PEOPLE_RECORD_TABLE).filter((field) => field.key !== 'id') : [{ key: 'id', label: 'Record ID', type: 'text' }, { key: 'person_id', label: 'Person ID', type: 'text' }, { key: 'service_id', label: 'Service ID', type: 'text' }, { key: 'staff_id', label: 'Staff ID', type: 'text' }, ...getTableFields('appointments').filter((field) => field.key !== 'id')]; return definitions.map((field) => { const value = triggerConfig.fields?.[field.key] || ''; return <div key={field.key} className="sb-record-field"><label className="sb-record-label">{field.label}</label><div style={{ position: 'relative' }}><input className="sb-input-field" type="text" value={value} onChange={(event) => setTriggerConfig((prev) => ({ ...prev, fields: { ...(prev?.fields || {}), [field.key]: event.target.value } }))} onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type || 'text' })} style={value.includes('{{') ? { color: 'transparent' } : {}} />{value.includes('{{') && <div className="sb-var-chip-overlay" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(value) }} />}</div></div>; }); })()}
                     </div>
                   </div>
                 ) : panelStage === 'triggerFilter' && triggerFilter ? (
@@ -5397,23 +5458,33 @@ export default function ScenariosPage({
                     <div className="sb-action-config-fields">
                       {runNodeModal.fields.map((field) => {
                         const value = runNodeModal.values[field.key] || '';
+                        const runNodeActionKey = nodeMap[runNodeModal.nodeId]?.actionConfig?._key || '';
                         return (
                           <div key={field.key} className="sb-action-config-field">
                             <label className="sb-action-field-label">{field.label}</label>
                             {field.type === 'select' ? (
-                              <select
-                                className="sb-input-field sb-select-field"
-                                value={value}
-                                onChange={(e) => setRunNodeModal((prev) => ({ ...prev, values: { ...prev.values, [field.key]: e.target.value } }))}
-                              >
-                                <option value="">Select...</option>
-                                {(field.options || []).map((opt) => {
-                                  const optionValue = typeof opt === 'string' ? opt : opt?.value;
-                                  const optionLabel = typeof opt === 'string' ? opt : (opt?.label || opt?.value);
-                                  return <option key={optionValue} value={optionValue}>{optionLabel}</option>;
-                                })}
-                              </select>
-                            ) : field.type === 'textarea' || field.type === 'prompt_textarea' || field.type === 'first_message_textarea' ? (
+                              STRIPE_ACTION_KEYS.has(runNodeActionKey) ? (
+                                renderCrmStyleSelect({
+                                  menuKey: `demo_run_payment_${runNodeModal.nodeId}_${field.key}`,
+                                  value,
+                                  options: field.options || [],
+                                  onChange: (nextValue) => setRunNodeModal((prev) => ({ ...prev, values: { ...prev.values, [field.key]: nextValue } })),
+                                })
+                              ) : (
+                                <select
+                                  className="sb-input-field sb-select-field"
+                                  value={value}
+                                  onChange={(e) => setRunNodeModal((prev) => ({ ...prev, values: { ...prev.values, [field.key]: e.target.value } }))}
+                                >
+                                  <option value="">Select...</option>
+                                  {(field.options || []).map((opt) => {
+                                    const optionValue = typeof opt === 'string' ? opt : opt?.value;
+                                    const optionLabel = typeof opt === 'string' ? opt : (opt?.label || opt?.value);
+                                    return <option key={optionValue} value={optionValue}>{optionLabel}</option>;
+                                  })}
+                                </select>
+                              )
+                            ) : field.type === 'textarea' || field.type === 'prompt_textarea' ? (
                               <textarea
                                 className="sb-input-field sb-run-node-panel-textarea"
                                 value={value}
@@ -5542,16 +5613,25 @@ export default function ScenariosPage({
                               {field.label}
                             </label>
                             {field.type === 'select' ? (
-                              <select
-                                className="sb-input-field sb-select-field"
-                                value={actionConfig[field.key] || ''}
-                                onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                              >
-                                <option value="">Select...</option>
-                                {(field.options || []).map(opt => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
+                              STRIPE_ACTION_KEYS.has(currentActionKey) ? (
+                                renderCrmStyleSelect({
+                                  menuKey: `demo_payment_action_${field.key}`,
+                                  value: actionConfig[field.key] || '',
+                                  options: field.options || [],
+                                  onChange: (nextValue) => setActionConfig(prev => ({ ...prev, [field.key]: nextValue })),
+                                })
+                              ) : (
+                                <select
+                                  className="sb-input-field sb-select-field"
+                                  value={actionConfig[field.key] || ''}
+                                  onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                >
+                                  <option value="">Select...</option>
+                                  {(field.options || []).map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              )
                             ) : field.type === 'prompt_textarea' ? (
                               /* Prompt textarea — no toggle, suggested smart actions above */
                               <div className="sb-prompt-textarea-wrap">
@@ -5575,7 +5655,14 @@ export default function ScenariosPage({
                                     className={`sb-input-field${varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
                                     value={rawVal}
                                     onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                    onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
+                                    onFocus={() => {
+                                      setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type });
+                                      setActionConfig(prev => {
+                                        const current = prev?.[field.key];
+                                        if (!current || typeof current !== 'string' || !current.includes('\x1E')) return prev;
+                                        return { ...prev, [field.key]: stripSmartActionDelimiters(current) };
+                                      });
+                                    }}
 
                                     rows={4}
                                     style={{
@@ -5596,7 +5683,7 @@ export default function ScenariosPage({
                                       style={{
                                         position: 'absolute', inset: 0, pointerEvents: 'none',
                                         display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
-                                        fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                        fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
                                         fontFamily: 'Inter, sans-serif', lineHeight: '1.5', wordBreak: 'break-word',
                                         whiteSpace: 'pre-wrap',
                                       }}
@@ -5604,70 +5691,6 @@ export default function ScenariosPage({
                                     />
                                   )}
                                 </div>
-                              </div>
-                            ) : field.type === 'first_message_textarea' ? (
-                              /* First Message — hidden behind a toggle */
-                              <div className="sb-first-message-wrap">
-                                <label className="sb-first-message-toggle">
-                                  <input
-                                    type="checkbox"
-                                    checked={!!actionConfig[`${field.key}_enabled`]}
-                                    onChange={e => setActionConfig(prev => ({ ...prev, [`${field.key}_enabled`]: e.target.checked }))}
-                                  />
-                                  <span className="sb-first-message-toggle-label">{field.toggleLabel || 'Override First Message'}</span>
-                                </label>
-                                {actionConfig[`${field.key}_enabled`] && (
-                                  <div style={{ marginTop: 8 }}>
-                                    {/* Business variable buttons */}
-                                    <div className="sb-suggested-actions-row" style={{ marginBottom: 6 }}>
-                                      {['name', 'city', 'state'].map(fKey => (
-                                        <button
-                                          key={fKey}
-                                          type="button"
-                                          className="sb-suggested-action-chip sb-chip-grey"
-                                          onClick={() => {
-                                            const varRef = `{{businesses.${fKey}}}`;
-                                            setActionConfig(prev => {
-                                              const current = prev[field.key] || '';
-                                              return { ...prev, [field.key]: current ? `${current} ${varRef}` : varRef };
-                                            });
-                                          }}
-                                        >
-                                          {{ name: 'Name', city: 'City', state: 'State' }[fKey]}
-                                        </button>
-                                      ))}
-                                    </div>
-                                    <div style={{ position: 'relative' }}>
-                                      <textarea
-                                        className={`sb-input-field${varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? ' sb-input-glow' : ''}`}
-                                        value={rawVal}
-                                        onChange={e => setActionConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                        onFocus={() => setVarsPane({ visible: true, active: true, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type })}
-                                        rows={3}
-                                        style={{
-                                          resize: 'none',
-                                          ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
-                                          ...(varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? {
-                                            borderColor: hoveredTableColor,
-                                            boxShadow: `0 0 0 1px ${hoveredTableColor}`,
-                                          } : {}),
-                                        }}
-                                      />
-                                      {rawVal.includes('{{') && (
-                                        <div
-                                          className="sb-var-chip-overlay"
-                                          style={{
-                                            position: 'absolute', inset: 0, pointerEvents: 'none',
-                                            display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
-                                            fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
-                                            fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                                          }}
-                                          dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
-                                        />
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
                               </div>
                             ) : field.type === 'textarea' ? (
                               <div style={{ position: 'relative' }}>
@@ -5694,7 +5717,7 @@ export default function ScenariosPage({
                                     style={{
                                       position: 'absolute', inset: 0, pointerEvents: 'none',
                                       display: 'flex', alignItems: 'flex-start', padding: '10px 14px',
-                                      fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                      fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
                                       fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                                     }}
                                     dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
@@ -5725,7 +5748,7 @@ export default function ScenariosPage({
                                     style={{
                                       position: 'absolute', inset: 0, pointerEvents: 'none',
                                       display: 'flex', alignItems: 'center', padding: '0 10px',
-                                      fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                      fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
                                       whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
                                     }}
                                     dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(rawVal) }}
@@ -5768,7 +5791,7 @@ export default function ScenariosPage({
                                 style={{
                                   position: 'absolute', inset: 0, pointerEvents: 'none',
                                   display: 'flex', alignItems: 'center', padding: '0 10px',
-                                  fontSize: 12, color: '#e4e4e7', overflow: 'hidden',
+                                  fontSize: 13, color: '#e4e4e7', overflow: 'hidden',
                                   whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
                                 }}
                                 dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(actionConfig.record_id) }}
@@ -5827,7 +5850,7 @@ export default function ScenariosPage({
                             />
                             {(appointmentConfig.person_id || '').includes('{{') && (
                               <div className="sb-var-chip-overlay"
-                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
+                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
                                 dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.person_id) }} />
                             )}
                           </div>
@@ -5862,7 +5885,7 @@ export default function ScenariosPage({
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
@@ -5902,7 +5925,7 @@ export default function ScenariosPage({
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
@@ -5935,7 +5958,7 @@ export default function ScenariosPage({
                             />
                             {(appointmentConfig.appointment_id || '').includes('{{') && (
                               <div className="sb-var-chip-overlay"
-                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
+                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif' }}
                                 dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.appointment_id) }} />
                             )}
                           </div>
@@ -5984,7 +6007,7 @@ export default function ScenariosPage({
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
@@ -6020,7 +6043,7 @@ export default function ScenariosPage({
                             />
                             {(appointmentConfig.notes || '').includes('{{') && (
                               <div className="sb-var-chip-overlay"
-                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'flex-start', padding: '10px 14px', fontSize: 12, color: '#e4e4e7', overflow: 'hidden', fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'flex-start', padding: '10px 14px', fontSize: 13, color: '#e4e4e7', overflow: 'hidden', fontFamily: 'Inter, sans-serif', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                                 dangerouslySetInnerHTML={{ __html: renderVarChipsHTML(appointmentConfig.notes) }} />
                             )}
                           </div>
@@ -6081,7 +6104,7 @@ export default function ScenariosPage({
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
@@ -6130,7 +6153,7 @@ export default function ScenariosPage({
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '0 10px',
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: '#e4e4e7',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
