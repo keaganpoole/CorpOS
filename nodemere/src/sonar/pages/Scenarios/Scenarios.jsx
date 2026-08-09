@@ -53,6 +53,21 @@ import stripeIcon from '../../../assets/stripe.svg';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const SCENARIOS_HELP_VIDEO_URL = 'https://www.youtube.com/watch?v=ysz5S6PUM-U';
+const SCENARIO_CALL_USAGE_TERMS_KEY = 'scenario_call_usage_acknowledgment_v1';
+const SCENARIO_CALL_USAGE_TERMS_STORAGE_KEY = `nodemere-${SCENARIO_CALL_USAGE_TERMS_KEY}`;
+const readStoredScenarioCallUsageTerms = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = JSON.parse(localStorage.getItem(SCENARIO_CALL_USAGE_TERMS_STORAGE_KEY) || 'null');
+    return stored?.accepted === true ? stored : null;
+  } catch (error) {
+    return null;
+  }
+};
+const hasAcceptedScenarioCallUsageTerms = (profile, localTerms = null) => (
+  profile?.terms_of_service?.[SCENARIO_CALL_USAGE_TERMS_KEY]?.accepted === true ||
+  localTerms?.accepted === true
+);
 const API_ORIGIN = (() => {
   try {
     return new URL(API_BASE_URL, window.location.origin).origin;
@@ -755,7 +770,7 @@ const sbModeToggleActiveStyle = {
 
 export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialIntroNode = false } = {}) {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
-  const { session } = useAuth();
+  const { session, profile, refreshProfile } = useAuth();
   const userId = session?.user?.id || null;
   const [builderTimezone, setBuilderTimezone] = useState(LOCAL_TIMEZONE);
   const [scenarios, setScenarios] = useState([]); // List of saved scenarios
@@ -825,6 +840,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const [noTriggerActive, setNoTriggerActive] = useState(false);
   const [scenarioIsActive, setScenarioIsActive] = useState(true);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showRecurringWarningModal, setShowRecurringWarningModal] = useState(false);
+  const [recurringWarningSaving, setRecurringWarningSaving] = useState(false);
+  const [localScenarioCallUsageTerms, setLocalScenarioCallUsageTerms] = useState(() => readStoredScenarioCallUsageTerms());
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showJsonModal, setShowJsonModal] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
@@ -1258,6 +1276,64 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
           ? config.days_of_week
           : [],
     };
+  };
+
+  const setScheduleMode = (mode) => {
+    setRecurringSchedule((prev) => normalizeScenarioSchedule({
+      ...prev,
+      mode,
+    }));
+  };
+
+  const dismissRecurringWarning = () => {
+    setShowRecurringWarningModal(false);
+    setScheduleMode('manual');
+  };
+
+  const acceptRecurringWarning = async () => {
+    const acceptedTerms = {
+      accepted: true,
+      accepted_at: new Date().toISOString(),
+      version: 1,
+    };
+
+    setRecurringWarningSaving(true);
+    try {
+      localStorage.setItem(SCENARIO_CALL_USAGE_TERMS_STORAGE_KEY, JSON.stringify(acceptedTerms));
+      setLocalScenarioCallUsageTerms(acceptedTerms);
+
+      if (userId) {
+        const nextTermsOfService = {
+          ...(profile?.terms_of_service || {}),
+          [SCENARIO_CALL_USAGE_TERMS_KEY]: acceptedTerms,
+        };
+        const { error } = await supabase
+          .from('users')
+          .update({ terms_of_service: nextTermsOfService })
+          .eq('id', userId);
+        if (error) throw error;
+        await refreshProfile?.();
+      }
+
+      setShowRecurringWarningModal(false);
+      setScheduleMode('scheduled');
+      setShowScheduleModal(true);
+    } catch (error) {
+      console.error('[Scenarios] Failed to save call usage acknowledgment:', error);
+      setShowRecurringWarningModal(false);
+      setScheduleMode('scheduled');
+      setShowScheduleModal(true);
+    } finally {
+      setRecurringWarningSaving(false);
+    }
+  };
+
+  const handleSelectScheduledMode = () => {
+    if (hasAcceptedScenarioCallUsageTerms(profile, localScenarioCallUsageTerms)) {
+      setScheduleMode('scheduled');
+      return;
+    }
+    setShowRecurringWarningModal(true);
   };
 
   useEffect(() => {
@@ -6513,10 +6589,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                 <button
                   type="button"
                   className={`sb-toolbar-mode-btn ${recurringSchedule.mode === 'scheduled' ? 'active' : ''}`}
-                  onClick={() => setRecurringSchedule((prev) => normalizeScenarioSchedule({
-                    ...prev,
-                    mode: 'scheduled',
-                  }))}
+                  onClick={handleSelectScheduledMode}
                 >
                   Scheduled
                 </button>
@@ -6825,6 +6898,49 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {showRecurringWarningModal && (
+          <div className="sb-recurring-warning-overlay" onClick={dismissRecurringWarning}>
+            <section className="sb-recurring-warning-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="sb-recurring-warning-header">
+                <div className="sb-recurring-warning-heading">
+                  <p>Outbound Call Scheduling</p>
+                  <h2>Call usage notice</h2>
+                </div>
+                <button
+                  type="button"
+                  className="sb-recurring-warning-close"
+                  onClick={dismissRecurringWarning}
+                  aria-label="Close recurring scenario warning"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="sb-recurring-warning-body">
+                <p>
+                  Scheduled call actions can use call minutes each time this scenario runs. Review your schedule and audience before turning this on so call usage stays aligned with your plan and intended customer flow.
+                </p>
+              </div>
+              <div className="sb-recurring-warning-footer">
+                <button
+                  type="button"
+                  className="sb-recurring-warning-secondary"
+                  onClick={dismissRecurringWarning}
+                >
+                  Nevermind
+                </button>
+                <button
+                  type="button"
+                  className="sb-recurring-warning-primary"
+                  onClick={acceptRecurringWarning}
+                  disabled={recurringWarningSaving}
+                >
+                  {recurringWarningSaving ? 'Saving...' : 'Yes, I accept'}
+                </button>
+              </div>
+            </section>
           </div>
         )}
 

@@ -117,26 +117,7 @@ const POPUP_DEFINITIONS = [
     placement: 'dashboard',
     title: 'Getting Started',
     manualOnly: true,
-    getDescription: () => '',
-    renderContent: () => (
-      <div className="mt-5 space-y-3 text-left">
-        <p className="text-center text-sm leading-6 text-zinc-500">
-          Getting Started keeps the account focused on the setup work that makes the front desk ready to operate.
-        </p>
-        <div className="grid gap-2">
-          {[
-            ['Tracks readiness', 'Business details, receptionists, staff, phone forwarding, and intake setup are grouped into a short path.'],
-            ['Updates automatically', 'The checklist is read-only. Once backend wiring is added, items will complete from real account activity.'],
-            ['Guides each step', 'Use the small info buttons beside subtasks to open video help and written instructions.'],
-          ].map(([label, body]) => (
-            <div key={label} className="rounded-2xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
-              <p className="text-[12px] font-semibold tracking-[-0.02em] text-white">{label}</p>
-              <p className="mt-1 text-[12px] leading-5 text-zinc-500">{body}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
+    getDescription: () => 'A few finishing touches can help you get the most out of your account. We’ll keep things simple and guide you along the way as everything comes together.',
     primaryActionLabel: 'Got it',
   },
   {
