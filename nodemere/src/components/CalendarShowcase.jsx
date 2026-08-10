@@ -437,7 +437,7 @@ function BookingReelWord({ playState }) {
   );
 }
 
-const CalendarShowcase = ({ variant = 'calendar', onScenarioDemoInteractionChange, scenarioDemoResetSignal = 0 }) => {
+const CalendarShowcase = ({ variant = 'calendar', scenarioDemoActive = false, onScenarioDemoInteractionChange, scenarioDemoResetSignal = 0 }) => {
   const { rootRef, progress: sectionProgress } = useSectionScrollProgress({ mobileMinDelta: 0.0025 });
   const stickyRef = useRef(null);
   const jitterDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('jitterDebug') === '1';
@@ -851,6 +851,11 @@ const CalendarShowcase = ({ variant = 'calendar', onScenarioDemoInteractionChang
               ) : (
                 <div
                   className="homepage-scenarios-builder-frame"
+                  onPointerDownCapture={(event) => {
+                    if (event.target.closest('.sb-quantum-centering .sb-builder-node')) {
+                      onScenarioDemoInteractionChange?.(true);
+                    }
+                  }}
                   style={{
                     transform: `scale(${scenarioDemoScale})`,
                     transformOrigin: 'center center',
@@ -860,9 +865,9 @@ const CalendarShowcase = ({ variant = 'calendar', onScenarioDemoInteractionChang
                     key={demoInstanceKey}
                     demoMode
                     demoMaxNodes={4}
+                    demoInteractionActive={scenarioDemoActive}
                     demoPeopleCustomFields={demoPeopleCustomFields}
                     onDemoLimitExceeded={handleDemoLimitExceeded}
-                    onDemoInteractionChange={onScenarioDemoInteractionChange}
                     className="homepage-scenarios-builder"
                   />
                 </div>
