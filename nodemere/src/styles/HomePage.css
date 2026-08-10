@@ -467,6 +467,9 @@ main > section.content-section--showcase {
     --sb-bg-panel: rgba(18, 18, 18, 0.95);
 }
 .scenario-demo-showcase .homepage-scenarios-builder-frame {
+    position: absolute;
+    left: 50%;
+    top: 50%;
     width: calc(100vw / var(--scenario-demo-scale, 1));
     height: calc(100vh / var(--scenario-demo-scale, 1));
 }
@@ -1266,6 +1269,26 @@ main > section.content-section--showcase {
         top: 12px;
         left: 12px;
         right: 12px;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .sb-node-inner-wrap {
+        width: 168px;
+        height: 168px;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .sb-builder-node.sb-is-configured {
+        width: 168px;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .sb-node-label-below {
+        top: 194px;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .sb-node-add {
+        right: -8px;
+        bottom: 31px;
+        width: 30px;
+        height: 30px;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .sb-node-add svg {
+        width: 16px;
+        height: 16px;
     }
 }
 @media (min-width: 1024px) {

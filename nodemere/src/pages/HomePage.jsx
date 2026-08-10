@@ -714,6 +714,39 @@ const HomePage = () => {
     observer.observe(heroRef.current);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!scenarioDemoActive) return undefined;
+
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const { body, documentElement } = document;
+    const previousBodyStyles = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      touchAction: body.style.touchAction,
+    };
+    const previousHtmlOverflow = documentElement.style.overflow;
+
+    documentElement.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+    body.style.touchAction = 'none';
+
+    return () => {
+      documentElement.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyStyles.overflow;
+      body.style.position = previousBodyStyles.position;
+      body.style.top = previousBodyStyles.top;
+      body.style.width = previousBodyStyles.width;
+      body.style.touchAction = previousBodyStyles.touchAction;
+      window.scrollTo(0, scrollY);
+    };
+  }, [scenarioDemoActive]);
+
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

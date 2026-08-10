@@ -1677,14 +1677,22 @@ export default function ScenariosPage({
 
   // Measure each node's actual circle center in canvas coordinates (no state mutation)
   const circleCenterRef = useRef({});
-  const getCanvasPointFromEvent = useCallback((event) => {
-    const canvasRect = canvasRef.current?.getBoundingClientRect();
-    if (!canvasRect) return null;
+  const getCanvasPointFromClient = useCallback((clientX, clientY) => {
+    const canvasEl = canvasRef.current;
+    const canvasRect = canvasEl?.getBoundingClientRect();
+    if (!canvasEl || !canvasRect) return null;
+    const cssScaleX = canvasRect.width > 0 ? canvasEl.offsetWidth / canvasRect.width : 1;
+    const cssScaleY = canvasRect.height > 0 ? canvasEl.offsetHeight / canvasRect.height : 1;
+    const localX = (clientX - canvasRect.left) * cssScaleX;
+    const localY = (clientY - canvasRect.top) * cssScaleY;
     return {
-      x: (event.clientX - canvasRect.left - view.x) / view.scale,
-      y: (event.clientY - canvasRect.top - view.y) / view.scale,
+      x: (localX - view.x) / view.scale,
+      y: (localY - view.y) / view.scale,
     };
   }, [view.x, view.y, view.scale]);
+  const getCanvasPointFromEvent = useCallback((event) => (
+    getCanvasPointFromClient(event.clientX, event.clientY)
+  ), [getCanvasPointFromClient]);
 
   const getNodeAnchor = useCallback((nodeId) => {
     const node = nodeMap[nodeId];
@@ -1784,16 +1792,21 @@ export default function ScenariosPage({
   }, [canvasInteractionEnabled, getNodeAnchor]);
 
   useLayoutEffect(() => {
-    const canvasRect = canvasRef.current?.getBoundingClientRect();
-    if (!canvasRect) return;
+    const canvasEl = canvasRef.current;
+    const canvasRect = canvasEl?.getBoundingClientRect();
+    if (!canvasEl || !canvasRect) return;
+    const cssScaleX = canvasRect.width > 0 ? canvasEl.offsetWidth / canvasRect.width : 1;
+    const cssScaleY = canvasRect.height > 0 ? canvasEl.offsetHeight / canvasRect.height : 1;
     nodes.forEach(node => {
       const circleEl = circleRefs.current[node.id];
       if (!circleEl) return;
       const rect = circleEl.getBoundingClientRect();
+      const localCenterX = (rect.left + rect.width / 2 - canvasRect.left) * cssScaleX;
+      const localCenterY = (rect.top + rect.height / 2 - canvasRect.top) * cssScaleY;
       circleCenterRef.current[node.id] = {
-        cx: (rect.left + rect.width / 2 - canvasRect.left - view.x) / view.scale,
-        cy: (rect.top + rect.height / 2 - canvasRect.top - view.y) / view.scale,
-        r: (rect.height / 2) / view.scale,
+        cx: (localCenterX - view.x) / view.scale,
+        cy: (localCenterY - view.y) / view.scale,
+        r: ((rect.height / 2) * cssScaleY) / view.scale,
       };
     });
   }, [nodes, nodesOpacity, view.x, view.y, view.scale]);
@@ -1815,15 +1828,15 @@ export default function ScenariosPage({
           circleCenterX = builderRect ? builderRect.left + builderRect.width / 2 : window.innerWidth / 2;
           circleCenterY = builderRect ? builderRect.top + builderRect.height / 2 : window.innerHeight / 2;
         }
-        // Convert circle center to canvas coordinates (undo viewport transform)
-        const canvasX = (circleCenterX - view.x) / view.scale;
-        const canvasY = (circleCenterY - view.y) / view.scale;
-        setNodes((prev) =>
-          prev.map((node) =>
-            node.id === INITIAL_NODE.id ? { ...node, x: canvasX, y: canvasY } : node
-          )
-        );
-        setInitialNodeShifted(true);
+        const canvasPoint = getCanvasPointFromClient(circleCenterX, circleCenterY);
+        if (canvasPoint) {
+          setNodes((prev) =>
+            prev.map((node) =>
+              node.id === INITIAL_NODE.id ? { ...node, x: canvasPoint.x, y: canvasPoint.y } : node
+            )
+          );
+          setInitialNodeShifted(true);
+        }
       }
       setSelectedNodeId(nodeId);
       setLogicPanel(null);
@@ -1865,7 +1878,7 @@ export default function ScenariosPage({
         setPanelStage('actionConfig');
       }
     },
-    [initialNodeShifted, nodeMap, view.x, view.y]
+    [getCanvasPointFromClient, initialNodeShifted, nodeMap]
   );
 
   useEffect(() => {
@@ -2246,12 +2259,12 @@ export default function ScenariosPage({
     const circleRect = introCircleRef.current.getBoundingClientRect();
     const cx = circleRect.left + circleRect.width / 2;
     const cy = circleRect.top + circleRect.height / 2;
-    const canvasX = (cx - view.x) / view.scale;
-    const canvasY = (cy - view.y) / view.scale;
+    const canvasPoint = getCanvasPointFromClient(cx, cy);
+    if (!canvasPoint) return;
     setNodes(prev => prev.map(n =>
-      n.id === INITIAL_NODE.id ? { ...n, x: canvasX, y: canvasY } : n
+      n.id === INITIAL_NODE.id ? { ...n, x: canvasPoint.x, y: canvasPoint.y } : n
     ));
-  }, [view.x, view.y, view.scale]);
+  }, [getCanvasPointFromClient]);
 
   const finalizeSelection = (label, detail, icon, categoryType, accentColor) => {
     if (!selectedNodeId) return;
