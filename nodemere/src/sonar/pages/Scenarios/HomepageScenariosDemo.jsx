@@ -757,6 +757,7 @@ export default function ScenariosPage({
   demoMaxNodes = Infinity,
   demoPeopleCustomFields = [],
   onDemoLimitExceeded,
+  onDemoInteractionChange,
   className = '',
 } = {}) {
   const [viewMode, setViewMode] = useState(demoMode ? 'builder' : 'list'); // 'list' or 'builder'
@@ -874,6 +875,11 @@ export default function ScenariosPage({
 
   const needsTouchInteractionMode = demoMode && isCompactViewport;
   const canvasInteractionEnabled = !needsTouchInteractionMode || demoInteractionActive;
+
+  useEffect(() => {
+    if (!demoMode) return;
+    onDemoInteractionChange?.(demoInteractionActive);
+  }, [demoInteractionActive, demoMode, onDemoInteractionChange]);
   
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
@@ -2030,6 +2036,9 @@ export default function ScenariosPage({
   }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, isValidConnectionTarget, nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
 
   const handleNodePointerDown = (nodeId, event) => {
+    if (demoMode && nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
+      setDemoInteractionActive(true);
+    }
     if (needsTouchInteractionMode && event.pointerType === 'touch') {
       event.stopPropagation();
       event.preventDefault();
@@ -2533,7 +2542,6 @@ export default function ScenariosPage({
       event.target.closest('.sb-node-add') ||
       event.target.closest('.sb-node-output-handle') ||
       event.target.closest('.sb-edge-end-handle') ||
-      event.target.closest('.sb-demo-touch-toggle') ||
       event.target.closest('.sb-variables-pane') ||
       event.target.closest('.sb-vars-field')
     )
@@ -4902,20 +4910,6 @@ export default function ScenariosPage({
   const renderBuilderView = () => (
     <div className={`scenario-builder-page${demoMode ? ' scenario-builder-page--demo' : ''}`} ref={builderRef} onPointerDown={handlePagePointerDown}>
       <div className="sb-canvas-wrapper">
-        {needsTouchInteractionMode && (
-          <div className="sb-demo-touch-toggle absolute right-3 top-3 z-40 flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#111113]/90 p-1.5 pl-3 shadow-[0_12px_32px_rgba(0,0,0,0.4)] backdrop-blur-sm lg:hidden">
-            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-zinc-500">{demoInteractionActive ? 'Canvas active' : 'Scroll enabled'}</span>
-            <button
-              type="button"
-              aria-pressed={demoInteractionActive}
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => setDemoInteractionActive((active) => !active)}
-              className="min-h-[34px] rounded-full border border-white/[0.1] bg-white/[0.06] px-3 text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-200 transition-colors active:bg-white/[0.12]"
-            >
-              {demoInteractionActive ? 'Done' : 'Explore'}
-            </button>
-          </div>
-        )}
         <div
           className={`sb-canvas ${needsTouchInteractionMode && demoInteractionActive ? 'sb-canvas--touch-active' : ''}`}
           ref={canvasRef}

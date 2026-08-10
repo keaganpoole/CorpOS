@@ -175,12 +175,55 @@
 
 .header {
     width: 100%; background: transparent !important; background-image: none !important; position: fixed; top: 0; left: 0; z-index: 1000; border-bottom: none; padding: 0 55px;
+    transition:
+        background-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 420ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        filter 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 .header.is-visible {
     background: #020202 !important;
     background-image: none !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+}
+.header.is-scenario-demo-active {
+    background: #ffffff !important;
+    background-image: none !important;
+    border-bottom-color: transparent;
+    box-shadow: 0 12px 34px rgba(255, 255, 255, 0.08);
+}
+.header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    opacity: 0;
+    background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd), var(--color3), var(--brandGradientStart));
+    background-size: 260% 100%;
+    transform: scaleX(0.98);
+    transform-origin: center;
+    pointer-events: none;
+}
+.header.is-scenario-demo-active::after {
+    opacity: 1;
+    animation: scenarioHeaderBrandBreath 3.2s ease-in-out infinite;
+}
+@keyframes scenarioHeaderBrandBreath {
+    0%, 100% {
+        opacity: 0.42;
+        background-position: 0% center;
+        transform: scaleX(0.965);
+    }
+    50% {
+        opacity: 1;
+        background-position: 100% center;
+        transform: scaleX(1);
+    }
 }
 .comparison-results-disclaimer {
     bottom: 10px;
@@ -197,6 +240,51 @@
     top: 50%;
     transform: translate(-50%, -50%);
     height: 40px; /* Adjust as needed */
+    opacity: 1;
+    transition: opacity 280ms ease, filter 280ms ease;
+}
+.homepage-header-standard-actions {
+    opacity: 1;
+    transition: opacity 280ms ease, filter 280ms ease;
+}
+.header.is-scenario-demo-active .header-logo,
+.header.is-scenario-demo-active .homepage-header-standard-actions {
+    opacity: 0;
+    filter: blur(4px);
+    pointer-events: none;
+}
+.scenario-demo-exit-button {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 0 15px;
+    border: 1px solid rgba(9, 9, 11, 0.1);
+    border-radius: 999px;
+    background: #09090b;
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) translateY(4px);
+    transition:
+        opacity 260ms ease,
+        transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 180ms ease;
+}
+.header.is-scenario-demo-active .scenario-demo-exit-button {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(-50%) translateY(0);
+}
+.scenario-demo-exit-button:hover {
+    background: #18181b;
 }
 
 @media (max-width: 768px) {
