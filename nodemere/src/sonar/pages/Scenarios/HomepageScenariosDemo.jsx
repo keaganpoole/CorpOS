@@ -1635,25 +1635,49 @@ export default function ScenariosPage({
       return;
     }
     const nodeEl = nodeRefs.current[selectedNodeId];
-    const pageRect = builderRef.current?.getBoundingClientRect();
-    if (!nodeEl || !pageRect) {
+    const builderEl = builderRef.current;
+    const pageRect = builderEl?.getBoundingClientRect();
+    if (!nodeEl || !builderEl || !pageRect) {
       setIsPanelVisible(false);
       setPanelIntent(false);
       return;
     }
     const rect = nodeEl.getBoundingClientRect();
-    const panelWidth = Math.min(440, Math.max(280, pageRect.width - 24));
-    const panelHeight = Math.min(800, Math.max(360, pageRect.height - 24));
+    const cssScaleX = pageRect.width > 0 ? builderEl.offsetWidth / pageRect.width : 1;
+    const cssScaleY = pageRect.height > 0 ? builderEl.offsetHeight / pageRect.height : 1;
+    const pageWidth = builderEl.offsetWidth || pageRect.width;
+    const pageHeight = builderEl.offsetHeight || pageRect.height;
+    const visualViewportWidth = window.visualViewport?.width || window.innerWidth || pageRect.width;
+    const visualViewportHeight = window.visualViewport?.height || window.innerHeight || pageRect.height;
+    const visualSafeTop = needsTouchInteractionMode ? 76 : 12;
+    const visualSafeBottom = needsTouchInteractionMode ? 14 : 12;
+    const visualSafeLeft = 12;
+    const visualSafeRight = 12;
+    const visibleLeft = Math.max(visualSafeLeft * cssScaleX, (0 - pageRect.left + visualSafeLeft) * cssScaleX);
+    const visibleRight = Math.min(pageWidth - visualSafeRight * cssScaleX, (visualViewportWidth - pageRect.left - visualSafeRight) * cssScaleX);
+    const visibleTop = Math.max(visualSafeTop * cssScaleY, (0 - pageRect.top + visualSafeTop) * cssScaleY);
+    const visibleBottom = Math.min(pageHeight - visualSafeBottom * cssScaleY, (visualViewportHeight - pageRect.top - visualSafeBottom) * cssScaleY);
+    const visibleWidth = Math.max(280 * cssScaleX, visibleRight - visibleLeft);
+    const visibleHeight = Math.max(360 * cssScaleY, visibleBottom - visibleTop);
+    const nodeRect = {
+      left: (rect.left - pageRect.left) * cssScaleX,
+      right: (rect.right - pageRect.left) * cssScaleX,
+      top: (rect.top - pageRect.top) * cssScaleY,
+      width: rect.width * cssScaleX,
+      height: rect.height * cssScaleY,
+    };
+    const panelWidth = Math.min(440 * cssScaleX, visibleWidth);
+    const panelHeight = Math.min(800 * cssScaleY, visibleHeight);
     
-    let left = rect.right - pageRect.left - rect.width * 0.13;
-    if (left + panelWidth > pageRect.width) {
-      left = rect.left - pageRect.left - panelWidth - 40;
+    let left = nodeRect.right - nodeRect.width * 0.13;
+    if (left + panelWidth > visibleRight) {
+      left = nodeRect.left - panelWidth - 40 * cssScaleX;
     }
-    left = Math.max(12, Math.min(pageRect.width - panelWidth - 12, left));
+    left = Math.max(visibleLeft, Math.min(visibleRight - panelWidth, left));
     
     const top = Math.max(
-      12,
-      Math.min(pageRect.height - panelHeight - 12, rect.top - pageRect.top + rect.height / 2 - panelHeight / 2)
+      visibleTop,
+      Math.min(visibleBottom - panelHeight, nodeRect.top + nodeRect.height / 2 - panelHeight / 2)
     );
     setPanelStyle({ top, left });
     if (panelIntent) {
@@ -1661,7 +1685,7 @@ export default function ScenariosPage({
     } else {
       setIsPanelVisible(false);
     }
-  }, [selectedNodeId, panelIntent]);
+  }, [selectedNodeId, panelIntent, needsTouchInteractionMode]);
 
   useLayoutEffect(() => {
     repositionPanel();
