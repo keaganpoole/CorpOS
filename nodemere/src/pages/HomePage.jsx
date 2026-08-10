@@ -718,29 +718,32 @@ const HomePage = () => {
   useEffect(() => {
     if (!scenarioDemoActive) return undefined;
 
+    const scrollY = window.scrollY || window.pageYOffset || 0;
     const { body, documentElement } = document;
     const previousBodyStyles = {
       overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
       touchAction: body.style.touchAction,
-      overscrollBehavior: body.style.overscrollBehavior,
     };
-    const previousHtmlStyles = {
-      overflow: documentElement.style.overflow,
-      overscrollBehavior: documentElement.style.overscrollBehavior,
-    };
+    const previousHtmlOverflow = documentElement.style.overflow;
 
     documentElement.style.overflow = 'hidden';
-    documentElement.style.overscrollBehavior = 'none';
     body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
     body.style.touchAction = 'none';
-    body.style.overscrollBehavior = 'none';
 
     return () => {
-      documentElement.style.overflow = previousHtmlStyles.overflow;
-      documentElement.style.overscrollBehavior = previousHtmlStyles.overscrollBehavior;
+      documentElement.style.overflow = previousHtmlOverflow;
       body.style.overflow = previousBodyStyles.overflow;
+      body.style.position = previousBodyStyles.position;
+      body.style.top = previousBodyStyles.top;
+      body.style.width = previousBodyStyles.width;
       body.style.touchAction = previousBodyStyles.touchAction;
-      body.style.overscrollBehavior = previousBodyStyles.overscrollBehavior;
+      window.scrollTo(0, scrollY);
     };
   }, [scenarioDemoActive]);
 
