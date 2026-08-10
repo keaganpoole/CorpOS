@@ -697,8 +697,6 @@ const HomePage = () => {
   useLegacyAnimation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [headerHasAppeared, setHeaderHasAppeared] = useState(false);
-  const [scenarioDemoActive, setScenarioDemoActive] = useState(false);
-  const [scenarioDemoResetSignal, setScenarioDemoResetSignal] = useState(0);
   const heroRef = useRef(null);
 
   useEffect(() => {
@@ -782,11 +780,6 @@ const HomePage = () => {
   }, []);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
-  const handleExitScenarioDemo = () => {
-    setScenarioDemoActive(false);
-    setIsMenuOpen(false);
-    setScenarioDemoResetSignal((signal) => signal + 1);
-  };
 
   const cardImages = [pgg1, pgg20, pgg3, pgg4, pgg5, pgg6, pgg7];
 
@@ -891,12 +884,12 @@ const HomePage = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      <div className={`header${headerHasAppeared || scenarioDemoActive ? ' is-visible' : ''}${scenarioDemoActive ? ' is-scenario-demo-active' : ''}`}>
+      <div className={`header${headerHasAppeared ? ' is-visible' : ''}`}>
         <nav className="nav-content">
           <img src={logoImage} alt="Nodemere" className="header-logo" />
 
           {/* Desktop Navigation */}
-          <div className="homepage-header-standard-actions hidden md:flex items-center space-x-6 ml-auto">
+          <div className="hidden md:flex items-center space-x-6 ml-auto">
             <Link to="/pricing" className="text-sm font-semibold text-white hover:text-gray-300">Pricing</Link>
             {session ? (
               <>
@@ -917,7 +910,7 @@ const HomePage = () => {
           </div>
 
           {/* Mobile Navigation */}
-          <div className="homepage-header-standard-actions md:hidden flex items-center space-x-4 ml-auto">
+          <div className="md:hidden flex items-center space-x-4 ml-auto">
             {!session && (
               <Link to="/auth" state={{ isSignUp: true }} className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
             )}
@@ -925,13 +918,6 @@ const HomePage = () => {
               {isMenuOpen ? <XIcon size={24} /> : <MenuIcon size={24} />}
             </button>
           </div>
-          <button
-            type="button"
-            className="scenario-demo-exit-button"
-            onClick={handleExitScenarioDemo}
-          >
-            Exit Demo
-          </button>
         </nav>
 
         <AnimatePresence>
@@ -981,11 +967,7 @@ const HomePage = () => {
         <ComparisonShowcase />
 
         <section className="content-section content-section--showcase dark-bg text-center">
-          <CalendarShowcase
-            variant="scenarios"
-            onScenarioDemoInteractionChange={setScenarioDemoActive}
-            scenarioDemoResetSignal={scenarioDemoResetSignal}
-          />
+          <CalendarShowcase variant="scenarios" />
         </section>
 
       </main>
