@@ -2061,6 +2061,11 @@ export default function ScenariosPage({
     if (event.target.closest('.sb-edge-end-handle')) return;
     if (event.target.closest('.sb-node-output-handle')) return;
     event.preventDefault();
+    setSelectedNodeId(null);
+    setIsPanelVisible(false);
+    setPanelIntent(false);
+    setLogicPanel(null);
+    setVarsPane(prev => ({ ...prev, visible: false }));
     panRef.current = {
       startX: event.clientX,
       startY: event.clientY,

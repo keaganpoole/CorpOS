@@ -857,6 +857,7 @@ const CalendarShowcase = ({ variant = 'calendar', scenarioDemoActive = false, on
                     }
                   }}
                   style={{
+                    '--scenario-demo-scale': scenarioDemoScale,
                     transform: `scale(${scenarioDemoScale})`,
                     transformOrigin: 'center center',
                   }}
