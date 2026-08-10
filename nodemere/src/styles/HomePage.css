@@ -467,8 +467,8 @@ main > section.content-section--showcase {
     --sb-bg-panel: rgba(18, 18, 18, 0.95);
 }
 .scenario-demo-showcase .homepage-scenarios-builder-frame {
-    width: calc(100vw / var(--scenario-demo-scale, 1));
-    height: calc(100vh / var(--scenario-demo-scale, 1));
+    width: 100%;
+    height: 100%;
 }
 .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page {
     min-height: 100vh;
