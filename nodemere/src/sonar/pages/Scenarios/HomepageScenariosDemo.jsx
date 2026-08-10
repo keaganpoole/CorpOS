@@ -755,9 +755,9 @@ const sbModeToggleActiveStyle = {
 export default function ScenariosPage({
   demoMode = false,
   demoMaxNodes = Infinity,
-  demoInteractionActive = false,
   demoPeopleCustomFields = [],
   onDemoLimitExceeded,
+  onDemoInteractionChange,
   className = '',
 } = {}) {
   const [viewMode, setViewMode] = useState(demoMode ? 'builder' : 'list'); // 'list' or 'builder'
@@ -771,6 +771,7 @@ export default function ScenariosPage({
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const [viewportReady, setViewportReady] = useState(false);
   const [isCompactViewport, setIsCompactViewport] = useState(() => window.innerWidth < 1024);
+  const [demoInteractionActive, setDemoInteractionActive] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState('node-1');
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [plusHoveredNodeId, setPlusHoveredNodeId] = useState(null);
@@ -865,6 +866,7 @@ export default function ScenariosPage({
     const updateViewport = () => {
       const compact = window.innerWidth < 1024;
       setIsCompactViewport(compact);
+      if (!compact) setDemoInteractionActive(false);
     };
     updateViewport();
     window.addEventListener('resize', updateViewport);
@@ -873,6 +875,11 @@ export default function ScenariosPage({
 
   const needsTouchInteractionMode = demoMode && isCompactViewport;
   const canvasInteractionEnabled = !needsTouchInteractionMode || demoInteractionActive;
+
+  useEffect(() => {
+    if (!demoMode) return;
+    onDemoInteractionChange?.(demoInteractionActive);
+  }, [demoInteractionActive, demoMode, onDemoInteractionChange]);
   
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
@@ -2029,6 +2036,9 @@ export default function ScenariosPage({
   }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, isValidConnectionTarget, nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
 
   const handleNodePointerDown = (nodeId, event) => {
+    if (demoMode && nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
+      setDemoInteractionActive(true);
+    }
     if (needsTouchInteractionMode && event.pointerType === 'touch') {
       event.stopPropagation();
       event.preventDefault();
