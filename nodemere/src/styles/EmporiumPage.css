@@ -125,8 +125,8 @@ body::before {
   transition: all 0.3s ease;
 }
 .search-bar-container:focus-within {
-  border-color: var(--color1);
-  box-shadow: 0 0 15px rgba(123, 138, 254, 0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
 .search-input {

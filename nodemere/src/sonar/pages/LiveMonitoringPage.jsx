@@ -80,7 +80,6 @@ const sankeyData = {
     { id: 'appointment-updated', name: 'Appointment Updated', category: 'target', color: '#38bdf8' },
     { id: 'appointment-cancelled', name: 'Appointment Cancelled', category: 'target', color: '#38bdf8' },
     { id: 'payment-received', name: 'Payment Received', category: 'target', color: '#f59e0b' },
-    { id: 'invoice-sent', name: 'Invoice Sent', category: 'target', color: '#f59e0b' },
   ],
   links: [
     { id: 'incoming-records', source: 0, target: 2, value: 1 },
@@ -95,7 +94,6 @@ const sankeyData = {
     { id: 'appointments-appointment-updated', source: 3, target: 8, value: 1 },
     { id: 'appointments-appointment-cancelled', source: 3, target: 9, value: 1 },
     { id: 'payments-payment-received', source: 4, target: 10, value: 1 },
-    { id: 'payments-invoice-sent', source: 4, target: 11, value: 1 },
   ],
 };
 
@@ -111,7 +109,6 @@ const INTENT_ALIASES = {
   create_appointment: 'appointment_created',
   update_appointment: 'appointment_updated',
   cancel_appointment: 'appointment_cancelled',
-  delete_appointment: 'appointment_cancelled',
   intent_appointment_created: 'appointment_created',
   intent_appointment_updated: 'appointment_updated',
   intent_appointment_cancelled: 'appointment_cancelled',
@@ -121,10 +118,7 @@ const INTENT_ALIASES = {
   intent_record_updated: 'record_updated',
   create_payment: 'payment_received',
   update_payment: 'payment_received',
-  create_invoice: 'invoice_sent',
-  send_invoice: 'invoice_sent',
   intent_payment_received: 'payment_received',
-  intent_invoice_sent: 'invoice_sent',
 };
 
 const INTENT_ROUTES = {
@@ -137,7 +131,6 @@ const INTENT_ROUTES = {
   record_created: { middle: 'records', target: 'record-created' },
   record_updated: { middle: 'records', target: 'record-updated' },
   payment_received: { middle: 'payments', target: 'payment-received' },
-  invoice_sent: { middle: 'payments', target: 'invoice-sent' },
 };
 
 const LINK_BY_ROUTE = Object.fromEntries(sankeyData.links.map((link) => {

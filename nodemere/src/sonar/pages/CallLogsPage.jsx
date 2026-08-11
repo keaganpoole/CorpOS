@@ -769,7 +769,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search calls"
-                    className="w-full rounded-md border border-white/[0.06] bg-white/[0.02] py-2 pl-9 pr-8 text-[12px] text-zinc-300 outline-none transition-colors placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)]"
+                    className="w-full rounded-md border border-white/[0.06] bg-white/[0.02] py-2 pl-9 pr-8 text-[12px] text-zinc-300 outline-none transition-colors placeholder:text-zinc-700 focus:!outline-none"
                   />
                   {searchQuery && (
                     <button

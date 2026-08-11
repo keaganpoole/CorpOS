@@ -929,7 +929,7 @@ const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll
       <div className="border-b border-white/[0.05] p-3">
         <div className="relative">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)]" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none" />
         </div>
         <div className="mt-2 flex gap-2">
           <button type="button" onClick={onShowAll} className="flex-1 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 hover:text-white">Show All</button>
@@ -972,7 +972,7 @@ const IntakeFieldsPopover = ({ columns, fieldConfig, onToggleField, onEnableAll,
         </div>
         <div className="relative">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search intake fields..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)]" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search intake fields..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none" />
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">
           Leaner intake usually performs better. Keeping this list under six fields helps the agent stay focused and keeps token usage tighter.
@@ -1017,7 +1017,7 @@ const ColumnOrderPopover = ({ columns, fieldConfig, onMove, onReset }) => {
       <div className="border-b border-white/[0.05] p-3">
         <div className="relative">
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)]" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search columns..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none" />
         </div>
       </div>
       <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
@@ -2174,7 +2174,7 @@ const LeadsTable = ({
         <div className="flex-1" />
         <div className={`relative w-[260px] ${searchFieldClassName}`}>
           <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder={searchPlaceholder} className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:!outline-none focus:border-[var(--focusOutline)] transition-colors" />
+          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder={searchPlaceholder} className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:!outline-none transition-colors" />
           {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
         </div>
       </div>

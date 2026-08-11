@@ -1560,8 +1560,8 @@
 }
 
 .sb-panel-search input:focus {
-  border-color: var(--focusOutline);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brandGradientStart) 8%, transparent);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
 }
 
 .sb-panel-search-icon {

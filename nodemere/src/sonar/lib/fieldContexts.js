@@ -72,7 +72,7 @@ export const getContextType = (node) => {
   const key = node.subOptionKey || node.label?.toLowerCase()?.replace(/\s+/g, '_') || '';
   
   // Appointment nodes
-  if (key.includes('appointment') || key.includes('create_appointment') || key.includes('search_appointments') || key.includes('update_appointment') || key.includes('delete_appointment')) {
+  if (key.includes('appointment') || key.includes('create_appointment') || key.includes('search_appointments') || key.includes('update_appointment')) {
     return 'appointment';
   }
   
@@ -87,7 +87,7 @@ export const getContextType = (node) => {
   }
   
   // Record nodes
-  if (key.includes('record') || key.includes('search_records') || key.includes('create_new_record') || key.includes('update_record') || key.includes('delete_record')) {
+  if (key.includes('record') || key.includes('search_records') || key.includes('create_new_record') || key.includes('update_record')) {
     return 'record';
   }
   
@@ -144,10 +144,6 @@ const OUTPUT_VARIABLE_MAP = {
     { key: 'appointment_id', label: 'Appointment ID', type: 'text' },
     { key: 'appointment_date', label: 'Updated Date', type: 'timestamp' },
   ],
-  delete_appointment: [
-    { key: 'deleted_appointment_id', label: 'Deleted Appointment ID', type: 'text' },
-  ],
-  
   // Record actions
   create_new_record: [
     { key: 'new_record_id', label: 'New Record ID', type: 'text' },
@@ -163,10 +159,6 @@ const OUTPUT_VARIABLE_MAP = {
   update_record: [
     { key: 'record_id', label: 'Record ID', type: 'text' },
   ],
-  delete_record: [
-    { key: 'deleted_record_id', label: 'Deleted Record ID', type: 'text' },
-  ],
-  
   // Call actions
   call_customer: [
     { key: 'call_outcome', label: 'Call Outcome', type: 'text' },

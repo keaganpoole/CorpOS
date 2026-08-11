@@ -45,6 +45,209 @@ TABLE_CONTEXT_ALIASES = {
 AGENT_REF_PREFIXES = {"rec", "agent", "receptionist"}
 APPOINTMENT_ALLOWED_STATUSES = {"pending", "confirmed", "cancelled", "completed", "missed"}
 
+# These are the definitions exposed by the active Scenarios Builder. Keep this
+# list intentionally separate from the legacy intent/checkpoint vocabulary so
+# an old key cannot be activated through imported or hand-built scenario JSON.
+SCENARIO_TRIGGER_KEYS = {
+    "no_trigger",
+    "incoming_call",
+    "record_created",
+    "record_updated",
+    "appointment_created",
+    "appointment_updated",
+    "appointment_cancelled",
+    "appointment_rescheduled",
+    "appointment_confirmed",
+    "appointment_soon",
+    "appointment_completed",
+    "appointment_missed",
+    "payment_received",
+    "payment_failed",
+    "refund_issued",
+    "subscription_created",
+}
+SCENARIO_ACTION_KEYS = {
+    "call_customer",
+    "search_records",
+    "create_new_record",
+    "update_record",
+    "search_appointments",
+    "create_appointment",
+    "update_appointment",
+    "cancel_appointment",
+    "create_customer",
+    "update_customer",
+    "create_payment",
+    "send_payment_link",
+    "create_invoice",
+    "send_invoice",
+    "refund_payment",
+    "cancel_subscription",
+    "send_email",
+}
+SCENARIO_UTILITY_KEYS = {"router", "iterator"}
+
+
+def _scenario_json_list(value: Any) -> list:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else []
+        except Exception:
+            return []
+    return []
+
+
+def _scenario_value_present(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    return True
+
+
+def validate_scenario_definition(scenario: Optional[dict]) -> list[str]:
+    """Return concrete definition errors before an active flow can run."""
+    if not isinstance(scenario, dict):
+        return ["Scenario payload must be an object"]
+
+    nodes = _scenario_json_list(scenario.get("nodes_data"))
+    edges = _scenario_json_list(scenario.get("edges_data"))
+    errors = []
+    if not nodes:
+        return ["Scenario must contain at least one node"]
+
+    node_ids = [str(node.get("id")) for node in nodes if isinstance(node, dict) and node.get("id")]
+    if len(node_ids) != len(set(node_ids)):
+        errors.append("Scenario node IDs must be unique")
+    node_id_set = set(node_ids)
+    triggers = [
+        node for node in nodes
+        if isinstance(node, dict) and node.get("configured") and node.get("categoryType") == "TRIGGERS"
+    ]
+    if len(triggers) != 1:
+        errors.append("Scenario must contain exactly one configured trigger")
+
+    for node in nodes:
+        if not isinstance(node, dict):
+            errors.append("Scenario contains an invalid node")
+            continue
+        if not node.get("configured"):
+            errors.append(f"Node {node.get('id') or '(unknown)'} is not configured")
+            continue
+
+        category = str(node.get("categoryType") or "").upper()
+        action_config = node.get("actionConfig") if isinstance(node.get("actionConfig"), dict) else {}
+        appointment_config = node.get("appointmentConfig") if isinstance(node.get("appointmentConfig"), dict) else {}
+        key = str(
+            node.get("subOptionKey")
+            or action_config.get("_key")
+            or appointment_config.get("key")
+            or ("router" if node.get("type") == "router" else "")
+        ).strip().lower()
+        # Appointment nodes may retain a small actionConfig (for example a
+        # legacy _key) alongside their real appointmentConfig. Validate the
+        # effective merged configuration so persistence/reload cannot make a
+        # valid appointment look unconfigured.
+        config = {**action_config, **appointment_config}
+
+        if category == "TRIGGERS":
+            if key not in SCENARIO_TRIGGER_KEYS:
+                errors.append(f"Unsupported trigger: {key or '(missing)'}")
+            if key == "appointment_soon":
+                trigger_filter = node.get("triggerFilter") if isinstance(node.get("triggerFilter"), dict) else {}
+                try:
+                    offset = (int(trigger_filter.get("hours") or 0) * 60) + int(trigger_filter.get("minutes") or 0)
+                except (TypeError, ValueError):
+                    offset = -1
+                if offset < 0:
+                    errors.append("Appointment Soon requires a valid reminder offset")
+        elif category == "ACTIONS":
+            if key not in SCENARIO_ACTION_KEYS:
+                errors.append(f"Unsupported action: {key or '(missing)'}")
+        elif category == "UTILITIES":
+            if key not in SCENARIO_UTILITY_KEYS:
+                errors.append(f"Unsupported utility: {key or '(missing)'}")
+            if key == "iterator" and not _scenario_value_present(config.get("collection_path") or config.get("collection") or config.get("array_path")):
+                errors.append("Iterator requires a collection path")
+        else:
+            errors.append(f"Unsupported node category: {category or '(missing)'}")
+
+        if key == "create_new_record":
+            record_values = [
+                value for name, value in config.items()
+                if not name.startswith("_") and name not in {"target_table", "table", "record_id"}
+            ]
+            if not any(_scenario_value_present(value) for value in record_values):
+                errors.append("Create New Person requires at least one person field")
+        elif key == "update_record":
+            if not _scenario_value_present(config.get("record_id")):
+                errors.append("Update Person requires a record ID")
+            update_values = [
+                value for name, value in config.items()
+                if not name.startswith("_") and name not in {"target_table", "table", "record_id", "record_lookup_value"}
+            ]
+            if not any(_scenario_value_present(value) for value in update_values):
+                errors.append("Update Person requires at least one field to change")
+        elif key == "create_appointment":
+            if not _scenario_value_present(config.get("date") or config.get("field_date")):
+                errors.append("Create Appointment requires a date")
+            if not _scenario_value_present(config.get("time") or config.get("field_time")):
+                errors.append("Create Appointment requires a time")
+        elif key in {"create_payment", "send_payment_link", "create_invoice"}:
+            if not _scenario_value_present(config.get("amount")):
+                errors.append(f"{key} requires an amount")
+        elif key == "send_email":
+            if not _scenario_value_present(config.get("to")):
+                errors.append("Send Email requires a recipient")
+            if not _scenario_value_present(config.get("subject")):
+                errors.append("Send Email requires a subject")
+        elif key == "create_customer":
+            if not any(_scenario_value_present(config.get(name)) for name in ("person_id", "customer_name", "customer_email", "customer_phone")):
+                errors.append("Create Customer requires a person or customer details")
+        elif key == "update_customer":
+            if not any(_scenario_value_present(config.get(name)) for name in ("customer_id", "person_id")):
+                errors.append("Update Customer requires a customer ID or person ID")
+
+    for edge in edges:
+        if not isinstance(edge, dict) or not edge.get("from") or not edge.get("to"):
+            errors.append("Scenario contains an invalid edge")
+            continue
+        if str(edge.get("from")) not in node_id_set or str(edge.get("to")) not in node_id_set:
+            errors.append(f"Edge references a missing node: {edge.get('from')} -> {edge.get('to')}")
+
+    if len(triggers) == 1 and node_ids:
+        outgoing = {}
+        for edge in edges:
+            if isinstance(edge, dict) and edge.get("from") and edge.get("to"):
+                outgoing.setdefault(str(edge["from"]), []).append(str(edge["to"]))
+        reachable = {str(triggers[0].get("id"))}
+        queue = list(reachable)
+        while queue:
+            current = queue.pop(0)
+            for target in outgoing.get(current, []):
+                if target not in reachable:
+                    reachable.add(target)
+                    queue.append(target)
+        unreachable = [node_id for node_id in node_ids if node_id not in reachable]
+        if unreachable:
+            errors.append(f"Scenario contains unreachable nodes: {', '.join(unreachable)}")
+
+    trigger_key = str(triggers[0].get("subOptionKey") or "").strip().lower() if len(triggers) == 1 else ""
+    if trigger_key == "no_trigger":
+        schedule_config = scenario.get("schedule_config")
+        if isinstance(schedule_config, str):
+            try:
+                schedule_config = json.loads(schedule_config)
+            except Exception:
+                schedule_config = {}
+        if not isinstance(schedule_config, dict) or schedule_config.get("mode") != "scheduled":
+            errors.append("No Trigger scenarios require an active schedule")
+
+    return list(dict.fromkeys(errors))
+
 
 def normalize_autonomy_index(value: Any) -> int:
     try:
@@ -130,6 +333,7 @@ TRIGGER_EVENT_MAP = {
 }
 
 SCHEDULE_JOB_TYPE = "scenario_schedule"
+APPOINTMENT_REMINDER_JOB_TYPE = "scenario_appointment_reminder"
 SCHEDULE_TRIGGER_EVENT = "scheduled_no_trigger"
 WEEKDAY_INDEX = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
 
@@ -1112,11 +1316,16 @@ class ScenarioActionExecutor:
         try:
             config = node.get("actionConfig") or {}
             table = "people"
-            limit = int(config.get("search_limit") or config.get("limit") or 10)
+            limit = max(1, min(int(config.get("search_limit") or config.get("limit") or 10), 100))
             user_id = context.get("business", {}).get("user_id") or context.get("user_id")
+            business_id = (context.get("business") or {}).get("id") or context.get("business_id")
+            if not user_id and not business_id:
+                return {"success": False, "error": "No business context for people search"}
 
             query = self.supabase.table(table).select("*").limit(limit)
-            if user_id:
+            if business_id:
+                query = query.eq("business_id", business_id)
+            elif user_id:
                 try:
                     query = query.eq("user_id", str(user_id))
                 except Exception:
@@ -1140,11 +1349,12 @@ class ScenarioActionExecutor:
     async def _search_appointments(self, node: dict, context: dict):
         try:
             config = node.get("actionConfig") or {}
-            limit = int(config.get("search_limit") or config.get("limit") or 10)
+            limit = max(1, min(int(config.get("search_limit") or config.get("limit") or 10), 100))
             business_id = (context.get("business") or {}).get("id") or context.get("business_id")
+            if business_id is None:
+                return {"success": False, "error": "No business context for appointment search"}
             query = self.supabase.table("appointments").select("*").limit(limit)
-            if business_id is not None:
-                query = query.eq("business_id", business_id)
+            query = query.eq("business_id", business_id)
             response = query.execute()
             records = response.data or []
             logging.info("Search appointments: %s", len(records))
@@ -1165,9 +1375,24 @@ class ScenarioActionExecutor:
         try:
             config = node.get("actionConfig") or {}
             table = str(config.get("target_table") or config.get("table") or "people").lower().replace(" ", "_")
+            if table != "people":
+                return {"success": False, "error": f"Unsupported record table: {table}"}
             record_id = self._resolve_variables(config.get("record_id") or "", context)
             if not record_id:
                 return {"success": False, "error": "No record ID specified"}
+
+            business = context.get("business") or {}
+            business_id = business.get("id") or context.get("business_id")
+            user_id = business.get("user_id") or context.get("user_id")
+            existing_query = self.supabase.table(table).select("*").eq("id", str(record_id))
+            if business_id is not None:
+                existing_query = existing_query.eq("business_id", business_id)
+            elif user_id:
+                existing_query = existing_query.eq("user_id", str(user_id))
+            existing_response = existing_query.limit(1).execute()
+            existing = (existing_response.data or [None])[0]
+            if not existing:
+                return {"success": False, "error": f"Person {record_id} was not found for this business"}
 
             updates = {}
             custom_updates = {}
@@ -1180,14 +1405,7 @@ class ScenarioActionExecutor:
                 column_key = key[6:] if key.startswith("field_") else key
                 resolved_value = self._resolve_variables(value, context)
                 if isinstance(resolved_value, str) and re.search(r"\{\{[^}]+\}\}", resolved_value):
-                    logging.warning(
-                        "[ActionExecutor] Skipping unresolved record update value table=%s record_id=%s field=%s value=%s",
-                        table,
-                        record_id,
-                        column_key,
-                        resolved_value,
-                    )
-                    continue
+                    return {"success": False, "error": f"Unresolved person field template: {resolved_value}"}
                 if table == "people" and column_key.startswith("custom_"):
                     custom_updates[column_key] = self._coerce_custom_field_value(resolved_value, custom_field_types.get(column_key))
                 else:
@@ -1195,18 +1413,27 @@ class ScenarioActionExecutor:
             if custom_updates:
                 existing_custom_fields = {}
                 try:
-                    existing = self.supabase.table("people").select("custom_fields").eq("id", str(record_id)).execute()
-                    if existing.data:
-                        existing_custom_fields = existing.data[0].get("custom_fields") or {}
+                    existing_custom_response = self.supabase.table("people").select("custom_fields").eq("id", str(record_id)).execute()
+                    if existing_custom_response.data:
+                        existing_custom_fields = existing_custom_response.data[0].get("custom_fields") or {}
                 except Exception as exc:
                     logging.warning("[ActionExecutor] Could not load existing custom_fields for people:%s: %s", record_id, exc)
                 updates["custom_fields"] = {**existing_custom_fields, **custom_updates}
+            if not updates:
+                return {"success": False, "error": "No person fields to update"}
             updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-
-            response = self.supabase.table(table).update(updates).eq("id", str(record_id)).execute()
+            self.supabase.table(table).update(updates).eq("id", str(record_id)).execute()
             logging.info("📝 %s:%s updated", table, record_id)
-            row = response.data[0] if response.data else {"id": record_id, **updates}
-            return {"success": True, "data": {"action": "update_record", **row}}
+            row = {**existing, **updates, "id": record_id}
+            self._emit_scenario_trigger("record_updated", {
+                "record_id": row.get("id"),
+                "person_id": row.get("id"),
+                "user_id": row.get("user_id") or user_id,
+                "business_id": row.get("business_id") or business_id,
+                "person": row,
+                "record": row,
+            }, source_scenario_id=context.get("_scenarioId"), scenario_chain=context.get("scenario_chain"))
+            return {"success": True, "data": {"action": "update_record", "table": table, **row}}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
@@ -1214,6 +1441,8 @@ class ScenarioActionExecutor:
         try:
             config = node.get("actionConfig") or {}
             table = str(config.get("target_table") or config.get("table") or "people").lower().replace(" ", "_")
+            if table != "people":
+                return {"success": False, "error": f"Unsupported record table: {table}"}
             row = {}
             custom_updates = {}
             custom_field_types = self._get_people_custom_field_types(context) if table == "people" else {}
@@ -1224,12 +1453,16 @@ class ScenarioActionExecutor:
                     continue
                 column_key = key[6:] if key.startswith("field_") else key
                 resolved_value = self._resolve_variables(value, context)
+                if self._has_unresolved_template(resolved_value):
+                    return {"success": False, "error": f"Unresolved person field template: {resolved_value}"}
                 if table == "people" and column_key.startswith("custom_"):
                     custom_updates[column_key] = self._coerce_custom_field_value(resolved_value, custom_field_types.get(column_key))
                 else:
                     row[column_key] = resolved_value
             if custom_updates:
                 row["custom_fields"] = custom_updates
+            if not row:
+                return {"success": False, "error": "No person fields provided"}
             now = datetime.now(timezone.utc).isoformat()
             row.setdefault("created_at", now)
             row.setdefault("updated_at", now)
@@ -1237,20 +1470,83 @@ class ScenarioActionExecutor:
                 business = context.get("business") or {}
                 row.setdefault("user_id", business.get("user_id") or context.get("user_id"))
                 row.setdefault("business_id", business.get("id") or context.get("business_id"))
+                if not row.get("user_id") and not row.get("business_id"):
+                    return {"success": False, "error": "No business context for person"}
             response = self.supabase.table(table).insert(row).execute()
             created = response.data[0] if response.data else row
             logging.info("🆕 %s:%s created", table, created.get("id"))
-            return {"success": True, "data": {"action": "create_new_record", **created}}
+            if table == "people":
+                self._emit_scenario_trigger("record_created", {
+                    "record_id": created.get("id"),
+                    "person_id": created.get("id"),
+                    "user_id": created.get("user_id") or context.get("user_id"),
+                    "business_id": created.get("business_id") or context.get("business_id"),
+                    "person": created,
+                    "record": created,
+                }, source_scenario_id=context.get("_scenarioId"), scenario_chain=context.get("scenario_chain"))
+            return {"success": True, "data": {"action": "create_new_record", "table": table, **created}}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
-    async def _safe_appointment_person(self, raw_value: Any):
+    def _emit_scenario_trigger(
+        self,
+        trigger_key: str,
+        payload: dict,
+        *,
+        source_scenario_id: Optional[str] = None,
+        scenario_chain: Optional[list] = None,
+    ):
+        callback = self.callbacks.get("emit_scenario_trigger")
+        if not callable(callback):
+            return
+        try:
+            event_payload = dict(payload or {})
+            chain = [str(item) for item in (scenario_chain or []) if item not in (None, "")]
+            if source_scenario_id not in (None, "") and str(source_scenario_id) not in chain:
+                chain.append(str(source_scenario_id))
+            if chain:
+                event_payload["scenario_chain"] = chain
+            callback(trigger_key, event_payload)
+        except Exception as exc:
+            # The mutation already succeeded. Do not turn a trigger delivery
+            # problem into a false action failure, but keep it observable.
+            logging.error("[ActionExecutor] Failed to emit %s trigger: %s", trigger_key, exc, exc_info=True)
+
+    def _emit_appointment_change_triggers(
+        self,
+        previous_appointment: Optional[dict],
+        current_appointment: Optional[dict],
+        *,
+        business_id=None,
+        include_updated: bool = True,
+        source_scenario_id: Optional[str] = None,
+        scenario_chain: Optional[list] = None,
+    ):
+        callback = self.callbacks.get("emit_appointment_change_triggers")
+        if not callable(callback):
+            return
+        try:
+            callback(
+                previous_appointment,
+                current_appointment,
+                business_id=business_id,
+                include_updated=include_updated,
+                source_scenario_id=source_scenario_id,
+                scenario_chain=scenario_chain,
+            )
+        except Exception as exc:
+            logging.error("[ActionExecutor] Failed to emit appointment triggers: %s", exc, exc_info=True)
+
+    async def _safe_appointment_person(self, raw_value: Any, business_id: Any = None):
         try:
             parsed = int(raw_value)
         except Exception:
             return None, None
         try:
-            response = self.supabase.table("people").select("id,first_name,last_name").eq("id", parsed).limit(1).execute()
+            query = self.supabase.table("people").select("*").eq("id", parsed)
+            if business_id is not None:
+                query = query.eq("business_id", business_id)
+            response = query.limit(1).execute()
             if not response.data:
                 return None, None
             person = response.data[0]
@@ -1258,12 +1554,15 @@ class ScenarioActionExecutor:
         except Exception:
             return None, None
 
-    async def _safe_appointment_service_id(self, raw_value: Any):
+    async def _safe_appointment_service_id(self, raw_value: Any, business_id: Any = None):
         parsed = uuid_or_none(raw_value)
         if not parsed:
             return None
         try:
-            response = self.supabase.table("services").select("id").eq("id", parsed).limit(1).execute()
+            query = self.supabase.table("services").select("id").eq("id", parsed)
+            if business_id is not None:
+                query = query.eq("business_id", business_id)
+            response = query.limit(1).execute()
             return parsed if response.data else None
         except Exception:
             return None
@@ -1289,6 +1588,9 @@ class ScenarioActionExecutor:
             self._hydrate_agent_appointment_context(context)
             config = node.get("appointmentConfig") or node.get("actionConfig") or {}
             business = context.get("business") or {}
+            business_id = business.get("id") or context.get("business_id")
+            if business_id is None:
+                return {"success": False, "error": "No business context for appointment"}
             resolved_date = self._resolve_variables(config.get("date") or config.get("field_date") or "", context)
             resolved_time = self._resolve_variables(config.get("time") or config.get("field_time") or "", context)
             if self._has_unresolved_template(resolved_date):
@@ -1323,7 +1625,8 @@ class ScenarioActionExecutor:
             if self._has_unresolved_template(raw_person_ref):
                 return {"success": False, "error": f"Unresolved appointment person_id template: {raw_person_ref}"}
             resolved_person_id, _resolved_person = await self._safe_appointment_person(
-                raw_person_ref or context.get("person", {}).get("id") or context.get("person_id")
+                raw_person_ref or context.get("person", {}).get("id") or context.get("person_id"),
+                business_id=business_id,
             )
             raw_service_id = self._resolve_variables(
                 config.get("service_id") or config.get("field_service_id") or "",
@@ -1365,7 +1668,7 @@ class ScenarioActionExecutor:
                     sorted((context.get("agent") or {}).keys()) if isinstance(context.get("agent"), dict) else [],
                 )
                 return {"success": False, "error": f"Unresolved appointment service_id template: {raw_service_id}"}
-            resolved_service_id = await self._safe_appointment_service_id(raw_service_id)
+            resolved_service_id = await self._safe_appointment_service_id(raw_service_id, business_id=business_id)
             raw_staff_id = self._resolve_variables(config.get("staff_id") or config.get("field_staff_id") or "", context)
             if self._has_unresolved_template(raw_staff_id):
                 raw_staff_id = self._deep_get_any(context, [
@@ -1377,7 +1680,7 @@ class ScenarioActionExecutor:
                 ]) or raw_staff_id
             if self._has_unresolved_template(raw_staff_id):
                 return {"success": False, "error": f"Unresolved appointment staff_id template: {raw_staff_id}"}
-            resolved_staff_id, _resolved_staff = await self._safe_appointment_staff_id(raw_staff_id, business.get("id"))
+            resolved_staff_id, _resolved_staff = await self._safe_appointment_staff_id(raw_staff_id, business_id)
             if raw_person_ref not in (None, "") and resolved_person_id is None:
                 return {"success": False, "error": f"Invalid appointment person_id: {raw_person_ref}"}
             if raw_service_id not in (None, "") and resolved_service_id is None:
@@ -1398,11 +1701,27 @@ class ScenarioActionExecutor:
                     self._resolve_variables(config.get("status") or "pending", context)
                 ),
                 "notes": self._resolve_variables(config.get("notes") or "", context),
-                "business_id": business.get("id"),
+                "business_id": business_id,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             response = self.supabase.table("appointments").insert(row).execute()
             created = response.data[0] if response.data else row
+            self._emit_scenario_trigger("appointment_created", {
+                "appointment": created,
+                "appointment_id": created.get("id"),
+                "person_id": created.get("person_id"),
+                "service_id": created.get("service_id"),
+                "staff_id": created.get("staff_id"),
+                "business_id": business_id,
+            }, source_scenario_id=context.get("_scenarioId"), scenario_chain=context.get("scenario_chain"))
+            self._emit_appointment_change_triggers(
+                None,
+                created,
+                business_id=business_id,
+                include_updated=False,
+                source_scenario_id=context.get("_scenarioId"),
+                scenario_chain=context.get("scenario_chain"),
+            )
             logging.info("📅 Appointment created")
             return {"success": True, "data": {"action": "create_appointment", "table": "appointments", **created}}
         except Exception as exc:
@@ -1413,10 +1732,24 @@ class ScenarioActionExecutor:
             config = node.get("appointmentConfig") or node.get("actionConfig") or {}
             appointment_id = self._resolve_variables(config.get("appointment_id") or config.get("record_id") or "", context) or context.get("appointment", {}).get("id")
             if not appointment_id:
-                return {"success": True, "data": {"action": "update_appointment", "skipped": True, "reason": "No appointment ID specified"}}
+                return {"success": False, "error": "No appointment ID specified"}
             appointment_id = uuid_or_none(appointment_id)
             if not appointment_id:
-                return {"success": True, "data": {"action": "update_appointment", "skipped": True, "reason": "Invalid appointment ID"}}
+                return {"success": False, "error": "Invalid appointment ID"}
+            business_id = (context.get("business") or {}).get("id") or context.get("business_id")
+            if business_id is None:
+                return {"success": False, "error": "No business context for appointment"}
+            existing_response = (
+                self.supabase.table("appointments")
+                .select("*")
+                .eq("id", str(appointment_id))
+                .eq("business_id", business_id)
+                .limit(1)
+                .execute()
+            )
+            previous = (existing_response.data or [None])[0]
+            if not previous:
+                return {"success": False, "error": "Appointment not found for this business"}
             updates = {}
             for key in ("date", "time", "duration", "status", "notes", "person_id", "service_id", "staff_id", "receptionist_id"):
                 raw = config.get(key) or config.get(f"field_{key}")
@@ -1433,29 +1766,40 @@ class ScenarioActionExecutor:
                     elif key == "status":
                         updates[key] = normalize_appointment_status(resolved)
                     elif key == "person_id":
-                        safe_person_id, _safe_person = await self._safe_appointment_person(resolved)
-                        if safe_person_id is not None:
-                            updates[key] = safe_person_id
+                        safe_person_id, _safe_person = await self._safe_appointment_person(resolved, business_id=business_id)
+                        if safe_person_id is None:
+                            return {"success": False, "error": f"Invalid appointment person_id: {resolved}"}
+                        updates[key] = safe_person_id
                     elif key == "service_id":
-                        safe_service_id = await self._safe_appointment_service_id(resolved)
-                        if safe_service_id is not None:
-                            updates[key] = safe_service_id
+                        safe_service_id = await self._safe_appointment_service_id(resolved, business_id=business_id)
+                        if safe_service_id is None:
+                            return {"success": False, "error": f"Invalid appointment service_id: {resolved}"}
+                        updates[key] = safe_service_id
                     elif key == "staff_id":
                         safe_staff_id, _safe_staff = await self._safe_appointment_staff_id(
                             resolved,
                             (context.get("business") or {}).get("id") or context.get("business_id"),
                         )
-                        if safe_staff_id is not None:
-                            updates[key] = safe_staff_id
+                        if safe_staff_id is None:
+                            return {"success": False, "error": f"Invalid appointment staff_id: {resolved}"}
+                        updates[key] = safe_staff_id
                     elif key == "receptionist_id":
                         updates[key] = resolved
                     else:
                         updates[key] = resolved
             if not updates:
-                return {"success": True, "data": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
+                return {"success": False, "error": "No appointment fields to update"}
             updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-            response = self.supabase.table("appointments").update(updates).eq("id", str(appointment_id)).execute()
-            row = response.data[0] if response.data else {"id": appointment_id, **updates}
+            self.supabase.table("appointments").update(updates).eq("id", str(appointment_id)).eq("business_id", business_id).execute()
+            row = {**previous, **updates, "id": str(appointment_id), "business_id": business_id}
+            self._emit_appointment_change_triggers(
+                previous,
+                row,
+                business_id=business_id,
+                include_updated=True,
+                source_scenario_id=context.get("_scenarioId"),
+                scenario_chain=context.get("scenario_chain"),
+            )
             logging.info("📅 Appointment updated")
             return {"success": True, "data": {"action": "update_appointment", "table": "appointments", **row}}
         except Exception as exc:
@@ -1466,15 +1810,37 @@ class ScenarioActionExecutor:
             config = node.get("appointmentConfig") or node.get("actionConfig") or {}
             appointment_id = self._resolve_variables(config.get("appointment_id") or config.get("record_id") or "", context) or context.get("appointment", {}).get("id")
             if not appointment_id:
-                return {"success": True, "data": {"action": "cancel_appointment", "skipped": True, "reason": "No appointment ID specified"}}
+                return {"success": False, "error": "No appointment ID specified"}
             appointment_id = uuid_or_none(appointment_id)
             if not appointment_id:
-                return {"success": True, "data": {"action": "cancel_appointment", "skipped": True, "reason": "Invalid appointment ID"}}
-            response = self.supabase.table("appointments").update({
+                return {"success": False, "error": "Invalid appointment ID"}
+            business_id = (context.get("business") or {}).get("id") or context.get("business_id")
+            if business_id is None:
+                return {"success": False, "error": "No business context for appointment"}
+            existing_response = (
+                self.supabase.table("appointments")
+                .select("*")
+                .eq("id", str(appointment_id))
+                .eq("business_id", business_id)
+                .limit(1)
+                .execute()
+            )
+            previous = (existing_response.data or [None])[0]
+            if not previous:
+                return {"success": False, "error": "Appointment not found for this business"}
+            self.supabase.table("appointments").update({
                 "status": "cancelled",
                 "updated_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("id", str(appointment_id)).execute()
-            row = response.data[0] if response.data else {"id": appointment_id, "status": "cancelled"}
+            }).eq("id", str(appointment_id)).eq("business_id", business_id).execute()
+            row = {**previous, "id": str(appointment_id), "status": "cancelled", "business_id": business_id}
+            self._emit_appointment_change_triggers(
+                previous,
+                row,
+                business_id=business_id,
+                include_updated=True,
+                source_scenario_id=context.get("_scenarioId"),
+                scenario_chain=context.get("scenario_chain"),
+            )
             logging.info("📅 Appointment cancelled")
             return {"success": True, "data": {"action": "cancel_appointment", "table": "appointments", **row}}
         except Exception as exc:
@@ -1998,6 +2364,8 @@ class ScenarioFlowExecutor:
         }
 
         execution_id = await self._create_execution_record(scenario, trigger_node["id"], context, trigger_event)
+        if not execution_id:
+            return {"success": False, "error": "Could not create scenario execution record"}
         context["_executionId"] = execution_id
         logging.info("▶ %s (%s)", scenario.get("name"), trigger_node.get("label"))
         return await self._execute_from_node(trigger_node["id"], node_map, edge_map, context, execution_id, scenario)
@@ -2136,7 +2504,9 @@ class ScenarioFlowExecutor:
             node = node_map.get(current_node_id)
             if not node:
                 logging.error("[FlowExecutor] Node %s not found", current_node_id)
-                break
+                error = f"Scenario references missing node: {current_node_id}"
+                await self._update_execution(execution_id, "failed", current_node_id, context, error)
+                return {"success": False, "error": error, "failed_at": current_node_id}
 
             logging.info("• %s. %s", steps, node.get("label") or current_node_id)
             if node.get("categoryType") == "TRIGGERS" and not (node.get("actionConfig") or {}).get("_key"):
@@ -2144,10 +2514,17 @@ class ScenarioFlowExecutor:
                 continue
 
             node_key = self._get_node_key(node)
-            if node.get("categoryType") == "UTILITIES" and node_key == "iterator":
-                result = await self._execute_iterator_node(node, node_map, edge_map, context, execution_id, scenario)
-            else:
-                result = await self.action_executor.execute(node, context)
+            try:
+                if node.get("categoryType") == "UTILITIES" and node_key == "iterator":
+                    result = await self._execute_iterator_node(node, node_map, edge_map, context, execution_id, scenario)
+                else:
+                    result = await self.action_executor.execute(node, context)
+            except Exception as exc:
+                error = str(exc) or f"{node.get('label') or node_key} failed"
+                append_execution_trace(current_node_id, "failed")
+                logging.error("[FlowExecutor] %s failed: %s", node.get("label") or current_node_id, error, exc_info=True)
+                await self._update_execution(execution_id, "failed", current_node_id, context, error)
+                return {"success": False, "error": error, "failed_at": current_node_id}
             if result.get("paused"):
                 append_execution_trace(current_node_id, "paused")
                 return result
@@ -2322,7 +2699,18 @@ class ScenarioEngine:
                 .order("created_at", desc=True)
                 .execute()
             )
-            self.scenarios = response.data or []
+            active_scenarios = response.data or []
+            self.scenarios = []
+            for scenario in active_scenarios:
+                definition_errors = validate_scenario_definition(scenario)
+                if definition_errors:
+                    logging.error(
+                        "[ScenarioEngine] Ignoring invalid active scenario %s: %s",
+                        scenario.get("id"),
+                        "; ".join(definition_errors),
+                    )
+                    continue
+                self.scenarios.append(scenario)
             await self.sync_scheduled_jobs()
         except Exception as exc:
             logging.error("[ScenarioEngine] Failed to load scenarios: %s", exc)
@@ -2345,6 +2733,7 @@ class ScenarioEngine:
         for scenario in scenarios:
             try:
                 await self._sync_scheduled_job_for_scenario(scenario)
+                await self._sync_appointment_reminder_job_for_scenario(scenario)
             except Exception as exc:
                 logging.warning(
                     "[ScenarioEngine] Could not sync job for scenario %s: %s",
@@ -2363,6 +2752,7 @@ class ScenarioEngine:
             and scenario.get("is_active") is not False
             and str(scenario.get("status") or "active").lower() == "active"
             and bool(schedule_config)
+            and not validate_scenario_definition(scenario)
         )
 
         if not should_schedule:
@@ -2427,12 +2817,333 @@ class ScenarioEngine:
                 "created_at": now_iso,
             }).execute()
 
+    def _appointment_soon_node(self, scenario: dict) -> Optional[dict]:
+        nodes = _scenario_json_list(scenario.get("nodes_data"))
+        return next(
+            (
+                node for node in nodes
+                if isinstance(node, dict)
+                and node.get("configured")
+                and node.get("categoryType") == "TRIGGERS"
+                and str(node.get("subOptionKey") or "").strip().lower() == "appointment_soon"
+            ),
+            None,
+        )
+
+    def _appointment_reminder_minutes(self, trigger_node: dict) -> int:
+        trigger_filter = trigger_node.get("triggerFilter") if isinstance(trigger_node.get("triggerFilter"), dict) else {}
+        try:
+            return max(0, int(trigger_filter.get("hours") or 0) * 60 + int(trigger_filter.get("minutes") or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    def _load_scenario_business(self, scenario: dict) -> Optional[dict]:
+        business_id = scenario.get("business_id")
+        user_id = scenario.get("user_id") or scenario.get("created_by")
+        try:
+            query = self.supabase.table("businesses").select("*")
+            if business_id is not None:
+                query = query.eq("id", business_id)
+            elif user_id:
+                query = query.eq("user_id", user_id)
+            else:
+                return None
+            response = query.limit(1).execute()
+            return response.data[0] if response.data else None
+        except Exception as exc:
+            logging.warning("[ScenarioEngine] Could not load business for appointment reminder: %s", exc)
+            return None
+
+    def _appointment_start_at(self, appointment: dict, business: Optional[dict]) -> Optional[datetime]:
+        try:
+            if not _scenario_value_present(appointment.get("date")) or not _scenario_value_present(appointment.get("time")):
+                return None
+            appointment_date = normalize_appointment_date_value(appointment.get("date"), fallback=None)
+            appointment_time = normalize_appointment_time_value(appointment.get("time"), fallback="")
+            if not appointment_date or not appointment_time:
+                return None
+            local_value = datetime.fromisoformat(f"{appointment_date}T{appointment_time}")
+            timezone_name = (
+                (business or {}).get("timezone")
+                or (business or {}).get("business_timezone")
+                or (business or {}).get("time_zone")
+                or "UTC"
+            )
+            try:
+                schedule_tz = ZoneInfo(str(timezone_name))
+            except Exception:
+                schedule_tz = timezone.utc
+            return local_value.replace(tzinfo=schedule_tz).astimezone(timezone.utc)
+        except Exception:
+            return None
+
+    def _appointment_reminder_targets(self, scenario: dict, after: Optional[datetime] = None) -> tuple[list[dict], Optional[dict], int]:
+        trigger_node = self._appointment_soon_node(scenario)
+        if not trigger_node:
+            return [], None, 0
+        business = self._load_scenario_business(scenario)
+        business_id = (business or {}).get("id") or scenario.get("business_id")
+        if business_id is None:
+            return [], business, self._appointment_reminder_minutes(trigger_node)
+        reminder_minutes = self._appointment_reminder_minutes(trigger_node)
+        minimum = after or datetime.now(timezone.utc)
+        if minimum.tzinfo is None:
+            minimum = minimum.replace(tzinfo=timezone.utc)
+        try:
+            response = (
+                self.supabase.table("appointments")
+                .select("*")
+                .eq("business_id", business_id)
+                .in_("status", ["pending", "confirmed"])
+                .execute()
+            )
+            appointments = response.data or []
+        except Exception as exc:
+            logging.warning("[ScenarioEngine] Could not load appointments for reminder: %s", exc)
+            return [], business, reminder_minutes
+
+        targets = []
+        for appointment in appointments:
+            start_at = self._appointment_start_at(appointment, business)
+            if not start_at:
+                continue
+            target_at = start_at - timedelta(minutes=reminder_minutes)
+            if target_at <= minimum:
+                continue
+            targets.append({
+                "appointment_id": appointment.get("id"),
+                "appointment": appointment,
+                "target_at": target_at.isoformat(),
+                "reminder_minutes": reminder_minutes,
+            })
+        targets.sort(key=lambda item: item.get("target_at") or "")
+        return targets, business, reminder_minutes
+
+    async def _sync_appointment_reminder_job_for_scenario(self, scenario: dict):
+        scenario_id = scenario.get("id")
+        if not scenario_id:
+            return
+        trigger_node = self._appointment_soon_node(scenario)
+        should_schedule = (
+            trigger_node is not None
+            and scenario.get("is_active") is not False
+            and str(scenario.get("status") or "active").lower() == "active"
+            and not validate_scenario_definition(scenario)
+        )
+        existing_response = (
+            self.supabase.table("jobs")
+            .select("*")
+            .eq("scenario_id", scenario_id)
+            .eq("type", APPOINTMENT_REMINDER_JOB_TYPE)
+            .limit(1)
+            .execute()
+        )
+        existing = existing_response.data[0] if existing_response.data else None
+        if not should_schedule:
+            if existing:
+                self.supabase.table("jobs").update({
+                    "status": "cancelled",
+                    "locked_at": None,
+                    "locked_by": None,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", existing["id"]).execute()
+            return
+        if existing and str(existing.get("status") or "").lower() == "running":
+            return
+
+        targets, business, reminder_minutes = self._appointment_reminder_targets(scenario)
+        if not targets:
+            if existing:
+                self.supabase.table("jobs").update({
+                    "status": "cancelled",
+                    "next_run_at": None,
+                    "locked_at": None,
+                    "locked_by": None,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", existing["id"]).execute()
+            return
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        schedule_config = {
+            "trigger_key": "appointment_soon",
+            "reminder_minutes": reminder_minutes,
+            "timezone": (business or {}).get("timezone") or (business or {}).get("business_timezone") or "UTC",
+        }
+        payload = {
+            "scenario_id": scenario_id,
+            "user_id": scenario.get("user_id") or scenario.get("created_by"),
+            "business_id": (business or {}).get("id") or scenario.get("business_id"),
+            "reminders": targets,
+        }
+        job_row = {
+            "scenario_id": scenario_id,
+            "user_id": scenario.get("user_id") or scenario.get("created_by"),
+            "business_id": (business or {}).get("id") or scenario.get("business_id"),
+            "type": APPOINTMENT_REMINDER_JOB_TYPE,
+            "status": "active",
+            "schedule_config": schedule_config,
+            "payload": payload,
+            "next_run_at": targets[0]["target_at"],
+            "locked_at": None,
+            "locked_by": None,
+            "updated_at": now_iso,
+        }
+        if existing:
+            self.supabase.table("jobs").update(job_row).eq("id", existing["id"]).execute()
+        else:
+            self.supabase.table("jobs").insert({**job_row, "created_at": now_iso}).execute()
+
+    async def run_due_appointment_reminder_jobs(self):
+        now = datetime.now(timezone.utc)
+        try:
+            response = (
+                self.supabase.table("jobs")
+                .select("*")
+                .eq("type", APPOINTMENT_REMINDER_JOB_TYPE)
+                .in_("status", ["active", "failed"])
+                .lte("next_run_at", now.isoformat())
+                .order("next_run_at")
+                .limit(10)
+                .execute()
+            )
+            candidates = response.data or []
+        except Exception as exc:
+            logging.warning("[ScenarioEngine] Could not find appointment reminder jobs: %s", exc)
+            return {"ok": False, "claimed": 0, "error": str(exc)}
+
+        runs = []
+        for candidate in candidates:
+            current_status = str(candidate.get("status") or "active")
+            claim_response = (
+                self.supabase.table("jobs")
+                .update({
+                    "status": "running",
+                    "locked_at": now.isoformat(),
+                    "locked_by": self.scheduler_worker_id,
+                    "attempt_count": int(candidate.get("attempt_count") or 0) + 1,
+                    "updated_at": now.isoformat(),
+                })
+                .eq("id", candidate.get("id"))
+                .eq("status", current_status)
+                .select("*")
+                .execute()
+            )
+            claimed = claim_response.data[0] if claim_response.data else None
+            if not claimed:
+                continue
+            result = await self._run_appointment_reminder_job(claimed)
+            runs.append({"job_id": claimed.get("id"), "result": result})
+        return {"ok": True, "claimed": len(runs), "runs": runs}
+
+    async def _run_appointment_reminder_job(self, job: dict):
+        job_id = job.get("id")
+        scenario_id = job.get("scenario_id")
+        try:
+            response = self.supabase.table("scenarios").select("*").eq("id", scenario_id).limit(1).execute()
+            scenario = response.data[0] if response.data else None
+            if not scenario or scenario.get("is_active") is False or str(scenario.get("status") or "active").lower() != "active":
+                self.supabase.table("jobs").update({
+                    "status": "cancelled",
+                    "locked_at": None,
+                    "locked_by": None,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", job_id).execute()
+                return {"ok": True, "skipped": "Scenario inactive or missing"}
+
+            job_payload = self._coerce_dict(job.get("payload"))
+            reminders = job_payload.get("reminders") if isinstance(job_payload.get("reminders"), list) else []
+            business_id = scenario.get("business_id") or job.get("business_id")
+            now = datetime.now(timezone.utc)
+            for reminder in reminders:
+                appointment_id = reminder.get("appointment_id")
+                if not appointment_id:
+                    continue
+                target_at = reminder.get("target_at")
+                if target_at:
+                    try:
+                        target_datetime = datetime.fromisoformat(str(target_at).replace("Z", "+00:00"))
+                        if target_datetime.tzinfo is None:
+                            target_datetime = target_datetime.replace(tzinfo=timezone.utc)
+                        if target_datetime > now:
+                            continue
+                    except (TypeError, ValueError):
+                        continue
+                appointment_response = (
+                    self.supabase.table("appointments")
+                    .select("*")
+                    .eq("id", appointment_id)
+                    .eq("business_id", business_id)
+                    .limit(1)
+                    .execute()
+                )
+                appointment = appointment_response.data[0] if appointment_response.data else None
+                if not appointment or str(appointment.get("status") or "").lower() not in {"pending", "confirmed"}:
+                    continue
+                business = self._load_scenario_business(scenario)
+                start_at = self._appointment_start_at(appointment, business)
+                expected_target = (start_at - timedelta(minutes=int(reminder.get("reminder_minutes") or 0))).isoformat() if start_at else None
+                if expected_target and reminder.get("target_at") and expected_target != reminder.get("target_at"):
+                    # The appointment moved; the appointment event will resync
+                    # this job for the new reminder time.
+                    continue
+                event_payload = {
+                    "appointment": appointment,
+                    "appointment_id": appointment.get("id"),
+                    "person_id": appointment.get("person_id"),
+                    "service_id": appointment.get("service_id"),
+                    "staff_id": appointment.get("staff_id"),
+                    "business_id": business_id,
+                    "reminder_minutes": int(reminder.get("reminder_minutes") or 0),
+                    "reminder_at": reminder.get("target_at"),
+                    "scenario_id": scenario_id,
+                }
+                result = await self.trigger_scenario(str(scenario_id), event_payload, event_type="appointment_reminder")
+                flow_result = result.get("result") if isinstance(result, dict) else None
+                if not result.get("ok") or not isinstance(flow_result, dict) or not flow_result.get("success"):
+                    raise RuntimeError((flow_result or result).get("error") or "Appointment reminder scenario failed")
+
+            next_targets, business, reminder_minutes = self._appointment_reminder_targets(scenario)
+            now_iso = datetime.now(timezone.utc).isoformat()
+            if next_targets:
+                next_payload = {
+                    "scenario_id": scenario_id,
+                    "user_id": scenario.get("user_id") or scenario.get("created_by"),
+                    "business_id": (business or {}).get("id") or scenario.get("business_id"),
+                    "reminders": next_targets,
+                }
+                self.supabase.table("jobs").update({
+                    "status": "active",
+                    "next_run_at": next_targets[0]["target_at"],
+                    "payload": next_payload,
+                    "schedule_config": {"trigger_key": "appointment_soon", "reminder_minutes": reminder_minutes},
+                    "last_run_at": now_iso,
+                    "locked_at": None,
+                    "locked_by": None,
+                    "attempt_count": 0,
+                    "last_error": None,
+                    "updated_at": now_iso,
+                }).eq("id", job_id).execute()
+            else:
+                self.supabase.table("jobs").update({
+                    "status": "cancelled",
+                    "next_run_at": None,
+                    "last_run_at": now_iso,
+                    "locked_at": None,
+                    "locked_by": None,
+                    "last_error": None,
+                    "updated_at": now_iso,
+                }).eq("id", job_id).execute()
+            return {"ok": True, "scenario_id": scenario_id, "reminders": len(reminders)}
+        except Exception as exc:
+            return self._mark_job_failed(job_id, str(exc))
+
     async def _scheduler_loop(self):
         while True:
             try:
                 logging.info("[ScenarioEngine] Scheduler worker tick: %s", self.scheduler_worker_id)
                 print(f"[ScenarioEngine] Scheduler worker tick: {self.scheduler_worker_id}", flush=True)
                 await self.run_due_scheduled_jobs()
+                await self.run_due_appointment_reminder_jobs()
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -2492,6 +3203,9 @@ class ScenarioEngine:
                 "job_id": job_id,
             })
             result = await self.trigger_scenario(str(scenario_id), payload, event_type=SCHEDULE_TRIGGER_EVENT)
+            flow_result = result.get("result") if isinstance(result, dict) else None
+            if not result.get("ok") or not isinstance(flow_result, dict) or not flow_result.get("success"):
+                raise RuntimeError((flow_result or result).get("error") or "Scheduled scenario failed")
 
             schedule_config = self._coerce_dict(scenario.get("schedule_config") or job.get("schedule_config"))
             frequency = str(schedule_config.get("frequency") or "once").lower()
@@ -2545,6 +3259,13 @@ class ScenarioEngine:
                 continue
             if not self._event_matches_scenario_tenant(scenario, payload):
                 continue
+            scenario_chain = payload.get("scenario_chain") if isinstance(payload.get("scenario_chain"), list) else []
+            if str(scenario.get("id")) in {str(item) for item in scenario_chain}:
+                logging.info(
+                    "[ScenarioEngine] Skipping scenario %s because it already exists in the event chain",
+                    scenario.get("id"),
+                )
+                continue
             trigger_node = match
             flow_context = await self._build_flow_context(scenario, event_type, payload)
             if not self._trigger_matches_config(trigger_node, event_type, payload, flow_context):
@@ -2577,6 +3298,22 @@ class ScenarioEngine:
         return resolved.strip() if isinstance(resolved, str) else resolved
 
     def _trigger_matches_config(self, trigger_node: dict, event_type: str, payload: dict, context: dict) -> bool:
+        trigger_key = str(trigger_node.get("subOptionKey") or "").strip().lower()
+        if trigger_key == "appointment_soon":
+            trigger_filter = trigger_node.get("triggerFilter") if isinstance(trigger_node.get("triggerFilter"), dict) else {}
+            try:
+                expected_minutes = max(0, int(trigger_filter.get("hours") or 0) * 60 + int(trigger_filter.get("minutes") or 0))
+            except (TypeError, ValueError):
+                return False
+            actual_minutes = payload.get("reminder_minutes")
+            if actual_minutes is None:
+                actual_minutes = payload.get("reminder_offset_minutes")
+            try:
+                if actual_minutes is None or int(actual_minutes) != expected_minutes:
+                    return False
+            except (TypeError, ValueError):
+                return False
+
         config = trigger_node.get("triggerConfig") or {}
         fields = config.get("fields") if isinstance(config, dict) else None
         if not isinstance(fields, dict):
@@ -2623,6 +3360,12 @@ class ScenarioEngine:
         scenario = response.data[0] if response.data else None
         if not scenario:
             return {"ok": False, "error": "Scenario not found"}
+        definition_errors = validate_scenario_definition(scenario)
+        if definition_errors:
+            return {
+                "ok": False,
+                "error": "Scenario configuration is invalid: " + "; ".join(definition_errors),
+            }
         flow_context = await self._build_flow_context(scenario, event_type, payload or {})
         result = await self.flow_executor.start(
             scenario,

@@ -812,6 +812,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
   // Save scenario modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveValidationError, setSaveValidationError] = useState('');
   const [scenarioName, setScenarioName] = useState('');
   const [scenarioDescription, setScenarioDescription] = useState('');
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(false);
@@ -2837,6 +2838,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     // If creating new scenario, show modal
     setScenarioName(`Scenario ${scenarios.length + 1}`);
     setScenarioDescription('');
+    setSaveValidationError('');
     setShowSaveModal(true);
   };
 
@@ -2918,6 +2920,98 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     userId,
   ]);
 
+  const validateScenarioForSave = useCallback((scenarioData) => {
+    const errors = [];
+    const supportedTriggers = new Set([
+      'no_trigger', 'incoming_call', 'record_created', 'record_updated',
+      'appointment_created', 'appointment_updated', 'appointment_cancelled',
+      'appointment_rescheduled', 'appointment_confirmed', 'appointment_soon',
+      'appointment_completed', 'appointment_missed', 'payment_received',
+      'payment_failed', 'refund_issued', 'subscription_created',
+    ]);
+    const supportedActions = new Set([
+      'call_customer', 'search_records', 'create_new_record', 'update_record',
+      'search_appointments', 'create_appointment', 'update_appointment',
+      'cancel_appointment', 'create_customer', 'update_customer',
+      'create_payment', 'send_payment_link', 'create_invoice', 'send_invoice',
+      'refund_payment', 'cancel_subscription', 'send_email',
+    ]);
+    const configuredNodes = (scenarioData.nodes_data || []).filter((node) => node?.configured);
+    const triggerNodes = configuredNodes.filter((node) => node.categoryType === 'TRIGGERS');
+    const nodeIds = new Set(configuredNodes.map((node) => node.id));
+    if (triggerNodes.length !== 1) errors.push('Add exactly one configured trigger.');
+    if (configuredNodes.length !== (scenarioData.nodes_data || []).length) errors.push('Every node must be configured before saving.');
+
+    const outgoing = {};
+    (scenarioData.edges_data || []).forEach((edge) => {
+      if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+        errors.push('Every connection must point to an existing node.');
+      }
+      outgoing[edge.from] = [...(outgoing[edge.from] || []), edge.to];
+    });
+    if (triggerNodes.length === 1) {
+      const reachable = new Set([triggerNodes[0].id]);
+      const queue = [triggerNodes[0].id];
+      while (queue.length) {
+        const current = queue.shift();
+        (outgoing[current] || []).forEach((target) => {
+          if (!reachable.has(target)) {
+            reachable.add(target);
+            queue.push(target);
+          }
+        });
+      }
+      if (configuredNodes.some((node) => !reachable.has(node.id))) errors.push('Every node must be connected to the trigger.');
+    }
+
+    const present = (value) => value !== undefined && value !== null && String(value).trim() !== '';
+    configuredNodes.forEach((node) => {
+      const actionConfig = node.actionConfig || {};
+      const appointmentConfig = node.appointmentConfig || {};
+      const key = node.subOptionKey || actionConfig._key || appointmentConfig.key || (node.type === 'router' ? 'router' : '');
+      const config = { ...actionConfig, ...appointmentConfig };
+      if (node.categoryType === 'TRIGGERS' && !supportedTriggers.has(key)) errors.push(`Unsupported trigger: ${key || '(missing)'}.`);
+      if (node.categoryType === 'ACTIONS' && !supportedActions.has(key)) errors.push(`Unsupported action: ${key || '(missing)'}.`);
+      if (node.categoryType === 'UTILITIES' && !['router', 'iterator'].includes(key)) errors.push(`Unsupported utility: ${key || '(missing)'}.`);
+      if (key === 'iterator' && !present(config.collection_path || config.collection || config.array_path)) {
+        errors.push('Iterator requires a collection path.');
+      }
+      if (key === 'create_new_record' && !Object.entries(config).some(([field, value]) => (
+        !field.startsWith('_') && !['target_table', 'table', 'record_id'].includes(field) && present(value)
+      ))) {
+        errors.push('Create New Person requires at least one person field.');
+      }
+      if (key === 'update_record') {
+        if (!present(config.record_id)) errors.push('Update Person requires a record ID.');
+        if (!Object.entries(config).some(([field, value]) => (
+          !field.startsWith('_') && !['target_table', 'table', 'record_id', 'record_lookup_value'].includes(field) && present(value)
+        ))) errors.push('Update Person requires at least one field to change.');
+      }
+      if (key === 'create_appointment') {
+        if (!present(config.date || config.field_date)) errors.push('Create Appointment requires a date.');
+        if (!present(config.time || config.field_time)) errors.push('Create Appointment requires a time.');
+      }
+      if (['create_payment', 'send_payment_link', 'create_invoice'].includes(key) && !present(config.amount)) {
+        errors.push(`${node.label || key} requires an amount.`);
+      }
+      if (key === 'send_email') {
+        if (!present(config.to)) errors.push('Send Email requires a recipient.');
+        if (!present(config.subject)) errors.push('Send Email requires a subject.');
+      }
+      if (key === 'create_customer' && !['person_id', 'customer_name', 'customer_email', 'customer_phone'].some((field) => present(config[field]))) {
+        errors.push('Create Customer requires a person or customer details.');
+      }
+      if (key === 'update_customer' && !['customer_id', 'person_id'].some((field) => present(config[field]))) {
+        errors.push('Update Customer requires a customer ID or person ID.');
+      }
+    });
+
+    if (triggerNodes[0]?.subOptionKey === 'no_trigger' && scenarioData.schedule_config?.mode !== 'scheduled') {
+      errors.push('No Trigger scenarios require an active schedule.');
+    }
+    return [...new Set(errors)];
+  }, []);
+
   const handleConfirmSaveScenario = async () => {
     const normalizedScenarioName = scenarioName?.trim()
       ? scenarioName.trim().charAt(0).toUpperCase() + scenarioName.trim().slice(1)
@@ -2932,6 +3026,14 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       name: resolvedScenarioName,
       description: resolvedDescription,
     });
+
+    const validationErrors = validateScenarioForSave(scenarioData);
+    if (validationErrors.length) {
+      setSaveValidationError(validationErrors.join(' '));
+      setShowSaveModal(true);
+      return;
+    }
+    setSaveValidationError('');
     
     let result;
     
@@ -2961,7 +3063,8 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     
     if (error) {
       console.error('[Scenarios] Error saving scenario:', error);
-      setShowSaveModal(false);
+      setSaveValidationError(error.message || 'Scenario could not be saved.');
+      setShowSaveModal(true);
       return;
     }
     
@@ -2986,6 +3089,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
   const handleCancelSaveScenario = () => {
     setShowSaveModal(false);
+    setSaveValidationError('');
     setScenarioName('');
     setScenarioDescription('');
   };
@@ -7116,6 +7220,11 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               </div>
               
               <div className="save-scenario-modal-body">
+                {saveValidationError && (
+                  <div className="sb-json-import-error" role="alert" style={{ marginBottom: 12 }}>
+                    {saveValidationError}
+                  </div>
+                )}
                 <div className="form-group">
                   <label htmlFor="scenario-name">Scenario Name</label>
                   <input

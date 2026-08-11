@@ -112,7 +112,7 @@ from .models import (
     UserIntegrationUpdate, UserIntegrationResponse,
 )
 from .dependencies import get_current_user, get_current_rep
-from .scenario_engine import ScenarioEngine
+from .scenario_engine import ScenarioEngine, validate_scenario_definition
 from .verification_service import (
     complete_verification,
     create_verification_session,
@@ -2793,20 +2793,16 @@ INTENT_KEY_ALIASES = {
     "create_record": "record_created",
     "update_record": "record_updated",
     "intent_payment_received": "payment_received",
-    "intent_invoice_sent": "invoice_sent",
     "intent_refund_issued": "refund_issued",
-    "intent_customer_created": "customer_created",
     "intent_subscription_created": "subscription_created",
-    "intent_subscription_canceled": "subscription_canceled",
-    "intent_subscription_payment_failed": "subscription_payment_failed",
-    "create_customer": "customer_created",
-    "update_customer": "customer_created",
-    "create_payment": "payment_received",
-    "send_payment_link": "invoice_sent",
-    "create_invoice": "invoice_sent",
-    "send_invoice": "invoice_sent",
+    "create_customer": "create_customer",
+    "update_customer": "update_customer",
+    "create_payment": "create_payment",
+    "send_payment_link": "send_payment_link",
+    "create_invoice": "create_invoice",
+    "send_invoice": "send_invoice",
     "refund_payment": "refund_issued",
-    "cancel_subscription": "subscription_canceled",
+    "cancel_subscription": "cancel_subscription",
     "intent_neutral_entered": "neutral",
     "neutral_entered": "neutral",
     "send_to_phone_number": "send_sms",
@@ -2834,13 +2830,9 @@ SUPPORTED_INTENT_KEYS = {
     "cancel_appointment",
     "record_created",
     "record_updated",
-    "customer_created",
     "payment_received",
     "refund_issued",
-    "invoice_sent",
     "subscription_created",
-    "subscription_canceled",
-    "subscription_payment_failed",
     "create_customer",
     "update_customer",
     "create_payment",
@@ -2854,10 +2846,7 @@ SUPPORTED_INTENT_KEYS = {
     "search_tags",
     "update_tag",
     "delete_tag",
-    "wait",
     "neutral",
-    "intent_router",
-    "end_call",
 }
 
 class IntentCheckpointRequest(BaseModel):
@@ -3324,6 +3313,8 @@ def emit_appointment_change_triggers(
     *,
     business_id=None,
     include_updated: bool = True,
+    source_scenario_id: Optional[str] = None,
+    scenario_chain: Optional[list] = None,
 ):
     if not isinstance(current_appointment, dict) or not current_appointment:
         return
@@ -3346,6 +3337,11 @@ def emit_appointment_change_triggers(
         "staff_id": current_appointment.get("staff_id"),
         "business_id": resolved_business_id,
     }
+    if source_scenario_id not in (None, ""):
+        chain = [str(item) for item in (scenario_chain or []) if item not in (None, "")]
+        if str(source_scenario_id) not in chain:
+            chain.append(str(source_scenario_id))
+        payload["scenario_chain"] = chain
 
     if include_updated:
         emit_scenario_trigger("appointment_updated", payload)
@@ -4993,10 +4989,15 @@ def build_payment_row(
 def insert_payment_record(payment_row: dict):
     try:
         response = supabase.table("payments").insert(payment_row).execute()
-        return response.data[0] if response.data else payment_row
+        if not response.data:
+            raise RuntimeError("Payment record was not persisted")
+        return response.data[0]
     except Exception as exc:
         logging.error("Failed to insert payment row: %s", exc, exc_info=True)
-        return payment_row
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Payment was created externally but could not be recorded locally.",
+        ) from exc
 
 def update_payment_record(match_field: str, match_value: str, update_data: dict):
     response = supabase.table("payments").update(update_data).eq(match_field, match_value).execute()
@@ -5509,10 +5510,20 @@ async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_c
 
     user_id = str(current_user.id)
     business = load_business_by_user_id(user_id)
-    scenario["user_id"] = scenario.get("user_id") or user_id
-    scenario["created_by"] = scenario.get("created_by") or user_id
-    if business and not scenario.get("business_id"):
-        scenario["business_id"] = business.get("id")
+    # The builder payload is untrusted input. Always bind a test run to the
+    # authenticated tenant instead of accepting user/business IDs supplied in
+    # imported JSON or by a caller.
+    scenario["user_id"] = user_id
+    scenario["created_by"] = user_id
+    scenario["business_id"] = business.get("id") if business else None
+    scenario["nodes_data"] = nodes_data
+
+    definition_errors = validate_scenario_definition(scenario)
+    if definition_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": "Scenario configuration is invalid", "errors": definition_errors},
+        )
 
     event_type = str(payload.get("event_type") or "manual_trigger")
     event_payload = payload.get("payload") if isinstance(payload.get("payload"), dict) else {}
@@ -5524,7 +5535,7 @@ async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_c
         # inside the flow context builder before doing any scenario work.
         event_payload.setdefault("business", business)
 
-    trigger_node = next((node for node in nodes_data if (node or {}).get("categoryType") == "TRIGGERS"), None)
+    trigger_node = next((node for node in nodes_data if (node or {}).get("categoryType") == "TRIGGERS" and (node or {}).get("configured")), None)
     if not trigger_node:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Scenario must contain a trigger node")
 
@@ -8903,6 +8914,8 @@ scenario_engine = ScenarioEngine(
         "refund_payment": scenario_refund_payment_callback,
         "cancel_subscription": scenario_cancel_subscription_callback,
         "send_email": scenario_send_email_callback,
+        "emit_scenario_trigger": emit_scenario_trigger,
+        "emit_appointment_change_triggers": emit_appointment_change_triggers,
     },
     base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
 )
@@ -9096,58 +9109,13 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         )
         logging.info(f"Checkout session completed for user with customer ID: {customer_id}. Plan changed: {current_plan} -> {plan_name}")
 
-    elif event_type == 'invoice.created':
-        invoice = event['data']['object']
-        if is_connected_account_event:
-            metadata = invoice.get("metadata") or {}
-            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
-            if user_id:
-                emit_payment_trigger("invoice_created", {
-                    "invoice": invoice,
-                    "customer_id": invoice.get("customer"),
-                    "invoice_id": invoice.get("id"),
-                    "amount_due": invoice.get("amount_due"),
-                    "currency": invoice.get("currency"),
-                    "status": invoice.get("status"),
-                    "user_id": user_id,
-                    "person_id": metadata.get("person_id"),
-                    "subscription_id": invoice.get("subscription"),
-                })
-    elif event_type == 'invoice.sent':
-        invoice = event['data']['object']
-        if is_connected_account_event:
-            metadata = invoice.get("metadata") or {}
-            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
-            if user_id:
-                emit_payment_trigger("invoice_sent", {
-                    "invoice": invoice,
-                    "customer_id": invoice.get("customer"),
-                    "invoice_id": invoice.get("id"),
-                    "amount_due": invoice.get("amount_due"),
-                    "currency": invoice.get("currency"),
-                    "hosted_invoice_url": invoice.get("hosted_invoice_url"),
-                    "status": invoice.get("status"),
-                    "user_id": user_id,
-                    "person_id": metadata.get("person_id"),
-                    "subscription_id": invoice.get("subscription"),
-                })
+    elif event_type in {'invoice.created', 'invoice.sent'}:
+        # These invoice lifecycle events are intentionally not exposed as
+        # Scenarios triggers.
+        return {"status": "success"}
     elif event_type == 'invoice.paid':
         invoice = event['data']['object']
         if is_connected_account_event:
-            metadata = invoice.get("metadata") or {}
-            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
-            if user_id:
-                emit_payment_trigger("invoice_paid", {
-                    "invoice": invoice,
-                    "customer_id": invoice.get("customer"),
-                    "invoice_id": invoice.get("id"),
-                    "amount_paid": invoice.get("amount_paid"),
-                    "currency": invoice.get("currency"),
-                    "status": invoice.get("status"),
-                    "user_id": user_id,
-                    "person_id": metadata.get("person_id"),
-                    "subscription_id": invoice.get("subscription"),
-                })
             return {"status": "success"}
         try:
             customer_id = invoice.get('customer')
@@ -9195,15 +9163,6 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                     reset_usage=True,
                 )
                 logging.info(f"User {user_id} subscription status updated to 'active' and months_subscribed incremented to {updated_months_subscribed}.")
-                emit_payment_trigger("invoice_paid", {
-                    "invoice": invoice,
-                    "customer_id": customer_id,
-                    "amount_paid": amount_paid,
-                    "currency": invoice.get("currency"),
-                    "status": invoice.get("status"),
-                    "user_id": user_id,
-                })
-
                 # 2. Commission Calculation for Rep
                 if associate_rep_id:
                     logging.info(f"Attempting to find rep with full name: {associate_rep_id}")
@@ -9283,7 +9242,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             metadata = invoice.get("metadata") or {}
             user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
             if user_id:
-                trigger_key = "subscription_payment_failed" if invoice.get("subscription") else "payment_failed"
+                trigger_key = "payment_failed"
                 emit_payment_trigger(trigger_key, {
                     "invoice": invoice,
                     "customer_id": invoice.get("customer"),
@@ -9416,21 +9375,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 "person_id": metadata.get("person_id"),
             })
     elif event_type == 'customer.created':
-        customer = event['data']['object']
-        if is_connected_account_event:
-            metadata = customer.get("metadata") or {}
-            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
-            if user_id:
-                emit_payment_trigger("customer_created", {
-                    "customer": customer,
-                    "customer_id": customer.get("id"),
-                    "customer_name": customer.get("name"),
-                    "customer_email": customer.get("email"),
-                    "customer_phone": customer.get("phone"),
-                    "status": "created",
-                    "user_id": user_id,
-                    "person_id": metadata.get("person_id"),
-                })
+        return {"status": "success"}
     elif event_type == 'customer.subscription.created':
         subscription = event['data']['object']
         if is_connected_account_event:
@@ -9448,18 +9393,6 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     elif event_type == 'customer.subscription.deleted':
         subscription = event['data']['object']
         if is_connected_account_event:
-            metadata = subscription.get("metadata") or {}
-            user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
-            if user_id:
-                emit_payment_trigger("subscription_canceled", {
-                    "subscription": subscription,
-                    "subscription_id": subscription.get("id"),
-                    "customer_id": subscription.get("customer"),
-                    "status": subscription.get("status"),
-                    "canceled_at": subscription.get("ended_at") or subscription.get("canceled_at"),
-                    "user_id": user_id,
-                    "person_id": metadata.get("person_id"),
-                })
             return {"status": "success"}
         customer_id = subscription.get('customer')
         subscription_id = subscription.get('id')
