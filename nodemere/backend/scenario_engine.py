@@ -45,6 +45,29 @@ TABLE_CONTEXT_ALIASES = {
 AGENT_REF_PREFIXES = {"rec", "agent", "receptionist"}
 APPOINTMENT_ALLOWED_STATUSES = {"pending", "confirmed", "cancelled", "completed", "missed"}
 
+
+def has_documented_call_consent(person: Optional[dict]) -> bool:
+    if not isinstance(person, dict):
+        return False
+    do_not_call = person.get("do_not_call")
+    if do_not_call is True or str(do_not_call or "").strip().lower() in {"1", "true", "yes", "on"}:
+        return False
+    value = person.get("consent_call")
+    has_consent_flag = value is True or str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+    consent_source = str(person.get("consent_call_source") or "").strip()
+    consent_recorded_at = person.get("consent_call_recorded_at")
+    consent_scope = str(person.get("consent_call_scope") or "").strip()
+    return has_consent_flag and bool(consent_source) and bool(consent_recorded_at) and bool(consent_scope)
+
+
+def build_outbound_ai_disclosure(*, assistant_name: str, business_name: str, purpose: str) -> str:
+    clean_purpose = re.sub(r"\s+", " ", str(purpose or "a service update")).strip()[:180]
+    return (
+        f"Hello, this is {assistant_name}, an AI assistant calling on behalf of {business_name}. "
+        f"This call may be recorded and transcribed. I'm calling about {clean_purpose}. "
+        "Is now an okay time to talk?"
+    )
+
 # These are the definitions exposed by the active Scenarios Builder. Keep this
 # list intentionally separate from the legacy intent/checkpoint vocabulary so
 # an old key cannot be activated through imported or hand-built scenario JSON.
@@ -1879,6 +1902,13 @@ class ScenarioActionExecutor:
             if not to_number:
                 return {"success": False, "error": "No phone number for call"}
 
+            customer_record = context.get("customer") or context.get("person") or {}
+            if not has_documented_call_consent(customer_record):
+                return {
+                    "success": False,
+                    "error": "Outbound AI calls require a contact with documented consent, a consent source, scope, timestamp, and no do-not-call flag.",
+                }
+
             receptionist = context.get("receptionist") if isinstance(context.get("receptionist"), dict) else {}
             if receptionist and not receptionist_direction_allows("outbound", receptionist.get("direction")):
                 return {"success": False, "error": "Outbound calling is disabled for this receptionist"}
@@ -1899,12 +1929,19 @@ class ScenarioActionExecutor:
             required_agent_fields = self._infer_required_agent_fields(context.get("_scenario"), node.get("id"), context)
             downstream_data = self._build_downstream_data(context.get("_scenario"), node.get("id"), context, required_agent_fields)
             mission_text = self._resolve_variables(config.get("main_content") or "", context)
+            assistant_name = (context.get("receptionist") or {}).get("first_name") or "Nodemere assistant"
+            business_name = (context.get("business") or {}).get("name") or "the business"
+            required_opening = build_outbound_ai_disclosure(
+                assistant_name=assistant_name,
+                business_name=business_name,
+                purpose=mission_text,
+            )
 
             scenario_context = {
                 "user_id": str((context.get("business") or {}).get("user_id") or context.get("user_id") or ""),
                 "company_name": (context.get("business") or {}).get("name") or "",
                 "autonomy_index": self._get_account_autonomy_index(context),
-                "receptionist_name": (context.get("receptionist") or {}).get("first_name") or "Receptionist",
+                "receptionist_name": assistant_name,
                 "receptionist_id": str((context.get("receptionist") or {}).get("id") or ""),
                 "elevenlabs_voice_id": (context.get("receptionist") or {}).get("elevenlabs_voice_id") or "",
                 "customer_name": (context.get("customer") or {}).get("first_name") or (context.get("person") or {}).get("first_name") or "",
@@ -1912,8 +1949,9 @@ class ScenarioActionExecutor:
                 "flow_execution_id": context.get("_executionId") or "",
                 "scenario_id": (context.get("_scenario") or {}).get("id") or "",
                 "mission": mission_text,
+                "required_opening_disclosure": required_opening,
+                "recording_enabled": True,
             }
-            customer_record = context.get("customer") or context.get("person") or {}
             customer_phone = normalize_phone_number(
                 customer_record.get("phone") or customer_record.get("phone_number") or to_number
             )
@@ -1939,12 +1977,13 @@ class ScenarioActionExecutor:
             conversation_initiation_client_data = {
                 "scenario_context": scenario_context,
                 "dynamic_variables": elevenlabs_dynamic_variables,
+                "conversation_config_override": {
+                    "agent": {"first_message": required_opening},
+                },
             }
             if scenario_context.get("elevenlabs_voice_id"):
-                conversation_initiation_client_data["conversation_config_override"] = {
-                    "tts": {
-                        "voice_id": scenario_context["elevenlabs_voice_id"],
-                    },
+                conversation_initiation_client_data["conversation_config_override"]["tts"] = {
+                    "voice_id": scenario_context["elevenlabs_voice_id"],
                 }
             logging.info("[ActionExecutor] outbound call dynamic variables: %s", json.dumps({
                 "user_id": scenario_context["user_id"],
@@ -1970,6 +2009,7 @@ class ScenarioActionExecutor:
                     "agent_phone_number_id": phone_number_id,
                     "to_number": to_number,
                     "conversation_initiation_client_data": conversation_initiation_client_data,
+                    "call_recording_enabled": True,
                 },
                 timeout=30,
             )
@@ -2621,6 +2661,8 @@ class ScenarioFlowExecutor:
         try:
             response = self.supabase.table("flow_executions").insert({
                 "scenario_id": scenario.get("id"),
+                "user_id": scenario.get("user_id") or scenario.get("created_by") or context.get("user_id"),
+                "business_id": scenario.get("business_id") or context.get("business_id"),
                 "status": "running",
                 "current_node_id": trigger_node_id,
                 "flow_context": context,

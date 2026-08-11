@@ -146,8 +146,14 @@ export const LEAD_FIELDS = [
   { key: 'best_time_to_contact', label: 'Best Time To Contact', type: 'text', required: false, table: false, tableWidth: '170px', section: 'preferences', editable: true },
 
   // Consent
-  { key: 'consent_sms', label: 'Consent SMS', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
-  { key: 'consent_call', label: 'Consent Call', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
+  { key: 'consent_sms', label: 'Documented SMS Consent', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
+  { key: 'consent_sms_source', label: 'SMS Consent Source', type: 'text', required: false, table: false, section: 'consent', editable: true },
+  { key: 'consent_sms_recorded_at', label: 'SMS Consent Timestamp', type: 'timestamp', required: false, table: false, section: 'consent', editable: true },
+  { key: 'consent_sms_scope', label: 'SMS Consent Scope', type: 'text', required: false, table: false, section: 'consent', editable: true },
+  { key: 'consent_call', label: 'Documented AI Call Consent', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
+  { key: 'consent_call_source', label: 'AI Call Consent Source', type: 'text', required: false, table: false, section: 'consent', editable: true },
+  { key: 'consent_call_recorded_at', label: 'AI Call Consent Timestamp', type: 'timestamp', required: false, table: false, section: 'consent', editable: true },
+  { key: 'consent_call_scope', label: 'AI Call Consent Scope', type: 'text', required: false, table: false, section: 'consent', editable: true },
   { key: 'do_not_call', label: 'Do Not Call', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
   { key: 'do_not_text', label: 'Do Not Text', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
 

@@ -10,6 +10,7 @@ import asyncio
 import requests
 import base64
 import binascii
+import hmac
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 from decimal import Decimal, InvalidOperation
@@ -69,6 +70,7 @@ from postgrest.exceptions import APIError
 from .config import (
     supabase,
     supabase_admin,
+    supabase_auth,
     stripe_webhook_secret,
     SECRET_KEY,
     ALGORITHM,
@@ -81,6 +83,7 @@ from .config import (
     elevenlabs_api_key,
     elevenlabs_agent_id_inbound,
     elevenlabs_agent_id_outbound,
+    internal_tool_secret,
     twilio_phone_number,
     twilio_account_sid,
     twilio_auth_token,
@@ -134,10 +137,28 @@ try:
 except Exception:
     ElevenLabs = None
 
+try:
+    from twilio.request_validator import RequestValidator
+except Exception:
+    RequestValidator = None
+
 # --------------------------------------------------------------------------
 # App Initialization
 # --------------------------------------------------------------------------
 app = FastAPI(title="Nodemere API")
+NODEMERE_LEGAL_ACCEPTANCE_KEY = "nodemere_legal_acceptance_v2026_08_11"
+NODEMERE_LEGAL_ACCEPTANCE_VERSION = "2026-08-11"
+RESTRICTED_LAUNCH_INDUSTRY_TERMS = {
+    "health", "medical", "dental", "hipaa", "pharmacy", "hospital", "clinic",
+    "legal", "law firm", "attorney", "financial", "bank", "lending", "credit",
+    "insurance", "education", "school", "government", "political", "campaign",
+    "debt collection", "collections",
+}
+
+
+def is_restricted_launch_industry(value: Optional[str]) -> bool:
+    normalized = str(value or "").strip().lower()
+    return bool(normalized) and any(term in normalized for term in RESTRICTED_LAUNCH_INDUSTRY_TERMS)
 # scheduler = AsyncIOScheduler()
 PAYMENT_TEST_MODE = TEST_MODE
 
@@ -156,6 +177,8 @@ SYSTEM_LOG_EVENTS: list[dict] = []
 CRON_JOBS: list[dict] = []
 REACTIONS_CACHE: list[dict] = []
 PENDING_RESTARTS: list[dict] = []
+TENANT_CONTROL_STATES: dict[str, dict] = {}
+TENANT_SESSION_STATES: dict[str, dict] = {}
 ROUTE_HIT_EXCLUDE_PATHS = {
     "/api/events/live-pulse",
     "/api/logs",
@@ -169,8 +192,22 @@ def next_live_event_id(prefix: Optional[str] = None) -> str:
     return f"{prefix}-{base_id}" if prefix else base_id
 
 
+def get_tenant_control_state(user_id: str) -> dict:
+    return TENANT_CONTROL_STATES.setdefault(str(user_id), dict(CONTROL_STATE))
+
+
+def get_tenant_session_state(user_id: str) -> dict:
+    return TENANT_SESSION_STATES.setdefault(str(user_id), dict(SESSION_STATE))
+
+
+def is_event_visible_to_user(event: dict, user_id: str) -> bool:
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    return str(payload.get("user_id") or event.get("user_id") or "") == str(user_id)
+
+
 def push_live_event(message: str, *, actor: str = "system", severity: str = "info", event_type: Optional[str] = None, payload: Optional[dict] = None):
     timestamp = datetime.now(timezone.utc).isoformat()
+    event_payload = payload or {}
     event = {
         "id": next_live_event_id(),
         "timestamp": timestamp,
@@ -178,7 +215,7 @@ def push_live_event(message: str, *, actor: str = "system", severity: str = "inf
         "actor": actor,
         "severity": severity,
         "event_type": event_type or "system_event",
-        "payload": payload or {},
+        "payload": event_payload,
     }
     LIVE_PULSE_EVENTS.insert(0, event)
     del LIVE_PULSE_EVENTS[50:]
@@ -188,11 +225,12 @@ def push_live_event(message: str, *, actor: str = "system", severity: str = "inf
         "level": severity,
         "source": actor,
         "message": message,
+        "user_id": event_payload.get("user_id"),
     })
     del SYSTEM_LOG_EVENTS[100:]
 
 
-def push_route_hit(method: str, endpoint: str, status_code: int, duration_ms: int, source: str):
+def push_route_hit(method: str, endpoint: str, status_code: int, duration_ms: int, source: str, user_id: Optional[str] = None):
     timestamp = datetime.now(timezone.utc).isoformat()
     LIVE_PULSE_EVENTS.insert(0, {
         "id": next_live_event_id("route"),
@@ -205,6 +243,7 @@ def push_route_hit(method: str, endpoint: str, status_code: int, duration_ms: in
         "duration": duration_ms,
         "source": source,
         "message": f"{method} {endpoint} -> {status_code}",
+        "user_id": user_id,
     })
     del LIVE_PULSE_EVENTS[50:]
 
@@ -750,6 +789,36 @@ def get_twilio_caller_id_status_callback_url() -> Optional[str]:
     if not base_url:
         return None
     return f"{base_url}/twilio/outgoing-caller-id/status"
+
+
+def build_inbound_ai_disclosure(business_name: Optional[str], receptionist_name: Optional[str]) -> str:
+    business_label = str(business_name or "the business").strip() or "the business"
+    assistant_label = str(receptionist_name or "Nodemere assistant").strip() or "Nodemere assistant"
+    return (
+        f"Thank you for calling {business_label}. You are speaking with {assistant_label}, an AI assistant. "
+        "This call may be recorded and transcribed. How may I help you?"
+    )
+
+
+async def verify_twilio_webhook_request(request: Request, expected_url: Optional[str]) -> None:
+    if not twilio_auth_token or not expected_url or RequestValidator is None:
+        logging.error("Twilio webhook verification is not fully configured.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Twilio webhook verification is not configured.",
+        )
+    signature = request.headers.get("x-twilio-signature")
+    if not signature:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing Twilio signature.")
+    try:
+        form = await request.form()
+        parameters = {key: value for key, value in form.multi_items()}
+        valid = RequestValidator(twilio_auth_token).validate(expected_url, parameters, signature)
+    except Exception as exc:
+        logging.warning("Twilio webhook verification failed: %s", exc)
+        valid = False
+    if not valid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Twilio signature.")
 
 
 def find_twilio_outgoing_caller_id(phone_number: Optional[str]) -> Optional[dict]:
@@ -2653,6 +2722,7 @@ class OnboardingRequest(BaseModel):
     policies: Optional[str] = None
     faq: Optional[str] = None
     terms_of_service: Optional[dict] = None
+    legal_acceptance: Optional[dict] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
     services: Optional[list[dict]] = None
@@ -2692,6 +2762,11 @@ class ScenarioTriggerRequest(BaseModel):
     trigger_key: str
     payload: Optional[dict] = None
     created_at: Optional[datetime] = None
+
+class LegalAcceptanceRequest(BaseModel):
+    version: str
+    accepted_terms: bool
+    certified_permitted_use: bool
 
 class CustomerCreateRequest(BaseModel):
     person_id: Optional[str] = None
@@ -2883,7 +2958,10 @@ configured_origins = [
 origins = configured_origins or [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://nodemere.com",
+    "https://nodemere.ai",
+    "https://www.nodemere.ai",
+    "https://nodemere.io",
+    "https://www.nodemere.io",
 ]
 
 app.add_middleware(
@@ -2893,6 +2971,71 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return response
+
+
+def is_public_api_route(request: Request) -> bool:
+    path = request.url.path
+    if request.method == "OPTIONS":
+        return True
+    if path == "/api/sonar/pricing/plans":
+        return True
+    if path == "/api/sonar/payments/test-mode" and request.method == "GET":
+        return True
+    if path.startswith("/api/contracts/"):
+        return True
+    if path.startswith("/api/upload/") or path.startswith("/api/verification/"):
+        return True
+    # These routes use provider signatures or the dedicated internal-tool secret
+    # at the endpoint. They cannot use a browser user JWT.
+    if path.startswith("/api/webhooks/elevenlabs/") or path.startswith("/api/tools/"):
+        return True
+    if path in {"/api/call/route", "/api/scenarios/resume"}:
+        return True
+    return False
+
+
+async def require_internal_tool_authorization(request: Request):
+    if not internal_tool_secret:
+        logging.error("NODEMERE_INTERNAL_TOOL_SECRET is not configured; refusing internal tool request.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Internal tool authentication is not configured.",
+        )
+    supplied = request.headers.get("x-nodemere-internal-secret") or ""
+    if not hmac.compare_digest(supplied, internal_tool_secret):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal tool authorization.")
+
+
+@app.middleware("http")
+async def require_authenticated_api_request(request: Request, call_next):
+    path = request.url.path
+    if not path.startswith("/api/") or is_public_api_route(request):
+        return await call_next(request)
+
+    authorization = request.headers.get("authorization") or ""
+    if not authorization.lower().startswith("bearer "):
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Authentication required."})
+    access_token = authorization.split(" ", 1)[1].strip()
+    if not access_token:
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Authentication required."})
+    try:
+        user_result = supabase_auth.auth.get_user(access_token)
+        if not user_result or not user_result.user:
+            raise ValueError("No authenticated user")
+        request.state.authenticated_user_id = str(user_result.user.id)
+    except Exception:
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Invalid or expired authentication token."})
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -2916,6 +3059,7 @@ async def capture_route_hits(request: Request, call_next):
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
                 duration_ms,
                 infer_route_source(request),
+                getattr(request.state, "authenticated_user_id", None),
             )
         raise
 
@@ -2927,6 +3071,7 @@ async def capture_route_hits(request: Request, call_next):
             response.status_code,
             duration_ms,
             infer_route_source(request),
+            getattr(request.state, "authenticated_user_id", None),
         )
 
     return response
@@ -4972,6 +5117,8 @@ def build_payment_row(
     stripe_session_id: Optional[str] = None,
     receipt_url: Optional[str] = None,
     error_message: Optional[str] = None,
+    user_id: Optional[str] = None,
+    business_id: Optional[str] = None,
 ):
     return {
         "amount": amount,
@@ -4984,6 +5131,8 @@ def build_payment_row(
         "stripe_session_id": stripe_session_id,
         "refunded_amount": 0,
         "error_message": error_message,
+        "user_id": user_id,
+        "business_id": business_id,
     }
 
 def insert_payment_record(payment_row: dict):
@@ -4999,8 +5148,11 @@ def insert_payment_record(payment_row: dict):
             detail="Payment was created externally but could not be recorded locally.",
         ) from exc
 
-def update_payment_record(match_field: str, match_value: str, update_data: dict):
-    response = supabase.table("payments").update(update_data).eq(match_field, match_value).execute()
+def update_payment_record(match_field: str, match_value: str, update_data: dict, user_id: Optional[str] = None):
+    query = supabase.table("payments").update(update_data).eq(match_field, match_value)
+    if user_id:
+        query = query.eq("user_id", user_id)
+    response = query.execute()
     return response.data[0] if response.data else None
 
 
@@ -5232,23 +5384,29 @@ def get_client_ip(request: Request) -> Optional[str]:
 
 
 @app.post("/api/contracts", tags=["Voice Contracts"])
-async def create_voice_contract(payload: ContractCreateRequest):
+async def create_voice_contract(payload: ContractCreateRequest, current_user: dict = Depends(get_current_user)):
+    current_user_id = str(current_user.id)
+    business = load_business_by_user_id(current_user_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    if payload.business_id and str(payload.business_id) != str(business.get("id")):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot create a contract for another business.")
     return create_contract(
         supabase_admin,
         base_url=verification_base_url,
         signer_name=payload.signer_name or "",
         signer_email=str(payload.signer_email or ""),
         voice_display_name=payload.voice_display_name or "",
-        business_id=payload.business_id,
+        business_id=business.get("id"),
         person_id=payload.person_id,
-        user_id=payload.user_id,
+        user_id=current_user_id,
         metadata=payload.metadata or {},
     )
 
 
 @app.post("/api/tools/create-contract-link", tags=["Server Tools"])
 @app.post("/api/tools/request-contract", tags=["Server Tools"])
-async def create_voice_contract_tool(request: Request):
+async def create_voice_contract_tool(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     payload = await parse_request_payload(request)
     context = build_verification_request_context(payload)
     metadata = first_present(payload, "metadata") or {}
@@ -5399,6 +5557,7 @@ async def upload_document_file(token: str, request: Request):
         uploaded = form.get("file")
         if uploaded is None or not hasattr(uploaded, "read"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="file is required")
+        notice_accepted = str(form.get("acknowledged") or "").strip().lower() in {"1", "true", "yes", "on"}
         content = await uploaded.read()
         result = store_document(
             supabase_admin,
@@ -5406,6 +5565,7 @@ async def upload_document_file(token: str, request: Request):
             filename=getattr(uploaded, "filename", "document"),
             content_type=getattr(uploaded, "content_type", None),
             content=content,
+            notice_accepted=notice_accepted,
         )
         if not result.get("success"):
             detail = {"message": result.get("message") or "Upload failed", "status": result.get("status")}
@@ -5431,7 +5591,7 @@ async def complete_verification_page(token: str):
 
 
 @app.post("/api/tools/send-verification-link", tags=["Server Tools"])
-async def send_verification_link_route(request: Request):
+async def send_verification_link_route(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     return await send_verification_link_tool(request)
 
 
@@ -5439,7 +5599,7 @@ async def send_verification_link_route(request: Request):
 @app.post("/api/tools/request_authentication", tags=["Server Tools"])
 @app.post("/api/tools/auth-request", tags=["Server Tools"])
 @app.post("/api/tools/auth_request", tags=["Server Tools"])
-async def request_authentication_route(request: Request):
+async def request_authentication_route(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     return await send_verification_link_tool(request)
 
 
@@ -5447,7 +5607,7 @@ async def request_authentication_route(request: Request):
 @app.post("/api/tools/request-docs", tags=["Server Tools"])
 @app.post("/api/tools/document_request", tags=["Server Tools"])
 @app.post("/api/tools/document-request", tags=["Server Tools"])
-async def request_document_upload_route(request: Request):
+async def request_document_upload_route(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     return await request_document_upload_tool(request)
 
 
@@ -5455,12 +5615,12 @@ async def request_document_upload_route(request: Request):
 @app.post("/api/tools/get-docs", tags=["Server Tools"])
 @app.post("/api/tools/document_verify", tags=["Server Tools"])
 @app.post("/api/tools/document-verify", tags=["Server Tools"])
-async def verify_document_upload_route(request: Request):
+async def verify_document_upload_route(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     return await check_document_upload_status_tool(request)
 
 
 @app.post("/api/tools/check-verification-status", tags=["Server Tools"])
-async def check_verification_status_route(request: Request):
+async def check_verification_status_route(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     return await check_verification_status_tool(request)
 
 
@@ -5470,22 +5630,67 @@ async def check_verification_status_route(request: Request):
 @app.post("/api/tools/verify_authentication", tags=["Server Tools"])
 @app.post("/api/tools/auth-verify", tags=["Server Tools"])
 @app.post("/api/tools/auth_verify", tags=["Server Tools"])
-async def check_authentication_route(request: Request):
+async def check_authentication_route(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     return await check_verification_status_tool(request)
 
+def scenario_belongs_to_user(scenario: dict, user_id: str) -> bool:
+    owner = scenario.get("user_id") or scenario.get("created_by")
+    return bool(owner) and str(owner) == str(user_id)
+
+
+def execution_belongs_to_user(execution: dict, user_id: str) -> bool:
+    if str(execution.get("user_id") or "") == str(user_id):
+        return True
+    flow_context = execution.get("flow_context") or {}
+    if isinstance(flow_context, str):
+        try:
+            flow_context = json.loads(flow_context)
+        except Exception:
+            flow_context = {}
+    if not isinstance(flow_context, dict):
+        return False
+    context_owner = flow_context.get("user_id") or (flow_context.get("business") or {}).get("user_id")
+    return bool(context_owner) and str(context_owner) == str(user_id)
+
+
+def build_authenticated_scenario_event_payload(payload: Optional[dict], current_user_id: str) -> dict:
+    business = load_business_by_user_id(current_user_id)
+    event_payload = dict(payload or {})
+    event_payload["user_id"] = current_user_id
+    if business and business.get("id") is not None:
+        event_payload["business_id"] = business.get("id")
+        event_payload["business"] = business
+    return event_payload
+
+
 @app.post("/api/scenarios/trigger", tags=["Scenarios"])
-async def trigger_scenario(request: ScenarioTriggerRequest):
-    return emit_scenario_trigger(request.trigger_key, request.payload, request.created_at)
+async def trigger_scenario(request: ScenarioTriggerRequest, current_user: dict = Depends(get_current_user)):
+    return emit_scenario_trigger(
+        request.trigger_key,
+        build_authenticated_scenario_event_payload(request.payload, str(current_user.id)),
+        request.created_at,
+    )
 
 @app.post("/api/trigger-scenario", tags=["Scenarios"])
-async def trigger_scenario_legacy_alias(request: ScenarioTriggerRequest):
-    return emit_scenario_trigger(request.trigger_key, request.payload, request.created_at)
+async def trigger_scenario_legacy_alias(request: ScenarioTriggerRequest, current_user: dict = Depends(get_current_user)):
+    return emit_scenario_trigger(
+        request.trigger_key,
+        build_authenticated_scenario_event_payload(request.payload, str(current_user.id)),
+        request.created_at,
+    )
 
 @app.post("/api/scenarios/trigger/{scenario_id}", tags=["Scenarios"])
-async def trigger_specific_scenario(scenario_id: str, payload: dict):
+async def trigger_specific_scenario(scenario_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
     if not scenario_engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
-    result = await scenario_engine.trigger_scenario(scenario_id, payload)
+    scenario_response = scenario_engine.supabase.table("scenarios").select("id,user_id,created_by").eq("id", scenario_id).limit(1).execute()
+    scenario = (scenario_response.data or [None])[0]
+    if not scenario or not scenario_belongs_to_user(scenario, str(current_user.id)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
+    result = await scenario_engine.trigger_scenario(
+        scenario_id,
+        build_authenticated_scenario_event_payload(payload, str(current_user.id)),
+    )
     if not result.get("ok"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result.get("error") or "Scenario not found")
     return result
@@ -5555,7 +5760,7 @@ async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_c
     return {"ok": True, "execution_id": execution_id, "result": result}
 
 @app.post("/api/scenarios/resume", tags=["Scenarios"])
-async def resume_scenario_execution(payload: dict):
+async def resume_scenario_execution(payload: dict, _internal: None = Depends(require_internal_tool_authorization)):
     if not scenario_engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
     execution_id = first_present(payload, "execution_id", "flow_execution_id", "id")
@@ -5614,22 +5819,23 @@ async def resume_scenario_execution(payload: dict):
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail)
 
 @app.get("/api/scenarios/executions", tags=["Scenarios"])
-async def list_scenario_executions(limit: int = 20):
+async def list_scenario_executions(limit: int = 20, current_user: dict = Depends(get_current_user)):
     if not scenario_engine:
         return []
-    return await scenario_engine.list_executions(max(1, min(limit, 100)))
+    executions = await scenario_engine.list_executions(max(1, min(limit, 100)))
+    return [execution for execution in executions if execution_belongs_to_user(execution, str(current_user.id))]
 
 @app.get("/api/scenarios/executions/{execution_id}", tags=["Scenarios"])
-async def get_scenario_execution(execution_id: str):
+async def get_scenario_execution(execution_id: str, current_user: dict = Depends(get_current_user)):
     if not scenario_engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
     execution = await scenario_engine.get_execution(execution_id)
-    if not execution:
+    if not execution or not execution_belongs_to_user(execution, str(current_user.id)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Execution not found")
     return execution
 
 @app.post("/api/scenarios/reload", tags=["Scenarios"])
-async def reload_scenarios():
+async def reload_scenarios(current_user: dict = Depends(get_current_user)):
     if not scenario_engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
     scenarios = await scenario_engine.load_scenarios()
@@ -5637,6 +5843,7 @@ async def reload_scenarios():
 
 @app.post("/twilio/inbound", tags=["Twilio"])
 async def twilio_inbound_webhook(request: Request):
+    await verify_twilio_webhook_request(request, twilio_voice_webhook_url)
     payload = await parse_request_payload(request)
     from_number = normalize_phone_number(first_present(payload, "From", "from", "from_number", "Caller", "caller"))
     to_number = normalize_phone_number(first_present(payload, "To", "to", "to_number", "Called", "called"))
@@ -5666,6 +5873,10 @@ async def twilio_inbound_webhook(request: Request):
     receptionist = find_inbound_receptionist_for_business(
         business.get("id") if business else None,
         context.get("user_id") or (business or {}).get("user_id"),
+    )
+    required_opening = build_inbound_ai_disclosure(
+        business.get("name") if business else None,
+        get_receptionist_display_name(receptionist),
     )
     maybe_auto_verify_business_forwarding(business, called_number=to_number)
 
@@ -5702,6 +5913,8 @@ async def twilio_inbound_webhook(request: Request):
                 "elevenlabs_voice_id": receptionist.get("elevenlabs_voice_id") if receptionist else None,
                 "twilio_to_number": to_number,
                 "twilio_call_sid": first_present(payload, "CallSid"),
+                "required_opening_disclosure": required_opening,
+                "recording_enabled": True,
             }
         },
     }
@@ -5733,11 +5946,12 @@ async def twilio_inbound_webhook(request: Request):
         for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
         if value is not None
     }
+    register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
+        "agent": {"first_message": required_opening},
+    }
     if receptionist and receptionist.get("elevenlabs_voice_id"):
-        register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
-            "tts": {
-                "voice_id": receptionist.get("elevenlabs_voice_id"),
-            },
+        register_payload["conversation_initiation_client_data"]["conversation_config_override"]["tts"] = {
+            "voice_id": receptionist.get("elevenlabs_voice_id"),
         }
 
     logging.info(
@@ -5764,7 +5978,7 @@ async def twilio_inbound_webhook(request: Request):
     return Response(content=response.text, media_type="application/xml")
 
 @app.post("/api/call/route", tags=["Server Tools"])
-async def route_call_compat(request: Request):
+async def route_call_compat(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     payload = await parse_request_payload(request)
     call_payload = build_call_route_payload(payload, request)
     context = resolve_business_context(call_payload)
@@ -5852,12 +6066,12 @@ async def route_call_compat(request: Request):
     return response_payload
 
 @app.post("/api/tools/report-intent-checkpoint", tags=["Server Tools"])
-async def report_intent_checkpoint(request: IntentCheckpointRequest):
+async def report_intent_checkpoint(request: IntentCheckpointRequest, _internal: None = Depends(require_internal_tool_authorization)):
     return emit_intent_checkpoint(request)
 
 
 @app.post("/api/tools/set-agent-data", tags=["Server Tools"])
-async def set_agent_data(request: Request):
+async def set_agent_data(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     payload = await parse_request_payload(request)
     updates_payload = extract_agent_data_updates(payload)
     flow_execution_id = first_present(
@@ -5986,7 +6200,11 @@ async def set_agent_data(request: Request):
     return {"ok": True, "call_log": saved}
 
 @app.api_route("/api/tools/{tool_name}", methods=["GET", "POST"], tags=["Server Tools"])
-async def legacy_server_tool(tool_name: str, request: Request):
+async def legacy_server_tool(
+    tool_name: str,
+    request: Request,
+    _internal: None = Depends(require_internal_tool_authorization),
+):
     payload = await parse_request_payload(request)
     context = resolve_business_context(payload)
     business = context.get("business")
@@ -6709,9 +6927,15 @@ async def elevenlabs_post_call_webhook(
     authorization: Optional[str] = Header(default=None),
 ):
     raw_body = await request.body()
-    if elevenlabs_webhook_secret:
-        hmac_signature = request.headers.get("elevenlabs-signature")
-        if hmac_signature:
+    if not elevenlabs_webhook_secret:
+        logging.error("ELEVENLABS_WEBHOOK_SECRET is not configured; refusing ElevenLabs webhook.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ElevenLabs webhook verification is not configured.",
+        )
+
+    hmac_signature = request.headers.get("elevenlabs-signature")
+    if hmac_signature:
             if ElevenLabs is None:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -6727,18 +6951,13 @@ async def elevenlabs_post_call_webhook(
             except Exception as exc:
                 logging.warning("Invalid ElevenLabs webhook HMAC signature: %s", exc)
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature") from exc
-        else:
-            bearer_secret = None
-            if authorization and authorization.lower().startswith("bearer "):
-                bearer_secret = authorization.split(" ", 1)[1].strip()
-            presented_secret = x_webhook_secret or bearer_secret
-            if presented_secret != elevenlabs_webhook_secret:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook secret")
-            try:
-                payload = json.loads(raw_body.decode("utf-8"))
-            except Exception as exc:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
     else:
+        bearer_secret = None
+        if authorization and authorization.lower().startswith("bearer "):
+            bearer_secret = authorization.split(" ", 1)[1].strip()
+        presented_secret = x_webhook_secret or bearer_secret
+        if not hmac.compare_digest(presented_secret or "", elevenlabs_webhook_secret):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook secret")
         try:
             payload = json.loads(raw_body.decode("utf-8"))
         except Exception as exc:
@@ -7022,37 +7241,49 @@ async def get_sonar_system_summary(current_user: dict = Depends(get_current_user
         return {"ok": 0, "warnings": 0, "errors": 0, "activeAgents": 0, "totalAgents": 0}
 
 @app.get("/api/events/live-pulse", tags=["Sonar Controller Compat"])
-async def get_live_pulse(limit: int = 30):
-    return LIVE_PULSE_EVENTS[:max(1, min(limit, 50))]
+async def get_live_pulse(limit: int = 30, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    return [
+        event for event in LIVE_PULSE_EVENTS
+        if is_event_visible_to_user(event, user_id)
+    ][:max(1, min(limit, 50))]
 
 @app.get("/api/logs", tags=["Sonar Controller Compat"])
-async def get_system_logs(limit: int = 50):
-    return SYSTEM_LOG_EVENTS[:max(1, min(limit, 100))]
+async def get_system_logs(limit: int = 50, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    return [
+        event for event in SYSTEM_LOG_EVENTS
+        if str(event.get("user_id") or "") == user_id
+    ][:max(1, min(limit, 100))]
 
 @app.get("/api/control-state", tags=["Sonar Controller Compat"])
-async def get_control_state():
-    return CONTROL_STATE
+async def get_control_state(current_user: dict = Depends(get_current_user)):
+    return get_tenant_control_state(str(current_user.id))
 
 @app.get("/api/session", tags=["Sonar Controller Compat"])
-async def get_session_state():
-    return SESSION_STATE
+async def get_session_state(current_user: dict = Depends(get_current_user)):
+    return get_tenant_session_state(str(current_user.id))
 
 @app.get("/api/pipeline", tags=["Sonar Controller Compat"])
-async def get_pipeline_state():
+async def get_pipeline_state(current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        return {"stages": [], "totalRelics": 0, "qualifiedLeads": 0, "activeOutreach": 0}
+    business_id = business.get("id")
     try:
-        people = supabase.table('people').select('id').execute().data or []
+        people = supabase.table('people').select('id').eq('business_id', business_id).execute().data or []
     except Exception:
         people = []
     try:
-        appointments = supabase.table('appointments').select('id').execute().data or []
+        appointments = supabase.table('appointments').select('id').eq('business_id', business_id).execute().data or []
     except Exception:
         appointments = []
     try:
-        payments = supabase.table('payments').select('id').execute().data or []
+        payments = supabase.table('payments').select('id').eq('business_id', business_id).execute().data or []
     except Exception:
         payments = []
     try:
-        call_logs = supabase.table('call_logs').select('id').execute().data or []
+        call_logs = supabase.table('call_logs').select('id').eq('user_id', str(current_user.id)).execute().data or []
     except Exception:
         call_logs = []
 
@@ -7069,60 +7300,76 @@ async def get_pipeline_state():
     }
 
 @app.get("/api/cron", tags=["Sonar Controller Compat"])
-async def get_cron_jobs():
-    return CRON_JOBS
+async def get_cron_jobs(current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    return [job for job in CRON_JOBS if str(job.get("user_id") or "") == user_id]
 
 @app.post("/api/cron", tags=["Sonar Controller Compat"])
-async def create_cron_job(job: dict):
+async def create_cron_job(job: dict, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
     cron_job = {
         "id": f"cron-{len(CRON_JOBS) + 1}",
         **job,
+        "user_id": user_id,
     }
     CRON_JOBS.append(cron_job)
     push_live_event("Cron job created.", actor="system", severity="info", event_type="cron_created", payload=cron_job)
     return cron_job
 
 @app.delete("/api/cron/{job_id}", tags=["Sonar Controller Compat"])
-async def delete_cron_job(job_id: str):
+async def delete_cron_job(job_id: str, current_user: dict = Depends(get_current_user)):
     global CRON_JOBS
-    CRON_JOBS = [job for job in CRON_JOBS if job.get("id") != job_id]
-    push_live_event("Cron job deleted.", actor="system", severity="info", event_type="cron_deleted", payload={"id": job_id})
+    user_id = str(current_user.id)
+    CRON_JOBS = [
+        job for job in CRON_JOBS
+        if job.get("id") != job_id or str(job.get("user_id") or "") != user_id
+    ]
+    push_live_event("Cron job deleted.", actor="system", severity="info", event_type="cron_deleted", payload={"id": job_id, "user_id": user_id})
     return {"ok": True}
 
 @app.get("/api/reactions", tags=["Sonar Controller Compat"])
-async def get_reactions():
+async def get_reactions(current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
     try:
-        return supabase.table('reactions').select('*').execute().data or []
+        return supabase.table('reactions').select('*').eq('user_id', user_id).execute().data or []
     except Exception:
-        return REACTIONS_CACHE
+        return [item for item in REACTIONS_CACHE if str(item.get("user_id") or "") == user_id]
 
 @app.post("/api/reactions", tags=["Sonar Controller Compat"])
-async def add_reaction(data: dict):
+async def add_reaction(data: dict, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    reaction_data = {**data, "user_id": user_id}
     try:
-        response = supabase.table('reactions').insert(data).execute()
-        created = response.data[0] if response.data else data
+        response = supabase.table('reactions').insert(reaction_data).execute()
+        created = response.data[0] if response.data else reaction_data
     except Exception:
-        created = {"id": f"reaction-{len(REACTIONS_CACHE) + 1}", **data}
+        created = {"id": f"reaction-{len(REACTIONS_CACHE) + 1}", **reaction_data}
         REACTIONS_CACHE.append(created)
     push_live_event("Reaction recorded.", actor="system", severity="info", event_type="reaction_added", payload=created)
     return created
 
 @app.get("/api/openrouter/models", tags=["Sonar Controller Compat"])
-async def get_openrouter_models():
+async def get_openrouter_models(current_user: dict = Depends(get_current_user)):
     return []
 
 @app.get("/api/pending-restarts", tags=["Sonar Controller Compat"])
-async def get_pending_restarts():
-    return PENDING_RESTARTS
+async def get_pending_restarts(current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    return [item for item in PENDING_RESTARTS if str(item.get("user_id") or "") == user_id]
 
 @app.delete("/api/pending-restarts/{restart_id}", tags=["Sonar Controller Compat"])
-async def clear_pending_restart(restart_id: str):
+async def clear_pending_restart(restart_id: str, current_user: dict = Depends(get_current_user)):
     global PENDING_RESTARTS
-    PENDING_RESTARTS = [item for item in PENDING_RESTARTS if item.get("id") != restart_id]
+    user_id = str(current_user.id)
+    PENDING_RESTARTS = [
+        item for item in PENDING_RESTARTS
+        if item.get("id") != restart_id or str(item.get("user_id") or "") != user_id
+    ]
     return {"ok": True}
 
 @app.post("/api/agents/{agent_id}/call-types", tags=["Sonar Controller Compat"])
-async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest):
+async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest, current_user: dict = Depends(get_current_user)):
+    current_user_id = str(current_user.id)
     payload_dict = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
     next_direction = normalize_receptionist_direction(
         payload_dict.get("direction")
@@ -7130,8 +7377,17 @@ async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest)
         or payload_dict.get("calls")
         or "all"
     )
-    existing_response = supabase.table('hired_receptionists').select('id,user_id,business_id,status,is_active,direction').eq('id', agent_id).limit(1).execute()
-    existing_agent = (existing_response.data or [{}])[0]
+    existing_response = (
+        supabase.table('hired_receptionists')
+        .select('id,user_id,business_id,status,is_active,direction')
+        .eq('id', agent_id)
+        .eq('user_id', current_user_id)
+        .limit(1)
+        .execute()
+    )
+    existing_agent = (existing_response.data or [None])[0]
+    if not existing_agent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
     next_status = derive_receptionist_status(
         existing_agent.get('status'),
         preserve_offline=False,
@@ -7140,28 +7396,41 @@ async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest)
     response = supabase.table('hired_receptionists').update({
         'direction': next_direction,
         'status': next_status,
-    }).eq('id', agent_id).execute()
+    }).eq('id', agent_id).eq('user_id', current_user_id).execute()
     clear_conflicting_receptionist_directions(agent_id, existing_agent, next_direction)
-    push_live_event("Agent call handling updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "direction": next_direction})
+    push_live_event("Agent call handling updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "direction": next_direction, "user_id": current_user_id})
     return response.data[0] if response.data else {"id": agent_id, "direction": next_direction, "status": next_status}
 
 @app.post("/api/agents/{agent_id}/model", tags=["Sonar Controller Compat"])
-async def update_agent_model(agent_id: str, payload: AgentModelRequest):
+async def update_agent_model(agent_id: str, payload: AgentModelRequest, current_user: dict = Depends(get_current_user)):
+    current_user_id = str(current_user.id)
     try:
-        response = supabase.table('hired_receptionists').update({'model': payload.model}).eq('id', agent_id).execute()
-        updated = response.data[0] if response.data else {"id": agent_id, "model": payload.model}
+        response = (
+            supabase.table('hired_receptionists')
+            .update({'model': payload.model})
+            .eq('id', agent_id)
+            .eq('user_id', current_user_id)
+            .execute()
+        )
+        if not response.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+        updated = response.data[0]
+    except HTTPException:
+        raise
     except Exception:
-        updated = {"id": agent_id, "model": payload.model}
-    push_live_event("Agent model updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "model": payload.model})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to update agent model")
+    push_live_event("Agent model updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "model": payload.model, "user_id": current_user_id})
     return updated
 
 @app.patch("/api/agents/{agent_id}", tags=["Sonar Controller Compat"])
-async def patch_agent(agent_id: str, payload: dict):
+async def patch_agent(agent_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
+    current_user_id = str(current_user.id)
     existing_response = (
         supabase
         .table('hired_receptionists')
         .select('id,user_id,business_id,is_active,status,direction')
         .eq('id', agent_id)
+        .eq('user_id', current_user_id)
         .limit(1)
         .execute()
     )
@@ -7169,8 +7438,10 @@ async def patch_agent(agent_id: str, payload: dict):
     if not existing_agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    update_payload = dict(payload)
-    update_payload.pop("phone_number", None)
+    allowed_fields = {"is_active", "status", "direction"}
+    update_payload = {key: value for key, value in payload.items() if key in allowed_fields}
+    if not update_payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No permitted agent fields supplied")
     if 'direction' in update_payload:
         update_payload['direction'] = normalize_receptionist_direction(update_payload.get('direction'))
         update_payload['status'] = derive_receptionist_status(
@@ -7189,10 +7460,16 @@ async def patch_agent(agent_id: str, payload: dict):
             direction=update_payload.get('direction', existing_agent.get('direction')),
         )
 
-    response = supabase.table('hired_receptionists').update(update_payload).eq('id', agent_id).execute()
+    response = (
+        supabase.table('hired_receptionists')
+        .update(update_payload)
+        .eq('id', agent_id)
+        .eq('user_id', current_user_id)
+        .execute()
+    )
     if 'direction' in update_payload:
         clear_conflicting_receptionist_directions(agent_id, existing_agent, update_payload.get('direction'))
-    push_live_event("Agent updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, **update_payload})
+    push_live_event("Agent updated.", actor="system", severity="info", event_type="agent_updated", payload={"agent_id": agent_id, "user_id": current_user_id, **update_payload})
     return response.data[0] if response.data else {"id": agent_id, **update_payload}
 
 @app.delete("/api/agents/{agent_id}", tags=["Sonar Controller Compat"])
@@ -7256,39 +7533,49 @@ async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_u
     return {"ok": True, "id": agent_id}
 
 @app.post("/api/control/runtime", tags=["Sonar Controller Compat"])
-async def set_runtime_mode(payload: RuntimeModeRequest):
-    CONTROL_STATE["runtime_mode"] = payload.mode
-    SESSION_STATE["status"] = payload.mode
-    push_live_event(f"Runtime {payload.mode}.", actor="system", severity="info", event_type=f"runtime_{payload.mode}", payload={"mode": payload.mode})
-    return CONTROL_STATE
+async def set_runtime_mode(payload: RuntimeModeRequest, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    control_state = get_tenant_control_state(user_id)
+    session_state = get_tenant_session_state(user_id)
+    control_state["runtime_mode"] = payload.mode
+    session_state["status"] = payload.mode
+    push_live_event(f"Runtime {payload.mode}.", actor="system", severity="info", event_type=f"runtime_{payload.mode}", payload={"mode": payload.mode, "user_id": user_id})
+    return control_state
 
 @app.post("/api/control/stage", tags=["Sonar Controller Compat"])
-async def set_control_stage(payload: StageRequest):
-    CONTROL_STATE["stage"] = payload.stage
-    push_live_event(f"Stage set to {payload.stage}.", actor="system", severity="info", event_type="stage_changed", payload={"stage": payload.stage})
-    return CONTROL_STATE
+async def set_control_stage(payload: StageRequest, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    control_state = get_tenant_control_state(user_id)
+    control_state["stage"] = payload.stage
+    push_live_event(f"Stage set to {payload.stage}.", actor="system", severity="info", event_type="stage_changed", payload={"stage": payload.stage, "user_id": user_id})
+    return control_state
 
 @app.post("/api/control/zone", tags=["Sonar Controller Compat"])
-async def set_control_zone(payload: ZoneRequest):
-    CONTROL_STATE["zone"] = payload.zone
-    push_live_event(f"Zone set to {payload.zone}.", actor="system", severity="info", event_type="zone_changed", payload={"zone": payload.zone})
-    return CONTROL_STATE
+async def set_control_zone(payload: ZoneRequest, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    control_state = get_tenant_control_state(user_id)
+    control_state["zone"] = payload.zone
+    push_live_event(f"Zone set to {payload.zone}.", actor="system", severity="info", event_type="zone_changed", payload={"zone": payload.zone, "user_id": user_id})
+    return control_state
 
 @app.post("/api/control/ping-max", tags=["Sonar Controller Compat"])
-async def ping_max():
-    SESSION_STATE["last_ping_at"] = datetime.now(timezone.utc).isoformat()
-    push_live_event("Ping sent.", actor="keagan", severity="info", event_type="ping_sent")
+async def ping_max(current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    get_tenant_session_state(user_id)["last_ping_at"] = datetime.now(timezone.utc).isoformat()
+    push_live_event("Ping sent.", actor="system", severity="info", event_type="ping_sent", payload={"user_id": user_id})
     return {"ok": True}
 
 @app.post("/api/webhook/people", tags=["Sonar Controller Compat"])
-async def people_webhook(payload: dict):
+async def people_webhook(payload: dict, current_user: dict = Depends(get_current_user)):
     event_type = payload.get("type", "people_update")
+    record = payload.get("record") if isinstance(payload.get("record"), dict) else {}
+    user_id = str(current_user.id)
     push_live_event(
         f"People event: {event_type}.",
         actor="system",
         severity="info",
         event_type=f"lead_{str(event_type).lower()}",
-        payload=payload,
+        payload={"user_id": user_id, "record_id": record.get("id")},
     )
     return {"ok": True}
 
@@ -7310,6 +7597,11 @@ async def update_sonar_business_profile(payload: dict, current_user: dict = Depe
         "about_us", "policies", "faq", "business_hours", "business_timezone", "industry",
     }
     updates = {key: value for key, value in payload.items() if key in allowed_fields}
+    if "industry" in updates and is_restricted_launch_industry(updates.get("industry")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This industry is not available for Nodemere's general-business launch. Contact support before using regulated or restricted activities.",
+        )
     if "business_hours" in updates and isinstance(updates["business_hours"], (dict, list)):
         updates["business_hours"] = json.dumps(updates["business_hours"])
     if "industry" in updates and isinstance(updates["industry"], (dict, list)):
@@ -8303,7 +8595,10 @@ async def get_sonar_payment_test_mode():
 
 
 @app.post("/api/sonar/payments/test-mode", tags=["Sonar Payments"])
-async def set_sonar_payment_test_mode(request: PaymentTestModeRequest):
+async def set_sonar_payment_test_mode(
+    request: PaymentTestModeRequest,
+    _internal: None = Depends(require_internal_tool_authorization),
+):
     set_payment_test_mode(request.enabled)
     return {
         "testMode": PAYMENT_TEST_MODE,
@@ -8430,6 +8725,9 @@ async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
         description,
     )
     stripe_request_options = _get_connected_stripe_request_options(user_id)
+    business = load_business_by_user_id(user_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
     customer, _person = create_or_update_stripe_customer_for_user(
         user_id=user_id,
         customer_id=request.customer_id,
@@ -8470,6 +8768,8 @@ async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
         stripe_payment_intent_id=(stripe_payment_intent.id if stripe_payment_intent else None),
         receipt_url=None,
         error_message=None,
+        user_id=user_id,
+        business_id=business.get("id"),
     )
     saved_payment = insert_payment_record(payment_row)
 
@@ -8518,6 +8818,9 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
         description,
     )
     stripe_request_options = _get_connected_stripe_request_options(user_id)
+    business = load_business_by_user_id(user_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
     customer, _person = create_or_update_stripe_customer_for_user(
         user_id=user_id,
         customer_id=request.customer_id,
@@ -8560,6 +8863,8 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
             description=description,
             status="pending",
             stripe_session_id=checkout_session.id,
+            user_id=user_id,
+            business_id=business.get("id"),
         )
         saved_payment = insert_payment_record(payment_row)
         response_payload = {
@@ -8575,6 +8880,8 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
             "payment_id": saved_payment.get("id"),
         }
         emit_payment_trigger("payment_link_sent", {
+            "user_id": user_id,
+            "business_id": business.get("id"),
             "payment": saved_payment,
             "payment_id": saved_payment.get("id"),
             "stripe_session_id": checkout_session.id,
@@ -8692,11 +8999,11 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
 
     payment_record = None
     if request.payment_id:
-        existing = supabase.table("payments").select("*").eq("stripe_payment_intent_id", request.payment_id).limit(1).execute()
+        existing = supabase.table("payments").select("*").eq("stripe_payment_intent_id", request.payment_id).eq("user_id", user_id).limit(1).execute()
         if existing.data:
             payment_record = existing.data[0]
         else:
-            existing = supabase.table("payments").select("*").eq("id", request.payment_id).limit(1).execute()
+            existing = supabase.table("payments").select("*").eq("id", request.payment_id).eq("user_id", user_id).limit(1).execute()
             if existing.data:
                 payment_record = existing.data[0]
 
@@ -8740,6 +9047,7 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
             "refunded_amount": refunded_amount,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         },
+        user_id=user_id,
     ) or payment_record or {}
 
     result = {
@@ -8921,15 +9229,16 @@ scenario_engine = ScenarioEngine(
 )
 
 @app.post("/api/sonar/update-payment", tags=["Sonar Payments"])
-async def update_payment(request: PaymentUpdateRequest):
+async def update_payment(request: PaymentUpdateRequest, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
     ensure_no_unresolved_templates(request.payment_id, request.description, request.notes)
     payment_record = None
     if request.payment_id:
-        existing = supabase.table("payments").select("*").eq("stripe_payment_intent_id", request.payment_id).limit(1).execute()
+        existing = supabase.table("payments").select("*").eq("stripe_payment_intent_id", request.payment_id).eq("user_id", user_id).limit(1).execute()
         if existing.data:
             payment_record = existing.data[0]
         else:
-            existing = supabase.table("payments").select("*").eq("id", request.payment_id).limit(1).execute()
+            existing = supabase.table("payments").select("*").eq("id", request.payment_id).eq("user_id", user_id).limit(1).execute()
             if existing.data:
                 payment_record = existing.data[0]
 
@@ -8946,10 +9255,11 @@ async def update_payment(request: PaymentUpdateRequest):
 
     match_field = "stripe_payment_intent_id" if payment_record.get("stripe_payment_intent_id") == request.payment_id else "id"
     match_value = request.payment_id if match_field == "stripe_payment_intent_id" else payment_record.get("id")
-    updated_payment = update_payment_record(match_field, match_value, update_data) or payment_record
+    updated_payment = update_payment_record(match_field, match_value, update_data, user_id=user_id) or payment_record
 
     if request.status in {"succeeded", "paid"}:
         emit_payment_trigger("payment_received", {
+            "user_id": user_id,
             "payment": updated_payment,
             "payment_id": request.payment_id,
             "amount": updated_payment.get("amount"),
@@ -8958,6 +9268,7 @@ async def update_payment(request: PaymentUpdateRequest):
         })
     elif request.status in {"refunded", "partial_refund"}:
         emit_payment_trigger("refund_issued", {
+            "user_id": user_id,
             "payment": updated_payment,
             "payment_id": request.payment_id,
             "amount": updated_payment.get("refunded_amount") or updated_payment.get("amount"),
@@ -8966,6 +9277,7 @@ async def update_payment(request: PaymentUpdateRequest):
         })
     elif request.status in {"failed", "error", "declined"}:
         emit_payment_trigger("payment_failed", {
+            "user_id": user_id,
             "payment": updated_payment,
             "payment_id": request.payment_id,
             "error_message": updated_payment.get("error_message"),
@@ -8976,6 +9288,9 @@ async def update_payment(request: PaymentUpdateRequest):
 
 @app.post("/stripe-webhook", tags=["Billing"])
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+    if not stripe_webhook_secret:
+        logging.error("STRIPE_WEBHOOK_SECRET is not configured; refusing Stripe webhook.")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Stripe webhook authentication is not configured.")
     raw_body = await request.body()
     logging.info(
         "[Stripe Webhook] Incoming request signature_present=%s body_bytes=%s",
@@ -9440,8 +9755,13 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 
 
 @app.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Users"])
-async def create_user(auth_data: AuthSignUpRequest):
+async def create_user(auth_data: AuthSignUpRequest, request: Request):
     try:
+        if not auth_data.terms_accepted or auth_data.legal_version != NODEMERE_LEGAL_ACCEPTANCE_VERSION:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current Nodemere legal terms must be accepted to create an account.",
+            )
         auth_response = supabase.auth.sign_up({"email": auth_data.email, "password": auth_data.password})
         if not auth_response.user:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Supabase signup failed")
@@ -9454,6 +9774,16 @@ async def create_user(auth_data: AuthSignUpRequest):
             "full_name": user_metadata.get("full_name") or user_metadata.get("name"),
             "phone": user_metadata.get("phone"),
             "onboarded": False,
+            "terms_of_service": {
+                NODEMERE_LEGAL_ACCEPTANCE_KEY: {
+                    "accepted": True,
+                    "version": NODEMERE_LEGAL_ACCEPTANCE_VERSION,
+                    "accepted_at": datetime.now(timezone.utc).isoformat(),
+                    "source": "signup",
+                    "ip_address": get_client_ip(request),
+                    "certified_permitted_use": False,
+                }
+            },
         }
         db_response = supabase_admin.table('users').insert(profile_data).execute()
         
@@ -9502,6 +9832,57 @@ async def read_current_user(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         logging.error(f"Error in read_current_user for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@app.post("/users/me/legal-acceptance", tags=["Users"])
+async def accept_legal_terms(
+    acceptance: LegalAcceptanceRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
+    if (
+        acceptance.version != NODEMERE_LEGAL_ACCEPTANCE_VERSION
+        or acceptance.accepted_terms is not True
+        or acceptance.certified_permitted_use is not True
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The current legal terms and permitted-use certification are required.",
+        )
+
+    current_user_id = str(current_user.id)
+    try:
+        profile_response = (
+            supabase_admin.table("users")
+            .select("terms_of_service")
+            .eq("id", current_user_id)
+            .limit(1)
+            .execute()
+        )
+        profile = (profile_response.data or [{}])[0]
+        terms = profile.get("terms_of_service") or {}
+        if not isinstance(terms, dict):
+            terms = {}
+        terms[NODEMERE_LEGAL_ACCEPTANCE_KEY] = {
+            "accepted": True,
+            "version": NODEMERE_LEGAL_ACCEPTANCE_VERSION,
+            "accepted_at": datetime.now(timezone.utc).isoformat(),
+            "source": "legal_acceptance_gate",
+            "ip_address": get_client_ip(request),
+            "certified_permitted_use": True,
+        }
+        response = (
+            supabase_admin.table("users")
+            .update({"terms_of_service": terms})
+            .eq("id", current_user_id)
+            .execute()
+        )
+        return {"ok": True, "terms_of_service": response.data[0].get("terms_of_service") if response.data else terms}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Unable to record legal acceptance for user %s: %s", current_user_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to record legal acceptance.") from exc
 
 @app.get("/users/me/integrations", response_model=List[UserIntegrationResponse], tags=["Users"])
 async def list_user_integrations(current_user: dict = Depends(get_current_user)):
@@ -10129,18 +10510,57 @@ async def update_login_status(status_update: LoginStatusUpdate, current_user: di
 @app.post("/users/me/onboarding", status_code=status.HTTP_200_OK, tags=["Users"])
 async def complete_onboarding(
     onboarding_data: OnboardingRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ):
     current_user_id = str(current_user.id)
 
     try:
+        if is_restricted_launch_industry(onboarding_data.industry):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This industry is not available for Nodemere's general-business launch. Contact support before using regulated or restricted activities.",
+            )
+
+        acceptance = onboarding_data.legal_acceptance or {}
+        if (
+            acceptance.get("version") != NODEMERE_LEGAL_ACCEPTANCE_VERSION
+            or acceptance.get("accepted_terms") is not True
+            or acceptance.get("certified_permitted_use") is not True
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An authorized representative must accept the current legal terms and certify permitted use before setup can be completed.",
+            )
+
         normalized_business_hours = normalize_onboarding_schedule(onboarding_data.business_hours or {})
+        existing_terms_response = (
+            supabase_admin.table('users')
+            .select('terms_of_service')
+            .eq('id', current_user_id)
+            .limit(1)
+            .execute()
+        )
+        existing_terms = ((existing_terms_response.data or [{}])[0].get('terms_of_service') or {})
+        if not isinstance(existing_terms, dict):
+            existing_terms = {}
+        supplied_terms = onboarding_data.terms_of_service or {}
+        if not isinstance(supplied_terms, dict):
+            supplied_terms = {}
+        merged_terms = {**existing_terms, **supplied_terms}
+        merged_terms[NODEMERE_LEGAL_ACCEPTANCE_KEY] = {
+            "accepted": True,
+            "version": NODEMERE_LEGAL_ACCEPTANCE_VERSION,
+            "accepted_at": datetime.now(timezone.utc).isoformat(),
+            "source": "onboarding",
+            "ip_address": get_client_ip(request),
+            "certified_permitted_use": True,
+        }
         user_update = {
             "onboarded": True,
             "phone": onboarding_data.business_phone,
+            "terms_of_service": merged_terms,
         }
-        if onboarding_data.terms_of_service:
-            user_update["terms_of_service"] = onboarding_data.terms_of_service
         supabase.table('users').update(user_update).eq('id', current_user_id).execute()
 
         business_payload = {
@@ -10639,6 +11059,7 @@ async def start_business_forwarding_caller_id_verification(
 
 @app.post("/twilio/outgoing-caller-id/status", tags=["Twilio"])
 async def twilio_outgoing_caller_id_status(request: Request):
+    await verify_twilio_webhook_request(request, get_twilio_caller_id_status_callback_url())
     try:
         form = await request.form()
         payload = dict(form)

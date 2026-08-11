@@ -10,4 +10,5 @@ pydantic[email]
 openai
 requests
 elevenlabs
+twilio
 reportlab

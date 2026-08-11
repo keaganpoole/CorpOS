@@ -10,6 +10,7 @@ function DocumentUploadPage() {
   const [state, setState] = useState({ loading: true, status: null, message: '' });
   const [file, setFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
 
   const loadState = useCallback(async () => {
     try {
@@ -29,6 +30,7 @@ function DocumentUploadPage() {
     try {
       const body = new FormData();
       body.append('file', file);
+      body.append('acknowledged', 'true');
       const response = await fetch(`${API_BASE}/api/upload/${encodeURIComponent(token)}/files`, { method: 'POST', body });
       const data = await response.json();
       if (!response.ok) {
@@ -57,20 +59,27 @@ function DocumentUploadPage() {
         <div className={`document-upload-icon ${isComplete ? 'document-upload-icon-success' : 'document-upload-icon-neutral'}`}>
           {state.loading ? <LoaderCircle className="document-upload-spinner" size={28} /> : isComplete ? <CheckCircle2 size={30} /> : isError ? <CircleAlert size={30} /> : <FileUp size={30} />}
         </div>
-        <p className="document-upload-eyebrow">Secure document upload</p>
+        <p className="document-upload-eyebrow">Document upload</p>
         <h1>{state.loading ? 'Checking your link' : isComplete ? 'Document uploaded' : isReady ? 'Upload your document' : 'Upload unavailable'}</h1>
         <p className="document-upload-message">{state.loading ? 'Please wait while we validate this link.' : isComplete ? 'Your document was uploaded successfully. You can return to your call.' : isReady ? 'Choose a document to send securely to the business.' : state.message}</p>
         {isReady && <>
+          <div className="document-upload-notice">
+            Only upload the document requested by the business. This file will be processed by Nodemere for that business and may be viewed by its authorized staff. Do not upload payment-card details, health records, government IDs, or other sensitive information unless the business has given you a secure, approved process for it.
+          </div>
           <label className="document-upload-picker" htmlFor="document-file">Choose file</label>
           <input id="document-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx" onChange={(event) => setFile(event.target.files?.[0] || null)} />
           {file && <p className="document-upload-filename">{file.name}</p>}
-          <button className="document-upload-button" type="button" onClick={handleUpload} disabled={!file || submitting}>
+          <label className="document-upload-acknowledgment">
+            <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
+            <span>I understand this notice and confirm I am authorized to upload this file for the business that requested it.</span>
+          </label>
+          <button className="document-upload-button" type="button" onClick={handleUpload} disabled={!file || !acknowledged || submitting}>
             {submitting ? <LoaderCircle className="document-upload-spinner" size={18} /> : <FileUp size={18} />}
             {submitting ? 'Uploading...' : 'Upload document'}
           </button>
         </>}
         {isComplete && <div className="document-upload-confirmation"><CheckCircle2 size={17} /> Complete</div>}
-        {!state.loading && <p className="document-upload-footnote">This testing link expires after 10 minutes.</p>}
+        {!state.loading && <p className="document-upload-footnote">This link expires after 10 minutes. See the <a href="/privacy-policy">Privacy Policy</a> and <a href="/communications-notice">Communications Notice</a>.</p>}
       </section>
     </main>
   );

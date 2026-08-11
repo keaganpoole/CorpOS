@@ -45,6 +45,7 @@ import HeroConcept from '../components/HeroConcept';
 import CalendarShowcase, { RightFeatureList } from '../components/CalendarShowcase';
 import WorkWeekComparison from '../components/WorkWeekComparison';
 import JitterDebugOverlay from '../components/JitterDebugOverlay';
+import LegalFooter from '../components/LegalFooter';
 import { trackVisitor } from '../services/apiService';
 import useSectionScrollProgress from '../hooks/useSectionScrollProgress';
 
@@ -755,7 +756,7 @@ const HomePage = () => {
     if (shouldUpdateCookie) {
         const d = new Date();
         d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000));
-        document.cookie = `source=${newSource}; expires=${d.toUTCString()}; path=/`;
+        document.cookie = `source=${newSource}; expires=${d.toUTCString()}; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
     }
   }, [location]);
 
@@ -971,14 +972,7 @@ const HomePage = () => {
         </section>
 
       </main>
-      <footer className="bg-black text-gray-400 py-8 text-center">
-        <div className="container mx-auto px-4">
-          <p className="text-sm">&copy; 2025 Nodemere. All rights reserved.</p>
-          <p className="text-sm mt-2">
-            <Link to="/privacy-policy" className="text-gray-400 hover:text-white underline">Privacy Policy</Link>
-          </p>
-        </div>
-      </footer>
+      <LegalFooter />
       <JitterDebugOverlay />
     </div>
   );

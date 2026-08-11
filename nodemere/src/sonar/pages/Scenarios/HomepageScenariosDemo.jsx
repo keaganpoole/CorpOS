@@ -2919,7 +2919,7 @@ export default function ScenariosPage({
     await loadScenarios();
 
     try {
-      await fetch(`${API_BASE_URL}/api/scenarios/reload`, { method: 'POST' });
+      await authorizedApiFetch('/api/scenarios/reload', { method: 'POST' });
     } catch (reloadError) {
       console.warn('[Scenarios] Scenario saved, but backend reload failed:', reloadError?.message || reloadError);
     }

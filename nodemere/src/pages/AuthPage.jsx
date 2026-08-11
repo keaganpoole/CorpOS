@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import googleIcon from '../assets/google.png'; // Import the local Google icon
+import { LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const FRONTEND_PUBLIC_URL = import.meta.env.VITE_FRONTEND_PUBLIC_URL || window.location.origin;
@@ -27,6 +28,7 @@ const AuthPage = () => {
     const [resendTimer, setResendTimer] = useState(0); // New state for resend timer
     const [canResend, setCanResend] = useState(false); // New state to control resend button
     const [isConfirmationSent, setIsConfirmationSent] = useState(false); // New state to track if confirmation was sent
+    const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => setIsLoaded(true), 10);
@@ -93,6 +95,11 @@ const AuthPage = () => {
 
         try {
             if (isSignUp) {
+                if (!hasAcceptedLegal) {
+                    setError("Please accept the Nodemere legal terms to create an account.");
+                    setIsLoading(false);
+                    return;
+                }
                 if (formData.password !== formData.confirmPassword) {
                     setError("Passwords do not match.");
                     setIsLoading(false);
@@ -101,6 +108,8 @@ const AuthPage = () => {
                 await axios.post(`${API_BASE_URL}/users`, {
                     email: formData.email,
                     password: formData.password,
+                    terms_accepted: true,
+                    legal_version: LEGAL_ACCEPTANCE_VERSION,
                 });
                 setSuccessMessage('Please check your email inbox and spam folder for a confirmation link. ');
                 setFormData(prev => ({ ...prev, password: '', confirmPassword: '' })); // Keep email, clear passwords
@@ -123,9 +132,14 @@ const AuthPage = () => {
         setError('');
         setSuccessMessage('');
         setFormData({ email: '', password: '', confirmPassword: '' });
+        setHasAcceptedLegal(false);
     };
 
     const handleGoogleSignIn = async () => {
+        if (isSignUp && !hasAcceptedLegal) {
+            setError('Please accept the Nodemere legal terms before continuing with Google.');
+            return;
+        }
         setError('');
         setSuccessMessage('');
         setIsLoading(true);
@@ -199,7 +213,7 @@ const AuthPage = () => {
             <div className={`w-full max-w-sm mx-auto transition-all duration-700 ease-in-out ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 <div className="flex flex-col items-center text-center">
                     <div style={{ width: '90px', aspectRatio: '19 / 17' }} className="mb-4">
-                        <img src="https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges/max.jpg" alt="Sonar Logo" className="w-full h-full object-contain rounded-xl" />
+                        <img src="https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges/max.jpg" alt="Nodemere logo" className="w-full h-full object-contain rounded-xl" />
                     </div>
                     <h1 className="text-2xl font-bold text-white mb-10">{isSignUp ? 'Create an account' : 'Welcome back'}</h1>
                 </div>
@@ -225,6 +239,17 @@ const AuthPage = () => {
                         </div>
                     )}
 
+                    {isSignUp && <label className="flex items-start gap-3 px-1 text-left text-xs leading-5 text-gray-400">
+                        <input
+                            type="checkbox"
+                            checked={hasAcceptedLegal}
+                            onChange={(event) => setHasAcceptedLegal(event.target.checked)}
+                            className="mt-1 h-4 w-4 shrink-0 accent-white"
+                            disabled={isLoading}
+                        />
+                        <span>I am authorized to create this business account and agree to the <Link to="/terms" target="_blank" className="text-white underline underline-offset-2">Terms</Link>, <Link to="/privacy-policy" target="_blank" className="text-white underline underline-offset-2">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank" className="text-white underline underline-offset-2">Acceptable Use Policy</Link>, and <Link to="/communications-notice" target="_blank" className="text-white underline underline-offset-2">AI & Recording Notice</Link>.</span>
+                    </label>}
+
                     <button type="submit" className="w-full py-3 mt-6 text-sm font-semibold text-black bg-gradient-to-r from-[#f7f7f8] to-[#b5b6c4] rounded-full hover:opacity-90 transition-all duration-300 shadow-lg shadow-[#b5b6c4]/10 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isLoading}>
                         {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Log In')}
                     </button>
@@ -249,7 +274,7 @@ const AuthPage = () => {
                 </form>
 
                 <div className="mt-8 space-y-4">
-                    <button onClick={handleGoogleSignIn} className="w-full flex items-center justify-center px-4 py-3 bg-transparent border border-gray-700 rounded-full hover:bg-[#1c1c1c] transition-colors disabled:opacity-50" disabled={isLoading}>
+                    <button onClick={handleGoogleSignIn} className="w-full flex items-center justify-center px-4 py-3 bg-transparent border border-gray-700 rounded-full hover:bg-[#1c1c1c] transition-colors disabled:opacity-50" disabled={isLoading || !hasAcceptedLegal}>
                         <img src={googleIcon} alt="Google icon" className="w-5 h-5 mr-3" style={{ backgroundColor: 'transparent' }} />
                         <span className="font-semibold text-xs text-white">Continue with Google</span>
                     </button>

@@ -1215,7 +1215,7 @@ export default function VoiceCloneExperience() {
           ? continueFromProfile
           : stage === 5
             ? saveReceptionistProfile
-            : () => navigate('/sonar');
+            : () => navigate('/dashboard');
   const continueLabel = stage === 1
     ? (isSigned ? 'Continue to sample' : 'Sign and continue')
     : stage === 2

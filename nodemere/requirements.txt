@@ -19,3 +19,4 @@ asyncpg
 sqlalchemy[asyncio]
 jose
 elevenlabs
+twilio

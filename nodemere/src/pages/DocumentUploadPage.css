@@ -5,10 +5,13 @@
 .document-upload-eyebrow { margin-bottom: 10px; color: #a3abc0; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .document-upload-panel h1 { margin-bottom: 12px; font-size: clamp(26px, 7vw, 34px); letter-spacing: 0; }
 .document-upload-message { min-height: 48px; margin: 0 auto 26px; color: #aeb5c4; font-size: 15px; line-height: 1.6; }
+.document-upload-notice { margin: -8px 0 18px; padding: 12px; border: 1px solid rgba(113,126,255,.25); border-radius: 6px; color: #b8bfd0; background: rgba(113,126,255,.06); text-align: left; font-size: 12px; line-height: 1.55; }
 .document-upload-picker, .document-upload-button { min-height: 48px; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border-radius: 6px; font-size: 15px; font-weight: 700; cursor: pointer; }
 .document-upload-picker { border: 1px dashed #7180ff; color: #dce0ff; background: rgba(113,126,255,.1); }
 .document-upload-panel input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .document-upload-filename { overflow-wrap: anywhere; margin: 12px 0; color: #c6cbd7; font-size: 13px; }
+.document-upload-acknowledgment { display: flex; align-items: flex-start; gap: 9px; margin: 16px 0; color: #b8bfd0; text-align: left; font-size: 12px; line-height: 1.5; cursor: pointer; }
+.document-upload-acknowledgment input[type=checkbox] { position: static; width: 15px; height: 15px; margin: 2px 0 0; opacity: 1; accent-color: #7180ff; flex: none; }
 .document-upload-button { border: 0; background: #7180ff; color: #fff; transition: background 160ms ease, transform 160ms ease; }
 .document-upload-button:hover:not(:disabled) { background: #8290ff; transform: translateY(-1px); }
 .document-upload-button:disabled { opacity: .55; cursor: not-allowed; }

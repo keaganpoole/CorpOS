@@ -204,6 +204,8 @@ class UserBase(BaseModel):
 class AuthSignUpRequest(BaseModel):
     email: EmailStr
     password: str
+    terms_accepted: bool = False
+    legal_version: Optional[str] = None
 
 class UserCreate(UserBase):
     id: UUID

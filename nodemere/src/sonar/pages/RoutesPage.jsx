@@ -4,8 +4,8 @@ import {
   Phone, AudioLines, Brain, Database, ArrowRight,
   Wifi, WifiOff, Activity, Radio, Globe, Server,
 } from 'lucide-react';
+import { api } from '../lib/api';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 // ─── All known endpoints ────────────────────────────────────
 const ENDPOINTS = [
@@ -209,10 +209,8 @@ export default function RoutesPage() {
 
     const loadRecentRouteHits = async () => {
       try {
-        const response = await fetch(`${BASE_URL}/api/events/live-pulse?limit=50`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const data = await response.json();
+        const data = await api.getLivePulse(50);
+        if (!data) throw new Error('Unable to load route activity');
         if (cancelled) return;
 
         const routeHits = (Array.isArray(data) ? data : [])

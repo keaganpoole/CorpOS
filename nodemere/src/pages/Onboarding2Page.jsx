@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
+import { LEGAL_ACCEPTANCE_KEY, LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
 import {
   ArrowRight,
   Building2,
@@ -31,7 +32,7 @@ const steps = [
   {
     id: 'business',
     title: 'What should callers know you as?',
-    description: 'Start with the core business identity. We will use this across Sonar as the foundation for your receptionist experience.',
+    description: 'Start with the core business identity. We will use this across Nodemere as the foundation for your receptionist experience.',
   },
   {
     id: 'contact',
@@ -67,14 +68,13 @@ const steps = [
 
 const industries = [
   'Home Services',
-  'Medical',
-  'Dental',
-  'Legal',
   'Real Estate',
   'Automotive',
   'Beauty & Wellness',
   'Hospitality',
-  'Other',
+  'Professional Services',
+  'Retail',
+  'Other General Business',
 ];
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -971,6 +971,8 @@ const Onboarding2Page = () => {
   const [lateHoursTermsSaving, setLateHoursTermsSaving] = useState(false);
   const [localLateHoursTerms, setLocalLateHoursTerms] = useState(() => readStoredOutboundLateHoursTerms());
   const [scheduleColorblindMode, setScheduleColorblindMode] = useState(false);
+  const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
+  const [hasCertifiedPermittedUse, setHasCertifiedPermittedUse] = useState(false);
   const [editingService, setEditingService] = useState(null);
   const [form, setForm] = useState({
     businessName: '',
@@ -1051,8 +1053,9 @@ const Onboarding2Page = () => {
   const canContinue = useMemo(() => {
     if (step === 0) return form.businessName.trim() && form.industry.trim();
     if (step === 1) return isEmailComplete(form.email) && (form.email.trim() || form.phone.trim() || form.street.trim() || form.city.trim() || form.state.trim() || form.zip.trim());
+    if (step === steps.length - 1) return hasAcceptedLegal && hasCertifiedPermittedUse;
     return true;
-  }, [form, step]);
+  }, [form, hasAcceptedLegal, hasCertifiedPermittedUse, step]);
 
   const normalizedServices = useMemo(() => (
     form.services
@@ -1104,7 +1107,22 @@ const Onboarding2Page = () => {
     faq: form.faq.trim(),
     business_hours: cleanScheduleForStorage(form.hours),
     appointment_settings: {},
-    terms_of_service: termsOfServiceForOnboarding,
+    terms_of_service: {
+      ...termsOfServiceForOnboarding,
+      ...(hasAcceptedLegal && hasCertifiedPermittedUse ? {
+        [LEGAL_ACCEPTANCE_KEY]: {
+          accepted: true,
+          version: LEGAL_ACCEPTANCE_VERSION,
+          certified_permitted_use: true,
+          source: 'onboarding',
+        },
+      } : {}),
+    },
+    legal_acceptance: {
+      version: LEGAL_ACCEPTANCE_VERSION,
+      accepted_terms: hasAcceptedLegal,
+      certified_permitted_use: hasCertifiedPermittedUse,
+    },
     services: normalizedServices,
   });
 
@@ -1247,7 +1265,7 @@ const Onboarding2Page = () => {
                     <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.035]">
                       <Loader2 className="h-6 w-6 animate-spin text-zinc-200" />
                     </div>
-                    <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">Preparing your Sonar workspace</h2>
+                    <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">Preparing your Nodemere workspace</h2>
                     <p className="mt-3 max-w-md text-sm leading-6 text-zinc-500">
                       Saving your setup draft and getting your dashboard ready.
                     </p>
@@ -1263,7 +1281,7 @@ const Onboarding2Page = () => {
                         {form.businessName || 'Your workspace'} is ready.
                       </h1>
                       <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500 sm:text-base">
-                        You now have a cleaner starting point for Sonar, with your business basics, call hours, appointment defaults, and receptionist context captured.
+                        You now have a cleaner starting point for Nodemere, with your business basics, call hours, appointment defaults, and receptionist context captured.
                       </p>
                     </div>
 
@@ -1274,7 +1292,7 @@ const Onboarding2Page = () => {
                             {(form.businessName || 'S').charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-bold text-white">{form.businessName || 'Sonar Workspace'}</div>
+                            <div className="truncate text-sm font-bold text-white">{form.businessName || 'Nodemere Workspace'}</div>
                             <div className="text-xs text-zinc-600">{form.industry || 'Business'} setup saved</div>
                           </div>
                         </div>
@@ -1491,6 +1509,20 @@ const Onboarding2Page = () => {
                             </div>
                           )}
                         </div>
+                        ) : null}
+
+                        {step === steps.length - 1 ? (
+                          <div className="mt-6 space-y-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400">Required account acknowledgments</p>
+                            <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-zinc-400">
+                              <input type="checkbox" checked={hasAcceptedLegal} onChange={(event) => setHasAcceptedLegal(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-white" />
+                              <span>I am authorized to bind this business and agree to the <a href="/terms" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">Terms</a>, <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">Privacy Policy</a>, <a href="/acceptable-use-policy" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">Acceptable Use Policy</a>, <a href="/communications-notice" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">AI & Recording Notice</a>, and <a href="/data-processing-addendum" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">DPA</a>.</span>
+                            </label>
+                            <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-zinc-400">
+                              <input type="checkbox" checked={hasCertifiedPermittedUse} onChange={(event) => setHasCertifiedPermittedUse(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-white" />
+                              <span>I certify that this is a permitted general U.S. business use. Before any automated communication, recording, or transcription, my business will give required notices, obtain and retain required consent, honor opt-outs, and will not use Nodemere for regulated or restricted activity.</span>
+                            </label>
+                          </div>
                         ) : null}
 
                         {submitError ? (

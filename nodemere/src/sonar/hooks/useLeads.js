@@ -140,9 +140,13 @@ export function useLeads() {
 
   const notifyBackend = useCallback(async (eventType, record, oldRecord) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       await fetch(`${API_BASE_URL}/api/webhook/people`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ type: eventType, record, old_record: oldRecord }),
       });
     } catch (err) {

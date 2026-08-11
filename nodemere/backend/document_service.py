@@ -3,6 +3,7 @@
 import logging
 import mimetypes
 import os
+from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from uuid import uuid4
 
@@ -63,7 +64,7 @@ def _safe_filename(filename: str) -> str:
     return name[:160] or "document"
 
 
-def store_document(supabase, *, token: str, filename: str, content_type: str, content: bytes) -> dict:
+def store_document(supabase, *, token: str, filename: str, content_type: str, content: bytes, notice_accepted: bool = False) -> dict:
     request = load_request_by_token(supabase, token, DOCUMENT_REQUEST_TYPE)
     if not request:
         return {"success": False, "status": "not_found", "message": "This upload link is invalid."}
@@ -73,6 +74,8 @@ def store_document(supabase, *, token: str, filename: str, content_type: str, co
         return {"success": False, "status": "expired", "message": "This upload link has expired."}
     if request.get("status") != "pending":
         return {"success": False, "status": request.get("status"), "message": "This upload request is no longer accepting files."}
+    if notice_accepted is not True:
+        return {"success": False, "status": "notice_required", "message": "Confirm the document upload notice before uploading a file."}
     if not content:
         return {"success": False, "status": "invalid", "message": "Choose a file to upload."}
     if len(content) > MAX_DOCUMENT_BYTES:
@@ -92,7 +95,8 @@ def store_document(supabase, *, token: str, filename: str, content_type: str, co
         row = {
             "request_id": request["id"], "business_id": business_id, "person_id": person_id,
             "file_name": safe_name, "storage_bucket": DOCUMENT_BUCKET, "storage_path": storage_path,
-            "content_type": normalized_type, "file_size": len(content), "metadata": {},
+            "content_type": normalized_type, "file_size": len(content),
+            "metadata": {"upload_notice_accepted_at": datetime.now(timezone.utc).isoformat()},
         }
         response = supabase.table("people_docs").insert(row).execute()
         saved = (response.data or [row])[0]

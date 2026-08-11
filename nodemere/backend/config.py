@@ -50,13 +50,15 @@ public_key: str | None = (
     or os.environ.get("VITE_SUPABASE_ANON_KEY")
 )
 key: str | None = (
-    os.environ.get("SUPABASE_KEY")
-    or service_role_key
+    service_role_key
+    or os.environ.get("SUPABASE_KEY")
     or public_key
 )
 
 # --- JWT Configuration ---
-SECRET_KEY = os.environ.get("SUPABASE_JWT_SECRET") or os.environ.get("SUPABASE_SECRET_KEY") or key
+# Never fall back to a public/anon Supabase key for JWT verification. When the
+# JWT secret is absent, dependencies use Supabase's token-introspection API.
+SECRET_KEY = os.environ.get("SUPABASE_JWT_SECRET") or os.environ.get("SUPABASE_SECRET_KEY")
 ALGORITHM = "HS256"
 
 
@@ -75,6 +77,7 @@ elevenlabs_webhook_secret = os.environ.get("ELEVENLABS_WEBHOOK_SECRET")
 elevenlabs_api_key = os.environ.get("ELEVENLABS_API_KEY")
 elevenlabs_agent_id_inbound = os.environ.get("ELEVENLABS_AGENT_ID_INBOUND")
 elevenlabs_agent_id_outbound = os.environ.get("ELEVENLABS_AGENT_ID_OUTBOUND")
+internal_tool_secret = os.environ.get("NODEMERE_INTERNAL_TOOL_SECRET")
 
 # --- Google / Gmail Integration Configuration ---
 google_client_id = os.environ.get("GOOGLE_CLIENT_ID")

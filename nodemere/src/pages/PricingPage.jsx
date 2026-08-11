@@ -5,6 +5,7 @@ import axios from 'axios';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getCookie } from '../utils/cookieUtils';
 import colors from '../../color';
+import LegalFooter from '../components/LegalFooter';
 
 // --- Data ---
 const API_BASE_URL = '/api/sonar';
@@ -40,10 +41,10 @@ const plansConfig = [
         features: [
             { label: "Everything in Essentials", description: "Starts with all Essentials features already included." },
             { label: "25 Receptionists", description: "Run a larger receptionist team for different roles or workflows." },
-            { label: "AI Outbound Calling", description: "Place outgoing calls for follow-ups, reminders, or outreach." },
+            { label: "AI Outbound Calling", description: "Place consented operational calls for follow-ups, reminders, and service updates." },
             { label: "Payments & Invoicing", description: "Receptionists can take payments, send invoices to customers, and more." },
             { label: "Unlock All Receptionists", description: "Full Access to the entire receptionist marketplace." },
-            { label: "AI Texting Automation", description: "Receptionists can send texts to customers." },
+            { label: "AI Texting Automation", description: "Not enabled at launch. Any future operational texting will require lawful consent and carrier approval." },
             { label: "Unlimited Contacts", description: "Keep your full contact list without contact-based restrictions." },
             { label: "Unlimited Scenarios", description: "Create as many workflow scenarios as your business needs." },
             { label: "Train Receptionists", description: "Customize your receptionist with business context and behavioral instructions." },
@@ -72,7 +73,7 @@ const plansConfig = [
     },
     {
         name: "Free",
-        description: "Try Sonar risk-free",
+        description: "Try Nodemere risk-free",
         prices: {
             Standard: { monthly: 0, annually: 0 },
             Sales: { monthly: 0, annually: 0 },
@@ -174,9 +175,6 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
             );
             const { url } = response.data;
             if (url) {
-                if (typeof fbq === 'function') {
-                    fbq('track', 'InitiateCheckout');
-                }
                 window.location.href = url;
             }
         } catch (error) {
@@ -226,7 +224,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
                         <span className="text-gray-400 ml-2">/ month</span>
                     </div>
                     <p className="text-center text-xs text-gray-500 h-5 mt-2">
-                        {cycle === 'annually' && price > 0 ? 'billed annually' : ''}
+                        {cycle === 'annually' && price > 0 ? `Billed annually at $${(price * 12).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/year` : ''}
                     </p>
                     <p ref={savingsRef} className="savings-text text-center text-xs font-semibold h-5">{'\u00A0'}</p>
                 </div>
@@ -349,7 +347,7 @@ const PricingPage = () => {
         if (shouldUpdateCookie) {
             const d = new Date();
             d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000));
-            document.cookie = `source=${newSource}; expires=${d.toUTCString()}; path=/`;
+            document.cookie = `source=${newSource}; expires=${d.toUTCString()}; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
         }
         
         setSource(newSource);
@@ -434,7 +432,7 @@ const PricingPage = () => {
     });
 
     return (
-        <div className="pricing-page-bg text-gray-300 antialiased min-h-screen">
+        <div className="pricing-page-bg text-gray-300 antialiased min-h-screen flex flex-col">
             <svg width="0" height="0" style={{ position: 'absolute' }}><defs>
                 <linearGradient id="checkGradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient>
             </defs></svg>
@@ -445,7 +443,7 @@ const PricingPage = () => {
                     </Link>
                 </div>
             </div>
-            <div className="container mx-auto px-3 py-12 sm:py-20"> 
+            <div className="container mx-auto px-3 py-12 sm:py-20 flex-1">
                 <div className="text-center max-w-3xl mx-auto mb-12">
                     <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Choose your plan</h1>
                     {subscriptionStatus === 'failed' && subscriptionLog && (
@@ -469,7 +467,11 @@ const PricingPage = () => {
                         </div>
                     )}
                 </div>
+                <p className="mx-auto mt-7 max-w-3xl text-center text-xs leading-5 text-zinc-500">
+                    By starting a trial or subscription, you agree to the <Link to="/terms" className="underline underline-offset-2">Terms of Service</Link> and <Link to="/privacy-policy" className="underline underline-offset-2">Privacy Policy</Link>. Paid subscriptions renew automatically at the selected billing interval unless canceled before the next renewal date. You can request cancellation at <a href="mailto:support@nodemere.ai" className="underline underline-offset-2">support@nodemere.ai</a>.
+                </p>
             </div>
+            <LegalFooter />
         </div>
     );
 };

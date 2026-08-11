@@ -3074,7 +3074,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     await loadScenarios();
 
     try {
-      await fetch(`${API_BASE_URL}/api/scenarios/reload`, { method: 'POST' });
+      await authorizedApiFetch('/api/scenarios/reload', { method: 'POST' });
     } catch (reloadError) {
       console.warn('[Scenarios] Scenario saved, but backend reload failed:', reloadError?.message || reloadError);
     }
@@ -5787,6 +5787,11 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                       </div>
                     ) : (
                     <div className="sb-action-config-fields">
+                      {actionRequiresStripeIntegration && (
+                        <div className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
+                          Payments are processed on your connected Stripe account. Your business is the merchant of record and is responsible for customer disclosures, taxes, refunds, chargebacks, and payment disputes. Do not collect card details outside Stripe-hosted payment flows. <a className="underline" href="/terms" target="_blank" rel="noreferrer">Read payment terms</a>.
+                        </div>
+                      )}
                       {(() => {
                         const idFieldPriority = {
                           record_id: 0,

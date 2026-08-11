@@ -79,7 +79,7 @@ const BreakroomLoginModal = ({ onLogin }) => {
                 <div className="bg-[#121212]/90 backdrop-blur-lg px-8 py-16 rounded-2xl shadow-2xl shadow-black/60 border border-gray-800/50">
                     <div className="flex flex-col items-center text-center mb-10">
                         <div style={{ width: '115px', aspectRatio: '19 / 17' }} className="mb-8">
-                            <img src="https://analbpbswioidemezozb.supabase.co/storage/v1/object/public/assets/logo.png" alt="Keyquarters Logo" className="w-full h-full object-contain" />
+                            <img src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png" alt="Nodemere logo" className="w-full h-full object-contain" />
                         </div>
                         <h1 className="text-3xl font-bold text-white">Breakroom Access</h1>
                     </div>

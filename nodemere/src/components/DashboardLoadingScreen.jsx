@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import colors from '../../color'; // Adjust path as needed
 import './DashboardLoadingScreen.css';
 
-const loadingTexts = ["Vault", "encyption", "Breezy AI", "threads", "preferences"];
+const loadingTexts = ["receptionists", "calls", "workflows", "contacts", "settings"];
 
 const DashboardLoadingScreen = ({ isLoading }) => {
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
@@ -44,8 +44,8 @@ const DashboardLoadingScreen = ({ isLoading }) => {
             transition={{ duration: 0.5 }}
           >
             <img
-              src="https://analbpbswioidemezozb.supabase.co/storage/v1/object/public/assets/logo.png"
-              alt="Keyquarters Logo"
+              src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png"
+              alt="Nodemere logo"
               className="dashboard-loading-logo"
             />
             <div className="loader">

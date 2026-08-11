@@ -48,8 +48,8 @@ export default function IntroOverlay() {
     >
       <img
         ref={logoRef}
-        src="https://d393ec8814550259215504977855f0b8.cdn.bubble.io/f1752264967091x715653164297439500/lgooo.png"
-        alt="Keyquarters Logo"
+        src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png"
+        alt="Nodemere logo"
         id="intro-logo"
       />
     </div>

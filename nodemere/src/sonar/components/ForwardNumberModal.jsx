@@ -1021,6 +1021,11 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           <p className="text-sm leading-6 text-zinc-500">
             Let outbound calls show <span className="font-semibold text-white">{sourceNumber || 'your business number'}</span> instead of the assigned line.
           </p>
+          <div className="rounded-2xl border border-orange-300/15 bg-orange-300/[0.05] p-4 text-sm leading-6 text-orange-100/85">
+            <p className="font-semibold text-orange-100">Outbound AI calling is limited to documented, consented operational or customer-service calls.</p>
+            <p className="mt-1">Nodemere records and transcribes calls by default. Do not use this feature for telemarketing, political outreach, debt collection, or restricted industries. Every call must identify the business, disclose the AI assistant, and give any notice or opt-out required by law.</p>
+            <a href="/communications-notice" target="_blank" rel="noreferrer" className="mt-2 inline-block font-semibold text-white underline underline-offset-2">Read the communications notice</a>
+          </div>
 
           {callerIdPending ? (
             <div className="space-y-4 rounded-[24px] border border-white/[0.10] bg-pink-400/[0.06] p-4">

@@ -235,28 +235,6 @@ const POPUP_DEFINITIONS = [
           />
         </div>
 
-        <div className="mt-8 grid gap-7 text-left sm:grid-cols-3 sm:gap-8">
-          <div className="relative">
-            <p className="text-[11px] font-bold uppercase leading-4 tracking-[0.18em] text-zinc-500">Build</p>
-            <p className="mt-4 text-[13px] leading-5 text-zinc-400">
-              Start with a trigger like a call, new person, appointment update, payment event, or scheduled time.
-            </p>
-          </div>
-
-          <div className="relative">
-            <p className="text-[11px] font-bold uppercase leading-4 tracking-[0.18em] text-zinc-500">Automate</p>
-            <p className="mt-4 text-[13px] leading-5 text-zinc-400">
-              Add actions to call customers, update records, create appointments, send links, or branch the workflow.
-            </p>
-          </div>
-
-          <div className="relative">
-            <p className="text-[11px] font-bold uppercase leading-4 tracking-[0.18em] text-zinc-500">Run</p>
-            <p className="mt-4 text-[13px] leading-5 text-zinc-400">
-              Test the workflow in the builder, then keep it manual or schedule it to run automatically.
-            </p>
-          </div>
-        </div>
       </div>
     ),
     primaryActionLabel: 'Got it',
@@ -1271,9 +1249,6 @@ const TasklistInstructionModal = ({ subtask, onClose }) => {
                   allowFullScreen
                 />
               </div>
-              <p className="mt-5 text-sm leading-6 text-zinc-500">
-                {subtask.instruction}
-              </p>
             </div>
           </motion.section>
         </motion.div>
@@ -2237,7 +2212,7 @@ const SonarDashboard = () => {
                   <div className="flex min-h-full items-center justify-center pb-20 text-center">
                     <div className="flex flex-col items-center">
                       <Moon size={30} strokeWidth={1.7} className="mx-auto mb-4 text-zinc-500" />
-                      <p className="text-[28px] font-semibold leading-none tracking-tight text-white">It's quiet in here</p>
+                      <p className="text-[28px] font-semibold leading-none tracking-tight text-white">No receptionists</p>
                       <p className="text-[13px] leading-none text-zinc-500 -translate-y-1.5">Hire an AI receptionist to put your front desk to work.</p>
                     </div>
                   </div>
