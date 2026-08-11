@@ -120,16 +120,10 @@ TRIGGER_EVENT_MAP = {
     "appointment_missed": "appointment_missed",
     "appointment_reminder": "appointment_reminder",
     "appointment_soon": "appointment_reminder",
-    "invoice_created": "invoice_created",
-    "invoice_sent": "invoice_sent",
-    "invoice_paid": "invoice_paid",
     "payment_received": "payment_received",
     "payment_failed": "payment_failed",
     "refund_issued": "refund_issued",
-    "customer_created": "customer_created",
     "subscription_created": "subscription_created",
-    "subscription_canceled": "subscription_canceled",
-    "subscription_payment_failed": "subscription_payment_failed",
     "payment_succeeded": "payment_received",
     "payment_link_sent": "payment_link_sent",
     "manual_trigger": "manual_trigger",
@@ -1074,9 +1068,6 @@ class ScenarioActionExecutor:
             return 1
 
     async def execute(self, node: dict, context: dict):
-        if node.get("type") == "end_call":
-            return {"success": True, "data": {"action": "end_call"}}
-
         key = ((node.get("actionConfig") or {}).get("_key") or node.get("subOptionKey") or "").strip()
         if not key:
             return {"success": True, "data": {"action": "noop"}}

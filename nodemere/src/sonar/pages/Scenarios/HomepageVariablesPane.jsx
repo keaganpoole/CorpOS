@@ -289,13 +289,7 @@ const TRIGGER_TABLE_MAP = {
   payment_received: ['payments', 'people', 'businesses'],
   payment_failed: ['invoices', 'payments', 'people', 'businesses'],
   refund_issued: ['payments', 'people', 'businesses'],
-  invoice_created: ['invoices', 'payments', 'people', 'businesses'],
-  invoice_sent: ['invoices', 'payments', 'people', 'businesses'],
-  invoice_paid: ['invoices', 'payments', 'people', 'businesses'],
-  customer_created: ['people', 'businesses'],
   subscription_created: ['invoices', 'payments', 'people', 'businesses'],
-  subscription_canceled: ['invoices', 'payments', 'people', 'businesses'],
-  subscription_payment_failed: ['invoices', 'payments', 'people', 'businesses'],
   manual_trigger: ['people', 'payments', 'appointments', 'services', 'staff', 'hired_receptionists', 'businesses'],
 };
 
@@ -697,13 +691,13 @@ const getFocusedTableKeyForNode = (node) => {
   if (!node) return null;
   const actionKey = node.actionConfig?._key || node.subOptionKey || node.triggerKey || '';
   const appointmentKey = node.appointmentConfig?.key || '';
-  if (appointmentKey === 'create_appointment' || appointmentKey === 'update_appointment' || appointmentKey === 'delete_appointment') {
+  if (appointmentKey === 'create_appointment' || appointmentKey === 'update_appointment' || appointmentKey === 'cancel_appointment') {
     return 'appointments';
   }
-  if (actionKey === 'create_appointment' || actionKey === 'update_appointment' || actionKey === 'delete_appointment' || actionKey === 'search_appointments') {
+  if (actionKey === 'create_appointment' || actionKey === 'update_appointment' || actionKey === 'cancel_appointment' || actionKey === 'search_appointments') {
     return 'appointments';
   }
-  if (['create_new_record', 'update_record', 'delete_record', 'search_records'].includes(actionKey)) {
+  if (['create_new_record', 'update_record', 'search_records'].includes(actionKey)) {
     const tableKey = (node.actionConfig?.target_table || 'people').toLowerCase().replace(/\s+/g, '_');
     return normalizeTableRefKey(tableKey);
   }

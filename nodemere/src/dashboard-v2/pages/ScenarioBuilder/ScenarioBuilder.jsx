@@ -16,13 +16,10 @@ import {
   FiShare2,
   FiMail,
   FiTag,
-  FiClock,
   FiTrash2,
 } from 'react-icons/fi';
 import './ScenarioBuilder.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
-
-import { FiRefreshCw, FiRepeat, FiTarget } from 'react-icons/fi'; // add these to your imports
 
 const OPTION_ICONS = {
   phone_calls: FiPhoneCall,
@@ -34,9 +31,7 @@ const OPTION_ICONS = {
   call_routing: FiShare2,
   email: FiMail,
   tags: FiTag,
-  wait: FiClock,
   router: FiShare2,
-  intent_router: FiRefreshCw, // <-- best for re-evaluation/backtracking
 };
 
 const AUTOMATION_HIERARCHY = {
@@ -101,11 +96,8 @@ const AUTOMATION_HIERARCHY = {
       accent: '#32f0d9',
       icon: OPTION_ICONS.payments,
       sub_options: [
-        { key: 'invoice_created', name: 'Invoice Created', description: 'When a new invoice is created' },
-        { key: 'invoice_paid', name: 'Invoice Paid', description: 'When an invoice is paid' },
         { key: 'payment_failed', name: 'Payment Failed', description: 'When a payment cannot process' },
         { key: 'payment_link_sent', name: 'Payment Link Sent', description: 'When a payment link is sent to the customer' },
-        { key: 'invoice_sent', name: 'Invoice Sent', description: 'When a real invoice is sent to the customer' },
       ],
     },
   ],
@@ -163,7 +155,6 @@ const AUTOMATION_HIERARCHY = {
         { key: 'search_records', name: 'Search Records', description: 'Find records' },
         { key: 'create_new_record', name: 'Create New Record', description: 'Create a new record' },
         { key: 'update_record', name: 'Update Record', description: 'Modify an existing record' },
-        { key: 'delete_record', name: 'Delete Record', description: 'Permanently delete a record' },
       ],
     },
     {
@@ -176,7 +167,7 @@ const AUTOMATION_HIERARCHY = {
         { key: 'create_appointment', name: 'Create Appointment', description: 'Schedule a new appointment' },
         { key: 'search_appointments', name: 'Search Appointments', description: 'Find existing appointments' },
         { key: 'update_appointment', name: 'Update Appointment', description: 'Change details of an appointment' },
-        { key: 'delete_appointment', name: 'Delete Appointment', description: 'Cancel and remove an appointment' },
+        { key: 'cancel_appointment', name: 'Cancel Appointment', description: 'Cancel an appointment' },
       ],
     },
     {
@@ -202,9 +193,7 @@ const AUTOMATION_HIERARCHY = {
     },
   ],
   UTILITIES: [
-  { key: 'wait', option: 'Wait', description: 'Pause the workflow temporarily', icon: OPTION_ICONS.wait, accent: '#f472b6' },
   { key: 'router', option: 'Router', description: 'Send flow to different paths', icon: OPTION_ICONS.router, accent: '#f472b6' },
-  { key: 'intent_router', option: 'Intent Router', description: 'Re-evaluate the conversation and choose the correct path', icon: OPTION_ICONS.intent_router, accent: '#f472b6' },
 ],
 };
 

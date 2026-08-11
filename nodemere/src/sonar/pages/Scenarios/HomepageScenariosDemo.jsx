@@ -19,7 +19,6 @@ import {
   Tag,
   Clock,
   Trash2,
-  RefreshCw,
   Repeat,
   Target,
   Check,
@@ -294,10 +293,7 @@ const OPTION_ICONS = {
   text_messaging: MessageSquare,
   email: Mail,
   tags: Tag,
-  wait: Clock,
   router: Share2,
-  intent_router: RefreshCw,
-  end_call: X,
   time_schedule: Clock,
 };
 
@@ -385,13 +381,7 @@ const AUTOMATION_HIERARCHY = {
         { key: 'payment_received', name: 'Payment Received', description: 'When a payment is successfully collected' },
         { key: 'payment_failed', name: 'Payment Failed', description: 'When a payment cannot process' },
         { key: 'refund_issued', name: 'Refund Issued', description: 'When a refund is successfully issued' },
-        { key: 'invoice_created', name: 'Invoice Created', description: 'When a new invoice is created' },
-        { key: 'invoice_sent', name: 'Invoice Sent', description: 'When an invoice is sent to the customer' },
-        { key: 'invoice_paid', name: 'Invoice Paid', description: 'When an invoice is paid' },
-        { key: 'customer_created', name: 'Customer Created', description: 'When a Stripe customer is created' },
         { key: 'subscription_created', name: 'Subscription Created', description: 'When a subscription starts' },
-        { key: 'subscription_canceled', name: 'Subscription Canceled', description: 'When a subscription is canceled' },
-        { key: 'subscription_payment_failed', name: 'Subscription Payment Failed', description: 'When recurring billing fails' },
       ],
     },
   ],
@@ -423,8 +413,6 @@ const AUTOMATION_HIERARCHY = {
         ]},
         { key: 'update_record', name: 'Update Person', description: 'Modify an existing person', configFields: [
         ]},
-        { key: 'delete_record', name: 'Delete Person', description: 'Permanently delete a person', configFields: [
-        ]},
       ],
     },
     {
@@ -453,7 +441,7 @@ const AUTOMATION_HIERARCHY = {
           { key: 'duration', label: 'Duration', type: 'text' },
           { key: 'notes', label: 'Notes', type: 'textarea' },
         ]},
-        { key: 'delete_appointment', name: 'Delete Appointment', description: 'Cancel and remove an appointment', configFields: [
+        { key: 'cancel_appointment', name: 'Cancel Appointment', description: 'Cancel an appointment', configFields: [
           { key: 'appointment_id', label: 'Appointment ID', type: 'text' },
         ]},
       ],
@@ -542,15 +530,12 @@ const AUTOMATION_HIERARCHY = {
     },
   ],
   UTILITIES: [
-    { key: 'wait', option: 'Wait', description: 'Pause the workflow temporarily', icon: OPTION_ICONS.wait, accent: '#f472b6' },
     { key: 'router', option: 'Router', description: 'Send flow to different paths', icon: OPTION_ICONS.router, accent: '#f472b6' },
     { key: 'iterator', option: 'Iterator', description: 'Run the downstream branch once for each item in a list', icon: OPTION_ICONS.records, accent: '#f472b6', sub_options: [
       { key: 'iterator', name: 'Iterator', description: 'Iterate over a collection from a previous step', configFields: [
         { key: 'collection_path', label: 'Collection Path', type: 'text' },
       ] },
     ] },
-    { key: 'intent_router', option: 'Intent Router', description: 'Re-evaluate the conversation and choose the correct path', icon: OPTION_ICONS.intent_router, accent: '#f472b6' },
-    { key: 'end_call', option: 'End Call', description: 'Immediately end the current call', icon: OPTION_ICONS.end_call, accent: '#f472b6' },
   ],
 };
 
@@ -576,7 +561,7 @@ const getNodeHelperText = (node) => {
   const appointmentCopy = {
     'Create Appointment': 'Create an appointment',
     'Update Appointment': 'Update an appointment',
-    'Delete Appointment': 'Delete an appointment',
+    'Cancel Appointment': 'Cancel an appointment',
     'Search Appointments': 'Find appointments for this business',
   };
 
@@ -584,7 +569,6 @@ const getNodeHelperText = (node) => {
     'Search People': 'Find people',
     'Create New Person': "Create a person's record",
     'Update Person': "Update a person's record",
-    'Delete Person': "Delete a person's record",
   };
 
   const paymentCopy = {
@@ -720,7 +704,7 @@ const getDemoNodeResult = (actionKey, nodeLabel = 'Node') => {
       return { ...base, id: 'demo-person-003', first_name: 'Casey', last_name: 'Rivera', status: 'demo_saved' };
     case 'create_appointment':
     case 'update_appointment':
-    case 'delete_appointment':
+    case 'cancel_appointment':
       return { ...base, id: 'demo-appointment-003', status: 'demo_applied' };
     case 'iterator':
       return { ...base, action: 'iterator', count: 2, results: [] };
@@ -2256,8 +2240,6 @@ export default function ScenariosPage({
       categoryType === 'UTILITIES'
         ? label.toLowerCase() === 'router'
           ? 'router'
-          : label.toLowerCase() === 'end call'
-            ? 'end_call'
           : 'utility'
         : meta.type;
     // Snap intro node to overlay center before configuring
@@ -2309,7 +2291,7 @@ export default function ScenariosPage({
   };
 
   const APPOINTMENT_CONFIG_ACTIONS = new Set([
-    'create_appointment', 'update_appointment', 'delete_appointment',
+    'create_appointment', 'update_appointment', 'cancel_appointment',
   ]);
   const TIME_CONFIG_ACTIONS = new Set([
     'specific_time', 'recurring_daily', 'recurring_weekly', 'appointment_reminder',
@@ -2394,7 +2376,7 @@ export default function ScenariosPage({
     // Check if this action needs config BEFORE finalizing
     const needsAppointmentConfig = APPOINTMENT_CONFIG_ACTIONS.has(subOption.key);
     const needsActionConfig = subOption.configFields && subOption.configFields.length > 0;
-    const needsRecordConfig = subOption.key === 'create_new_record' || subOption.key === 'update_record' || subOption.key === 'delete_record';
+    const needsRecordConfig = subOption.key === 'create_new_record' || subOption.key === 'update_record';
     
     if (needsAppointmentConfig || needsActionConfig || needsRecordConfig) {
       // Snap intro node to overlay center before configuring
@@ -2455,7 +2437,7 @@ export default function ScenariosPage({
       } else {
         const initialConfig = { _key: subOption.key, _fields: subOption.configFields };
         subOption.configFields.forEach(f => { initialConfig[f.key] = ''; });
-        if (subOption.key === 'create_new_record' || subOption.key === 'update_record' || subOption.key === 'delete_record') {
+        if (subOption.key === 'create_new_record' || subOption.key === 'update_record') {
           initialConfig.target_table = PEOPLE_RECORD_TABLE;
         }
         restoringFromNodeRef.current = true;
@@ -5764,10 +5746,10 @@ export default function ScenariosPage({
                     )}
 
                     {/* Table-specific fields — dynamic based on selected table */}
-                    {['create_new_record', 'update_record', 'delete_record'].includes(actionConfig._key) && (
+                    {['create_new_record', 'update_record'].includes(actionConfig._key) && (
                       <div className="sb-record-fields-section">
                         {/* Record ID — shown for update/delete actions */}
-                        {(actionConfig._key === 'update_record' || actionConfig._key === 'delete_record') && (
+                        {actionConfig._key === 'update_record' && (
                           <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
                           <label className="sb-record-label" style={{ display: 'block' }}><Hash size={11} className="sb-record-label-icon" style={{ marginRight: 4, display: 'inline', verticalAlign: -1 }} />{getRecordIdLabelForTable(PEOPLE_RECORD_TABLE)}</label>
                           <div style={{ position: 'relative' }}>
@@ -5826,7 +5808,7 @@ export default function ScenariosPage({
                     <div style={{ fontSize: 10, color: '#71717a', marginBottom: 14, fontWeight: 600 }}>
                       {appointmentConfig.key === 'create_appointment' && 'Set up the appointment details.'}
                       {appointmentConfig.key === 'update_appointment' && 'Update appointment fields.'}
-                      {appointmentConfig.key === 'delete_appointment' && 'Set cancellation criteria.'}
+                      {appointmentConfig.key === 'cancel_appointment' && 'Set cancellation criteria.'}
                     </div>
                     <div className="sb-record-fields-grid">
                       {/* Record ID — for create and update_appointment (person_id field) */}
@@ -5937,8 +5919,8 @@ export default function ScenariosPage({
                           </div>
                         </div>
                       )}
-                      {/* Appointment ID — for update/delete_appointment (first field) */}
-                      {(appointmentConfig.key === 'update_appointment' || appointmentConfig.key === 'delete_appointment') && (
+                      {/* Appointment ID — for update/cancel appointment (first field) */}
+                      {(appointmentConfig.key === 'update_appointment' || appointmentConfig.key === 'cancel_appointment') && (
                         <div className="sb-record-field" style={{ order: 0 }}>
                           <label className="sb-record-label"><Hash size={11} style={{ marginRight: 4, opacity: 0.5, display: 'inline', verticalAlign: -1 }} />Appointment ID</label>
                           <div style={{ position: 'relative' }}>
