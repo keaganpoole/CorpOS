@@ -677,10 +677,11 @@ def deep_merge_dicts(base: Optional[dict], updates: Optional[dict]) -> dict:
 
 
 class ScenarioActionExecutor:
-    def __init__(self, supabase, callbacks: dict[str, Callable], base_url: str):
+    def __init__(self, supabase, callbacks: dict[str, Callable], base_url: str, plan_access_checker: Optional[Callable] = None):
         self.supabase = supabase
         self.callbacks = callbacks
         self.base_url = base_url.rstrip("/")
+        self.plan_access_checker = plan_access_checker
 
     def _resolve_variables(self, value: Any, context: dict):
         if not isinstance(value, str):
@@ -1871,6 +1872,9 @@ class ScenarioActionExecutor:
 
     async def _call_customer(self, node: dict, context: dict):
         try:
+            if self.plan_access_checker:
+                owner_id = str((context.get("business") or {}).get("user_id") or context.get("user_id") or "")
+                self.plan_access_checker(owner_id, context.get("business") or {}, direction="outbound")
             config = node.get("actionConfig") or {}
             to_number = (
                 self._resolve_variables(config.get("to_phone") or "", context)
@@ -2698,12 +2702,13 @@ class ScenarioFlowExecutor:
 
 
 class ScenarioEngine:
-    def __init__(self, supabase, callbacks: dict[str, Callable], base_url: str):
+    def __init__(self, supabase, callbacks: dict[str, Callable], base_url: str, plan_access_checker: Optional[Callable] = None, scenario_access_checker: Optional[Callable] = None):
         self.supabase = supabase
         self.callbacks = callbacks
         self.base_url = base_url
+        self.scenario_access_checker = scenario_access_checker
         self.scenarios: list[dict] = []
-        self.action_executor = ScenarioActionExecutor(supabase, callbacks, base_url)
+        self.action_executor = ScenarioActionExecutor(supabase, callbacks, base_url, plan_access_checker=plan_access_checker)
         self.flow_executor = ScenarioFlowExecutor(supabase, self.action_executor)
         self.scheduler_task: Optional[asyncio.Task] = None
         self.scheduler_worker_id = f"scenario-engine-{os.getpid()}"
@@ -3402,6 +3407,9 @@ class ScenarioEngine:
         scenario = response.data[0] if response.data else None
         if not scenario:
             return {"ok": False, "error": "Scenario not found"}
+        if self.scenario_access_checker:
+            owner_id = str(scenario.get("user_id") or scenario.get("created_by") or (payload or {}).get("user_id") or "")
+            self.scenario_access_checker(owner_id, scenario, direction="scenario")
         definition_errors = validate_scenario_definition(scenario)
         if definition_errors:
             return {

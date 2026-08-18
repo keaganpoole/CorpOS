@@ -43,6 +43,7 @@ import ScenarioIntroNode from '../../../components/ScenarioIntroNode';
 import AetherEdgeLogic from './AetherEdgeLogic';
 import VariablesPane, { getFieldDisplayLabel, getTableFields, getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields } from './VariablesPane';
 import { supabase } from '../../lib/supabase';
+import { api } from '../../lib/api';
 import { fetchCustomFields, getCurrentBusinessId, isCustomFieldKey } from '../../lib/customFields';
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
 import { getSmartActions, getSmartActionByKey } from './smartActions';
@@ -863,23 +864,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     }
 
     try {
-      const { data, error } = await applyScenarioOwnershipFilter(
-        supabase
-          .from('scenarios')
-          .select('*')
-      )
-        .order('updated_at', { ascending: false });
-
-      if (error) {
-        if (error.code === 'PGRST205') {
-          console.log('[Scenarios] Table not found. Run SQL in Supabase to create scenarios table.');
-          setScenarios([]);
-          return [];
-        }
-        throw error;
-      }
-
-      const rows = data || [];
+      const rows = (await api.getScenarios()) || [];
       setScenarios(rows);
       console.log('[Scenarios] Loaded', rows.length, 'scenarios');
       return rows;
@@ -1330,9 +1315,12 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     setScenarioIsActive(newActive);
     // Persist to Supabase if editing existing scenario
     if (currentScenario?.id && userId) {
-      await applyScenarioOwnershipFilter(
-        supabase.from('scenarios').update({ is_active: newActive }).eq('id', currentScenario.id)
-      );
+      try {
+        await api.updateScenario(currentScenario.id, { is_active: newActive });
+      } catch (error) {
+        setScenarioIsActive(!newActive);
+        console.error('[Scenarios] Failed to update scenario status:', error);
+      }
     }
   };
 
@@ -3036,27 +3024,21 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     setSaveValidationError('');
     
     let result;
-    
-    if (currentScenario) {
-      // Update existing scenario
-      const { data, error } = await applyScenarioOwnershipFilter(
-        supabase
-        .from('scenarios')
-        .update(scenarioData)
-        .eq('id', currentScenario.id)
-        .select()
-      )
-        .single();
-      
-      result = { data, error };
-    } else {
-      // Insert new scenario
-      const { data, error } = await supabase
-        .from('scenarios')
-        .insert(scenarioData)
-        .select();
-      
-      result = { data: data?.[0], error };
+    try {
+      if (currentScenario) {
+        // Update existing scenario
+        const data = await api.updateScenario(currentScenario.id, scenarioData);
+        result = { data, error: null };
+      } else {
+        // Insert new scenario
+        const data = await api.createScenario(scenarioData);
+        result = { data, error: null };
+      }
+    } catch (error) {
+      console.error('[Scenarios] Error saving scenario:', error);
+      setSaveValidationError(error.message || 'Scenario could not be saved.');
+      setShowSaveModal(true);
+      return;
     }
     
     const { data, error } = result;
@@ -4604,8 +4586,17 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
           }
 
           if (actionKey === 'update_record' && resolvedRecordId) {
-            // Update existing record via Supabase
-            const { data, error } = await supabase.from(tableKey).update(updateData).eq('id', resolvedRecordId).select().single();
+            // Controlled records go through the backend so plan limits and
+            // tenant ownership are enforced server-side.
+            let data;
+            let error = null;
+            try {
+              data = tableKey === 'people'
+                ? await api.updatePerson(resolvedRecordId, updateData)
+                : (await supabase.from(tableKey).update(updateData).eq('id', resolvedRecordId).select().single()).data;
+            } catch (requestError) {
+              error = requestError;
+            }
             if (!error) {
               setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: data } : n));
               resultsMap[node.id] = data;
@@ -4618,8 +4609,15 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               console.error(`[Scenario Run]   └ Error:`, error.message);
             }
           } else if (actionKey === 'create_new_record') {
-            // Create new record via Supabase
-            const { data, error } = await supabase.from(tableKey).insert(updateData).select().single();
+            let data;
+            let error = null;
+            try {
+              data = tableKey === 'people'
+                ? await api.createPerson(updateData)
+                : (await supabase.from(tableKey).insert(updateData).select().single()).data;
+            } catch (requestError) {
+              error = requestError;
+            }
             if (!error) {
               setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: data } : n));
               resultsMap[node.id] = data;
@@ -4941,19 +4939,11 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     const scenario = scenarioPendingDelete;
     if (!scenario) return;
 
-    const { data: deletedRows, error } = await applyScenarioOwnershipFilter(
-      supabase.from('scenarios').delete().eq('id', scenario.id).select('id')
-    );
-    
-    if (error) {
+    try {
+      await api.deleteScenario(scenario.id);
+    } catch (error) {
       console.error('[Scenarios] Error deleting scenario:', error);
       setDeleteConfirmModal(false);
-      return;
-    }
-    if (!deletedRows?.length) {
-      console.error('[Scenarios] Scenario was not deleted; ownership or RLS prevented the delete.');
-      setDeleteConfirmModal(false);
-      setScenarioPendingDelete(null);
       return;
     }
     
@@ -4975,14 +4965,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const handleToggleScenarioStatus = async (scenario) => {
     const newStatus = scenario.status === 'active' ? 'disabled' : 'active';
     
-    const { error } = await applyScenarioOwnershipFilter(
-      supabase
-        .from('scenarios')
-        .update({ status: newStatus })
-        .eq('id', scenario.id)
-    );
-    
-    if (error) {
+    try {
+      await api.updateScenario(scenario.id, { status: newStatus });
+    } catch (error) {
       console.error('[Scenarios] Error updating scenario status:', error);
       return;
     }

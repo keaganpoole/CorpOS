@@ -3,14 +3,25 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
+import { api } from '../../sonar/lib/api';
 import '../../styles/PasswordsPage.css'; // Assuming similar styling
 
-const STRIPE_BILLING_PORTAL_URL = "https://billing.stripe.com/p/login/dRm4gz11YesldM7apW7wA00";
-
 const UpdateBillingInfoModal = ({ isOpen, onClose }) => {
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
 
-  const handleRedirectToStripe = () => {
-    window.location.href = STRIPE_BILLING_PORTAL_URL;
+  const handleRedirectToStripe = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await api.createBillingPortal();
+      if (!result?.url) throw new Error('Stripe Billing Portal is unavailable.');
+      window.location.assign(result.url);
+    } catch (err) {
+      setError(err.message || 'Could not open Stripe Billing Portal.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -23,8 +34,9 @@ const UpdateBillingInfoModal = ({ isOpen, onClose }) => {
               <button onClick={onClose} className="close-btn"><FontAwesomeIcon icon={faTimes} /></button>
             </header>
             <div className="modal-form text-center">
-              <p className="text-gray-400 mb-6">You will be redirected to the Customer Portal to manage your billing details securely.</p>
-              <button onClick={handleRedirectToStripe} className="submit-btn">Go to Customer Portal</button>
+              <p className="text-gray-400 mb-6">Stripe Billing Portal securely manages your payment method, invoices, plan changes, and cancellation.</p>
+              {error && <p className="mb-4 text-sm text-rose-400">{error}</p>}
+              <button onClick={handleRedirectToStripe} disabled={loading} className="submit-btn disabled:cursor-wait disabled:opacity-60">{loading ? 'Opening...' : 'Open Stripe Billing Portal'}</button>
             </div>
           </motion.div>
         </motion.div>

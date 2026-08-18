@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../../sonar/lib/api';
 
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -62,29 +63,14 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
     setTimeout(() => setFeedback({ message: '', type: '' }), 3000);
   };
 
-  const handleSubscriptionCancel = async (reason) => {
-    const { data, error } = await supabase
-      .from('users')
-      .update({
-        plan: 'free',
-        subscription_status: 'canceled',
-        trial_end_date: new Date().toISOString(),
-        cancellation_reason: reason,
-      })
-      .eq('id', session.user.id)
-      .select()
-      .single();
-
-    if (error) {
-      showFeedback('Error cancelling subscription.', 'error');
-      console.error('Error cancelling subscription:', error);
-    } else {
-      showFeedback('Subscription canceled successfully.', 'success');
-      updateProfile({ 
-        plan: data.plan, 
-        subscription_status: data.subscription_status,
-        trial_end_date: data.trial_end_date
-      });
+  const handleSubscriptionCancel = async () => {
+    try {
+      const result = await api.createBillingPortal();
+      if (!result?.url) throw new Error('Stripe Billing Portal is unavailable.');
+      window.location.assign(result.url);
+    } catch (error) {
+      showFeedback('Could not open Stripe Billing Portal.', 'error');
+      console.error('Error opening Stripe Billing Portal:', error);
     }
   };
 

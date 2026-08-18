@@ -29,12 +29,34 @@ async function buildAuthHeaders(extraHeaders = {}) {
   };
 }
 
+function reportApiError(detail, statusCode) {
+  const value = detail?.detail || detail;
+  if (statusCode === 402 && value && typeof value === 'object') {
+    window.dispatchEvent(new CustomEvent('nodemere:plan-limit', { detail: value }));
+  }
+  const message = typeof value === 'string' ? value : value?.message || `Request failed (HTTP ${statusCode})`;
+  const error = new Error(message);
+  error.status = statusCode;
+  error.detail = value;
+  return error;
+}
+
+async function parseApiError(response) {
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Fall back to the HTTP status when the backend returned no JSON body.
+  }
+  return reportApiError(body, response.status);
+}
+
 // ─── REST Helpers ───────────────────────────────────────────
 async function fetchJSON(endpoint) {
   try {
     const headers = await buildAuthHeaders();
     const res = await fetch(`${API_BASE}${endpoint}`, { headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
     console.error(`[SONARAPI] Fetch failed: ${endpoint}`, err.message);
@@ -51,6 +73,15 @@ export const api = {
   getSession: () => fetchJSON('/api/session'),
   getPipeline: () => fetchJSON('/api/pipeline'),
   getReceptionistCatalog: () => fetchJSON('/api/sonar/receptionists/catalog'),
+  getPeople: (limit = 500) => fetchJSON(`/api/sonar/people?limit=${limit}`),
+  createPerson: (person) => postJSON('/api/sonar/people', person),
+  updatePerson: (id, person) => putJSON(`/api/sonar/people/${encodeURIComponent(id)}`, person),
+  deletePerson: (id) => deleteJSON(`/api/sonar/people/${encodeURIComponent(id)}`),
+  getScenarios: () => fetchJSON('/api/sonar/scenarios'),
+  createScenario: (scenario) => postJSON('/api/sonar/scenarios', scenario),
+  updateScenario: (id, scenario) => putJSON(`/api/sonar/scenarios/${encodeURIComponent(id)}`, scenario),
+  deleteScenario: (id) => deleteJSON(`/api/sonar/scenarios/${encodeURIComponent(id)}`),
+  createBillingPortal: () => postJSON('/api/sonar/billing/portal', {}),
   getCronJobs: () => fetchJSON('/api/cron'),
   createCronJob: (job) => postJSON('/api/cron', job),
   deleteCronJob: (id) => deleteJSON(`/api/cron/${id}`),
@@ -89,11 +120,27 @@ async function postJSON(endpoint, body) {
       headers,
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
     console.error(`[SONARAPI] POST failed: ${endpoint}`, err.message);
-    return null;
+    throw err;
+  }
+}
+
+async function putJSON(endpoint, body) {
+  try {
+    const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await parseApiError(res);
+    return await res.json();
+  } catch (err) {
+    console.error(`[SONARAPI] PUT failed: ${endpoint}`, err.message);
+    throw err;
   }
 }
 
@@ -105,11 +152,11 @@ async function patchJSON(endpoint, body) {
       headers,
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
     console.error(`[SONARAPI] PATCH failed: ${endpoint}`, err.message);
-    return null;
+    throw err;
   }
 }
 
@@ -120,11 +167,11 @@ async function deleteJSON(endpoint) {
       method: 'DELETE',
       headers,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
     console.error(`[SONARAPI] DELETE failed: ${endpoint}`, err.message);
-    return null;
+    throw err;
   }
 }
 

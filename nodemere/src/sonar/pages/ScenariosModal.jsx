@@ -4,7 +4,7 @@ import {
   X, Target, Check, Plus, Trash2, AlertCircle, Loader2,
   Pencil, Sparkles, GitBranch, Play, Pause, Zap,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
 
 const STATUS_CONFIG = {
   disabled: { color: 'text-zinc-500',   bg: 'bg-zinc-500/10',    border: 'border-zinc-500/20',    glow: '',                                        icon: <Pause size={10} /> },
@@ -16,35 +16,10 @@ const ScenariosModal = ({ agent, onClose, onScenarioAssigned }) => {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
-  const getCurrentUserId = async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    return data.user?.id || null;
-  };
-
-  const applyScenarioOwnershipFilter = (query, userId) => {
-    if (!userId) return query;
-    return query.or(`user_id.eq.${userId},created_by.eq.${userId}`);
-  };
-
   const loadScenarios = async () => {
     setLoading(true);
     try {
-      const userId = await getCurrentUserId();
-      if (!userId) {
-        setScenarios([]);
-        return;
-      }
-
-      const { data, error } = await applyScenarioOwnershipFilter(
-        supabase
-          .from('scenarios')
-          .select('*'),
-        userId
-      ).order('updated_at', { ascending: false });
-      
-      if (error) throw error;
-      setScenarios(data || []);
+      setScenarios((await api.getScenarios()) || []);
     } catch (err) {
       console.error('[ScenariosModal] Failed to load scenarios:', err);
     } finally {
@@ -58,27 +33,12 @@ const ScenariosModal = ({ agent, onClose, onScenarioAssigned }) => {
 
   const handleAssignScenario = async (scenario) => {
     try {
-      const userId = await getCurrentUserId();
-      const { error } = await applyScenarioOwnershipFilter(
-        supabase
-          .from('scenarios')
-          .update({ assigned_to: agent.name })
-          .eq('id', scenario.id),
-        userId
-      );
-      
-      if (error) throw error;
+      await api.updateScenario(scenario.id, { assigned_to: agent.name });
       
       // Unassign from other scenarios
       const otherScenarios = scenarios.filter(s => s.id !== scenario.id && s.assigned_to === agent.name);
       for (const s of otherScenarios) {
-        await applyScenarioOwnershipFilter(
-          supabase
-            .from('scenarios')
-            .update({ assigned_to: null })
-            .eq('id', s.id),
-          userId
-        );
+        await api.updateScenario(s.id, { assigned_to: null });
       }
       
       loadScenarios();
@@ -90,16 +50,7 @@ const ScenariosModal = ({ agent, onClose, onScenarioAssigned }) => {
 
   const handleUnassignScenario = async (scenario) => {
     try {
-      const userId = await getCurrentUserId();
-      const { error } = await applyScenarioOwnershipFilter(
-        supabase
-          .from('scenarios')
-          .update({ assigned_to: null })
-          .eq('id', scenario.id),
-        userId
-      );
-      
-      if (error) throw error;
+      await api.updateScenario(scenario.id, { assigned_to: null });
       
       loadScenarios();
       onScenarioAssigned?.();
@@ -111,16 +62,7 @@ const ScenariosModal = ({ agent, onClose, onScenarioAssigned }) => {
   const toggleScenarioStatus = async (scenario) => {
     try {
       const newStatus = scenario.status === 'active' ? 'disabled' : 'active';
-      const userId = await getCurrentUserId();
-      const { error } = await applyScenarioOwnershipFilter(
-        supabase
-          .from('scenarios')
-          .update({ status: newStatus })
-          .eq('id', scenario.id),
-        userId
-      );
-      
-      if (error) throw error;
+      await api.updateScenario(scenario.id, { status: newStatus });
       
       loadScenarios();
     } catch (err) {

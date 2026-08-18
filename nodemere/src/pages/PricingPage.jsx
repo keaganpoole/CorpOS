@@ -6,6 +6,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getCookie } from '../utils/cookieUtils';
 import colors from '../../color';
 import LegalFooter from '../components/LegalFooter';
+import { api } from '../sonar/lib/api';
 
 // --- Data ---
 const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
@@ -138,7 +139,7 @@ const useTextScramble = (ref) => {
 };
 
 // --- Plan Card ---
-const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStartedTrial, isTestMode }) => {
+const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscriptionStatus, hasStartedTrial, isTestMode }) => {
     const { session } = useAuth();
     const navigate = useNavigate();
     const [isCheckoutLoading, setCheckoutLoading] = useState(false);
@@ -149,6 +150,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
     const isUpgrade = planHierarchy[plan.name] > planHierarchy[currentUserPlan];
     const annualSavings = ((plan.price?.monthly || 0) * 12) - ((plan.price?.annually || 0) * 12);
     const hasOverages = Boolean(plan.entitlements?.overage_enabled);
+    const billingManagedInStripe = ['active', 'trialing', 'past_due', 'unpaid'].includes(String(subscriptionStatus || '').toLowerCase());
     const overageCents = Number(plan.entitlements?.overage_price_per_minute_cents ?? 30);
     const overageRate = overageCents / 100;
 
@@ -158,6 +160,9 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
     const savingsRef = useRef(null);
 
     const handleUpgradeClick = async () => {
+        if (billingManagedInStripe) {
+            return handleManageBilling();
+        }
         const priceId = plan.priceIds?.[cycle];
         if (!priceId) { console.error("Stripe Price ID is not defined for this plan/cycle."); return; }
 
@@ -182,6 +187,16 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
             console.error("Error creating checkout session:", error);
             alert(`Could not initiate checkout. Please try again. Error: ${error.message || error}`);
             setCheckoutLoading(false);
+        }
+    };
+
+    const handleManageBilling = async () => {
+        try {
+            const result = await api.createBillingPortal();
+            if (!result?.url) throw new Error('Stripe Billing Portal is unavailable.');
+            window.location.assign(result.url);
+        } catch (error) {
+            alert(error.message || 'Could not open Stripe Billing Portal.');
         }
     };
 
@@ -276,18 +291,24 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
                     </p>
                 )}
                 {isCurrent ? (
-                    <div className="w-full mt-auto font-semibold py-3 text-gray-500 cursor-default text-center">Your current plan</div>
+                    plan.name === 'Free' ? (
+                        <div className="w-full mt-auto font-semibold py-3 text-gray-500 cursor-default text-center">Your current plan</div>
+                    ) : (
+                        <button onClick={handleManageBilling} className="pricing-neutral-button w-full mt-auto font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity btn-shine">
+                            Manage billing in Stripe
+                        </button>
+                    )
                 ) : (
                     <button 
                         onClick={handleUpgradeClick}
                         disabled={isCheckoutLoading}
                         className="pricing-neutral-button w-full mt-auto font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity btn-shine disabled:opacity-50 disabled:cursor-wait">
                         {isCheckoutLoading ? 'Redirecting...' : (
-                            isTestMode ? 'Test this subscription' : (
+                            billingManagedInStripe ? 'Manage plan in Stripe' : (isTestMode ? 'Test this subscription' : (
                                 plan.name === 'Free' ? 'Choose plan' : (
                                     plan.cta || (hasStartedTrial ? 'Choose plan' : 'Try for 14 days')
                                 )
-                            )
+                            ))
                         )}
                     </button>
                 )}
@@ -299,7 +320,10 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
 // --- Main Pricing Page Component ---
 const PricingPage = () => {
     const location = useLocation();
-    const { profile, subscriptionStatus, subscriptionLog, startedTrial } = useAuth(); 
+    const { profile } = useAuth();
+    const subscriptionStatus = profile?.subscription_status;
+    const subscriptionLog = profile?.log;
+    const startedTrial = profile?.started_trial;
     const [cycle, setCycle] = useState('monthly');
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [source, setSource] = useState('standard');
@@ -464,7 +488,7 @@ const PricingPage = () => {
                         <div className="py-10 text-sm text-gray-500">{plansError}</div>
                     ) : (
                         <div className="inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4">
-                           {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} hasStartedTrial={startedTrial} isTestMode={isTestMode} />)}
+                           {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} hasStartedTrial={startedTrial} isTestMode={isTestMode} />)}
                         </div>
                     )}
                 </div>

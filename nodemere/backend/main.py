@@ -4319,6 +4319,148 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
     except Exception as exc:
         logging.error("Failed to sync plan entitlement for user %s plan %s: %s", user_id, plan_name, exc, exc_info=True)
 
+
+# Plan access is evaluated from the authenticated user's current profile and
+# the server-owned entitlement table. The browser may display these values,
+# but it is never trusted to enforce them.
+DEFAULT_PLAN_ENTITLEMENTS = {
+    "free": {"included_call_minutes": 20, "max_receptionists": 1, "max_scenarios": 3, "max_contacts": 100, "inbound_calling": True, "outbound_calling": False, "overage_enabled": False},
+    "essentials": {"included_call_minutes": 300, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True},
+    "pro": {"included_call_minutes": 1500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True},
+    "ultra": {"included_call_minutes": 3000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True},
+}
+SUBSCRIPTION_ACCESS_STATUSES = {"active", "trialing"}
+
+
+def get_user_plan_context(user_id: str) -> dict:
+    profile_response = (
+        supabase_admin.table("users")
+        .select("id,plan,subscription_status,stripe_subscription_id,stripe_customer_id")
+        .eq("id", str(user_id))
+        .limit(1)
+        .execute()
+    )
+    profile = (profile_response.data or [None])[0]
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
+
+    plan_slug = str(profile.get("plan") or "free").strip().lower()
+    if plan_slug not in DEFAULT_PLAN_ENTITLEMENTS:
+        plan_slug = "free"
+    entitlements = dict(DEFAULT_PLAN_ENTITLEMENTS[plan_slug])
+    try:
+        plan_response = (
+            supabase_admin.table("sonar_plans")
+            .select("slug,entitlements")
+            .eq("slug", plan_slug)
+            .limit(1)
+            .execute()
+        )
+        plan_row = (plan_response.data or [None])[0]
+        if isinstance(plan_row and plan_row.get("entitlements"), dict):
+            entitlements.update(plan_row["entitlements"])
+    except Exception as exc:
+        logging.warning("Could not load entitlement row for %s: %s", plan_slug, exc)
+
+    return {
+        "user": profile,
+        "plan": plan_slug,
+        "status": str(profile.get("subscription_status") or "").strip().lower(),
+        "entitlements": entitlements,
+    }
+
+
+def require_plan_access(user_id: str, feature: str) -> dict:
+    context = get_user_plan_context(user_id)
+    if context["plan"] != "free" and context["status"] not in SUBSCRIPTION_ACCESS_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "subscription_inactive",
+                "feature": feature,
+                "message": "Your subscription is not active. Open Stripe Billing Portal to update billing.",
+                "plan": context["plan"],
+                "subscription_status": context["status"] or "unknown",
+            },
+        )
+    return context
+
+
+def enforce_plan_limit(context: dict, resource: str, current_count: int, limit_key: str) -> None:
+    raw_limit = context["entitlements"].get(limit_key)
+    if raw_limit is None:
+        return
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return
+    if current_count >= limit:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "plan_limit_reached",
+                "resource": resource,
+                "limit": limit,
+                "current": current_count,
+                "plan": context["plan"],
+                "message": f"Your {context['plan'].capitalize()} plan allows {limit} {resource}. Upgrade in Stripe Billing Portal to add more.",
+            },
+        )
+
+
+def count_user_rows(table_name: str, user_id: str, *, business_id: Optional[int] = None) -> int:
+    query = supabase_admin.table(table_name).select("id")
+    query = query.eq("business_id", business_id) if business_id is not None else query.eq("user_id", str(user_id))
+    return len(query.execute().data or [])
+
+
+def count_active_receptionists(user_id: str) -> int:
+    response = (
+        supabase_admin.table("hired_receptionists")
+        .select("id,is_active,status")
+        .eq("user_id", str(user_id))
+        .execute()
+    )
+    inactive_statuses = {"archived", "inactive", "disabled", "terminated"}
+    return len([
+        row for row in (response.data or [])
+        if row.get("is_active") is not False
+        and str(row.get("status") or "").strip().lower() not in inactive_statuses
+    ])
+
+
+def enforce_call_minutes(user_id: str, business: Optional[dict], *, direction: str = "inbound") -> dict:
+    context = require_plan_access(user_id, f"{direction}_calling")
+    if direction == "outbound" and context["entitlements"].get("outbound_calling") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "feature_not_in_plan",
+                "feature": "outbound_calling",
+                "plan": context["plan"],
+                "message": "Outbound calling is available on the Pro and Ultra plans.",
+            },
+        )
+    if not business:
+        return context
+    used_seconds = parse_usage_seconds(business.get("current_cycle_used_seconds"))
+    included_seconds = parse_usage_seconds(business.get("current_cycle_included_seconds"))
+    if included_seconds <= 0:
+        included_seconds = int(context["entitlements"].get("included_call_minutes") or 0) * 60
+    if used_seconds >= included_seconds and context["entitlements"].get("overage_enabled") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "minute_limit_reached",
+                "resource": "call minutes",
+                "limit": included_seconds // 60,
+                "current": used_seconds // 60,
+                "plan": context["plan"],
+                "message": "Your included call minutes are used. Upgrade in Stripe Billing Portal to continue calling.",
+            },
+        )
+    return context
+
 def build_call_route_payload(payload: dict, request: Request):
     forwarded_from = first_present(payload, "forwarded_from", "forwardedFrom", "ForwardedFrom", "source_number")
     trigger_key = first_present(payload, "trigger_key", "trigger", "event", "type")
@@ -5671,6 +5813,84 @@ async def trigger_scenario(request: ScenarioTriggerRequest, current_user: dict =
         request.created_at,
     )
 
+
+@app.get("/api/sonar/scenarios", tags=["Sonar Scenarios"])
+async def list_sonar_scenarios(current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    response = (
+        supabase_admin.table("scenarios")
+        .select("*")
+        .or_(f"user_id.eq.{user_id},created_by.eq.{user_id}")
+        .order("updated_at", desc=True)
+        .execute()
+    )
+    return response.data or []
+
+
+@app.post("/api/sonar/scenarios", tags=["Sonar Scenarios"])
+async def create_sonar_scenario(payload: dict, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    context = require_plan_access(user_id, "scenarios")
+    existing_count = count_user_rows("scenarios", user_id)
+    enforce_plan_limit(context, "scenarios", existing_count, "max_scenarios")
+    insert_payload = dict(payload or {})
+    insert_payload["user_id"] = user_id
+    insert_payload["created_by"] = user_id
+    business = load_business_by_user_id(user_id)
+    insert_payload["business_id"] = (business or {}).get("id")
+    response = supabase_admin.table("scenarios").insert(insert_payload).execute()
+    if not response.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Scenario could not be created")
+    if scenario_engine:
+        await scenario_engine.load_scenarios()
+    return response.data[0]
+
+
+@app.put("/api/sonar/scenarios/{scenario_id}", tags=["Sonar Scenarios"])
+async def update_sonar_scenario(scenario_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    require_plan_access(user_id, "scenarios")
+    existing_response = (
+        supabase_admin.table("scenarios")
+        .select("*")
+        .eq("id", scenario_id)
+        .or_(f"user_id.eq.{user_id},created_by.eq.{user_id}")
+        .limit(1)
+        .execute()
+    )
+    if not existing_response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
+    updates = {key: value for key, value in (payload or {}).items() if key not in {"id", "user_id", "created_by", "business_id", "created_at"}}
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    response = (
+        supabase_admin.table("scenarios")
+        .update(updates)
+        .eq("id", scenario_id)
+        .or_(f"user_id.eq.{user_id},created_by.eq.{user_id}")
+        .execute()
+    )
+    if scenario_engine:
+        await scenario_engine.load_scenarios()
+    return (response.data or [{**existing_response.data[0], **updates}])[0]
+
+
+@app.delete("/api/sonar/scenarios/{scenario_id}", tags=["Sonar Scenarios"])
+async def delete_sonar_scenario(scenario_id: str, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    require_plan_access(user_id, "scenarios")
+    response = (
+        supabase_admin.table("scenarios")
+        .delete()
+        .eq("id", scenario_id)
+        .or_(f"user_id.eq.{user_id},created_by.eq.{user_id}")
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
+    if scenario_engine:
+        await scenario_engine.load_scenarios()
+    return {"ok": True, "id": scenario_id}
+
 @app.post("/api/trigger-scenario", tags=["Scenarios"])
 async def trigger_scenario_legacy_alias(request: ScenarioTriggerRequest, current_user: dict = Depends(get_current_user)):
     return emit_scenario_trigger(
@@ -5683,6 +5903,7 @@ async def trigger_scenario_legacy_alias(request: ScenarioTriggerRequest, current
 async def trigger_specific_scenario(scenario_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
     if not scenario_engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
+    require_plan_access(str(current_user.id), "scenarios")
     scenario_response = scenario_engine.supabase.table("scenarios").select("id,user_id,created_by").eq("id", scenario_id).limit(1).execute()
     scenario = (scenario_response.data or [None])[0]
     if not scenario or not scenario_belongs_to_user(scenario, str(current_user.id)):
@@ -5714,6 +5935,7 @@ async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_c
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="scenario.nodes_data required")
 
     user_id = str(current_user.id)
+    require_plan_access(user_id, "scenarios")
     business = load_business_by_user_id(user_id)
     # The builder payload is untrusted input. Always bind a test run to the
     # authenticated tenant instead of accepting user/business IDs supplied in
@@ -5870,6 +6092,9 @@ async def twilio_inbound_webhook(request: Request):
         "forwarded_from": first_present(payload, "ForwardedFrom", "forwarded_from"),
     })
     business = context.get("business")
+    resolved_user_id = context.get("user_id") or (business or {}).get("user_id")
+    if resolved_user_id:
+        enforce_call_minutes(str(resolved_user_id), business, direction="inbound")
     receptionist = find_inbound_receptionist_for_business(
         business.get("id") if business else None,
         context.get("user_id") or (business or {}).get("user_id"),
@@ -7715,9 +7940,17 @@ async def get_sonar_person(person_id: str, current_user: dict = Depends(get_curr
 @app.post("/api/sonar/people", tags=["Sonar People"])
 async def create_sonar_person(payload: dict, current_user: dict = Depends(get_current_user)):
     business = load_business_by_user_id(str(current_user.id))
+    user_id = str(current_user.id)
+    context = require_plan_access(user_id, "contacts")
+    enforce_plan_limit(
+        context,
+        "contacts",
+        count_user_rows("people", user_id, business_id=(business or {}).get("id")),
+        "max_contacts",
+    )
     insert_payload = {**payload}
-    insert_payload["user_id"] = insert_payload.get("user_id") or str(current_user.id)
-    if business and "business_id" not in insert_payload:
+    insert_payload["user_id"] = user_id
+    if business:
         insert_payload["business_id"] = business["id"]
     insert_payload = normalize_people_payload_custom_fields(
         insert_payload,
@@ -7983,6 +8216,13 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="catalog_id is required")
 
     current_user_id = str(current_user.id)
+    plan_context = require_plan_access(current_user_id, "receptionists")
+    enforce_plan_limit(
+        plan_context,
+        "receptionists",
+        count_active_receptionists(current_user_id),
+        "max_receptionists",
+    )
     try:
         if is_voice_clone_hire:
             voice_response = (
@@ -8533,6 +8773,16 @@ async def get_sonar_pricing_plans():
 async def create_checkout_session(request: CreateCheckoutSessionRequest, current_user: dict = Depends(get_current_user)):
   current_user_id = current_user.id
   try:
+    try:
+      requested_price = stripe.Price.retrieve(request.price_id)
+      requested_product = stripe.Product.retrieve(requested_price.get("product"))
+    except Exception as exc:
+      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not available.") from exc
+    if not requested_price.get("active") or not requested_price.get("recurring"):
+      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not an active subscription price.")
+    if str(requested_product.get("name") or "").strip().lower() not in DEFAULT_PLAN_ENTITLEMENTS:
+      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not a Nodemere plan.")
+
     user_profile = supabase.table('users').select('email', 'stripe_customer_id', 'started_trial').eq('id', str(current_user_id)).single().execute()
     if not user_profile.data:
       raise HTTPException(status_code=404, detail="User not found")
@@ -8547,9 +8797,9 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
 
     # Dynamically set the base URL based on TEST_MODE
     if TEST_MODE:
-        base_url = "http://localhost:5173"
+        base_url = frontend_base_url or "http://localhost:5173"
     else:
-        base_url = "https://nodemere.com"
+        base_url = frontend_base_url or "https://nodemere.ai"
 
     price_to_use = request.price_id
     checkout_session_data = {
@@ -8584,6 +8834,42 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
   except Exception as e:
     logging.error(f"Error creating checkout session for user {current_user_id}: {e}", exc_info=True)
     raise HTTPException(status_code=500, detail="An internal error occurred.")
+
+
+@app.post("/api/sonar/billing/portal", tags=["Billing"])
+async def create_billing_portal_session(current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    profile_response = (
+        supabase_admin.table("users")
+        .select("email,stripe_customer_id")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    profile = (profile_response.data or [None])[0]
+    customer_id = (profile or {}).get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "billing_customer_missing", "message": "Start a subscription before opening Billing Portal."},
+        )
+
+    return_url = f"{(frontend_base_url or 'http://localhost:5173').rstrip('/')}/dashboard"
+    try:
+        portal_session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=return_url,
+        )
+    except stripe.error.InvalidRequestError as exc:
+        logging.warning("Stripe Billing Portal rejected customer %s for user %s: %s", customer_id, user_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "billing_customer_invalid", "message": "Billing Portal is not available for this account yet."},
+        ) from exc
+    except Exception as exc:
+        logging.error("Failed to create Billing Portal session for user %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not open Stripe Billing Portal.") from exc
+    return {"url": portal_session.url}
 
 @app.get("/api/sonar/payments/test-mode", tags=["Sonar Payments"])
 async def get_sonar_payment_test_mode():
@@ -8632,6 +8918,7 @@ async def call_customer(payload: dict, current_user: dict = Depends(get_current_
 
     user_id = str(current_user.id)
     business = load_business_by_user_id(user_id)
+    enforce_call_minutes(user_id, business, direction="outbound")
     receptionist = find_inbound_receptionist_for_business(
         (business or {}).get("id"),
         user_id,
@@ -9226,6 +9513,8 @@ scenario_engine = ScenarioEngine(
         "emit_appointment_change_triggers": emit_appointment_change_triggers,
     },
     base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
+    plan_access_checker=enforce_call_minutes,
+    scenario_access_checker=lambda user_id, _context, direction="scenario": require_plan_access(user_id, "scenarios"),
 )
 
 @app.post("/api/sonar/update-payment", tags=["Sonar Payments"])
@@ -9691,6 +9980,45 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             })
     elif event_type == 'customer.created':
         return {"status": "success"}
+    elif event_type == 'customer.subscription.updated':
+        subscription = event['data']['object']
+        if is_connected_account_event:
+            return {"status": "success"}
+        customer_id = subscription.get("customer")
+        if customer_id:
+            user_response = (
+                supabase_admin.table("users")
+                .select("id,plan")
+                .eq("stripe_customer_id", customer_id)
+                .limit(1)
+                .execute()
+            )
+            user_row = (user_response.data or [None])[0]
+            if user_row:
+                status_value = str(subscription.get("status") or "").lower()
+                if subscription.get("trial_start"):
+                    status_value = "trialing"
+                update_data = {
+                    "stripe_subscription_id": subscription.get("id"),
+                    "subscription_status": status_value,
+                    "trial_start_date": date.fromtimestamp(subscription.get("trial_start")).isoformat() if subscription.get("trial_start") else None,
+                    "trial_end_date": date.fromtimestamp(subscription.get("trial_end")).isoformat() if subscription.get("trial_end") else None,
+                }
+                price_data = (((subscription.get("items") or {}).get("data") or [{}])[0]).get("price") or {}
+                product_id = price_data.get("product")
+                if product_id:
+                    product = stripe.Product.retrieve(product_id)
+                    plan_name = str(product.get("name") or "").strip().lower()
+                    if plan_name in DEFAULT_PLAN_ENTITLEMENTS:
+                        update_data["plan"] = plan_name
+                supabase_admin.table("users").update(update_data).eq("id", user_row["id"]).execute()
+                sync_business_plan_entitlement(
+                    user_row["id"],
+                    update_data.get("plan") or user_row.get("plan") or "free",
+                    datetime.fromtimestamp(subscription.get("current_period_start"), timezone.utc).isoformat() if subscription.get("current_period_start") else None,
+                    datetime.fromtimestamp(subscription.get("current_period_end"), timezone.utc).isoformat() if subscription.get("current_period_end") else None,
+                )
+        return {"status": "success"}
     elif event_type == 'customer.subscription.created':
         subscription = event['data']['object']
         if is_connected_account_event:
@@ -9737,6 +10065,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 }
 
                 supabase.table('users').update(update_data).eq('id', user_id).execute()
+                sync_business_plan_entitlement(user_id, "free", reset_usage=True)
                 logging.info(f"User {user_id} (customer {customer_id}) subscription deleted. Status set to 'canceled'. Subscription ID: {subscription_id}")
             else:
                 logging.warning(f"User not found for stripe_customer_id {customer_id} during customer.subscription.deleted event.")

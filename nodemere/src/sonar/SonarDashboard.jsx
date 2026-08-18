@@ -70,6 +70,7 @@ import CalendarPage from './pages/CalendarPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
 import CubePreloader from './components/CubePreloader';
+import PlanLimitModal from '../components/modals/PlanLimitModal';
 import { AudioPlayerProvider, PersistentAudioPlayer } from './contexts/AudioPlayerContext';
 import { CallLogsProvider, useCallLogs } from './contexts/CallLogsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -1704,8 +1705,15 @@ const SonarDashboard = () => {
   const [recentlyHiredReceptionist, setRecentlyHiredReceptionist] = useState(false);
   const [backendTasklistState, setBackendTasklistState] = useState(null);
   const [showSetupGuide, setShowSetupGuide] = useState(true);
+  const [planLimitDetail, setPlanLimitDetail] = useState(null);
   const tasklistPersistRef = useRef('');
   const userId = authSession?.user?.id || profile?.id || null;
+
+  useEffect(() => {
+    const handlePlanLimit = (event) => setPlanLimitDetail(event.detail || null);
+    window.addEventListener('nodemere:plan-limit', handlePlanLimit);
+    return () => window.removeEventListener('nodemere:plan-limit', handlePlanLimit);
+  }, []);
 
   const dismissPopup = useCallback(async (popup) => {
     if (!popup) return;
@@ -2618,6 +2626,7 @@ const SonarDashboard = () => {
         profile={profile}
         onClose={() => dismissPopup(activePopup)}
       />
+      <PlanLimitModal detail={planLimitDetail} onClose={() => setPlanLimitDetail(null)} />
       {showSetupGuide && (
         <TasklistWidget
           tasklistState={backendTasklistState || profile?.tasklist}

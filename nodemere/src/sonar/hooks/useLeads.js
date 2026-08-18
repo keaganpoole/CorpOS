@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { getCurrentBusinessId } from '../lib/customFields';
+import { api } from '../lib/api';
 import {
   normalizeOptionValue,
   titleCase,
@@ -31,11 +31,6 @@ const TRIMMED_TEXT_FIELDS = new Set([
 ]);
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-const isRlsInsertError = (error) => {
-  const message = String(error?.message || '').toLowerCase();
-  return message.includes('row-level security') || error?.code === '42501';
-};
-
 const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
   const next = { ...payload };
   const now = new Date().toISOString();
@@ -99,15 +94,6 @@ export function useLeads() {
       setJustAddedLeadIds((prev) => prev.filter((id) => id !== leadId));
     }, 1200);
     shimmerTimersRef.current.set(leadId, timeout);
-  }, []);
-
-  const getCreateContext = useCallback(async () => {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) throw userError;
-    if (!user) throw new Error('User not found');
-
-    const businessId = await getCurrentBusinessId();
-    return { userId: user.id, businessId };
   }, []);
 
   const fetchLeads = useCallback(async () => {
@@ -184,33 +170,8 @@ export function useLeads() {
   }, [markLeadJustAdded, notifyBackend]);
 
   const createLead = async (leadData, options = {}) => {
-    const { userId, businessId } = await getCreateContext();
-    const payload = normalizePayload({
-      ...leadData,
-      user_id: userId,
-      business_id: businessId,
-    }, { isCreate: true });
-    let { data, error: err } = await supabase
-      .from('people')
-      .insert(payload)
-      .select()
-      .single();
-
-    if (err && isRlsInsertError(err)) {
-      const legacyPayload = normalizePayload({
-        ...leadData,
-        user: userId,
-      }, { isCreate: true });
-      const retry = await supabase
-        .from('people')
-        .insert(legacyPayload)
-        .select()
-        .single();
-      data = retry.data;
-      err = retry.error;
-    }
-
-    if (err) throw err;
+    const payload = normalizePayload({ ...leadData }, { isCreate: true });
+    const data = await api.createPerson(payload);
     markLeadJustAdded(data.id);
     if (options.placement === 'end') {
       pendingInsertPlacementRef.current.set(data.id, 'end');
@@ -232,14 +193,10 @@ export function useLeads() {
       return { ...row, ...payload };
     }));
 
-    const { data, error: err } = await supabase
-      .from('people')
-      .update(payload)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (err) {
+    let data;
+    try {
+      data = await api.updatePerson(id, payload);
+    } catch (err) {
       if (previousRow) {
         setLeads((prev) => prev.map((row) => (row.id === id ? previousRow : row)));
       }
@@ -251,11 +208,7 @@ export function useLeads() {
   };
 
   const deleteLead = async (id) => {
-    const { error: err } = await supabase
-      .from('people')
-      .delete()
-      .eq('id', id);
-    if (err) throw err;
+    await api.deletePerson(id);
     setLeads((prev) => prev.filter((row) => row.id !== id));
     if (selectedId === id) setSelectedId(null);
   };
