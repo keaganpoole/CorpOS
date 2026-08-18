@@ -8577,7 +8577,7 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
     if "No such customer" in str(e):
       logging.warning(f"Stale customer ID for user {current_user_id}. Creating a new one.")
       supabase.table('users').update({'stripe_customer_id': None}).eq('id', str(current_user_id)).execute()
-      return await create_checkout_session(request, current_user_id)
+      return await create_checkout_session(request, current_user)
     else:
       logging.error(f"Stripe InvalidRequestError: {e}", exc_info=True)
       raise HTTPException(status_code=500, detail=str(e))

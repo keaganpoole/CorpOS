@@ -8,7 +8,8 @@ import colors from '../../color';
 import LegalFooter from '../components/LegalFooter';
 
 // --- Data ---
-const API_BASE_URL = '/api/sonar';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const apiUrl = (path) => `${API_BASE_URL}${path}`;
 const planHierarchy = { "Free": 0, "Essentials": 1, "Pro": 2, "Ultra": 3 };
 
 const plansConfig = [
@@ -169,7 +170,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, hasStart
         setCheckoutLoading(true);
         try {
             const response = await axios.post(
-                `${API_BASE_URL}/create-checkout-session`,
+                apiUrl('/create-checkout-session'),
                 { price_id: priceId },
                 { headers: { Authorization: `Bearer ${session.access_token}` } }
             );
@@ -315,7 +316,7 @@ const PricingPage = () => {
     useEffect(() => {
         const fetchConfig = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/payments/test-mode`);
+                const response = await axios.get(apiUrl('/api/sonar/payments/test-mode'));
                 setIsTestMode(Boolean(response.data.testMode));
             } catch (error) {
                 console.error("Error fetching server config:", error);
@@ -356,7 +357,7 @@ const PricingPage = () => {
     useEffect(() => {
         const fetchPlans = async () => {
             try {
-                const { data } = await axios.get(`${API_BASE_URL}/pricing/plans`);
+                const { data } = await axios.get(apiUrl('/api/sonar/pricing/plans'));
                 setStripeData(data);
                 if (Array.isArray(data.plans) && data.plans.length) {
                     setPlanEntitlements(data.plans);
