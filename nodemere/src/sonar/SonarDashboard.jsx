@@ -1511,6 +1511,8 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
     const safeValue = Number.isFinite(value) ? value : 0;
     return safeValue >= 100 ? safeValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) : safeValue.toLocaleString(undefined, { maximumFractionDigits: 1 });
   };
+  const overageMinutes = Number(usage?.billable_overage_minutes ?? 0);
+  const overageAmount = Number(usage?.estimated_overage_amount_cents ?? 0) / 100;
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -1646,6 +1648,21 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
                   <span className="font-semibold text-zinc-100 tabular-nums">{formatMinutes(usedMinutes)} min</span>
                 </div>
               </div>
+              {usage?.alert_level === 'warning' && (
+                <div className="mt-4 border-l border-amber-400/70 pl-3 text-[12px] leading-5 text-amber-200">
+                  You have used 80% of your included minutes.
+                </div>
+              )}
+              {usage?.alert_level === 'limit' && (
+                <div className="mt-4 border-l border-rose-400/70 pl-3 text-[12px] leading-5 text-rose-200">
+                  Included minutes are exhausted. New calls may be blocked by your plan.
+                </div>
+              )}
+              {usage?.alert_level === 'overage' && (
+                <div className="mt-4 border-l border-amber-400/70 pl-3 text-[12px] leading-5 text-amber-200">
+                  {formatMinutes(overageMinutes)} overage minute{overageMinutes === 1 ? '' : 's'} estimated at ${overageAmount.toFixed(2)}. This will be added to your next Stripe invoice.
+                </div>
+              )}
             </div>
 
             <div className="border-b border-white/[0.06] bg-white/[0.025] px-4 py-4">
@@ -1845,6 +1862,9 @@ const SonarDashboard = () => {
           setBusinessUsage(data);
         }
       });
+    api.getBillingUsage().then((data) => {
+      if (data) setBusinessUsage((current) => ({ ...(current || {}), ...data }));
+    });
   }, [userId]);
 
   useEffect(() => {
@@ -1854,7 +1874,12 @@ const SonarDashboard = () => {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'businesses', filter: `id=eq.${staffBusinessId}` },
-        (payload) => setBusinessUsage(payload.new)
+        (payload) => {
+          setBusinessUsage((current) => ({ ...(current || {}), ...(payload.new || {}) }));
+          api.getBillingUsage().then((data) => {
+            if (data) setBusinessUsage((current) => ({ ...(current || {}), ...data }));
+          });
+        }
       )
       .subscribe();
     return () => {

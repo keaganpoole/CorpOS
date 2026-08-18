@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 
 const DeleteAccountModal = ({ isOpen, onClose, onConfirmDelete, subscriptionStatus, onManageSubscription }) => {
+  const hasSubscription = ['active', 'trialing', 'past_due', 'unpaid', 'failed'].includes(String(subscriptionStatus || '').toLowerCase());
   return (
     <AnimatePresence>
       {isOpen && (
@@ -26,11 +27,11 @@ const DeleteAccountModal = ({ isOpen, onClose, onConfirmDelete, subscriptionStat
               </button>
             </header>
             <div className="modal-body text-center p-4">
-              {subscriptionStatus === 'active' ? (
+              {hasSubscription ? (
                 <>
                   <FontAwesomeIcon icon={faExclamationTriangle} className="text-yellow-500 text-4xl mb-4" />
                   <p className="text-white mb-4">
-                    You have an active subscription. Please cancel your subscription first before deleting your account.
+                    You have an active subscription. Please cancel your subscription in Stripe Billing Portal before closing your account.
                   </p>
                   <button
                     onClick={onManageSubscription}
@@ -42,14 +43,14 @@ const DeleteAccountModal = ({ isOpen, onClose, onConfirmDelete, subscriptionStat
               ) : (
                 <>
                   <p className="text-white mb-4">
-                    Are you sure you want to delete your account? This action cannot be undone.
+                    Are you sure you want to close your account and submit a deletion request? You will be signed out and this action cannot be undone.
                   </p>
                   <div className="flex justify-center space-x-4">
                     <button
                       onClick={onConfirmDelete}
                       className="btn-danger bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
                     >
-                      Yes, Delete My Account
+                      Close account
                     </button>
                     <button
                       onClick={onClose}

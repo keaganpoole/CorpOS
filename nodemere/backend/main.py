@@ -7,6 +7,7 @@ import json
 import re
 import time
 import asyncio
+import math
 import requests
 import base64
 import binascii
@@ -4461,6 +4462,143 @@ def enforce_call_minutes(user_id: str, business: Optional[dict], *, direction: s
         )
     return context
 
+
+def get_usage_snapshot(user_id: str) -> dict:
+    context = get_user_plan_context(user_id)
+    business = load_business_by_user_id(user_id) or {}
+    used_seconds = parse_usage_seconds(business.get("current_cycle_used_seconds"))
+    included_seconds = parse_usage_seconds(business.get("current_cycle_included_seconds"))
+    if included_seconds <= 0:
+        included_seconds = int(context["entitlements"].get("included_call_minutes") or 0) * 60
+    overage_seconds = max(0, used_seconds - included_seconds)
+    overage_rate_cents = int(context["entitlements"].get("overage_price_per_minute_cents") or 30)
+    billable_overage_minutes = math.ceil(overage_seconds / 60) if overage_seconds else 0
+    usage_percent = (used_seconds / included_seconds * 100) if included_seconds else 0
+    if overage_seconds > 0 and context["entitlements"].get("overage_enabled") is True:
+        alert_level = "overage"
+    elif usage_percent >= 100:
+        alert_level = "limit"
+    elif usage_percent >= 80:
+        alert_level = "warning"
+    else:
+        alert_level = "normal"
+    return {
+        "business_id": business.get("id"),
+        "plan": context["plan"],
+        "subscription_status": context["status"] or "unknown",
+        "included_seconds": included_seconds,
+        "used_seconds": used_seconds,
+        "overage_seconds": overage_seconds,
+        "current_cycle_included_seconds": included_seconds,
+        "current_cycle_used_seconds": used_seconds,
+        "current_cycle_overage_seconds": overage_seconds,
+        "billable_overage_minutes": billable_overage_minutes,
+        "overage_price_per_minute_cents": overage_rate_cents,
+        "estimated_overage_amount_cents": billable_overage_minutes * overage_rate_cents,
+        "overage_enabled": context["entitlements"].get("overage_enabled") is True,
+        "usage_percent": round(usage_percent, 2),
+        "alert_level": alert_level,
+        "cycle_started_at": business.get("current_cycle_started_at"),
+        "cycle_ends_at": business.get("current_cycle_ends_at"),
+    }
+
+
+def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
+    """Create one idempotent Stripe invoice item for the current usage cycle."""
+    customer_id = invoice.get("customer")
+    invoice_id = invoice.get("id")
+    if not customer_id or not invoice_id:
+        return
+
+    user_response = (
+        supabase_admin.table("users")
+        .select("id,plan,subscription_status")
+        .eq("stripe_customer_id", customer_id)
+        .limit(1)
+        .execute()
+    )
+    user = (user_response.data or [None])[0]
+    if not user:
+        logging.warning("Cannot reconcile overage for unknown Stripe customer %s", customer_id)
+        return
+
+    context = get_user_plan_context(str(user["id"]))
+    if context["entitlements"].get("overage_enabled") is not True:
+        return
+
+    usage = get_usage_snapshot(str(user["id"]))
+    if usage["billable_overage_minutes"] <= 0:
+        return
+
+    existing_response = (
+        supabase_admin.table("billing_overage_events")
+        .select("*")
+        .eq("user_id", str(user["id"]))
+        .eq("stripe_invoice_id", invoice_id)
+        .limit(1)
+        .execute()
+    )
+    existing = (existing_response.data or [None])[0]
+    if existing and existing.get("stripe_invoice_item_id"):
+        return
+
+    event_payload = {
+        "user_id": str(user["id"]),
+        "business_id": usage.get("business_id"),
+        "stripe_customer_id": customer_id,
+        "stripe_invoice_id": invoice_id,
+        "billing_period_start": datetime.fromtimestamp(invoice["period_start"], timezone.utc).isoformat() if invoice.get("period_start") else usage.get("cycle_started_at"),
+        "billing_period_end": datetime.fromtimestamp(invoice["period_end"], timezone.utc).isoformat() if invoice.get("period_end") else usage.get("cycle_ends_at"),
+        "overage_seconds": usage["overage_seconds"],
+        "billable_minutes": usage["billable_overage_minutes"],
+        "amount_cents": usage["estimated_overage_amount_cents"],
+        "currency": str(invoice.get("currency") or "usd").lower(),
+        "status": "pending",
+    }
+    try:
+        if not existing:
+            insert_response = supabase_admin.table("billing_overage_events").insert(event_payload).execute()
+            existing = (insert_response.data or [None])[0]
+        if existing and existing.get("stripe_invoice_item_id"):
+            return
+
+        item = stripe.InvoiceItem.create(
+            customer=customer_id,
+            invoice=invoice_id,
+            amount=event_payload["amount_cents"],
+            currency=event_payload["currency"],
+            description=f"Nodemere call overage: {event_payload['billable_minutes']} minute(s)",
+            metadata={
+                "nodemere_user_id": str(user["id"]),
+                "nodemere_overage_event_id": str((existing or {}).get("id") or ""),
+            },
+            idempotency_key=f"nodemere-overage-{invoice_id}-{user['id']}",
+        )
+        supabase_admin.table("billing_overage_events").update({
+            "stripe_invoice_item_id": item.get("id"),
+            "status": "invoiced",
+            "error_message": None,
+        }).eq("user_id", str(user["id"])).eq("stripe_invoice_id", invoice_id).execute()
+        logging.info("Attached %s cents of call overage to Stripe invoice %s", event_payload["amount_cents"], invoice_id)
+    except Exception as exc:
+        logging.error("Failed to attach call overage to invoice %s: %s", invoice_id, exc, exc_info=True)
+        supabase_admin.table("billing_overage_events").update({
+            "status": "failed",
+            "error_message": str(exc)[:1000],
+        }).eq("user_id", str(user["id"])).eq("stripe_invoice_id", invoice_id).execute()
+
+
+def reconcile_overage_invoice(invoice_id: Optional[str], status_value: str) -> None:
+    if not invoice_id:
+        return
+    update_data = {"status": status_value}
+    if status_value in {"paid", "void"}:
+        update_data["reconciled_at"] = datetime.now(timezone.utc).isoformat()
+    try:
+        supabase_admin.table("billing_overage_events").update(update_data).eq("stripe_invoice_id", invoice_id).execute()
+    except Exception as exc:
+        logging.error("Failed to reconcile overage invoice %s: %s", invoice_id, exc, exc_info=True)
+
 def build_call_route_payload(payload: dict, request: Request):
     forwarded_from = first_present(payload, "forwarded_from", "forwardedFrom", "ForwardedFrom", "source_number")
     trigger_key = first_present(payload, "trigger_key", "trigger", "event", "type")
@@ -8871,6 +9009,24 @@ async def create_billing_portal_session(current_user: dict = Depends(get_current
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not open Stripe Billing Portal.") from exc
     return {"url": portal_session.url}
 
+
+@app.get("/api/sonar/billing/usage", tags=["Billing"])
+async def get_billing_usage(current_user: dict = Depends(get_current_user)):
+    usage = get_usage_snapshot(str(current_user.id))
+    recent_events = []
+    try:
+        recent_events = (
+            supabase_admin.table("billing_overage_events")
+            .select("stripe_invoice_id,billable_minutes,amount_cents,currency,status,error_message,created_at,reconciled_at")
+            .eq("user_id", str(current_user.id))
+            .order("created_at", desc=True)
+            .limit(5)
+            .execute()
+        ).data or []
+    except Exception as exc:
+        logging.warning("Could not load overage reconciliation history: %s", exc)
+    return {**usage, "recent_overage_events": recent_events}
+
 @app.get("/api/sonar/payments/test-mode", tags=["Sonar Payments"])
 async def get_sonar_payment_test_mode():
     return {
@@ -9713,12 +9869,19 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         )
         logging.info(f"Checkout session completed for user with customer ID: {customer_id}. Plan changed: {current_plan} -> {plan_name}")
 
+    elif event_type == 'invoice.upcoming':
+        invoice = event['data']['object']
+        if not is_connected_account_event:
+            attach_overage_to_upcoming_invoice(invoice)
+        return {"status": "success"}
     elif event_type in {'invoice.created', 'invoice.sent'}:
         # These invoice lifecycle events are intentionally not exposed as
         # Scenarios triggers.
         return {"status": "success"}
     elif event_type == 'invoice.paid':
         invoice = event['data']['object']
+        if not is_connected_account_event:
+            reconcile_overage_invoice(invoice.get("id"), "paid")
         if is_connected_account_event:
             return {"status": "success"}
         try:
@@ -9842,6 +10005,8 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 
     elif event_type == 'invoice.payment_failed':
         invoice = event['data']['object']
+        if not is_connected_account_event:
+            reconcile_overage_invoice(invoice.get("id"), "failed")
         if is_connected_account_event:
             metadata = invoice.get("metadata") or {}
             user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
@@ -9889,6 +10054,11 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 logging.error(f"User not found for stripe_customer_id {customer_id} during payment_failed event.")
         else:
             logging.error(f"Customer ID missing in invoice.payment_failed event.")
+    elif event_type == 'invoice.voided':
+        invoice = event['data']['object']
+        if not is_connected_account_event:
+            reconcile_overage_invoice(invoice.get("id"), "void")
+        return {"status": "success"}
     elif event_type == 'payment_intent.succeeded':
         payment_intent = event['data']['object']
         updated_payment = upsert_payment_from_stripe(
@@ -10161,6 +10331,91 @@ async def read_current_user(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         logging.error(f"Error in read_current_user for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@app.get("/users/me/privacy-requests", tags=["Users"])
+async def list_privacy_requests(current_user: dict = Depends(get_current_user)):
+    response = (
+        supabase_admin.table("account_data_requests")
+        .select("id,request_type,status,details,created_at,completed_at")
+        .eq("user_id", str(current_user.id))
+        .order("created_at", desc=True)
+        .limit(20)
+        .execute()
+    )
+    return response.data or []
+
+
+@app.post("/users/me/privacy-requests", tags=["Users"])
+async def create_privacy_request(payload: dict, current_user: dict = Depends(get_current_user)):
+    request_type = str((payload or {}).get("request_type") or "").strip().lower()
+    if request_type not in {"access", "deletion", "correction"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="request_type must be access, deletion, or correction")
+    details = str((payload or {}).get("details") or "").strip()[:2000] or None
+    existing = (
+        supabase_admin.table("account_data_requests")
+        .select("id,request_type,status,created_at")
+        .eq("user_id", str(current_user.id))
+        .eq("request_type", request_type)
+        .in_("status", ["requested", "processing"])
+        .limit(1)
+        .execute()
+    ).data or []
+    if existing:
+        return existing[0]
+    response = supabase_admin.table("account_data_requests").insert({
+        "user_id": str(current_user.id),
+        "request_type": request_type,
+        "details": details,
+    }).execute()
+    if not response.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Privacy request could not be created")
+    if request_type == "deletion":
+        supabase_admin.table("users").update({
+            "account_status": "pending_deletion",
+            "deletion_requested_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", str(current_user.id)).execute()
+    return response.data[0]
+
+
+@app.post("/users/me/account/close", tags=["Users"])
+async def close_account(current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.id)
+    profile_response = (
+        supabase_admin.table("users")
+        .select("subscription_status,stripe_customer_id")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    profile = (profile_response.data or [None])[0]
+    status_value = str((profile or {}).get("subscription_status") or "").lower()
+    if status_value in {"active", "trialing", "past_due", "unpaid", "failed"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "subscription_must_be_canceled",
+                "message": "Cancel your subscription in Stripe Billing Portal before closing this account.",
+            },
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    supabase_admin.table("account_data_requests").insert({
+        "user_id": user_id,
+        "request_type": "deletion",
+        "details": "Account closure requested from Account Settings.",
+    }).execute()
+    update_response = supabase_admin.table("users").update({
+        "account_status": "closed",
+        "closed_at": now,
+        "deletion_requested_at": now,
+    }).eq("id", user_id).execute()
+    if not update_response.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Account could not be closed")
+    return {
+        "closed": True,
+        "message": "Your account is closed and your deletion request has been submitted.",
+    }
 
 
 @app.post("/users/me/legal-acceptance", tags=["Users"])

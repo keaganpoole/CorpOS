@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel # type: ignore
-from .config import ALGORITHM, SECRET_KEY, supabase_auth
+from .config import ALGORITHM, SECRET_KEY, supabase_admin, supabase_auth
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 http_bearer = HTTPBearer()
@@ -41,7 +41,11 @@ async def get_current_user(token = Depends(http_bearer)):
                 algorithms=[ALGORITHM],
                 options={"verify_aud": False},
             )
-            return _build_authenticated_user(payload)
+            user = _build_authenticated_user(payload)
+            profile = supabase_admin.table("users").select("account_status").eq("id", str(user.id)).limit(1).execute()
+            if profile.data and profile.data[0].get("account_status") in {"closed", "pending_deletion"}:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is closed.")
+            return user
     except JWTError:
         pass
     except HTTPException:
@@ -50,6 +54,9 @@ async def get_current_user(token = Depends(http_bearer)):
     try:
         user_info = supabase_auth.auth.get_user(token.credentials)
         if user_info and user_info.user:
+            profile = supabase_admin.table("users").select("account_status").eq("id", str(user_info.user.id)).limit(1).execute()
+            if profile.data and profile.data[0].get("account_status") in {"closed", "pending_deletion"}:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is closed.")
             return user_info.user
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     except HTTPException:

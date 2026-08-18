@@ -15,6 +15,8 @@ import DeleteAccountModal from '../modals/DeleteAccountModal'; // Import DeleteA
 import ContactUsModal from '../modals/ContactUsModal'; // Import the new ContactUsModal
 import TutorialModal from '../modals/TutorialModal'; // Import TutorialModal
 import DeviceInfoModal from '../modals/DeviceInfoModal'; // Import DeviceInfoModal
+import AccountSecurityModal from '../modals/AccountSecurityModal';
+import PrivacyRequestModal from '../modals/PrivacyRequestModal';
 
 const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, onShowTutorial }) => {
   const { session, profile, updateProfile } = useAuth();
@@ -26,6 +28,8 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
   const [isContactUsModalOpen, setIsContactUsModalOpen] = useState(false); // State for ContactUsModal
   const [isTutorialModalOpen, setIsTutorialModalOpen] = useState(false); // State for TutorialModal
   const [isDeviceInfoModalOpen, setIsDeviceInfoModalOpen] = useState(false); // New state for DeviceInfoModal
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [feedback, setFeedback] = useState({ message: '', type: '' });
   const navigate = useNavigate();
 
@@ -75,69 +79,19 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
   };
 
   const handleDeleteAccount = async () => {
-    if (!session || !session.user) {
-      showFeedback('You must be logged in to delete your account.', 'error');
-      return;
-    }
-
-    // Fetch the latest user profile to check subscription status
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('subscription_status')
-      .eq('id', session.user.id)
-      .single();
-
-    if (userError) {
-      console.error('Error fetching user subscription status:', userError.message);
-      showFeedback('Error checking subscription status.', 'error');
-      return;
-    }
-
-    if (userData.subscription_status === 'active') {
-      setIsDeleteAccountModalOpen(true); // Open modal to inform user about active subscription
-      return;
-    }
-
-    // Proceed with deletion if no active subscription
     try {
-      // Delete user's password accounts
-      const { error: passwordsError } = await supabase
-        .from('passwords')
-        .delete()
-        .eq('user', session.user.id);
-
-      if (passwordsError) throw passwordsError;
-
-      // Delete user's messages
-      const { error: messagesError } = await supabase
-        .from('messages')
-        .delete()
-        .eq('user', session.user.id);
-
-      if (messagesError) throw messagesError;
-
-      // Delete user's threads
-      const { error: threadsError } = await supabase
-        .from('threads')
-        .delete()
-        .eq('user', session.user.id);
-
-      if (threadsError) throw threadsError;
-
-      // Update user's plan to 'free' and set account_deletion_date
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ plan: 'free', account_deletion_date: new Date().toISOString() })
-        .eq('id', session.user.id);
-
-      if (updateError) throw updateError;
-
-      showFeedback('Account deleted successfully.', 'success');
-      // Optionally log out the user or redirect to a confirmation page
-      handleLogout();
+      await api.closeAccount();
+      await supabase.auth.signOut();
+      navigate('/auth');
     } catch (error) {
-      console.error('Error deleting account:', error.message);
-      showFeedback('Error deleting account.', 'error');
+      console.error('Error closing account:', error);
+      if (error.status === 409) {
+        setIsDeleteAccountModalOpen(false);
+        setIsBillingModalOpen(true);
+        showFeedback('Cancel your subscription in Stripe Billing Portal before closing your account.', 'error');
+      } else {
+        showFeedback(error.message || 'Error closing account.', 'error');
+      }
     }
   };
 
@@ -192,6 +146,20 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
                 <button className="settings-btn" onClick={() => setIsBillingModalOpen(true)}>
                   <FontAwesomeIcon icon={faCreditCard} />
                   Update billing info
+                </button>
+              </li>
+
+              <li className="settings-option">
+                <button className="settings-btn" onClick={() => setIsSecurityModalOpen(true)}>
+                  <FontAwesomeIcon icon={faKey} />
+                  Email & password security
+                </button>
+              </li>
+
+              <li className="settings-option">
+                <button className="settings-btn" onClick={() => setIsPrivacyModalOpen(true)}>
+                  <FontAwesomeIcon icon={faIdCard} />
+                  Privacy & data requests
                 </button>
               </li>
 
@@ -264,6 +232,19 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
           initialDeviceData={profile?.device}
         />
       )}
+
+      <AccountSecurityModal
+        isOpen={isSecurityModalOpen}
+        onClose={() => setIsSecurityModalOpen(false)}
+        session={session}
+        onFeedback={showFeedback}
+      />
+
+      <PrivacyRequestModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => setIsPrivacyModalOpen(false)}
+        onFeedback={showFeedback}
+      />
     </>
   );
 };
