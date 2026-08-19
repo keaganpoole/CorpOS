@@ -6138,6 +6138,44 @@ def scenario_belongs_to_user(scenario: dict, user_id: str) -> bool:
     return bool(owner) and str(owner) == str(user_id)
 
 
+def normalize_scenario_json_fields(payload: dict) -> dict:
+    normalized = dict(payload or {})
+    for field in ("nodes_data", "edges_data"):
+        if field not in normalized:
+            continue
+        value = normalized.get(field)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={field: f"Invalid JSON: {exc}"},
+                ) from exc
+        if not isinstance(value, list):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={field: "Must be a list"},
+            )
+        normalized[field] = value
+    return normalized
+
+
+def validate_scenario_if_active(payload: dict):
+    status_value = str((payload or {}).get("status") or "").lower()
+    is_active = (payload or {}).get("is_active") is True or status_value == "active"
+    if not is_active:
+        return
+    definition_errors = validate_scenario_definition(payload or {})
+    if definition_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": "Scenario configuration is invalid", "errors": definition_errors},
+        )
+
+
 def execution_belongs_to_user(execution: dict, user_id: str) -> bool:
     if str(execution.get("user_id") or "") == str(user_id):
         return True
@@ -6191,11 +6229,12 @@ async def create_sonar_scenario(payload: dict, current_user: dict = Depends(get_
     context = require_plan_access(user_id, "scenarios")
     existing_count = count_user_rows("scenarios", user_id)
     enforce_plan_limit(context, "scenarios", existing_count, "max_scenarios")
-    insert_payload = dict(payload or {})
+    insert_payload = normalize_scenario_json_fields(payload or {})
     insert_payload["user_id"] = user_id
     insert_payload["created_by"] = user_id
     business = load_business_by_user_id(user_id)
     insert_payload["business_id"] = (business or {}).get("id")
+    validate_scenario_if_active(insert_payload)
     response = supabase_admin.table("scenarios").insert(insert_payload).execute()
     if not response.data:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Scenario could not be created")
@@ -6218,8 +6257,9 @@ async def update_sonar_scenario(scenario_id: str, payload: dict, current_user: d
     )
     if not existing_response.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
-    updates = {key: value for key, value in (payload or {}).items() if key not in {"id", "user_id", "created_by", "business_id", "created_at"}}
+    updates = {key: value for key, value in normalize_scenario_json_fields(payload or {}).items() if key not in {"id", "user_id", "created_by", "business_id", "created_at"}}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    validate_scenario_if_active({**existing_response.data[0], **updates})
     response = (
         supabase_admin.table("scenarios")
         .update(updates)
@@ -6330,6 +6370,7 @@ async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_c
         {"event_type": event_type, "payload": event_payload},
         flow_context=flow_context,
         trigger_node_id=trigger_node.get("id"),
+        persist_execution=False,
     )
     execution_id = (
         result.get("executionId")

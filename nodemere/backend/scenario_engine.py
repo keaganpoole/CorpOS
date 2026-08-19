@@ -6,7 +6,7 @@ import calendar
 import asyncio
 from datetime import date, datetime, time, timezone, timedelta
 from typing import Any, Callable, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import requests
@@ -1295,6 +1295,14 @@ class ScenarioActionExecutor:
             logging.warning("[ActionExecutor] Failed to load autonomy index for user %s: %s", user_id, exc)
             return 1
 
+    def _string_or_none(self, value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return str(value)
+
     async def execute(self, node: dict, context: dict):
         key = ((node.get("actionConfig") or {}).get("_key") or node.get("subOptionKey") or "").strip()
         if not key:
@@ -2054,7 +2062,7 @@ class ScenarioActionExecutor:
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "payment_method_type": self._resolve_variables(config.get("payment_method") or "card", context),
             "description": self._resolve_variables(config.get("description") or "", context),
-            "person_id": self._resolve_variables(config.get("person_id") or "", context) or context.get("person", {}).get("id") or context.get("person_id"),
+            "person_id": self._string_or_none(self._resolve_variables(config.get("person_id") or "", context) or context.get("person", {}).get("id") or context.get("person_id")),
             "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
             "customer_name": self._resolve_variables(config.get("customer_name") or format_person_display_name(person) or "", context),
             "customer_email": self._resolve_variables(config.get("customer_email") or person.get("email") or "", context),
@@ -2071,7 +2079,7 @@ class ScenarioActionExecutor:
         person = context.get("person") or {}
         payload = {
             "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
-            "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+            "person_id": self._string_or_none(self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id")),
             "customer_name": self._resolve_variables(config.get("customer_name") or format_person_display_name(person) or "", context),
             "customer_email": self._resolve_variables(config.get("customer_email") or person.get("email") or "", context),
             "customer_phone": self._resolve_variables(config.get("customer_phone") or person.get("phone") or "", context),
@@ -2088,7 +2096,7 @@ class ScenarioActionExecutor:
         payload = {
             "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
             "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
-            "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+            "person_id": self._string_or_none(self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id")),
             "customer_name": self._resolve_variables(config.get("customer_name") or format_person_display_name(person) or "", context),
             "customer_email": self._resolve_variables(config.get("customer_email") or person.get("email") or "", context),
             "customer_phone": self._resolve_variables(config.get("customer_phone") or person.get("phone") or "", context),
@@ -2107,7 +2115,7 @@ class ScenarioActionExecutor:
             "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)) if config.get("amount") else None,
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "description": self._resolve_variables(config.get("description") or "", context),
-            "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+            "person_id": self._string_or_none(self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id")),
             "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
             "customer_name": self._resolve_variables(config.get("customer_name") or f"{person.get('first_name', '')} {person.get('last_name', '')}".strip(), context),
             "customer_email": self._resolve_variables(config.get("customer_email") or person.get("email") or "", context),
@@ -2127,7 +2135,7 @@ class ScenarioActionExecutor:
             "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)),
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "description": self._resolve_variables(config.get("description") or "", context),
-            "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+            "person_id": self._string_or_none(self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id")),
             "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
             "appointment_id": self._resolve_variables(config.get("appointment_id") or "", context) or context.get("appointment", {}).get("id"),
             "service_id": self._resolve_variables(config.get("service_id") or "", context) or context.get("service", {}).get("id"),
@@ -2177,7 +2185,7 @@ class ScenarioActionExecutor:
             "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
             "subscription_id": self._resolve_variables(config.get("subscription_id") or "", context) or context.get("subscription_id") or context.get("subscription", {}).get("subscription_id"),
             "customer_id": self._resolve_variables(config.get("customer_id") or "", context) or person.get("stripe_customer_id") or context.get("customer_id"),
-            "person_id": self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id"),
+            "person_id": self._string_or_none(self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id")),
         }
         result = await callback(payload)
         return {"success": True, "data": {"action": "cancel_subscription", **result}}
@@ -2368,7 +2376,7 @@ class ScenarioFlowExecutor:
         }
         return await self._continue_iterator_from_state(node_map, edge_map, context, execution_id, scenario, iterator_state)
 
-    async def start(self, scenario: dict, trigger_event: dict, flow_context: Optional[dict] = None, trigger_node_id: Optional[str] = None):
+    async def start(self, scenario: dict, trigger_event: dict, flow_context: Optional[dict] = None, trigger_node_id: Optional[str] = None, persist_execution: bool = True):
         nodes = scenario.get("nodes_data")
         edges = scenario.get("edges_data")
         if isinstance(nodes, str):
@@ -2407,12 +2415,23 @@ class ScenarioFlowExecutor:
             },
         }
 
-        execution_id = await self._create_execution_record(scenario, trigger_node["id"], context, trigger_event)
-        if not execution_id:
-            return {"success": False, "error": "Could not create scenario execution record"}
+        execution_id = None
+        if persist_execution:
+            execution_id = await self._create_execution_record(scenario, trigger_node["id"], context, trigger_event)
+            if not execution_id:
+                return {"success": False, "error": "Could not create scenario execution record"}
+        else:
+            execution_id = f"builder-run-{uuid4()}"
         context["_executionId"] = execution_id
         logging.info("▶ %s (%s)", scenario.get("name"), trigger_node.get("label"))
-        return await self._execute_from_node(trigger_node["id"], node_map, edge_map, context, execution_id, scenario)
+        return await self._execute_from_node(
+            trigger_node["id"],
+            node_map,
+            edge_map,
+            context,
+            execution_id if persist_execution else None,
+            scenario,
+        )
 
     async def resume(self, execution_id: str, resume_data: Optional[dict] = None):
         try:
@@ -2561,6 +2580,8 @@ class ScenarioFlowExecutor:
             try:
                 if node.get("categoryType") == "UTILITIES" and node_key == "iterator":
                     result = await self._execute_iterator_node(node, node_map, edge_map, context, execution_id, scenario)
+                elif node.get("categoryType") == "UTILITIES" and node_key == "router":
+                    result = {"success": True, "data": {"action": "router", "routed": True}}
                 else:
                     result = await self.action_executor.execute(node, context)
             except Exception as exc:
