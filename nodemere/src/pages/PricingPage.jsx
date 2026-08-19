@@ -7,6 +7,7 @@ import { getCookie } from '../utils/cookieUtils';
 import colors from '../../color';
 import LegalFooter from '../components/LegalFooter';
 import { api } from '../sonar/lib/api';
+import { supabase } from '../supabaseClient';
 
 // --- Data ---
 const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
@@ -141,7 +142,7 @@ const useTextScramble = (ref) => {
 
 // --- Plan Card ---
 const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscriptionStatus, isTestMode }) => {
-    const { session } = useAuth();
+    const { session, refreshProfile } = useAuth();
     const navigate = useNavigate();
     const [isCheckoutLoading, setCheckoutLoading] = useState(false);
     const [openFeature, setOpenFeature] = useState(null);
@@ -161,6 +162,37 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
     const savingsRef = useRef(null);
 
     const handleUpgradeClick = async () => {
+        const planSlug = plan.name.toLowerCase();
+        if (planSlug === 'free') {
+            if (!session) {
+                localStorage.removeItem('pendingPlan');
+                navigate('/auth');
+                return;
+            }
+            if (billingManagedInStripe) {
+                return handleManageBilling();
+            }
+            setCheckoutLoading(true);
+            try {
+                const { error } = await supabase
+                    .from('users')
+                    .update({
+                        plan: 'free',
+                        subscription_status: 'inactive',
+                    })
+                    .eq('id', session.user.id);
+                if (error) throw error;
+                await refreshProfile?.();
+            } catch (error) {
+                console.error("Error selecting free plan:", error);
+                alert(`Could not select the Free plan. Please try again. Error: ${error.message || error}`);
+                setCheckoutLoading(false);
+                return;
+            }
+            navigate('/dashboard');
+            return;
+        }
+
         if (billingManagedInStripe) {
             return handleManageBilling();
         }
@@ -168,7 +200,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
         if (!priceId) { console.error("Stripe Price ID is not defined for this plan/cycle."); return; }
 
         if (!session) {
-            localStorage.setItem('pendingPlan', JSON.stringify({ priceId, cycle, planSlug: plan.name.toLowerCase() }));
+            localStorage.setItem('pendingPlan', JSON.stringify({ priceId, cycle, planSlug }));
             navigate('/auth');
             return;
         }
@@ -177,7 +209,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
         try {
             const response = await axios.post(
                 apiUrl('/create-checkout-session'),
-                { price_id: priceId, plan_slug: plan.name.toLowerCase(), billing_cycle: cycle },
+                { price_id: priceId, plan_slug: planSlug, billing_cycle: cycle },
                 { headers: { Authorization: `Bearer ${session.access_token}` } }
             );
             const { url } = response.data;
