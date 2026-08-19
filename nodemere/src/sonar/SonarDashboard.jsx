@@ -1497,13 +1497,15 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
   const overageUsedMinutes = overageSeconds / 60;
   const usagePercent = includedSeconds > 0 ? Math.max(0, (usedSeconds / includedSeconds) * 100) : 0;
   const cappedUsagePercent = Math.min(100, usagePercent);
-  const isOverage = overageSeconds > 0 || usagePercent > 100 || usage?.alert_level === 'overage';
+  const overageEnabled = usage?.overage_enabled === true;
+  const isOverage = overageEnabled && (overageSeconds > 0 || usagePercent > 100 || usage?.alert_level === 'overage');
+  const isOverLimit = !overageEnabled && (overageSeconds > 0 || usagePercent >= 100 || usage?.alert_level === 'limit');
   const avatarRadius = 17;
   const avatarCircumference = 2 * Math.PI * avatarRadius;
   const avatarDashOffset = avatarCircumference - ((cappedUsagePercent / 100) * avatarCircumference);
   const avatarUrl = String(usage?.avatar || '').trim();
   const initials = String(profile?.first_name || profile?.email || 'S').trim().slice(0, 1).toUpperCase();
-  const rawPlanName = String(profile?.plan || 'Free').trim() || 'Free';
+  const rawPlanName = String(usage?.plan || profile?.plan || 'Free').trim() || 'Free';
   const planName = rawPlanName
     .split(/[\s_-]+/)
     .filter(Boolean)
@@ -1519,10 +1521,21 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
   const overageRateCents = Number(usage?.overage_price_per_minute_cents ?? 30);
   const overageCap = Number(usage?.overage_cap_cents ?? 0) / 100;
   const overageLimitReached = usage?.overage_limit_reached === true;
-  const usageAccentClass = isOverage ? 'text-rose-300' : 'text-white';
-  const usageBarBackground = isOverage
+  const usageNeedsAttention = isOverage || isOverLimit || overageLimitReached;
+  const usageAccentClass = usageNeedsAttention ? 'text-rose-300' : 'text-white';
+  const usageBarBackground = usageNeedsAttention
     ? 'linear-gradient(90deg, #f43f5e, #fb7185)'
     : 'linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd))';
+  const WarningMessage = ({ tone = 'rose', children }) => {
+    const toneClasses = tone === 'amber' ? 'text-amber-200 bg-amber-400/[0.07]' : 'text-rose-200 bg-rose-400/[0.07]';
+    const iconClasses = tone === 'amber' ? 'text-amber-300' : 'text-rose-300';
+    return (
+      <div className={`mt-4 flex items-start gap-2 rounded-xl px-3 py-2.5 text-[12px] leading-5 ${toneClasses}`}>
+        <AlertTriangle size={14} className={`mt-0.5 shrink-0 ${iconClasses}`} />
+        <span>{children}</span>
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -1581,7 +1594,7 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
             cy="20"
             r={avatarRadius}
             fill="none"
-            stroke={isOverage ? 'url(#accountOverageGradient)' : 'url(#accountUsageGradient)'}
+            stroke={usageNeedsAttention ? 'url(#accountOverageGradient)' : 'url(#accountUsageGradient)'}
             strokeWidth="1.35"
             strokeLinecap="round"
             strokeDasharray={avatarCircumference}
@@ -1657,19 +1670,30 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
                   <span className="font-medium text-zinc-500">Minutes used</span>
                   <span className={`font-semibold tabular-nums ${usageAccentClass}`}>{formatMinutes(usedMinutes)} min</span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-zinc-500">Overage</span>
-                  <span className={`font-semibold tabular-nums ${isOverage ? 'text-rose-300' : 'text-zinc-100'}`}>
-                    {formatMinutes(Math.max(overageMinutes, overageUsedMinutes))} min
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-zinc-500">Estimated overage</span>
-                  <span className={`font-semibold tabular-nums ${isOverage ? 'text-rose-300' : 'text-zinc-100'}`}>
-                    ${overageAmount.toFixed(2)}
-                  </span>
-                </div>
-                {overageCap > 0 && (
+                {overageEnabled ? (
+                  <>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="font-medium text-zinc-500">Overage</span>
+                      <span className={`font-semibold tabular-nums ${isOverage ? 'text-rose-300' : 'text-zinc-100'}`}>
+                        {formatMinutes(Math.max(overageMinutes, overageUsedMinutes))} min
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="font-medium text-zinc-500">Estimated overage</span>
+                      <span className={`font-semibold tabular-nums ${isOverage ? 'text-rose-300' : 'text-zinc-100'}`}>
+                        ${overageAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  </>
+                ) : isOverLimit ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-medium text-zinc-500">Over limit</span>
+                    <span className="font-semibold text-rose-300 tabular-nums">
+                      {formatMinutes(overageUsedMinutes)} min
+                    </span>
+                  </div>
+                ) : null}
+                {overageEnabled && overageCap > 0 && (
                   <div className="flex items-center justify-between gap-4">
                     <span className="font-medium text-zinc-500">Overage limit</span>
                     <span className={`font-semibold tabular-nums ${overageLimitReached ? 'text-rose-300' : 'text-zinc-100'}`}>
@@ -1679,24 +1703,24 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
                 )}
               </div>
               {usage?.alert_level === 'warning' && (
-                <div className="mt-4 border-l border-amber-400/70 pl-3 text-[12px] leading-5 text-amber-200">
+                <WarningMessage tone="amber">
                   You have used 80% of your included minutes.
-                </div>
+                </WarningMessage>
               )}
-              {usage?.alert_level === 'limit' && (
-                <div className="mt-4 border-l border-rose-400/70 pl-3 text-[12px] leading-5 text-rose-200">
-                  Included minutes are exhausted. New calls may be blocked by your plan.
-                </div>
+              {usage?.alert_level === 'limit' && !overageEnabled && (
+                <WarningMessage>
+                  Included minutes are exhausted. Upgrade to continue calls.
+                </WarningMessage>
               )}
-              {usage?.alert_level === 'overage' && (
-                <div className="mt-4 border-l border-rose-400/70 pl-3 text-[12px] leading-5 text-rose-200">
+              {usage?.alert_level === 'overage' && overageEnabled && (
+                <WarningMessage>
                   {formatMinutes(overageMinutes)} overage minute{overageMinutes === 1 ? '' : 's'} at ${(overageRateCents / 100).toFixed(2)}/min. Estimated ${overageAmount.toFixed(2)} will be added to your next Stripe invoice.
-                </div>
+                </WarningMessage>
               )}
               {overageLimitReached && (
-                <div className="mt-4 border-l border-rose-400/70 pl-3 text-[12px] leading-5 text-rose-200">
+                <WarningMessage>
                   New calls are paused until billing is updated in Stripe Billing Portal.
-                </div>
+                </WarningMessage>
               )}
             </div>
 

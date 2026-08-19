@@ -4609,9 +4609,8 @@ def enforce_call_minutes(user_id: str, business: Optional[dict], *, direction: s
             },
         )
     used_seconds = parse_usage_seconds(business.get("current_cycle_used_seconds"))
-    included_seconds = parse_usage_seconds(business.get("current_cycle_included_seconds"))
-    if included_seconds <= 0:
-        included_seconds = int(context["entitlements"].get("included_call_minutes") or 0) * 60
+    entitled_seconds = int(context["entitlements"].get("included_call_minutes") or 0) * 60
+    included_seconds = entitled_seconds if entitled_seconds > 0 else parse_usage_seconds(business.get("current_cycle_included_seconds"))
     overage_seconds = max(0, used_seconds - included_seconds)
     overage_rate_cents = int(context["entitlements"].get("overage_price_per_minute_cents") or 30)
     billable_overage_minutes = math.ceil(overage_seconds / 60) if overage_seconds else 0
@@ -4650,9 +4649,8 @@ def get_usage_snapshot(user_id: str) -> dict:
     context = get_user_plan_context(user_id)
     business = load_business_by_user_id(user_id) or {}
     used_seconds = parse_usage_seconds(business.get("current_cycle_used_seconds"))
-    included_seconds = parse_usage_seconds(business.get("current_cycle_included_seconds"))
-    if included_seconds <= 0:
-        included_seconds = int(context["entitlements"].get("included_call_minutes") or 0) * 60
+    entitled_seconds = int(context["entitlements"].get("included_call_minutes") or 0) * 60
+    included_seconds = entitled_seconds if entitled_seconds > 0 else parse_usage_seconds(business.get("current_cycle_included_seconds"))
     overage_seconds = max(0, used_seconds - included_seconds)
     overage_rate_cents = int(context["entitlements"].get("overage_price_per_minute_cents") or 30)
     billable_overage_minutes = math.ceil(overage_seconds / 60) if overage_seconds else 0
