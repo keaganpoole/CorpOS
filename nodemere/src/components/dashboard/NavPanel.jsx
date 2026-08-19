@@ -4,7 +4,7 @@ import { NavLink, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faKey, faCommentDots, faCalendarDays, faCog, faClipboardList, faUserCircle
+  faKey, faCommentDots, faCalendarDays, faCog, faClipboardList
 } from '@fortawesome/free-solid-svg-icons';import '../../styles/NavPanel.css';
 
 const mainNavItems = [
@@ -14,7 +14,7 @@ const mainNavItems = [
 
 const bottomNavItems = [
   { path: 'pricing', icon: faClipboardList, text: 'Plans', external: true }, // External link to /pricing
-  { path: 'settings', icon: faUserCircle, text: 'Account' },
+  { path: 'settings', icon: faCog, text: 'Settings' },
 ];
 
 const navVariants = {

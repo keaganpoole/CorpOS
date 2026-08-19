@@ -9,9 +9,10 @@ import LegalFooter from '../components/LegalFooter';
 import { api } from '../sonar/lib/api';
 
 // --- Data ---
-const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 const apiUrl = (path) => `${API_BASE_URL}${path}`;
 const planHierarchy = { "Free": 0, "Essentials": 1, "Pro": 2, "Ultra": 3 };
+const paidPlanNames = new Set(['essentials', 'pro', 'ultra']);
 
 const plansConfig = [
     {
@@ -139,7 +140,7 @@ const useTextScramble = (ref) => {
 };
 
 // --- Plan Card ---
-const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscriptionStatus, hasStartedTrial, isTestMode }) => {
+const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscriptionStatus, isTestMode }) => {
     const { session } = useAuth();
     const navigate = useNavigate();
     const [isCheckoutLoading, setCheckoutLoading] = useState(false);
@@ -150,7 +151,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
     const isUpgrade = planHierarchy[plan.name] > planHierarchy[currentUserPlan];
     const annualSavings = ((plan.price?.monthly || 0) * 12) - ((plan.price?.annually || 0) * 12);
     const hasOverages = Boolean(plan.entitlements?.overage_enabled);
-    const billingManagedInStripe = ['active', 'trialing', 'past_due', 'unpaid'].includes(String(subscriptionStatus || '').toLowerCase());
+    const billingManagedInStripe = !isTestMode && ['active', 'trialing', 'past_due', 'unpaid'].includes(String(subscriptionStatus || '').toLowerCase());
     const overageCents = Number(plan.entitlements?.overage_price_per_minute_cents ?? 30);
     const overageRate = overageCents / 100;
 
@@ -167,7 +168,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
         if (!priceId) { console.error("Stripe Price ID is not defined for this plan/cycle."); return; }
 
         if (!session) {
-            localStorage.setItem('pendingPlan', JSON.stringify({ priceId, cycle }));
+            localStorage.setItem('pendingPlan', JSON.stringify({ priceId, cycle, planSlug: plan.name.toLowerCase() }));
             navigate('/auth');
             return;
         }
@@ -176,7 +177,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
         try {
             const response = await axios.post(
                 apiUrl('/create-checkout-session'),
-                { price_id: priceId },
+                { price_id: priceId, plan_slug: plan.name.toLowerCase(), billing_cycle: cycle },
                 { headers: { Authorization: `Bearer ${session.access_token}` } }
             );
             const { url } = response.data;
@@ -306,7 +307,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                         {isCheckoutLoading ? 'Redirecting...' : (
                             billingManagedInStripe ? 'Manage plan in Stripe' : (isTestMode ? 'Test this subscription' : (
                                 plan.name === 'Free' ? 'Choose plan' : (
-                                    plan.cta || (hasStartedTrial ? 'Choose plan' : 'Try for 14 days')
+                                    plan.cta || 'Start plan'
                                 )
                             ))
                         )}
@@ -323,7 +324,6 @@ const PricingPage = () => {
     const { profile } = useAuth();
     const subscriptionStatus = profile?.subscription_status;
     const subscriptionLog = profile?.log;
-    const startedTrial = profile?.started_trial;
     const [cycle, setCycle] = useState('monthly');
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [source, setSource] = useState('standard');
@@ -417,7 +417,7 @@ const PricingPage = () => {
             features: Array.isArray(databasePlan.features) ? databasePlan.features : [],
             isRecommended: Boolean(databasePlan.is_recommended),
             entitlements: databasePlan.entitlements || {},
-            cta: display.cta || null,
+            cta: paidPlanNames.has(String(databasePlan.name || '').toLowerCase()) ? 'Start plan' : (display.cta || null),
         };
     });
 
@@ -488,12 +488,12 @@ const PricingPage = () => {
                         <div className="py-10 text-sm text-gray-500">{plansError}</div>
                     ) : (
                         <div className="inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4">
-                           {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} hasStartedTrial={startedTrial} isTestMode={isTestMode} />)}
+                           {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} isTestMode={isTestMode} />)}
                         </div>
                     )}
                 </div>
                 <p className="mx-auto mt-7 max-w-3xl text-center text-xs leading-5 text-zinc-500">
-                    By starting a trial or subscription, you agree to the <Link to="/terms" className="underline underline-offset-2">Terms of Service</Link> and <Link to="/privacy-policy" className="underline underline-offset-2">Privacy Policy</Link>. Paid subscriptions renew automatically at the selected billing interval unless canceled before the next renewal date. You can request cancellation at <a href="mailto:support@nodemere.ai" className="underline underline-offset-2">support@nodemere.ai</a>.
+                    By starting a subscription, you agree to the <Link to="/terms" className="underline underline-offset-2">Terms of Service</Link> and <Link to="/privacy-policy" className="underline underline-offset-2">Privacy Policy</Link>. Paid subscriptions renew automatically at the selected billing interval unless canceled before the next renewal date. You can request cancellation at <a href="mailto:support@nodemere.ai" className="underline underline-offset-2">support@nodemere.ai</a>.
                 </p>
             </div>
             <LegalFooter />

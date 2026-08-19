@@ -39,7 +39,7 @@ const PlanChangePopupModal = ({ isOpen, onClose, plan }) => {
             {plan.toLowerCase() === 'free' ? (
               <>
                 <h2>You're in! 🎂</h2>
-                <p>Your free plan gives you full access with limits. Start your 14-day free trial of the Unlimited plan now for increased limits. </p>
+                <p>Your free plan gives you full access with limits. Choose a paid plan when you need more capacity and features.</p>
                 <div className="plan-change-modal-actions">
                   <motion.button 
                     onClick={handleUpgradeClick} 
@@ -47,7 +47,7 @@ const PlanChangePopupModal = ({ isOpen, onClose, plan }) => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    Try for 14 days
+                    View paid plans
                   </motion.button>
                   <motion.p 
                     onClick={onClose} 

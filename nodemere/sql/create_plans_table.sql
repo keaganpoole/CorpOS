@@ -60,7 +60,7 @@ values
   2,
   true,
   false,
-  '{"description":"For businesses that need a solid front desk without the complexity.","cta":"Try for 14 days"}'::jsonb,
+  '{"description":"For businesses that need a solid front desk without the complexity.","cta":"Start plan"}'::jsonb,
   '{"included_call_minutes":300,"max_receptionists":3,"max_scenarios":null,"max_contacts":1000,"inbound_calling":true,"outbound_calling":false,"sms":false,"overage_enabled":true,"overage_price_per_minute_cents":30}'::jsonb,
   '["300 call minutes","3 receptionists","1,000 contacts","Unlimited scenarios","Inbound calling"]'::jsonb
 ),
@@ -71,7 +71,7 @@ values
   3,
   true,
   true,
-  '{"description":"For growing businesses that need serious call capacity.","cta":"Try for 14 days"}'::jsonb,
+  '{"description":"For growing businesses that need serious call capacity.","cta":"Start plan"}'::jsonb,
   '{"included_call_minutes":1500,"max_receptionists":null,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"sms":true,"overage_enabled":true,"overage_price_per_minute_cents":30}'::jsonb,
   '["1,500 call minutes","Unlimited receptionists","Unlimited contacts","Unlimited scenarios","Outbound calling","Inbound calling","Voice cloning","SMS support"]'::jsonb
 ),
@@ -82,7 +82,7 @@ values
   4,
   true,
   false,
-  '{"description":"For high-volume teams running advanced voice operations.","cta":"Try for 14 days"}'::jsonb,
+  '{"description":"For high-volume teams running advanced voice operations.","cta":"Start plan"}'::jsonb,
   '{"included_call_minutes":3000,"max_receptionists":null,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"sms":true,"overage_enabled":true,"overage_price_per_minute_cents":30}'::jsonb,
   '["3,000 call minutes","Unlimited receptionists","Unlimited contacts","Unlimited scenarios","Inbound calling","Outbound calling","Voice cloning","SMS support","Dedicated onboarding specialist"]'::jsonb
 )

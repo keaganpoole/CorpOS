@@ -8,10 +8,11 @@ import {
   Copy, Download, Layers, Plus, Trash2, Tag, DollarSign,
   ArrowRight, X, MessageSquareText, Users,
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil,
-  Loader2,
+  Loader2, CreditCard, ExternalLink,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../lib/api';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 import CubePreloader from '../components/CubePreloader';
 
@@ -2513,6 +2514,70 @@ const BusinessForwardingSettings = ({ authSession }) => {
   );
 };
 
+const BillingSettings = ({ profile }) => {
+  const [openingPortal, setOpeningPortal] = useState(false);
+  const [error, setError] = useState('');
+
+  const openBillingPortal = async () => {
+    setOpeningPortal(true);
+    setError('');
+    try {
+      const result = await api.createBillingPortal();
+      if (!result?.url) throw new Error('Stripe Billing Portal is unavailable.');
+      window.location.assign(result.url);
+    } catch (err) {
+      setError(err?.message || 'Could not open Stripe Billing Portal.');
+    } finally {
+      setOpeningPortal(false);
+    }
+  };
+
+  const plan = profile?.plan || 'Free';
+  const subscriptionStatus = profile?.subscription_status || 'inactive';
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-[24px] border border-white/[0.05] bg-zinc-950/40 p-5">
+        <div className="flex items-start justify-between gap-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <CreditCard size={15} className="settings-icon" />
+              <h4 className="text-[13px] font-semibold text-zinc-100">Billing Portal</h4>
+            </div>
+            <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
+              Manage payment method, invoices, plan changes, and cancellation through Stripe.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openBillingPortal}
+            disabled={openingPortal}
+            className="settings-neutral-button inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:cursor-wait disabled:opacity-50"
+          >
+            {openingPortal ? <Loader2 size={13} className="animate-spin" /> : <ExternalLink size={13} />}
+            {openingPortal ? 'Opening' : 'Open Portal'}
+          </button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-white/[0.04] bg-black/20 p-4">
+            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-700">Current Plan</p>
+            <p className="mt-2 truncate text-[14px] font-semibold text-zinc-200">{plan}</p>
+          </div>
+          <div className="rounded-2xl border border-white/[0.04] bg-black/20 p-4">
+            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-700">Subscription Status</p>
+            <p className="mt-2 truncate text-[14px] font-semibold text-zinc-200">{subscriptionStatus}</p>
+          </div>
+        </div>
+
+        {error && (
+          <p className="mt-4 text-[11px] font-medium text-rose-400">{error}</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const SettingsPage = () => {
   const { session: authSession, profile, refreshProfile } = useAuth();
   const [settings, setSettings] = useState(defaultSettings);
@@ -2895,6 +2960,7 @@ const SettingsPage = () => {
   const settingsSections = [
     { id: 'business', title: 'Business Info', icon: Building2, iconClass: 'settings-icon', hint: 'Name, contact, and location' },
     { id: 'forwarding', title: 'Connections', icon: PhoneCall, iconClass: 'settings-icon', hint: 'Call routing' },
+    { id: 'billing', title: 'Billing', icon: CreditCard, iconClass: 'settings-icon', hint: 'Plan, invoices, and payment' },
     { id: 'preferences', title: 'Preferences', icon: Shield, iconClass: 'settings-icon', hint: 'Call permissions and controls' },
     { id: 'intro', title: 'Intro Message', icon: MessageSquareText, iconClass: 'settings-icon', hint: 'Opening call greeting' },
     { id: 'appointments', title: 'Hours', icon: Calendar, iconClass: 'settings-icon', hint: 'Business availability' },
@@ -2909,6 +2975,8 @@ const SettingsPage = () => {
     switch (activeSection) {
       case 'forwarding':
         return <BusinessForwardingSettings authSession={authSession} />;
+      case 'billing':
+        return <BillingSettings profile={profile} />;
       case 'intro':
         return (
           <>

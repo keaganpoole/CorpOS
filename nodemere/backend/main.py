@@ -350,16 +350,38 @@ def hydrate_business_with_purchased_number_data(business: Optional[dict]) -> Opt
 def get_system_config_row() -> dict:
     try:
         response = (
-            supabase
+            supabase_admin
             .table("system_config")
-            .select("total_allowed_number_purchases,verify_caller_id")
+            .select("total_allowed_number_purchases,verify_caller_id,test_mode")
             .limit(1)
             .execute()
         )
         return (response.data or [None])[0] or {}
     except Exception as exc:
         logging.warning("Failed to load system_config: %s", exc)
-        return {}
+        return {"_system_config_read_error": True}
+
+
+def _coerce_boolean(value, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
+
+def is_payment_test_mode() -> bool:
+    """Read the database-controlled payment safety switch for each request."""
+    global PAYMENT_TEST_MODE
+    row = get_system_config_row()
+    if row.get("_system_config_read_error") or not row:
+        # Fail closed: an unavailable safety switch must never enable live
+        # billing by accident.
+        PAYMENT_TEST_MODE = True
+    elif "test_mode" in row and row.get("test_mode") is not None:
+        PAYMENT_TEST_MODE = _coerce_boolean(row.get("test_mode"))
+    stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
+    return PAYMENT_TEST_MODE
 
 
 def get_system_number_purchase_limit() -> int:
@@ -1819,6 +1841,8 @@ async def shutdown_scenario_engine():
 # --------------------------------------------------------------------------
 class CreateCheckoutSessionRequest(BaseModel):
     price_id: str
+    plan_slug: Optional[str] = None
+    billing_cycle: Optional[str] = None
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -2272,6 +2296,7 @@ def _upsert_integration_row(user_id: str, provider: str, updates: dict) -> dict:
 
 
 def _stripe_platform_api_key(livemode: Optional[bool] = None) -> str:
+    is_payment_test_mode()
     use_live_key = (not PAYMENT_TEST_MODE) if livemode is None else livemode
     api_key = STRIPE_LIVE_SECRET_KEY if use_live_key else STRIPE_TEST_SECRET_KEY
     if not api_key:
@@ -2289,6 +2314,8 @@ def _stripe_object_to_dict(value) -> dict:
 
 
 def _exchange_stripe_code(code: str) -> dict:
+    if is_payment_test_mode():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Stripe account authorization is simulated while payment test mode is enabled.")
     if not stripe_connect_client_id:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -2329,6 +2356,8 @@ def _get_connected_stripe_request_options(user_id: str) -> dict:
 
 
 def _deauthorize_stripe_integration(integration: Optional[dict]) -> None:
+    if is_payment_test_mode():
+        return
     credentials = (integration or {}).get("credentials") or {}
     stripe_user_id = credentials.get("stripe_user_id") or (integration or {}).get("provider_metadata", {}).get("account_id")
     if not stripe_user_id or not stripe_connect_client_id:
@@ -3184,9 +3213,101 @@ def get_payment_mode_label() -> str:
     return "test" if PAYMENT_TEST_MODE else "live"
 
 def get_payment_frontend_base_url() -> str:
-    if PAYMENT_TEST_MODE:
+    if is_payment_test_mode():
         return os.environ.get("PAYMENT_TEST_FRONTEND_URL", "http://localhost:5173")
     return os.environ.get("PAYMENT_LIVE_FRONTEND_URL", "https://nodemere.com")
+
+
+def _simulated_id(kind: str) -> str:
+    return f"sim_{kind}_{uuid4().hex}"
+
+
+def _simulated_customer_for_user(
+    user_id: str,
+    *,
+    customer_id: Optional[str] = None,
+    person_id: Optional[str] = None,
+    name: Optional[str] = None,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+) -> dict:
+    """Return a local Stripe-shaped customer without contacting Stripe."""
+    customer_id = customer_id if str(customer_id or "").startswith("sim_cus_") else _simulated_id("cus")
+    metadata = {"user_id": str(user_id), "simulation": "true"}
+    if person_id:
+        metadata["person_id"] = str(person_id)
+        persist_person_stripe_customer_id(user_id, person_id, customer_id)
+    return {
+        "id": customer_id,
+        "object": "customer",
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "metadata": metadata,
+        "created": int(datetime.now(timezone.utc).timestamp()),
+        "simulation": True,
+    }
+
+
+def _resolve_checkout_plan(request: CreateCheckoutSessionRequest, test_mode: bool) -> tuple[str, str]:
+    requested_plan = str(request.plan_slug or "").strip().lower()
+    if requested_plan:
+        if requested_plan not in DEFAULT_PLAN_ENTITLEMENTS or requested_plan == "free":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected plan is not a paid Nodemere plan.")
+        billing_cycle = str(request.billing_cycle or "monthly").strip().lower()
+        if billing_cycle not in {"monthly", "annually", "annual", "yearly"}:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected billing cycle is not supported.")
+        return requested_plan, "yearly" if billing_cycle in {"annually", "annual", "yearly"} else "monthly"
+
+    # Older clients may only send the Stripe price ID. Read from the selected
+    # mode's catalog, but never create or charge anything in this fallback.
+    try:
+        requested_price = stripe.Price.retrieve(request.price_id)
+        requested_product = stripe.Product.retrieve(requested_price.get("product"))
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not available.") from exc
+    plan_slug = str(requested_product.get("name") or "").strip().lower()
+    if plan_slug not in DEFAULT_PLAN_ENTITLEMENTS or plan_slug == "free":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not a paid Nodemere plan.")
+    interval = ((requested_price.get("recurring") or {}).get("interval") or "month").lower()
+    return plan_slug, "yearly" if interval == "year" else "monthly"
+
+
+def _apply_simulated_subscription(user_id: str, plan_slug: str, billing_cycle: str, customer_id: str) -> dict:
+    now = datetime.now(timezone.utc)
+    period_days = 365 if billing_cycle == "yearly" else 30
+    period_end = now + timedelta(days=period_days)
+    subscription_id = _simulated_id("sub")
+    update_data = {
+        "stripe_customer_id": customer_id,
+        "stripe_subscription_id": subscription_id,
+        "plan": plan_slug,
+        "subscription_status": "active",
+        "billing_period": billing_cycle,
+        "trial_start_date": None,
+        "trial_end_date": None,
+        "started_trial": False,
+        "source": "simulation",
+    }
+    supabase_admin.table("users").update(update_data).eq("id", str(user_id)).execute()
+    sync_business_plan_entitlement(
+        str(user_id),
+        plan_slug,
+        now.isoformat(),
+        period_end.isoformat(),
+        reset_usage=True,
+    )
+    return {
+        "id": subscription_id,
+        "object": "subscription",
+        "customer": customer_id,
+        "status": "active",
+        "cancel_at_period_end": False,
+        "current_period_start": int(now.timestamp()),
+        "current_period_end": int(period_end.timestamp()),
+        "metadata": {"supabase_user_id": str(user_id), "simulation": "true", "plan": plan_slug},
+        "simulation": True,
+    }
 
 def coerce_amount_to_cents(amount_value) -> int:
     try:
@@ -3341,6 +3462,27 @@ def create_or_update_stripe_customer_for_user(
     appointment_id: Optional[str] = None,
     service_id: Optional[str] = None,
 ):
+    if is_payment_test_mode():
+        person = load_person_by_id_for_user(user_id, person_id)
+        profile_response = (
+            supabase_admin.table("users")
+            .select("email")
+            .eq("id", str(user_id))
+            .limit(1)
+            .execute()
+        )
+        profile = (profile_response.data or [None])[0] or {}
+        return _simulated_customer_for_user(
+            user_id,
+            customer_id=customer_id,
+            person_id=person_id,
+            name=customer_name or (format_person_display_name(person) if person else None),
+            email=customer_email or (
+                person.get("email") if person and person.get("email") else profile.get("email")
+            ),
+            phone=customer_phone or (person.get("phone") if person else None),
+        ), person
+
     stripe_request_options = _get_connected_stripe_request_options(user_id)
     person = load_person_by_id_for_user(user_id, person_id)
     resolved_customer_id = (
@@ -4505,6 +4647,9 @@ def get_usage_snapshot(user_id: str) -> dict:
 
 def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
     """Create one idempotent Stripe invoice item for the current usage cycle."""
+    if is_payment_test_mode():
+        logging.info("Skipping Stripe overage invoice item because payment test mode is enabled.")
+        return
     customer_id = invoice.get("customer")
     invoice_id = invoice.get("id")
     if not customer_id or not invoice_id:
@@ -8881,6 +9026,7 @@ async def get_money_table_data(current_rep: str = Depends(get_current_rep)):
 @app.get("/plans", tags=["Billing"])
 async def get_plans():
     try:
+        is_payment_test_mode()
         products = stripe.Product.list(active=True, limit=100)
         prices = stripe.Price.list(active=True, limit=100)
         return {"products": products.data, "prices": prices.data}
@@ -8910,23 +9056,51 @@ async def get_sonar_pricing_plans():
 @app.post("/create-checkout-session", tags=["Billing"])
 async def create_checkout_session(request: CreateCheckoutSessionRequest, current_user: dict = Depends(get_current_user)):
   current_user_id = current_user.id
+  test_mode = is_payment_test_mode()
   try:
-    try:
-      requested_price = stripe.Price.retrieve(request.price_id)
-      requested_product = stripe.Product.retrieve(requested_price.get("product"))
-    except Exception as exc:
-      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not available.") from exc
-    if not requested_price.get("active") or not requested_price.get("recurring"):
-      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not an active subscription price.")
-    if str(requested_product.get("name") or "").strip().lower() not in DEFAULT_PLAN_ENTITLEMENTS:
-      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not a Nodemere plan.")
+    plan_slug, billing_cycle = _resolve_checkout_plan(request, test_mode)
+    if not test_mode:
+      try:
+        requested_price = stripe.Price.retrieve(request.price_id)
+        requested_product = stripe.Product.retrieve(requested_price.get("product"))
+      except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not available.") from exc
+      if not requested_price.get("active") or not requested_price.get("recurring"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price is not an active subscription price.")
+      if str(requested_product.get("name") or "").strip().lower() != plan_slug:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected Stripe price does not match the selected plan.")
 
-    user_profile = supabase.table('users').select('email', 'stripe_customer_id', 'started_trial').eq('id', str(current_user_id)).single().execute()
+    try:
+      user_profile = supabase.table('users').select('email', 'stripe_customer_id').eq('id', str(current_user_id)).single().execute()
+    except APIError as exc:
+      error_payload = getattr(exc, "args", [None])[0]
+      if isinstance(error_payload, dict) and error_payload.get("code") == "42703":
+        raise HTTPException(
+          status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+          detail="Database migration missing: run sql/add_user_billing_columns.sql in Supabase before using billing.",
+        ) from exc
+      raise
     if not user_profile.data:
       raise HTTPException(status_code=404, detail="User not found")
     
     customer_id = user_profile.data.get('stripe_customer_id')
     user_email = user_profile.data.get('email')
+
+    if test_mode:
+      customer_id = customer_id if str(customer_id or "").startswith("sim_cus_") else _simulated_id("cus")
+      subscription = _apply_simulated_subscription(
+        str(current_user_id), plan_slug, billing_cycle, customer_id
+      )
+      session_id = _simulated_id("cs")
+      base_url = get_payment_frontend_base_url().rstrip('/')
+      return {
+        "sessionId": session_id,
+        "url": f"{base_url}/dashboard?payment=simulated&session_id={session_id}&plan={plan_slug}",
+        "simulated": True,
+        "charged": False,
+        "mode": "test",
+        "subscription": serialize_stripe_subscription(subscription),
+      }
 
     if not customer_id:
       customer = stripe.Customer.create(email=user_email, metadata={'supabase_user_id': str(current_user_id)})
@@ -8934,7 +9108,7 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
       supabase.table('users').update({'stripe_customer_id': customer_id}).eq('id', str(current_user_id)).execute()
 
     # Dynamically set the base URL based on TEST_MODE
-    if TEST_MODE:
+    if test_mode:
         base_url = frontend_base_url or "http://localhost:5173"
     else:
         base_url = frontend_base_url or "https://nodemere.ai"
@@ -8942,7 +9116,9 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
     price_to_use = request.price_id
     checkout_session_data = {
       'customer': customer_id,
-      'payment_method_types': ['card'],
+      # The new Stripe account has Managed Payments enabled by default. Keep
+      # the existing card-only Checkout flow valid by opting out per session.
+      'managed_payments': {'enabled': False},
       'line_items': [{'price': price_to_use, 'quantity': 1}],
       'mode': 'subscription',
       'allow_promotion_codes': True,
@@ -8950,11 +9126,6 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
       'success_url': f'{base_url}/dashboard?session_id={{CHECKOUT_SESSION_ID}}',
       'cancel_url': f'{base_url}/pricing?canceled=true',
     }
-
-    # Conditionally add 14-day trial
-    user_has_started_trial = user_profile.data.get('started_trial', False)
-    if not user_has_started_trial:
-      checkout_session_data['subscription_data']['trial_period_days'] = 14
 
     checkout_session = stripe.checkout.Session.create(**checkout_session_data)
 
@@ -8977,6 +9148,14 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
 @app.post("/api/sonar/billing/portal", tags=["Billing"])
 async def create_billing_portal_session(current_user: dict = Depends(get_current_user)):
     user_id = str(current_user.id)
+    if is_payment_test_mode():
+        base_url = get_payment_frontend_base_url().rstrip('/')
+        return {
+            "url": f"{base_url}/dashboard?billing=simulated",
+            "simulated": True,
+            "charged": False,
+            "mode": "test",
+        }
     profile_response = (
         supabase_admin.table("users")
         .select("email,stripe_customer_id")
@@ -9029,9 +9208,10 @@ async def get_billing_usage(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/sonar/payments/test-mode", tags=["Sonar Payments"])
 async def get_sonar_payment_test_mode():
+    test_mode = is_payment_test_mode()
     return {
-        "testMode": PAYMENT_TEST_MODE,
-        "enabled": PAYMENT_TEST_MODE,
+        "testMode": test_mode,
+        "enabled": test_mode,
         "mode": get_payment_mode_label(),
     }
 
@@ -9042,9 +9222,10 @@ async def set_sonar_payment_test_mode(
     _internal: None = Depends(require_internal_tool_authorization),
 ):
     set_payment_test_mode(request.enabled)
+    test_mode = is_payment_test_mode()
     return {
-        "testMode": PAYMENT_TEST_MODE,
-        "enabled": PAYMENT_TEST_MODE,
+        "testMode": test_mode,
+        "enabled": test_mode,
         "mode": get_payment_mode_label(),
     }
 
@@ -9167,10 +9348,58 @@ async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
         request.customer_phone,
         description,
     )
-    stripe_request_options = _get_connected_stripe_request_options(user_id)
     business = load_business_by_user_id(user_id)
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    if is_payment_test_mode():
+        customer = create_or_update_stripe_customer_for_user(
+            user_id=user_id,
+            customer_id=request.customer_id,
+            person_id=request.person_id,
+            customer_name=request.customer_name,
+            customer_email=request.customer_email,
+            customer_phone=request.customer_phone,
+            create_if_missing=True,
+            appointment_id=request.appointment_id,
+        )[0]
+        payment_intent_id = _simulated_id("pi")
+        payment_row = build_payment_row(
+            amount=request.amount,
+            currency=request.currency,
+            payment_method=request.payment_method_type,
+            description=description,
+            status="succeeded",
+            stripe_payment_intent_id=payment_intent_id,
+            user_id=user_id,
+            business_id=business.get("id"),
+        )
+        saved_payment = insert_payment_record(payment_row)
+        emit_payment_trigger("payment_received", {
+            "user_id": user_id,
+            "business_id": business.get("id"),
+            "payment": saved_payment,
+            "payment_id": saved_payment.get("id"),
+            "stripe_payment_intent_id": payment_intent_id,
+            "customer_id": customer.get("id"),
+            "amount": request.amount,
+            "currency": request.currency,
+            "status": "succeeded",
+            "simulation": True,
+        })
+        return {
+            **saved_payment,
+            "client_secret": None,
+            "status": "succeeded",
+            "id": payment_intent_id,
+            "object": "payment_intent",
+            "amount": request.amount,
+            "amount_received": request.amount,
+            "currency": request.currency,
+            "customer_id": customer.get("id"),
+            "simulated": True,
+            "charged": False,
+        }
+
     customer, _person = create_or_update_stripe_customer_for_user(
         user_id=user_id,
         customer_id=request.customer_id,
@@ -9260,10 +9489,60 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
         request.customer_phone,
         description,
     )
-    stripe_request_options = _get_connected_stripe_request_options(user_id)
     business = load_business_by_user_id(user_id)
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    if is_payment_test_mode():
+        customer, _person = create_or_update_stripe_customer_for_user(
+            user_id=user_id,
+            customer_id=request.customer_id,
+            person_id=request.person_id,
+            customer_name=request.customer_name,
+            customer_email=request.customer_email,
+            customer_phone=request.customer_phone,
+            create_if_missing=True,
+        )
+        session_id = _simulated_id("cs")
+        payment_row = build_payment_row(
+            amount=request.amount,
+            currency=request.currency,
+            payment_method="link",
+            description=description,
+            status="succeeded",
+            stripe_session_id=session_id,
+            user_id=user_id,
+            business_id=business.get("id"),
+        )
+        saved_payment = insert_payment_record(payment_row)
+        payment_url = f"{payment_mode_base_url.rstrip('/')}/dashboard?payment=simulated&session_id={session_id}"
+        emit_payment_trigger("payment_link_sent", {
+            "user_id": user_id,
+            "business_id": business.get("id"),
+            "payment": saved_payment,
+            "payment_id": saved_payment.get("id"),
+            "stripe_session_id": session_id,
+            "payment_url": payment_url,
+            "customer_id": customer.get("id"),
+            "amount": request.amount,
+            "currency": request.currency,
+            "status": "succeeded",
+            "simulation": True,
+        })
+        return {
+            "customer_id": customer.get("id"),
+            "payment_url": payment_url,
+            "amount": request.amount,
+            "currency": request.currency,
+            "status": "succeeded",
+            "customer_name": request.customer_name,
+            "customer_email": request.customer_email,
+            "customer_phone": request.customer_phone,
+            "stripe_session_id": session_id,
+            "payment_id": saved_payment.get("id"),
+            "simulated": True,
+            "charged": False,
+        }
+
     customer, _person = create_or_update_stripe_customer_for_user(
         user_id=user_id,
         customer_id=request.customer_id,
@@ -9359,7 +9638,6 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
         request.customer_phone,
         description,
     )
-    stripe_request_options = _get_connected_stripe_request_options(user_id)
     customer, _person = create_or_update_stripe_customer_for_user(
         user_id=user_id,
         customer_id=request.customer_id,
@@ -9371,6 +9649,28 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
         appointment_id=request.appointment_id,
         service_id=request.service_id,
     )
+    if is_payment_test_mode():
+        invoice_id = _simulated_id("in")
+        now = int(datetime.now(timezone.utc).timestamp())
+        invoice = {
+            "id": invoice_id,
+            "object": "invoice",
+            "status": "draft",
+            "amount_due": request.amount,
+            "amount_paid": 0,
+            "currency": request.currency,
+            "customer": customer.get("id"),
+            "description": description or "Invoice",
+            "created": now,
+            "due_date": now + max(int(request.due_days or 7), 1) * 86400,
+            "metadata": {"simulation": "true", "user_id": user_id},
+            "simulation": True,
+        }
+        payload = serialize_stripe_invoice(invoice)
+        payload.update({"customer_id": customer.get("id"), "simulated": True, "charged": False})
+        return payload
+
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
     try:
         invoice_metadata = build_invoice_metadata(
             person_id=request.person_id,
@@ -9413,6 +9713,25 @@ async def send_invoice(
 
 async def _send_invoice_for_user(request: InvoiceSendRequest, user_id: str):
     ensure_no_unresolved_templates(request.invoice_id)
+    if is_payment_test_mode():
+        if not str(request.invoice_id or "").startswith("sim_in_"):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Simulated invoice not found.")
+        now = int(datetime.now(timezone.utc).timestamp())
+        invoice = {
+            "id": request.invoice_id,
+            "object": "invoice",
+            "status": "open",
+            "amount_due": 0,
+            "amount_paid": 0,
+            "currency": "usd",
+            "created": now,
+            "metadata": {"simulation": "true", "user_id": user_id},
+            "simulation": True,
+        }
+        payload = serialize_stripe_invoice(invoice)
+        payload.update({"simulated": True, "charged": False})
+        return payload
+
     stripe_request_options = _get_connected_stripe_request_options(user_id)
     try:
         invoice = stripe.Invoice.retrieve(request.invoice_id, **stripe_request_options)
@@ -9438,6 +9757,52 @@ async def refund_payment(
 
 async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
     ensure_no_unresolved_templates(request.payment_id, request.refund_reason)
+    if is_payment_test_mode():
+        payment_record = None
+        if request.payment_id:
+            response = (
+                supabase_admin.table("payments")
+                .select("*")
+                .eq("user_id", user_id)
+                .or_(f"stripe_payment_intent_id.eq.{request.payment_id},id.eq.{request.payment_id}")
+                .limit(1)
+                .execute()
+            )
+            payment_record = (response.data or [None])[0]
+        if not payment_record:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+        payment_intent_id = payment_record.get("stripe_payment_intent_id") or request.payment_id
+        refunded_amount = int(request.amount or payment_record.get("amount") or 0)
+        update_payment_record(
+            "id",
+            payment_record.get("id"),
+            {
+                "status": "refunded",
+                "refunded_amount": refunded_amount,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            user_id=user_id,
+        )
+        refund = {
+            "id": _simulated_id("re"),
+            "object": "refund",
+            "payment_intent": payment_intent_id,
+            "amount": refunded_amount,
+            "currency": payment_record.get("currency") or "usd",
+            "reason": "requested_by_customer" if request.refund_reason else None,
+            "status": "succeeded",
+            "created": int(datetime.now(timezone.utc).timestamp()),
+            "metadata": {"user_id": user_id, "simulation": "true"},
+            "simulation": True,
+        }
+        return {
+            **serialize_stripe_refund(refund),
+            "payment_id": payment_record.get("id"),
+            "customer_id": None,
+            "simulated": True,
+            "charged": False,
+        }
+
     stripe_request_options = _get_connected_stripe_request_options(user_id)
 
     payment_record = None
@@ -9511,6 +9876,42 @@ async def cancel_subscription(
 
 async def _cancel_subscription_for_user(request: CancelSubscriptionRequest, user_id: str):
     ensure_no_unresolved_templates(request.subscription_id, request.customer_id, request.person_id)
+    if is_payment_test_mode():
+        profile_response = (
+            supabase_admin.table("users")
+            .select("stripe_subscription_id,stripe_customer_id,plan,subscription_status")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        profile = (profile_response.data or [None])[0] or {}
+        subscription_id = request.subscription_id or profile.get("stripe_subscription_id")
+        if not str(subscription_id or "").startswith("sim_sub_"):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No simulated active subscription found.")
+        supabase_admin.table("users").update({
+            "plan": "free",
+            "subscription_status": "canceled",
+            "billing_period": None,
+            "source": None,
+            "trial_start_date": None,
+            "trial_end_date": None,
+            "started_trial": False,
+        }).eq("id", user_id).execute()
+        sync_business_plan_entitlement(user_id, "free", reset_usage=False)
+        subscription = {
+            "id": subscription_id,
+            "object": "subscription",
+            "customer": profile.get("stripe_customer_id"),
+            "status": "canceled",
+            "cancel_at_period_end": False,
+            "canceled_at": int(datetime.now(timezone.utc).timestamp()),
+            "metadata": {"user_id": user_id, "simulation": "true"},
+            "simulation": True,
+        }
+        result = serialize_stripe_subscription(subscription)
+        result.update({"customer_id": subscription.get("customer"), "simulated": True, "charged": False})
+        return result
+
     stripe_request_options = _get_connected_stripe_request_options(user_id)
     customer, _person = create_or_update_stripe_customer_for_user(
         user_id=user_id,
@@ -10481,6 +10882,18 @@ async def list_user_integrations(current_user: dict = Depends(get_current_user))
             or []
         )
         by_provider = {row.get("provider"): row for row in rows if row.get("provider")}
+        if is_payment_test_mode():
+            simulated_stripe = _default_user_integration("stripe", current_user_id)
+            simulated_stripe.update({
+                "status": "connected",
+                "selected": True,
+                "provider_metadata": {
+                    "display_name": "Simulated Stripe",
+                    "test_mode": True,
+                    "livemode": False,
+                },
+            })
+            by_provider["stripe"] = simulated_stripe
         integrations = [
             UserIntegrationResponse.model_validate(
                 _serialize_public_integration(
@@ -10572,35 +10985,53 @@ async def authorize_user_integration(
         }
         authorization_url = requests.Request("GET", OUTLOOK_AUTH_URL, params=params).prepare().url
     elif provider == "stripe":
-        if not stripe_connect_client_id:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe Connect is not configured.")
-        _stripe_platform_api_key()
+        if is_payment_test_mode():
+            _upsert_integration_row(
+                str(current_user.id),
+                provider,
+                {
+                    "selected": True,
+                    "status": "connected",
+                    "provider_metadata": {
+                        "display_name": "Simulated Stripe",
+                        "test_mode": True,
+                        "livemode": False,
+                    },
+                    "credentials": {},
+                },
+            )
+            authorization_url = f"{get_payment_frontend_base_url().rstrip('/')}/dashboard?integration=stripe&simulated=true"
+        else:
+            if not stripe_connect_client_id:
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe Connect is not configured.")
+            _stripe_platform_api_key()
 
-        redirect_uri = _get_stripe_redirect_uri(request)
-        state_token = _build_integration_state(str(current_user.id), provider, return_to)
-        params = {
-            "client_id": stripe_connect_client_id,
-            "redirect_uri": redirect_uri,
-            "response_type": "code",
-            "scope": STRIPE_CONNECT_SCOPE,
-            "state": state_token,
-        }
-        authorization_url = requests.Request("GET", STRIPE_CONNECT_AUTH_URL, params=params).prepare().url
+            redirect_uri = _get_stripe_redirect_uri(request)
+            state_token = _build_integration_state(str(current_user.id), provider, return_to)
+            params = {
+                "client_id": stripe_connect_client_id,
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": STRIPE_CONNECT_SCOPE,
+                "state": state_token,
+            }
+            authorization_url = requests.Request("GET", STRIPE_CONNECT_AUTH_URL, params=params).prepare().url
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provider authorization not implemented.")
     if not authorization_url:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create authorization URL.")
-    _upsert_integration_row(
-        str(current_user.id),
-        provider,
-        {
-            "selected": True,
-            "status": "selected",
-            "provider_metadata": {
-                "last_authorize_started_at": datetime.now(timezone.utc).isoformat(),
+    if not (provider == "stripe" and is_payment_test_mode()):
+        _upsert_integration_row(
+            str(current_user.id),
+            provider,
+            {
+                "selected": True,
+                "status": "selected",
+                "provider_metadata": {
+                    "last_authorize_started_at": datetime.now(timezone.utc).isoformat(),
+                },
             },
-        },
-    )
+        )
     return {"provider": provider, "authorization_url": authorization_url}
 
 

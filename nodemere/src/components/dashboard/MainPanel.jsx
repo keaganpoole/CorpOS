@@ -13,7 +13,7 @@ const MainPanel = ({ setCurrentView }) => {
       </div>
       <div className="main-panel-actions">
         <Link to="/pricing" className="text-sm text-gray-400 hover:text-white transition-colors">Plans</Link>
-        <Link to="/dashboard/settings" className="text-sm text-gray-400 hover:text-white transition-colors">Account</Link>
+        <Link to="/dashboard/settings" className="text-sm text-gray-400 hover:text-white transition-colors">Settings</Link>
       </div>
     </div>
   );

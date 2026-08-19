@@ -3,6 +3,10 @@
 Frontend: Vercel.
 Backend: Render web service.
 
+## Supabase
+
+Before deploying billing, run `sql/add_user_billing_columns.sql` in the Supabase SQL Editor. The `system_config.test_mode` column must also exist and be set to `true` for simulated billing.
+
 ## Vercel
 
 - Framework preset: Vite

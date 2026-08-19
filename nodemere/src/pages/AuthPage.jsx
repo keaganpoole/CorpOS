@@ -8,7 +8,7 @@ import { supabase } from '../supabaseClient';
 import googleIcon from '../assets/google.png'; // Import the local Google icon
 import { LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 const FRONTEND_PUBLIC_URL = import.meta.env.VITE_FRONTEND_PUBLIC_URL || window.location.origin;
 
 console.log('AuthPage: import.meta.env.DEV =', import.meta.env.DEV);
@@ -45,13 +45,13 @@ const AuthPage = () => {
             const pendingPlan = localStorage.getItem('pendingPlan');
             if (pendingPlan) {
                 localStorage.removeItem('pendingPlan');
-                const { priceId } = JSON.parse(pendingPlan);
+                const { priceId, planSlug, cycle } = JSON.parse(pendingPlan);
                 
                 const initiateStripeCheckout = async () => {
                     try {
                         const response = await axios.post(
                             `${API_BASE_URL}/create-checkout-session`,
-                            { price_id: priceId },
+                            { price_id: priceId, plan_slug: planSlug, billing_cycle: cycle },
                             { headers: { Authorization: `Bearer ${session.access_token}` } }
                         );
                         const { url } = response.data;

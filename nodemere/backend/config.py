@@ -12,6 +12,7 @@ except ImportError:
 
 
 # General
+load_project_env()
 TEST_MODE = os.environ.get("TEST_MODE", "false").strip().lower() in {"1", "true", "yes", "on"}
 UPDATE2 = os.environ.get("UPDATE2", "false").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -19,8 +20,6 @@ UPDATE2 = os.environ.get("UPDATE2", "false").strip().lower() in {"1", "true", "y
 
 
 
-
-load_project_env()
 
 # --- Stripe Configuration ---
 STRIPE_LIVE_SECRET_KEY = os.environ.get("STRIPE_API_SECRET_KEY") or os.environ.get("STRIPE_SECRET_KEY")
