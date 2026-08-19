@@ -1,85 +1,78 @@
 // src/components/modals/PlanChangePopupModal.jsx
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '@fortawesome/free-solid-svg-icons';
-import colors from '../../../color';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
-import './PlanChangePopupModal.css';
+import { X } from 'lucide-react';
 
 const PlanChangePopupModal = ({ isOpen, onClose, plan }) => {
-  const color1 = colors.find(color => color.name === 'color1')?.hex || '#7b8afe';
-  const color2 = colors.find(color => color.name === 'color2')?.hex || '#534eef';
-  const navigate = useNavigate(); // Initialize navigate
+  if (typeof document === 'undefined') return null;
 
-  const handleUpgradeClick = () => {
-    onClose();
-    navigate('/pricing');
+  const normalizedPlan = String(plan || 'Free').trim() || 'Free';
+  const formattedPlan = normalizedPlan
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(' ') || 'Free';
+  const planSummaries = {
+    free: 'You can start testing Nodemere with light usage and a simple setup.',
+    essentials: 'You now have more room to run your receptionist and support day-to-day call handling.',
+    pro: 'Your account is set up for higher-volume operations and more flexible automation.',
+    ultra: 'Your account is set up for larger-scale receptionist operations and advanced capacity.',
   };
+  const summary = planSummaries[normalizedPlan.toLowerCase()] || 'Your account has been updated and your new plan is ready.';
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <motion.div 
-          className="plan-change-modal-backdrop"
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          style={{ '--color1': color1, '--color2': color2 }} // Pass colors as CSS variables
+          className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]"
+          onClick={onClose}
         >
-          <motion.div 
-            className="plan-change-modal-content"
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
+          <motion.section
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
+            onClick={(event) => event.stopPropagation()}
+            className="relative flex max-h-[calc(100vh-48px)] w-full max-w-[520px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
           >
-            <button className="plan-change-modal-close-btn" onClick={onClose}>
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-            {plan.toLowerCase() === 'free' ? (
-              <>
-                <h2>You're in! 🎂</h2>
-                <p>Your free plan gives you full access with limits. Choose a paid plan when you need more capacity and features.</p>
-                <div className="plan-change-modal-actions">
-                  <motion.button 
-                    onClick={handleUpgradeClick} 
-                    className="plan-change-modal-btn upgrade-btn text-black"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    View paid plans
-                  </motion.button>
-                  <motion.p 
-                    onClick={onClose} 
-                    className="plan-change-modal-text-link maybe-later-btn"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    Maybe later
-                  </motion.p>
+            <div className="relative flex flex-1 flex-col p-6 sm:p-8">
+              <div className="relative mb-6 flex items-start gap-5 justify-between">
+                <div className="min-w-0 flex-1 pl-8 text-center">
+                  <h2 className="text-[26px] font-semibold tracking-[-0.01em] text-white sm:text-[34px]">
+                    Welcome to {formattedPlan}
+                  </h2>
+                  <p className="mt-4 w-full max-w-none text-sm leading-[1.55] text-zinc-300 sm:text-[15px]">
+                    {summary}
+                  </p>
                 </div>
-              </>
-            ) : (
-              <>
-                <h2>You're on the {plan} plan! 🎉</h2>
-                <p>Enjoy all the features tailored for your current subscription. Keep up the great work!</p>
-                <div className="plan-change-modal-actions">
-                  <motion.button 
-                    onClick={onClose} 
-                    className="plan-change-modal-btn got-it-btn text-black"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    Got it
-                  </motion.button>
-                </div>
-              </>
-            )}
-          </motion.div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="mt-8 flex justify-center">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-12 rounded-full bg-white px-10 text-sm font-bold text-black transition hover:bg-zinc-200"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </motion.section>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 
-export default PlanChangePopupModal; 
+export default PlanChangePopupModal;

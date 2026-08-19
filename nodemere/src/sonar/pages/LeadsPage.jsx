@@ -52,11 +52,6 @@ const PeoplePage = ({ hideTitle = false, onToolbarMetaChange = null }) => {
 
   return (
     <div className="flex h-full bg-[#020202] relative overflow-hidden">
-
-      <div className="absolute bottom-3 left-1/2 z-40 w-[min(760px,calc(100%-32px))] -translate-x-1/2 rounded-xl border border-orange-300/15 bg-[#15110b]/95 px-4 py-2.5 text-center text-[11px] leading-5 text-orange-100/85 shadow-2xl backdrop-blur">
-        Consent flags are not a substitute for proof. Mark a contact as consented only when the business has retained the required consent record, and honor Do Not Call and Do Not Text immediately. Automated marketing is not enabled for this launch.
-      </div>
-
       {/* Error banner */}
       {error && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-rose-500/10 border-b border-rose-500/20 px-8 py-2 flex items-center gap-3">

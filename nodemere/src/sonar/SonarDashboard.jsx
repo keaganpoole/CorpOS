@@ -71,6 +71,7 @@ import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
 import CubePreloader from './components/CubePreloader';
 import PlanLimitModal from '../components/modals/PlanLimitModal';
+import PlanChangePopupModal from '../components/modals/PlanChangePopupModal';
 import { AudioPlayerProvider, PersistentAudioPlayer } from './contexts/AudioPlayerContext';
 import { CallLogsProvider, useCallLogs } from './contexts/CallLogsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -1492,12 +1493,14 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
   const includedSeconds = Number(usage?.current_cycle_included_seconds ?? 0);
   const usedMinutes = usedSeconds / 60;
   const includedMinutes = includedSeconds / 60;
-  const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
-  const percent = includedSeconds > 0 ? Math.min(100, Math.max(0, (usedSeconds / includedSeconds) * 100)) : 0;
-  const remainingPercent = includedSeconds > 0 ? Math.min(100, Math.max(0, 100 - percent)) : 0;
+  const overageSeconds = Math.max(0, Number(usage?.current_cycle_overage_seconds ?? usage?.overage_seconds ?? 0));
+  const overageUsedMinutes = overageSeconds / 60;
+  const usagePercent = includedSeconds > 0 ? Math.max(0, (usedSeconds / includedSeconds) * 100) : 0;
+  const cappedUsagePercent = Math.min(100, usagePercent);
+  const isOverage = overageSeconds > 0 || usagePercent > 100 || usage?.alert_level === 'overage';
   const avatarRadius = 17;
   const avatarCircumference = 2 * Math.PI * avatarRadius;
-  const avatarDashOffset = avatarCircumference - ((remainingPercent / 100) * avatarCircumference);
+  const avatarDashOffset = avatarCircumference - ((cappedUsagePercent / 100) * avatarCircumference);
   const avatarUrl = String(usage?.avatar || '').trim();
   const initials = String(profile?.first_name || profile?.email || 'S').trim().slice(0, 1).toUpperCase();
   const rawPlanName = String(profile?.plan || 'Free').trim() || 'Free';
@@ -1513,6 +1516,13 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
   };
   const overageMinutes = Number(usage?.billable_overage_minutes ?? 0);
   const overageAmount = Number(usage?.estimated_overage_amount_cents ?? 0) / 100;
+  const overageRateCents = Number(usage?.overage_price_per_minute_cents ?? 30);
+  const overageCap = Number(usage?.overage_cap_cents ?? 0) / 100;
+  const overageLimitReached = usage?.overage_limit_reached === true;
+  const usageAccentClass = isOverage ? 'text-rose-300' : 'text-white';
+  const usageBarBackground = isOverage
+    ? 'linear-gradient(90deg, #f43f5e, #fb7185)'
+    : 'linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd))';
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -1559,6 +1569,10 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
               <stop offset="0%" stopColor="var(--brandGradientStart)" />
               <stop offset="100%" stopColor="var(--brandGradientEnd)" />
             </linearGradient>
+            <linearGradient id="accountOverageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f43f5e" />
+              <stop offset="100%" stopColor="#fb7185" />
+            </linearGradient>
           </defs>
         </svg>
         <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
@@ -1567,7 +1581,7 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
             cy="20"
             r={avatarRadius}
             fill="none"
-            stroke="url(#accountUsageGradient)"
+            stroke={isOverage ? 'url(#accountOverageGradient)' : 'url(#accountUsageGradient)'}
             strokeWidth="1.35"
             strokeLinecap="round"
             strokeDasharray={avatarCircumference}
@@ -1583,7 +1597,7 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
             </span>
           )}
           <span className="absolute inset-0 flex items-center justify-center bg-[#050505]/85 text-[9px] font-black text-white opacity-0 transition-opacity duration-200 group-hover/account:opacity-100">
-            {Math.round(remainingPercent)}%
+            {Math.round(usagePercent)}%
           </span>
         </span>
       </button>
@@ -1620,15 +1634,15 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
 
               <div className="mb-5">
                 <div className="mb-2 flex items-end justify-between">
-                  <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-600">Remaining</span>
-                  <span className="text-[28px] font-light leading-none tracking-tight text-white tabular-nums">{Math.round(remainingPercent)}%</span>
+                  <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-600">Used</span>
+                  <span className={`text-[28px] font-light leading-none tracking-tight tabular-nums ${usageAccentClass}`}>{Math.round(usagePercent)}%</span>
                 </div>
                 <div className="h-px overflow-hidden rounded-full bg-white/[0.08]">
                   <div
                     className="h-full rounded-full transition-[width] duration-500 ease-out"
                     style={{
-                      width: `${remainingPercent}%`,
-                      background: 'linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd))',
+                      width: `${cappedUsagePercent}%`,
+                      background: usageBarBackground,
                     }}
                   />
                 </div>
@@ -1640,13 +1654,29 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
                   <span className="font-semibold text-zinc-100 tabular-nums">{formatMinutes(includedMinutes)} min</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-zinc-500">Minutes remaining</span>
-                  <span className="font-semibold text-zinc-100 tabular-nums">{formatMinutes(remainingMinutes)} min</span>
+                  <span className="font-medium text-zinc-500">Minutes used</span>
+                  <span className={`font-semibold tabular-nums ${usageAccentClass}`}>{formatMinutes(usedMinutes)} min</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-zinc-500">Minutes used</span>
-                  <span className="font-semibold text-zinc-100 tabular-nums">{formatMinutes(usedMinutes)} min</span>
+                  <span className="font-medium text-zinc-500">Overage</span>
+                  <span className={`font-semibold tabular-nums ${isOverage ? 'text-rose-300' : 'text-zinc-100'}`}>
+                    {formatMinutes(Math.max(overageMinutes, overageUsedMinutes))} min
+                  </span>
                 </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-zinc-500">Estimated overage</span>
+                  <span className={`font-semibold tabular-nums ${isOverage ? 'text-rose-300' : 'text-zinc-100'}`}>
+                    ${overageAmount.toFixed(2)}
+                  </span>
+                </div>
+                {overageCap > 0 && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-medium text-zinc-500">Overage limit</span>
+                    <span className={`font-semibold tabular-nums ${overageLimitReached ? 'text-rose-300' : 'text-zinc-100'}`}>
+                      ${overageCap.toFixed(2)}
+                    </span>
+                  </div>
+                )}
               </div>
               {usage?.alert_level === 'warning' && (
                 <div className="mt-4 border-l border-amber-400/70 pl-3 text-[12px] leading-5 text-amber-200">
@@ -1659,8 +1689,13 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
                 </div>
               )}
               {usage?.alert_level === 'overage' && (
-                <div className="mt-4 border-l border-amber-400/70 pl-3 text-[12px] leading-5 text-amber-200">
-                  {formatMinutes(overageMinutes)} overage minute{overageMinutes === 1 ? '' : 's'} estimated at ${overageAmount.toFixed(2)}. This will be added to your next Stripe invoice.
+                <div className="mt-4 border-l border-rose-400/70 pl-3 text-[12px] leading-5 text-rose-200">
+                  {formatMinutes(overageMinutes)} overage minute{overageMinutes === 1 ? '' : 's'} at ${(overageRateCents / 100).toFixed(2)}/min. Estimated ${overageAmount.toFixed(2)} will be added to your next Stripe invoice.
+                </div>
+              )}
+              {overageLimitReached && (
+                <div className="mt-4 border-l border-rose-400/70 pl-3 text-[12px] leading-5 text-rose-200">
+                  New calls are paused until billing is updated in Stripe Billing Portal.
                 </div>
               )}
             </div>
@@ -1723,6 +1758,7 @@ const SonarDashboard = () => {
   const [backendTasklistState, setBackendTasklistState] = useState(null);
   const [showSetupGuide, setShowSetupGuide] = useState(true);
   const [planLimitDetail, setPlanLimitDetail] = useState(null);
+  const [showPlanChangePopup, setShowPlanChangePopup] = useState(false);
   const tasklistPersistRef = useRef('');
   const userId = authSession?.user?.id || profile?.id || null;
 
@@ -1730,6 +1766,14 @@ const SonarDashboard = () => {
     const handlePlanLimit = (event) => setPlanLimitDetail(event.detail || null);
     window.addEventListener('nodemere:plan-limit', handlePlanLimit);
     return () => window.removeEventListener('nodemere:plan-limit', handlePlanLimit);
+  }, []);
+
+  useEffect(() => {
+    setShowPlanChangePopup(Boolean(profile?.plan));
+  }, [profile?.plan, profile?.plan_change_popup]);
+
+  const handleClosePlanChangePopup = useCallback(async () => {
+    setShowPlanChangePopup(false);
   }, []);
 
   const dismissPopup = useCallback(async (popup) => {
@@ -2650,6 +2694,11 @@ const SonarDashboard = () => {
         popup={activePopup}
         profile={profile}
         onClose={() => dismissPopup(activePopup)}
+      />
+      <PlanChangePopupModal
+        isOpen={showPlanChangePopup}
+        onClose={handleClosePlanChangePopup}
+        plan={profile?.plan || 'Free'}
       />
       <PlanLimitModal detail={planLimitDetail} onClose={() => setPlanLimitDetail(null)} />
       {showSetupGuide && (

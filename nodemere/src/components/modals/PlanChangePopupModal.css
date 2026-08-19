@@ -3,89 +3,125 @@
 .plan-change-modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 1450;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px;
 }
 
 .plan-change-modal-content {
-  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 34px;
   width: 100%;
-  max-width: 450px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  max-width: 520px;
+  max-height: calc(100vh - 48px);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
   padding: 32px;
   text-align: center;
-  background: #141414;
-  border: 1px solid #262626;
-  color: #F5F5F5;
-  position: relative; /* Needed for absolute positioning of close button */
+  background: rgba(7, 7, 7, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  backdrop-filter: blur(24px);
+}
+
+.plan-change-modal-content::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: -260px;
+  height: 520px;
+  width: 520px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color1) 12%, transparent);
+  filter: blur(90px);
 }
 
 .plan-change-modal-close-btn {
   position: absolute;
-  top: 15px;
-  right: 15px;
+  top: 24px;
+  right: 24px;
+  z-index: 1;
+  display: flex;
+  height: 32px;
+  width: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
   background: none;
   border: none;
-  color: #A3A3A3; /* secondary-text-color */
-  font-size: 1.2rem;
+  color: #71717a;
+  font-size: 0.95rem;
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .plan-change-modal-close-btn:hover {
-  color: #F5F5F5; /* primary-text-color */
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
 }
 
 .plan-change-modal-content h2 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 0 36px;
+  color: #fff;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
 }
 
 .plan-change-modal-content p {
-  font-size: 1rem;
-  line-height: 1.6;
-  margin-bottom: 24px;
-  color: #A3A3A3;
+  position: relative;
+  z-index: 1;
+  margin: 16px auto 0;
+  max-width: 420px;
+  color: #d4d4d8;
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 .plan-change-modal-actions {
+  position: relative;
+  z-index: 1;
   display: flex;
-  flex-direction: column; /* Stack buttons vertically */
-  gap: 12px;
+  margin-top: 32px;
   justify-content: center;
-  align-items: center; /* Center buttons horizontally */
+  align-items: center;
 }
 
 .plan-change-modal-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%; /* Make buttons take full width of the column */
-  max-width: 200px; /* Limit max width for better aesthetics */
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 1rem;
+  min-height: 48px;
+  min-width: 142px;
+  padding: 0 40px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
   text-decoration: none;
   border: 1px solid transparent;
-  color: #fff;
+  color: #000;
 }
 
 .plan-change-modal-btn.got-it-btn,
 .plan-change-modal-btn.upgrade-btn {
-  background: linear-gradient(to right, var(--color1), var(--color2));
+  background: #fff;
 }
 
 .plan-change-modal-btn.got-it-btn:hover,
 .plan-change-modal-btn.upgrade-btn:hover {
-  filter: brightness(1.1);
+  background: #e4e4e7;
 }
 
 .plan-change-modal-text-link {
@@ -101,5 +137,22 @@
   text-decoration: underline;
 }
 
-/* Define CSS variables for colors from color.js */
+@media (max-width: 640px) {
+  .plan-change-modal-backdrop {
+    padding: 16px;
+  }
 
+  .plan-change-modal-content {
+    border-radius: 28px;
+    padding: 28px 22px;
+  }
+
+  .plan-change-modal-close-btn {
+    top: 18px;
+    right: 18px;
+  }
+
+  .plan-change-modal-content h2 {
+    font-size: 26px;
+  }
+}

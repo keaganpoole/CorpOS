@@ -848,6 +848,15 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const [integrationPopupPending, setIntegrationPopupPending] = useState(false);
   const [integrationError, setIntegrationError] = useState('');
   const [selectedIntegrationProvider, setSelectedIntegrationProvider] = useState(INTEGRATION_PROVIDERS[0]?.key || 'gmail');
+  const canShowSaveScenario = useMemo(() => {
+    const hasConfiguredTrigger = nodes.some((node) => (
+      node?.configured && node?.categoryType === 'TRIGGERS'
+    ));
+    const hasConfiguredAction = nodes.some((node) => (
+      node?.configured && node?.categoryType === 'ACTIONS'
+    ));
+    return hasConfiguredTrigger && hasConfiguredAction;
+  }, [nodes]);
   const integrationsLoadedRef = useRef(false);
 
   // Fade-in animation state
@@ -6624,13 +6633,15 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               <CircleHelp size={16} />
               Help
             </button>
-            <button
-              className="save-scenario-btn"
-              onClick={handleSaveScenario}
-            >
-              <Check size={16} />
-              {currentScenario ? 'Save' : 'Save Scenario'}
-            </button>
+            {canShowSaveScenario && (
+              <button
+                className="save-scenario-btn"
+                onClick={handleSaveScenario}
+              >
+                <Check size={16} />
+                {currentScenario ? 'Save' : 'Save Scenario'}
+              </button>
+            )}
           </div>
         </div>
         

@@ -4468,11 +4468,11 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
 # but it is never trusted to enforce them.
 DEFAULT_PLAN_ENTITLEMENTS = {
     "free": {"included_call_minutes": 20, "max_receptionists": 1, "max_scenarios": 3, "max_contacts": 100, "inbound_calling": True, "outbound_calling": False, "overage_enabled": False},
-    "essentials": {"included_call_minutes": 300, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True},
-    "pro": {"included_call_minutes": 1500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True},
-    "ultra": {"included_call_minutes": 3000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True},
+    "essentials": {"included_call_minutes": 300, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True, "overage_cap_cents": 2500},
+    "pro": {"included_call_minutes": 1500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 10000},
+    "ultra": {"included_call_minutes": 3000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 25000},
 }
-SUBSCRIPTION_ACCESS_STATUSES = {"active", "trialing"}
+SUBSCRIPTION_ACCESS_STATUSES = {"active"}
 
 
 def get_user_plan_context(user_id: str) -> dict:
@@ -4573,7 +4573,31 @@ def count_active_receptionists(user_id: str) -> int:
 
 
 def enforce_call_minutes(user_id: str, business: Optional[dict], *, direction: str = "inbound") -> dict:
-    context = require_plan_access(user_id, f"{direction}_calling")
+    normalized_user_id = str(user_id or "").strip()
+    if not normalized_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "billing_context_missing",
+                "feature": f"{direction}_calling",
+                "message": "This call could not be started because the account billing context could not be verified.",
+            },
+        )
+
+    if not business:
+        business = load_business_by_user_id(normalized_user_id)
+    business_owner_id = str((business or {}).get("user_id") or "").strip()
+    if not business or (business_owner_id and business_owner_id != normalized_user_id):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "billing_context_missing",
+                "feature": f"{direction}_calling",
+                "message": "Finish setting up your business before calls can run. Billing could not be verified for this account.",
+            },
+        )
+
+    context = require_plan_access(normalized_user_id, f"{direction}_calling")
     if direction == "outbound" and context["entitlements"].get("outbound_calling") is not True:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
@@ -4584,13 +4608,18 @@ def enforce_call_minutes(user_id: str, business: Optional[dict], *, direction: s
                 "message": "Outbound calling is available on the Pro and Ultra plans.",
             },
         )
-    if not business:
-        return context
     used_seconds = parse_usage_seconds(business.get("current_cycle_used_seconds"))
     included_seconds = parse_usage_seconds(business.get("current_cycle_included_seconds"))
     if included_seconds <= 0:
         included_seconds = int(context["entitlements"].get("included_call_minutes") or 0) * 60
-    if used_seconds >= included_seconds and context["entitlements"].get("overage_enabled") is not True:
+    overage_seconds = max(0, used_seconds - included_seconds)
+    overage_rate_cents = int(context["entitlements"].get("overage_price_per_minute_cents") or 30)
+    billable_overage_minutes = math.ceil(overage_seconds / 60) if overage_seconds else 0
+    estimated_overage_amount_cents = billable_overage_minutes * overage_rate_cents
+    overage_enabled = context["entitlements"].get("overage_enabled") is True
+    overage_cap_cents = int(context["entitlements"].get("overage_cap_cents") or 0)
+
+    if used_seconds >= included_seconds and not overage_enabled:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
@@ -4600,6 +4629,18 @@ def enforce_call_minutes(user_id: str, business: Optional[dict], *, direction: s
                 "current": used_seconds // 60,
                 "plan": context["plan"],
                 "message": "Your included call minutes are used. Upgrade in Stripe Billing Portal to continue calling.",
+            },
+        )
+    if overage_enabled and overage_cap_cents > 0 and estimated_overage_amount_cents >= overage_cap_cents:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "overage_limit_reached",
+                "resource": "call minutes",
+                "plan": context["plan"],
+                "overage_cap_cents": overage_cap_cents,
+                "estimated_overage_amount_cents": estimated_overage_amount_cents,
+                "message": "Your account reached its call overage limit. Open Stripe Billing Portal to update your billing before more calls can run.",
             },
         )
     return context
@@ -4615,6 +4656,13 @@ def get_usage_snapshot(user_id: str) -> dict:
     overage_seconds = max(0, used_seconds - included_seconds)
     overage_rate_cents = int(context["entitlements"].get("overage_price_per_minute_cents") or 30)
     billable_overage_minutes = math.ceil(overage_seconds / 60) if overage_seconds else 0
+    estimated_overage_amount_cents = billable_overage_minutes * overage_rate_cents
+    overage_cap_cents = int(context["entitlements"].get("overage_cap_cents") or 0)
+    overage_limit_reached = bool(
+        context["entitlements"].get("overage_enabled") is True
+        and overage_cap_cents > 0
+        and estimated_overage_amount_cents >= overage_cap_cents
+    )
     usage_percent = (used_seconds / included_seconds * 100) if included_seconds else 0
     if overage_seconds > 0 and context["entitlements"].get("overage_enabled") is True:
         alert_level = "overage"
@@ -4636,7 +4684,11 @@ def get_usage_snapshot(user_id: str) -> dict:
         "current_cycle_overage_seconds": overage_seconds,
         "billable_overage_minutes": billable_overage_minutes,
         "overage_price_per_minute_cents": overage_rate_cents,
-        "estimated_overage_amount_cents": billable_overage_minutes * overage_rate_cents,
+        "estimated_overage_amount_cents": estimated_overage_amount_cents,
+        "overage_cap_cents": overage_cap_cents or None,
+        "remaining_overage_cap_cents": max(0, overage_cap_cents - estimated_overage_amount_cents) if overage_cap_cents else None,
+        "overage_limit_reached": overage_limit_reached,
+        "billing_access": context["plan"] == "free" or context["status"] in SUBSCRIPTION_ACCESS_STATUSES,
         "overage_enabled": context["entitlements"].get("overage_enabled") is True,
         "usage_percent": round(usage_percent, 2),
         "alert_level": alert_level,
@@ -6376,8 +6428,20 @@ async def twilio_inbound_webhook(request: Request):
     })
     business = context.get("business")
     resolved_user_id = context.get("user_id") or (business or {}).get("user_id")
-    if resolved_user_id:
-        enforce_call_minutes(str(resolved_user_id), business, direction="inbound")
+    try:
+        enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        logging.warning(
+            "Rejecting inbound call before ElevenLabs registration: code=%s user_id=%s business_id=%s",
+            detail.get("code") or "billing_blocked",
+            resolved_user_id,
+            (business or {}).get("id"),
+        )
+        return Response(
+            content="<Response><Say>We are unable to connect this call right now. Please contact the account owner.</Say><Hangup/></Response>",
+            media_type="application/xml",
+        )
     receptionist = find_inbound_receptionist_for_business(
         business.get("id") if business else None,
         context.get("user_id") or (business or {}).get("user_id"),
@@ -6491,6 +6555,8 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
     call_payload = build_call_route_payload(payload, request)
     context = resolve_business_context(call_payload)
     business = context.get("business")
+    resolved_user_id = context.get("user_id") or (business or {}).get("user_id")
+    enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
     receptionist = (
         (context.get("receptionist") if receptionist_direction_allows("inbound", (context.get("receptionist") or {}).get("direction")) else None)
         or find_inbound_receptionist_for_business(
