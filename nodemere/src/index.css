@@ -185,7 +185,9 @@ button:focus-visible,
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--focusOutline) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .time-input-no-icon::-webkit-calendar-picker-indicator {

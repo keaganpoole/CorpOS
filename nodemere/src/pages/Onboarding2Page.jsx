@@ -20,9 +20,11 @@ import {
   Loader2,
   Mail,
   MapPin,
+  Maximize2,
   Phone,
   Trash2,
   FileText,
+  Wand2,
   X,
 } from 'lucide-react';
 
@@ -31,13 +33,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const steps = [
   {
     id: 'business',
-    title: 'What should callers know you as?',
-    description: 'Start with the core business identity. We will use this across Nodemere as the foundation for your receptionist experience.',
+    title: 'Tell us about your business',
+    description: 'Start with the essentials your receptionist needs to know about your business.',
   },
   {
     id: 'contact',
-    title: 'Where and how should people reach you?',
-    description: 'Add the phone, email, and full business address so your workspace feels real from day one. You can refine any of this later.',
+    title: 'Business Details',
+    description: 'Add your business details. You can always update them later.',
   },
   {
     id: 'operations',
@@ -46,23 +48,28 @@ const steps = [
   },
   {
     id: 'context',
-    title: 'Give your receptionist some context.',
-    description: 'This is the background your receptionist uses when callers ask who you are, what makes you different, where you work, how you operate, and what customers should expect. A useful starter is already loaded, so you can keep it, edit it, or skip it for now.',
+    title: 'Build your business brief',
+    description: 'Write a practical business brief that helps the AI understand what the company is, how it operates, what makes it distinct, and why customers choose it.',
   },
   {
     id: 'policies',
-    title: 'What policies should your receptionist follow?',
+    title: 'Set your business policies',
     description: 'Add the business rules your receptionist should know for cancellations, deposits, warranties, service areas, payment terms, emergencies, and anything callers commonly need clarified.',
   },
   {
     id: 'faq',
-    title: 'What questions should your receptionist answer?',
+    title: 'Frequently asked questions',
     description: 'Add common customer questions and answers so your receptionist can respond consistently. A simple list is enough; you can refine it later.',
   },
   {
     id: 'services',
-    title: 'What services should your receptionist know?',
-    description: 'Build a clean service catalog your receptionist can use for booking, pricing questions, and caller guidance. Add the common services now; you can refine every detail later.',
+    title: 'What services do you offer?',
+    description: 'Get your receptionist familiar with what you offer so they’re ready when customers have questions or want to book.',
+  },
+  {
+    id: 'acknowledgments',
+    title: 'Review required acknowledgments',
+    description: 'Confirm the required account acknowledgments to complete setup.',
   },
 ];
 
@@ -185,24 +192,31 @@ const createDefaultSchedule = () => ({
   }, {}),
 });
 
-const aboutTemplate = `Who are you? Tell your story. Your AI receptionist uses this to answer questions about your business.
+const industryExamples = {
+  'Home Services': {
+    serviceName: 'Roof repair',
+    about: `Business overview:
+We are a family-owned residential roofing company based in Portland, Maine. We help homeowners protect their homes with clear roofing guidance, reliable repairs, and professional installation work.
 
-EXAMPLE:
+Why customers come to us:
+Customers usually reach out when their home feels exposed, urgent, or uncertain. They are not just looking for roofing work; they are looking for confidence that the problem will be understood and handled responsibly.
 
-We're Hartley Roofing, a family-owned roofing company based in Portland, Maine. My dad started this business back in 2006 with nothing but a truck and a ladder, and we've been keeping roofs tight ever since.
+How we should be represented:
+Sound calm, practical, and trustworthy. Customers may be worried about leaks, storm damage, cost, or urgency, so explain next steps clearly and avoid overpromising before an inspection.
 
-We specialize in residential roofing: asphalt shingles, metal roofing, flat roofs, and repairs. We also do gutter installation and siding.
-
-We're licensed and insured, and every job comes with a workmanship warranty on top of the manufacturer warranty.
-
-We proudly serve the Greater Portland area and much of southern Maine, including Portland, South Portland, Scarborough, Westbrook, Falmouth, Cape Elizabeth, Gorham, Windham, Cumberland, Yarmouth, Freeport, and surrounding communities.
-`;
-
-const policiesTemplate = `Add the policies your AI receptionist should follow during calls.
-
-EXAMPLE:
+What customers should understand:
+- We handle roof repairs, asphalt shingles, metal roofing, flat roofs, gutter installation, and siding.
+- We are licensed and insured.
+- Workmanship warranty details are confirmed based on the service performed.
+- Emergency or active leak situations should be treated as higher priority.
 
 Service area:
+We serve Greater Portland and much of southern Maine, including Portland, South Portland, Scarborough, Westbrook, Falmouth, Cape Elizabeth, Gorham, Windham, Cumberland, Yarmouth, Freeport, and nearby communities.
+
+Boundaries:
+Do not diagnose the exact cause of roof damage without an inspection. If the customer has active leaking, storm damage, or safety concerns, collect details and help schedule the soonest appropriate follow-up.
+`,
+    policies: `Service area:
 - We serve Cumberland County and most of Southern Maine.
 
 Scheduling:
@@ -217,13 +231,8 @@ Payments:
 - Final payment is due when work is complete unless another arrangement is approved.
 
 Warranty:
-- Workmanship warranty details depend on the service performed and will be confirmed in the estimate.`;
-
-const faqTemplate = `Add common customer questions and the answers your AI receptionist should give.
-
-EXAMPLE:
-
-Q: Do you offer free estimates?
+- Workmanship warranty details depend on the service performed and will be confirmed in the estimate.`,
+    faq: `Q: Do you offer free estimates?
 A: Yes, estimates are available for most larger projects. Emergency visits or diagnostic calls may have a service fee.
 
 Q: How soon can someone come out?
@@ -236,7 +245,756 @@ Q: What areas do you serve?
 A: We serve Cumberland County and most of Southern Maine.
 
 Q: Do you handle emergency repairs?
-A: Yes, callers with active leaks, storm damage, or urgent issues should be prioritized for the soonest available appointment.`;
+A: Yes, callers with active leaks, storm damage, or urgent issues should be prioritized for the soonest available appointment.`,
+    serviceDescription: (serviceName) => `Service overview:
+This service helps homeowners fix roof issues before they turn into larger damage. It is for leaks, missing or damaged shingles, storm damage, flashing problems, small punctures, worn sealant, and other localized roofing issues.
+
+Best fit:
+This service is a good fit when a customer notices water stains, active leaking, loose or missing shingles, damage after heavy wind or hail, exposed flashing, or a roof problem that seems limited to one area.
+
+What is included:
+- Inspection of the affected area
+- Identification of the likely cause of the issue
+- Clear explanation of the repair options
+- Repair of common localized roof problems when possible
+- Recommendation for a larger estimate if the issue is more extensive
+
+What customers can expect:
+Customers can expect a straightforward assessment, practical repair guidance, and a clear next step. If the issue can be repaired during the visit, the technician will explain the work before moving forward. If the roof needs a larger repair or replacement estimate, the customer will be guided toward the right follow-up.
+
+Recommended next step:
+Ask where the issue is located, whether there is active leaking, when the problem started, and whether there was recent storm damage. If the customer is dealing with an active leak or urgent damage, prioritize the soonest available appointment.`,
+  },
+  'Real Estate': {
+    serviceName: 'Buyer consultation',
+    about: `Business overview:
+We are a residential real estate team based in Portland, Maine. We help buyers, sellers, and relocating families make informed decisions in a competitive local market.
+
+Why customers come to us:
+Customers often come to us during major life transitions. They want steady guidance, local insight, and the feeling that someone is helping them make smart decisions instead of pushing them through a transaction.
+
+How we should be represented:
+Sound knowledgeable, responsive, and steady. Customers may be making high-stakes decisions, so keep answers clear and encourage the right next step instead of guessing.
+
+What customers should understand:
+- We help with buying, selling, relocation, listing preparation, showings, and consultations.
+- First-time buyers may need guidance on pre-approval, budget, timeline, and next steps.
+- Sellers may need help understanding pricing, timing, preparation, and listing strategy.
+- Urgent offer, showing, or inspection deadlines should be prioritized.
+
+Service area:
+We serve Greater Portland and nearby communities, including South Portland, Scarborough, Falmouth, Cape Elizabeth, Westbrook, Cumberland, and surrounding areas.
+
+Boundaries:
+Do not provide legal, tax, lending, or appraisal advice. Route those questions to the appropriate licensed professional or team member.`,
+    policies: `Appointments:
+- Consultations are available by appointment.
+- Showings depend on property availability and seller approval.
+
+Client intake:
+- New buyers should be asked about budget, preferred areas, timeline, financing status, and must-have features.
+
+Communication:
+- Urgent offer or inspection deadlines should be prioritized for same-day follow-up.
+
+Compliance:
+- Specific legal, tax, or lending advice should be referred to the appropriate licensed professional.`,
+    faq: `Q: Can you help first-time buyers?
+A: Yes, we regularly help first-time buyers understand the process and prepare for next steps.
+
+Q: Do I need pre-approval before seeing homes?
+A: It is strongly recommended because it helps clarify budget and makes offers stronger.
+
+Q: What areas do you cover?
+A: We serve Greater Portland and nearby communities.
+
+Q: Can you help sell my home?
+A: Yes, we can schedule a listing consultation to review the property, timing, and pricing strategy.`,
+    serviceDescription: (serviceName) => `Service overview:
+This service helps prospective buyers understand the buying process, clarify their goals, and decide what steps to take before touring homes or making offers.
+
+Best fit:
+This service is a good fit for first-time buyers, relocating buyers, or anyone who wants guidance before actively searching.
+
+What is included:
+- Review of buying goals and timeline
+- Discussion of preferred locations and property needs
+- Guidance on financing readiness and pre-approval
+- Overview of the search, offer, inspection, and closing process
+- Recommendation for next steps based on buyer readiness
+
+What customers can expect:
+Customers can expect a clear, low-pressure conversation that helps them understand what to do next and how to prepare for a successful home search.
+
+Recommended next step:
+Ask about budget, preferred areas, timeline, financing status, and must-have features. If the buyer is ready, help schedule a consultation or connect them with the right team member.`,
+  },
+  'Beauty & Wellness': {
+    serviceName: 'Signature facial',
+    about: `Business overview:
+We are a boutique skincare and wellness studio focused on calm, personalized treatments. We help clients improve skin health while creating a relaxing, professional experience.
+
+Why customers come to us:
+Clients often come to us because they want to feel better in their skin and trust someone to guide them thoughtfully. The experience should feel personal, attentive, and reassuring rather than clinical or rushed.
+
+How we should be represented:
+Sound warm, polished, and reassuring. Clients may be unsure which treatment fits them, so guide them gently and encourage consultation when needed.
+
+What customers should understand:
+- Treatments are personalized based on skin goals, comfort level, and treatment history.
+- Clients should mention allergies, sensitivities, pregnancy, recent procedures, or medical concerns before booking.
+- Cleanliness, consistency, and client comfort are important parts of the experience.
+- Recurring appointments may be recommended depending on skin goals.
+
+Service style:
+Appointments should feel calm, professional, and never rushed.
+
+Boundaries:
+Do not make medical claims or diagnose skin conditions. For medical concerns, recommend speaking with a qualified healthcare professional.`,
+    policies: `Appointments:
+- Services are by appointment.
+- Clients should arrive a few minutes early when possible.
+
+Cancellations:
+- Clients should give advance notice if they need to cancel or reschedule.
+
+Health and safety:
+- Clients should mention allergies, sensitivities, recent treatments, pregnancy, or medical concerns before booking.
+
+Payments:
+- Payment is due at the time of service unless otherwise arranged.`,
+    faq: `Q: Do you work with sensitive skin?
+A: Yes, treatment recommendations can be adjusted for sensitive skin.
+
+Q: How do I know which service to book?
+A: If unsure, clients can book a consultation or choose a starter treatment and discuss goals before the service.
+
+Q: Should I arrive early?
+A: Arriving a few minutes early is recommended.
+
+Q: Can I book recurring appointments?
+A: Yes, recurring appointments can be discussed based on treatment goals.`,
+    serviceDescription: (serviceName) => `Service overview:
+This service is a personalized skincare treatment designed to refresh the skin, support skin health, and create a calm, restorative experience.
+
+Best fit:
+This service is a good fit for clients who want a professional facial, help with dryness or congestion, or a relaxing treatment tailored to their skin goals.
+
+What is included:
+- Skin check-in and goal review
+- Cleansing and preparation
+- Customized treatment steps based on skin needs
+- Product recommendations when appropriate
+- Guidance for follow-up care
+
+What customers can expect:
+Clients can expect a relaxing appointment, clear communication, and a treatment adapted to their comfort level and skin condition.
+
+Recommended next step:
+Ask about skin goals, sensitivities, recent treatments, and preferred appointment time. If the client is unsure what to book, recommend a consultation or starter facial.`,
+  },
+  Automotive: {
+    serviceName: 'Brake inspection',
+    about: `Business overview:
+We are a local auto repair shop focused on honest diagnostics, clear estimates, and dependable vehicle maintenance.
+
+Why customers come to us:
+Customers usually reach out when something feels wrong, inconvenient, or unsafe. They want straightforward answers, fair guidance, and confidence about what needs attention now versus later.
+
+How we should be represented:
+Sound direct, practical, and safety-focused. Customers may be stressed about vehicle issues, so ask for symptoms clearly and help them understand the next step.
+
+What customers should understand:
+- We help with common maintenance, diagnostics, brake concerns, warning lights, and repair needs for most passenger vehicles.
+- Useful intake details include year, make, model, mileage, symptoms, warning lights, and when the issue started.
+- Final pricing may depend on inspection, parts, and labor.
+- Brake, steering, tire, overheating, or drivability concerns should be treated as higher priority.
+
+Service style:
+Communication should be straightforward and transparent about what is known, what needs inspection, and what can wait.
+
+Boundaries:
+Do not diagnose the exact repair or guarantee pricing without technician review.`,
+    policies: `Appointments:
+- Diagnostic and repair appointments are scheduled based on shop availability.
+- Customers should describe symptoms, warning lights, vehicle year, make, and model.
+
+Estimates:
+- Final pricing depends on inspection and parts availability.
+
+Drop-off:
+- Some repairs may require leaving the vehicle for part of the day.
+
+Safety:
+- Brake, steering, tire, or overheating concerns should be prioritized.`,
+    faq: `Q: Can you diagnose warning lights?
+A: Yes, diagnostic appointments can be scheduled for warning lights and vehicle symptoms.
+
+Q: Do I need an appointment?
+A: Appointments are recommended so the shop can plan technician time.
+
+Q: Can you give an exact price over the phone?
+A: Some services can be estimated, but final pricing may depend on inspection and parts.
+
+Q: What information should I provide?
+A: Vehicle year, make, model, mileage, symptoms, and when the issue started are helpful.`,
+    serviceDescription: (serviceName) => `Service overview:
+This service helps drivers understand whether their brakes are safe, worn, noisy, or in need of repair.
+
+Best fit:
+This service is a good fit when a customer hears squeaking or grinding, feels vibration while braking, notices reduced stopping power, or has a brake warning light.
+
+What is included:
+- Review of the customer's brake concern
+- Inspection of visible brake components
+- Assessment of likely wear or safety issues
+- Explanation of repair recommendations
+- Estimate or next step based on findings
+
+What customers can expect:
+Customers can expect a practical safety-focused inspection and clear guidance on whether the vehicle needs immediate work or planned maintenance.
+
+Recommended next step:
+Ask for the vehicle year, make, model, symptoms, and when the issue started. If braking feels unsafe, recommend the earliest available appointment.`,
+  },
+  Hospitality: {
+    serviceName: 'Private event reservation',
+    about: `Business overview:
+We are a neighborhood restaurant and event space known for seasonal food, attentive service, and intimate gatherings.
+
+Why customers come to us:
+Guests come to us for experiences that feel welcoming, memorable, and well cared for. Whether it is a dinner reservation or a private event, they want the planning and hospitality to feel easy and personal.
+
+How we should be represented:
+Sound warm, organized, and hospitality-first. Guests should feel welcomed, understood, and guided toward the right reservation or event follow-up.
+
+What customers should understand:
+- We help with standard reservations, group dining, small celebrations, private dinners, and event inquiries.
+- Important event details include date, time, guest count, event type, food preferences, and accessibility needs.
+- Larger groups or private events may require advance planning and team follow-up.
+- Dietary restrictions should be captured so the team can confirm options.
+
+Service style:
+The tone should feel gracious, polished, and helpful without making availability promises before checking.
+
+Boundaries:
+Do not guarantee a reservation, private room, menu item, or accommodation until availability is confirmed by the team.`,
+    policies: `Reservations:
+- Standard reservations depend on availability.
+- Larger groups or private events may require advance planning.
+
+Cancellations:
+- Guests should notify us as early as possible if plans change.
+
+Events:
+- Event details, guest count, date, timing, and food preferences should be collected before follow-up.
+
+Accessibility:
+- Guests should mention accessibility needs or special accommodations when booking.`,
+    faq: `Q: Do you take reservations?
+A: Yes, reservations are available based on date, time, and party size.
+
+Q: Can you host private events?
+A: Yes, private events can be discussed based on guest count and availability.
+
+Q: Can you accommodate dietary restrictions?
+A: Guests should share dietary needs when booking so the team can confirm options.
+
+Q: What information is needed for an event?
+A: Date, time, guest count, event type, and food or beverage preferences are helpful.`,
+    serviceDescription: (serviceName) => `Service overview:
+This service helps guests plan a private dinner, celebration, meeting, or small event with the right space, timing, and service setup.
+
+Best fit:
+This service is a good fit for birthdays, rehearsal dinners, business meals, family gatherings, and other planned group experiences.
+
+What is included:
+- Review of preferred date and time
+- Guest count and event style discussion
+- Food, beverage, and seating preference notes
+- Availability check or follow-up with the events team
+- Next-step guidance for confirming the reservation
+
+What customers can expect:
+Guests can expect a warm, organized planning process and clear follow-up about availability, options, and any requirements.
+
+Recommended next step:
+Ask for the date, time, guest count, event type, budget range if relevant, and any dietary or accessibility needs.`,
+  },
+  'Professional Services': {
+    serviceName: 'Initial consultation',
+    about: `Business overview:
+We are a professional services firm that helps clients make organized, informed decisions with clear guidance and reliable follow-through.
+
+Why customers come to us:
+Clients often come to us when the stakes are meaningful and the details matter. They want judgment, structure, and the sense that their situation is being handled carefully and professionally.
+
+How we should be represented:
+Sound professional, composed, and precise. Clients may have sensitive or deadline-driven matters, so collect the right context and route them carefully.
+
+What customers should understand:
+- New clients usually start with an initial consultation.
+- Useful intake details include the issue, goals, timeline, urgency, relevant documents, and preferred contact method.
+- The team may need to review details before giving specific guidance.
+- Deadline-driven matters should be flagged for priority follow-up.
+
+Service style:
+Communication should be clear, discreet, and careful with client information.
+
+Boundaries:
+Do not provide legal, financial, tax, or technical advice unless it has been approved by the appropriate professional on the team.`,
+    policies: `Consultations:
+- New clients should schedule an initial consultation.
+- The team may request background information before the meeting.
+
+Scope:
+- Advice depends on the client's situation and the agreed scope of work.
+
+Confidentiality:
+- Client information should be handled carefully and routed to the appropriate team member.
+
+Urgency:
+- Deadline-driven matters should be flagged for priority follow-up.`,
+    faq: `Q: Do you offer consultations?
+A: Yes, initial consultations can be scheduled to understand the client's needs.
+
+Q: What should I prepare?
+A: Relevant documents, goals, deadlines, and background details are helpful.
+
+Q: Can you give advice immediately?
+A: The team may need to review the situation before giving specific guidance.
+
+Q: How do I know if you can help?
+A: A consultation is the best next step to determine fit and scope.`,
+    serviceDescription: (serviceName) => `Service overview:
+This service helps new clients explain their situation, clarify their goals, and determine whether the firm is the right fit.
+
+Best fit:
+This service is a good fit when someone has a new matter, a deadline, a business question, or wants professional guidance before deciding next steps.
+
+What is included:
+- Overview of the client's situation
+- Review of goals, timeline, and urgency
+- Identification of relevant background details
+- Discussion of possible next steps
+- Follow-up recommendation based on fit and scope
+
+What customers can expect:
+Clients can expect a professional conversation focused on understanding the issue and routing them toward the right next step.
+
+Recommended next step:
+Ask what the client needs help with, whether there is a deadline, and the best contact information for follow-up.`,
+  },
+  Retail: {
+    serviceName: 'Personal shopping appointment',
+    about: `Business overview:
+We are a local retail shop focused on thoughtful products, helpful recommendations, and a friendly in-store experience.
+
+Why customers come to us:
+Customers come to us because they want more than a transaction. They want help finding the right item, gift, or option without feeling overwhelmed or left to sort it out alone.
+
+How we should be represented:
+Sound warm, helpful, and practical. Customers may need help choosing between options, finding gifts, checking availability, or understanding store policies.
+
+What customers should understand:
+- We help with product questions, recommendations, gift ideas, store availability, pickup questions, and general shopping guidance.
+- Good recommendation details include recipient, occasion, style, use case, budget, and timing.
+- Holds, special orders, and returns depend on item availability and store policy.
+- Accurate contact information is important for order or pickup follow-up.
+
+Service style:
+The experience should feel friendly, low-pressure, and easy to navigate.
+
+Boundaries:
+Do not guarantee inventory, holds, returns, or delivery timing until confirmed by the store.`,
+    policies: `Store help:
+- Customers can ask about product availability, recommendations, and store hours.
+
+Returns:
+- Return eligibility depends on item condition, timing, and store policy.
+
+Orders:
+- Special orders or holds may depend on product availability.
+
+Pickup:
+- Customers should provide name, order details, and contact information for pickup questions.`,
+    faq: `Q: Can you check if an item is in stock?
+A: Yes, customers can ask about availability and the team can confirm when possible.
+
+Q: Do you offer gift recommendations?
+A: Yes, recommendations can be made based on recipient, occasion, and budget.
+
+Q: Can you hold an item?
+A: Holds may be available depending on the item and store policy.
+
+Q: What is your return policy?
+A: Return eligibility depends on item condition, timing, and the store's policy.`,
+    serviceDescription: (serviceName) => `Service overview:
+This service helps customers get tailored product recommendations for gifts, events, wardrobe needs, home items, or everyday purchases.
+
+Best fit:
+This service is a good fit when a customer wants help choosing between options, shopping for someone else, or finding items that match a style, need, or budget.
+
+What is included:
+- Review of customer preferences
+- Product recommendations based on need and budget
+- Help narrowing options
+- Guidance on availability, pickup, or next steps
+- Follow-up if an item needs to be ordered or held
+
+What customers can expect:
+Customers can expect friendly, practical help that makes shopping easier and more focused.
+
+Recommended next step:
+Ask what the customer is shopping for, who it is for, preferred style or use, budget, and timing.`,
+  },
+  'Other General Business': {
+    serviceName: 'Initial consultation',
+    about: `Business overview:
+We are a local business focused on responsive service, clear communication, and helping customers get the right support quickly.
+
+Why customers come to us:
+Customers usually come to us because they need clarity, movement, or help figuring out what to do next. They want to feel understood quickly and guided toward the right outcome without unnecessary friction.
+
+How we should be represented:
+Sound helpful, organized, and straightforward. Customers should feel that their request is understood and that the next step is clear.
+
+What customers should understand:
+- We help customers clarify what they need, understand available options, and move toward the right follow-up.
+- Important intake details include the request, timing, urgency, location if relevant, and best contact information.
+- Pricing, availability, and scope may depend on the details.
+- Urgent requests should be flagged for priority follow-up.
+
+Service style:
+Keep communication practical, friendly, and focused on helping the customer move forward.
+
+Boundaries:
+Do not promise exact pricing, timing, or outcomes before the request has been reviewed by the right person.`,
+    policies: `Appointments:
+- Appointments depend on availability.
+- Customers should provide the reason for the request and preferred timing.
+
+Communication:
+- Urgent requests should be flagged for priority follow-up.
+
+Pricing:
+- Final pricing may depend on scope, timing, or service details.
+
+Follow-up:
+- Customers should provide accurate contact information for confirmations and updates.`,
+    faq: `Q: How do I get started?
+A: The best first step is to share what you need help with and the team can recommend the next step.
+
+Q: Do I need an appointment?
+A: Some requests require an appointment, depending on the service and availability.
+
+Q: Can you give pricing over the phone?
+A: General pricing may be available, but final pricing can depend on the details.
+
+Q: How quickly can someone follow up?
+A: Follow-up timing depends on availability and urgency.`,
+    serviceDescription: (serviceName) => `Service overview:
+This service helps customers who need support, guidance, or a specific outcome related to this offering.
+
+Best fit:
+This service is a good fit when the customer's request matches the service scope and they need help deciding or taking the next step.
+
+What is included:
+- Review of the customer's request
+- Clarification of needs, timing, and expectations
+- Explanation of available options
+- Recommendation for the right next step
+- Scheduling or follow-up when appropriate
+
+What customers can expect:
+Customers can expect clear communication, practical guidance, and help moving forward without confusion.
+
+Recommended next step:
+Ask what the customer needs, when they need it, and the best way to follow up. If it is a fit, help them schedule or connect with the right person.`,
+  },
+};
+
+const getIndustryExample = (industry) => industryExamples[industry] || industryExamples['Other General Business'];
+const allIndustryExampleValues = (key) => Object.values(industryExamples).map((example) => example[key]);
+const allServiceDescriptionExamples = () => Object.values(industryExamples).map((example) => example.serviceDescription(example.serviceName));
+const aboutTemplate = getIndustryExample('Home Services').about;
+
+const businessBriefSectionDefinitions = [
+  { id: 'story', label: 'Story' },
+  { id: 'identity', label: 'Identity' },
+  { id: 'whatWeDo', label: 'What We Do' },
+  { id: 'whoWeServe', label: 'Who We Serve' },
+  { id: 'serviceArea', label: 'Service Area' },
+  { id: 'operations', label: 'Operations' },
+  { id: 'credentials', label: 'Licenses & Credentials' },
+  { id: 'additionalContext', label: 'Extra Context' },
+];
+
+const businessBriefIndustryContext = {
+  'Home Services': {
+    story: '[founder\'s name] opened the company in [year] after several years working in roofing, exterior repair, and residential property maintenance. Many of the company\'s earliest calls came from homeowners dealing with leaks, storm damage, aging shingles, and gutter issues, but a steady number of those customers continued calling back for larger repairs, replacement projects, and ongoing property needs. That repeat work gradually changed the company from a small repair-focused operation into a broader roofing and exterior services business.\n\nThe company grew around that original customer base, gradually adding field crews, office support, service vehicles, and relationships with suppliers, property managers, builders, and local homeowners. Because much of the work came through referrals and repeat property owners, the business developed around practical follow-through rather than one-time jobs. As the company became more established locally, it also became familiar with the roof types, older homes, seasonal weather patterns, and common property issues found throughout the area.\n\nToday, the company serves a wider mix of homeowners, landlords, commercial property owners, and property managers, but its beginnings are still part of how it operates. Repair calls and storm-related work remain part of the business, while much of its day-to-day work now includes planned replacements, inspections, estimates, and larger roofing projects. Its local presence has grown alongside that work, making the company a familiar contractor for both urgent roof problems and long-term property upkeep.',
+    identity: '**Legal business name:** [Legal business name]\n**Doing business as:** [DBA / Trade name, if applicable]\n**Founded:** [Year]\n**Founder:** [Founder\'s name]\n**Ownership:** [Independent / Family-owned / Partnership / Other]\n**Primary location:** [City, State]\n**Primary market:** [Residential / Commercial / Both]',
+    whatWeDo: 'The company specializes in residential and commercial roofing, working on both existing properties and new construction. Its work ranges from addressing individual roofing problems to managing larger roofing projects from initial evaluation through completion.\n\nProjects vary in size, property type, and complexity, with the appropriate approach determined by the condition of the property, the work involved, and the customer\'s goals.',
+    whoWeServe: 'The company commonly works with:\n\n- Homeowners\n- Landlords and rental property owners\n- Commercial property owners\n- Property managers\n- Real estate professionals\n- Builders and contractors\n- Businesses and organizations',
+    serviceArea: 'The company primarily serves [primary city/region] and surrounding communities. Its normal operating territory includes [counties, cities, radius, or broader territory].\n\nProjects outside the normal service area may be considered depending on the location and scope of the project.',
+    properties: 'The company commonly works on:\n\n- Single-family homes\n- Multi-family properties\n- Apartment buildings\n- Commercial buildings\n- Retail properties\n- Office buildings\n- Garages and outbuildings\n- New construction\n- Other residential and light-commercial structures',
+    howWeWork: 'The company takes a practical, straightforward approach to roofing. Rather than assuming every property needs the same solution, it first works to understand the property, why the customer is reaching out, and what actually needs attention.\n\nDepending on the situation, this may involve gathering information about the property, evaluating the roof or affected area, documenting relevant conditions, and discussing the customer\'s goals. From there, the company determines an appropriate path forward based on the findings and scope of the work.\n\nClear communication is an important part of the process. Customers are kept informed about what has been identified, what the project is expected to involve, and what the next steps are.',
+    operations: 'The company operates as [brief description of the operation, e.g. a locally operated roofing contractor serving residential and commercial properties throughout the region].\n\n**Field operations:** [In-house crews / Subcontractors / Combination]\n**Primary office:** [Location]\n**Operating territory:** [Local / Regional / Multi-state / Other]\n**Seasonal operations:** [Year-round / Seasonal / Details]',
+    credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to the work it performs.\n\n- **[License type]:** [License number] — [State / Jurisdiction]\n- **[License type]:** [License number] — [State / Jurisdiction]\n- **[License type]:** [License number] — [State / Jurisdiction]\n\n**Contractor registrations:** [Registrations, if applicable]\n**Manufacturer certifications:** [Certifications, if applicable]\n**Professional certifications:** [Certifications, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
+    additionalContext: '**Insured:** [Yes / No / Details]\n**Bonded:** [Yes / No / Not applicable]\n**Languages supported:** [Languages]\n**Years of industry experience:** [Years]\n**Notable affiliations:** [If applicable]\n**Other relevant business information:** [Any important, long-term company-specific context the receptionist should know]',
+  },
+  'Real Estate': {
+    story: '[founder\'s name] opened the company in [year] after several years working with buyers, sellers, and local property owners. Many of the company\'s earliest clients came through open houses, buyer referrals, neighborhood listings, and relationships with people already active in the local market. A surprising number of those early clients returned later for another purchase, a sale, an investment property, or a referral to someone else, which gradually shifted the company from transaction-by-transaction work into a more established real estate practice.\n\nThe company grew around that original client base, gradually expanding its understanding of neighborhoods, price ranges, school districts, inspection patterns, and the differences between nearby communities. Because many clients came through referrals or repeat relationships, the business developed around long-term market familiarity rather than one-off lead volume. As the company became more established locally, it also built connections through brokerage affiliations, referral partners, community sponsorships, landlord relationships, builders, and other professionals involved in property decisions.\n\nToday, the company serves a broader mix of buyers, sellers, investors, relocating families, and property owners, but its beginnings are still part of how it operates. First-time guidance, seller preparation, neighborhood knowledge, and practical transaction support remain central to the business. Its local involvement has continued alongside that growth, making the company not only a real estate resource, but also a familiar presence in the market it serves.',
+    identity: '**Legal business name:** [Legal business name]\n**Doing business as:** [DBA / Trade name, if applicable]\n**Founded:** [Year]\n**Founder:** [Founder\'s name]\n**Ownership:** [Independent / Partnership / Brokerage / Other]\n**Primary location:** [City, State]\n**Primary market:** [Residential / Commercial / Both]',
+    whatWeDo: 'The company provides real estate guidance for people making decisions about buying, selling, investing in, or managing property. Its work may include helping clients understand the market, evaluate opportunities, prepare for a transaction, and move from an initial question to a well-supported decision.\n\nThe right approach depends on the property, the client\'s goals, the timing, and the complexity of the transaction.',
+    whoWeServe: 'The company commonly works with:\n\n- Home buyers\n- Home sellers\n- Relocating families\n- Property investors\n- Landlords and property owners\n- Commercial property clients\n- Builders and developers\n- Real estate professionals',
+    serviceArea: 'The company primarily serves [primary city/region] and surrounding communities. Its normal operating territory includes [counties, cities, radius, or broader territory].\n\nClients or properties outside the normal market may be considered depending on the location and scope of the need.',
+    properties: 'The company commonly works with:\n\n- Single-family homes\n- Condominiums\n- Multi-family properties\n- Rental properties\n- Land and development sites\n- Commercial buildings\n- Investment properties\n- New construction\n- Other residential and commercial property types',
+    howWeWork: 'The company takes a thoughtful, practical approach to real estate. It first works to understand the client\'s goals, timing, financial considerations, and the property or opportunity involved.\n\nThe team gathers the relevant details, explains what matters, identifies options, and helps the client understand the next decision. Communication stays clear and organized throughout the process so clients know what is happening and what is expected next.',
+    operations: 'The company operates as [brief description of the operation, e.g. an independent real estate practice serving buyers, sellers, and property owners throughout the region].\n\n**Team structure:** [Solo agent / Team / Brokerage / Other]\n**Primary office:** [Location]\n**Operating territory:** [Local / Regional / Multi-state / Other]\n**Market focus:** [Residential / Commercial / Both]',
+    credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to its real estate work.\n\n- **[License type]:** [License number] — [State / Jurisdiction]\n- **[License type]:** [License number] — [State / Jurisdiction]\n\n**Brokerage affiliation:** [Brokerage, if applicable]\n**Professional certifications:** [Certifications, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
+    additionalContext: '**Languages supported:** [Languages]\n**Years of industry experience:** [Years]\n**Notable affiliations:** [If applicable]\n**Transaction specialties:** [Details]\n**Other relevant business information:** [Any important, long-term company-specific context the receptionist should know]',
+  },
+};
+
+const sharedBusinessBriefContext = {
+  'Beauty & Wellness': {
+    story: '[founder\'s name] opened the company in [year] after several years working independently in the beauty and wellness industry. Many of the company\'s earliest clients came through weddings, special events, referrals, and focused appointment work, but a surprising number continued coming back long after the original occasion or first visit was over. That repeat business eventually changed the direction of the company from primarily one-time or event-based work into a permanent beauty and wellness practice.\n\nThe company grew around that original client base, gradually adding providers, treatment rooms, product knowledge, and a broader range of appointments. Because many clients had been with the business since its earlier days, the studio developed around repeat relationships rather than a high-volume, walk-in approach. As the business became more established locally, it also began building community ties through neighborhood clients, local events, wellness partnerships, fundraisers, bridal work, and occasional support for charitable causes.\n\nToday, the company serves a much broader clientele, but its beginnings are still part of how it operates. Special occasions remain part of the business, while most of its day-to-day work now comes from regular appointments, recurring services, and returning clients. Its local involvement has continued alongside that growth, making the company not only a place people visit for appointments, but also a familiar part of the community.',
+    identity: '**Legal business name:** [Legal business name]\n**Doing business as:** [DBA / Trade name, if applicable]\n**Founded:** [Year]\n**Founder:** [Founder\'s name]\n**Ownership:** [Independent / Partnership / Other]\n**Primary location:** [City, State]\n**Primary market:** [In-studio / Mobile / Both]',
+    whatWeDo: 'The company provides personalized beauty, wellness, and self-care experiences that help clients feel cared for, confident, and comfortable. Its work is shaped around the client\'s goals, preferences, history, and the appropriate level of care for the appointment.\n\nThe experience may be ongoing or occasional, with recommendations guided by the client\'s needs rather than a one-size-fits-all approach.',
+    whoWeServe: 'The company commonly works with:\n\n- New clients\n- Returning clients\n- Individuals preparing for an event\n- Clients seeking ongoing care\n- Clients with specific beauty or wellness goals\n- People looking for a calm, personalized experience',
+    serviceArea: 'The company primarily serves [primary city/region] and surrounding communities. Its normal operating territory includes [neighborhoods, cities, radius, or broader territory].\n\nRequests outside the normal service area may be considered depending on the format and availability.',
+    properties: 'The company commonly works in:\n\n- The primary studio or office\n- Private treatment rooms\n- Wellness spaces\n- Client homes, if mobile care is offered\n- Event or venue settings, if applicable\n- Other approved appointment environments',
+    howWeWork: 'The company takes a personalized, consultative approach. It first learns what the client is hoping to accomplish, what they have tried before, and any preferences or considerations that should shape the experience.\n\nThe team then recommends an appropriate path, explains what the appointment involves, and keeps the experience comfortable and organized from start to finish. Consistency, cleanliness, and respectful care are central to how the company operates.',
+    operations: 'The company operates as [brief description of the operation, e.g. a locally operated studio providing personalized beauty and wellness care by appointment].\n\n**Care team:** [Solo provider / In-house team / Combination]\n**Primary location:** [Location]\n**Operating territory:** [Studio-based / Mobile / Regional / Other]\n**Appointment model:** [By appointment / Walk-in / Combination]',
+    credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to the care it provides.\n\n- **[License type]:** [License number] — [State / Jurisdiction]\n- **[License type]:** [License number] — [State / Jurisdiction]\n\n**Professional certifications:** [Certifications, if applicable]\n**Product or manufacturer certifications:** [Certifications, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
+    additionalContext: '**Insured:** [Yes / No / Details]\n**Languages supported:** [Languages]\n**Years of industry experience:** [Years]\n**Client considerations:** [Important sensitivities, preferences, or long-term context]\n**Other relevant business information:** [Any important, long-term company-specific context the receptionist should know]',
+  },
+  'Automotive': {
+    story: '[founder\'s name] opened the company in [year] after several years working hands-on with vehicle maintenance, diagnostics, and repair. Many of the shop\'s earliest customers came in for routine work like oil changes, brakes, inspections, tires, and warning lights, but a steady number continued returning whenever another vehicle issue came up. That repeat business gradually changed the company from a small repair option into a regular automotive shop for local drivers and families.\n\nThe company grew around that original customer base, gradually adding service bays, technicians, repair equipment, parts relationships, and capacity for more complex diagnostic work. Because many customers returned with the same vehicles over time, the shop developed around maintenance history, practical repair planning, and long-term familiarity with customer vehicles rather than isolated one-time visits. As the business became more established locally, it also built ties with nearby employers, small businesses, fleet operators, used-car buyers, and families with multiple vehicles.\n\nToday, the company serves a broader mix of individual drivers, commuters, families, businesses, and fleet accounts, but its beginnings are still part of how it operates. Routine maintenance remains part of the business, while much of its day-to-day work now includes diagnostics, repairs, safety concerns, estimates, and ongoing vehicle care. Its local relationships have continued alongside that growth, making the shop not only a place people visit when something breaks, but also a familiar part of how customers keep their vehicles dependable.',
+    identity: '**Legal business name:** [Legal business name]\n**Doing business as:** [DBA / Trade name, if applicable]\n**Founded:** [Year]\n**Founder:** [Founder\'s name]\n**Ownership:** [Independent / Family-owned / Partnership / Other]\n**Primary location:** [City, State]\n**Primary market:** [Consumer / Fleet / Both]',
+    whatWeDo: 'The company helps vehicle owners maintain, understand, and repair their cars, trucks, and other vehicles. Its work ranges from routine care to diagnosing concerns and addressing problems that affect safety, reliability, or day-to-day use.\n\nThe appropriate path depends on the vehicle, the symptoms, the findings, and the customer\'s goals and timing.',
+    whoWeServe: 'The company commonly works with:\n\n- Individual vehicle owners\n- Families with multiple vehicles\n- Commuters\n- Fleet owners and operators\n- Businesses with work vehicles\n- Used-vehicle buyers\n- Drivers preparing for a trip or inspection',
+    serviceArea: 'The company primarily serves [primary city/region] and surrounding communities. Its normal operating territory includes [cities, radius, or broader territory].\n\nVehicle or mobile requests outside the normal service area may be considered depending on the location and scope.',
+    properties: 'The company commonly works on:\n\n- Passenger cars\n- Pickup trucks\n- SUVs and vans\n- Fleet vehicles\n- Hybrid or electric vehicles, if supported\n- Light commercial vehicles\n- Other vehicle types within the company\'s capabilities',
+    howWeWork: 'The company takes a diagnostic, straightforward approach. It first gathers the driver\'s description of the concern, the vehicle\'s history, and any timing or safety considerations.\n\nThe team evaluates the vehicle, explains what was found, outlines the appropriate options, and communicates what should happen next. Customers should leave with a clearer understanding of the work and why it is recommended.',
+    operations: 'The company operates as [brief description of the operation, e.g. a locally operated automotive shop serving personal and commercial vehicles throughout the region].\n\n**Technicians:** [In-house / Subcontractors / Combination]\n**Primary shop:** [Location]\n**Operating territory:** [Local / Regional / Mobile / Other]\n**Vehicle focus:** [Passenger / Commercial / Both]',
+    credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to the automotive work it performs.\n\n- **[License or registration]:** [Number] — [State / Jurisdiction]\n- **[Certification]:** [Number] — [Issuing organization]\n\n**Manufacturer certifications:** [Certifications, if applicable]\n**Professional certifications:** [Certifications, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
+    additionalContext: '**Insured:** [Yes / No / Details]\n**Languages supported:** [Languages]\n**Years of industry experience:** [Years]\n**Vehicle limitations:** [Makes, models, systems, or work not supported]\n**Other relevant business information:** [Any important, long-term company-specific context the receptionist should know]',
+  },
+  'Hospitality': {
+    story: '[founder\'s name] opened the company in [year] after several years working in hospitality, food service, lodging, events, or venue operations. Many of the company\'s earliest guests came through dinner service, private events, lodging stays, catering, weddings, group dining, or seasonal visitors, but a meaningful number returned for later occasions, repeat visits, and referrals. That repeat guest activity gradually changed the company from a focused hospitality offering into a more established local destination.\n\nThe company grew around that original guest base, gradually adding staff, guest spaces, event capacity, kitchen or lodging systems, reservation processes, and relationships with planners, vendors, tourism partners, farms, breweries, and local organizations. Because many guests first discovered the business through a specific occasion and later returned for different reasons, the operation developed around both everyday hospitality and special-event coordination. As the business became more established locally, it also became connected to festivals, charities, business associations, venues, and community events.\n\nToday, the company serves a broader mix of local guests, travelers, families, corporate groups, event hosts, and private parties, but its beginnings are still part of how it operates. Special occasions remain part of the business, while regular reservations, seasonal service, group inquiries, and repeat guests now shape much of its day-to-day work. Its local involvement has continued alongside that growth, making the company not only a place people visit, but also a familiar part of the area\'s hospitality community.',
+    identity: '**Legal business name:** [Legal business name]\n**Doing business as:** [DBA / Trade name, if applicable]\n**Founded:** [Year]\n**Founder:** [Founder\'s name]\n**Ownership:** [Independent / Family-owned / Partnership / Other]\n**Primary location:** [City, State]\n**Primary market:** [Dining / Lodging / Events / Combination]',
+    whatWeDo: 'The company creates hospitality experiences for guests, whether they are visiting for a meal, an overnight stay, a private gathering, or a special occasion. Its work combines a welcoming environment with the planning, coordination, and attention needed to make the guest experience feel easy and cared for.\n\nThe right approach depends on the type of visit, the size of the group, the occasion, and what the guest needs from the company.',
+    whoWeServe: 'The company commonly works with:\n\n- Individual guests\n- Families and groups\n- Local residents\n- Travelers and visitors\n- Corporate or organizational groups\n- Guests planning celebrations\n- Event hosts and private party organizers',
+    serviceArea: 'The company primarily serves [primary city/region] and surrounding communities. Its normal operating territory includes [neighborhoods, cities, radius, or broader territory].\n\nGuests or events outside the normal area may be considered depending on the format, timing, and scope.',
+    properties: 'The company commonly operates in or hosts guests at:\n\n- Restaurants or dining rooms\n- Guest rooms or lodging spaces\n- Private event rooms\n- Outdoor or seasonal spaces\n- Wedding or celebration venues\n- Corporate or group event settings\n- Other approved hospitality environments',
+    howWeWork: 'The company takes an attentive, organized approach to hospitality. It first understands the guest\'s purpose, timing, group size, preferences, and any details that could shape the experience.\n\nThe team then explains the available options, confirms the important details, and coordinates the next step clearly. Warmth and responsiveness matter, but so do accuracy, preparation, and following through on what was promised.',
+    operations: 'The company operates as [brief description of the operation, e.g. a locally operated hospitality business welcoming guests for dining, lodging, and private gatherings].\n\n**Team structure:** [In-house team / Seasonal team / Combination]\n**Primary location:** [Location]\n**Operating territory:** [Single location / Multi-location / Regional / Other]\n**Guest model:** [Reservations / Walk-ins / Events / Combination]',
+    credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to the hospitality operation.\n\n- **[License or permit]:** [Number] - [State / Jurisdiction]\n- **[License or permit]:** [Number] - [State / Jurisdiction]\n\n**Food service permits:** [Permits, if applicable]\n**Alcohol license:** [License details, if applicable]\n**Event or lodging registrations:** [Registrations, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
+    additionalContext: '**Insured:** [Yes / No / Details]\n**Languages supported:** [Languages]\n**Years of industry experience:** [Years]\n**Accessibility details:** [Important guest access information]\n**Other relevant business information:** [Any important, long-term company-specific context the receptionist should know]',
+  },
+  'Professional Services': {
+    story: '[founder\'s name] opened the company in [year] after several years working independently or inside a larger professional environment. Many of the company\'s earliest clients came through referrals, prior professional relationships, local businesses, industry contacts, and community organizations, but a surprising number continued relying on the company after the first matter or project was complete. That repeat work gradually changed the company from a small practice handling individual engagements into a more established professional services firm.\n\nThe company grew around that original client base, gradually adding team members, office or remote capacity, partner relationships, systems for intake, and a more defined set of service categories. Because many clients stayed with the business over time, the practice developed around long-term relationships, confidentiality, technical knowledge, and familiarity with each client\'s broader situation rather than isolated one-time requests. As the company became more established locally, it also built presence through professional associations, chamber involvement, nonprofit boards, referral partners, speaking events, and local business networks.\n\nToday, the company serves a broader mix of individuals, families, small businesses, organizations, founders, and professional clients, but its beginnings are still part of how it operates. Project-based work remains part of the business, while much of its day-to-day work now comes from ongoing engagements, recurring clients, advisory needs, and referrals. Its local and professional involvement has continued alongside that growth, making the company not only a provider of specialized services, but also a known resource within its business community.',
+    identity: '**Legal business name:** [Legal business name]\n**Doing business as:** [DBA / Trade name, if applicable]\n**Founded:** [Year]\n**Founder:** [Founder\'s name]\n**Ownership:** [Independent / Partnership / Firm / Other]\n**Primary location:** [City, State]\n**Primary market:** [Individual / Business / Both]',
+    whatWeDo: 'The company provides specialized guidance, expertise, or support that helps clients make informed decisions and accomplish important goals. Its work may involve understanding a situation, analyzing the relevant details, developing a path forward, and supporting the client through implementation or ongoing needs.\n\nThe approach depends on the client\'s circumstances, the complexity of the matter, the required expertise, and the desired outcome.',
+    whoWeServe: 'The company commonly works with:\n\n- Individuals and families\n- Small businesses\n- Larger organizations\n- Founders and leadership teams\n- Professionals and decision-makers\n- Referral partners\n- Clients with ongoing or project-based needs',
+    serviceArea: 'The company primarily serves [primary city/region] and surrounding communities. Its normal operating territory includes [counties, cities, radius, or broader territory].\n\nRemote or out-of-area engagements may be considered depending on the work, jurisdiction, and scope.',
+    properties: 'The company commonly works with:\n\n- Individuals and households\n- Small and mid-sized businesses\n- Corporate departments\n- Nonprofit or community organizations\n- Professional practices\n- Remote or distributed teams\n- Other client environments relevant to the company\'s work',
+    howWeWork: 'The company takes a thoughtful, structured approach to professional work. It first understands the client\'s goals, situation, constraints, and definition of a useful outcome.\n\nThe team organizes the relevant information, explains the available path, and sets expectations about scope, timing, and next steps. Clients should understand both the recommendation and the reasoning behind it, with communication that remains clear throughout the engagement.',
+    operations: 'The company operates as [brief description of the operation, e.g. an independent professional practice serving individuals and businesses through project-based and ongoing engagements].\n\n**Team structure:** [Solo practitioner / In-house team / Partner network / Combination]\n**Primary office:** [Location]\n**Operating territory:** [Local / Regional / National / Other]\n**Engagement model:** [Consultation / Project-based / Retainer / Combination]',
+    credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to the work it performs.\n\n- **[License or registration]:** [Number] - [State / Jurisdiction]\n- **[Certification]:** [Number] - [Issuing organization]\n\n**Professional certifications:** [Certifications, if applicable]\n**Regulatory registrations:** [Registrations, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
+    additionalContext: '**Insured:** [Yes / No / Details]\n**Languages supported:** [Languages]\n**Years of industry experience:** [Years]\n**Confidentiality considerations:** [Important client or information-handling context]\n**Other relevant business information:** [Any important, long-term company-specific context the receptionist should know]',
+  },
+  'Retail': {
+    story: '[founder\'s name] opened the company in [year] after starting with a focused product idea, storefront, online shop, market presence, family retail background, or gap in the local shopping market. Many of the company\'s earliest customers came through neighborhood shopping, pop-up markets, online orders, tourists, gift buyers, or wholesale relationships, but a surprising number continued returning for new products, repeat purchases, recommendations, and seasonal needs. That repeat business gradually changed the company from a small retail concept into a more established shop.\n\nThe company grew around that original customer base, gradually adding staff, inventory systems, product categories, fulfillment processes, supplier relationships, and a clearer sense of what customers returned for. Because many shoppers came back repeatedly, the business developed around product familiarity, local taste, recurring gift needs, and customer questions rather than simple transactions. As the company became more established locally, it also built ties through markets, events, downtown associations, schools, charities, makers, artists, suppliers, and business groups.\n\nToday, the company serves a broader mix of local shoppers, online customers, gift buyers, wholesale buyers, tourists, and returning customers, but its beginnings are still part of how it operates. The original product focus remains part of the business, while much of its day-to-day work now includes new inventory, fulfillment, product guidance, pickup, delivery, shipping, and repeat customer needs. Its local involvement has continued alongside that growth, making the company not only a place people shop, but also a familiar part of the community.',
+    identity: '**Legal business name:** [Legal business name]\n**Doing business as:** [DBA / Trade name, if applicable]\n**Founded:** [Year]\n**Founder:** [Founder\'s name]\n**Ownership:** [Independent / Family-owned / Partnership / Other]\n**Primary location:** [City, State]\n**Primary market:** [Consumer / Business / Both]',
+    whatWeDo: 'The company curates and sells products that help customers meet everyday needs, find a meaningful gift, or choose something that fits their preferences and budget. Its role is more than making products available; it helps customers compare options, understand what is different, and make a decision they feel good about.\n\nThe best recommendation depends on the customer\'s intended use, priorities, timing, and the products currently available.',
+    whoWeServe: 'The company commonly works with:\n\n- Local shoppers\n- Gift buyers\n- Returning customers\n- Customers looking for specific products\n- Families and households\n- Small business or wholesale buyers\n- Customers seeking product guidance',
+    serviceArea: 'The company primarily serves [primary city/region] and surrounding communities. Its normal operating territory includes [neighborhoods, cities, shipping area, or broader territory].\n\nOrders or customers outside the normal area may be supported depending on delivery, shipping, and product availability.',
+    properties: 'The company commonly operates through:\n\n- A retail storefront\n- A showroom or studio\n- Pop-up or market locations\n- An online store\n- Local delivery or pickup locations\n- Wholesale or partner settings\n- Other approved sales environments',
+    howWeWork: 'The company takes a helpful, product-aware approach to retail. It first understands what the customer is looking for, how the product will be used, the customer\'s preferences, and any timing or budget considerations.\n\nThe team explains relevant options without pressure, confirms availability and fulfillment details, and helps the customer take the right next step. A good experience is clear, welcoming, and useful even when the customer is still deciding.',
+    operations: 'The company operates as [brief description of the operation, e.g. an independent retail business serving local shoppers through a storefront and online sales].\n\n**Sales channels:** [Storefront / Online / Wholesale / Combination]\n**Primary location:** [Location]\n**Operating territory:** [Local / Regional / National / Other]\n**Fulfillment model:** [Pickup / Delivery / Shipping / Combination]',
+    credentials: 'The company maintains the registrations, permits, and professional credentials applicable to the products and sales channels it operates.\n\n- **[License or registration]:** [Number] - [State / Jurisdiction]\n- **[Certification]:** [Number] - [Issuing organization]\n\n**Product certifications:** [Certifications, if applicable]\n**Resale or specialty permits:** [Permits, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
+    additionalContext: '**Insured:** [Yes / No / Details]\n**Languages supported:** [Languages]\n**Years in business:** [Years]\n**Product limitations:** [Products, brands, or categories not carried]\n**Other relevant business information:** [Any important, long-term company-specific context the receptionist should know]',
+  },
+  'Other General Business': {
+    story: '[founder\'s name] opened the company in [year] after industry experience, family business history, purchase of an existing company, a side business becoming full-time, or visible demand in the local market. Many of the company\'s earliest customers came through referrals, neighborhood awareness, local businesses, online orders, community groups, or prior professional relationships, but a meaningful number continued returning as their needs changed. That repeat business gradually changed the company from a narrow early offering into a more established local operation.\n\nThe company grew around that original customer base, gradually adding team members, locations, vehicles, facilities, online presence, service capacity, or a broader set of products and services. Because many customers came back over time, the business developed around familiarity with recurring needs rather than isolated one-time requests. As the company became more established locally, it also built presence through community events, partnerships, sponsorships, notable projects, recurring customers, local organizations, or industry groups.\n\nToday, the company serves a broader mix of customers than it did at the beginning, but its origins are still part of how it operates. The original products or services remain part of the business, while much of its day-to-day work now comes from repeat customers, referrals, expanded offerings, and ongoing community visibility. Its local involvement has continued alongside that growth, making the company not only a provider of products or services, but also a familiar part of the market it serves.',
+    identity: '**Legal business name:** [Legal business name]\n**Doing business as:** [DBA / Trade name, if applicable]\n**Founded:** [Year]\n**Founder:** [Founder\'s name]\n**Ownership:** [Independent / Family-owned / Partnership / Other]\n**Primary location:** [City, State]\n**Primary market:** [Consumer / Business / Both]',
+    whatWeDo: 'The company provides [broad description of what the company does] for customers who need [general need, outcome, or type of support]. Its work may involve guidance, coordination, products, projects, or ongoing support depending on the customer\'s situation.\n\nThe right approach is shaped by the customer\'s goals, timing, circumstances, and the scope of the request.',
+    whoWeServe: 'The company commonly works with:\n\n- [Primary customer group]\n- [Secondary customer group]\n- [Business or organizational customer group]\n- [Referral or professional partner group]\n- [Other important customer group]',
+    serviceArea: 'The company primarily serves [primary city/region] and surrounding communities. Its normal operating territory includes [counties, cities, radius, or broader territory].\n\nRequests outside the normal service area may be considered depending on the location, format, and scope.',
+    properties: 'The company commonly works in or with:\n\n- [Primary customer, property, or operating environment]\n- [Secondary customer, property, or operating environment]\n- [Commercial or professional environment]\n- [Remote, mobile, or online environment]\n- [Other important environment]',
+    howWeWork: 'The company takes a practical, thoughtful approach. It first works to understand the customer\'s situation, what they are trying to accomplish, and what details should shape the next step.\n\nFrom there, the company explains the available path, sets clear expectations, and follows through in a way that keeps the customer informed and confident. The experience should reflect what this company does especially well: [specific approach, strength, or point of difference].',
+    operations: 'The company operates as [brief description of the operation and the market it serves].\n\n**Team structure:** [Solo / In-house team / Subcontractors / Combination]\n**Primary location:** [Location]\n**Operating territory:** [Local / Regional / Multi-state / Other]\n**Operating model:** [By appointment / Walk-in / Project-based / Online / Other]',
+    credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to the work it performs.\n\n- **[License or registration]:** [Number] - [State / Jurisdiction]\n- **[Certification]:** [Number] - [Issuing organization]\n\n**Professional certifications:** [Certifications, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
+    additionalContext: '**Insured:** [Yes / No / Details]\n**Languages supported:** [Languages]\n**Years in business:** [Years]\n**Notable affiliations:** [If applicable]\n**Other relevant business information:** [Any important, long-term company-specific context the receptionist should know]',
+  },
+};
+
+const fallbackBusinessBriefContext = {
+  story: '[founder\'s name] opened the company in [year] after industry experience, family business history, purchase of an existing company, independent work, or visible demand in the local market. Many of the company\'s earliest customers came through referrals, neighborhood awareness, local businesses, online orders, community groups, or prior professional relationships, but a meaningful number continued returning as their needs changed. That repeat business gradually changed the company from a narrow early offering into a more established local operation.\n\nThe company grew around that original customer base, gradually adding team members, locations, vehicles, facilities, online presence, service capacity, or a broader set of products and services. Because many customers came back over time, the business developed around familiarity with recurring needs rather than isolated one-time requests. As the company became more established locally, it also built presence through community events, partnerships, sponsorships, notable projects, recurring customers, local organizations, or industry groups.\n\nToday, the company serves a broader mix of customers than it did at the beginning, but its origins are still part of how it operates. The original products or services remain part of the business, while much of its day-to-day work now comes from repeat customers, referrals, expanded offerings, and ongoing community visibility. Its local involvement has continued alongside that growth, making the company not only a provider of products or services, but also a familiar part of the market it serves.',
+  identity: '**Legal business name:** [Legal business name]\n**Doing business as:** [DBA / Trade name, if applicable]\n**Founded:** [Year]\n**Founder:** [Founder\'s name]\n**Ownership:** [Independent / Family-owned / Partnership / Other]\n**Primary location:** [City, State]\n**Primary market:** [Customer or market type]',
+  whatWeDo: 'The company provides [broad description of what the company does]. It helps customers make progress on [general customer need or outcome] through a process shaped around the details of each request.\n\nThe right approach depends on the customer\'s goals, timing, circumstances, and the scope of the work involved.',
+  whoWeServe: 'The company commonly works with:\n\n- [Primary customer group]\n- [Secondary customer group]\n- [Professional or commercial customer group]\n- [Other important customer group]',
+  serviceArea: 'The company primarily serves [primary city/region] and surrounding communities. Its normal operating territory includes [counties, cities, radius, or broader territory].\n\nRequests outside the normal service area may be considered depending on the location and scope.',
+  howWeWork: 'The company takes a practical, thoughtful approach. It first works to understand the customer\'s situation, what they are trying to accomplish, and what details should shape the next step.\n\nFrom there, the company explains the available path, sets clear expectations, and follows through in a way that keeps the customer informed and confident.',
+  operations: 'The company operates as [brief description of the operation and the market it serves].\n\n**Team structure:** [Solo / In-house team / Subcontractors / Combination]\n**Primary location:** [Location]\n**Operating territory:** [Local / Regional / Multi-state / Other]\n**Operating model:** [By appointment / Walk-in / Project-based / Other]',
+  credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to the work it performs.\n\n- **[License or registration]:** [Number] — [State / Jurisdiction]\n- **[Certification]:** [Number] — [Issuing organization]\n\n**Professional certifications:** [Certifications, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
+  additionalContext: '**Insured:** [Yes / No / Details]\n**Languages supported:** [Languages]\n**Years of industry experience:** [Years]\n**Notable affiliations:** [If applicable]\n**Other relevant business information:** [Any important, long-term company-specific context the receptionist should know]',
+};
+
+const getBusinessBriefContext = (industry) => (
+  businessBriefIndustryContext[industry] || sharedBusinessBriefContext[industry] || fallbackBusinessBriefContext
+);
+
+const getBusinessBriefSections = (industry) => {
+  const context = getBusinessBriefContext(industry);
+
+  return businessBriefSectionDefinitions.map((section) => ({
+    ...section,
+    template: context[section.id],
+  }));
+};
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const buildBusinessBriefSection = (section) => `${section.label}:\n\n${section.template}`;
+const buildFullBusinessBrief = (sections) => sections.map(buildBusinessBriefSection).join('\n\n');
+const allBusinessBriefContexts = () => [
+  ...Object.values(businessBriefIndustryContext),
+  ...Object.values(sharedBusinessBriefContext),
+  fallbackBusinessBriefContext,
+];
+const allBusinessBriefSections = () => allBusinessBriefContexts().flatMap((context) => (
+  businessBriefSectionDefinitions.map((section) => ({
+    ...section,
+    template: context[section.id],
+  }))
+));
+const normalizeBusinessBriefPlaceholder = (value) => String(value || '')
+  .replace(/^\[/, '')
+  .replace(/\]$/, '')
+  .trim()
+  .toLowerCase();
+const generatedBusinessBriefPlaceholders = () => new Set(
+  allBusinessBriefSections().flatMap((section) => (
+    [...String(section.template || '').matchAll(/\[([^\]]+)\]/g)]
+      .map((match) => normalizeBusinessBriefPlaceholder(match[1]))
+  )),
+);
+const hasBusinessBriefSection = (value, section) => (
+  new RegExp(`(?:^|\\n\\n)${escapeRegExp(section.label)}:\\n\\n`, 'm').test(value || '')
+);
+const getBusinessBriefSectionText = (value, section, sections) => {
+  const labels = sections.map((item) => item.label);
+  const pattern = new RegExp(
+    `(?:^|\\n\\n)${escapeRegExp(section.label)}:\\n\\n([\\s\\S]*?)(?=\\n\\n(?:${labels.map((label) => escapeRegExp(`${label}:`)).join('|')})\\n\\n|$)`,
+    'm',
+  );
+  return String(value || '').match(pattern)?.[1]?.trim() || '';
+};
+const replaceBusinessBriefSection = (value, section, sections) => {
+  if (!hasBusinessBriefSection(value, section)) {
+    return [String(value || '').trim(), buildBusinessBriefSection(section)].filter(Boolean).join('\n\n');
+  }
+  const labels = sections.map((item) => item.label);
+  const pattern = new RegExp(
+    `((?:^|\\n\\n)${escapeRegExp(section.label)}:\\n\\n)[\\s\\S]*?(?=\\n\\n(?:${labels.map((label) => escapeRegExp(`${label}:`)).join('|')})\\n\\n|$)`,
+    'm',
+  );
+  return String(value || '').replace(pattern, `$1${section.template}`).replace(/\n{3,}/g, '\n\n').trim();
+};
+const removeBusinessBriefSection = (value, section, sections) => {
+  const labels = sections.map((item) => item.label);
+  const pattern = new RegExp(
+    `(?:^|\\n\\n)${escapeRegExp(section.label)}:\\n\\n[\\s\\S]*?(?=\\n\\n(?:${labels.map((label) => escapeRegExp(`${label}:`)).join('|')})\\n\\n|$)`,
+    'm',
+  );
+  return String(value || '').replace(pattern, '').replace(/\n{3,}/g, '\n\n').trim();
+};
+const isGeneratedBusinessBriefSection = (value, section) => (
+  allBusinessBriefSections().some((candidate) => (
+    candidate.id === section.id && String(value || '').trim() === String(candidate.template || '').trim()
+  ))
+);
+const refreshGeneratedBusinessBriefSections = (value, nextSections) => {
+  const currentValue = String(value || '');
+  if (!currentValue.trim()) return currentValue;
+
+  return nextSections.reduce((nextValue, section) => {
+    if (!hasBusinessBriefSection(nextValue, section)) return nextValue;
+    const currentSectionText = getBusinessBriefSectionText(nextValue, section, allBusinessBriefSections());
+    if (!isGeneratedBusinessBriefSection(currentSectionText, section)) return nextValue;
+    return replaceBusinessBriefSection(nextValue, section, allBusinessBriefSections());
+  }, currentValue);
+};
+const legacyNamedAboutExamples = [
+  `We're Hartley Roofing, a family-owned roofing company based in Portland, Maine. My dad started this business back in 2006 with nothing but a truck and a ladder, and we've been keeping roofs tight ever since.
+
+We specialize in residential roofing: asphalt shingles, metal roofing, flat roofs, and repairs. We also do gutter installation and siding.
+
+We're licensed and insured, and every job comes with a workmanship warranty on top of the manufacturer warranty.
+
+We proudly serve the Greater Portland area and much of southern Maine, including Portland, South Portland, Scarborough, Westbrook, Falmouth, Cape Elizabeth, Gorham, Windham, Cumberland, Yarmouth, Freeport, and surrounding communities.
+`,
+  `We're Harbor & Pine Realty, a residential real estate team based in Portland, Maine. We help buyers, sellers, and relocating families make clear decisions in a competitive local market.
+
+Our team focuses on practical guidance, fast communication, and a calm process from the first conversation through closing.
+
+We serve Greater Portland and nearby communities, including South Portland, Scarborough, Falmouth, Cape Elizabeth, Westbrook, and Cumberland.`,
+  `We're Luma Skin Studio, a boutique skincare and wellness studio focused on calm, personalized treatments. We help clients improve skin health while creating a relaxing, professional experience.
+
+Our approach is thoughtful and consultative. We tailor recommendations based on skin goals, comfort level, and treatment history.
+
+We serve clients by appointment and prioritize cleanliness, consistency, and a peaceful client experience.`,
+  `We're Northline Auto Care, a local repair shop focused on honest diagnostics, clear estimates, and dependable vehicle maintenance.
+
+We help drivers understand what their vehicle needs, what can wait, and what should be handled soon for safety or reliability.
+
+Our team works on common maintenance and repair needs for most passenger vehicles, with a focus on straightforward communication.`,
+  `We're The Bramble House, a warm neighborhood restaurant and event space known for seasonal food, attentive service, and intimate gatherings.
+
+We help guests plan dinners, small celebrations, and private events with clear communication and a welcoming experience.
+
+Our team focuses on hospitality that feels personal, organized, and easy for guests.`,
+  `We're Meridian Advisory Group, a professional services firm that helps clients make organized, informed decisions with clear guidance and reliable follow-through.
+
+We focus on practical advice, responsive communication, and a professional process from first inquiry through ongoing support.
+
+Our team works with individuals and businesses that value clarity, preparation, and trusted expertise.`,
+  `We're Elm & Co., a local retail shop focused on thoughtful products, helpful recommendations, and a friendly in-store experience.
+
+We help customers find gifts, everyday essentials, and pieces that fit their needs, style, and budget.
+
+Our team values warm service, practical product knowledge, and making shopping easier for every customer.`,
+  `We're Summit Client Services, a local business focused on responsive service, clear communication, and helping customers get the right support quickly.
+
+We work with customers who value practical guidance, dependable follow-through, and a straightforward experience.
+
+Our team focuses on understanding each request, answering questions clearly, and helping customers take the right next step.`,
+];
+
+const removedAboutIntro = `Who are you? Tell your story. Your AI receptionist uses this to answer questions about your business.
+
+EXAMPLE:
+
+`;
+
+const policiesTemplate = getIndustryExample('Home Services').policies;
+
+const removedPoliciesIntro = `Add the policies your AI receptionist should follow during calls.
+
+EXAMPLE:
+
+`;
+
+const faqTemplate = getIndustryExample('Home Services').faq;
+
+const removedFaqIntro = `Add common customer questions and the answers your AI receptionist should give.
+
+EXAMPLE:
+
+`;
 
 const unitOptions = [
   { value: '', label: 'None' },
@@ -258,6 +1016,12 @@ const blankService = () => ({
   unit: 'hourly',
   is_active: true,
 });
+
+const serviceDescriptionMagicTemplate = (serviceName, industry) => {
+  const example = getIndustryExample(industry);
+  const name = String(serviceName || '').trim() || example.serviceName;
+  return example.serviceDescription(name);
+};
 
 const formatServicePrice = (service) => {
   const unit = service.unit ? ` / ${service.unit}` : '';
@@ -313,6 +1077,62 @@ const Field = ({ label, hint, children }) => (
     {children}
   </div>
 );
+
+const escapeEditableHtml = (value) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/\[([^\]]+)\]/g, (match, placeholder) => {
+    const className = generatedBusinessBriefPlaceholders().has(normalizeBusinessBriefPlaceholder(placeholder))
+      ? 'business-brief-placeholder-highlight'
+      : 'business-brief-placeholder-edited';
+    return `<span class="${className}">[${placeholder}]</span>`;
+  });
+
+const refreshEditedPlaceholderStyles = (editor) => {
+  const generatedPlaceholders = generatedBusinessBriefPlaceholders();
+  editor.querySelectorAll('.business-brief-placeholder-highlight').forEach((placeholder) => {
+    if (generatedPlaceholders.has(normalizeBusinessBriefPlaceholder(placeholder.textContent))) return;
+    placeholder.classList.remove('business-brief-placeholder-highlight');
+    placeholder.classList.add('business-brief-placeholder-edited');
+  });
+};
+
+const EditableBusinessBrief = ({ value, onChange }) => {
+  const editorRef = useRef(null);
+  const lastInputValueRef = useRef(String(value || ''));
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const nextValue = String(value || '');
+    if (!editor) return;
+    if (editor.textContent === nextValue && lastInputValueRef.current === nextValue) return;
+    editor.innerHTML = escapeEditableHtml(nextValue);
+    lastInputValueRef.current = nextValue;
+  }, [value]);
+
+  return (
+    <div
+      ref={editorRef}
+      contentEditable
+      role="textbox"
+      aria-multiline="true"
+      suppressContentEditableWarning
+      onInput={(event) => {
+        const nextValue = event.currentTarget.textContent || '';
+        refreshEditedPlaceholderStyles(event.currentTarget);
+        lastInputValueRef.current = nextValue;
+        onChange(nextValue);
+      }}
+      onBlur={(event) => {
+        const nextValue = event.currentTarget.textContent || '';
+        event.currentTarget.innerHTML = escapeEditableHtml(nextValue);
+      }}
+      className={`${fieldClass} h-[360px] overflow-y-auto whitespace-pre-wrap resize-none py-4 leading-6`}
+    />
+  );
+};
 
 const SelectCard = ({ label, active, onClick }) => (
   <button
@@ -485,7 +1305,9 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
         <div className="border-b border-white/[0.06] px-7 py-6">
           <div className="flex items-start justify-between gap-5">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-300/80">Outbound calling notice</p>
+              <p className="outbound-notice-gradient inline-block text-[11px] font-bold uppercase tracking-[0.18em]">
+                Outbound calling notice
+              </p>
               <h2 className="mt-2 text-[22px] font-black tracking-[-0.04em] text-white">Late-hours calling</h2>
             </div>
             <button type="button" onClick={onClose} className="mt-0.5 text-zinc-600 transition hover:text-white" aria-label="Close">
@@ -869,7 +1691,65 @@ const BillingUnitCascade = ({ value, options, onChange }) => {
   );
 };
 
-const ServiceModal = ({ initialService, onClose, onSave }) => {
+const InfoModal = ({ eyebrow = 'Tips', title, intro, points = [], footer, onClose, zIndexClass = 'z-[220]' }) => (
+  <motion.div
+    className={`fixed inset-0 ${zIndexClass} flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm`}
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    onMouseDown={onClose}
+  >
+    <motion.div
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 16, scale: 0.98 }}
+      transition={{ duration: 0.18 }}
+      className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] p-7 shadow-[0_28px_90px_rgba(0,0,0,0.62)] sm:p-8"
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      <div className="context-help-spectrum-line pointer-events-none absolute -left-8 -right-8 top-0 h-px" />
+      <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
+      <div className="flex items-start justify-between gap-4">
+        <div className="relative">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">{eyebrow}</p>
+          <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">{title}</h2>
+          {intro ? (
+            <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">{intro}</p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white"
+          aria-label={`Close ${title}`}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {points.length ? (
+        <div className="relative mt-7 space-y-4 text-sm leading-6 text-zinc-400">
+          {points.map((point, index) => (
+            <div key={point.title} className="flex gap-3">
+              <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${index === 0 ? 'bg-white' : index === 1 ? 'bg-white/70' : 'bg-white/40'}`} />
+              <p><span className="font-semibold text-white">{point.title}</span> {point.body}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {footer ? (
+        <div className="relative mt-7 border-t border-white/[0.06] pt-5">
+          <p className="max-w-[520px] text-[13px] leading-6 text-zinc-500">{footer}</p>
+        </div>
+      ) : null}
+    </motion.div>
+  </motion.div>
+);
+
+const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
+  const [descriptionHelpOpen, setDescriptionHelpOpen] = useState(false);
+  const [descriptionEditorOpen, setDescriptionEditorOpen] = useState(false);
   const [draft, setDraft] = useState({
     ...(initialService || blankService()),
     price_type: 'fixed',
@@ -877,6 +1757,18 @@ const ServiceModal = ({ initialService, onClose, onSave }) => {
     is_active: true,
   });
   const setDraftValue = (key, value) => setDraft((prev) => ({ ...prev, [key]: value }));
+  const exampleService = getIndustryExample(industry);
+  const magicDescription = serviceDescriptionMagicTemplate(draft.name, industry);
+  const magicDescriptionEnabled = draft.description === magicDescription;
+  const toggleMagicDescription = () => {
+    setDraft((prev) => {
+      const nextMagicDescription = serviceDescriptionMagicTemplate(prev.name, industry);
+      return {
+        ...prev,
+        description: prev.description === nextMagicDescription ? '' : nextMagicDescription,
+      };
+    });
+  };
 
   return (
     <motion.div
@@ -909,17 +1801,56 @@ const ServiceModal = ({ initialService, onClose, onSave }) => {
               <p className="mb-5 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Service details</p>
               <div className="space-y-5">
                 <Field label="Service name">
-                  <input type="text" value={draft.name} onChange={(e) => setDraftValue('name', e.target.value)} placeholder="e.g., Roof repair" autoFocus className={fieldClass} />
+                  <input type="text" value={draft.name} onChange={(e) => setDraftValue('name', e.target.value)} placeholder={`e.g., ${exampleService.serviceName}`} autoFocus className={fieldClass} />
                 </Field>
 
-                <Field label="Description" hint="Optional">
-                  <textarea
-                    value={draft.description}
-                    onChange={(e) => setDraftValue('description', e.target.value)}
-                    placeholder="Briefly describe what this service includes and what customers should expect."
-                    rows={5}
-                    className={`${fieldClass} h-[132px] resize-none py-4 leading-6`}
-                  />
+                <Field
+                  label={(
+                    <span className="flex items-center gap-2">
+                      <span>Description</span>
+                      <button
+                        type="button"
+                        onClick={() => setDescriptionHelpOpen(true)}
+                        title="Help"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
+                        aria-label="Service description help"
+                      >
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={toggleMagicDescription}
+                        title={magicDescriptionEnabled ? 'Hide example' : 'Show example'}
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition ${
+                          magicDescriptionEnabled
+                            ? 'bg-white/[0.05] text-white shadow-[0_0_6px_rgba(255,255,255,0.10)]'
+                            : 'text-zinc-600 hover:text-zinc-300'
+                        }`}
+                        aria-pressed={magicDescriptionEnabled}
+                        aria-label="Use suggested service description"
+                      >
+                        <Wand2 className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  )}
+                >
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setDescriptionEditorOpen(true)}
+                      className="absolute right-7 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.06] bg-[#0b0b0b]/90 text-zinc-600 transition hover:border-white/[0.12] hover:text-zinc-300"
+                      aria-label="Enlarge service description"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </button>
+                    <textarea
+                      value={draft.description}
+                      onChange={(e) => setDraftValue('description', e.target.value)}
+                      placeholder="Describe what this service includes and what customers should expect."
+                      rows={5}
+                      className={`${fieldClass} h-[132px] resize-none py-4 pr-16 leading-6`}
+                    />
+                  </div>
                 </Field>
 
                 <Field label="Price">
@@ -931,7 +1862,7 @@ const ServiceModal = ({ initialService, onClose, onSave }) => {
             <div>
               <p className="mb-5 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Billing</p>
               <div className="space-y-5">
-                <Field label="Billing unit" hint="Optional">
+                <Field label="Billing unit">
                   <BillingUnitCascade value={draft.unit || ''} options={unitOptions} onChange={(value) => setDraftValue('unit', value)} />
                 </Field>
               </div>
@@ -954,6 +1885,83 @@ const ServiceModal = ({ initialService, onClose, onSave }) => {
           </button>
         </div>
       </motion.section>
+      <AnimatePresence>
+        {descriptionEditorOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={() => setDescriptionEditorOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-[760px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5">
+                <div>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Service description</p>
+                  <h2 className="text-xl font-semibold tracking-[-0.04em] text-white">Edit full description</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDescriptionEditorOpen(false)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white"
+                  aria-label="Close description editor"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="p-6">
+                <textarea
+                  value={draft.description}
+                  onChange={(event) => setDraftValue('description', event.target.value)}
+                  placeholder="Describe what this service includes and what customers should expect."
+                  autoFocus
+                  className={`${fieldClass} h-[420px] resize-none py-4 leading-6`}
+                />
+              </div>
+              <div className="flex items-center justify-end border-t border-white/[0.05] px-6 py-5">
+                <button
+                  type="button"
+                  onClick={() => setDescriptionEditorOpen(false)}
+                  className="h-11 rounded-full bg-white px-8 text-sm font-bold text-black transition hover:bg-zinc-200"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+
+        {descriptionHelpOpen ? (
+          <InfoModal
+            zIndexClass="z-[1300]"
+            title="Write a useful service description"
+            intro="A good description helps your receptionist understand when this service fits, how to answer questions about it, and what next step to recommend."
+            points={[
+              {
+                title: 'Focus on fit.',
+                body: 'Explain what the service is for, when someone needs it, and what outcome they can expect.',
+              },
+              {
+                title: 'Stay concise.',
+                body: 'One clear paragraph is usually enough. Pricing and billing details live in their own fields.',
+              },
+              {
+                title: 'Example:',
+                body: exampleService.serviceDescription(exampleService.serviceName).split('\n\n')[0].replace('Service overview:\n', ''),
+              },
+            ]}
+            footer="Keep it practical: what it is, when it applies, and anything else your receptionist should know about it."
+            onClose={() => setDescriptionHelpOpen(false)}
+          />
+        ) : null}
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -967,6 +1975,7 @@ const Onboarding2Page = () => {
   const [submitError, setSubmitError] = useState('');
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [scheduleHelpOpen, setScheduleHelpOpen] = useState(false);
+  const [contextHelpOpen, setContextHelpOpen] = useState(false);
   const [lateHoursTermsOpen, setLateHoursTermsOpen] = useState(false);
   const [lateHoursTermsSaving, setLateHoursTermsSaving] = useState(false);
   const [localLateHoursTerms, setLocalLateHoursTerms] = useState(() => readStoredOutboundLateHoursTerms());
@@ -984,15 +1993,38 @@ const Onboarding2Page = () => {
     state: '',
     zip: '',
     hours: createDefaultSchedule(),
-    about: aboutTemplate,
+    about: '',
     policies: policiesTemplate,
     faq: faqTemplate,
     services: [],
   });
 
+  useEffect(() => {
+    setForm((prev) => {
+      const currentExample = getIndustryExample(prev.industry || 'Home Services');
+      const about = legacyNamedAboutExamples.includes(prev.about)
+        ? currentExample.about
+        : prev.about.startsWith(removedAboutIntro)
+        ? currentExample.about
+        : prev.about;
+      const policies = prev.policies.startsWith(removedPoliciesIntro)
+        ? prev.policies.slice(removedPoliciesIntro.length)
+        : prev.policies;
+      const faq = prev.faq.startsWith(removedFaqIntro)
+        ? prev.faq.slice(removedFaqIntro.length)
+        : prev.faq;
+      if (about === prev.about && policies === prev.policies && faq === prev.faq) return prev;
+      return { ...prev, about, policies, faq };
+    });
+  }, []);
+
   const progress = ((step + 1) / steps.length) * 100;
   const current = steps[step];
   const stepLabel = current.id.charAt(0).toUpperCase() + current.id.slice(1);
+  const currentDescription = current.id === 'contact'
+    ? `Add the details for ${form.businessName.trim() || 'your business'}. You can always update them later.`
+    : current.description;
+  const businessBriefSections = useMemo(() => getBusinessBriefSections(form.industry), [form.industry]);
   const activeScheduleLayerTypes = useMemo(() => getScheduleLayerTypes(scheduleColorblindMode), [scheduleColorblindMode]);
   const outboundLateHoursAccepted = hasAcceptedOutboundLateHoursTerms(profile) || localLateHoursTerms?.accepted === true;
   const termsOfServiceForOnboarding = useMemo(() => {
@@ -1005,7 +2037,48 @@ const Onboarding2Page = () => {
   }, [localLateHoursTerms, profile]);
 
   const update = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      if (key !== 'industry') return { ...prev, [key]: value };
+      const example = getIndustryExample(value);
+      const shouldReplaceAbout = allIndustryExampleValues('about').includes(prev.about) || legacyNamedAboutExamples.includes(prev.about);
+      const shouldReplacePolicies = !prev.policies.trim() || allIndustryExampleValues('policies').includes(prev.policies);
+      const shouldReplaceFaq = !prev.faq.trim() || allIndustryExampleValues('faq').includes(prev.faq);
+      const nextBusinessBriefSections = getBusinessBriefSections(value);
+      const nextServices = prev.services.map((service) => {
+        if (!allServiceDescriptionExamples().includes(service.description)) return service;
+        return {
+          ...service,
+          name: service.name || example.serviceName,
+          description: example.serviceDescription(service.name || example.serviceName),
+        };
+      });
+      return {
+        ...prev,
+        industry: value,
+        about: shouldReplaceAbout ? example.about : refreshGeneratedBusinessBriefSections(prev.about, nextBusinessBriefSections),
+        policies: shouldReplacePolicies ? example.policies : prev.policies,
+        faq: shouldReplaceFaq ? example.faq : prev.faq,
+        services: nextServices,
+      };
+    });
+  };
+
+  const toggleBusinessBriefSection = (section) => {
+    const isActive = hasBusinessBriefSection(form.about, section);
+    const currentSectionText = getBusinessBriefSectionText(form.about, section, allBusinessBriefSections());
+    const isStaleGeneratedSection = isActive
+      && isGeneratedBusinessBriefSection(currentSectionText, section)
+      && currentSectionText !== section.template;
+    const nextAbout = isStaleGeneratedSection
+      ? replaceBusinessBriefSection(form.about, section, businessBriefSections)
+      : isActive
+      ? removeBusinessBriefSection(form.about, section, businessBriefSections)
+      : [form.about.trim(), buildBusinessBriefSection(section)].filter(Boolean).join('\n\n');
+    update('about', nextAbout);
+  };
+
+  const showFullBusinessBrief = () => {
+    update('about', buildFullBusinessBrief(businessBriefSections));
   };
 
   const removeService = (serviceId) => {
@@ -1127,7 +2200,7 @@ const Onboarding2Page = () => {
   });
 
   const handleNext = async () => {
-    if (!canContinue && step < steps.length - 1) return;
+    if (!canContinue) return;
     setSubmitError('');
     if (step === 2 && !outboundLateHoursAccepted && scheduleHasOutboundLateHours(form.hours)) {
       setLateHoursTermsOpen(true);
@@ -1229,6 +2302,51 @@ const Onboarding2Page = () => {
           outline-style: none !important;
           box-shadow: none !important;
         }
+
+        @keyframes outbound-notice-spectrum-run {
+          from {
+            background-position: 0% center;
+          }
+          to {
+            background-position: 200% center;
+          }
+        }
+
+        @keyframes context-help-spectrum-run {
+          from {
+            background-position: 0% center;
+          }
+          to {
+            background-position: 100% center;
+          }
+        }
+
+        .outbound-notice-gradient {
+          background-image: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd), var(--brandGradientStart));
+          background-size: 200% 100%;
+          background-position: 0% center;
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          color: transparent;
+          animation: outbound-notice-spectrum-run 1.2s ease-out 1;
+        }
+
+        .business-brief-placeholder-highlight {
+          color: #8e8e98;
+        }
+
+        .business-brief-placeholder-edited {
+          color: #fff;
+        }
+
+        .context-help-spectrum-line {
+          background-image: linear-gradient(90deg, var(--brandGradientEnd), var(--brandGradientStart), var(--brandGradientEnd));
+          background-size: 200% 100%;
+          background-position: 0% center;
+          animation: context-help-spectrum-run 1.2s ease-out 1 forwards;
+        }
+
       `}</style>
 
       <div className="mx-auto flex min-h-screen w-full items-center justify-center px-5 py-3 sm:px-8 lg:px-10">
@@ -1246,7 +2364,7 @@ const Onboarding2Page = () => {
                     <div className="h-full rounded-full brand-gradient transition-all duration-500" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
-                {step > 0 ? (
+                {step > 0 && step < steps.length - 1 ? (
                   <button
                     type="button"
                     onClick={handleSkip}
@@ -1345,21 +2463,31 @@ const Onboarding2Page = () => {
                               <HelpCircle className="h-3.5 w-3.5" />
                             </button>
                           ) : null}
+                          {step === 3 ? (
+                            <button
+                              type="button"
+                              onClick={() => setContextHelpOpen(true)}
+                              className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
+                              aria-label="Context help"
+                            >
+                              <HelpCircle className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
                         </div>
-                        <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-500 sm:text-base">{current.description}</p>
+                        <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-500 sm:text-base">{currentDescription}</p>
                       </div>
 
                       <div className="flex-1">
                         {step === 0 ? (
                           <div className="space-y-6">
-                            <Field label="Business name" hint="The primary name your receptionist should use.">
+                            <Field label="Business name" hint="">
                               <div className="relative">
                                 <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
                                 <input
                                   type="text"
                                   value={form.businessName}
                                   onChange={(e) => update('businessName', e.target.value)}
-                                  placeholder="e.g., Hartley Roofing"
+                                  placeholder="e.g., Your business name"
                                   autoFocus
                                   className={`${fieldClass} pl-12`}
                                 />
@@ -1425,13 +2553,40 @@ const Onboarding2Page = () => {
                         ) : null}
 
                         {step === 3 ? (
-                        <textarea
-                          value={form.about}
-                          onChange={(e) => update('about', e.target.value)}
-                          rows={9}
-                          autoFocus
-                          className={`${fieldClass} h-[360px] resize-none py-4 leading-6`}
-                        />
+                        <div className="space-y-3">
+                          <div className="custom-scrollbar flex min-w-0 gap-2 overflow-x-auto pb-1" aria-label="Business brief sections">
+                            <button
+                              type="button"
+                              aria-pressed={businessBriefSections.every((section) => hasBusinessBriefSection(form.about, section))}
+                              onClick={showFullBusinessBrief}
+                              className={`shrink-0 rounded-[4px] border bg-transparent px-2 py-0.5 text-[10px] font-semibold leading-[1.7] whitespace-nowrap transition ${businessBriefSections.every((section) => hasBusinessBriefSection(form.about, section))
+                                ? 'border-white/[0.32] text-white'
+                                : 'border-white/[0.10] text-zinc-500 hover:border-white/[0.22] hover:text-zinc-200'}`}
+                            >
+                              All
+                            </button>
+                            {businessBriefSections.map((section) => {
+                              const active = hasBusinessBriefSection(form.about, section);
+                              return (
+                                <button
+                                  key={section.id}
+                                  type="button"
+                                  aria-pressed={active}
+                                  onClick={() => toggleBusinessBriefSection(section)}
+                                  className={`shrink-0 rounded-[4px] border bg-transparent px-2 py-0.5 text-[10px] font-semibold leading-[1.7] whitespace-nowrap transition ${active
+                                    ? 'border-white/[0.32] text-white'
+                                    : 'border-white/[0.10] text-zinc-500 hover:border-white/[0.22] hover:text-zinc-200'}`}
+                                >
+                                  {section.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <EditableBusinessBrief
+                            value={form.about}
+                            onChange={(value) => update('about', value)}
+                          />
+                        </div>
                         ) : null}
 
                         {step === 4 ? (
@@ -1471,9 +2626,9 @@ const Onboarding2Page = () => {
 
                           {form.services.length === 0 ? (
                             <div className="flex min-h-[160px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/[0.08] bg-black/20 p-7 text-center">
-                              <h3 className="text-lg font-semibold tracking-[-0.03em] text-white">No services added yet</h3>
+                              <h3 className="text-lg font-semibold tracking-[-0.03em] text-white">Add your first service</h3>
                               <p className="mt-2 max-w-md text-sm leading-6 text-zinc-600">
-                                Add your common services, pricing style, and booking details. You can also skip this and add services later.
+                                Add the services your business offers and the details your receptionist should know. You can always add or update services later.
                               </p>
                             </div>
                           ) : (
@@ -1574,6 +2729,7 @@ const Onboarding2Page = () => {
 
         {serviceModalOpen ? (
           <ServiceModal
+            industry={form.industry}
             initialService={editingService}
             onClose={() => {
               setServiceModalOpen(false);
@@ -1601,11 +2757,11 @@ const Onboarding2Page = () => {
               className="w-full max-w-[620px] rounded-[30px] border border-white/[0.08] bg-[#070707] p-7 shadow-[0_28px_90px_rgba(0,0,0,0.62)] sm:p-8"
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <div className="mb-5 flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">Scheduling help</h2>
                   <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">
-                    Use this slide to tell your receptionist when each type of schedule should be active across a full 24-hour day.
+                    Adjust each schedule to match how your business operates and when you want your receptionist available. You can fine-tune these hours now and change them anytime as your needs change.
                   </p>
                 </div>
                 <button
@@ -1618,24 +2774,50 @@ const Onboarding2Page = () => {
                 </button>
               </div>
 
-              <div className="space-y-4 text-sm leading-6 text-zinc-400">
-                {activeScheduleLayerTypes.map((layer) => {
-                  const detail = layer.id === 'business'
-                    ? 'should match when the business is generally open.'
-                    : layer.id === 'inbound'
-                      ? 'controls when the receptionist should answer incoming calls.'
-                      : 'controls when the receptionist can place follow-up or return calls.';
-                  return (
-                    <p key={layer.id} className="flex gap-3">
-                      <span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} />
-                      <span><span className="font-semibold text-white">{layer.label}</span> {detail}</span>
-                    </p>
-                  );
-                })}
-                <p>Drag a whole bar to move that schedule. Drag either white handle to adjust the start or end time. Use the snap control to choose how precise each adjustment should be.</p>
+              <div className="mt-5 text-sm leading-6 text-zinc-400">
+                <div className="space-y-3">
+                  {activeScheduleLayerTypes.map((layer) => {
+                    const detail = layer.id === 'business'
+                      ? 'should match when the business is generally open.'
+                      : layer.id === 'inbound'
+                        ? 'controls when the receptionist should answer incoming calls.'
+                        : 'controls when the receptionist can place follow-up or return calls.';
+                    return (
+                      <p key={layer.id} className="flex gap-3">
+                        <span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} />
+                        <span><span className="font-semibold text-white">{layer.label}</span> {detail}</span>
+                      </p>
+                    );
+                  })}
+                </div>
               </div>
             </motion.div>
           </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {contextHelpOpen ? (
+          <InfoModal
+            title="Write a strong business brief"
+            intro="Write this like an experienced manager briefing a new receptionist before their first shift. It should give the AI factual background about the company, how it started, what it is known for, where it operates, and what details matter internally."
+            points={[
+              {
+                title: 'Ground it in the business itself.',
+                body: 'Include concrete information: founder, start year, early work, location history, community presence, operating model, specialties, and current scale.',
+              },
+              {
+                title: 'Keep the story informational.',
+                body: 'The story should not sound customer-facing, promotional, sentimental, or like a commercial. It should read like useful company context.',
+              },
+              {
+                title: 'Keep it specific and useful.',
+                body: 'Skip service lists, FAQs, policies, generic receptionist instructions, and anything that could describe almost any business in the same industry.',
+              },
+            ]}
+            footer="A good final test: after reading it, the AI should know factual details about the company that would not be true of a generic competitor."
+            onClose={() => setContextHelpOpen(false)}
+          />
         ) : null}
       </AnimatePresence>
     </div>
@@ -1643,3 +2825,4 @@ const Onboarding2Page = () => {
 };
 
 export default Onboarding2Page;
+
