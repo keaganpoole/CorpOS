@@ -3,7 +3,6 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import { LEGAL_ACCEPTANCE_KEY, LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
 import {
   additionalBusinessBriefContexts,
   additionalIndustries,
@@ -72,11 +71,6 @@ const steps = [
     id: 'services',
     title: 'What services do you offer?',
     description: 'Give your receptionist the knowledge it needs to explain what you offer, make helpful service recommendations, and guide customers toward the right next step when they are ready to book.',
-  },
-  {
-    id: 'acknowledgments',
-    title: 'Review required acknowledgments',
-    description: 'Confirm the required account acknowledgments to complete setup.',
   },
 ];
 
@@ -1288,8 +1282,7 @@ const selectEditablePlaceholder = (event) => {
   selection.addRange(range);
 };
 
-const EditableBusinessBrief = ({ value, onChange, maxLength = LONG_TEXT_LIMIT }) => {
-  const editorRef = useRef(null);
+const EditableBusinessBrief = ({ value, onChange, maxLength = LONG_TEXT_LIMIT, editorRef }) => {
   const lastInputValueRef = useRef(String(value || ''));
 
   useEffect(() => {
@@ -2223,9 +2216,8 @@ const Onboarding2Page = () => {
   const [lateHoursTermsSaving, setLateHoursTermsSaving] = useState(false);
   const [localLateHoursTerms, setLocalLateHoursTerms] = useState(() => readStoredOutboundLateHoursTerms());
   const [scheduleColorblindMode, setScheduleColorblindMode] = useState(false);
-  const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
-  const [hasCertifiedPermittedUse, setHasCertifiedPermittedUse] = useState(false);
   const [editingService, setEditingService] = useState(null);
+  const businessBriefEditorRef = useRef(null);
   const [form, setForm] = useState({
     businessName: '',
     industry: '',
@@ -2335,6 +2327,11 @@ const Onboarding2Page = () => {
       ? removeBusinessBriefSection(form.about, section, businessBriefSections)
       : [form.about.trim(), buildBusinessBriefSection(section)].filter(Boolean).join('\n\n');
     update('about', nextAbout);
+    requestAnimationFrame(() => {
+      const editor = businessBriefEditorRef.current;
+      if (!editor) return;
+      editor.scrollTo({ top: editor.scrollHeight, behavior: 'smooth' });
+    });
   };
 
   const showFullBusinessBrief = () => {
@@ -2395,9 +2392,8 @@ const Onboarding2Page = () => {
     if (step === 1) return isEmailComplete(form.email) && (form.email.trim() || form.phone.trim() || form.street.trim() || form.city.trim() || form.state.trim() || form.zip.trim());
     if (step === 3) return String(form.about || '').length < LONG_TEXT_LIMIT;
     if (step === 4) return String(form.policies || '').length < LONG_TEXT_LIMIT;
-    if (step === steps.length - 1) return hasAcceptedLegal && hasCertifiedPermittedUse;
     return true;
-  }, [form, hasAcceptedLegal, hasCertifiedPermittedUse, step]);
+  }, [form, step]);
 
   const normalizedServices = useMemo(() => (
     form.services
@@ -2449,22 +2445,7 @@ const Onboarding2Page = () => {
     faq: form.faq.trim(),
     business_hours: cleanScheduleForStorage(form.hours),
     appointment_settings: {},
-    terms_of_service: {
-      ...termsOfServiceForOnboarding,
-      ...(hasAcceptedLegal && hasCertifiedPermittedUse ? {
-        [LEGAL_ACCEPTANCE_KEY]: {
-          accepted: true,
-          version: LEGAL_ACCEPTANCE_VERSION,
-          certified_permitted_use: true,
-          source: 'onboarding',
-        },
-      } : {}),
-    },
-    legal_acceptance: {
-      version: LEGAL_ACCEPTANCE_VERSION,
-      accepted_terms: hasAcceptedLegal,
-      certified_permitted_use: hasCertifiedPermittedUse,
-    },
+    terms_of_service: termsOfServiceForOnboarding,
     services: normalizedServices,
   });
 
@@ -2921,6 +2902,7 @@ const Onboarding2Page = () => {
                           </div>
                           <div className="relative">
                             <EditableBusinessBrief
+                              editorRef={businessBriefEditorRef}
                               value={form.about}
                               onChange={(value) => update('about', value)}
                               maxLength={LONG_TEXT_LIMIT}
@@ -3025,20 +3007,6 @@ const Onboarding2Page = () => {
                             </div>
                           )}
                         </div>
-                        ) : null}
-
-                        {step === steps.length - 1 ? (
-                          <div className="mt-6 space-y-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400">Required account acknowledgments</p>
-                            <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-zinc-400">
-                              <input type="checkbox" checked={hasAcceptedLegal} onChange={(event) => setHasAcceptedLegal(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-white" />
-                              <span>I am authorized to bind this business and agree to the <a href="/terms" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">Terms</a>, <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">Privacy Policy</a>, <a href="/acceptable-use-policy" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">Acceptable Use Policy</a>, <a href="/communications-notice" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">AI & Recording Notice</a>, and <a href="/data-processing-addendum" target="_blank" rel="noreferrer" className="text-white underline underline-offset-2">DPA</a>.</span>
-                            </label>
-                            <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-zinc-400">
-                              <input type="checkbox" checked={hasCertifiedPermittedUse} onChange={(event) => setHasCertifiedPermittedUse(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-white" />
-                              <span>I certify that this is a permitted general U.S. business use. Before any automated communication, recording, or transcription, my business will give required notices, obtain and retain required consent, honor opt-outs, and will not use Nodemere for regulated or restricted activity.</span>
-                            </label>
-                          </div>
                         ) : null}
 
                         {submitError ? (

@@ -10,14 +10,12 @@ import AuthPage from './pages/AuthPage';
 import Onboarding2Page from './pages/Onboarding2Page';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import LegalAcceptancePage from './pages/LegalAcceptancePage';
 import VerificationPage from './pages/VerificationPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
 import VoiceClonePage from './pages/VoiceClonePage';
 import SplashScreen from './components/SplashScreen';
 import LegalDocumentPage from './components/LegalDocumentPage';
 import CookieNotice from './components/CookieNotice';
-import { hasCurrentLegalAcceptance } from './legal/legalDocuments';
 
 // Sonar Dashboard
 import SonarDashboard from './sonar/SonarDashboard';
@@ -37,10 +35,6 @@ function DashboardGate() {
     return <Navigate to="/onboarding" replace />;
   }
 
-  if (!hasCurrentLegalAcceptance(profile)) {
-    return <Navigate to="/legal-acceptance" replace />;
-  }
-
   return <SonarDashboard />;
 }
 
@@ -53,10 +47,6 @@ function OnboardingGate() {
 
   if (!session) {
     return <Navigate to="/auth" replace />;
-  }
-
-  if (profile?.onboarded && !hasCurrentLegalAcceptance(profile)) {
-    return <Navigate to="/legal-acceptance" replace />;
   }
 
   if (profile?.onboarded) {
@@ -102,7 +92,6 @@ function AppContent() {
         <Route path="/data-processing-addendum" element={<LegalDocumentPage documentKey="dpa" />} />
         <Route path="/subprocessors" element={<LegalDocumentPage documentKey="subprocessors" />} />
         <Route path="/cookie-notice" element={<LegalDocumentPage documentKey="cookies" />} />
-        <Route path="/legal-acceptance" element={<LegalAcceptancePage />} />
         <Route path="/verify/:token" element={<VerificationPage />} />
         <Route path="/upload/:token" element={<DocumentUploadPage />} />
         <Route path="/clone/:token" element={<VoiceClonePage />} />

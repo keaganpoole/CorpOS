@@ -10,6 +10,7 @@ import { LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 const FRONTEND_PUBLIC_URL = import.meta.env.VITE_FRONTEND_PUBLIC_URL || window.location.origin;
+const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
 
 console.log('AuthPage: import.meta.env.DEV =', import.meta.env.DEV);
 console.log('AuthPage: import.meta.env.VITE_FRONTEND_PUBLIC_URL =', import.meta.env.VITE_FRONTEND_PUBLIC_URL);
@@ -110,6 +111,7 @@ const AuthPage = () => {
                     password: formData.password,
                     terms_accepted: true,
                     legal_version: LEGAL_ACCEPTANCE_VERSION,
+                    certified_permitted_use: true,
                 });
                 setSuccessMessage('Please check your email inbox and spam folder for a confirmation link. ');
                 setFormData(prev => ({ ...prev, password: '', confirmPassword: '' })); // Keep email, clear passwords
@@ -203,37 +205,34 @@ const AuthPage = () => {
     };
 
     // ... your existing JSX for the form ...
-    const inputGroupClasses = "relative group";
-    const inputClasses = "relative w-full px-5 py-3 bg-[#1c1c1c] border border-gray-700 rounded-full text-white placeholder-gray-500 focus:outline-none focus:border-transparent transition-all peer";
+    const inputGroupClasses = "relative";
+    const inputClasses = "relative w-full px-5 py-3 bg-[#1c1c1c] border border-zinc-700 rounded-full text-white placeholder-gray-500 outline-none ring-0 transition-colors peer focus:border-zinc-300 focus:outline-none focus:ring-0";
     const labelClasses = "absolute left-4 -top-2 text-xs text-gray-400 bg-[#1c1c1c] px-2 rounded-md transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:-top-2 peer-focus:text-xs";
-    const gradientBorderClasses = "absolute -inset-px bg-gradient-to-r from-[#f7f7f8] to-[#b5b6c4] rounded-full opacity-0 group-focus-within:opacity-100 transition duration-150";
+    const isSubmitDisabled = isLoading || (isSignUp && !hasAcceptedLegal);
 
     return (
-        <div className="min-h-[var(--app-height)] bg-black text-gray-300 flex items-center justify-center px-6 py-4 font-inter antialiased">
+        <div className="auth-page min-h-[var(--app-height)] bg-black text-gray-300 flex items-center justify-center px-6 py-4 font-inter antialiased">
             <div className={`w-full max-w-sm mx-auto transition-all duration-700 ease-in-out ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 <div className="flex flex-col items-center text-center">
-                    <div style={{ width: '90px', aspectRatio: '19 / 17' }} className="mb-4">
-                        <img src="https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges/max.jpg" alt="Nodemere logo" className="w-full h-full object-contain rounded-xl" />
+                    <div className="mb-4 flex h-24 items-center justify-center">
+                        <img src={NODEMERE_LOGO_SRC} alt="Nodemere logo" className="h-28 w-auto object-contain" />
                     </div>
                     <h1 className="text-2xl font-bold text-white mb-10">{isSignUp ? 'Create an account' : 'Welcome back'}</h1>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div className={inputGroupClasses}>
-                        <div className={gradientBorderClasses}></div>
                         <input id="email" type="email" name="email" placeholder=" " value={formData.email} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
                         <label htmlFor="email" className={labelClasses}>Email</label>
                     </div>
 
                     <div className={inputGroupClasses}>
-                        <div className={gradientBorderClasses}></div>
                         <input id="password" type="password" name="password" placeholder=" " value={formData.password} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
                         <label htmlFor="password" className={labelClasses}>Password</label>
                     </div>
 
                     {isSignUp && (
                         <div className={inputGroupClasses}>
-                            <div className={gradientBorderClasses}></div>
                             <input id="confirmPassword" type="password" name="confirmPassword" placeholder=" " value={formData.confirmPassword} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
                             <label htmlFor="confirmPassword" className={labelClasses}>Confirm password</label>
                         </div>
@@ -247,10 +246,10 @@ const AuthPage = () => {
                             className="mt-1 h-4 w-4 shrink-0 accent-white"
                             disabled={isLoading}
                         />
-                        <span>I am authorized to create this business account and agree to the <Link to="/terms" target="_blank" className="text-white underline underline-offset-2">Terms</Link>, <Link to="/privacy-policy" target="_blank" className="text-white underline underline-offset-2">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank" className="text-white underline underline-offset-2">Acceptable Use Policy</Link>, and <Link to="/communications-notice" target="_blank" className="text-white underline underline-offset-2">AI & Recording Notice</Link>.</span>
+                        <span>I am authorized to create this business account, agree to the <Link to="/terms" target="_blank" className="text-white underline underline-offset-2">Terms</Link>, <Link to="/privacy-policy" target="_blank" className="text-white underline underline-offset-2">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank" className="text-white underline underline-offset-2">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank" className="text-white underline underline-offset-2">AI & Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank" className="text-white underline underline-offset-2">DPA</Link>, and certify this account is for a permitted general U.S. business use.</span>
                     </label>}
 
-                    <button type="submit" className="w-full py-3 mt-6 text-sm font-semibold text-black bg-gradient-to-r from-[#f7f7f8] to-[#b5b6c4] rounded-full hover:opacity-90 transition-all duration-300 shadow-lg shadow-[#b5b6c4]/10 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isLoading}>
+                    <button type="submit" className="w-full py-3 mt-6 text-sm font-semibold text-black bg-gradient-to-r from-[#f7f7f8] to-[#b5b6c4] rounded-full hover:opacity-90 transition-all duration-300 shadow-lg shadow-[#b5b6c4]/10 disabled:opacity-35 disabled:cursor-not-allowed" disabled={isSubmitDisabled}>
                         {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Log In')}
                     </button>
 
@@ -274,7 +273,7 @@ const AuthPage = () => {
                 </form>
 
                 <div className="mt-8 space-y-4">
-                    <button onClick={handleGoogleSignIn} className="w-full flex items-center justify-center px-4 py-3 bg-transparent border border-gray-700 rounded-full hover:bg-[#1c1c1c] transition-colors disabled:opacity-50" disabled={isLoading || !hasAcceptedLegal}>
+                    <button onClick={handleGoogleSignIn} className="w-full flex items-center justify-center px-4 py-3 bg-transparent border border-gray-700 rounded-full hover:bg-[#1c1c1c] transition-colors disabled:opacity-50" disabled={isLoading || (isSignUp && !hasAcceptedLegal)}>
                         <img src={googleIcon} alt="Google icon" className="w-5 h-5 mr-3" style={{ backgroundColor: 'transparent' }} />
                         <span className="font-semibold text-xs text-white">Continue with Google</span>
                     </button>

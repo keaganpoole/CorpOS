@@ -190,6 +190,20 @@ select:focus {
   box-shadow: none !important;
 }
 
+/* Auth fields use their own neutral focus states and never show a focus ring. */
+.auth-page input:not([type="checkbox"]),
+.auth-page input:not([type="checkbox"]):focus,
+.auth-page input:not([type="checkbox"]):focus-visible {
+  border-color: #3f3f46 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.auth-page input:not([type="checkbox"]):focus,
+.auth-page input:not([type="checkbox"]):focus-visible {
+  border-color: #a1a1aa !important;
+}
+
 .time-input-no-icon::-webkit-calendar-picker-indicator {
   -webkit-appearance: none;
   appearance: none;
