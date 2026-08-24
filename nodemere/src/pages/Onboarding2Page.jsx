@@ -360,7 +360,10 @@ Q: What areas do you cover?
 A: We serve Greater Portland and nearby communities.
 
 Q: Can you help sell my home?
-A: Yes, we can schedule a listing consultation to review the property, timing, and pricing strategy.`,
+A: Yes, we can schedule a listing consultation to review the property, timing, and pricing strategy.
+
+Q: Can you help with relocation?
+A: Yes, relocation inquiries can be routed to the team after collecting the customer's timeline, preferred areas, budget, and current location.`,
     serviceDescription: (serviceName) => `Service overview:
 This service helps prospective buyers understand the buying process, clarify their goals, and decide what steps to take before touring homes or making offers.
 
@@ -432,7 +435,10 @@ Q: Should I arrive early?
 A: Arriving a few minutes early is recommended.
 
 Q: Can I book recurring appointments?
-A: Yes, recurring appointments can be discussed based on treatment goals.`,
+A: Yes, recurring appointments can be discussed based on treatment goals.
+
+Q: What should I mention before booking?
+A: Clients should mention allergies, sensitivities, pregnancy, recent procedures, medications, and any skin concerns that may affect the appointment.`,
     serviceDescription: (serviceName) => `Service overview:
 This service is a personalized skincare treatment designed to refresh the skin, support skin health, and create a calm, restorative experience.
 
@@ -504,7 +510,10 @@ Q: Can you give an exact price over the phone?
 A: Some services can be estimated, but final pricing may depend on inspection and parts.
 
 Q: What information should I provide?
-A: Vehicle year, make, model, mileage, symptoms, and when the issue started are helpful.`,
+A: Vehicle year, make, model, mileage, symptoms, and when the issue started are helpful.
+
+Q: Can I wait while the vehicle is being serviced?
+A: Waiting may be possible for shorter services, but timing depends on the repair, inspection needs, and shop schedule.`,
     serviceDescription: (serviceName) => `Service overview:
 This service helps drivers understand whether their brakes are safe, worn, noisy, or in need of repair.
 
@@ -576,7 +585,10 @@ Q: Can you accommodate dietary restrictions?
 A: Guests should share dietary needs when booking so the team can confirm options.
 
 Q: What information is needed for an event?
-A: Date, time, guest count, event type, and food or beverage preferences are helpful.`,
+A: Date, time, guest count, event type, and food or beverage preferences are helpful.
+
+Q: Can I request a specific table or room?
+A: Requests can be noted, but seating or room availability must be confirmed by the team.`,
     serviceDescription: (serviceName) => `Service overview:
 This service helps guests plan a private dinner, celebration, meeting, or small event with the right space, timing, and service setup.
 
@@ -648,7 +660,10 @@ Q: Can you give advice immediately?
 A: The team may need to review the situation before giving specific guidance.
 
 Q: How do I know if you can help?
-A: A consultation is the best next step to determine fit and scope.`,
+A: A consultation is the best next step to determine fit and scope.
+
+Q: Do you handle urgent matters?
+A: Urgent matters should be flagged with the deadline, background, and best contact information so the team can review priority and fit.`,
     serviceDescription: (serviceName) => `Service overview:
 This service helps new clients explain their situation, clarify their goals, and determine whether the firm is the right fit.
 
@@ -720,7 +735,10 @@ Q: Can you hold an item?
 A: Holds may be available depending on the item and store policy.
 
 Q: What is your return policy?
-A: Return eligibility depends on item condition, timing, and the store's policy.`,
+A: Return eligibility depends on item condition, timing, and the store's policy.
+
+Q: Can you order an item that is not currently in stock?
+A: Special orders may be available depending on supplier availability, payment requirements, and store policy.`,
     serviceDescription: (serviceName) => `Service overview:
 This service helps customers get tailored product recommendations for gifts, events, wardrobe needs, home items, or everyday purchases.
 
@@ -792,7 +810,10 @@ Q: Can you give pricing over the phone?
 A: General pricing may be available, but final pricing can depend on the details.
 
 Q: How quickly can someone follow up?
-A: Follow-up timing depends on availability and urgency.`,
+A: Follow-up timing depends on availability and urgency.
+
+Q: What information should I provide?
+A: The customer should share the request, timing, location if relevant, urgency, and best contact information.`,
     serviceDescription: (serviceName) => `Service overview:
 This service helps customers who need support, guidance, or a specific outcome related to this offering.
 
@@ -2276,7 +2297,7 @@ const Onboarding2Page = () => {
 
   const update = (key, value) => {
     setForm((prev) => {
-      if (key === 'about' || key === 'policies') return { ...prev, [key]: limitLongText(value) };
+      if (key === 'about' || key === 'policies' || key === 'faq') return { ...prev, [key]: limitLongText(value) };
       if (key !== 'industry') return { ...prev, [key]: value };
       const example = getIndustryExample(value);
       const shouldReplaceAbout = allIndustryExampleValues('about').includes(prev.about) || legacyNamedAboutExamples.includes(prev.about);
@@ -2318,6 +2339,13 @@ const Onboarding2Page = () => {
 
   const showFullBusinessBrief = () => {
     update('about', buildFullBusinessBrief(businessBriefSections));
+  };
+
+  const addFaqQuestion = () => {
+    const block = 'Q: \nA: ';
+    const currentFaq = form.faq.trimEnd();
+    const nextFaq = currentFaq ? `${currentFaq}\n\n${block}` : block;
+    update('faq', nextFaq);
   };
 
   const removeService = (serviceId) => {
@@ -2917,13 +2945,29 @@ const Onboarding2Page = () => {
                         ) : null}
 
                         {step === 5 ? (
-                        <textarea
-                          value={form.faq}
-                          onChange={(e) => update('faq', e.target.value)}
-                          rows={9}
-                          autoFocus
-                          className={`${fieldClass} h-[499px] resize-none py-4 leading-6`}
-                        />
+                        <div className="space-y-3">
+                          <div className="custom-scrollbar flex min-w-0 items-center overflow-x-auto pb-1" aria-label="Frequently asked questions actions">
+                            <button
+                              type="button"
+                              onClick={addFaqQuestion}
+                              disabled={form.faq.length >= LONG_TEXT_LIMIT}
+                              className="shrink-0 bg-transparent pr-3 text-[10px] font-semibold leading-[1.7] whitespace-nowrap text-zinc-500 transition hover:text-zinc-200 disabled:cursor-not-allowed disabled:text-zinc-700"
+                            >
+                              Add new
+                            </button>
+                          </div>
+                          <div className="relative">
+                            <textarea
+                              value={form.faq}
+                              onChange={(e) => update('faq', e.target.value)}
+                              maxLength={LONG_TEXT_LIMIT}
+                              rows={9}
+                              autoFocus
+                              className={`${fieldClass} h-[499px] resize-none py-4 leading-6`}
+                            />
+                            <CharacterLimitNotice value={form.faq} />
+                          </div>
+                        </div>
                         ) : null}
 
                         {step === 6 ? (
