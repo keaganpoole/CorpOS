@@ -5,6 +5,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { LEGAL_ACCEPTANCE_KEY, LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
 import {
+  additionalBusinessBriefContexts,
+  additionalIndustries,
+  additionalIndustryExamples,
+} from '../data/onboardingIndustryTemplates';
+import {
   ArrowRight,
   Building2,
   Check,
@@ -22,6 +27,7 @@ import {
   MapPin,
   Maximize2,
   Phone,
+  Search,
   Trash2,
   FileText,
   Wand2,
@@ -82,7 +88,39 @@ const industries = [
   'Hospitality',
   'Professional Services',
   'Retail',
+  ...additionalIndustries,
   'Other General Business',
+];
+
+const industryGroups = [
+  {
+    label: 'Home & Property',
+    industries: ['Home Services', 'Real Estate', 'Cleaning Services', 'Landscaping', 'Plumbing', 'HVAC', 'Electrical', 'Pest Control', 'Construction & Remodeling', 'Interior Design'],
+  },
+  {
+    label: 'Vehicles & Moving',
+    industries: ['Automotive', 'Moving & Storage', 'Repair Services'],
+  },
+  {
+    label: 'Personal & Recreation',
+    industries: ['Beauty & Wellness', 'Fitness & Recreation', 'Pet Services', 'Travel & Tours'],
+  },
+  {
+    label: 'Hospitality & Events',
+    industries: ['Hospitality', 'Catering & Food Service', 'Events & Venues', 'Photography'],
+  },
+  {
+    label: 'Business & Creative',
+    industries: ['Professional Services', 'Marketing & Creative', 'IT Services'],
+  },
+  {
+    label: 'Retail & Distribution',
+    industries: ['Retail', 'Wholesale & Distribution'],
+  },
+  {
+    label: 'Other',
+    industries: ['Other General Business'],
+  },
 ];
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -774,6 +812,7 @@ Customers can expect clear communication, practical guidance, and help moving fo
 Recommended next step:
 Ask what the customer needs, when they need it, and the best way to follow up. If it is a fit, help them schedule or connect with the right person.`,
   },
+  ...additionalIndustryExamples,
 };
 
 const getIndustryExample = (industry) => industryExamples[industry] || industryExamples['Other General Business'];
@@ -817,6 +856,7 @@ const businessBriefIndustryContext = {
     credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to its real estate work.\n\n- **[License type]:** [License number] — [State / Jurisdiction]\n- **[License type]:** [License number] — [State / Jurisdiction]\n\n**Brokerage affiliation:** [Brokerage, if applicable]\n**Professional certifications:** [Certifications, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
     additionalContext: '**Languages supported:** [Languages]\n**Brokerage affiliation:** [Brokerage, if applicable]\n**Client confidentiality notes:** [Details the receptionist should avoid sharing or should route carefully]\n**Transaction specialties:** [First-time buyers, listings, relocation, investment properties, commercial, or other focus areas]\n**Urgent transaction triggers:** [Offers, showings, inspections, financing deadlines, or closing issues that need priority follow-up]',
   },
+  ...additionalBusinessBriefContexts,
 };
 
 const sharedBusinessBriefContext = {
@@ -1147,6 +1187,8 @@ const possessiveName = (value) => {
   if (!name) return '';
   return `${name}${name.toLowerCase().endsWith('s') ? "'" : "'s"}`;
 };
+const formatBusinessNameInput = (value) => String(value || '')
+  .replace(/\S+/g, (word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`);
 
 const isEmailComplete = (value) => {
   const email = String(value || '').trim();
@@ -1213,6 +1255,18 @@ const refreshEditedPlaceholderStyles = (editor) => {
   });
 };
 
+const selectEditablePlaceholder = (event) => {
+  const placeholder = event.target.closest?.('.business-brief-placeholder-highlight, .business-brief-placeholder-edited');
+  if (!placeholder || !event.currentTarget.contains(placeholder)) return;
+
+  const selection = window.getSelection?.();
+  if (!selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(placeholder);
+  selection.removeAllRanges();
+  selection.addRange(range);
+};
+
 const EditableBusinessBrief = ({ value, onChange, maxLength = LONG_TEXT_LIMIT }) => {
   const editorRef = useRef(null);
   const lastInputValueRef = useRef(String(value || ''));
@@ -1265,6 +1319,7 @@ const EditableBusinessBrief = ({ value, onChange, maxLength = LONG_TEXT_LIMIT })
         lastInputValueRef.current = nextValue;
         onChange(nextValue);
       }}
+      onClick={selectEditablePlaceholder}
       onBlur={(event) => {
         const nextValue = event.currentTarget.textContent || '';
         event.currentTarget.innerHTML = escapeEditableHtml(nextValue);
@@ -2137,6 +2192,8 @@ const Onboarding2Page = () => {
   const [complete, setComplete] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [industryPickerOpen, setIndustryPickerOpen] = useState(false);
+  const [industrySearch, setIndustrySearch] = useState('');
   const [scheduleHelpOpen, setScheduleHelpOpen] = useState(false);
   const [contextHelpOpen, setContextHelpOpen] = useState(false);
   const [policiesHelpOpen, setPoliciesHelpOpen] = useState(false);
@@ -2188,6 +2245,13 @@ const Onboarding2Page = () => {
   const stepLabel = current.id.charAt(0).toUpperCase() + current.id.slice(1);
   const businessName = form.businessName.trim();
   const businessPossessive = possessiveName(businessName);
+  const normalizedIndustrySearch = industrySearch.trim().toLowerCase();
+  const filteredIndustryGroups = industryGroups
+    .map((group) => ({
+      ...group,
+      industries: group.industries.filter((industry) => industry.toLowerCase().includes(normalizedIndustrySearch)),
+    }))
+    .filter((group) => group.industries.length > 0);
   const currentTitle = current.id === 'contact'
     ? 'Set business details'
     : current.title;
@@ -2683,7 +2747,7 @@ const Onboarding2Page = () => {
                                 <input
                                   type="text"
                                   value={form.businessName}
-                                  onChange={(e) => update('businessName', e.target.value)}
+                                  onChange={(e) => update('businessName', formatBusinessNameInput(e.target.value))}
                                   placeholder="e.g., Your business name"
                                   autoFocus
                                   className={`${fieldClass} pl-12`}
@@ -2692,10 +2756,56 @@ const Onboarding2Page = () => {
                             </Field>
 
                             <Field label="Industry" hint="Choose the closest fit. This helps shape smarter defaults.">
-                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                {industries.map((industry) => (
-                                  <SelectCard key={industry} label={industry} active={form.industry === industry} onClick={() => update('industry', industry)} />
-                                ))}
+                              <div className="relative">
+                                <div className={`relative flex h-12 items-center rounded-2xl border bg-white/[0.035] transition ${industryPickerOpen ? 'border-white/[0.18]' : 'border-white/[0.08]'}`}>
+                                  <Search className="pointer-events-none absolute left-4 h-4 w-4 text-zinc-600" />
+                                  <input
+                                    type="text"
+                                    value={industryPickerOpen ? industrySearch : form.industry}
+                                    onFocus={() => {
+                                      setIndustryPickerOpen(true);
+                                      setIndustrySearch('');
+                                    }}
+                                    onBlur={() => setTimeout(() => setIndustryPickerOpen(false), 120)}
+                                    onChange={(e) => {
+                                      setIndustryPickerOpen(true);
+                                      setIndustrySearch(e.target.value);
+                                    }}
+                                    placeholder="Search industries"
+                                    className="h-full w-full bg-transparent pl-11 pr-12 text-sm font-medium text-white outline-none placeholder:text-zinc-600"
+                                    aria-label="Search industries"
+                                  />
+                                  <ChevronDown className={`pointer-events-none absolute right-4 h-4 w-4 text-zinc-600 transition-transform ${industryPickerOpen ? 'rotate-180' : ''}`} />
+                                </div>
+
+                                {industryPickerOpen ? (
+                                  <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-[310px] overflow-y-auto rounded-2xl border border-white/[0.1] bg-[#111111] p-2 shadow-[0_18px_45px_rgba(0,0,0,0.45)]">
+                                    {filteredIndustryGroups.length ? filteredIndustryGroups.map((group) => (
+                                      <div key={group.label} className="px-1 pb-2 last:pb-1">
+                                        <p className="px-2 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600">{group.label}</p>
+                                        <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
+                                          {group.industries.map((industry) => (
+                                            <button
+                                              key={industry}
+                                              type="button"
+                                              onClick={() => {
+                                                update('industry', industry);
+                                                setIndustryPickerOpen(false);
+                                                setIndustrySearch('');
+                                              }}
+                                              className={`flex min-h-9 items-center justify-between rounded-xl px-3 text-left text-sm transition ${form.industry === industry ? 'bg-white/[0.1] font-semibold text-white' : 'text-zinc-400 hover:bg-white/[0.06] hover:text-white'}`}
+                                            >
+                                              <span>{industry}</span>
+                                              {form.industry === industry ? <Check className="h-3.5 w-3.5 text-zinc-300" /> : null}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )) : (
+                                      <p className="px-3 py-8 text-center text-sm text-zinc-600">No industries found</p>
+                                    )}
+                                  </div>
+                                ) : null}
                               </div>
                             </Field>
                           </div>
