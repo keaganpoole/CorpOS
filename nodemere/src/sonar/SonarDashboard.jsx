@@ -78,7 +78,7 @@ import { useAuth } from '../contexts/AuthContext';
 import logoImage from '../assets/logo.png';
 
 const DASHBOARD_ROUTE_STORAGE_KEY = 'sonar-dashboard-route';
-const DEFAULT_DASHBOARD_ROUTE = 'live-monitoring';
+const DEFAULT_DASHBOARD_ROUTE = 'receptionists';
 const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'settings'];
 const POPUP_DISMISS_PERSISTS_SHOWN = false;
 
@@ -121,16 +121,6 @@ const POPUP_DEFINITIONS = [
     manualOnly: true,
     getDescription: () => 'A few finishing touches can help you get the most out of your account. We’ll keep things simple and guide you along the way as everything comes together.',
     primaryActionLabel: 'Got it',
-  },
-  {
-    id: 'receptionists_team_welcome',
-    type: 'general',
-    placement: 'dashboard',
-    title: 'Meet Your Team',
-    getDescription: () => 'This is where your front line comes together. Choose from a catalog of AI receptionists, each with a distinct personality, and assemble a team ready to carry your name, represent your business, and stand ready for every call.',
-    primaryActionLabel: 'Got it',
-    showDontRemindMe: true,
-    shouldShow: ({ currentRoute }) => currentRoute === 'receptionists',
   },
   {
     id: 'receptionists_empty_roster',
@@ -193,7 +183,9 @@ const POPUP_DEFINITIONS = [
     emoji: '🎉',
     getDescription: () => 'Your calendar has started filling up. Open appointments to review the details, confirm the booking context, and keep your front desk schedule clean.',
     primaryActionLabel: 'Got it',
-    shouldShow: ({ currentRoute, calendarCount, calendarLoading }) => currentRoute === 'calendar' && !calendarLoading && calendarCount > 0,
+    shouldShow: ({ currentRoute, calendarLoading, calendarHasAppointmentWithPerson }) => (
+      currentRoute === 'calendar' && !calendarLoading && calendarHasAppointmentWithPerson
+    ),
   },
   {
     id: 'people_intro',
@@ -527,6 +519,8 @@ const createTasklistState = ({ business = null, agents = [], staff = [], purchas
 
 function getInitialDashboardRoute() {
   if (typeof window === 'undefined') return DEFAULT_DASHBOARD_ROUTE;
+  const routeFromPath = window.location.pathname.split('/').filter(Boolean)[1];
+  if (DASHBOARD_ROUTES.includes(routeFromPath)) return routeFromPath;
   const savedRoute = window.localStorage.getItem(DASHBOARD_ROUTE_STORAGE_KEY);
   return DASHBOARD_ROUTES.includes(savedRoute) ? savedRoute : DEFAULT_DASHBOARD_ROUTE;
 }
@@ -1770,7 +1764,7 @@ const SonarDashboard = () => {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [teamView, setTeamView] = useState('receptionists');
   const [peopleToolbarMeta, setPeopleToolbarMeta] = useState({ count: 0, loading: true });
-  const [calendarToolbarMeta, setCalendarToolbarMeta] = useState({ count: 0, loading: true });
+  const [calendarToolbarMeta, setCalendarToolbarMeta] = useState({ count: 0, loading: true, hasAppointmentWithPerson: false });
   const [scenariosToolbarMeta, setScenariosToolbarMeta] = useState({ count: 0, loading: true });
   const [callLogsToolbarMeta, setCallLogsToolbarMeta] = useState({ count: 0, loading: true });
   const [terminateAgentHasAppointments, setTerminateAgentHasAppointments] = useState(false);
@@ -2211,6 +2205,7 @@ const SonarDashboard = () => {
     showHireModal,
     calendarCount: calendarToolbarMeta.count,
     calendarLoading: calendarToolbarMeta.loading,
+    calendarHasAppointmentWithPerson: calendarToolbarMeta.hasAppointmentWithPerson,
     peopleCount: peopleToolbarMeta.count,
     peopleLoading: peopleToolbarMeta.loading,
     scenariosCount: scenariosToolbarMeta.count,

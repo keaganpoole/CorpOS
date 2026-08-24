@@ -9,11 +9,15 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
   const [mobilePanel, setMobilePanel] = useState('appointments');
 
   useEffect(() => {
+    const hasAppointmentWithPerson = appointmentsData.allAppointments.some((appointment) => (
+      String(appointment.person_id || '').trim().length > 0
+    ));
     onToolbarMetaChange?.({
       count: appointmentsData.allAppointments.length,
       loading: appointmentsData.loading,
+      hasAppointmentWithPerson,
     });
-  }, [appointmentsData.allAppointments.length, appointmentsData.loading, onToolbarMetaChange]);
+  }, [appointmentsData.allAppointments, appointmentsData.loading, onToolbarMetaChange]);
 
   return (
     <div className="h-full overflow-hidden bg-[#020202] px-4 pb-5 pt-8 md:px-5 md:pb-5 md:pt-8">

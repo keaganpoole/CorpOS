@@ -206,6 +206,7 @@ class AuthSignUpRequest(BaseModel):
     password: str
     terms_accepted: bool = False
     legal_version: Optional[str] = None
+    certified_permitted_use: bool = False
 
 class UserCreate(UserBase):
     id: UUID

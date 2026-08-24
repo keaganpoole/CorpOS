@@ -176,7 +176,7 @@ export function useAppointments() {
         if (businessId && userId) {
           const combinedResponse = await supabase
             .from('hired_receptionists')
-            .select('id,full_name,first_name,status,avatar,banner_id,catalog_id,user_id,business_id')
+            .select('id,full_name,first_name,status,avatar,catalog_id,user_id,business_id')
             .or(`business_id.eq.${businessId},user_id.eq.${userId}`)
             .order('full_name', { ascending: true });
           if (combinedResponse.error) throw combinedResponse.error;
@@ -184,7 +184,7 @@ export function useAppointments() {
         } else if (businessId) {
           const businessResponse = await supabase
             .from('hired_receptionists')
-            .select('id,full_name,first_name,status,avatar,banner_id,catalog_id,user_id,business_id')
+            .select('id,full_name,first_name,status,avatar,catalog_id,user_id,business_id')
             .eq('business_id', businessId)
             .order('full_name', { ascending: true });
           if (businessResponse.error) throw businessResponse.error;
@@ -192,7 +192,7 @@ export function useAppointments() {
         } else if (userId) {
           const userResponse = await supabase
             .from('hired_receptionists')
-            .select('id,full_name,first_name,status,avatar,banner_id,catalog_id,user_id,business_id')
+            .select('id,full_name,first_name,status,avatar,catalog_id,user_id,business_id')
             .eq('user_id', userId)
             .order('full_name', { ascending: true });
           if (userResponse.error) throw userResponse.error;

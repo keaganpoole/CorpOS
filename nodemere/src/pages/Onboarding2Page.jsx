@@ -2253,6 +2253,16 @@ const Onboarding2Page = () => {
     });
   }, []);
 
+  useEffect(() => {
+    if (!session?.access_token) return;
+    axios.post(`${API_BASE_URL}/users/me/onboarding/prepare`, null, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    }).catch((error) => {
+      console.error('Failed to prepare onboarding:', error);
+      setSubmitError('Could not prepare your setup. Please refresh and try again.');
+    });
+  }, [session?.access_token]);
+
   const progress = ((step + 1) / steps.length) * 100;
   const current = steps[step];
   const stepLabel = current.id.charAt(0).toUpperCase() + current.id.slice(1);
@@ -2388,7 +2398,7 @@ const Onboarding2Page = () => {
   };
 
   const canContinue = useMemo(() => {
-    if (step === 0) return form.businessName.trim() && form.industry.trim();
+    if (step === 0) return form.businessName.trim();
     if (step === 1) return isEmailComplete(form.email) && (form.email.trim() || form.phone.trim() || form.street.trim() || form.city.trim() || form.state.trim() || form.zip.trim());
     if (step === 3) return String(form.about || '').length < LONG_TEXT_LIMIT;
     if (step === 4) return String(form.policies || '').length < LONG_TEXT_LIMIT;
@@ -2429,7 +2439,7 @@ const Onboarding2Page = () => {
     })
     .join('\n\n');
 
-  const buildOnboardingPayload = () => ({
+  const buildOnboardingPayload = (markOnboarded = false) => ({
     business_name: form.businessName.trim(),
     industry: form.industry,
     sub_industry: null,
@@ -2447,7 +2457,30 @@ const Onboarding2Page = () => {
     appointment_settings: {},
     terms_of_service: termsOfServiceForOnboarding,
     services: normalizedServices,
+    mark_onboarded: markOnboarded,
   });
+
+  const saveCurrentStep = async (markOnboarded = false) => {
+    if (!session?.access_token) {
+      setSubmitError('Your session expired. Please sign in again to finish setup.');
+      return false;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await axios.post(`${API_BASE_URL}/users/me/onboarding`, buildOnboardingPayload(markOnboarded), {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      localStorage.setItem('sonar-onboarding2-draft', JSON.stringify(form));
+      return true;
+    } catch (error) {
+      console.error('Failed to save onboarding:', error);
+      setSubmitError(error.response?.data?.detail || 'Could not save onboarding. Please try again.');
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleNext = async () => {
     if (!canContinue) return;
@@ -2456,51 +2489,41 @@ const Onboarding2Page = () => {
       setLateHoursTermsOpen(true);
       return;
     }
+
+    const saved = await saveCurrentStep(step === 0);
+    if (!saved) return;
     if (step < steps.length - 1) {
       setStep((prev) => prev + 1);
       return;
     }
 
-    if (!session?.access_token) {
-      setSubmitError('Your session expired. Please sign in again to finish setup.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await axios.post(`${API_BASE_URL}/users/me/onboarding`, buildOnboardingPayload(), {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      localStorage.setItem('sonar-onboarding2-draft', JSON.stringify(form));
-      await refreshProfile?.();
-      setComplete(true);
-    } catch (error) {
-      console.error('Failed to save onboarding:', error);
-      setSubmitError(error.response?.data?.detail || 'Could not save onboarding. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    await refreshProfile?.();
+    setComplete(true);
   };
 
   const handleBack = () => {
     if (step > 0) setStep((prev) => prev - 1);
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     setSubmitError('');
     if (step === 2 && !outboundLateHoursAccepted && scheduleHasOutboundLateHours(form.hours)) {
       setLateHoursTermsOpen(true);
       return;
     }
+
+    const saved = await saveCurrentStep(false);
+    if (!saved) return;
     if (step < steps.length - 1) {
       setStep((prev) => prev + 1);
     } else {
-      handleNext();
+      await refreshProfile?.();
+      setComplete(true);
     }
   };
 
   const handleLaunch = () => {
-    navigate('/dashboard');
+    navigate('/dashboard/receptionists');
   };
 
   const acceptOutboundLateHoursTerms = async () => {

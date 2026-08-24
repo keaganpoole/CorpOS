@@ -2736,7 +2736,7 @@ class PaymentCreateRequest(BaseModel):
     customer_phone: Optional[str] = None
 
 class OnboardingRequest(BaseModel):
-    business_name: str
+    business_name: Optional[str] = None
     industry: Optional[str] = None
     sub_industry: Optional[str] = None
     business_email: Optional[EmailStr] = None
@@ -2752,10 +2752,10 @@ class OnboardingRequest(BaseModel):
     policies: Optional[str] = None
     faq: Optional[str] = None
     terms_of_service: Optional[dict] = None
-    legal_acceptance: Optional[dict] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
     services: Optional[list[dict]] = None
+    mark_onboarded: bool = False
 
 class BusinessForwardingUpdateRequest(BaseModel):
     agent_id: Optional[str] = None
@@ -10811,7 +10811,7 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
                     "accepted_at": datetime.now(timezone.utc).isoformat(),
                     "source": "signup",
                     "ip_address": get_client_ip(request),
-                    "certified_permitted_use": False,
+                    "certified_permitted_use": auth_data.certified_permitted_use,
                 }
             },
         }
@@ -10820,6 +10820,8 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
         if not db_response.data:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create user profile")
         return db_response.data[0]
+    except HTTPException:
+        raise
     except AuthApiError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
     except Exception as e:
@@ -11652,6 +11654,36 @@ async def update_login_status(status_update: LoginStatusUpdate, current_user: di
     except Exception as e:
         logging.error(f"ERROR: Could not update login status for user {current_user_id}: {e}")
 
+@app.post("/users/me/onboarding/prepare", status_code=status.HTTP_200_OK, tags=["Users"])
+async def prepare_onboarding(current_user: dict = Depends(get_current_user)):
+    """Ensure the public profile exists before the onboarding form is shown."""
+    current_user_id = str(current_user.id)
+    try:
+        existing = (
+            supabase_admin.table('users')
+            .select('id')
+            .eq('id', current_user_id)
+            .limit(1)
+            .execute()
+        )
+        if not existing.data:
+            user_metadata = getattr(current_user, "user_metadata", {}) or {}
+            profile_data = {
+                "id": current_user_id,
+                "email": current_user.email,
+                "full_name": user_metadata.get("full_name") or user_metadata.get("name"),
+                "phone": user_metadata.get("phone"),
+                "onboarded": False,
+            }
+            supabase_admin.table('users').insert(profile_data).execute()
+        return {"ready": True, "user_id": current_user_id}
+    except Exception as e:
+        logging.error(f"Failed to prepare onboarding for user {current_user_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to prepare onboarding data.",
+        )
+
 @app.post("/users/me/onboarding", status_code=status.HTTP_200_OK, tags=["Users"])
 async def complete_onboarding(
     onboarding_data: OnboardingRequest,
@@ -11661,21 +11693,16 @@ async def complete_onboarding(
     current_user_id = str(current_user.id)
 
     try:
-        if is_restricted_launch_industry(onboarding_data.industry):
+        if onboarding_data.mark_onboarded and not (onboarding_data.business_name or '').strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Business name is required to start onboarding.",
+            )
+
+        if onboarding_data.industry and is_restricted_launch_industry(onboarding_data.industry):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="This industry is not available for Nodemere's general-business launch. Contact support before using regulated or restricted activities.",
-            )
-
-        acceptance = onboarding_data.legal_acceptance or {}
-        if (
-            acceptance.get("version") != NODEMERE_LEGAL_ACCEPTANCE_VERSION
-            or acceptance.get("accepted_terms") is not True
-            or acceptance.get("certified_permitted_use") is not True
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="An authorized representative must accept the current legal terms and certify permitted use before setup can be completed.",
             )
 
         normalized_business_hours = normalize_onboarding_schedule(onboarding_data.business_hours or {})
@@ -11693,23 +11720,16 @@ async def complete_onboarding(
         if not isinstance(supplied_terms, dict):
             supplied_terms = {}
         merged_terms = {**existing_terms, **supplied_terms}
-        merged_terms[NODEMERE_LEGAL_ACCEPTANCE_KEY] = {
-            "accepted": True,
-            "version": NODEMERE_LEGAL_ACCEPTANCE_VERSION,
-            "accepted_at": datetime.now(timezone.utc).isoformat(),
-            "source": "onboarding",
-            "ip_address": get_client_ip(request),
-            "certified_permitted_use": True,
-        }
         user_update = {
-            "onboarded": True,
             "phone": onboarding_data.business_phone,
             "terms_of_service": merged_terms,
         }
+        if onboarding_data.mark_onboarded:
+            user_update["onboarded"] = True
         supabase.table('users').update(user_update).eq('id', current_user_id).execute()
 
         business_payload = {
-            "name": onboarding_data.business_name,
+            "name": onboarding_data.business_name or "",
             "phone": onboarding_data.business_phone,
             "email": onboarding_data.business_email,
             "address": onboarding_data.business_street,
@@ -11782,9 +11802,11 @@ async def complete_onboarding(
                 supabase.table("services").insert(service_rows).execute()
 
         return {
-            "onboarded": True,
+            "onboarded": onboarding_data.mark_onboarded,
             "business": business,
         }
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
