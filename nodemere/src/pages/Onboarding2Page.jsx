@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import SplashScreenAlternate from '../components/SplashScreenAlternate';
+import ModalSpectrumLine from '../components/ModalSpectrumLine';
 import {
   additionalBusinessBriefContexts,
   additionalIndustries,
@@ -1869,7 +1870,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
   );
 };
 
-const InfoModal = ({ eyebrow = 'Tips', title, intro, points = [], footer, onClose, zIndexClass = 'z-[220]', dense = false }) => (
+const InfoModal = ({ eyebrow = 'Tips', title, intro, points = [], footer, onClose, zIndexClass = 'z-[220]', dense = false, maxWidthClass = 'max-w-[620px]' }) => (
   <motion.div
     className={`fixed inset-0 ${zIndexClass} flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm`}
     initial={{ opacity: 0 }}
@@ -1882,48 +1883,53 @@ const InfoModal = ({ eyebrow = 'Tips', title, intro, points = [], footer, onClos
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 16, scale: 0.98 }}
       transition={{ duration: 0.18 }}
-      className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] p-7 shadow-[0_28px_90px_rgba(0,0,0,0.62)] sm:p-8"
+      className={`relative w-full ${maxWidthClass} overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]`}
       onMouseDown={(event) => event.stopPropagation()}
     >
-      <div className="context-help-spectrum-line pointer-events-none absolute -left-8 -right-8 top-0 h-px" />
+      <ModalSpectrumLine variant="tips" />
       <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
-      <div className="flex items-start justify-between gap-4">
-        <div className="relative">
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">{eyebrow}</p>
-          <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">{title}</h2>
-          {intro ? (
-            <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">{intro}</p>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white"
-          aria-label={`Close ${title}`}
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {points.length ? (
-        <div className={`relative mt-7 text-sm text-zinc-400 ${dense ? 'space-y-1 leading-5' : 'space-y-4 leading-6'}`}>
-          {points.map((point, index) => (
-            <div key={point.title} className={`flex ${dense ? 'gap-2' : 'gap-3'}`}>
-              <span
-                className={`${dense ? 'mt-2 h-1 w-1' : 'mt-2 h-1.5 w-1.5'} shrink-0 rounded-full`}
-                style={{ backgroundColor: `rgba(255,255,255,${Math.max(0.35, 1 - (index * 0.14))})` }}
-              />
-              <p><span className="font-semibold text-white">{point.title}</span> {point.body}</p>
+      <div className="p-7 sm:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div className="relative">
+            <div className="mb-3 flex items-center gap-1.5">
+              {String(eyebrow).trim().toLowerCase() === 'tips' ? <Lightbulb className="h-4 w-4 shrink-0 -translate-y-[5px] text-zinc-600" aria-hidden="true" /> : null}
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">{eyebrow}</p>
             </div>
-          ))}
+            <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">{title}</h2>
+            {intro ? (
+              <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">{intro}</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white"
+            aria-label={`Close ${title}`}
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-      ) : null}
 
-      {footer ? (
-        <div className="relative mt-7 border-t border-white/[0.06] pt-5">
-          <p className="max-w-[520px] text-[13px] leading-6 text-zinc-500">{footer}</p>
-        </div>
-      ) : null}
+        {points.length ? (
+          <div className={`relative mt-7 text-sm text-zinc-400 ${dense ? 'space-y-1 leading-5' : 'space-y-4 leading-6'}`}>
+            {points.map((point, index) => (
+              <div key={point.title} className={`flex ${dense ? 'gap-2' : 'gap-3'}`}>
+                <span
+                  className={`${dense ? 'mt-2 h-1 w-1' : 'mt-2 h-1.5 w-1.5'} shrink-0 rounded-full`}
+                  style={{ backgroundColor: `rgba(255,255,255,${Math.max(0.35, 1 - (index * 0.14))})` }}
+                />
+                <p><span className="font-semibold text-white">{point.title}</span> {point.body}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {footer ? (
+          <div className="relative mt-7 border-t border-white/[0.06] pt-5">
+            <p className="max-w-[520px] text-[13px] leading-6 text-zinc-500">{footer}</p>
+          </div>
+        ) : null}
+      </div>
     </motion.div>
   </motion.div>
 );
@@ -2639,15 +2645,6 @@ const Onboarding2Page = () => {
           }
         }
 
-        @keyframes context-help-spectrum-run {
-          from {
-            background-position: 0% center;
-          }
-          to {
-            background-position: 100% center;
-          }
-        }
-
         .outbound-notice-gradient {
           background-image: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd), var(--brandGradientStart));
           background-size: 200% 100%;
@@ -2665,13 +2662,6 @@ const Onboarding2Page = () => {
 
         .business-brief-placeholder-edited {
           color: #fff;
-        }
-
-        .context-help-spectrum-line {
-          background-image: linear-gradient(90deg, var(--brandGradientEnd), var(--brandGradientStart), var(--brandGradientEnd));
-          background-size: 200% 100%;
-          background-position: 0% center;
-          animation: context-help-spectrum-run 1.2s ease-out 1 forwards;
         }
 
       `}</style>
@@ -3153,57 +3143,21 @@ const Onboarding2Page = () => {
 
       <AnimatePresence>
         {scheduleHelpOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[220] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onMouseDown={() => setScheduleHelpOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
-              className="w-full max-w-[620px] rounded-[30px] border border-white/[0.08] bg-[#070707] p-7 shadow-[0_28px_90px_rgba(0,0,0,0.62)] sm:p-8"
-              onMouseDown={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">Scheduling help</h2>
-                  <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">
-                    Adjust each schedule to match how your business operates and when you want your receptionist available. You can fine-tune these hours now and change them anytime as your needs change.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setScheduleHelpOpen(false)}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white"
-                  aria-label="Close schedule help"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="mt-5 text-sm leading-6 text-zinc-400">
-                <div className="space-y-3">
-                  {activeScheduleLayerTypes.map((layer) => {
-                    const detail = layer.id === 'business'
-                      ? 'should match when the business is generally open.'
-                      : layer.id === 'inbound'
-                        ? 'controls when the receptionist should answer incoming calls.'
-                        : 'controls when the receptionist can place follow-up or return calls.';
-                    return (
-                      <p key={layer.id} className="flex gap-3">
-                        <span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} />
-                        <span><span className="font-semibold text-white">{layer.label}</span> {detail}</span>
-                      </p>
-                    );
-                  })}
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+          <InfoModal
+            maxWidthClass="max-w-[530px]"
+            title="Scheduling help"
+            intro="Adjust each schedule to match how your business operates and when you want your receptionist available. You can fine-tune these hours now and change them anytime as your needs change."
+            points={activeScheduleLayerTypes.map((layer) => ({
+              title: `${layer.label}.`,
+              body: layer.id === 'business'
+                ? 'Set when the business is generally open.'
+                : layer.id === 'inbound'
+                  ? 'Set when the receptionist should answer incoming calls.'
+                  : 'Set when the receptionist can place follow-up or return calls.',
+            }))}
+            footer="Drag an entire bar to move a schedule, or drag either end to adjust its start and end time."
+            onClose={() => setScheduleHelpOpen(false)}
+          />
         ) : null}
       </AnimatePresence>
 

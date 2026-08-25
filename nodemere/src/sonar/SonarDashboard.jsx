@@ -72,6 +72,7 @@ import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
 import CubePreloader from './components/CubePreloader';
 import PlanLimitModal from '../components/modals/PlanLimitModal';
 import PlanChangePopupModal from '../components/modals/PlanChangePopupModal';
+import ModalSpectrumLine, { resolveModalSpectrumVariant } from '../components/ModalSpectrumLine';
 import { AudioPlayerProvider, PersistentAudioPlayer } from './contexts/AudioPlayerContext';
 import { CallLogsProvider, useCallLogs } from './contexts/CallLogsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -1128,16 +1129,16 @@ const PlaceholderView = ({ title, body }) => (
   </div>
 );
 
-// ─── Main SonarDashboard Component ────────────────────────────────────────
-const popupSpectrumStyles = '@keyframes popup-spectrum-run { from { background-position: 0% center; } to { background-position: 100% center; } }';
-
 const PopupModal = ({ popup, profile, onClose }) => {
   if (typeof document === 'undefined') return null;
   const isScenariosIntro = popup?.id === 'scenarios_intro';
+  const popupState = getPopupState(profile?.popups, popup?.id);
+  const spectrumVariant = resolveModalSpectrumVariant(
+    popup?.spectrumVariant || popupState.type || popup?.type,
+  );
 
   return createPortal(
     <>
-      <style>{popupSpectrumStyles}</style>
       <AnimatePresence>
         {popup && (
           <motion.div
@@ -1152,17 +1153,9 @@ const PopupModal = ({ popup, profile, onClose }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.98 }}
           onClick={(event) => event.stopPropagation()}
-          className={`relative flex max-h-[calc(100vh-48px)] w-full overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl ${isScenariosIntro ? 'max-w-[900px]' : 'max-w-[520px]'}`}
+          className={`relative flex max-h-[calc(100vh-48px)] w-full flex-col overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl ${isScenariosIntro ? 'max-w-[900px]' : 'max-w-[520px]'}`}
             >
-              <div
-                className="pointer-events-none absolute -left-8 -right-8 top-0 z-10 h-px"
-                style={{
-                  backgroundImage: 'linear-gradient(90deg, var(--brandGradientEnd), var(--brandGradientStart), var(--brandGradientEnd))',
-                  backgroundSize: '200% 100%',
-                  backgroundPosition: '0% center',
-                  animation: 'popup-spectrum-run 1.2s ease-out 1 forwards',
-                }}
-              />
+              <ModalSpectrumLine variant={spectrumVariant} />
               <div className="relative flex flex-1 flex-col p-6 sm:p-8">
             <div className={`relative flex items-start gap-5 ${isScenariosIntro ? 'mb-0 justify-center' : 'mb-6 justify-between'}`}>
               <div className={`min-w-0 flex-1 ${isScenariosIntro ? 'px-10 text-center' : 'pl-8 text-center'}`}>
@@ -2646,7 +2639,7 @@ const SonarDashboard = () => {
         {/* Center title */}
         <div className="absolute left-1/2 z-10 hidden -translate-x-1/2 items-center xl:flex">
           <div className="relative flex flex-col items-center">
-            <div className={`relative transition-all duration-700 transform ${glitch ? 'opacity-10 scale-[1.05] blur-sm' : 'opacity-100 scale-100'}`}>
+            <div className="relative">
               <div className="absolute -left-6 top-1/2 h-5 w-[1px] -translate-y-1/2 bg-white/10" />
               <div className="absolute -right-6 top-1/2 h-5 w-[1px] -translate-y-1/2 bg-white/10" />
               <h1 className="text-[22px] font-light tracking-[0.52em] text-white/15 uppercase leading-none cursor-default">

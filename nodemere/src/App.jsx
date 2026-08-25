@@ -16,6 +16,7 @@ import VoiceClonePage from './pages/VoiceClonePage';
 import SplashScreen from './components/SplashScreen';
 import LegalDocumentPage from './components/LegalDocumentPage';
 import CookieNotice from './components/CookieNotice';
+import CustomerExperienceFeedback from './components/CustomerExperienceFeedback';
 
 // Sonar Dashboard
 import SonarDashboard from './sonar/SonarDashboard';
@@ -105,6 +106,7 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <CookieNotice />
+      <CustomerExperienceFeedback />
     </>
   );
 }
