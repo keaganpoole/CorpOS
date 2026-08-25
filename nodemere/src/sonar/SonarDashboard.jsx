@@ -1785,22 +1785,34 @@ const SonarDashboard = () => {
   }, []);
 
   useEffect(() => {
-    setShowPlanChangePopup(Boolean(profile?.plan) && profile?.plan_change_popup !== true);
-  }, [profile?.plan, profile?.plan_change_popup]);
+    const welcomePopupDismissed = profile?.popups?.plan_change_popup?.shown === true;
+    setShowPlanChangePopup(Boolean(profile?.plan) && !welcomePopupDismissed);
+  }, [profile?.plan, profile?.popups]);
 
   const handleClosePlanChangePopup = useCallback(async () => {
     setShowPlanChangePopup(false);
     if (!userId) return;
+
+    const currentPopups = profile?.popups && typeof profile.popups === 'object' ? profile.popups : {};
     const { error } = await supabase
       .from('users')
-      .update({ plan_change_popup: true })
+      .update({
+        popups: {
+          ...currentPopups,
+          plan_change_popup: {
+            ...(currentPopups.plan_change_popup || {}),
+            type: 'gasp',
+            shown: true,
+          },
+        },
+      })
       .eq('id', userId);
     if (error) {
       console.error('[Welcome popup] Failed to save dismissal:', error);
       return;
     }
     refreshProfile?.();
-  }, [refreshProfile, userId]);
+  }, [profile?.popups, refreshProfile, userId]);
 
   const dismissPopup = useCallback(async (popup) => {
     if (!popup) return;

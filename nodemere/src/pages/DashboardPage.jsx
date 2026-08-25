@@ -102,7 +102,7 @@ export const DashboardPage = () => {
 
                     if (data) {
                         setUserPlan(data.plan || 'Free'); // Set the user's plan, default to Free
-                        if (data.plan_change_popup === false || data.plan_change_popup === null) {
+                        if (data.popups?.plan_change_popup?.shown !== true) {
                             newModalQueue.push('planChange');
                         }
                     }
@@ -148,10 +148,31 @@ export const DashboardPage = () => {
       return;
     }
 
-    const { error } = await updateTableRecord('users', user.id, { plan_change_popup: true });
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('popups')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching popup state:', profileError);
+      handleCloseModal('planChange');
+      return;
+    }
+
+    const { error } = await updateTableRecord('users', user.id, {
+      popups: {
+        ...(userProfile?.popups && typeof userProfile.popups === 'object' ? userProfile.popups : {}),
+        plan_change_popup: {
+          ...(userProfile?.popups?.plan_change_popup || {}),
+          type: 'gasp',
+          shown: true,
+        },
+      },
+    });
 
     if (error) {
-      console.error('Error updating plan_change_popup:', error);
+      console.error('Error updating welcome popup:', error);
     }
     handleCloseModal('planChange');
   };

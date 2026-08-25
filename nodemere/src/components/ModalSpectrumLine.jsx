@@ -164,7 +164,7 @@ const normalizeVariant = (variant) => {
 export const resolveModalSpectrumVariant = normalizeVariant;
 
 const ANIMATIONS = {
-  tips: 'thermalInertiaRamp 1.1s ease-out forwards',
+    tips: 'lb01-flicker 2s var(--modal-ease-snap) forwards',
   gasp: 'lb10-gasp 2.2s var(--ease-cinematic) forwards',
   error: 'err_2 1.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
   plan: 'eventHorizonOpen 1.15s cubic-bezier(0.85, 0, 0.15, 1) forwards',
@@ -172,7 +172,7 @@ const ANIMATIONS = {
 };
 
 const REVEAL_DURATIONS = {
-  tips: 1100,
+    tips: 2000,
   gasp: 2200,
   error: 1250,
   plan: 1150,

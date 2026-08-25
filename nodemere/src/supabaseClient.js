@@ -31,7 +31,7 @@ export const fetchUserTable = async (tableName) => {
   return { data, error };
 };
 
-// Specific function to fetch user's plan and plan_change_popup status
+// Specific function to fetch user's plan and welcome popup status
 export const fetchUserPlanAndPopupStatus = async () => {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
@@ -41,7 +41,7 @@ export const fetchUserPlanAndPopupStatus = async () => {
 
   const { data, error } = await supabase
     .from('users')
-    .select('plan, plan_change_popup, identity_questions')
+    .select('plan, popups, identity_questions')
     .eq('id', user.id)
     .single();
 
