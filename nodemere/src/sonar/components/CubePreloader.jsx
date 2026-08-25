@@ -12,6 +12,13 @@ const CubePreloader = ({ className = '', size = 22 }) => (
       .cube-preloader .boxes {
           --brandGradientStart: #ff32ac;
           --brandGradientEnd: #8B5CF6;
+          --cube-brand-gradient: linear-gradient(
+            135deg,
+            var(--brandGradientStart) 0%,
+            var(--brandGradientStart) 18%,
+            var(--brandGradientEnd) 82%,
+            var(--brandGradientEnd) 100%
+          );
           --size: var(--cube-preloader-size, 22px);
           --duration: 1000ms;
           --timing: cubic-bezier(0.65, 0, 0.35, 1);
@@ -79,7 +86,9 @@ const CubePreloader = ({ className = '', size = 22 }) => (
           top: 0; right: 0; bottom: 0; left: 0;
           z-index: -1;
           margin: -2px;
-          background: linear-gradient(135deg, var(--brandGradientStart), var(--brandGradientEnd));
+          background: var(--cube-brand-gradient);
+          background-size: 300% 100%;
+          background-position: var(--cube-gradient-position, 50%) 50%;
       }
 
       .cube-preloader .boxes .box > div:nth-child(2) {
@@ -95,12 +104,21 @@ const CubePreloader = ({ className = '', size = 22 }) => (
       }
 
       .cube-preloader .boxes .box > div:nth-child(4) {
-          --background: linear-gradient(135deg, var(--brandGradientStart) 0%, var(--brandGradientEnd) 100%);
+          --background: var(--cube-brand-gradient);
           --top: 0; --left: 0;
           --translateZ: calc(var(--size) * 3 * -1);
           filter: blur(15px);
           opacity: 0.6;
       }
+
+      .cube-preloader .boxes .box:nth-child(1) > div:nth-child(1)::before,
+      .cube-preloader .boxes .box:nth-child(1) > div:nth-child(4) { --cube-gradient-position: 0%; }
+      .cube-preloader .boxes .box:nth-child(2) > div:nth-child(1)::before,
+      .cube-preloader .boxes .box:nth-child(2) > div:nth-child(4) { --cube-gradient-position: 33.333%; }
+      .cube-preloader .boxes .box:nth-child(3) > div:nth-child(1)::before,
+      .cube-preloader .boxes .box:nth-child(3) > div:nth-child(4) { --cube-gradient-position: 66.666%; }
+      .cube-preloader .boxes .box:nth-child(4) > div:nth-child(1)::before,
+      .cube-preloader .boxes .box:nth-child(4) > div:nth-child(4) { --cube-gradient-position: 100%; }
 
       @keyframes cubePreloaderBox1 { 0%, 50% { transform: translate(100%, 0); } 100% { transform: translate(200%, 0); } }
       @keyframes cubePreloaderBox2 { 0% { transform: translate(0, 100%); } 50% { transform: translate(0, 0); } 100% { transform: translate(100%, 0); } }

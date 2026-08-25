@@ -6,7 +6,7 @@ import {
   BookOpen, FileText, Shield, HelpCircle, Sparkles,
   Eye, EyeOff, Lightbulb, Zap, Star, Info,
   Copy, Download, Layers, Plus, Trash2, Tag, DollarSign,
-  ArrowRight, X, MessageSquareText, Users,
+  ArrowRight, X, MessageSquareText, Users, Maximize2, Wand2,
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil,
   Loader2, CreditCard, ExternalLink,
 } from 'lucide-react';
@@ -15,6 +15,20 @@ import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../lib/api';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 import CubePreloader from '../components/CubePreloader';
+import {
+  allBusinessBriefSections,
+  allIndustryExampleValues,
+  buildBusinessBriefSection,
+  buildFullBusinessBrief,
+  formatBusinessBriefTemplate,
+  generatedBusinessBriefPlaceholders,
+  getBusinessBriefSections,
+  getBusinessBriefTemplateVariants,
+  getFaqExamples,
+  getIndustryExample,
+  LONG_TEXT_LIMIT_VALUE,
+  normalizeBusinessBriefPlaceholder,
+} from '../../data/onboardingKnowledgeTemplates';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SCHEDULE_LAYER_TYPES = [
@@ -189,6 +203,8 @@ const KNOWLEDGE_TABS = [
 
 const defaultSettings = {
   business_name: '',
+  industry: '',
+  industry_details: {},
   business_phone: '',
   business_email: '',
   business_avatar: '',
@@ -291,6 +307,29 @@ const createServiceFormState = (service) => ({
   category: service?.category ?? '',
   is_active: service?.is_active !== false,
 });
+
+const ONBOARDING_SERVICE_UNITS = [
+  { value: 'session', label: 'Session' },
+  { value: 'hourly', label: 'Hourly' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+];
+
+const serviceDescriptionMagicTemplate = (serviceName, industry) => {
+  const example = getIndustryExample(industry || 'Other General Business');
+  const name = String(serviceName || '').trim() || example.serviceName;
+  return example.serviceDescription(name);
+};
+
+const formatOnboardingServicePrice = (service) => {
+  const unit = service.unit ? ` / ${service.unit}` : '';
+  if (service.price_type === 'free') return 'Free';
+  if (service.price_type === 'quote') return 'Quote required';
+  if (service.price_type === 'range') return `$${service.price_min || 0} - $${service.price_max || 0}${unit}`;
+  if (service.price_type === 'starting_at') return `From $${service.price_min || 0}${unit}`;
+  return service.price_min ? `$${service.price_min}${unit}` : 'Price not set';
+};
 
 const createDefaultHours = (baseHours = null) => (
   DAYS.reduce((acc, day) => {
@@ -1381,8 +1420,81 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
   );
 };
 
+const SettingsServiceInfoModal = ({ title, intro, points, footer, onClose, dense = false }) => (
+  <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
+    <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="p-7 sm:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Tips</p>
+            <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">{title}</h2>
+            {intro ? <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">{intro}</p> : null}
+          </div>
+          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label={`Close ${title}`}><X size={16} /></button>
+        </div>
+        {points?.length ? <div className={`mt-7 text-sm text-zinc-400 ${dense ? 'space-y-1 leading-5' : 'space-y-4 leading-6'}`}>
+          {points.map((point, index) => <div key={point.title} className="flex gap-3"><span className={`${dense ? 'mt-2 h-1 w-1' : 'mt-2 h-1.5 w-1.5'} shrink-0 rounded-full bg-white`} style={{ opacity: Math.max(0.35, 1 - (index * 0.14)) }} /><p><span className="font-semibold text-white">{point.title}</span> {point.body}</p></div>)}
+        </div> : null}
+        {footer ? <div className="relative mt-7 border-t border-white/[0.06] pt-5"><p className="max-w-[520px] text-[13px] leading-6 text-zinc-500">{footer}</p></div> : null}
+      </div>
+    </motion.div>
+  </motion.div>
+);
+
+const SettingsServiceModal = ({ initialService, industry, onClose, onSave }) => {
+  const [serviceDetailsHelpOpen, setServiceDetailsHelpOpen] = useState(false);
+  const [descriptionHelpOpen, setDescriptionHelpOpen] = useState(false);
+  const [descriptionEditorOpen, setDescriptionEditorOpen] = useState(false);
+  const [draft, setDraft] = useState({
+    ...(initialService || { name: '', description: '', price_min: '', unit: 'session', is_active: true }),
+    price_type: 'fixed',
+    price_max: '',
+    unit: initialService?.unit === 'per session' ? 'session' : initialService?.unit || 'session',
+    is_active: true,
+  });
+  const exampleService = getIndustryExample(industry || 'Other General Business');
+  const magicDescription = serviceDescriptionMagicTemplate(draft.name, industry);
+  const magicDescriptionEnabled = draft.description === magicDescription;
+  const setDraftValue = (key, nextValue) => setDraft((prev) => ({ ...prev, [key]: nextValue }));
+  const toggleMagicDescription = () => setDraft((prev) => ({ ...prev, description: prev.description === serviceDescriptionMagicTemplate(prev.name, industry) ? '' : serviceDescriptionMagicTemplate(prev.name, industry) }));
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-xl">
+      <motion.section initial={{ opacity: 0, y: 18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 18, scale: 0.98 }} className="w-full max-w-[720px] overflow-visible rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5">
+          <div><h2 className="text-xl font-semibold tracking-[-0.04em] text-white">{initialService ? 'Edit service' : 'Create service'}</h2><p className="mt-1 text-sm leading-6 text-zinc-500">Add a service customers can ask about or book.</p></div>
+          <button type="button" onClick={onClose} className="p-0 text-zinc-600 transition hover:text-white" aria-label="Close service modal"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="custom-scrollbar max-h-[calc(100vh-170px)] overflow-y-auto px-6 py-7 sm:px-8">
+          <div className="space-y-6">
+            <div className="border-b border-white/[0.05] pb-6">
+              <div className="mb-1.5 flex items-baseline gap-1.5"><p className="text-[10px] font-bold uppercase leading-none tracking-[0.22em] text-zinc-600">Billing unit</p><button type="button" onClick={() => setServiceDetailsHelpOpen(true)} className="inline-flex h-3.5 w-3.5 shrink-0 translate-y-[1px] items-center justify-center text-zinc-600 transition hover:text-zinc-300" aria-label="Service details help"><Lightbulb className="h-3 w-3" /></button></div>
+              <div className="space-y-5">
+                <div className="custom-scrollbar flex min-w-0 items-center overflow-x-auto pb-1" aria-label="Billing unit">
+                  {ONBOARDING_SERVICE_UNITS.map((option, index) => { const active = draft.unit === option.value; return <div key={option.value} className="flex shrink-0 items-center">{index > 0 ? <span className="h-3 w-px bg-white/[0.10]" /> : null}<button type="button" aria-pressed={active} onClick={() => setDraftValue('unit', option.value)} className={`${index === 0 ? 'pr-3' : 'px-3'} bg-transparent text-[10px] font-semibold leading-[1.7] whitespace-nowrap transition ${active ? 'text-white' : 'text-zinc-500 hover:text-zinc-200'}`}>{option.label}</button></div>; })}
+                </div>
+                <Field label="Service name"><input type="text" value={draft.name} onChange={(event) => setDraftValue('name', event.target.value)} placeholder={`e.g., ${exampleService.serviceName}`} autoFocus className={settingsFieldClass} /></Field>
+                <Field label={<span className="flex items-center gap-2"><span>Description</span><button type="button" onClick={() => setDescriptionHelpOpen(true)} className="flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300" aria-label="Service description help"><Lightbulb className="h-3.5 w-3.5" /></button><button type="button" onClick={toggleMagicDescription} className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition ${magicDescriptionEnabled ? 'bg-white/[0.05] text-white shadow-[0_0_6px_rgba(255,255,255,0.10)]' : 'text-zinc-600 hover:text-zinc-300'}`} aria-pressed={magicDescriptionEnabled} aria-label="Use suggested service description"><Wand2 className="h-3.5 w-3.5" /></button></span>}>
+                  <div className="relative"><button type="button" onClick={() => setDescriptionEditorOpen(true)} className="absolute right-7 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.06] bg-[#0b0b0b]/90 text-zinc-600 transition hover:border-white/[0.12] hover:text-zinc-300" aria-label="Enlarge service description"><Maximize2 className="h-3.5 w-3.5" /></button><textarea value={draft.description} onChange={(event) => setDraftValue('description', event.target.value)} placeholder="Describe what this service includes and what customers should expect." rows={5} className={`${settingsFieldClass} h-[168px] resize-none py-4 pr-16 leading-6`} /></div>
+                </Field>
+                <Field label="Price"><input type="text" inputMode="decimal" value={draft.price_min ?? ''} onChange={(event) => setDraftValue('price_min', String(event.target.value).replace(/[^\d.]/g, '').replace(/(\.\d{2}).*$/, '$1'))} placeholder="e.g., 49.99" className={settingsFieldClass} /></Field>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-white/[0.05] px-6 py-5"><button type="button" onClick={onClose} className="h-11 rounded-full px-8 text-sm font-normal text-zinc-500 transition hover:text-white">Cancel</button><button type="button" onClick={() => onSave(draft)} disabled={!draft.name.trim()} className="flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-full bg-white px-8 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"><Check className="h-4 w-4" /><span>Save service</span></button></div>
+      </motion.section>
+      <AnimatePresence>
+        {descriptionEditorOpen ? <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => setDescriptionEditorOpen(false)}><motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="w-full max-w-[760px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}><div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Service description</p><h2 className="text-xl font-semibold tracking-[-0.04em] text-white">Edit full description</h2></div><button type="button" onClick={() => setDescriptionEditorOpen(false)} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close description editor"><X className="h-4 w-4" /></button></div><div className="p-6"><textarea value={draft.description} onChange={(event) => setDraftValue('description', event.target.value)} placeholder="Describe what this service includes and what customers should expect." autoFocus className={`${settingsFieldClass} h-[420px] resize-none py-4 leading-6`} /></div><div className="flex items-center justify-end border-t border-white/[0.05] px-6 py-5"><button type="button" onClick={() => setDescriptionEditorOpen(false)} className="h-11 rounded-full bg-white px-8 text-sm font-bold text-black transition hover:bg-zinc-200">Done</button></div></motion.div></motion.div> : null}
+        {serviceDetailsHelpOpen ? <SettingsServiceInfoModal dense title="Billing units" intro="Use this to tell your receptionist how the service is normally priced or discussed when customers ask about cost." points={[{ title: 'Session.', body: 'Each appointment or visit has its own price.' }, { title: 'Hourly.', body: 'Price is based on the amount of time worked.' }, { title: 'Weekly.', body: 'Price is charged per week.' }, { title: 'Monthly.', body: 'Price is charged per month.' }, { title: 'Yearly.', body: 'Price is charged per year.' }]} onClose={() => setServiceDetailsHelpOpen(false)} /> : null}
+        {descriptionHelpOpen ? <SettingsServiceInfoModal title="Write a useful service description" intro="A good description helps your receptionist understand when this service fits, how to answer questions about it, and what next step to recommend." points={[{ title: 'Focus on fit.', body: 'Explain what the service is for, when someone needs it, and what outcome they can expect.' }, { title: 'Stay concise.', body: 'One clear paragraph is usually enough. Pricing and billing details live in their own fields.' }, { title: 'Example:', body: exampleService.serviceDescription(exampleService.serviceName).split('\n\n')[0].replace('Service overview:\n', '') }]} footer="Keep it practical: what it is, when it applies, and anything else your receptionist should know about it." onClose={() => setDescriptionHelpOpen(false)} /> : null}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
 // ─── Services Manager ──────────────────────────────────────────────────────
-const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked }) => {
+const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, industry }) => {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -1484,7 +1596,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked })
       const { error } = await query;
       if (error) throw error;
       setServices(prev => prev.filter(s => s.id !== id));
-      setEditingId(null);
+       setAddForm(null);
     } catch (err) {
       console.error('[ServicesManager] Failed to delete:', err);
     }
@@ -1518,112 +1630,53 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked })
   return (
     <div className="border border-white/[0.04] rounded-2xl bg-gradient-to-b from-zinc-950/40 to-transparent overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.03]">
-        <div className="flex items-center gap-2.5">
-          <DollarSign size={14} className="settings-icon" />
-          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
-            {services.length} service{services.length !== 1 ? 's' : ''} configured
-          </span>
-          <span className="text-[10px] text-zinc-700">·</span>
-          <span className="text-[10px] text-zinc-600">
-            {services.filter(s => s.is_active).length} active
-          </span>
-        </div>
-        <button onClick={() => setAddForm({ name: '', description: '', price_type: 'fixed', price_min: '', price_max: '', unit: '', category: '', is_active: true })}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-black text-[10px] font-black uppercase tracking-wider hover:scale-105 transition-all shadow-[0_0_15px_rgba(255,255,255,0.08)]">
-          <Plus size={10} /> Add Service
+      <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/[0.03]">
+        <p className="text-[12px] font-medium text-zinc-600">
+          {services.length} service{services.length === 1 ? '' : 's'} configured
+        </p>
+        <button type="button" onClick={() => setAddForm({ name: '', description: '', price_type: 'fixed', price_min: '', price_max: '', unit: 'session', category: 'General', is_active: true })}
+          className="flex h-10 items-center justify-center rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200">
+          <span>Create service</span>
         </button>
       </div>
 
-      {/* Add form */}
-      {addForm && (
-        <div className="px-5 pt-4">
-          <ServiceForm
-            initial={addForm}
-            onSave={addService}
-            onCancel={() => setAddForm(null)}
-          />
-        </div>
-      )}
-
-      {/* Service list grouped by category */}
+      {/* Service list */}
       <div className="p-5 space-y-6">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <span className="text-[10px] text-zinc-700 uppercase tracking-[0.3em] animate-pulse">Loading services</span>
           </div>
-        ) : services.length === 0 && !addForm ? (
-          <div className="flex flex-col items-center justify-center py-12 opacity-40">
-            <Tag size={32} className="text-zinc-800 mb-3" />
-            <p className="text-[11px] text-zinc-800 font-black uppercase tracking-[0.4em]">No services yet</p>
-            <p className="text-[10px] text-zinc-900 mt-1 mb-4">Click Add Service to get started</p>
+        ) : services.length === 0 ? (
+          <div className="flex min-h-[160px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/[0.08] bg-black/20 p-7 text-center">
+            <h3 className="text-lg font-semibold tracking-[-0.03em] text-white">Add your first service</h3>
+            <p className="mt-2 max-w-md text-sm leading-6 text-zinc-600">Add the services your business offers and the details your receptionist should know. You can always add or update services later.</p>
           </div>
         ) : (
-          Object.entries(categories).map(([cat, catServices]) => (
-            <div key={cat}>
-              <div className="flex items-center gap-2 mb-3">
-                <Tag size={10} className="settings-icon" />
-                <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.3em]">{cat}</span>
-                <div className="flex-1 h-px bg-white/[0.03]" />
-              </div>
-              <div className="space-y-2">
-                {catServices.map(svc => (
-                  <div key={svc.id}>
-                    {editingId === svc.id ? (
-                      <ServiceForm
-                        initial={svc}
-                        onSave={(form) => { updateService(svc.id, form); setEditingId(null); }}
-                        onCancel={() => setEditingId(null)}
-                      />
-                    ) : (
-                      <div className={`group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer
-                        ${svc.is_active
-                          ? 'border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/[0.08]'
-                          : 'border-white/[0.02] bg-white/[0.005] opacity-50 hover:opacity-70'
-                        }`}
-                        onClick={() => setEditingId(svc.id)}
-                      >
-                        {/* Active toggle */}
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Toggle
-                            value={svc.is_active}
-                            onChange={() => toggleActive(svc.id)}
-                            color="amber"
-                          />
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[13px] font-bold truncate ${svc.is_active ? 'text-zinc-200' : 'text-zinc-500'}`}>
-                              {svc.name}
-                            </span>
-                          </div>
-                          {svc.description && (
-                            <p className="text-[10px] text-zinc-700 truncate mt-0.5">{svc.description}</p>
-                          )}
-                        </div>
-
-                        {/* Price */}
-                        <span className="shrink-0 text-[12px] font-black text-zinc-300 tabular-nums">
-                          {formatPrice(svc)}
-                        </span>
-
-                        {/* Delete */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteService(svc.id); }}
-                          className="shrink-0 p-1.5 rounded-lg text-zinc-800 hover:text-rose-400 hover:bg-rose-500/5 transition-all opacity-0 group-hover:opacity-100">
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+          <div className="overflow-hidden rounded-[22px] border border-white/[0.05] bg-black/10">
+            <div className="grid grid-cols-[minmax(0,1fr)_130px_72px] items-center gap-5 border-b border-white/[0.04] px-5 py-3 text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-700 max-sm:hidden">
+              <div>Service</div>
+              <div>Price</div>
+              <div className="text-right">Actions</div>
             </div>
-          ))
+            <div className="custom-scrollbar max-h-[360px] divide-y divide-white/[0.035] overflow-y-auto">
+              {services.map((service) => (
+                <div key={service.id} className="grid cursor-pointer grid-cols-[minmax(0,1fr)_130px_72px] items-center gap-5 px-5 py-2.5 transition hover:bg-white/[0.018] max-sm:grid-cols-[minmax(0,1fr)_64px] max-sm:gap-3" onClick={() => setAddForm(service)}>
+                  <div className="flex min-w-0 items-center gap-3 leading-none">
+                    <span className="flex shrink-0 items-center truncate text-sm font-medium leading-none text-zinc-100">{service.name || 'Untitled service'}</span>
+                    {service.description ? <span className="flex min-w-0 items-center truncate text-[11px] leading-none text-zinc-700">{service.description}</span> : null}
+                  </div>
+                  <div className="truncate text-xs text-zinc-500 max-sm:hidden">{formatOnboardingServicePrice(service)}</div>
+                  <div className="flex items-center justify-end gap-1">
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setAddForm(service); }} className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-700 transition hover:text-zinc-300" aria-label="Edit service"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); deleteService(service.id); }} className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-800 transition hover:text-rose-400" aria-label="Remove service"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
+      <AnimatePresence>{addForm ? <SettingsServiceModal initialService={addForm.name !== '' || addForm.id ? addForm : null} industry={industry} onClose={() => setAddForm(null)} onSave={(draft) => { if (addForm.id) { updateService(addForm.id, draft); setAddForm(null); } else { addService(draft); } }} /> : null}</AnimatePresence>
     </div>
   );
 };
@@ -2209,171 +2262,353 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   );
 };
 
-// ─── Knowledge Base Editor ─────────────────────────────────────────────────
-const KnowledgeBaseEditor = ({ value, onChange }) => {
+const SETTINGS_LONG_TEXT_LIMIT = LONG_TEXT_LIMIT_VALUE;
+const settingsFieldClass = 'h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white !outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:!outline-none focus:ring-0 focus-visible:!outline-none focus-visible:ring-0 [color-scheme:dark]';
+
+const limitKnowledgeText = (value) => String(value || '').slice(0, SETTINGS_LONG_TEXT_LIMIT);
+const escapeKnowledgeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const allSettingsBriefSections = () => allBusinessBriefSections();
+
+const hasBusinessBriefSection = (value, section) => (
+  new RegExp(`(?:^|\\n\\n)${escapeKnowledgeRegExp(section.label)}:\\n\\n`, 'm').test(value || '')
+);
+
+const getBusinessBriefSectionText = (value, section, sections) => {
+  const labels = sections.map((item) => item.label);
+  const pattern = new RegExp(
+    `(?:^|\\n\\n)${escapeKnowledgeRegExp(section.label)}:\\n\\n([\\s\\S]*?)(?=\\n\\n(?:${labels.map((label) => escapeKnowledgeRegExp(`${label}:`)).join('|')})\\n\\n|$)`,
+    'm',
+  );
+  return String(value || '').match(pattern)?.[1]?.trim() || '';
+};
+
+const replaceBusinessBriefSection = (value, section, sections) => {
+  if (!hasBusinessBriefSection(value, section)) {
+    return [String(value || '').trim(), buildBusinessBriefSection(section)].filter(Boolean).join('\n\n');
+  }
+  const labels = sections.map((item) => item.label);
+  const pattern = new RegExp(
+    `((?:^|\\n\\n)${escapeKnowledgeRegExp(section.label)}:\\n\\n)[\\s\\S]*?(?=\\n\\n(?:${labels.map((label) => escapeKnowledgeRegExp(`${label}:`)).join('|')})\\n\\n|$)`,
+    'm',
+  );
+  return String(value || '').replace(pattern, `$1${formatBusinessBriefTemplate(section)}`).replace(/\n{3,}/g, '\n\n').trim();
+};
+
+const removeBusinessBriefSection = (value, section, sections) => {
+  const labels = sections.map((item) => item.label);
+  const pattern = new RegExp(
+    `(?:^|\\n\\n)${escapeKnowledgeRegExp(section.label)}:\\n\\n[\\s\\S]*?(?=\\n\\n(?:${labels.map((label) => escapeKnowledgeRegExp(`${label}:`)).join('|')})\\n\\n|$)`,
+    'm',
+  );
+  return String(value || '').replace(pattern, '').replace(/\n{3,}/g, '\n\n').trim();
+};
+
+const isGeneratedBusinessBriefSection = (value, section) => (
+  allSettingsBriefSections().some((candidate) => (
+    candidate.id === section.id && getBusinessBriefTemplateVariants(candidate).includes(String(value || '').trim())
+  ))
+);
+
+const EditableKnowledgeBrief = ({ value, onChange, editorRef }) => {
+  const lastInputValueRef = useRef(String(value || ''));
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const nextValue = String(value || '');
+    if (!editor) return;
+    if (editor.textContent === nextValue && lastInputValueRef.current === nextValue) return;
+    editor.innerHTML = escapeKnowledgeHtml(nextValue);
+    lastInputValueRef.current = nextValue;
+  }, [editorRef, value]);
+
+  return (
+    <div
+      ref={editorRef}
+      contentEditable
+      role="textbox"
+      aria-multiline="true"
+      suppressContentEditableWarning
+      onBeforeInput={(event) => {
+        if (!event.inputType?.startsWith('insert')) return;
+        const currentValue = event.currentTarget.textContent || '';
+        const selectedTextLength = window.getSelection?.()?.toString().length || 0;
+        if (currentValue.length - selectedTextLength >= SETTINGS_LONG_TEXT_LIMIT) event.preventDefault();
+      }}
+      onPaste={(event) => {
+        event.preventDefault();
+        const editor = event.currentTarget;
+        const currentValue = editor.textContent || '';
+        const pastedText = event.clipboardData.getData('text/plain');
+        const selection = window.getSelection?.();
+        const selectedTextLength = selection?.rangeCount ? String(selection.toString()).length : 0;
+        const available = SETTINGS_LONG_TEXT_LIMIT - (currentValue.length - selectedTextLength);
+        if (available > 0) document.execCommand('insertText', false, pastedText.slice(0, available));
+      }}
+      onInput={(event) => {
+        const editor = event.currentTarget;
+        let nextValue = editor.textContent || '';
+        if (nextValue.length > SETTINGS_LONG_TEXT_LIMIT) {
+          nextValue = nextValue.slice(0, SETTINGS_LONG_TEXT_LIMIT);
+          editor.textContent = nextValue;
+          moveKnowledgeCaretToEnd(editor);
+        }
+        refreshKnowledgePlaceholderStyles(editor);
+        lastInputValueRef.current = nextValue;
+        onChange(nextValue);
+      }}
+      onClick={selectKnowledgePlaceholder}
+      onBlur={(event) => { event.currentTarget.innerHTML = escapeKnowledgeHtml(event.currentTarget.textContent || ''); }}
+      className={`${settingsFieldClass} h-[459px] overflow-y-auto whitespace-pre-wrap resize-none py-4 leading-6`}
+    />
+  );
+};
+
+const escapeKnowledgeHtml = (value) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/\[([^\]]+)\]/g, (match, placeholder) => {
+    const className = generatedBusinessBriefPlaceholders().has(normalizeBusinessBriefPlaceholder(placeholder))
+      ? 'business-brief-placeholder-highlight'
+      : 'business-brief-placeholder-edited';
+    return `<span class="${className}">[${placeholder}]</span>`;
+  });
+
+const refreshKnowledgePlaceholderStyles = (editor) => {
+  const generatedPlaceholders = generatedBusinessBriefPlaceholders();
+  editor.querySelectorAll('.business-brief-placeholder-highlight').forEach((placeholder) => {
+    if (generatedPlaceholders.has(normalizeBusinessBriefPlaceholder(placeholder.textContent))) return;
+    placeholder.classList.remove('business-brief-placeholder-highlight');
+    placeholder.classList.add('business-brief-placeholder-edited');
+  });
+};
+
+const selectKnowledgePlaceholder = (event) => {
+  const placeholder = event.target.closest?.('.business-brief-placeholder-highlight, .business-brief-placeholder-edited');
+  if (!placeholder || !event.currentTarget.contains(placeholder)) return;
+  const selection = window.getSelection?.();
+  if (!selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(placeholder);
+  selection.removeAllRanges();
+  selection.addRange(range);
+};
+
+const moveKnowledgeCaretToEnd = (element) => {
+  const selection = window.getSelection?.();
+  if (!selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+};
+
+const KnowledgeBaseEditor = ({ value, onChange, industry }) => {
   const [activeTab, setActiveTab] = useState('about');
-  const [showPreview, setShowPreview] = useState(false);
-
-  const activeConfig = KNOWLEDGE_TABS.find(t => t.key === activeTab);
-  const ActiveIcon = activeConfig.icon;
+  const [faqExampleIndex, setFaqExampleIndex] = useState(0);
+  const [tipsOpen, setTipsOpen] = useState(false);
+  const businessBriefEditorRef = useRef(null);
+  const businessBriefSections = getBusinessBriefSections(industry || 'Other General Business');
+  const industryExample = getIndustryExample(industry || 'Other General Business');
+  const faqExamples = getFaqExamples(industry || 'Other General Business');
   const content = value[activeTab] || '';
-  const template = KNOWLEDGE_TEMPLATES[activeTab];
-  const TemplateIcon = template.icon;
 
-  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
-  const charCount = content.length;
+  useEffect(() => {
+    setFaqExampleIndex(0);
+    const currentValue = String(value.about || '');
+    if (!currentValue.trim()) return;
+    const refreshed = businessBriefSections.reduce((nextValue, section) => {
+      if (!hasBusinessBriefSection(nextValue, section)) return nextValue;
+      const currentSectionText = getBusinessBriefSectionText(nextValue, section, allSettingsBriefSections());
+      if (!isGeneratedBusinessBriefSection(currentSectionText, section)) return nextValue;
+      return replaceBusinessBriefSection(nextValue, section, allSettingsBriefSections());
+    }, currentValue);
+    const nextValue = {
+      ...value,
+      about: refreshed,
+      policies: allIndustryExampleValues('policies').includes(value.policies) ? '' : value.policies,
+      faq: allIndustryExampleValues('faq').includes(value.faq) ? '' : value.faq,
+    };
+    if (nextValue.about !== value.about || nextValue.policies !== value.policies || nextValue.faq !== value.faq) onChange(nextValue);
+  }, [industry]);
 
-  const updateDoc = (val) => {
-    onChange({ ...value, [activeTab]: val });
+  const updateDoc = (nextValue) => onChange({ ...value, [activeTab]: limitKnowledgeText(nextValue) });
+  const toggleBusinessBriefSection = (section) => {
+    const isActive = hasBusinessBriefSection(value.about, section);
+    const currentSectionText = getBusinessBriefSectionText(value.about, section, allSettingsBriefSections());
+    const isStaleGeneratedSection = isActive
+      && isGeneratedBusinessBriefSection(currentSectionText, section)
+      && currentSectionText !== section.template;
+    const nextAbout = isStaleGeneratedSection
+      ? replaceBusinessBriefSection(value.about, section, businessBriefSections)
+      : isActive
+        ? removeBusinessBriefSection(value.about, section, businessBriefSections)
+        : [String(value.about || '').trim(), buildBusinessBriefSection(section)].filter(Boolean).join('\n\n');
+    onChange({ ...value, about: limitKnowledgeText(nextAbout) });
+    requestAnimationFrame(() => businessBriefEditorRef.current?.scrollTo({ top: businessBriefEditorRef.current.scrollHeight, behavior: 'smooth' }));
   };
 
-  const loadTemplate = () => {
-    if (content.trim()) {
-      if (!window.confirm('This will replace your current content with the template. Continue?')) return;
-    }
-    updateDoc(template.placeholder);
+  const showFullBusinessBrief = () => onChange({ ...value, about: limitKnowledgeText(buildFullBusinessBrief(businessBriefSections)) });
+  const addFaqQuestion = () => {
+    const block = 'Q: \nA: ';
+    const currentFaq = String(value.faq || '').trimEnd();
+    updateDoc(currentFaq ? `${currentFaq}\n\n${block}` : block);
+  };
+  const addFaqExample = () => {
+    if (!faqExamples.length) return;
+    const example = faqExamples[faqExampleIndex % faqExamples.length];
+    updateDoc([String(value.faq || '').trim(), example].filter(Boolean).join('\n\n'));
+    setFaqExampleIndex((index) => (index + 1) % faqExamples.length);
   };
 
-  const clearDoc = () => {
-    if (!window.confirm('Clear all content in this tab?')) return;
-    updateDoc('');
-  };
+  const tabs = [
+    { key: 'about', label: 'Business Brief', icon: FileText, hint: 'What the company is, how it works, and who it serves' },
+    { key: 'policies', label: 'Policies', icon: Shield, hint: 'Business rules, restrictions, requirements, and boundaries' },
+    { key: 'faq', label: 'FAQ', icon: HelpCircle, hint: 'Common customer questions and clear answers' },
+  ];
+  const activeConfig = tabs.find((tab) => tab.key === activeTab) || tabs[0];
+  const ActiveIcon = activeConfig.icon;
 
   return (
     <div className="border border-white/[0.04] rounded-2xl bg-gradient-to-b from-zinc-950/40 to-transparent overflow-hidden">
-      {/* Tabs */}
       <div className="flex items-center gap-1 px-4 py-3 border-b border-white/[0.03] overflow-x-auto">
-        {KNOWLEDGE_TABS.map(tab => {
+        {tabs.map((tab) => {
           const TabIcon = tab.icon;
           const isActive = activeTab === tab.key;
-          const hasContent = (value[tab.key] || '').trim().length > 0;
+          const hasContent = String(value[tab.key] || '').trim().length > 0;
           return (
-            <button
-              key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setShowPreview(false); }}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap
-                ${isActive
-                  ? 'bg-white/[0.06] text-white border border-white/[0.08] shadow-[0_0_8px_color-mix(in_srgb,var(--brandGradientStart)_3%,transparent)]'
-                  : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.02] border border-transparent'
-                }`}
-            >
+            <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${isActive ? 'bg-white/[0.06] text-white border border-white/[0.08]' : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.02] border border-transparent'}`}>
               <TabIcon size={13} />
               {tab.label}
-              {hasContent && !isActive && (
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-              )}
+              {hasContent && !isActive ? <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" /> : null}
             </button>
           );
         })}
       </div>
 
-      {/* Hint bar */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.02] bg-white/[0.01]">
-        <div className="flex items-center gap-2">
-          <Lightbulb size={12} className="settings-icon" />
-          <span className="text-[11px] text-zinc-600">{activeConfig.hint}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] text-zinc-700 tabular-nums">{wordCount} words · {charCount} chars</span>
-          <button
-            onClick={() => setShowPreview(!showPreview)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all
-              ${showPreview
-                ? 'bg-white/[0.06] text-white border border-white/[0.08]'
-                : 'text-zinc-700 hover:text-zinc-400 border border-transparent'
-              }`}
-          >
-            {showPreview ? <><EyeOff size={10} /> Edit</> : <><Eye size={10} /> Preview</>}
+        <div className="flex items-center gap-2 min-w-0">
+          <ActiveIcon size={12} className="settings-icon shrink-0" />
+          <span className="text-[11px] text-zinc-600 truncate">{activeConfig.hint}</span>
+          <button type="button" onClick={() => setTipsOpen(true)} className="flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300" aria-label={`${activeConfig.label} tips`}>
+            <Lightbulb size={13} />
           </button>
         </div>
+        <span className="text-[10px] text-zinc-700 tabular-nums shrink-0 ml-3">{content.trim() ? content.trim().split(/\s+/).length : 0} words · {content.length} chars</span>
       </div>
 
-      {/* Content area */}
       <div className="p-5">
-        {showPreview ? (
-          <div className="min-h-[300px]">
-            {!content.trim() ? (
-              <div className="flex flex-col items-center justify-center h-48 opacity-40">
-                <Eye size={28} className="text-zinc-700 mb-3" />
-                <p className="text-[11px] text-zinc-700 font-bold uppercase tracking-[0.3em]">Nothing to preview</p>
-                <p className="text-[10px] text-zinc-800 mt-1">Write some content or load a template first</p>
-              </div>
-            ) : (
-              <div className="prose prose-invert prose-sm max-w-none">
-                <div className="whitespace-pre-wrap text-[13px] text-zinc-300 leading-relaxed font-sans">
-                  {content.split('\n').map((line, i) => {
-                    if (line.startsWith('Q:') || line.startsWith('A:')) {
-                      const isQuestion = line.startsWith('Q:');
-                      return (
-                        <div key={i} className={isQuestion ? 'mt-4 mb-1' : 'mb-2 pl-4 border-l-2 border-white/[0.08]'}>
-                          <span className={`font-bold ${isQuestion ? 'text-zinc-200' : 'text-zinc-500'}`}>
-                            {line.substring(0, 2)}
-                          </span>
-                          <span className={isQuestion ? 'text-zinc-200 font-semibold' : 'text-zinc-400'}>
-                            {line.substring(2)}
-                          </span>
-                        </div>
-                      );
-                    }
-                    if (line.startsWith('•') || line.startsWith('-')) {
-                      return (
-                        <div key={i} className="pl-4 flex items-start gap-2 my-1">
-                          <span className="text-zinc-500 mt-0.5 shrink-0">▸</span>
-                          <span className="text-zinc-400">{line.substring(1).trim()}</span>
-                        </div>
-                      );
-                    }
-                    if (line.startsWith('SERVICES') || line.startsWith('WHAT') || line.startsWith('CANCELLATION') || line.startsWith('PAYMENT') || line.startsWith('WARRANTY') || line.startsWith('INSURANCE')) {
-                      return <div key={i} className="text-zinc-200 font-black text-[12px] uppercase tracking-wider mt-4 mb-2">{line}</div>;
-                    }
-                    if (line.trim() === '') {
-                      return <div key={i} className="h-2" />;
-                    }
-                    return <div key={i} className="text-zinc-400">{line}</div>;
-                  })}
-                </div>
-              </div>
-            )}
+        {activeTab === 'about' ? (
+          <div className="space-y-3">
+            <div className="custom-scrollbar flex min-w-0 items-center overflow-x-auto pb-1" aria-label="Business brief sections">
+              <button type="button" aria-pressed={businessBriefSections.every((section) => hasBusinessBriefSection(value.about, section))} onClick={showFullBusinessBrief} className={`shrink-0 bg-transparent pr-3 text-[10px] font-semibold leading-[1.7] whitespace-nowrap transition ${businessBriefSections.every((section) => hasBusinessBriefSection(value.about, section)) ? 'text-white' : 'text-zinc-500 hover:text-zinc-200'}`}>All</button>
+              {businessBriefSections.map((section) => {
+                const active = hasBusinessBriefSection(value.about, section);
+                return <div key={section.id} className="flex shrink-0 items-center"><span className="h-3 w-px bg-white/[0.10]" /><button type="button" aria-pressed={active} onClick={() => toggleBusinessBriefSection(section)} className={`bg-transparent px-3 text-[10px] font-semibold leading-[1.7] whitespace-nowrap transition ${active ? 'text-white' : 'text-zinc-500 hover:text-zinc-200'}`}>{section.label}</button></div>;
+              })}
+            </div>
+            <div className="relative">
+              <EditableKnowledgeBrief editorRef={businessBriefEditorRef} value={value.about || ''} onChange={(nextValue) => onChange({ ...value, about: nextValue })} />
+              <KnowledgeCharacterLimitNotice value={value.about} />
+            </div>
           </div>
-        ) : (
-          <div className="relative">
-            {!content.trim() && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-30">
-                <TemplateIcon size={32} className="text-zinc-800 mb-3" />
-                <p className="text-[11px] text-zinc-800 font-bold uppercase tracking-[0.3em]">Empty document</p>
-                <p className="text-[10px] text-zinc-900 mt-1">Load the template below or start typing</p>
-              </div>
-            )}
-            <textarea
-              value={content}
-              onChange={(e) => updateDoc(e.target.value)}
-              placeholder={`Write about ${activeConfig.label.toLowerCase()}...`}
-              className="w-full min-h-[360px] bg-black/30 border border-white/[0.04] rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none transition-all resize-y leading-relaxed font-mono"
-              style={{ tabSize: 2 }}
-            />
-          </div>
-        )}
-      </div>
+        ) : null}
 
-      {/* Action bar */}
-      <div className="flex items-center justify-end px-5 py-3 border-t border-white/[0.03] bg-white/[0.01]">
-        <button
-          onClick={loadTemplate}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-white/[0.08] bg-white/[0.04] text-[11px] font-bold text-zinc-300 uppercase tracking-wider hover:bg-white/[0.06] hover:border-white/15 transition-all"
-        >
-          <Star size={12} />
-          Load Template
-        </button>
-        {content.trim() && (
-          <button
-            onClick={clearDoc}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-zinc-700 uppercase tracking-wider hover:text-rose-400 hover:bg-rose-500/5 transition-all"
-          >
-            Clear
-          </button>
-        )}
+        {activeTab === 'policies' ? (
+          <div className="relative">
+            <textarea value={value.policies || ''} onChange={(event) => onChange({ ...value, policies: limitKnowledgeText(event.target.value) })} placeholder={industryExample.policies} maxLength={SETTINGS_LONG_TEXT_LIMIT} rows={9} className={`${settingsFieldClass} h-[499px] resize-none py-4 leading-6`} />
+            <KnowledgeCharacterLimitNotice value={value.policies} />
+          </div>
+        ) : null}
+
+        {activeTab === 'faq' ? (
+          <div className="space-y-3">
+            <div className="custom-scrollbar flex min-w-0 items-center overflow-x-auto pb-1" aria-label="Frequently asked questions actions">
+              <button type="button" onClick={addFaqQuestion} disabled={String(value.faq || '').length >= SETTINGS_LONG_TEXT_LIMIT} className="shrink-0 bg-transparent pr-3 text-[10px] font-semibold leading-[1.7] whitespace-nowrap text-zinc-500 transition hover:text-zinc-200 disabled:cursor-not-allowed disabled:text-zinc-700">Add new</button>
+              <span className="h-3 w-px bg-white/[0.10]" />
+              <button type="button" onClick={addFaqExample} disabled={!faqExamples.length || String(value.faq || '').length >= SETTINGS_LONG_TEXT_LIMIT} className="shrink-0 bg-transparent px-3 text-[10px] font-semibold leading-[1.7] whitespace-nowrap text-zinc-500 transition hover:text-zinc-200 disabled:cursor-not-allowed disabled:text-zinc-700">Add example</button>
+            </div>
+            <div className="relative">
+              <textarea value={value.faq || ''} onChange={(event) => onChange({ ...value, faq: limitKnowledgeText(event.target.value) })} placeholder={industryExample.faq} maxLength={SETTINGS_LONG_TEXT_LIMIT} rows={9} className={`${settingsFieldClass} h-[499px] resize-none py-4 leading-6`} />
+              <KnowledgeCharacterLimitNotice value={value.faq} />
+            </div>
+          </div>
+        ) : null}
       </div>
+      <AnimatePresence>{tipsOpen ? <KnowledgeTipsModal activeTab={activeTab} onClose={() => setTipsOpen(false)} /> : null}</AnimatePresence>
     </div>
+  );
+};
+
+const KnowledgeCharacterLimitNotice = ({ value, limit = SETTINGS_LONG_TEXT_LIMIT }) => {
+  const remaining = Math.max(0, limit - String(value || '').length);
+  if (remaining > 1000) return null;
+  return <div className="pointer-events-none absolute right-4 top-3 z-10 rounded-full bg-[#0d0d0d]/90 px-2 py-1 text-[10px] font-semibold text-rose-300">{remaining.toLocaleString()} / {limit.toLocaleString()} characters left</div>;
+};
+
+const KNOWLEDGE_TIPS = {
+  about: {
+    title: 'Build a strong business brief',
+    intro: 'Give your AI receptionist a clear understanding of the company, including its background, how it developed, what it is known for, where it operates, and what makes it distinct, so it can respond to customers with more confidence.',
+    points: [
+      ['Use real business details.', 'Include relevant information such as the founder, start year, early work, location history, community involvement, operating model, specialties, and current scale.'],
+      ['Keep it factual and informative.', 'Focus on useful company context rather than promotional language, sentiment, or generic descriptions.'],
+      ['Company-focused.', 'Detailed services, FAQs, and policies are covered in their own tabs. Here, focus on the company itself and the details that define it.'],
+    ],
+    footer: 'Your AI receptionist should come away knowing meaningful facts about this company that would not automatically be true of a typical competitor.',
+  },
+  policies: {
+    title: 'How policies work',
+    intro: 'Policies are company-specific rules, restrictions, requirements, and operating boundaries that the AI could not reasonably know or infer on its own. They define how this particular business chooses to operate and may differ significantly from other businesses in the same industry.',
+    points: [
+      ['Use real operating rules.', 'Policies can cover service limitations, scheduling requirements, geographic restrictions, minimum requirements, qualification rules, pricing boundaries, approval requirements, exceptions, and other internal business rules.'],
+      ['Keep them company-specific.', 'A good policy should be something another legitimate business in the same industry could reasonably handle differently or even opposite.'],
+      ['Think like you are training a receptionist.', 'Include the important rules and guidelines they should follow when helping customers.'],
+    ],
+    footer: 'Could another legitimate business in the same industry reasonably have a different or opposite policy? If not, it is probably a general rule or industry standard rather than a company policy.',
+  },
+  faq: {
+    title: 'Write useful FAQs',
+    intro: 'Add common customer questions and the answers your AI receptionist should give so it can respond consistently and guide callers toward the right next step.',
+    points: [
+      ['Use real customer questions.', 'Write questions the way callers naturally ask them, including questions about timing, pricing, availability, service areas, and what to expect.'],
+      ['Answer clearly and specifically.', 'Give a direct answer with the details the receptionist should share, while avoiding promises that depend on confirmation.'],
+      ['Include the next step when useful.', 'Explain what information the caller should provide or what the receptionist should do when the answer depends on the business or situation.'],
+    ],
+    footer: 'A strong FAQ helps your receptionist answer common questions without guessing, overpromising, or sending every caller back to the office.',
+  },
+};
+
+const KnowledgeTipsModal = ({ activeTab, onClose }) => {
+  const tips = KNOWLEDGE_TIPS[activeTab] || KNOWLEDGE_TIPS.about;
+  return (
+    <motion.div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
+      <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--brandGradientStart)] to-[var(--brandGradientEnd)]" />
+        <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
+        <div className="p-7 sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="relative">
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Tips</p>
+              <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">{tips.title}</h2>
+              <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">{tips.intro}</p>
+            </div>
+            <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label={`Close ${tips.title}`}><X size={17} /></button>
+          </div>
+          <div className="mt-7 space-y-5">
+            {tips.points.map(([title, body]) => (
+              <div key={title} className="flex gap-3">
+                <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/[0.10] text-[10px] font-semibold text-zinc-500">•</span>
+                <div><p className="text-sm font-semibold text-zinc-200">{title}</p><p className="mt-1 text-sm leading-6 text-zinc-500">{body}</p></div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-7 border-t border-white/[0.06] pt-5 text-sm leading-6 text-zinc-400">{tips.footer}</p>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
@@ -2609,6 +2844,10 @@ const SettingsPage = () => {
 
     const businessPayload = {
       name: settings.business_name || '',
+      industry: {
+        ...(settings.industry_details || {}),
+        industry: settings.industry || null,
+      },
       phone: settings.business_phone || '',
       email: settings.business_email || '',
       avatar: settings.business_avatar || '',
@@ -2693,7 +2932,7 @@ const SettingsPage = () => {
       // Load business info from businesses table
       const { data: bizData, error: bizErr } = await supabase
         .from('businesses')
-        .select('id, name, phone, email, avatar, address, city, state, zip, business_hours, about_us, policies, faq')
+        .select('id, name, industry, phone, email, avatar, address, city, state, zip, business_hours, about_us, policies, faq')
         .eq('user_id', userId)
         .limit(1)
         .maybeSingle();
@@ -2711,6 +2950,7 @@ const SettingsPage = () => {
       if (settingsErr && settingsErr.code !== 'PGRST116') throw settingsErr;
 
       const biz = bizData || {};
+      const storedIndustry = typeof biz.industry === 'string' ? biz.industry : biz.industry?.industry || '';
       const config = settingsData ? (() => {
         const { created_at, updated_at, business_name, business_phone, business_email, business_address, business_hours, business_timezone, ...parsed } = settingsData;
         return parsed;
@@ -2721,6 +2961,8 @@ const SettingsPage = () => {
         // Business fields from businesses table
         _business_id: biz.id || null,
         business_name: biz.name || '',
+        industry: storedIndustry,
+        industry_details: biz.industry && typeof biz.industry === 'object' ? biz.industry : {},
         business_phone: biz.phone || '',
         business_email: biz.email || '',
         business_avatar: biz.avatar || '',
@@ -2780,7 +3022,7 @@ const SettingsPage = () => {
       const normalizedBusinessId = business?.id ?? null;
 
       // Save app config to account_settings (excluding business fields and services)
-      const { business_name, business_phone, business_email, business_avatar, business_street, business_city, business_state, business_zip, business_hours, business_timezone, _business_id, services, knowledge_base, id: _id, created_at, updated_at, ...appConfig } = settings;
+      const { business_name, industry, industry_details, business_phone, business_email, business_avatar, business_street, business_city, business_state, business_zip, business_hours, business_timezone, _business_id, services, knowledge_base, id: _id, created_at, updated_at, ...appConfig } = settings;
       const normalizedAppConfig = normalizeNullishStrings(appConfig);
       const scopedAppConfig = {
         ...normalizedAppConfig,
@@ -3005,13 +3247,14 @@ const SettingsPage = () => {
           <>
             <div className="mb-4">
               <p className="text-[12px] text-zinc-500 leading-relaxed">
-                Your AI receptionist uses these to answer pricing questions and describe what you offer.
+                Give your receptionist the knowledge it needs to explain what you offer, make helpful service recommendations, and guide customers toward the right next step when they are ready to book.
               </p>
             </div>
             <ServicesManager
               businessId={settings._business_id}
               ensureBusinessRecord={ensureBusinessRecord}
               onBusinessLinked={syncBusinessId}
+              industry={settings.industry}
             />
           </>
         );
@@ -3022,13 +3265,10 @@ const SettingsPage = () => {
               <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
                 Your AI receptionist reads these documents during calls. They contain your business story, policies, and common answers.
               </p>
-              <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
-                <Info size={11} className="settings-icon shrink-0" />
-                Each tab has a ready-to-customize template.
-              </p>
             </div>
             <KnowledgeBaseEditor
               value={settings.knowledge_base || {}}
+              industry={settings.industry}
               onChange={(v) => update('knowledge_base', v)}
             />
           </>
@@ -3348,7 +3588,7 @@ const SettingsPage = () => {
           <Section title="Services & Pricing" icon={Tag} color="bg-white/[0.04] text-white" defaultOpen={true}>
             <div className="mb-4">
               <p className="text-[12px] text-zinc-500 leading-relaxed">
-                Your AI receptionist uses these to answer pricing questions and describe what you offer.
+                Give your receptionist the knowledge it needs to explain what you offer, make helpful service recommendations, and guide customers toward the right next step when they are ready to book.
               </p>
             </div>
 
@@ -3356,6 +3596,7 @@ const SettingsPage = () => {
               businessId={settings._business_id}
               ensureBusinessRecord={ensureBusinessRecord}
               onBusinessLinked={syncBusinessId}
+              industry={settings.industry}
             />
           </Section>
 
@@ -3365,14 +3606,11 @@ const SettingsPage = () => {
               <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
                 Your AI receptionist reads these documents during calls. They contain everything it needs to know about your business — your story, services, pricing, policies, and common answers.
               </p>
-              <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
-                <Info size={11} className="settings-icon shrink-0" />
-                Each tab below has a ready-to-customize template. Just edit the placeholders and your receptionist knows your business.
-              </p>
             </div>
 
             <KnowledgeBaseEditor
               value={settings.knowledge_base || {}}
+              industry={settings.industry}
               onChange={(v) => update('knowledge_base', v)}
             />
           </Section>
