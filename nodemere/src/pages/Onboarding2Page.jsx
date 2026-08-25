@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
+import SplashScreenAlternate from '../components/SplashScreenAlternate';
 import {
   additionalBusinessBriefContexts,
   additionalIndustries,
@@ -19,7 +20,7 @@ import {
   Download,
   Edit3,
   Eye,
-  HelpCircle,
+  Lightbulb,
   Layers,
   Loader2,
   Mail,
@@ -1123,7 +1124,8 @@ EXAMPLE:
 
 `;
 
-const policiesTemplate = getIndustryExample('Home Services').policies;
+const policiesTemplate = '';
+const policiesPlaceholder = getIndustryExample('Home Services').policies;
 
 const removedPoliciesIntro = `Add the policies your AI receptionist should follow during calls.
 
@@ -1131,7 +1133,12 @@ EXAMPLE:
 
 `;
 
-const faqTemplate = getIndustryExample('Home Services').faq;
+const faqTemplate = '';
+const faqPlaceholder = getIndustryExample('Home Services').faq;
+const getFaqExamples = (industry) => String(getIndustryExample(industry).faq || '')
+  .split(/\n\n(?=Q:)/)
+  .map((example) => example.trim())
+  .filter(Boolean);
 
 const removedFaqIntro = `Add common customer questions and the answers your AI receptionist should give.
 
@@ -1983,7 +1990,7 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
                   className="inline-flex h-3.5 w-3.5 shrink-0 translate-y-[1px] items-center justify-center text-zinc-600 transition hover:text-zinc-300"
                   aria-label="Service details help"
                 >
-                  <HelpCircle className="h-3 w-3" />
+                  <Lightbulb className="h-3 w-3" />
                 </button>
               </div>
               <div className="space-y-5">
@@ -2023,7 +2030,7 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
                         className="flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
                         aria-label="Service description help"
                       >
-                        <HelpCircle className="h-3.5 w-3.5" />
+                        <Lightbulb className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
@@ -2202,8 +2209,12 @@ const Onboarding2Page = () => {
   const navigate = useNavigate();
   const { session, profile, refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [complete, setComplete] = useState(false);
+  const [showFinalSplash, setShowFinalSplash] = useState(false);
+  const [finalSaveStatus, setFinalSaveStatus] = useState('idle');
+  const [splashFinished, setSplashFinished] = useState(false);
+  const saveQueueRef = useRef(Promise.resolve());
+  const hasLaunchedRef = useRef(false);
+  const complete = false;
   const [submitError, setSubmitError] = useState('');
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [industryPickerOpen, setIndustryPickerOpen] = useState(false);
@@ -2217,6 +2228,7 @@ const Onboarding2Page = () => {
   const [localLateHoursTerms, setLocalLateHoursTerms] = useState(() => readStoredOutboundLateHoursTerms());
   const [scheduleColorblindMode, setScheduleColorblindMode] = useState(false);
   const [editingService, setEditingService] = useState(null);
+  const [faqExampleIndex, setFaqExampleIndex] = useState(0);
   const businessBriefEditorRef = useRef(null);
   const [form, setForm] = useState({
     businessName: '',
@@ -2286,6 +2298,7 @@ const Onboarding2Page = () => {
     ? `Write a practical business brief that helps the AI understand ${businessName || 'the company'}, how it operates, what makes it distinct, and why customers choose it.`
     : current.description;
   const businessBriefSections = useMemo(() => getBusinessBriefSections(form.industry), [form.industry]);
+  const faqExamples = useMemo(() => getFaqExamples(form.industry || 'Home Services'), [form.industry]);
   const activeScheduleLayerTypes = useMemo(() => getScheduleLayerTypes(scheduleColorblindMode), [scheduleColorblindMode]);
   const outboundLateHoursAccepted = hasAcceptedOutboundLateHoursTerms(profile) || localLateHoursTerms?.accepted === true;
   const termsOfServiceForOnboarding = useMemo(() => {
@@ -2298,13 +2311,14 @@ const Onboarding2Page = () => {
   }, [localLateHoursTerms, profile]);
 
   const update = (key, value) => {
+    if (key === 'industry') setFaqExampleIndex(0);
     setForm((prev) => {
       if (key === 'about' || key === 'policies' || key === 'faq') return { ...prev, [key]: limitLongText(value) };
       if (key !== 'industry') return { ...prev, [key]: value };
       const example = getIndustryExample(value);
       const shouldReplaceAbout = allIndustryExampleValues('about').includes(prev.about) || legacyNamedAboutExamples.includes(prev.about);
-      const shouldReplacePolicies = !prev.policies.trim() || allIndustryExampleValues('policies').includes(prev.policies);
-      const shouldReplaceFaq = !prev.faq.trim() || allIndustryExampleValues('faq').includes(prev.faq);
+      const shouldReplacePolicies = allIndustryExampleValues('policies').includes(prev.policies);
+      const shouldReplaceFaq = allIndustryExampleValues('faq').includes(prev.faq);
       const nextBusinessBriefSections = getBusinessBriefSections(value);
       const nextServices = prev.services.map((service) => {
         if (!allServiceDescriptionExamples().includes(service.description)) return service;
@@ -2318,8 +2332,8 @@ const Onboarding2Page = () => {
         ...prev,
         industry: value,
         about: shouldReplaceAbout ? example.about : refreshGeneratedBusinessBriefSections(prev.about, nextBusinessBriefSections),
-        policies: shouldReplacePolicies ? example.policies : prev.policies,
-        faq: shouldReplaceFaq ? example.faq : prev.faq,
+        policies: shouldReplacePolicies ? '' : prev.policies,
+        faq: shouldReplaceFaq ? '' : prev.faq,
         services: nextServices,
       };
     });
@@ -2353,6 +2367,14 @@ const Onboarding2Page = () => {
     const currentFaq = form.faq.trimEnd();
     const nextFaq = currentFaq ? `${currentFaq}\n\n${block}` : block;
     update('faq', nextFaq);
+  };
+
+  const addFaqExample = () => {
+    if (!faqExamples.length) return;
+    const example = faqExamples[faqExampleIndex % faqExamples.length];
+    const nextFaq = [form.faq.trim(), example].filter(Boolean).join('\n\n');
+    update('faq', nextFaq);
+    setFaqExampleIndex((currentIndex) => (currentIndex + 1) % faqExamples.length);
   };
 
   const removeService = (serviceId) => {
@@ -2466,7 +2488,6 @@ const Onboarding2Page = () => {
       return false;
     }
 
-    setIsSubmitting(true);
     try {
       await axios.post(`${API_BASE_URL}/users/me/onboarding`, buildOnboardingPayload(markOnboarded), {
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -2477,9 +2498,15 @@ const Onboarding2Page = () => {
       console.error('Failed to save onboarding:', error);
       setSubmitError(error.response?.data?.detail || 'Could not save onboarding. Please try again.');
       return false;
-    } finally {
-      setIsSubmitting(false);
     }
+  };
+
+  const queueSave = (markOnboarded = false) => {
+    const savePromise = saveQueueRef.current
+      .catch(() => {})
+      .then(() => saveCurrentStep(markOnboarded));
+    saveQueueRef.current = savePromise;
+    return savePromise;
   };
 
   const handleNext = async () => {
@@ -2490,15 +2517,17 @@ const Onboarding2Page = () => {
       return;
     }
 
-    const saved = await saveCurrentStep(step === 0);
-    if (!saved) return;
     if (step < steps.length - 1) {
       setStep((prev) => prev + 1);
+      void queueSave(step === 0);
       return;
     }
 
-    await refreshProfile?.();
-    setComplete(true);
+    setFinalSaveStatus('saving');
+    setShowFinalSplash(true);
+    void queueSave(true).then((saved) => {
+      setFinalSaveStatus(saved ? 'ready' : 'error');
+    });
   };
 
   const handleBack = () => {
@@ -2512,15 +2541,40 @@ const Onboarding2Page = () => {
       return;
     }
 
-    const saved = await saveCurrentStep(false);
-    if (!saved) return;
     if (step < steps.length - 1) {
       setStep((prev) => prev + 1);
+      void queueSave(false);
     } else {
-      await refreshProfile?.();
-      setComplete(true);
+      setFinalSaveStatus('saving');
+      setShowFinalSplash(true);
+      void queueSave(false).then((saved) => {
+        setFinalSaveStatus(saved ? 'ready' : 'error');
+      });
     }
   };
+
+  const finishFinalSplash = useCallback(() => {
+    setSplashFinished(true);
+  }, []);
+
+  useEffect(() => {
+    if (!showFinalSplash || !splashFinished || finalSaveStatus !== 'ready' || hasLaunchedRef.current) return;
+    hasLaunchedRef.current = true;
+    let isCurrent = true;
+    void Promise.resolve(refreshProfile?.()).then(() => {
+      if (isCurrent) navigate('/dashboard/receptionists', { replace: true });
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [finalSaveStatus, navigate, refreshProfile, showFinalSplash, splashFinished]);
+
+  useEffect(() => {
+    if (showFinalSplash && finalSaveStatus === 'error') {
+      setShowFinalSplash(false);
+      setSplashFinished(false);
+    }
+  }, [finalSaveStatus, showFinalSplash]);
 
   const handleLaunch = () => {
     navigate('/dashboard/receptionists');
@@ -2623,11 +2677,13 @@ const Onboarding2Page = () => {
       `}</style>
 
       <div className="mx-auto flex min-h-screen w-full items-center justify-center px-5 py-3 sm:px-8 lg:px-10">
-        <section className={`relative max-h-[calc(100vh-20px)] w-full ${step === 2 && !complete && !isSubmitting ? 'max-w-[1120px]' : 'max-w-[960px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}>
+        <section className={showFinalSplash
+          ? 'relative w-full max-w-none bg-transparent shadow-none'
+          : `relative max-h-[calc(100vh-20px)] w-full ${step === 2 ? 'max-w-[1120px]' : 'max-w-[960px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}>
           <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-white/[0.035] blur-[90px]" />
 
           <main className="relative flex max-h-[calc(100vh-20px)] min-h-[740px] flex-col overflow-auto p-6 sm:p-8">
-            {!complete && !isSubmitting ? (
+            {!showFinalSplash ? (
               <div className="mb-6 flex items-center justify-between gap-5">
                 <div className="flex h-4 items-center gap-3">
                   <p className="shrink-0 text-[13px] font-normal leading-4 text-zinc-300">
@@ -2651,16 +2707,8 @@ const Onboarding2Page = () => {
 
             <div className="flex flex-1 items-stretch py-0">
               <div className="flex w-full">
-                {isSubmitting ? (
-                  <div className="mx-auto flex max-w-xl flex-col items-center justify-center py-16 text-center">
-                    <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.035]">
-                      <Loader2 className="h-6 w-6 animate-spin text-zinc-200" />
-                    </div>
-                    <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">Preparing your Nodemere workspace</h2>
-                    <p className="mt-3 max-w-md text-sm leading-6 text-zinc-500">
-                      Saving your setup draft and getting your dashboard ready.
-                    </p>
-                  </div>
+                {showFinalSplash ? (
+                  <SplashScreenAlternate label="Workspace" onAnimationEnd={finishFinalSplash} />
                 ) : complete ? (
                   <div className="mx-auto w-full max-w-3xl space-y-8">
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300">
@@ -2733,7 +2781,7 @@ const Onboarding2Page = () => {
                               className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
                               aria-label="Schedule help"
                             >
-                              <HelpCircle className="h-3.5 w-3.5" />
+                              <Lightbulb className="h-4 w-4" />
                             </button>
                           ) : null}
                           {step === 3 ? (
@@ -2743,7 +2791,7 @@ const Onboarding2Page = () => {
                               className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
                               aria-label="Context help"
                             >
-                              <HelpCircle className="h-3.5 w-3.5" />
+                              <Lightbulb className="h-4 w-4" />
                             </button>
                           ) : null}
                           {step === 4 ? (
@@ -2753,7 +2801,7 @@ const Onboarding2Page = () => {
                               className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
                               aria-label="Policies help"
                             >
-                              <HelpCircle className="h-3.5 w-3.5" />
+                              <Lightbulb className="h-4 w-4" />
                             </button>
                           ) : null}
                           {step === 6 ? (
@@ -2763,7 +2811,7 @@ const Onboarding2Page = () => {
                               className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
                               aria-label="Services help"
                             >
-                              <HelpCircle className="h-3.5 w-3.5" />
+                              <Lightbulb className="h-4 w-4" />
                             </button>
                           ) : null}
                         </div>
@@ -2940,6 +2988,7 @@ const Onboarding2Page = () => {
                           <textarea
                             value={form.policies}
                             onChange={(e) => update('policies', e.target.value)}
+                            placeholder={form.industry ? getIndustryExample(form.industry).policies : policiesPlaceholder}
                             maxLength={LONG_TEXT_LIMIT}
                             rows={9}
                             autoFocus
@@ -2960,11 +3009,21 @@ const Onboarding2Page = () => {
                             >
                               Add new
                             </button>
+                            <span className="h-3 w-px bg-white/[0.10]" />
+                            <button
+                              type="button"
+                              onClick={addFaqExample}
+                              disabled={!faqExamples.length || form.faq.length >= LONG_TEXT_LIMIT}
+                              className="shrink-0 bg-transparent px-3 text-[10px] font-semibold leading-[1.7] whitespace-nowrap text-zinc-500 transition hover:text-zinc-200 disabled:cursor-not-allowed disabled:text-zinc-700"
+                            >
+                              Add example
+                            </button>
                           </div>
                           <div className="relative">
                             <textarea
                               value={form.faq}
                               onChange={(e) => update('faq', e.target.value)}
+                              placeholder={form.industry ? getIndustryExample(form.industry).faq : faqPlaceholder}
                               maxLength={LONG_TEXT_LIMIT}
                               rows={9}
                               autoFocus

@@ -105,15 +105,6 @@ const getPlanSummary = (plan) => {
 
 const POPUP_DEFINITIONS = [
   {
-    id: 'dashboard_welcome',
-    type: 'general',
-    placement: 'dashboard',
-    title: 'Welcome',
-    emoji: '🎉',
-    getDescription: () => 'You made it! Your front desk just took its first step toward running itself. Nodemere brings autonomy to the heart of your business and a new standard to every first impression. You’re stepping into the future early. Welcome to the autonomous front desk.',
-    primaryActionLabel: 'Got it',
-  },
-  {
     id: 'tasklist_intro',
     type: 'general',
     placement: 'dashboard',
@@ -1138,28 +1129,41 @@ const PlaceholderView = ({ title, body }) => (
 );
 
 // ─── Main SonarDashboard Component ────────────────────────────────────────
+const popupSpectrumStyles = '@keyframes popup-spectrum-run { from { background-position: 0% center; } to { background-position: 100% center; } }';
+
 const PopupModal = ({ popup, profile, onClose }) => {
   if (typeof document === 'undefined') return null;
   const isScenariosIntro = popup?.id === 'scenarios_intro';
 
   return createPortal(
-    <AnimatePresence>
-      {popup && (
-        <motion.div
+    <>
+      <style>{popupSpectrumStyles}</style>
+      <AnimatePresence>
+        {popup && (
+          <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]"
           onClick={onClose}
         >
-          <motion.section
+            <motion.section
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.98 }}
           onClick={(event) => event.stopPropagation()}
           className={`relative flex max-h-[calc(100vh-48px)] w-full overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl ${isScenariosIntro ? 'max-w-[900px]' : 'max-w-[520px]'}`}
-        >
-          <div className="relative flex flex-1 flex-col p-6 sm:p-8">
+            >
+              <div
+                className="pointer-events-none absolute -left-8 -right-8 top-0 z-10 h-px"
+                style={{
+                  backgroundImage: 'linear-gradient(90deg, var(--brandGradientEnd), var(--brandGradientStart), var(--brandGradientEnd))',
+                  backgroundSize: '200% 100%',
+                  backgroundPosition: '0% center',
+                  animation: 'popup-spectrum-run 1.2s ease-out 1 forwards',
+                }}
+              />
+              <div className="relative flex flex-1 flex-col p-6 sm:p-8">
             <div className={`relative flex items-start gap-5 ${isScenariosIntro ? 'mb-0 justify-center' : 'mb-6 justify-between'}`}>
               <div className={`min-w-0 flex-1 ${isScenariosIntro ? 'px-10 text-center' : 'pl-8 text-center'}`}>
                 <h2 className="text-[26px] font-semibold tracking-[-0.01em] text-white sm:text-[34px]">
@@ -1195,11 +1199,12 @@ const PopupModal = ({ popup, profile, onClose }) => {
                   {popup.primaryActionLabel || 'Got it'}
                 </button>
               </div>
-            </div>
-          </motion.section>
-        </motion.div>
-      )}
-    </AnimatePresence>,
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>,
     document.body
   );
 };
@@ -1787,12 +1792,22 @@ const SonarDashboard = () => {
   }, []);
 
   useEffect(() => {
-    setShowPlanChangePopup(Boolean(profile?.plan));
+    setShowPlanChangePopup(Boolean(profile?.plan) && profile?.plan_change_popup !== true);
   }, [profile?.plan, profile?.plan_change_popup]);
 
   const handleClosePlanChangePopup = useCallback(async () => {
     setShowPlanChangePopup(false);
-  }, []);
+    if (!userId) return;
+    const { error } = await supabase
+      .from('users')
+      .update({ plan_change_popup: true })
+      .eq('id', userId);
+    if (error) {
+      console.error('[Welcome popup] Failed to save dismissal:', error);
+      return;
+    }
+    refreshProfile?.();
+  }, [refreshProfile, userId]);
 
   const dismissPopup = useCallback(async (popup) => {
     if (!popup) return;

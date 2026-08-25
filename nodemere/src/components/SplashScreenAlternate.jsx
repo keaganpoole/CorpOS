@@ -3,7 +3,7 @@ import './SplashScreenAlternate.css';
 
 const LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
 
-const SplashScreenAlternate = ({ onAnimationEnd }) => {
+const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio' }) => {
   const [phase, setPhase] = useState('logo-prep');
   const [logoReady, setLogoReady] = useState(false);
 
@@ -46,7 +46,7 @@ const SplashScreenAlternate = ({ onAnimationEnd }) => {
   }, [logoReady, onAnimationEnd]);
 
   return (
-    <div className={`splash-alternate splash-alternate--${phase}`} role="status" aria-label="Loading Nodemere Studio">
+    <div className={`splash-alternate splash-alternate--${phase}`} role="status" aria-label={'Loading Nodemere ' + label}>
       <div className={`splash-alternate-mark splash-alternate-mark--${phase}`}>
         <img
           src={LOGO_SRC}
@@ -56,7 +56,7 @@ const SplashScreenAlternate = ({ onAnimationEnd }) => {
         />
       </div>
       <div className={`splash-alternate-studio splash-alternate-studio--${phase}`} aria-hidden="true">
-        Nodemere <span>Studio</span>
+        Nodemere <span>{label}</span>
       </div>
     </div>
   );
