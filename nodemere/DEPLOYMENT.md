@@ -57,4 +57,20 @@ Required environment variables:
 - `CORS_ORIGINS` = comma-separated allowed frontend origins, for example `https://nodemere.com,https://your-project.vercel.app`
 - `TEST_MODE` = `false`
 
+### System Gmail delivery
+
+Secure verification and document-upload links are sent through Nodemere's
+system Gmail mailbox, not through the Scenario integrations feature. Configure
+these backend-only Render environment variables:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `SYSTEM_GMAIL_SENDER_EMAIL` = the Keeganpoole2 Gmail address
+- `SYSTEM_GMAIL_REFRESH_TOKEN` = an OAuth refresh token for that mailbox with
+  the Gmail `gmail.send` scope
+
+Do not put any of these values in frontend variables or source control. The
+sender email must be the same mailbox (or an authorized Gmail send-as alias)
+represented by the refresh token.
+
 After Render is live, copy its backend URL into Vercel as `VITE_API_URL`, then redeploy Vercel.

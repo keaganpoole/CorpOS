@@ -94,6 +94,8 @@ from .config import (
     google_client_id,
     google_client_secret,
     google_oauth_redirect_uri,
+    system_gmail_sender_email,
+    system_gmail_refresh_token,
     outlook_client_id,
     outlook_client_secret,
     outlook_authority,
@@ -124,6 +126,12 @@ from .verification_service import (
     get_verification_status,
 )
 from .document_service import create_document_request, get_document_request, get_document_request_status, store_document
+from .email_delivery_service import (
+    EmailDeliveryError,
+    SystemGmailConfiguration,
+    log_email_delivery_failure,
+    send_secure_link_email,
+)
 from .contract_service import (
     clone_voice,
     create_contract,
@@ -3706,7 +3714,7 @@ def lookup_person_record(
 ):
     try:
         if person_id:
-            query = supabase.table("people").select("id,first_name,last_name,phone,business_id,user_id,custom_fields").eq("id", str(person_id))
+            query = supabase.table("people").select("id,first_name,last_name,email,phone,business_id,user_id,custom_fields").eq("id", str(person_id))
             if business_id:
                 query = query.eq("business_id", str(business_id))
             elif user_id:
@@ -3719,7 +3727,7 @@ def lookup_person_record(
         if not match_values:
             return None
 
-        query = supabase.table("people").select("id,first_name,last_name,phone,business_id,user_id,custom_fields")
+        query = supabase.table("people").select("id,first_name,last_name,email,phone,business_id,user_id,custom_fields")
         if business_id:
             query = query.eq("business_id", str(business_id))
         elif user_id:
@@ -5788,6 +5796,157 @@ def build_verification_request_context(payload: dict) -> dict:
     }
 
 
+def _system_gmail_configuration() -> SystemGmailConfiguration:
+    return SystemGmailConfiguration(
+        sender_email=system_gmail_sender_email,
+        refresh_token=system_gmail_refresh_token,
+        google_client_id=google_client_id,
+        google_client_secret=google_client_secret,
+    )
+
+
+def _customer_email_for_secure_link(context: dict) -> Optional[str]:
+    """Resolve the delivery recipient from the existing customer record only."""
+    person_id = context.get("person_id")
+    if not person_id:
+        return None
+    person = lookup_person_record(
+        person_id=str(person_id),
+        business_id=str(context["business_id"]) if context.get("business_id") is not None else None,
+        user_id=context.get("user_id"),
+    )
+    return str((person or {}).get("email") or "").strip() or None
+
+
+def _business_name_for_secure_link(payload: dict, context: dict) -> Optional[str]:
+    resolved = resolve_business_context(payload)
+    business = resolved.get("business") or {}
+    if not business and context.get("business_id") is not None:
+        business = load_business_by_id(str(context["business_id"])) or {}
+    name = str(business.get("name") or "").strip()
+    return name or None
+
+
+def _secure_link_delivery_failure(
+    *,
+    request_result: dict,
+    code: str,
+    message: str,
+    missing_configuration: tuple[str, ...] = (),
+) -> dict:
+    """Return the existing request identifiers without leaking its raw token."""
+    delivery = {
+        "success": False,
+        "status": "failed",
+        "channel": "email",
+        "code": code,
+    }
+    if missing_configuration:
+        delivery["missing_configuration"] = list(missing_configuration)
+    return {
+        "success": False,
+        "status": "delivery_failed",
+        "message": message,
+        "request_id": request_result.get("request_id"),
+        "session_id": request_result.get("session_id"),
+        "request_type": request_result.get("request_type"),
+        "expires_at": request_result.get("expires_at"),
+        "delivery": delivery,
+    }
+
+
+def deliver_existing_secure_link_by_email(
+    *,
+    request_result: dict,
+    context: dict,
+    payload: dict,
+    kind: Literal["verification", "document_upload"],
+) -> dict:
+    """Deliver a pre-generated request URL without changing its lifecycle."""
+    link_key = "verification_url" if kind == "verification" else "request_url"
+    secure_link = request_result.get(link_key)
+    if not secure_link:
+        return _secure_link_delivery_failure(
+            request_result=request_result,
+            code="secure_link_missing",
+            message="The secure link could not be prepared for email delivery.",
+        )
+
+    business_name = _business_name_for_secure_link(payload, context)
+    if not business_name:
+        return _secure_link_delivery_failure(
+            request_result=request_result,
+            code="business_name_missing",
+            message="The secure link could not be emailed because the business is unavailable.",
+        )
+
+    recipient_email = _customer_email_for_secure_link(context)
+    if not recipient_email:
+        return _secure_link_delivery_failure(
+            request_result=request_result,
+            code="customer_email_missing",
+            message="The caller does not have an email address on file.",
+        )
+
+    try:
+        delivery = send_secure_link_email(
+            kind=kind,
+            recipient_email=recipient_email,
+            business_name=business_name,
+            secure_link=str(secure_link),
+            configuration=_system_gmail_configuration(),
+        )
+    except EmailDeliveryError as exc:
+        log_email_delivery_failure(
+            kind=kind,
+            request_id=request_result.get("request_id"),
+            business_id=context.get("business_id"),
+            error=exc,
+        )
+        return _secure_link_delivery_failure(
+            request_result=request_result,
+            code=exc.code,
+            message=exc.message,
+            missing_configuration=exc.missing_configuration,
+        )
+    except requests.RequestException:
+        logging.warning(
+            "Secure email delivery network failure kind=%s request_id=%s business_id=%s",
+            kind,
+            request_result.get("request_id"),
+            context.get("business_id"),
+        )
+        return _secure_link_delivery_failure(
+            request_result=request_result,
+            code="email_provider_unavailable",
+            message="The email provider could not be reached. Please try again.",
+        )
+    except Exception:
+        logging.exception(
+            "Unexpected secure email delivery failure kind=%s request_id=%s business_id=%s",
+            kind,
+            request_result.get("request_id"),
+            context.get("business_id"),
+        )
+        return _secure_link_delivery_failure(
+            request_result=request_result,
+            code="email_delivery_failed",
+            message="The secure link could not be emailed. Please try again.",
+        )
+
+    # The generated URL contains the one-time token. It is passed directly to
+    # Gmail, but intentionally omitted from the receptionist/tool response.
+    return {
+        "success": True,
+        "request_id": request_result.get("request_id"),
+        "session_id": request_result.get("session_id"),
+        "request_type": request_result.get("request_type"),
+        "status": request_result.get("status"),
+        "expires_at": request_result.get("expires_at"),
+        "delivery": delivery,
+    }
+
+
 async def send_verification_link_tool(request: Request):
     payload = await parse_request_payload(request)
     context = build_verification_request_context(payload)
@@ -5796,10 +5955,16 @@ async def send_verification_link_tool(request: Request):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Caller authentication is disabled in account preferences.",
         )
-    return create_verification_session(
+    request_result = create_verification_session(
         supabase_admin,
         base_url=verification_base_url,
         **context,
+    )
+    return deliver_existing_secure_link_by_email(
+        request_result=request_result,
+        context=context,
+        payload=payload,
+        kind="verification",
     )
 
 
@@ -5834,7 +5999,13 @@ async def request_document_upload_tool(request: Request):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A matching business and person are required before requesting a document upload.",
         )
-    return create_document_request(supabase_admin, base_url=verification_base_url, **context)
+    request_result = create_document_request(supabase_admin, base_url=verification_base_url, **context)
+    return deliver_existing_secure_link_by_email(
+        request_result=request_result,
+        context=context,
+        payload=payload,
+        kind="document_upload",
+    )
 
 
 async def check_document_upload_status_tool(request: Request):
@@ -6854,10 +7025,16 @@ async def legacy_server_tool(
     if normalized_tool in {"send-verification-link", "request-authentication", "auth-request"}:
         context_payload = {**payload, "business": business, "user_id": user_id}
         context = build_verification_request_context(context_payload)
-        return create_verification_session(
+        request_result = create_verification_session(
             supabase_admin,
             base_url=verification_base_url,
             **context,
+        )
+        return deliver_existing_secure_link_by_email(
+            request_result=request_result,
+            context=context,
+            payload=context_payload,
+            kind="verification",
         )
 
     if normalized_tool in {"check-verification-status", "check-authentication", "verify-authentication", "auth-verify"}:
@@ -6874,8 +7051,15 @@ async def legacy_server_tool(
         )
 
     if normalized_tool in {"request-docs", "document-request", "document-upload-request"}:
-        context = build_verification_request_context({**payload, "business": business, "user_id": user_id})
-        return create_document_request(supabase_admin, base_url=verification_base_url, **context)
+        context_payload = {**payload, "business": business, "user_id": user_id}
+        context = build_verification_request_context(context_payload)
+        request_result = create_document_request(supabase_admin, base_url=verification_base_url, **context)
+        return deliver_existing_secure_link_by_email(
+            request_result=request_result,
+            context=context,
+            payload=context_payload,
+            kind="document_upload",
+        )
 
     if normalized_tool in {"get-docs", "document-verify", "document-upload-verify"}:
         context = build_verification_request_context({**payload, "business": business, "user_id": user_id})

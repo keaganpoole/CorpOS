@@ -29,6 +29,12 @@ services:
       - key: TWILIO_PHONE_NUMBER
       - key: TWILIO_VOICE_WEBHOOK_URL
       - key: BACKEND_PUBLIC_URL
+      # System Gmail sender for verification and document-upload links.
+      # This is separate from customer-managed scenario integrations.
+      - key: GOOGLE_CLIENT_ID
+      - key: GOOGLE_CLIENT_SECRET
+      - key: SYSTEM_GMAIL_SENDER_EMAIL
+      - key: SYSTEM_GMAIL_REFRESH_TOKEN
       # Stripe
       - key: STRIPE_SECRET_KEY
       - key: STRIPE_SECRET_TEST_KEY
