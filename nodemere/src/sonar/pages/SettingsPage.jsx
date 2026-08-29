@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../lib/api';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 import CubePreloader from '../components/CubePreloader';
+import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import {
   allBusinessBriefSections,
   allIndustryExampleValues,
@@ -1420,13 +1421,15 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
   );
 };
 
-const SettingsServiceInfoModal = ({ title, intro, points, footer, onClose, dense = false }) => (
+const SettingsServiceInfoModal = ({ title, intro, points, footer, onClose, dense = false, maxWidthClass = 'max-w-[620px]' }) => (
   <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
-    <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}>
+    <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className={`relative w-full ${maxWidthClass} overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]`} onMouseDown={(event) => event.stopPropagation()}>
+      <ModalSpectrumLine variant="tips" />
+      <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
       <div className="p-7 sm:p-8">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Tips</p>
+          <div className="relative">
+            <div className="mb-3 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 shrink-0 -translate-y-[5px] text-zinc-600" aria-hidden="true" /><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Tips</p></div>
             <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">{title}</h2>
             {intro ? <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">{intro}</p> : null}
           </div>
@@ -1486,7 +1489,7 @@ const SettingsServiceModal = ({ initialService, industry, onClose, onSave }) => 
       </motion.section>
       <AnimatePresence>
         {descriptionEditorOpen ? <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => setDescriptionEditorOpen(false)}><motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="w-full max-w-[760px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}><div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Service description</p><h2 className="text-xl font-semibold tracking-[-0.04em] text-white">Edit full description</h2></div><button type="button" onClick={() => setDescriptionEditorOpen(false)} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close description editor"><X className="h-4 w-4" /></button></div><div className="p-6"><textarea value={draft.description} onChange={(event) => setDraftValue('description', event.target.value)} placeholder="Describe what this service includes and what customers should expect." autoFocus className={`${settingsFieldClass} h-[420px] resize-none py-4 leading-6`} /></div><div className="flex items-center justify-end border-t border-white/[0.05] px-6 py-5"><button type="button" onClick={() => setDescriptionEditorOpen(false)} className="h-11 rounded-full bg-white px-8 text-sm font-bold text-black transition hover:bg-zinc-200">Done</button></div></motion.div></motion.div> : null}
-        {serviceDetailsHelpOpen ? <SettingsServiceInfoModal dense title="Billing units" intro="Use this to tell your receptionist how the service is normally priced or discussed when customers ask about cost." points={[{ title: 'Session.', body: 'Each appointment or visit has its own price.' }, { title: 'Hourly.', body: 'Price is based on the amount of time worked.' }, { title: 'Weekly.', body: 'Price is charged per week.' }, { title: 'Monthly.', body: 'Price is charged per month.' }, { title: 'Yearly.', body: 'Price is charged per year.' }]} onClose={() => setServiceDetailsHelpOpen(false)} /> : null}
+        {serviceDetailsHelpOpen ? <SettingsServiceInfoModal dense maxWidthClass="max-w-[480px]" title="Billing units" intro="Use this to tell your receptionist how the service is normally priced or discussed when customers ask about cost." points={[{ title: 'Session.', body: 'Each appointment or visit has its own price.' }, { title: 'Hourly.', body: 'Price is based on the amount of time worked.' }, { title: 'Weekly.', body: 'Price is charged per week.' }, { title: 'Monthly.', body: 'Price is charged per month.' }, { title: 'Yearly.', body: 'Price is charged per year.' }]} onClose={() => setServiceDetailsHelpOpen(false)} /> : null}
         {descriptionHelpOpen ? <SettingsServiceInfoModal title="Write a useful service description" intro="A good description helps your receptionist understand when this service fits, how to answer questions about it, and what next step to recommend." points={[{ title: 'Focus on fit.', body: 'Explain what the service is for, when someone needs it, and what outcome they can expect.' }, { title: 'Stay concise.', body: 'One clear paragraph is usually enough. Pricing and billing details live in their own fields.' }, { title: 'Example:', body: exampleService.serviceDescription(exampleService.serviceName).split('\n\n')[0].replace('Service overview:\n', '') }]} footer="Keep it practical: what it is, when it applies, and anything else your receptionist should know about it." onClose={() => setDescriptionHelpOpen(false)} /> : null}
       </AnimatePresence>
     </motion.div>
@@ -2585,22 +2588,22 @@ const KnowledgeTipsModal = ({ activeTab, onClose }) => {
   const tips = KNOWLEDGE_TIPS[activeTab] || KNOWLEDGE_TIPS.about;
   return (
     <motion.div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
-      <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--brandGradientStart)] to-[var(--brandGradientEnd)]" />
+        <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}>
+        <ModalSpectrumLine variant="tips" />
         <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
         <div className="p-7 sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <div className="relative">
-              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Tips</p>
+              <div className="mb-3 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 shrink-0 -translate-y-[5px] text-zinc-600" aria-hidden="true" /><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Tips</p></div>
               <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">{tips.title}</h2>
               <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">{tips.intro}</p>
             </div>
             <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label={`Close ${tips.title}`}><X size={17} /></button>
           </div>
           <div className="mt-7 space-y-5">
-            {tips.points.map(([title, body]) => (
+            {tips.points.map(([title, body], index) => (
               <div key={title} className="flex gap-3">
-                <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/[0.10] text-[10px] font-semibold text-zinc-500">•</span>
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: `rgba(255,255,255,${Math.max(0.35, 1 - (index * 0.14))})` }} />
                 <div><p className="text-sm font-semibold text-zinc-200">{title}</p><p className="mt-1 text-sm leading-6 text-zinc-500">{body}</p></div>
               </div>
             ))}
@@ -3203,7 +3206,7 @@ const SettingsPage = () => {
     { id: 'business', title: 'Business Info', icon: Building2, iconClass: 'settings-icon', hint: 'Name, contact, and location' },
     { id: 'forwarding', title: 'Connections', icon: PhoneCall, iconClass: 'settings-icon', hint: 'Call routing' },
     { id: 'billing', title: 'Billing', icon: CreditCard, iconClass: 'settings-icon', hint: 'Plan, invoices, and payment' },
-    { id: 'preferences', title: 'Preferences', icon: Shield, iconClass: 'settings-icon', hint: 'Call permissions and controls' },
+    { id: 'preferences', title: 'Preferences', icon: Shield, iconClass: 'settings-icon', hint: 'Permissions and controls' },
     { id: 'intro', title: 'Intro Message', icon: MessageSquareText, iconClass: 'settings-icon', hint: 'Opening call greeting' },
     { id: 'appointments', title: 'Hours', icon: Calendar, iconClass: 'settings-icon', hint: 'Business availability' },
     { id: 'services', title: 'Services & Pricing', icon: Tag, iconClass: 'settings-icon', hint: 'Offer catalog and rates' },

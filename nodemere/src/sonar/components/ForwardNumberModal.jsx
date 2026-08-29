@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, Copy, Phone, Plus, Repeat, Search, X } from 'lucide-react';
+import { CheckCircle2, Copy, Phone, Plus, Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import CubePreloader from './CubePreloader';
 
 const PHONE_PROVIDERS = [
-  { id: 'verizon', label: 'Verizon', action: 'Open Verizon call forwarding, then forward calls to this number.' },
-  { id: 'att', label: 'AT&T', action: 'Open AT&T call forwarding, then forward calls to this number.' },
-  { id: 'tmobile', label: 'T-Mobile', action: 'Open T-Mobile call forwarding, then forward calls to this number.' },
-  { id: 'comcast', label: 'Comcast / Xfinity', action: 'Open Voice settings, then forward calls to this number.' },
-  { id: 'ringcentral', label: 'RingCentral', action: 'Open Phone System, then set forwarding to this number.' },
-  { id: 'google', label: 'Google Voice', action: 'Open Calls settings, then forward calls to this number.' },
-  { id: 'other', label: 'Other provider', action: 'Open your call forwarding settings, then forward calls to this number.' },
+  { id: 'verizon', label: 'Verizon' },
+  { id: 'att', label: 'AT&T' },
+  { id: 'tmobile', label: 'T-Mobile' },
+  { id: 'comcast', label: 'Comcast / Xfinity' },
+  { id: 'ringcentral', label: 'RingCentral' },
+  { id: 'google', label: 'Google Voice' },
+  { id: 'other', label: 'Other provider' },
 ];
 
 export const FORWARDING_API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -25,16 +26,13 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
   const [entryId, setEntryId] = useState(null);
   const [businessId, setBusinessId] = useState(null);
   const [businessName, setBusinessName] = useState('');
-  const agentName = agent?.first_name || agent?.name || 'your AI receptionist';
   const [businessPhone, setBusinessPhone] = useState('');
   const [twilioNumber, setTwilioNumber] = useState('');
   const [twilioNumberStatus, setTwilioNumberStatus] = useState('');
   const [twilioNumberLabel, setTwilioNumberLabel] = useState('');
-  const [numberPurchaseCount, setNumberPurchaseCount] = useState(0);
-  const [numberPurchaseLimit, setNumberPurchaseLimit] = useState(0);
   const [canPurchaseNumber, setCanPurchaseNumber] = useState(true);
-  const [defaultAreaCode, setDefaultAreaCode] = useState('');
   const [availableTargetNumbers, setAvailableTargetNumbers] = useState([]);
+  const [targetNumbersVisibleCount, setTargetNumbersVisibleCount] = useState(10);
   const [targetNumbersLoading, setTargetNumbersLoading] = useState(false);
   const [selectedTargetNumber, setSelectedTargetNumber] = useState(null);
   const [targetSearch, setTargetSearch] = useState({
@@ -67,12 +65,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     'Checking call quality',
     'Connecting it to your receptionist',
   ];
-  const agentPronoun = (() => {
-    const normalizedGender = String(agent?.gender || '').trim().toLowerCase();
-    if (normalizedGender === 'she' || normalizedGender === 'her' || normalizedGender.startsWith('f')) return 'she';
-    if (normalizedGender === 'he' || normalizedGender === 'him' || normalizedGender.startsWith('m')) return 'he';
-    return 'they';
-  })();
   const modalTitle =
     slide === 0
       ? targetQualityState === 'running'
@@ -95,11 +87,29 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                 ? 'Caller ID verified.'
                 : 'Use your business number for outbound calls.'
               : 'Forwarding verified.';
+  const slideDescription =
+    slide === 0
+      ? targetQualityState === 'running'
+        ? 'We’re checking the selected number before making it your active receptionist line.'
+        : targetQualityState === 'passed'
+          ? 'This number passed our quality check and is ready to use. Continue to connect your business line.'
+          : needsTargetNumberSelection
+            ? 'Pick the receptionist number your business line will forward calls to. We’ll test it first and only switch the active number if it passes.'
+            : 'Your business line currently forwards to this active receptionist number. Replace it if you need a different line.'
+      : slide === 1
+        ? `In your carrier or phone system settings, forward ${sourceNumber || 'your business number'} to this receptionist number.`
+        : slide === 2
+          ? `Open ${selectedProvider.label} settings, turn on call forwarding, and forward ${sourceNumber || 'your business number'} to ${forwardingNumber}. Save your changes.`
+          : slide === 3
+            ? forwardingStatus === 'verified'
+              ? 'Your business line is connected and ready to route calls to your receptionist.'
+              : 'After you turn forwarding on, place a quick test call so we can confirm the connection.'
+            : `Verify ${sourceNumber || 'your business number'} so outbound calls can display it as the caller ID. This step is optional.`;
   const forwardingSteps = [
     {
       label: 'Number forwarding',
       title: modalTitle,
-      description: `Forward calls to ${agentName} so ${agentPronoun} can handle calls for ${businessName || 'your business'}.`,
+      description: slideDescription,
     },
   ];
   const normalizedSourceNumber = sourceNumber.trim();
@@ -137,11 +147,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     return entry.source_number === normalizedSourceNumber;
   }) || null;
   const selectedExistingEntryIsVerified = selectedExistingEntry?.status === 'verified';
-  const activeSourceOption = sourceOptions.find((option) => {
-    if (entryId && option.entryId) return option.entryId === entryId;
-    return option.source_number === normalizedSourceNumber;
-  }) || null;
-
   const applyCallerIdEntryState = (entry) => {
     const nextStatus = entry?.caller_id_verification_status || 'not_started';
     setCallerIdStatus(nextStatus);
@@ -223,14 +228,13 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
       const params = new URLSearchParams();
       if (filters.areaCode?.trim()) params.set('area_code', filters.areaCode.trim());
       if (filters.contains?.trim()) params.set('contains', filters.contains.trim());
-      params.set('limit', '12');
+      params.set('limit', '100');
 
       const data = await requestForwarding(`/businesses/me/forwarding/available-numbers?${params.toString()}`);
       const options = data?.options || [];
       setAvailableTargetNumbers(options);
+      setTargetNumbersVisibleCount(Math.min(10, options.length));
       setCanPurchaseNumber(Boolean(data?.can_purchase_number));
-      setNumberPurchaseCount(data?.number_purchase_count || 0);
-      setNumberPurchaseLimit(data?.total_allowed_number_purchases || 0);
 
       setSelectedTargetNumber((current) => {
         if (current) {
@@ -272,9 +276,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           label: `${businessName || 'Business'} line`,
         }),
       });
-
-      setNumberPurchaseCount(data?.number_purchase_count || 0);
-      setNumberPurchaseLimit(data?.total_allowed_number_purchases || 0);
 
       if (data?.verified) {
         setTwilioNumber(data?.twilio_number || selectedTargetNumber.phone_number);
@@ -326,11 +327,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
         setTwilioNumber(data?.twilio_number || '');
         setTwilioNumberStatus(data?.twilio_number_status || '');
         setTwilioNumberLabel(data?.twilio_number_label || '');
-        setNumberPurchaseCount(data?.number_purchase_count || 0);
-        setNumberPurchaseLimit(data?.total_allowed_number_purchases || 0);
         setCanPurchaseNumber(Boolean(data?.can_purchase_number));
         setVerifyCallerIdEnabled(Boolean(data?.verify_caller_id));
-        setDefaultAreaCode(data?.default_area_code || '');
         setForwardingTargetNumber(data?.forwarding_target_number || '');
         setTargetQualityMessage(data?.twilio_number_quality_error || '');
         setTargetQualityState('idle');
@@ -450,6 +448,12 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
       }
     };
 
+    // Realtime is an optimization, not the source of truth. The backend checks
+    // Twilio for a recent inbound call during this request, so polling also
+    // recovers when the browser misses the Supabase UPDATE event.
+    refreshVerificationStatus();
+    const pollingTimer = window.setInterval(refreshVerificationStatus, 4000);
+
     const channel = supabase
       .channel(`business-forwarding-${businessId}`)
       .on(
@@ -468,6 +472,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
 
     return () => {
       active = false;
+      window.clearInterval(pollingTimer);
       supabase.removeChannel(channel);
     };
   }, [slide, authSession?.access_token, entryId, forwardingStatus, callerIdStatus, onSaved, businessId]);
@@ -617,6 +622,14 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     setSlide((current) => Math.max(current - 1, 0));
   };
 
+  const revealMoreTargetNumbers = (event) => {
+    const element = event.currentTarget;
+    const reachedEnd = element.scrollTop + element.clientHeight >= element.scrollHeight - 72;
+    if (reachedEnd && targetNumbersVisibleCount < availableTargetNumbers.length) {
+      setTargetNumbersVisibleCount((current) => Math.min(current + 25, availableTargetNumbers.length));
+    }
+  };
+
   const renderSlide = () => {
     if (slide === 0) {
       if (needsTargetNumberSelection || targetQualityState !== 'idle') {
@@ -625,19 +638,11 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           return (
             <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-white/[0.025]">
               <div className="relative p-5 text-center">
-                <div className={`relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border transition-all duration-500 ${
-                  passed
-                    ? 'border-emerald-400/20 bg-emerald-400/[0.06] shadow-[0_0_44px_rgba(52,211,153,0.16)]'
-                    : 'border-white/[0.10] bg-pink-400/[0.06] shadow-[0_0_44px_color-mix(in_srgb,var(--brandGradientStart)_12%,transparent)]'
-                }`}>
-                  <span className={`absolute h-20 w-20 rounded-full border ${passed ? 'border-emerald-300/25' : 'border-white/[0.14] animate-ping'}`} />
-                  <span className={`absolute h-14 w-14 rounded-full border ${passed ? 'border-emerald-300/20' : 'border-white/[0.10] animate-pulse'}`} />
-                  <div className={`relative flex h-12 w-12 items-center justify-center rounded-full text-black transition-all duration-500 ${
-                    passed
-                      ? 'bg-emerald-300 shadow-[0_0_22px_rgba(52,211,153,0.22)]'
-                      : 'bg-pink-300 shadow-[0_0_22px_color-mix(in_srgb,var(--brandGradientStart)_22%,transparent)]'
-                  }`}>
-                    {passed ? <CheckCircle2 size={21} /> : <Phone size={21} />}
+                <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.025] shadow-[0_0_44px_rgba(255,255,255,0.05)] transition-all duration-500">
+                  <span className={`absolute h-20 w-20 rounded-full border border-white/[0.14] ${passed ? '' : 'animate-ping'}`} />
+                  <span className={`absolute h-14 w-14 rounded-full border border-white/[0.10] ${passed ? '' : 'animate-pulse'}`} />
+                  <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-white text-black shadow-[0_0_22px_rgba(255,255,255,0.12)] transition-all duration-500">
+                    {passed ? <CheckCircle2 size={21} strokeWidth={2.5} /> : <Phone size={21} strokeWidth={2.5} />}
                   </div>
                 </div>
 
@@ -658,7 +663,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                       <span
                         key={dot}
                         className={`h-1.5 w-1.5 rounded-full ${
-                          passed ? 'bg-emerald-300' : dot <= targetQualityStep ? 'bg-pink-300' : 'bg-zinc-700'
+                          passed ? 'bg-emerald-300' : dot <= targetQualityStep ? 'bg-emerald-300' : 'bg-zinc-700'
                         } ${passed ? '' : 'transition-colors duration-300'}`}
                       />
                     ))}
@@ -705,12 +710,12 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
 
             <div className="space-y-2 rounded-[24px] border border-white/[0.06] bg-black/20 p-2">
               {targetNumbersLoading ? (
-                <div className="flex min-h-[180px] items-center justify-center text-[11px] uppercase tracking-[0.3em] text-zinc-700">
-                  Loading numbers
+                <div className="flex min-h-[220px] items-center justify-center" aria-label="Loading available numbers">
+                  <CubePreloader size={18} />
                 </div>
               ) : availableTargetNumbers.length ? (
-                <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
-                  {availableTargetNumbers.map((option) => {
+                <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1 custom-scrollbar" onScroll={revealMoreTargetNumbers}>
+                  {availableTargetNumbers.slice(0, targetNumbersVisibleCount).map((option) => {
                     const active = selectedTargetNumber?.phone_number === option.phone_number;
                     return (
                       <button
@@ -755,14 +760,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm leading-6 text-zinc-500">
-                Pick the receptionist number your business line will forward calls to. We’ll test it first and only switch the active number if it passes.
-              </p>
-              <p className="text-xs leading-5 text-zinc-600">
-                {numberPurchaseLimit
-                  ? `${numberPurchaseCount} of ${numberPurchaseLimit} number purchases used for this business.`
-                  : `${numberPurchaseCount} number purchases used for this business.`}
-              </p>
               {targetQualityState === 'failed' && targetQualityMessage ? (
                 <div className="rounded-2xl border border-rose-400/20 bg-rose-400/8 px-4 py-3 text-sm leading-6 text-rose-200">
                   {targetQualityMessage}
@@ -779,27 +776,28 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
       }
 
       return (
-        <div className="space-y-4 rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
+        <div className="rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-4">
           {targetLineReady && (
             <div className="rounded-[24px] border border-white/[0.08] bg-black/20 p-4">
-              <div className="mb-3 flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-600">Current receptionist number</p>
-                  <p className="mt-2 truncate text-xs font-normal text-zinc-500">{businessName || 'Your business'}</p>
-                  <p className="mt-2 break-words text-2xl font-semibold tracking-[-0.04em] text-white">
-                    {forwardingNumber}
-                  </p>
-                  {twilioNumberLabel ? (
-                    <p className="mt-1 truncate text-xs text-zinc-600">{twilioNumberLabel}</p>
-                  ) : null}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.035] text-zinc-300">
+                      <Phone size={15} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-600">Current receptionist number</p>
+                      <p className="mt-1 break-words text-xl font-semibold tracking-[-0.04em] text-white">{forwardingNumber}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="shrink-0 px-1 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">
+                <div className="shrink-0 px-1 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">
                   Active
                 </div>
               </div>
-              <p className="text-sm leading-6 text-zinc-500">
-                This is the number your business line forwards to. Replace it only if call quality is poor or you want a better local number.
-              </p>
+              {businessName || twilioNumberLabel ? (
+                <p className="mt-2 pl-12 text-xs text-zinc-600">{twilioNumberLabel || businessName}</p>
+              ) : null}
               <button
                 type="button"
                 onClick={() => {
@@ -813,7 +811,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
               </button>
             </div>
           )}
-          <div className="space-y-2">
+          <div className={`${targetLineReady ? 'mt-3 border-t border-white/[0.06] pt-3' : ''} min-w-0 space-y-2`}>
             {sourceOptions.map((option) => {
                 const active = sourceNumber === option.source_number;
                 return (
@@ -836,7 +834,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                       </div>
                     </div>
                     {option.status === 'verified' ? (
-                      <div className="shrink-0 rounded-full p-1 text-emerald-300">
+                      <div className="shrink-0 rounded-full p-1 text-zinc-300">
                         <CheckCircle2 size={14} />
                       </div>
                     ) : null}
@@ -879,18 +877,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
             )}
           </div>
 
-          <p className="text-sm leading-6 text-zinc-500">
-            {isAddingNewNumber
-              ? `${agent?.first_name || agent?.name || 'Your receptionist'} needs your business number connected so calls can be answered in the right place.`
-              : activeSourceOption
-                ? 'Choose the existing business number that will forward into the receptionist number.'
-                : 'Choose the business number customers already call, or add it if it is not listed yet.'}
-          </p>
-          {!hasTargetNumber && (
-            <p className="text-xs leading-5 text-pink-300/80">
-              Assign a phone number before forwarding calls to your AI receptionist.
-            </p>
-          )}
         </div>
       );
     }
@@ -898,10 +884,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     if (slide === 1) {
       return (
         <div className="space-y-4 rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-5">
-          <p className="text-sm leading-6 text-zinc-500">
-            Forward calls to this receptionist number.
-          </p>
-
           <div className="flex items-center justify-between gap-3 rounded-[24px] border border-white/[0.08] bg-black/20 p-4">
             <div className="min-w-0">
               <p className="break-words text-3xl font-semibold tracking-[-0.04em] text-white">
@@ -919,9 +901,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
             </button>
           </div>
 
-          <p className="text-sm leading-6 text-zinc-500">
-            In your carrier or phone system settings, forward <span className="font-semibold text-white">{sourceNumber || 'your business number'}</span> to this number.
-          </p>
         </div>
       );
     }
@@ -948,18 +927,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
               );
             })}
           </div>
-          <div className="mt-4 border-t border-white/[0.06] pt-4">
-            <div className="mb-4 flex items-center gap-2">
-              <Repeat size={15} className="text-pink-300" />
-              <p className="text-[13px] font-normal text-zinc-400">{selectedProvider.action}</p>
-            </div>
-            <div className="space-y-2 text-sm text-zinc-500">
-              <p>1. Open your phone provider settings.</p>
-              <p>2. Turn on call forwarding.</p>
-              <p>3. Forward <span className="font-semibold text-white">{sourceNumber || 'your business number'}</span> to <span className="font-semibold text-white">{forwardingNumber}</span>.</p>
-              <p>4. Save your changes.</p>
-            </div>
-          </div>
         </div>
       );
     }
@@ -968,20 +935,12 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
       const isVerified = forwardingStatus === 'verified';
       return (
       <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-white/[0.025]">
-        <div className="relative p-5 text-center">
-          <div className={`relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border transition-all duration-500 ${
-            isVerified
-              ? 'border-emerald-400/20 bg-emerald-400/[0.06] shadow-[0_0_44px_rgba(52,211,153,0.16)]'
-              : 'border-white/[0.10] bg-pink-400/[0.06] shadow-[0_0_44px_color-mix(in_srgb,var(--brandGradientStart)_12%,transparent)]'
-          }`}>
-            <span className={`absolute h-20 w-20 rounded-full border ${isVerified ? 'border-emerald-300/25' : 'border-white/[0.14] animate-ping'}`} />
-            <span className={`absolute h-14 w-14 rounded-full border ${isVerified ? 'border-emerald-300/20' : 'border-white/[0.10] animate-pulse'}`} />
-            <div className={`relative flex h-12 w-12 items-center justify-center rounded-full text-black transition-all duration-500 ${
-              isVerified
-                ? 'bg-emerald-300 shadow-[0_0_22px_rgba(52,211,153,0.22)]'
-                : 'bg-pink-300 shadow-[0_0_22px_color-mix(in_srgb,var(--brandGradientStart)_22%,transparent)]'
-            }`}>
-              <Phone size={21} />
+        <div className="relative flex min-h-[240px] flex-col items-center justify-center p-6 text-center">
+          <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.025] shadow-[0_0_44px_rgba(255,255,255,0.05)] transition-all duration-500">
+            <span className={`absolute h-20 w-20 rounded-full border border-white/[0.14] ${isVerified ? '' : 'animate-ping'}`} />
+            <span className={`absolute h-14 w-14 rounded-full border border-white/[0.10] ${isVerified ? '' : 'animate-pulse'}`} />
+            <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-white text-black shadow-[0_0_22px_rgba(255,255,255,0.12)] transition-all duration-500">
+              {isVerified ? <CheckCircle2 size={21} strokeWidth={2.5} /> : <Phone size={21} strokeWidth={2.5} />}
             </div>
           </div>
 
@@ -1001,7 +960,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
               {[0, 1, 2].map((dot) => (
                 <span
                   key={dot}
-                  className={`h-1.5 w-1.5 rounded-full ${isVerified ? 'bg-emerald-300' : 'bg-pink-300 animate-pulse'}`}
+                  className={`h-1.5 w-1.5 rounded-full ${isVerified ? 'bg-emerald-300' : 'bg-zinc-700'}`}
                   style={{ animationDelay: `${dot * 160}ms` }}
                 />
               ))}
@@ -1018,9 +977,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     return (
       <div className="rounded-[26px] border border-white/[0.08] bg-white/[0.025] p-5">
         <div className="space-y-4">
-          <p className="text-sm leading-6 text-zinc-500">
-            Let outbound calls show <span className="font-semibold text-white">{sourceNumber || 'your business number'}</span> instead of the assigned line.
-          </p>
           <div className="rounded-2xl border border-orange-300/15 bg-orange-300/[0.05] p-4 text-sm leading-6 text-orange-100/85">
             <p className="font-semibold text-orange-100">Outbound AI calling is limited to documented, consented operational or customer-service calls.</p>
             <p className="mt-1">Nodemere records and transcribes calls by default. Do not use this feature for telemarketing, political outreach, debt collection, or restricted industries. Every call must identify the business, disclose the AI assistant, and give any notice or opt-out required by law.</p>
@@ -1061,7 +1017,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                 disabled={callerIdStarting}
                 className="h-11 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {callerIdStarting ? 'Starting verification...' : 'Verify this number'}
+              {callerIdStarting ? <span className="flex items-center justify-center" aria-label="Starting verification"><CubePreloader size={14} /></span> : 'Verify this number'}
               </button>
             </div>
           )}
@@ -1075,7 +1031,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                 disabled={callerIdStarting}
                 className="mt-3 h-10 w-full rounded-full border border-white/[0.08] bg-white/[0.04] text-sm font-semibold text-white transition hover:border-white/[0.14] hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {callerIdStarting ? 'Starting verification...' : 'Try again'}
+                {callerIdStarting ? <span className="flex items-center justify-center" aria-label="Starting verification"><CubePreloader size={14} /></span> : 'Try again'}
               </button>
             </div>
           ) : null}
@@ -1101,21 +1057,21 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 18 }}
         onClick={(e) => e.stopPropagation()}
-        className="relative max-h-[calc(100vh-32px)] w-full max-w-[520px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+        className="relative max-h-[calc(100vh-24px)] w-full max-w-[700px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
       >
-        <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-[90px]" style={{ background: 'var(--modalBloom)' }} />
+        <div className="pointer-events-none absolute right-[-64px] top-[-80px] h-56 w-56 rounded-full bg-white/[0.035] blur-[70px]" />
 
-        <div className="relative p-5 sm:p-7">
+        <div className="relative p-6 sm:p-8">
           <div className="mb-6 flex items-start justify-between gap-5">
             <div className="min-w-0 flex-1">
-              <div className="flex h-4 items-center gap-3 pr-8">
+              <div className="flex h-4 w-full items-center gap-3 pr-8">
                 <p className="shrink-0 text-[13px] font-normal leading-4 text-zinc-300">{forwardingSteps[0].label} · {slide + 1} of {totalSlides}</p>
-                <div className="h-1 w-[190px] shrink-0 translate-y-0 overflow-hidden rounded-full bg-white/[0.06]">
+                <div className="h-1 min-w-0 max-w-[360px] flex-1 translate-y-0 overflow-hidden rounded-full bg-white/[0.06]">
                   <div className="h-full rounded-full brand-gradient transition-all duration-500" style={{ width: `${((slide + 1) / totalSlides) * 100}%` }} />
                 </div>
               </div>
               <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">{forwardingSteps[0].title}</h2>
-              <p className="mt-3 max-w-md text-sm leading-6 text-zinc-500">
+              <p className="mt-3 max-w-none text-sm leading-6 text-zinc-500">
                 {forwardingSteps[0].description}
               </p>
             </div>
@@ -1135,11 +1091,11 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -18 }}
               transition={{ duration: 0.18 }}
-              className="min-h-[190px]"
+              className=""
             >
               {loading ? (
-                <div className="flex min-h-[190px] items-center justify-center text-[11px] uppercase tracking-[0.3em] text-zinc-700">
-                  Loading...
+                <div className="flex min-h-[220px] items-center justify-center" aria-label="Loading forwarding settings">
+                  <CubePreloader size={18} />
                 </div>
               ) : (
                 renderSlide()
@@ -1153,7 +1109,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                 type="button"
                 onClick={goNext}
                 disabled={loading || saving || callerIdStarting}
-                className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mx-auto block h-12 w-full max-w-[440px] rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Finish Setup
               </button>
@@ -1171,12 +1127,10 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                   || (slide === 0 && needsTargetNumberSelection && (!selectedTargetNumber || !canPurchaseNumber))
                   || (slide === 3 && forwardingStatus !== 'verified')
                 }
-                className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mx-auto block h-12 w-full max-w-[440px] rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {saving
-                  ? targetQualityState === 'running'
-                    ? 'Checking number...'
-                    : 'Saving...'
+                  ? <span className="flex items-center justify-center" aria-label={targetQualityState === 'running' ? 'Checking number' : 'Saving'}><CubePreloader size={14} /></span>
                   : slide === 0 && needsTargetNumberSelection
                     ? targetQualityState === 'passed'
                       ? 'Continue'

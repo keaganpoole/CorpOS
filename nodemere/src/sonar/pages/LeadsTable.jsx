@@ -591,14 +591,17 @@ const DraggableHeader = ({
   const iconName = fieldConfig[col.id]?.icon;
   const IconComp = iconName ? ICONS[iconName] : null;
   const zoneEligible = isZoneEligibleColumn(col);
+  const canDrag = col.id !== 'avatar' && col.id !== 'select';
   return (
-    <div ref={headerRef} draggable={col.id !== 'avatar'} onDragStart={(e) => col.id !== 'avatar' && onDragStart(e, index)} onDragOver={(e) => onDragOver(e, index)}
-      onDrop={(e) => onDrop(e, index)} onDragEnd={onDragEnd}
+    <div ref={headerRef} draggable={canDrag} onDragStart={(e) => canDrag && onDragStart(e, index)} onDragOver={(e) => canDrag && onDragOver(e, index)}
+      onDrop={(e) => canDrag && onDrop(e, index)} onDragEnd={onDragEnd}
       style={{ width: col.width, minWidth: col.width }}
-      className={`shrink-0 flex items-center gap-1 transition-all duration-200 cursor-grab active:cursor-grabbing relative group/header ${isDragging ? 'opacity-30' : ''} ${dragOverIndex === index && !isDragging ? 'translate-x-1' : ''} ${isZoneCandidate ? 'text-white' : ''}`}>
-      <div className="w-0 overflow-hidden group-hover/header:w-3 transition-all duration-200 shrink-0 flex items-center">
-        <GripVertical size={10} className="text-zinc-800 group-hover/header:text-zinc-500 transition-colors shrink-0" />
-      </div>
+      className={`shrink-0 flex items-center gap-1 transition-all duration-200 ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''} relative group/header ${isDragging ? 'opacity-30' : ''} ${dragOverIndex === index && !isDragging ? 'translate-x-1' : ''} ${isZoneCandidate ? 'text-white' : ''}`}>
+      {col.id !== 'select' && (
+        <div className="w-0 overflow-hidden group-hover/header:w-3 transition-all duration-200 shrink-0 flex items-center">
+          <GripVertical size={10} className="text-zinc-800 group-hover/header:text-zinc-500 transition-colors shrink-0" />
+        </div>
+      )}
       {col.label ? (
         <button onClick={() => col.sortKey && onSort(col.sortKey)}
           className="flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:text-zinc-300 transition-colors">
@@ -1084,6 +1087,7 @@ const LeadsTable = ({
   searchPlaceholder = 'Search people...',
   searchFieldClassName = '',
 }) => {
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [viewSettings, setViewSettings] = useState(() => ({
     rowHeight: 3,
     sortRules: [],
@@ -1122,6 +1126,12 @@ const LeadsTable = ({
   const orderButtonRef = useRef(null);
   const rowHeightButtonRef = useRef(null);
   const intakeButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (!loading) setHasLoadedOnce(true);
+  }, [loading]);
+
+  const showInitialLoader = loading && !hasLoadedOnce;
 
   const column_options = CUSTOM_FIELD_TYPES;
   const anySelected = selectedIds.length > 0;
@@ -1896,7 +1906,7 @@ const LeadsTable = ({
             </div>
           )}
           <div className="divide-y divide-white/[0.02]">
-            {!loading && leads.length > 0 && sortedLeads.map((lead, idx) => {
+            {!showInitialLoader && leads.length > 0 && sortedLeads.map((lead, idx) => {
               const isJustAdded = justAddedLeadIds.includes(lead.id);
               const isRowSelected = selectedId === lead.id;
               const isRowBulkSelected = selectedIds.includes(lead.id);
@@ -1930,7 +1940,7 @@ const LeadsTable = ({
                 </motion.div>
               );
             })}
-            {!loading && leads.length > 0 && frozenCount > 0 && (
+            {!showInitialLoader && leads.length > 0 && frozenCount > 0 && (
               <button
                 type="button"
                 onClick={onCreateInline}
@@ -2090,7 +2100,7 @@ const LeadsTable = ({
             </div>
 
             <div className="divide-y divide-white/[0.02]">
-              {loading ? null : leads.length === 0 ? null : (
+              {showInitialLoader ? null : leads.length === 0 ? null : (
                 <>
                   {sortedLeads.map((lead, idx) => {
                     const isJustAdded = justAddedLeadIds.includes(lead.id);
@@ -2143,8 +2153,8 @@ const LeadsTable = ({
           </div>
         </div>
       </div>
-      {!loading && leads.length === 0 ? renderNewRecordEmptyState() : null}
-      {loading ? renderPeopleLoader() : null}
+      {!showInitialLoader && leads.length === 0 ? renderNewRecordEmptyState() : null}
+      {showInitialLoader ? renderPeopleLoader() : null}
     </div>
   );
 

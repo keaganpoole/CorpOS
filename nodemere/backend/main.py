@@ -932,7 +932,7 @@ def search_available_twilio_numbers(
     contains: Optional[str] = None,
     near_number: Optional[str] = None,
     region: Optional[str] = None,
-    limit: int = 12,
+    limit: int = 100,
 ) -> list[dict]:
     auth = get_twilio_auth_tuple()
     if not twilio_account_sid or not auth:
@@ -941,7 +941,7 @@ def search_available_twilio_numbers(
             detail="Twilio provisioning is not configured.",
         )
 
-    query_limit = max(1, min(limit, 20))
+    query_limit = max(1, min(limit, 100))
     search_params = {
         "VoiceEnabled": "true",
         "SmsEnabled": "true",
@@ -2782,7 +2782,7 @@ class BusinessForwardingNumberSearchRequest(BaseModel):
     contains: Optional[str] = None
     near_number: Optional[str] = None
     region: Optional[str] = None
-    limit: Optional[int] = 12
+    limit: Optional[int] = 100
 
 
 class BusinessForwardingNumberClaimRequest(BaseModel):
@@ -12064,7 +12064,7 @@ async def search_business_forwarding_numbers(
     contains: Optional[str] = None,
     near_number: Optional[str] = None,
     region: Optional[str] = None,
-    limit: int = 12,
+    limit: int = 100,
     current_user: dict = Depends(get_current_user),
 ):
     current_user_id = str(current_user.id)
@@ -12121,6 +12121,13 @@ async def claim_business_forwarding_number(
             normalize_phone_number(payload.phone_number),
             business.get("twilio_number"),
         )
+        previous_active_purchased_number = get_active_purchased_number_for_business(
+            int(business["id"]),
+            kind="assigned_line",
+        )
+        previous_elevenlabs_phone_number_id = (
+            previous_active_purchased_number or {}
+        ).get("elevenlabs_phone_number_id")
         updated_business, purchased, purchased_row = purchase_specific_twilio_number_for_business(
             business,
             payload.phone_number,
@@ -12254,6 +12261,11 @@ async def claim_business_forwarding_number(
             },
         )
         deactivate_other_purchased_numbers(int(business["id"]), activated_row.get("id"), kind="assigned_line")
+        if (
+            previous_elevenlabs_phone_number_id
+            and str(previous_elevenlabs_phone_number_id) != str(phone_number_id)
+        ):
+            delete_elevenlabs_phone_number(str(previous_elevenlabs_phone_number_id))
         activated_business = hydrate_business_with_purchased_number_data(business) or business
         logging.info(
             "Forwarding number activated business_id=%s active_number=%s incoming_sid=%s phone_number_id=%s activated_row_id=%s",
