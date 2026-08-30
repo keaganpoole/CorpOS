@@ -225,7 +225,7 @@ const POPUP_DEFINITIONS = [
     ),
     primaryActionLabel: 'Got it',
     showDontRemindMe: true,
-    shouldShow: ({ currentRoute }) => currentRoute === 'scenarios',
+    shouldShow: ({ currentRoute, scenariosIntroClicked }) => currentRoute === 'scenarios' && scenariosIntroClicked === true,
   },
   {
     id: 'live_monitoring_intro',
@@ -1783,6 +1783,7 @@ const SonarDashboard = () => {
   const [peopleToolbarMeta, setPeopleToolbarMeta] = useState({ count: 0, loading: true });
   const [calendarToolbarMeta, setCalendarToolbarMeta] = useState({ count: 0, loading: true, hasAppointmentWithPerson: false });
   const [scenariosToolbarMeta, setScenariosToolbarMeta] = useState({ count: 0, loading: true });
+  const [scenariosIntroClicked, setScenariosIntroClicked] = useState(false);
   const [callLogsToolbarMeta, setCallLogsToolbarMeta] = useState({ count: 0, loading: true });
   const [terminateAgentHasAppointments, setTerminateAgentHasAppointments] = useState(false);
   const [archivedAgents, setArchivedAgents] = useState([]);
@@ -1796,6 +1797,12 @@ const SonarDashboard = () => {
   const [showPlanChangePopup, setShowPlanChangePopup] = useState(false);
   const tasklistPersistRef = useRef('');
   const userId = authSession?.user?.id || profile?.id || null;
+
+  useEffect(() => {
+    const handleScenarioIntroClicked = () => setScenariosIntroClicked(true);
+    window.addEventListener('sonar:scenario-intro-clicked', handleScenarioIntroClicked);
+    return () => window.removeEventListener('sonar:scenario-intro-clicked', handleScenarioIntroClicked);
+  }, []);
 
   useEffect(() => {
     const handlePlanLimit = (event) => setPlanLimitDetail(event.detail || null);
@@ -2248,6 +2255,7 @@ const SonarDashboard = () => {
     peopleLoading: peopleToolbarMeta.loading,
     scenariosCount: scenariosToolbarMeta.count,
     scenariosLoading: scenariosToolbarMeta.loading,
+    scenariosIntroClicked,
     callLogsCount: callLogsToolbarMeta.count,
     callLogsLoading: callLogsToolbarMeta.loading,
     liveCallSeen,

@@ -21,7 +21,7 @@ import {
   Clock,
   Trash2,
   Repeat,
-  Target,
+  Webhook,
   Check,
   Eye,
   EyeOff,
@@ -398,7 +398,7 @@ const AUTOMATION_HIERARCHY = {
     {
       key: 'payments',
       option: 'Payments',
-      description: 'When something happens with billing, customers, or subscriptions',
+      description: 'When something happens with billing',
       accent: 'var(--brandGradientStart)',
       icon: OPTION_ICONS.payments,
       sub_options: [
@@ -473,7 +473,7 @@ const AUTOMATION_HIERARCHY = {
     {
       key: 'payments',
       option: 'Payments',
-      description: 'Manage customers, payments, invoices, and subscriptions',
+      description: 'Manage payments, invoices, and more',
       accent: '#cbd5e1',
       icon: OPTION_ICONS.payments,
       sub_options: [
@@ -2068,6 +2068,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     event.preventDefault();
     const node = nodeMap[nodeId];
     if (!node) return;
+    if (nodeId === INITIAL_NODE.id && !node.configured) {
+      emitScenarioPopupEvent('sonar:scenario-intro-clicked');
+    }
     if (!hasPaymentAccess && isPaymentScenarioNode(node)) {
       goToPaymentUpgrade();
       return;
@@ -2320,6 +2323,16 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     }
     const optionIcon = option.icon || categoryMeta.icon;
     const optionAccent = option.accent || categoryMeta.accent;
+    if (option.key === 'iterator') {
+      const iteratorOption = option.sub_options?.[0] || {
+        key: 'iterator',
+        name: option.option,
+        description: option.description,
+        configFields: [{ key: 'collection_path', label: 'Collection Path', type: 'text' }],
+      };
+      handleSubOptionClick(iteratorOption);
+      return;
+    }
     if (option.sub_options?.length) {
       setActiveOption({ ...option, accent: optionAccent });
       setPanelStage('subOptions');
@@ -5086,26 +5099,27 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     <div className="scenario-list-page">
       <div className="scenario-list-header">
         <div className="scenario-list-title-group" aria-hidden="true" />
-        <div className="scenario-list-actions">
-          <button className="create-scenario-btn" onClick={handleCreateScenario}>
-            Create Scenario
-          </button>
-        </div>
+        {scenarios.length > 0 && (
+          <div className="scenario-list-actions">
+            <button className="create-scenario-btn" onClick={handleCreateScenario}>
+              Create Scenario
+            </button>
+          </div>
+        )}
       </div>
       
       <div className="scenario-list-content">
         {scenarios.length === 0 ? (
           <div className="scenario-empty-state">
             <div className="scenario-empty-icon">
-              <Target size={48} />
+              <Webhook size={48} />
             </div>
             <h3 className="scenario-empty-title">No scenarios yet</h3>
             <p className="scenario-empty-description">
-              Create your first scenario to automate workflows based on lead conditions.
+              Create your first scenario to automate workflows.
             </p>
             <button className="create-scenario-btn" onClick={handleCreateScenario}>
-              <Plus size={18} />
-              Create Your First Scenario
+              Create a Scenario
             </button>
           </div>
         ) : (
@@ -6528,7 +6542,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                           </div>
                           {isPaymentOptionLocked ? (
                             <span className="sb-payment-badge-wrapper"><span className="sb-payment-unlock-badge"><LockKeyhole size={11} /> Unlock with <span className="sb-payment-pro-text">Pro</span></span></span>
-                          ) : hasChildren && <ChevronRight size={18} style={{ opacity: 0.4, marginLeft: 'auto' }} />}
+                          ) : hasChildren && option.key !== 'iterator' && <ChevronRight size={18} style={{ opacity: 0.4, marginLeft: 'auto' }} />}
                         </button>
                       );
                     })

@@ -374,7 +374,7 @@ const AUTOMATION_HIERARCHY = {
     {
       key: 'payments',
       option: 'Payments',
-      description: 'When something happens with billing, customers, or subscriptions',
+      description: 'When something happens with billing',
       accent: 'var(--brandGradientStart)',
       icon: OPTION_ICONS.payments,
       sub_options: [
@@ -449,7 +449,7 @@ const AUTOMATION_HIERARCHY = {
     {
       key: 'payments',
       option: 'Payments',
-      description: 'Manage customers, payments, invoices, and subscriptions',
+      description: 'Manage payments, invoices, and more',
       accent: '#cbd5e1',
       icon: OPTION_ICONS.payments,
       sub_options: [
@@ -4819,7 +4819,7 @@ export default function ScenariosPage({
             </div>
             <h3 className="scenario-empty-title">No scenarios yet</h3>
             <p className="scenario-empty-description">
-              Create your first scenario to automate workflows based on lead conditions.
+              Create your first scenario to automate workflows.
             </p>
             <button className="create-scenario-btn" onClick={handleCreateScenario}>
               <Plus size={18} />
