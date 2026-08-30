@@ -65,6 +65,7 @@ import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 import ScenariosPage from './pages/Scenarios/Scenarios';
 import SettingsPage from './pages/SettingsPage';
 import { StaffManager } from './pages/SettingsPage';
+import ReportProblemModal from './components/ReportProblemModal';
 import CalendarPage from './pages/CalendarPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
@@ -1578,7 +1579,7 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
   }, [isOpen, onClose]);
 
   return (
-    <div ref={menuRef} className="relative z-[200] ml-auto no-drag">
+    <div ref={menuRef} className="relative z-[200] no-drag">
       <button
         ref={buttonRef}
         type="button"
@@ -1777,6 +1778,7 @@ const SonarDashboard = () => {
   const [staffBusinessId, setStaffBusinessId] = useState(null);
   const [businessUsage, setBusinessUsage] = useState(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [reportProblemOpen, setReportProblemOpen] = useState(false);
   const [teamView, setTeamView] = useState('receptionists');
   const [peopleToolbarMeta, setPeopleToolbarMeta] = useState({ count: 0, loading: true });
   const [calendarToolbarMeta, setCalendarToolbarMeta] = useState({ count: 0, loading: true, hasAppointmentWithPerson: false });
@@ -2638,22 +2640,42 @@ const SonarDashboard = () => {
             </div>
           </div>
         </div>
-        <AccountDropdown
-          profile={profile}
-          usage={businessUsage}
-          isOpen={accountMenuOpen}
-          onToggle={() => setAccountMenuOpen((open) => !open)}
-          onClose={() => setAccountMenuOpen(false)}
-          onOpenSettings={() => {
-            setAccountMenuOpen(false);
-            setCurrentRoute('settings');
-          }}
-          onUpgrade={() => {
-            setAccountMenuOpen(false);
-            window.location.href = '/pricing';
-          }}
-        />
+        <div className="ml-auto flex items-center">
+          <button
+            type="button"
+            onClick={() => {
+              setAccountMenuOpen(false);
+              setReportProblemOpen(true);
+            }}
+            className="no-drag mr-2 hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-[10px] font-semibold tracking-[-0.01em] text-zinc-600 transition-colors hover:bg-white/[0.04] hover:text-zinc-300 lg:inline-flex"
+          >
+            <CircleQuestionMark size={14} />
+            <span>Report a problem</span>
+          </button>
+          <AccountDropdown
+            profile={profile}
+            usage={businessUsage}
+            isOpen={accountMenuOpen}
+            onToggle={() => setAccountMenuOpen((open) => !open)}
+            onClose={() => setAccountMenuOpen(false)}
+            onOpenSettings={() => {
+              setAccountMenuOpen(false);
+              setCurrentRoute('settings');
+            }}
+            onUpgrade={() => {
+              setAccountMenuOpen(false);
+              window.location.href = '/pricing';
+            }}
+          />
+        </div>
       </header>
+
+      {reportProblemOpen && (
+        <ReportProblemModal
+          currentPage={currentRoute}
+          onClose={() => setReportProblemOpen(false)}
+        />
+      )}
 
       {/* Layout */}
       <div className="flex flex-1 min-h-0">
@@ -2679,6 +2701,20 @@ const SonarDashboard = () => {
             </nav>
           </div>
           <div className="mt-auto px-3 pb-5 pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                setSidebarCollapsed(true);
+                setReportProblemOpen(true);
+              }}
+              title="Report a problem"
+              className="no-drag group mb-1 flex w-full items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] text-zinc-500 transition-colors hover:bg-white/5 hover:text-white lg:hidden"
+            >
+              <CircleQuestionMark size={15} className="shrink-0 text-zinc-600 transition-colors duration-300 group-hover:text-white" />
+              <span className={`overflow-hidden font-bold tracking-tight whitespace-nowrap transition-[max-width,opacity,transform,margin] duration-180 ease-out ${sidebarCollapsed ? 'ml-0 max-w-0 opacity-0 translate-x-[-4px]' : 'ml-0.5 max-w-[140px] opacity-100 translate-x-0'}`}>
+                Report a problem
+              </span>
+            </button>
             <button
               type="button"
               onClick={() => {

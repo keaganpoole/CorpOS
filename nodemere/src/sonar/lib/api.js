@@ -87,6 +87,7 @@ export const api = {
   deleteScenario: (id) => deleteJSON(`/api/sonar/scenarios/${encodeURIComponent(id)}`),
   createBillingPortal: () => postJSON('/api/sonar/billing/portal', {}),
   getBillingUsage: () => fetchJSON('/api/sonar/billing/usage'),
+  submitBugReport: (report) => postJSON('/api/sonar/bugs', report),
   createPrivacyRequest: (request) => postJSON('/users/me/privacy-requests', request),
   closeAccount: () => postJSON('/users/me/account/close', {}),
   getCronJobs: () => fetchJSON('/api/cron'),

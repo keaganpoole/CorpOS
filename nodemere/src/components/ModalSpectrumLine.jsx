@@ -174,6 +174,21 @@ const MODAL_SPECTRUM_STYLES = `
     100% { opacity: 0; transform: translateX(360%); }
   }
 
+  @keyframes modal-report-danger-pulse {
+    0%, 100% { opacity: 0; box-shadow: none; }
+    12% { opacity: .72; box-shadow: 0 0 9px rgba(244, 63, 94, .45); }
+    27% { opacity: .18; box-shadow: none; }
+    42% { opacity: .72; box-shadow: 0 0 9px rgba(244, 63, 94, .45); }
+    57% { opacity: .12; box-shadow: none; }
+    72%, 100% { opacity: 0; }
+  }
+
+  @keyframes modal-report-current-reveal {
+    0%, 54% { opacity: 0; }
+    76% { opacity: .42; }
+    100% { opacity: 1; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .modal-spectrum-line *, .modal-spectrum-line *::before, .modal-spectrum-line *::after {
       animation-duration: .001ms !important;
@@ -190,6 +205,7 @@ const normalizeVariant = (variant) => {
   if (['error', 'errors', 'warning', 'warnings', 'alert', 'danger'].includes(value)) return 'error';
   if (['plan', 'plan_change', 'plan_changed', 'billing', 'upgrade', 'downgrade'].includes(value)) return 'plan';
   if (['success', 'complete', 'completed', 'done'].includes(value)) return 'success';
+  if (['report', 'problem', 'bug'].includes(value)) return 'report';
   return 'general';
 };
 
@@ -202,6 +218,7 @@ const ANIMATIONS = {
   plan: 'eventHorizonOpen 1.15s cubic-bezier(0.85, 0, 0.15, 1) forwards',
   general: 'popup-spectrum-run 1.2s ease-out 1 forwards',
   success: 'popup-success-spectrum-run 1.5s ease-out 1 forwards',
+  report: 'modal-report-current-reveal 5.8s ease-in-out forwards',
 };
 
 const REVEAL_DURATIONS = {
@@ -211,6 +228,7 @@ const REVEAL_DURATIONS = {
   plan: 1150,
   general: 1200,
   success: 1500,
+  report: 5800,
 };
 
 const ModalSpectrumLine = ({ variant = 'general' }) => {
@@ -241,6 +259,15 @@ const ModalSpectrumLine = ({ variant = 'general' }) => {
             animation: ANIMATIONS[resolvedVariant],
           }}
         />
+        {resolvedVariant === 'report' && (
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: 'linear-gradient(90deg, #ef4444, #fb7185, #ef4444)',
+              animation: 'modal-report-danger-pulse 5.8s ease-in-out forwards',
+            }}
+          />
+        )}
         {revealReady || resolvedVariant === 'success' ? (
           <>
             <div

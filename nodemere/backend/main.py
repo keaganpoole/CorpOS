@@ -8457,6 +8457,12 @@ class SonarDocumentRenameRequest(BaseModel):
     file_name: str = Field(..., min_length=1, max_length=255)
 
 
+class SonarBugReportRequest(BaseModel):
+    description: str = Field(..., min_length=1, max_length=10000)
+    severity: int = Field(default=3, ge=1, le=5)
+    page: Optional[str] = Field(default=None, max_length=120)
+
+
 def normalize_sonar_document_name(file_name: str) -> str:
     """Keep dashboard document names safe for display without changing storage paths."""
     normalized = " ".join(str(file_name or "").replace("\\", "/").split("/")[-1].split())
@@ -8688,7 +8694,6 @@ async def rename_sonar_person_document(
             .eq("id", document_id)
             .eq("person_id", person_id)
             .eq("business_id", business["id"])
-            .select("id,request_id,person_id,file_name,content_type,file_size,created_at")
             .execute()
         )
         if not response.data:
@@ -8735,6 +8740,42 @@ async def delete_sonar_person_document(person_id: str, document_id: str, current
     except Exception as exc:
         logging.error("Failed to delete dashboard document %s: %s", document_id, exc, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not delete document.") from exc
+
+
+@app.post("/api/sonar/bugs", tags=["Sonar Feedback"])
+async def create_sonar_bug_report(
+    payload: SonarBugReportRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = str(current_user.id)
+    business = load_business_by_user_id(user_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    description = payload.description.strip()
+    if not description:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Describe the problem before submitting")
+    try:
+        response = (
+            supabase_admin.table("bugs")
+            .insert({
+                "user_id": user_id,
+                "business_id": business["id"],
+                "description": description,
+                "severity": payload.severity,
+                "page": (payload.page or "").strip()[:120] or None,
+                "user_agent": request.headers.get("user-agent"),
+            })
+            .execute()
+        )
+        if not response.data:
+            raise RuntimeError("Bug report was not created.")
+        return {"ok": True, "bug": response.data[0]}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to save bug report for user %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not submit the problem report.") from exc
 
 @app.get("/api/sonar/people/search", tags=["Sonar People"])
 async def search_sonar_people(q: str, limit: int = 25, current_user: dict = Depends(get_current_user)):
