@@ -231,13 +231,9 @@ const defaultSettings = {
   reminder_before_minutes: 60,
   allow_cancellations: true,
   cancellation_window_hours: 24,
-  autonomy_index: 1,
   preferences: {
     general: {
       show_setup_guide: true,
-    },
-    calls: {
-      allow_caller_authentication: false,
     },
   },
   knowledge_base: {
@@ -3300,39 +3296,6 @@ const SettingsPage = () => {
                 </div>
               </div>
             </div>
-            <div>
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Calls</p>
-            <div className="rounded-2xl border border-white/[0.05] bg-zinc-950/40 p-5">
-              <div className="flex items-start justify-between gap-5">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Shield size={15} className="settings-icon" />
-                    <h4 className="text-[13px] font-semibold text-zinc-100">Authenticate Callers</h4>
-                    <span className="group relative inline-flex">
-                      <button
-                        type="button"
-                        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/[0.12] text-[10px] font-bold text-zinc-500 transition-colors hover:border-white/30 hover:text-zinc-300 outline-none focus:outline-none focus-visible:outline-none"
-                        aria-label="Caller authentication details"
-                      >
-                        i
-                      </button>
-                      <span className="pointer-events-none absolute bottom-6 left-1/2 z-20 hidden w-72 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-zinc-950 px-3 py-2 text-[11px] font-normal leading-4 text-zinc-400 shadow-2xl shadow-black/40 group-hover:block group-focus-within:block">
-                        If a caller's incoming phone number doesn't match the number on file, the receptionist will text a secure OTP verification link to confirm their identity before making any account changes. This helps protect customer accounts from unauthorized access.
-                      </span>
-                    </span>
-                  </div>
-                  <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
-                    Sends a secure text message with a one-time verification link to confirm the caller's identity.
-                  </p>
-                </div>
-                <Toggle
-                  value={settings.preferences?.calls?.allow_caller_authentication === true}
-                  onChange={(value) => updatePreference('calls', 'allow_caller_authentication', value)}
-                  color="cyan"
-                />
-              </div>
-            </div>
-            </div>
           </div>
         );
       default:
@@ -3378,7 +3341,7 @@ const SettingsPage = () => {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-[#020202]">
-        <div className="text-[11px] text-zinc-700 uppercase tracking-[0.3em] animate-pulse">Loading settings</div>
+        <CubePreloader size={22} />
       </div>
     );
   }

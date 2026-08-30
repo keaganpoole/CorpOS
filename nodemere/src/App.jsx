@@ -10,7 +10,6 @@ import AuthPage from './pages/AuthPage';
 import Onboarding2Page from './pages/Onboarding2Page';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import VerificationPage from './pages/VerificationPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
 import VoiceClonePage from './pages/VoiceClonePage';
 import SplashScreen from './components/SplashScreen';
@@ -93,7 +92,6 @@ function AppContent() {
         <Route path="/data-processing-addendum" element={<LegalDocumentPage documentKey="dpa" />} />
         <Route path="/subprocessors" element={<LegalDocumentPage documentKey="subprocessors" />} />
         <Route path="/cookie-notice" element={<LegalDocumentPage documentKey="cookies" />} />
-        <Route path="/verify/:token" element={<VerificationPage />} />
         <Route path="/upload/:token" element={<DocumentUploadPage />} />
         <Route path="/clone/:token" element={<VoiceClonePage />} />
         <Route path="/clone" element={<VoiceClonePage />} />

@@ -319,6 +319,7 @@ const FieldSettingsModal = ({
   const [activeTab, setActiveTab] = useState('name');
   const [saved, setSaved] = useState(false);
   const isCustomField = typeof fieldKey === 'string' && fieldKey.startsWith('custom_');
+  const isDocsField = fieldMeta?.type === 'docs';
   const isOptionsField = fieldMeta?.type === 'select' || fieldMeta?.type === 'multi_select';
   const normalizedOptions = useMemo(() => (
     Array.isArray(fieldConfig?.options)
@@ -328,7 +329,7 @@ const FieldSettingsModal = ({
         : []
   ), [fieldConfig?.options, fieldMeta?.options]);
   const hasOptions = normalizedOptions.length > 0 || isOptionsField;
-  const intakeLocked = fieldKey === 'phone';
+  const intakeLocked = fieldKey === 'phone' || isDocsField;
 
   useEffect(() => {
     setName(fieldConfig?.name || fieldKey);
@@ -392,7 +393,7 @@ const FieldSettingsModal = ({
 
   const tabs = [
     { key: 'name', label: 'Name & Icon', icon: <Type size={12} /> },
-    { key: 'intake', label: 'Intake', icon: <ClipboardList size={12} /> },
+    ...(!isDocsField ? [{ key: 'intake', label: 'Intake', icon: <ClipboardList size={12} /> }] : []),
     ...(hasOptions ? [{ key: 'colors', label: 'Options', icon: <Palette size={12} /> }] : []),
   ];
   const intakeStyles = getIntakeBadgeStyles(intakeEnabledCount);

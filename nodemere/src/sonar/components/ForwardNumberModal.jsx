@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, Copy, Phone, Plus, Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -54,6 +54,11 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
   const [verifyCallerIdEnabled, setVerifyCallerIdEnabled] = useState(false);
   const [isAddingNewNumber, setIsAddingNewNumber] = useState(false);
   const [isReplacingTargetNumber, setIsReplacingTargetNumber] = useState(false);
+  const verificationWatchCleanupRef = useRef(null);
+  const handleClose = () => {
+    verificationWatchCleanupRef.current?.();
+    onClose();
+  };
   const forwardingNumber = forwardingTargetNumber || '';
   const hasTargetNumber = Boolean(forwardingNumber);
   const targetLineReady = hasTargetNumber && String(twilioNumberStatus || '').toLowerCase() === 'active';
@@ -470,10 +475,18 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
       )
       .subscribe();
 
-    return () => {
+    const stopVerificationWatch = () => {
       active = false;
       window.clearInterval(pollingTimer);
       supabase.removeChannel(channel);
+    };
+    verificationWatchCleanupRef.current = stopVerificationWatch;
+
+    return () => {
+      stopVerificationWatch();
+      if (verificationWatchCleanupRef.current === stopVerificationWatch) {
+        verificationWatchCleanupRef.current = null;
+      }
     };
   }, [slide, authSession?.access_token, entryId, forwardingStatus, callerIdStatus, onSaved, businessId]);
 
@@ -575,7 +588,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           if (verifyCallerIdEnabled && saved?.caller_id_verification_status !== 'verified') {
             setSlide(4);
           } else {
-            onClose();
+            handleClose();
           }
         }
         return;
@@ -605,11 +618,11 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
         setSlide(4);
         return;
       }
-      onClose();
+      handleClose();
       return;
     }
 
-    onClose();
+    handleClose();
   };
 
   const goBack = () => {
@@ -1050,7 +1063,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 p-4 text-white backdrop-blur-md sm:p-8 font-sans"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <motion.div
         initial={{ scale: 0.96, opacity: 0, y: 18 }}
@@ -1077,7 +1090,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white"
             >
               <X size={16} />
@@ -1146,7 +1159,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
             )}
             <button
               type="button"
-              onClick={slide === 0 && targetQualityState !== 'passed' ? onClose : goBack}
+              onClick={slide === 0 && targetQualityState !== 'passed' ? handleClose : goBack}
               disabled={saving}
               className="h-11 w-full rounded-full text-sm font-normal text-zinc-500 transition hover:text-white disabled:opacity-40"
             >

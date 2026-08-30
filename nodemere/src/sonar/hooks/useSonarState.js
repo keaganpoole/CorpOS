@@ -3,15 +3,9 @@
  * Connects to WebSocket on mount, manages all operational data
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api, connectWebSocket, addMessageListener, disconnectWebSocket } from '../lib/api';
 import { supabase } from '../lib/supabase';
-
-function normalizeAutonomyIndex(value) {
-  const parsed = parseInt(value, 10);
-  if (Number.isNaN(parsed)) return 1;
-  return Math.min(5, Math.max(1, parsed));
-}
 
 function normalizeCallDirection(value) {
   const normalized = String(value || 'all').trim().toLowerCase();
@@ -33,7 +27,7 @@ function directionConflicts(selectedDirection, existingDirection) {
 export function useSonarState() {
   const [tasks, setTasks] = useState([]);
   const [agents, setAgents] = useState([]);
-  const [controlState, setControlState] = useState({ runtime_mode: 'running', stage: 'code_blue', zone: 1, calls_filter: 'all' });
+  const [controlState, setControlState] = useState({ runtime_mode: 'running', stage: 'code_blue', calls_filter: 'all' });
   const [session, setSession] = useState(null);
   const [livePulse, setLivePulse] = useState([]);
   const [systemLogs, setSystemLogs] = useState([]);
@@ -68,7 +62,7 @@ const [reactions, setReactions] = useState([]);
       api.getPipeline(),
       api.getCronJobs(),
       api.getReactions(),
-      supabase.from('account_settings').select('id, call_routing, autonomy_index').limit(1).maybeSingle(),
+      supabase.from('account_settings').select('id, call_routing').limit(1).maybeSingle(),
     ]);
 
     // Note: tasksData removed - Sonar no longer uses tasks
@@ -81,7 +75,6 @@ const [reactions, setReactions] = useState([]);
       setControlState(prev => ({
         ...prev,
         calls_filter: String(settingsResponse.data.call_routing || prev.calls_filter || 'all').toLowerCase(),
-        zone: normalizeAutonomyIndex(settingsResponse.data.autonomy_index ?? prev.zone),
       }));
     }
     if (sessionData) setSession(sessionData);
@@ -143,8 +136,6 @@ const [reactions, setReactions] = useState([]);
           setControlState(prev => ({ ...prev, runtime_mode: 'running' }));
         } else if (data.event_type === 'stage_changed') {
           setControlState(prev => ({ ...prev, stage: data.payload?.stage || prev.stage }));
-        } else if (data.event_type === 'zone_changed') {
-          setControlState(prev => ({ ...prev, zone: data.payload?.zone || prev.zone }));
         }
 
         // Refresh pipeline on lead events
@@ -208,12 +199,10 @@ const [reactions, setReactions] = useState([]);
         const next = payload.new || payload.record || null;
         if (!next) return;
         const normalized = String(next.call_routing || 'all').toLowerCase();
-        const autonomyIndex = normalizeAutonomyIndex(next.autonomy_index);
         setAccountSettingsId(next.id || null);
         setControlState(prev => ({
           ...prev,
           calls_filter: normalized || prev.calls_filter || 'all',
-          zone: autonomyIndex,
         }));
         setAgents(prev => prev.map(agent => {
           const currentStatus = String(agent.status || '').trim().toLowerCase();
@@ -262,71 +251,6 @@ const [reactions, setReactions] = useState([]);
       api.setStage(stage);
     }
   }, []);
-
-  const setZone = useCallback((zone) => {
-    const autonomyIndex = normalizeAutonomyIndex(zone);
-    let previousZone = controlState.zone;
-
-    setControlState(prev => {
-      previousZone = prev.zone;
-      return { ...prev, zone: autonomyIndex };
-    });
-
-    const persistAutonomyIndex = async () => {
-      try {
-        if (accountSettingsId) {
-          const { data, error } = await supabase
-            .from('account_settings')
-            .update({ autonomy_index: autonomyIndex })
-            .eq('id', accountSettingsId)
-            .select('id, autonomy_index')
-            .single();
-          if (error) throw error;
-          if (data?.id) setAccountSettingsId(data.id);
-          return data;
-        }
-
-        const { data: existingSettings, error: existingError } = await supabase
-          .from('account_settings')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-        if (existingError) throw existingError;
-
-        if (existingSettings?.id) {
-          const { data, error } = await supabase
-            .from('account_settings')
-            .update({ autonomy_index: autonomyIndex })
-            .eq('id', existingSettings.id)
-            .select('id, autonomy_index')
-            .single();
-          if (error) throw error;
-          if (data?.id) setAccountSettingsId(data.id);
-          return data;
-        }
-
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError) throw authError;
-        const userId = authData?.user?.id;
-        if (!userId) throw new Error('User not found');
-
-        const { data, error } = await supabase
-          .from('account_settings')
-          .insert({ user_id: userId, autonomy_index: autonomyIndex })
-          .select('id, autonomy_index')
-          .single();
-        if (error) throw error;
-        if (data?.id) setAccountSettingsId(data.id);
-        return data;
-      } catch (err) {
-        console.error('[SonarState] Failed to save autonomy index:', err.message || err);
-        setControlState(prev => ({ ...prev, zone: previousZone }));
-        return null;
-      }
-    };
-
-    void persistAutonomyIndex();
-  }, [accountSettingsId, controlState.zone]);
 
   const setCallsFilter = useCallback(async (callsFilter) => {
     const normalized = String(callsFilter || 'all').trim().toLowerCase();
@@ -523,7 +447,6 @@ const [reactions, setReactions] = useState([]);
     agentsLoading,
     isPaused,
     toggleRuntime,
-    setZone,
     setCallsFilter,
     pingMax,
     updateAgentActive,

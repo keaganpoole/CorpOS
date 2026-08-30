@@ -125,7 +125,7 @@ from .verification_service import (
     get_public_verification,
     get_verification_status,
 )
-from .document_service import create_document_request, get_document_request, get_document_request_status, store_document
+from .document_service import DOCUMENT_BUCKET, create_document_request, get_document_request, get_document_request_status, store_document
 from .email_delivery_service import (
     EmailDeliveryError,
     SystemGmailConfiguration,
@@ -174,7 +174,6 @@ PAYMENT_TEST_MODE = TEST_MODE
 CONTROL_STATE = {
     "runtime_mode": "running",
     "stage": "code_blue",
-    "zone": 1,
 }
 SESSION_STATE = {
     "status": "running",
@@ -566,24 +565,6 @@ def get_account_call_routing_for_user(user_id: Optional[str]) -> str:
     except Exception as exc:
         logging.warning("Failed to load account call routing for user %s: %s", user_id, exc)
         return "all"
-
-
-def get_account_autonomy_index_for_user(user_id: Optional[str] = None) -> int:
-    try:
-        query = (
-            supabase
-            .table("account_settings")
-            .select("autonomy_index")
-        )
-        if user_id:
-            query = query.eq("user_id", str(user_id))
-        response = query.limit(1).execute()
-        row = (response.data or [None])[0]
-        parsed = int((row or {}).get("autonomy_index") or 1)
-        return min(5, max(1, parsed))
-    except Exception as exc:
-        logging.warning("Failed to load account autonomy index for user %s: %s", user_id, exc)
-        return 1
 
 
 def caller_authentication_allowed(*, user_id: Optional[str] = None, business_id: Optional[str] = None) -> bool:
@@ -2691,9 +2672,6 @@ class RuntimeModeRequest(BaseModel):
 
 class StageRequest(BaseModel):
     stage: str
-
-class ZoneRequest(BaseModel):
-    zone: int
 
 class AgentCallTypesRequest(BaseModel):
     call_types: Optional[str] = None
@@ -5780,6 +5758,21 @@ def build_verification_request_context(payload: dict) -> dict:
         if matched_person:
             person_id = matched_person.get("id")
             business_id = business_id or matched_person.get("business_id")
+    receptionist_id = first_present(
+        payload,
+        "hired_receptionist_id",
+        "receptionist_id",
+        "system__receptionist_id",
+        "system_receptionist_id",
+        "metadata.hired_receptionist_id",
+        "metadata.receptionist_id",
+    )
+    if not receptionist_id and business_id:
+        assigned_receptionist = find_inbound_receptionist_for_business(
+            business_id,
+            context.get("user_id") or business.get("user_id"),
+        )
+        receptionist_id = (assigned_receptionist or {}).get("id")
     return {
         "business_id": business_id,
         "person_id": person_id,
@@ -5791,6 +5784,7 @@ def build_verification_request_context(payload: dict) -> dict:
             "conversation_id": first_present(payload, "conversation_id", "system__conversation_id", "system_conversation_id"),
             "call_id": first_present(payload, "call_id", "CallSid", "callSid"),
             "agent_id": first_present(payload, "agent_id", "elevenlabs_agent_id"),
+            "hired_receptionist_id": receptionist_id,
             **(payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}),
         },
     }
@@ -5945,27 +5939,6 @@ def deliver_existing_secure_link_by_email(
         "expires_at": request_result.get("expires_at"),
         "delivery": delivery,
     }
-
-
-async def send_verification_link_tool(request: Request):
-    payload = await parse_request_payload(request)
-    context = build_verification_request_context(payload)
-    if not caller_authentication_allowed(user_id=context.get("user_id"), business_id=context.get("business_id")):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Caller authentication is disabled in account preferences.",
-        )
-    request_result = create_verification_session(
-        supabase_admin,
-        base_url=verification_base_url,
-        **context,
-    )
-    return deliver_existing_secure_link_by_email(
-        request_result=request_result,
-        context=context,
-        payload=payload,
-        kind="verification",
-    )
 
 
 async def check_verification_status_tool(request: Request):
@@ -6259,19 +6232,6 @@ async def get_verification_page_state(token: str):
 @app.post("/api/verification/{token}/complete", tags=["Verification"])
 async def complete_verification_page(token: str):
     return complete_verification(supabase_admin, token)
-
-
-@app.post("/api/tools/send-verification-link", tags=["Server Tools"])
-async def send_verification_link_route(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
-    return await send_verification_link_tool(request)
-
-
-@app.post("/api/tools/request-authentication", tags=["Server Tools"])
-@app.post("/api/tools/request_authentication", tags=["Server Tools"])
-@app.post("/api/tools/auth-request", tags=["Server Tools"])
-@app.post("/api/tools/auth_request", tags=["Server Tools"])
-async def request_authentication_route(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
-    return await send_verification_link_tool(request)
 
 
 @app.post("/api/tools/request_docs", tags=["Server Tools"])
@@ -6711,7 +6671,7 @@ async def twilio_inbound_webhook(request: Request):
         "direction": "inbound",
         "conversation_initiation_client_data": {
             "scenario_context": {
-                "autonomy_index": get_account_autonomy_index_for_user(context.get("user_id") or (business or {}).get("user_id")),
+                "autonomy_index": 1,
                 "caller_number": from_number,
                 "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
                 "business_name": business.get("name") if business else None,
@@ -6824,7 +6784,7 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
     )
 
     dynamic_variables = {
-        "autonomy_index": get_account_autonomy_index_for_user(context.get("user_id") or (business or {}).get("user_id")),
+        "autonomy_index": 1,
         "authenticate_caller": caller_authentication_allowed(
             user_id=context.get("user_id") or (business or {}).get("user_id"),
             business_id=str(business.get("id")) if business and business.get("id") is not None else None,
@@ -7021,21 +6981,6 @@ async def legacy_server_tool(
     receptionist = context.get("receptionist")
 
     normalized_tool = (tool_name or "").strip().lower().replace("_", "-")
-
-    if normalized_tool in {"send-verification-link", "request-authentication", "auth-request"}:
-        context_payload = {**payload, "business": business, "user_id": user_id}
-        context = build_verification_request_context(context_payload)
-        request_result = create_verification_session(
-            supabase_admin,
-            base_url=verification_base_url,
-            **context,
-        )
-        return deliver_existing_secure_link_by_email(
-            request_result=request_result,
-            context=context,
-            payload=context_payload,
-            kind="verification",
-        )
 
     if normalized_tool in {"check-verification-status", "check-authentication", "verify-authentication", "auth-verify"}:
         context = build_verification_request_context({**payload, "business": business, "user_id": user_id})
@@ -8372,14 +8317,6 @@ async def set_control_stage(payload: StageRequest, current_user: dict = Depends(
     push_live_event(f"Stage set to {payload.stage}.", actor="system", severity="info", event_type="stage_changed", payload={"stage": payload.stage, "user_id": user_id})
     return control_state
 
-@app.post("/api/control/zone", tags=["Sonar Controller Compat"])
-async def set_control_zone(payload: ZoneRequest, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
-    control_state = get_tenant_control_state(user_id)
-    control_state["zone"] = payload.zone
-    push_live_event(f"Zone set to {payload.zone}.", actor="system", severity="info", event_type="zone_changed", payload={"zone": payload.zone, "user_id": user_id})
-    return control_state
-
 @app.post("/api/control/ping-max", tags=["Sonar Controller Compat"])
 async def ping_max(current_user: dict = Depends(get_current_user)):
     user_id = str(current_user.id)
@@ -8499,6 +8436,305 @@ async def list_sonar_people(limit: int = 100, current_user: dict = Depends(get_c
         query = query.eq("user_id", str(current_user.id))
     response = query.order("created_at", desc=True).limit(max(1, min(limit, 500))).execute()
     return response.data or []
+
+
+def serialize_sonar_person_document(row: dict, receptionist: Optional[dict] = None) -> dict:
+    document = {
+        "id": row.get("id"),
+        "request_id": row.get("request_id"),
+        "person_id": row.get("person_id"),
+        "file_name": row.get("file_name") or "Document",
+        "content_type": row.get("content_type") or "application/octet-stream",
+        "file_size": row.get("file_size"),
+        "created_at": row.get("created_at"),
+    }
+    if receptionist:
+        document["receptionist"] = receptionist
+    return document
+
+
+class SonarDocumentRenameRequest(BaseModel):
+    file_name: str = Field(..., min_length=1, max_length=255)
+
+
+def normalize_sonar_document_name(file_name: str) -> str:
+    """Keep dashboard document names safe for display without changing storage paths."""
+    normalized = " ".join(str(file_name or "").replace("\\", "/").split("/")[-1].split())
+    if not normalized or normalized in {".", ".."}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Enter a valid document name")
+    return normalized[:255]
+
+
+def attach_document_receptionists(documents: list[dict], *, user_id: str, business_id) -> list[dict]:
+    """Resolve a document request's conversation to the receptionist who handled it."""
+    request_ids = [str(row.get("request_id")) for row in documents if row.get("request_id")]
+    if not request_ids:
+        return documents
+    try:
+        request_rows = (
+            supabase_admin.table("requests")
+            .select("id,metadata")
+            .eq("business_id", business_id)
+            .in_("id", request_ids)
+            .execute()
+            .data
+            or []
+        )
+        conversation_by_request_id = {
+            str(row.get("id")): str((row.get("metadata") or {}).get("conversation_id") or "").strip()
+            for row in request_rows
+        }
+        receptionist_id_by_request_id = {
+            str(row.get("id")): str((row.get("metadata") or {}).get("hired_receptionist_id") or "").strip()
+            for row in request_rows
+        }
+        conversation_ids = list({value for value in conversation_by_request_id.values() if value})
+        call_rows = []
+        if conversation_ids:
+            call_rows = (
+                supabase_admin.table("call_logs")
+                .select("conversation_id,hired_receptionist_id,elevenlabs_agent_id,created_at")
+                .eq("user_id", user_id)
+                .in_("conversation_id", conversation_ids)
+                .order("created_at", desc=True)
+                .execute()
+                .data
+                or []
+            )
+        receptionist_id_by_conversation = {}
+        agent_id_by_conversation = {}
+        for call in call_rows:
+            conversation_id = str(call.get("conversation_id") or "").strip()
+            receptionist_id = call.get("hired_receptionist_id")
+            if conversation_id and receptionist_id and conversation_id not in receptionist_id_by_conversation:
+                receptionist_id_by_conversation[conversation_id] = str(receptionist_id)
+            agent_id = str(call.get("elevenlabs_agent_id") or "").strip()
+            if conversation_id and agent_id and conversation_id not in agent_id_by_conversation:
+                agent_id_by_conversation[conversation_id] = agent_id
+        receptionist_ids = list(set([
+            *receptionist_id_by_conversation.values(),
+            *[value for value in receptionist_id_by_request_id.values() if value],
+        ]))
+        agent_ids = list(set(agent_id_by_conversation.values()))
+        receptionist_rows = []
+        if receptionist_ids:
+            receptionist_rows.extend(
+                supabase_admin.table("hired_receptionists")
+                .select("id,full_name,avatar,catalog_id,elevenlabs_voice_id")
+                .eq("user_id", user_id)
+                .in_("id", receptionist_ids)
+                .execute()
+                .data
+                or []
+            )
+        fallback_receptionist_id = None
+        fallback_rows = (
+            supabase_admin.table("hired_receptionists")
+            .select("id,full_name,avatar,catalog_id,elevenlabs_voice_id,direction,is_active,status")
+            .eq("business_id", business_id)
+            .eq("user_id", user_id)
+            .execute()
+            .data
+            or []
+        )
+        eligible_fallback_rows = [
+            row for row in fallback_rows
+            if receptionist_direction_allows("inbound", row.get("direction"))
+            and row.get("is_active") is not False
+            and str(row.get("status") or "").strip().lower() not in {"offline", "disabled", "inactive"}
+        ]
+        if len(eligible_fallback_rows) == 1:
+            fallback_receptionist_id = str(eligible_fallback_rows[0].get("id"))
+            if not any(str(row.get("id")) == fallback_receptionist_id for row in receptionist_rows):
+                receptionist_rows.append(eligible_fallback_rows[0])
+        if not receptionist_rows:
+            return documents
+        if agent_ids:
+            receptionist_rows.extend(
+                supabase_admin.table("hired_receptionists")
+                .select("id,full_name,avatar,catalog_id,elevenlabs_voice_id")
+                .eq("user_id", user_id)
+                .in_("elevenlabs_voice_id", agent_ids)
+                .execute()
+                .data
+                or []
+            )
+        catalog_ids = [str(row.get("catalog_id")) for row in receptionist_rows if row.get("catalog_id")]
+        catalog_by_id = {}
+        if catalog_ids:
+            catalog_rows = (
+                supabase_admin.table("receptionist_catalog")
+                .select("id,banner_id,avatar")
+                .in_("id", catalog_ids)
+                .execute()
+                .data
+                or []
+            )
+            catalog_by_id = {str(row.get("id")): row for row in catalog_rows}
+        receptionist_by_id = {}
+        receptionist_id_by_agent_id = {}
+        for receptionist in receptionist_rows:
+            catalog = catalog_by_id.get(str(receptionist.get("catalog_id"))) or {}
+            receptionist_by_id[str(receptionist.get("id"))] = {
+                "id": receptionist.get("id"),
+                "name": receptionist.get("full_name") or "Receptionist",
+                "avatar": receptionist.get("avatar") or catalog.get("avatar"),
+                "banner_id": catalog.get("banner_id"),
+            }
+            if receptionist.get("elevenlabs_voice_id"):
+                receptionist_id_by_agent_id[str(receptionist["elevenlabs_voice_id"])] = str(receptionist.get("id"))
+
+        for document in documents:
+            conversation_id = conversation_by_request_id.get(str(document.get("request_id")))
+            receptionist_id = (
+                receptionist_id_by_request_id.get(str(document.get("request_id")))
+                or receptionist_id_by_conversation.get(conversation_id)
+                or receptionist_id_by_agent_id.get(agent_id_by_conversation.get(conversation_id))
+            )
+            is_fallback = False
+            if not receptionist_id and fallback_receptionist_id:
+                receptionist_id = fallback_receptionist_id
+                is_fallback = True
+            if receptionist_id in receptionist_by_id:
+                document["receptionist"] = {
+                    **receptionist_by_id[receptionist_id],
+                    "attribution": "current_inbound_assignment" if is_fallback else "conversation",
+                }
+    except Exception as exc:
+        logging.warning("Failed to attach receptionist attribution to documents: %s", exc)
+    return documents
+
+
+@app.get("/api/sonar/people/documents", tags=["Sonar People"])
+async def list_sonar_people_documents(current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        return []
+    try:
+        response = (
+            supabase_admin.table("people_docs")
+            .select("id,request_id,person_id,file_name,content_type,file_size,created_at")
+            .eq("business_id", business["id"])
+            .order("created_at", desc=True)
+            .limit(1000)
+            .execute()
+        )
+        documents = attach_document_receptionists(
+            response.data or [],
+            user_id=str(current_user.id),
+            business_id=business["id"],
+        )
+        return [serialize_sonar_person_document(row, row.get("receptionist")) for row in documents]
+    except Exception as exc:
+        logging.error("Failed to list dashboard documents for business %s: %s", business.get("id"), exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not load documents.") from exc
+
+
+@app.get("/api/sonar/people/{person_id}/documents/{document_id}/url", tags=["Sonar People"])
+async def get_sonar_person_document_url(person_id: str, document_id: str, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    try:
+        response = (
+            supabase_admin.table("people_docs")
+            .select("id,person_id,file_name,content_type,storage_bucket,storage_path")
+            .eq("id", document_id)
+            .eq("person_id", person_id)
+            .eq("business_id", business["id"])
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        document = response.data[0]
+        if document.get("storage_bucket") != DOCUMENT_BUCKET or not document.get("storage_path"):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file is unavailable")
+        signed = supabase_admin.storage.from_(DOCUMENT_BUCKET).create_signed_url(document["storage_path"], 900)
+        url = (
+            signed.get("signedURL") or signed.get("signed_url") or signed.get("signedUrl")
+            if isinstance(signed, dict)
+            else None
+        )
+        if not url:
+            raise RuntimeError("Storage did not return a signed document URL.")
+        return {
+            "url": url,
+            "expires_in_seconds": 900,
+            "document": serialize_sonar_person_document(document),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to create dashboard document URL for document %s: %s", document_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not open document.") from exc
+
+
+@app.put("/api/sonar/people/{person_id}/documents/{document_id}", tags=["Sonar People"])
+async def rename_sonar_person_document(
+    person_id: str,
+    document_id: str,
+    payload: SonarDocumentRenameRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    file_name = normalize_sonar_document_name(payload.file_name)
+    try:
+        response = (
+            supabase_admin.table("people_docs")
+            .update({"file_name": file_name})
+            .eq("id", document_id)
+            .eq("person_id", person_id)
+            .eq("business_id", business["id"])
+            .select("id,request_id,person_id,file_name,content_type,file_size,created_at")
+            .execute()
+        )
+        if not response.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        return {"document": serialize_sonar_person_document(response.data[0])}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to rename dashboard document %s: %s", document_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not rename document.") from exc
+
+
+@app.delete("/api/sonar/people/{person_id}/documents/{document_id}", tags=["Sonar People"])
+async def delete_sonar_person_document(person_id: str, document_id: str, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    try:
+        response = (
+            supabase_admin.table("people_docs")
+            .select("id,person_id,storage_bucket,storage_path")
+            .eq("id", document_id)
+            .eq("person_id", person_id)
+            .eq("business_id", business["id"])
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        document = response.data[0]
+        if document.get("storage_bucket") == DOCUMENT_BUCKET and document.get("storage_path"):
+            supabase_admin.storage.from_(DOCUMENT_BUCKET).remove([document["storage_path"]])
+        (
+            supabase_admin.table("people_docs")
+            .delete()
+            .eq("id", document_id)
+            .eq("person_id", person_id)
+            .eq("business_id", business["id"])
+            .execute()
+        )
+        return {"ok": True, "id": document_id}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Failed to delete dashboard document %s: %s", document_id, exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not delete document.") from exc
 
 @app.get("/api/sonar/people/search", tags=["Sonar People"])
 async def search_sonar_people(q: str, limit: int = 25, current_user: dict = Depends(get_current_user)):

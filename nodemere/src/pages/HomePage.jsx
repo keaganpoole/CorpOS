@@ -103,11 +103,6 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     copy: 'Have your AI receptionist place calls for reminders, confirmations, updates, and any custom tasks you desire, without tying up your team.',
   },
   {
-    icon: <ShieldCheck className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
-    title: 'Secure Verification',
-    copy: 'Optionally send authentication links during inbound calls so customers can verify identity before account details or account changes are handled.',
-  },
-  {
     icon: <Globe2 className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12" />,
     title: '30+ Languages',
     copy: "Detect a caller's language automatically and respond fluently without transfers, translators, or awkward misunderstandings.",

@@ -11,6 +11,10 @@ export const CUSTOM_FIELD_TYPES = [
   { type: 'multi_select', label: 'Multi Select', icon: 'layers' },
 ];
 
+export const SPECIAL_FIELD_TYPES = [
+  { type: 'docs', label: 'Docs', icon: 'file-text' },
+];
+
 const titleCase = (value) => String(value || '')
   .replace(/[_-]+/g, ' ')
   .replace(/\s+/g, ' ')
@@ -71,6 +75,7 @@ export const fetchCustomFields = async (businessId) => {
       date: '150px',
       select: '140px',
       multi_select: '220px',
+      docs: '240px',
     }[field.field_type] || '160px',
     position: field.position ?? 0,
     config: field.config || {},
@@ -80,9 +85,12 @@ export const fetchCustomFields = async (businessId) => {
 };
 
 export const createCustomField = async (type, existingFields = [], businessId) => {
+  if (type === 'docs' && existingFields.some((field) => field.type === 'docs')) {
+    throw new Error('The Docs column has already been added.');
+  }
   const countForType = existingFields.filter((field) => field.type === type).length + 1;
   const fieldKey = `${CUSTOM_FIELD_PREFIX}${type}_${Date.now()}`;
-  const label = `${titleCase(type)} Field ${countForType}`;
+  const label = type === 'docs' ? 'Docs' : `${titleCase(type)} Field ${countForType}`;
   const position = existingFields.length;
   const tableWidth = {
     boolean: '110px',
@@ -91,6 +99,7 @@ export const createCustomField = async (type, existingFields = [], businessId) =
     date: '150px',
     select: '140px',
     multi_select: '220px',
+    docs: '240px',
   }[type] || '160px';
 
   const { data, error } = await supabase

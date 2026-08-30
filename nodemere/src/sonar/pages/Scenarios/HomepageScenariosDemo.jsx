@@ -2144,14 +2144,14 @@ export default function ScenariosPage({
     setVarsPane(prev => ({ ...prev, visible: false }));
   }, [demoMaxNodes, demoMode, nodes.length, onDemoLimitExceeded]);
 
-  const handleDeleteNode = useCallback(() => {
-    if (!selectedNodeId) return;
-    if (selectedNodeId === INITIAL_NODE.id) return;
-    setNodes((prev) => prev.filter((node) => node.id !== selectedNodeId));
+  const handleDeleteNode = useCallback((nodeId = selectedNodeId) => {
+    if (!nodeId) return;
+    if (nodeId === INITIAL_NODE.id) return;
+    setNodes((prev) => prev.filter((node) => node.id !== nodeId));
     setEdges((prev) =>
-      prev.filter((edge) => edge.from !== selectedNodeId && edge.to !== selectedNodeId)
+      prev.filter((edge) => edge.from !== nodeId && edge.to !== nodeId)
     );
-    setSelectedNodeId(null);
+    setSelectedNodeId((current) => (current === nodeId ? null : current));
     setIsPanelVisible(false);
     setPanelIntent(false);
     setPanelStage('options');
@@ -5086,13 +5086,14 @@ export default function ScenariosPage({
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
                     event.preventDefault();
-                    if ((node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'search_appointments' || node.actionConfig?._key === 'create_customer' || node.actionConfig?._key === 'update_customer' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'send_payment_link' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice' || node.actionConfig?._key === 'refund_payment' || node.actionConfig?._key === 'cancel_subscription' || node.actionConfig?._key === 'send_email') && node.configured) {
+                    const canRunNode = (node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'search_appointments' || node.actionConfig?._key === 'create_customer' || node.actionConfig?._key === 'update_customer' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'send_payment_link' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice' || node.actionConfig?._key === 'refund_payment' || node.actionConfig?._key === 'cancel_subscription' || node.actionConfig?._key === 'send_email') && node.configured;
+                    if (canRunNode || node.id !== INITIAL_NODE.id) {
                       setRunNodeModal(null);
                       setIsPanelVisible(false);
                       setPanelIntent(false);
                       setLogicPanel(null);
                       setVarsPane((prev) => ({ ...prev, visible: false }));
-                      setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
+                      setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id, canRun: canRunNode });
                     }
                   }}
                 >
@@ -6990,25 +6991,55 @@ export default function ScenariosPage({
               left: contextMenu.x,
               zIndex: 201,
             }}
-            onClick={async (e) => {
-              e.stopPropagation();
-              const menu = contextMenu;
-              setContextMenu(null);
-              if (menu.type === 'canvas') {
-                handleSpawnCanvasNode(menu.canvasX, menu.canvasY);
-                return;
-              }
-              try {
-                await handleRunNodeRequest(menu.nodeId);
-              } catch (err) {
-                console.error('[Run Node] Request failed:', err.message);
-              }
-            }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="sb-context-menu-action">
-              {contextMenu.type === 'canvas' ? <Plus size={13} /> : <Zap size={13} />}
-              <span>{contextMenu.type === 'canvas' ? 'New Node' : 'Run Node'}</span>
-            </div>
+            {contextMenu.type === 'canvas' ? (
+              <button
+                type="button"
+                className="sb-context-menu-action"
+                onClick={() => {
+                  const menu = contextMenu;
+                  setContextMenu(null);
+                  handleSpawnCanvasNode(menu.canvasX, menu.canvasY);
+                }}
+              >
+                <Plus size={13} />
+                <span>New Node</span>
+              </button>
+            ) : (
+              <>
+                {contextMenu.canRun && (
+                  <button
+                    type="button"
+                    className="sb-context-menu-action"
+                    onClick={async () => {
+                      const menu = contextMenu;
+                      setContextMenu(null);
+                      try {
+                        await handleRunNodeRequest(menu.nodeId);
+                      } catch (err) {
+                        console.error('[Run Node] Request failed:', err.message);
+                      }
+                    }}
+                  >
+                    <Zap size={13} />
+                    <span>Run Node</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="sb-context-menu-action sb-context-menu-action--remove"
+                  onClick={() => {
+                    const menu = contextMenu;
+                    setContextMenu(null);
+                    handleDeleteNode(menu.nodeId);
+                  }}
+                >
+                  <Trash2 size={13} />
+                  <span>Remove Node</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

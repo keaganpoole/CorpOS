@@ -29,7 +29,27 @@ def create_document_request(supabase, *, base_url: str, **context) -> dict:
 
 
 def get_document_request(supabase, token: str) -> dict:
-    return get_public_request(supabase, token, DOCUMENT_REQUEST_TYPE)
+    result = get_public_request(supabase, token, DOCUMENT_REQUEST_TYPE)
+    if not result.get("success"):
+        return result
+
+    business_name = None
+    request = load_request_by_token(supabase, token, DOCUMENT_REQUEST_TYPE)
+    business_id = (request or {}).get("business_id")
+    if business_id is not None:
+        try:
+            response = (
+                supabase.table("businesses")
+                .select("name")
+                .eq("id", business_id)
+                .limit(1)
+                .execute()
+            )
+            business_name = str((response.data or [{}])[0].get("name") or "").strip() or None
+        except Exception as exc:
+            logging.warning("Failed to resolve business name for document request %s: %s", result.get("request_id"), exc)
+
+    return {**result, "business_name": business_name}
 
 
 def get_document_request_status(supabase, *, request_id=None, token=None, business_id=None) -> dict:

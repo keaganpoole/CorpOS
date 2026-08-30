@@ -18,12 +18,14 @@ import {
   saveFieldConfig, loadColorbarRules, saveColorbarRules, evaluateColorbar,
 } from '../lib/fieldConfig';
 import {
-  CUSTOM_FIELD_TYPES, createCustomField, fetchCustomFields, getCurrentBusinessId, getCustomValue,
+  CUSTOM_FIELD_TYPES, SPECIAL_FIELD_TYPES, createCustomField, fetchCustomFields, getCurrentBusinessId, getCustomValue,
   isCustomFieldKey, setCustomFieldValue, updateCustomField, updateCustomFieldPositions, deleteCustomField, syncCustomFieldOptionValues,
 } from '../lib/customFields';
+import { api } from '../lib/api';
 import FieldSettingsModal from './FieldSettingsModal';
 import ColorbarConfigModal from './ColorbarConfigModal';
 import CubePreloader from '../components/CubePreloader';
+import PersonDocumentsModal from '../components/PersonDocumentsModal';
 
 const ICONS = {
   building: Building2, user: User, briefcase: Briefcase, factory: Factory,
@@ -43,6 +45,7 @@ const FIELD_TYPE_ICONS = {
   text: Type,
   number: Hash,
   date: CalendarDays,
+  docs: FileText,
 };
 
 const ZONE_META_KEY = '__zones';
@@ -616,12 +619,33 @@ const DraggableHeader = ({
   );
 };
 
-const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], selection = null }) => {
+const PersonDocumentsCell = ({ documents = [], onOpen }) => {
+  const latestDocument = documents[0];
+  if (!latestDocument) return <span className="text-[12px] font-medium text-zinc-700">—</span>;
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen?.(latestDocument);
+      }}
+      className="group flex max-w-full items-center gap-2 rounded-lg py-1 text-left transition-colors"
+      title={`View ${latestDocument.file_name}`}
+    >
+      <FileText size={13} className="shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-300" />
+      <span className="truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 underline decoration-zinc-700/80 underline-offset-4 transition-colors group-hover:text-white group-hover:decoration-zinc-400">{latestDocument.file_name}</span>
+      {documents.length > 1 && <span className="shrink-0 text-[9px] font-semibold text-zinc-600">+{documents.length - 1}</span>}
+    </button>
+  );
+};
+
+const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], documents = [], onOpenDocuments, selection = null }) => {
   const getConfiguredOptions = (key, fallbackOptions = []) => fieldConfig[key]?.options || fallbackOptions;
   const customField = customFields.find((field) => field.key === colId);
   if (customField) {
     const value = getCustomValue(lead.custom_fields, colId);
     const saveCustom = (nextValue) => autoSave(lead.id, 'custom_fields', setCustomFieldValue(lead.custom_fields, colId, nextValue));
+    if (customField.type === 'docs') return <PersonDocumentsCell documents={documents} onOpen={(document) => onOpenDocuments?.(lead, document)} />;
     if (customField.type === 'boolean') return <InlineBoolean value={value} onSave={saveCustom} />;
     if (customField.type === 'number') return <InlineNumber value={value} onSave={saveCustom} />;
     if (customField.type === 'date') return <InlineDateOnly value={value} onSave={saveCustom} />;
@@ -692,6 +716,7 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
   ...TABLE_COLUMNS.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({
     id: field.key,
     label: field.label,
+    type: field.type,
     width: field.tableWidth || {
       text: '180px',
       email: '210px',
@@ -709,6 +734,7 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
   ...customFields.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({
     id: field.key,
     label: field.label,
+    type: field.type,
     width: field.tableWidth || {
       boolean: '110px',
       text: '180px',
@@ -773,6 +799,7 @@ const getAllDataColumns = (customFields = [], fieldConfig = {}) => [
   ...customFields.map((field) => ({
     id: field.key,
     label: field.label,
+    type: field.type,
     width: field.tableWidth || {
       boolean: '110px',
       text: '180px',
@@ -1103,6 +1130,8 @@ const LeadsTable = ({
   const [settingsField, setSettingsField] = useState(null);
   const [showColorbarStudio, setShowColorbarStudio] = useState(false);
   const [showColumnOptions, setShowColumnOptions] = useState(false);
+  const [personDocuments, setPersonDocuments] = useState([]);
+  const [documentViewer, setDocumentViewer] = useState(null);
   const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, left: 0 });
   const columnOptionsButtonRef = useRef(null);
   const tableScrollRef = useRef(null);
@@ -1134,13 +1163,32 @@ const LeadsTable = ({
   const showInitialLoader = loading && !hasLoadedOnce;
 
   const column_options = CUSTOM_FIELD_TYPES;
+  const specialColumnOptions = SPECIAL_FIELD_TYPES.filter((option) => !customFields.some((field) => field.type === option.type));
   const anySelected = selectedIds.length > 0;
   const zones = useMemo(() => getSavedZones(fieldConfig), [fieldConfig]);
   const allDataColumns = useMemo(() => getAllDataColumns(customFields, fieldConfig), [customFields, fieldConfig]);
   const intakeEnabledCount = useMemo(
-    () => allDataColumns.filter((column) => isIntakeEnabled(fieldConfig, column.id)).length,
+    () => allDataColumns.filter((column) => column.type !== 'docs' && isIntakeEnabled(fieldConfig, column.id)).length,
     [allDataColumns, fieldConfig],
   );
+  const personDocumentsById = useMemo(() => personDocuments.reduce((byPerson, document) => {
+    const personId = String(document.person_id || '');
+    if (!personId) return byPerson;
+    const current = byPerson.get(personId) || [];
+    current.push(document);
+    byPerson.set(personId, current);
+    return byPerson;
+  }, new Map()), [personDocuments]);
+
+  const refreshPersonDocuments = useCallback(async () => {
+    if (demoMode) return;
+    try {
+      const documents = await api.getPeopleDocuments();
+      setPersonDocuments(Array.isArray(documents) ? documents : []);
+    } catch (error) {
+      console.error('[LeadsTable] Failed to load person documents:', error?.message);
+    }
+  }, [demoMode]);
 
   const updateViewSettings = useCallback((updates) => {
     setViewSettings((current) => {
@@ -1189,6 +1237,18 @@ const LeadsTable = ({
       return next;
     });
   }, [customFields, fieldConfig]);
+
+  useEffect(() => {
+    if (demoMode || !customFields.some((field) => field.type === 'docs')) {
+      setPersonDocuments([]);
+      return undefined;
+    }
+    let active = true;
+    refreshPersonDocuments().then(() => {
+      if (!active) return;
+    });
+    return () => { active = false; };
+  }, [customFields, demoMode, refreshPersonDocuments]);
 
   useEffect(() => {
     onSchemaChange?.({ columns, customFields, fieldConfig });
@@ -1305,6 +1365,7 @@ const LeadsTable = ({
 
   const handleCreateColumn = async (type) => {
     if (!businessId) return;
+    if (type === 'docs' && customFields.some((field) => field.type === 'docs')) return;
     const countForType = customFields.filter((field) => field.type === type).length + 1;
     const tableWidth = {
       boolean: '110px',
@@ -1313,11 +1374,12 @@ const LeadsTable = ({
       date: '150px',
       select: '140px',
       multi_select: '220px',
+      docs: '240px',
     }[type] || '160px';
     const nextField = demoMode
       ? {
           key: `custom_${type}_${Date.now()}`,
-          label: `${type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())} Field ${countForType}`,
+          label: type === 'docs' ? 'Docs' : `${type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())} Field ${countForType}`,
           description: '',
           type,
           options: [],
@@ -1343,7 +1405,7 @@ const LeadsTable = ({
       },
     ]);
     setFieldConfig((prev) => {
-      const icon = { boolean: 'shield', text: 'file-text', number: 'activity', date: 'clock', select: 'tag', multi_select: 'layers' }[type] || 'tag';
+      const icon = { boolean: 'shield', text: 'file-text', number: 'activity', date: 'clock', select: 'tag', multi_select: 'layers', docs: 'file-text' }[type] || 'tag';
       const next = { ...prev, [nextField.key]: { name: nextField.label, icon } };
       if (!demoMode && businessId) {
         saveFieldConfig(businessId, next).catch((err) => {
@@ -1353,7 +1415,7 @@ const LeadsTable = ({
       return next;
     });
     setShowColumnOptions(false);
-    setSettingsField(nextField.key);
+    if (type !== 'docs') setSettingsField(nextField.key);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const scroller = horizontalScrollRef.current;
@@ -1366,7 +1428,7 @@ const LeadsTable = ({
   const updateColumnOptionsPosition = useCallback(() => {
     const rect = columnOptionsButtonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const menuWidth = 168;
+    const menuWidth = 200;
     const left = Math.min(rect.left, window.innerWidth - menuWidth - 12);
     setColumnOptionsPosition({ top: rect.bottom + 8, left: Math.max(12, left) });
   }, []);
@@ -1793,10 +1855,9 @@ const LeadsTable = ({
       }}
       className={`${col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'} ${demoEntrance ? 'crm-demo-entrance-cell' : ''}`}
     >
-      <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(lead.id), toggle: toggleSelectedId }} />
+      <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} documents={personDocumentsById.get(String(lead.id)) || []} onOpenDocuments={(person, initialDocument) => setDocumentViewer({ person, initialDocument })} selection={{ anySelected, isSelected: selectedIds.includes(lead.id), toggle: toggleSelectedId }} />
     </div>
   );
-
   const renderCreateColumn = (col, index) => (
     <div
       key={col.id}
@@ -2295,7 +2356,7 @@ const LeadsTable = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{ top: columnOptionsPosition.top, left: columnOptionsPosition.left }}
-            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_12px_28px_rgba(0,0,0,0.64)]"
+            className="fixed z-[220] w-[200px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_12px_28px_rgba(0,0,0,0.64)]"
           >
             <div className="py-1">
               {column_options.map((option, idx) => {
@@ -2315,11 +2376,36 @@ const LeadsTable = ({
                   </motion.button>
                 );
               })}
+              {specialColumnOptions.length > 0 && (
+                <div className="mx-1.5 mb-1.5 mt-2 border-t border-white/[0.06] pt-2">
+                  {specialColumnOptions.map((option) => (
+                    <div key={option.type} className="rounded-md bg-gradient-to-r from-[#3f3f46] via-[#71717a] to-[#3f3f46] p-px">
+                      <button
+                        type="button"
+                        onClick={() => handleCreateColumn(option.type)}
+                        className="flex w-full items-center gap-2.5 rounded-[5px] bg-[#18181b] px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-white transition-colors hover:bg-[#27272a]"
+                      >
+                        <FileText size={13} strokeWidth={2} />
+                        <span>{option.label}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
         {settingsField && (
           <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={handleFieldHide} onClose={() => setSettingsField(null)} intakeEnabledCount={intakeEnabledCount} />
+        )}
+        {documentViewer && (
+          <PersonDocumentsModal
+            person={documentViewer.person}
+            documents={personDocumentsById.get(String(documentViewer.person.id)) || []}
+            initialDocument={documentViewer.initialDocument}
+            onDocumentsChanged={refreshPersonDocuments}
+            onClose={() => setDocumentViewer(null)}
+          />
         )}
         {showColorbarStudio && (
           <ColorbarConfigModal

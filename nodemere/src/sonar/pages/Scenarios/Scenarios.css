@@ -5198,6 +5198,8 @@
 
 .sb-context-menu-action {
   display: flex;
+  width: 100%;
+  box-sizing: border-box;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -5214,11 +5216,25 @@
 }
 
 .sb-context-menu-action:hover {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(249, 115, 22, 0.12));
+  background: rgba(82, 82, 91, 0.2);
+  color: inherit;
 }
 
 .sb-context-menu-action svg {
   color: #38bdf8;
+}
+
+.sb-context-menu-action--remove {
+  color: #f87171;
+}
+
+.sb-context-menu-action--remove:hover {
+  background: rgba(82, 82, 91, 0.2);
+  color: #f87171;
+}
+
+.sb-context-menu-action--remove svg {
+  color: currentColor;
 }
 
 .sb-notes-textarea {

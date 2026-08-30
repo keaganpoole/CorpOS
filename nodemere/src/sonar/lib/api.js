@@ -74,6 +74,10 @@ export const api = {
   getPipeline: () => fetchJSON('/api/pipeline'),
   getReceptionistCatalog: () => fetchJSON('/api/sonar/receptionists/catalog'),
   getPeople: (limit = 500) => fetchJSON(`/api/sonar/people?limit=${limit}`),
+  getPeopleDocuments: () => fetchJSON('/api/sonar/people/documents'),
+  getPersonDocumentUrl: (personId, documentId) => fetchJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}/url`),
+  renamePersonDocument: (personId, documentId, fileName) => putJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}`, { file_name: fileName }),
+  deletePersonDocument: (personId, documentId) => deleteJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}`),
   createPerson: (person) => postJSON('/api/sonar/people', person),
   updatePerson: (id, person) => putJSON(`/api/sonar/people/${encodeURIComponent(id)}`, person),
   deletePerson: (id) => deleteJSON(`/api/sonar/people/${encodeURIComponent(id)}`),
@@ -111,7 +115,6 @@ export const api = {
   // Control commands via REST (fallback when IPC unavailable)
   setRuntime: (mode) => postJSON('/api/control/runtime', { mode }),
   setStage: (stage) => postJSON('/api/control/stage', { stage }),
-  setZone: (zone) => postJSON('/api/control/zone', { zone }),
   pingMax: () => postJSON('/api/control/ping-max', {}),
 };
 

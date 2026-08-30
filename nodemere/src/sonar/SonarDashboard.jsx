@@ -10,7 +10,6 @@ import {
   Activity,
   BarChart3,
   Database,
-  Gavel,
   Settings,
   Plus,
   Zap,
@@ -654,12 +653,19 @@ function PeopleToolbarTitle({ active, count, loading, action = null }) {
   );
 }
 
-function StaticToolbarTitle({ active, title, description, action = null }) {
+function StaticToolbarTitle({ active, title, description, beta = false, action = null }) {
   if (!active) return null;
 
   return (
     <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
-      <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">{title}</span>
+      <span className="inline-flex items-center gap-2 text-[13px] font-semibold tracking-[-0.02em] text-white">
+        {title}
+        {beta && (
+          <span className="brand-gradient-text text-[10px] font-bold uppercase tracking-[0.14em]">
+            Beta
+          </span>
+        )}
+      </span>
       <span className="hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
       <span className="hidden text-[12px] font-medium text-zinc-500 md:inline">{description}</span>
       {action}
@@ -1071,7 +1077,14 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
           collapsed ? 'ml-0 max-w-0 opacity-0 translate-x-[-4px]' : 'ml-0.5 max-w-[140px] opacity-100 translate-x-0'
         }`}
       >
-        {item.label}
+        <span className="inline-flex items-center gap-2">
+          {item.label}
+          {item.beta && (
+            <span className="brand-gradient-text text-[9px] font-bold uppercase tracking-[0.14em]">
+              Beta
+            </span>
+          )}
+        </span>
       </span>
       {isActive && (
         <motion.div
@@ -1222,6 +1235,7 @@ const TasklistInstructionModal = ({ subtask, onClose }) => {
             onClick={(event) => event.stopPropagation()}
             className="relative w-full max-w-[620px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
           >
+            <ModalSpectrumLine variant="general" />
             <div className="flex items-start justify-between gap-5 p-6 pb-4 sm:p-8 sm:pb-5">
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-600">Task guide</p>
@@ -1306,7 +1320,9 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
               className="w-full overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_10px_28px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-xl"
             >
               <div className="h-[3px] w-full overflow-hidden bg-white/[0.06]">
-                <div className="h-full brand-gradient transition-all duration-500" style={{ width: `${overallProgress}%` }} />
+                <div className="transition-all duration-500" style={{ width: `${overallProgress}%` }}>
+                  <ModalSpectrumLine variant="general" />
+                </div>
               </div>
               <div className="px-4 py-4">
                 <AnimatePresence mode="wait" initial={false}>
@@ -1459,7 +1475,9 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
               <ChevronUp size={14} className="shrink-0 text-zinc-500" />
             </div>
             <div className="h-[3px] w-full overflow-hidden bg-white/[0.06]">
-              <div className="h-full brand-gradient transition-all duration-500" style={{ width: `${overallProgress}%` }} />
+              <div className="transition-all duration-500" style={{ width: `${overallProgress}%` }}>
+                <ModalSpectrumLine variant="general" />
+              </div>
             </div>
             <div className="flex items-center gap-2 px-3 py-2">
               <p className="shrink-0 text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-600">Next task</p>
@@ -1748,7 +1766,6 @@ const SonarDashboard = () => {
   const [currentRoute, setCurrentRoute] = useState(getInitialDashboardRoute);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [glitch, setGlitch] = useState(false);
-  const [zoneOpen, setZoneOpen] = useState(false);
   const [marketplaceAgent, setMarketplaceAgent] = useState(null);
   const [pendingModel, setPendingModel] = useState(null);
   const [receptionistsAgent, setReceptionistsAgent] = useState(null);
@@ -2068,7 +2085,6 @@ const SonarDashboard = () => {
     summary,
     wsStatus,
     agentsLoading,
-    setZone,
     updateAgentDirection,
     refresh,
   } = useSonarState();
@@ -2276,7 +2292,7 @@ const SonarDashboard = () => {
     { id: 'receptionists', icon: <IdCardLanyard size={18} />, label: 'Team' },
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
     { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
-    { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios' },
+    { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios', beta: true },
     { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
   ];
@@ -2546,45 +2562,6 @@ const SonarDashboard = () => {
     }
   };
 
-  const displayZone = controlState?.zone || 1;
-  const renderAutonomyControl = () => (
-    <GradientBleed
-      trigger="Autonomy"
-      options={['1', '2', '3', '4', '5']}
-      variant="prism"
-      icon={<Gavel size={12} />}
-      value={String(displayZone)}
-      onSelect={(val) => setZone(parseInt(val))}
-      onOpenChange={(open) => setZoneOpen(open)}
-      prismAxis="vertical"
-    />
-  );
-  const toolbarAutonomyControl = (
-    <div className="absolute left-[calc(50%+210px)] top-1/2 z-10 hidden -translate-y-1/2 no-drag xl:block" style={{ width: '120px', textAlign: 'center' }}>
-      {renderAutonomyControl()}
-    </div>
-  );
-  const mobileSidebarAutonomyControl = (
-    <div className="no-drag relative flex flex-col items-center xl:hidden">
-      <GradientBleed
-        trigger="Autonomy"
-        options={['1', '2', '3', '4', '5']}
-        variant="prism"
-        icon={<Gavel size={14} />}
-        value={String(displayZone)}
-        onSelect={(val) => setZone(parseInt(val))}
-        onOpenChange={(open) => setZoneOpen(open)}
-        showTrigger={false}
-        textClassName="text-[11px] tracking-widest"
-        buttonPaddingClassName="h-10 w-10 justify-center text-zinc-300"
-        optionsGapClassName="gap-3"
-        optionsOpenClassName="max-h-64 pb-3"
-        underlineOffsetClassName="-right-1"
-        orientation="vertical"
-      />
-    </div>
-  );
-
   return (
     <AudioPlayerProvider>
     <CallLogsProvider normalizeCall={normalizeCall}>
@@ -2640,6 +2617,7 @@ const SonarDashboard = () => {
         <StaticToolbarTitle
           active={currentRoute === 'scenarios'}
           title="Scenarios"
+          beta
           description="Automate workflows with conditional logic"
         />
         <StaticToolbarTitle
@@ -2660,7 +2638,6 @@ const SonarDashboard = () => {
             </div>
           </div>
         </div>
-        {toolbarAutonomyControl}
         <AccountDropdown
           profile={profile}
           usage={businessUsage}
@@ -2701,19 +2678,21 @@ const SonarDashboard = () => {
               ))}
             </nav>
           </div>
-          <div className="relative mt-auto h-[220px] px-3 pb-4">
-            <div
-              className={`pointer-events-none absolute bottom-[92px] left-1/2 flex h-[118px] w-10 -translate-x-1/2 items-center justify-center transition-[opacity,filter] duration-700 xl:hidden ${
-                zoneOpen ? 'opacity-10 blur-sm' : 'opacity-100 blur-0'
-              }`}
+          <div className="mt-auto px-3 pb-5 pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                setSidebarCollapsed(true);
+                setCurrentRoute('settings');
+              }}
+              title={sidebarCollapsed ? 'Settings' : undefined}
+              className="no-drag group flex w-full items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] text-zinc-500 transition-colors hover:bg-white/5 hover:text-white"
             >
-              <span className="-rotate-90 whitespace-nowrap text-[17px] font-light uppercase leading-none tracking-[0.46em] text-white/15">
-                NODEMERE
+              <Settings size={15} className="shrink-0 text-zinc-600 transition-colors duration-300 group-hover:text-white" />
+              <span className={`overflow-hidden font-bold tracking-tight whitespace-nowrap transition-[max-width,opacity,transform,margin] duration-180 ease-out ${sidebarCollapsed ? 'ml-0 max-w-0 opacity-0 translate-x-[-4px]' : 'ml-0.5 max-w-[140px] opacity-100 translate-x-0'}`}>
+                Settings
               </span>
-            </div>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-              {mobileSidebarAutonomyControl}
-            </div>
+            </button>
           </div>
         </aside>
 
