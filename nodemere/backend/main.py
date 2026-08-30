@@ -4459,10 +4459,10 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
 # the server-owned entitlement table. The browser may display these values,
 # but it is never trusted to enforce them.
 DEFAULT_PLAN_ENTITLEMENTS = {
-    "free": {"included_call_minutes": 20, "max_receptionists": 1, "max_scenarios": 3, "max_contacts": 100, "inbound_calling": True, "outbound_calling": False, "overage_enabled": False},
-    "essentials": {"included_call_minutes": 300, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True, "overage_cap_cents": 2500},
-    "pro": {"included_call_minutes": 1500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 10000},
-    "ultra": {"included_call_minutes": 3000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 25000},
+    "free": {"included_call_minutes": 20, "max_receptionists": 1, "max_scenarios": 3, "max_contacts": 100, "inbound_calling": True, "outbound_calling": False, "overage_enabled": False, "payment_processing": False},
+    "essentials": {"included_call_minutes": 300, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True, "overage_cap_cents": 2500, "payment_processing": False},
+    "pro": {"included_call_minutes": 1500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 10000, "payment_processing": True},
+    "ultra": {"included_call_minutes": 3000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 25000, "payment_processing": True},
 }
 SUBSCRIPTION_ACCESS_STATUSES = {"active"}
 
@@ -4516,6 +4516,22 @@ def require_plan_access(user_id: str, feature: str) -> dict:
                 "message": "Your subscription is not active. Open Stripe Billing Portal to update billing.",
                 "plan": context["plan"],
                 "subscription_status": context["status"] or "unknown",
+            },
+        )
+    return context
+
+
+def require_payment_access(user_id: str) -> dict:
+    """Enforce payment access from the server-owned plan entitlements."""
+    context = require_plan_access(user_id, "payments")
+    if context["entitlements"].get("payment_processing") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "code": "feature_not_in_plan",
+                "feature": "payments",
+                "plan": context["plan"],
+                "message": "Payments and invoicing are available on the Pro and Ultra plans.",
             },
         )
     return context
@@ -6294,6 +6310,43 @@ def normalize_scenario_json_fields(payload: dict) -> dict:
     return normalized
 
 
+PAYMENT_SCENARIO_FEATURE_KEYS = {
+    "create_customer",
+    "update_customer",
+    "create_payment",
+    "send_payment_link",
+    "create_invoice",
+    "send_invoice",
+    "refund_payment",
+    "cancel_subscription",
+    "update_payment",
+    "check_payment_status",
+    "issue_refund",
+    "payment_received",
+    "payment_failed",
+    "refund_issued",
+    "subscription_created",
+}
+
+
+def scenario_uses_payment_features(payload: dict) -> bool:
+    for node in (payload or {}).get("nodes_data") or []:
+        if not isinstance(node, dict):
+            continue
+        action_config = node.get("actionConfig") or {}
+        key = node.get("subOptionKey") or action_config.get("_key")
+        if key in PAYMENT_SCENARIO_FEATURE_KEYS:
+            return True
+    return False
+
+
+def require_scenario_feature_access(user_id: str, scenario: dict, *, direction: str = "scenario") -> dict:
+    context = require_plan_access(user_id, direction)
+    if scenario_uses_payment_features(scenario):
+        require_payment_access(user_id)
+    return context
+
+
 def validate_scenario_if_active(payload: dict):
     status_value = str((payload or {}).get("status") or "").lower()
     is_active = (payload or {}).get("is_active") is True or status_value == "active"
@@ -6361,6 +6414,8 @@ async def create_sonar_scenario(payload: dict, current_user: dict = Depends(get_
     existing_count = count_user_rows("scenarios", user_id)
     enforce_plan_limit(context, "scenarios", existing_count, "max_scenarios")
     insert_payload = normalize_scenario_json_fields(payload or {})
+    if scenario_uses_payment_features(insert_payload):
+        require_payment_access(user_id)
     insert_payload["user_id"] = user_id
     insert_payload["created_by"] = user_id
     business = load_business_by_user_id(user_id)
@@ -6390,7 +6445,10 @@ async def update_sonar_scenario(scenario_id: str, payload: dict, current_user: d
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
     updates = {key: value for key, value in normalize_scenario_json_fields(payload or {}).items() if key not in {"id", "user_id", "created_by", "business_id", "created_at"}}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-    validate_scenario_if_active({**existing_response.data[0], **updates})
+    next_scenario = {**existing_response.data[0], **updates}
+    if scenario_uses_payment_features(next_scenario):
+        require_payment_access(user_id)
+    validate_scenario_if_active(next_scenario)
     response = (
         supabase_admin.table("scenarios")
         .update(updates)
@@ -9892,6 +9950,7 @@ async def call_customer(payload: dict, current_user: dict = Depends(get_current_
 
 
 async def _create_customer_for_user(request: CustomerCreateRequest, user_id: str):
+    require_payment_access(user_id)
     ensure_no_unresolved_templates(request.person_id, request.customer_name, request.customer_email, request.customer_phone)
     customer, _person = create_or_update_stripe_customer_for_user(
         user_id=user_id,
@@ -9913,6 +9972,7 @@ async def update_customer(
 
 
 async def _update_customer_for_user(request: CustomerUpdateRequest, user_id: str):
+    require_payment_access(user_id)
     ensure_no_unresolved_templates(request.customer_id, request.person_id, request.customer_name, request.customer_email, request.customer_phone)
     customer, _person = create_or_update_stripe_customer_for_user(
         user_id=user_id,
@@ -9927,6 +9987,7 @@ async def _update_customer_for_user(request: CustomerUpdateRequest, user_id: str
 
 
 async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
+    require_payment_access(user_id)
     description = request.description or ""
     payment_method_type = (request.payment_method_type or "card").lower()
     payment_method = "us_bank_account" if payment_method_type == "ach" else payment_method_type
@@ -10069,7 +10130,15 @@ async def send_payment_link(
 
 
 @app.post("/api/sonar/create-payment-profile", tags=["Sonar Payments"])
+async def create_payment_profile(
+    request: PaymentLinkCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    return await _send_payment_link_for_user(request, str(current_user.id))
+
+
 async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id: str):
+    require_payment_access(user_id)
     description = request.description or ""
     payment_mode_base_url = get_payment_frontend_base_url()
     ensure_no_unresolved_templates(
@@ -10218,6 +10287,7 @@ async def create_invoice(
 
 
 async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
+    require_payment_access(user_id)
     description = request.description or ""
     ensure_no_unresolved_templates(
         request.person_id,
@@ -10303,6 +10373,7 @@ async def send_invoice(
 
 
 async def _send_invoice_for_user(request: InvoiceSendRequest, user_id: str):
+    require_payment_access(user_id)
     ensure_no_unresolved_templates(request.invoice_id)
     if is_payment_test_mode():
         if not str(request.invoice_id or "").startswith("sim_in_"):
@@ -10347,6 +10418,7 @@ async def refund_payment(
 
 
 async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
+    require_payment_access(user_id)
     ensure_no_unresolved_templates(request.payment_id, request.refund_reason)
     if is_payment_test_mode():
         payment_record = None
@@ -10466,6 +10538,7 @@ async def cancel_subscription(
 
 
 async def _cancel_subscription_for_user(request: CancelSubscriptionRequest, user_id: str):
+    require_payment_access(user_id)
     ensure_no_unresolved_templates(request.subscription_id, request.customer_id, request.person_id)
     if is_payment_test_mode():
         profile_response = (
@@ -10662,12 +10735,13 @@ scenario_engine = ScenarioEngine(
     },
     base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
     plan_access_checker=enforce_call_minutes,
-    scenario_access_checker=lambda user_id, _context, direction="scenario": require_plan_access(user_id, "scenarios"),
+    scenario_access_checker=require_scenario_feature_access,
 )
 
 @app.post("/api/sonar/update-payment", tags=["Sonar Payments"])
 async def update_payment(request: PaymentUpdateRequest, current_user: dict = Depends(get_current_user)):
     user_id = str(current_user.id)
+    require_payment_access(user_id)
     ensure_no_unresolved_templates(request.payment_id, request.description, request.notes)
     payment_record = None
     if request.payment_id:
@@ -11512,6 +11586,8 @@ async def upsert_user_integration(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
 
     current_user_id = str(current_user.id)
+    if provider == "stripe":
+        require_payment_access(current_user_id)
     update_data = payload.model_dump(exclude_unset=True)
 
     try:
@@ -11543,6 +11619,9 @@ async def authorize_user_integration(
     provider = provider.lower().strip()
     if provider not in SUPPORTED_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
+
+    if provider == "stripe":
+        require_payment_access(str(current_user.id))
 
     if provider == "gmail":
         if not google_client_id or not google_client_secret:
@@ -11872,6 +11951,7 @@ async def stripe_integration_callback(
         state_payload = _decode_integration_state(state)
         user_id = str(state_payload["sub"])
         frontend_target = state_payload.get("return_to") or frontend_target
+        require_payment_access(user_id)
         token_data = _exchange_stripe_code(code)
         stripe_user_id = token_data.get("stripe_user_id")
         if not stripe_user_id:

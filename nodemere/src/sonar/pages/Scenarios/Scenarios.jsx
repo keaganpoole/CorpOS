@@ -37,6 +37,7 @@ import {
   ShieldCheck,
   Upload,
   CircleHelp,
+  LockKeyhole,
 } from 'lucide-react';
 import './Scenarios.css';
 import ScenarioIntroNode from '../../../components/ScenarioIntroNode';
@@ -148,6 +149,22 @@ const STRIPE_ACTION_KEYS = new Set([
   'refund_payment',
   'cancel_subscription',
 ]);
+const PAYMENT_TRIGGER_KEYS = new Set([
+  'payment_received',
+  'payment_failed',
+  'refund_issued',
+  'subscription_created',
+]);
+const PAYMENT_NODE_KEYS = new Set([
+  ...STRIPE_ACTION_KEYS,
+  ...PAYMENT_TRIGGER_KEYS,
+  'update_payment',
+  'check_payment_status',
+  'issue_refund',
+]);
+const isPaymentScenarioNode = (node) => PAYMENT_NODE_KEYS.has(
+  node?.subOptionKey || node?.actionConfig?._key || ''
+);
 
 const LEGACY_ACTION_FIELD_MAP = {
   update_payment: [
@@ -757,6 +774,11 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
   const { session, profile, refreshProfile } = useAuth();
   const userId = session?.user?.id || null;
+  const currentPlan = String(profile?.plan || 'free').trim().toLowerCase();
+  const hasPaymentAccess = currentPlan === 'pro' || currentPlan === 'ultra';
+  const goToPaymentUpgrade = useCallback(() => {
+    window.location.assign('/pricing');
+  }, []);
   const [builderTimezone, setBuilderTimezone] = useState(LOCAL_TIMEZONE);
   const [scenarios, setScenarios] = useState([]); // List of saved scenarios
   const [nodes, setNodes] = useState([INITIAL_NODE]);
@@ -1336,20 +1358,32 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const optionsForCategory = AUTOMATION_HIERARCHY[panelCategory] || [];
   const normalizedPanelSearch = panelSearch.trim().toLowerCase();
   const filteredOptions = useMemo(
-    () =>
-      optionsForCategory.filter((option) => {
+    () => {
+      const filtered = optionsForCategory.filter((option) => {
         const optionLabel = option.option.toLowerCase();
         return !normalizedPanelSearch || optionLabel.includes(normalizedPanelSearch);
-      }),
-    [normalizedPanelSearch, optionsForCategory]
+      });
+      return filtered.sort((a, b) => {
+        const aLockedPayment = (a.key === 'payments' || PAYMENT_NODE_KEYS.has(a.key)) && !hasPaymentAccess;
+        const bLockedPayment = (b.key === 'payments' || PAYMENT_NODE_KEYS.has(b.key)) && !hasPaymentAccess;
+        return Number(aLockedPayment) - Number(bLockedPayment);
+      });
+    },
+    [hasPaymentAccess, normalizedPanelSearch, optionsForCategory]
   );
   const filteredSubOptions = useMemo(
-    () =>
-      (activeOption?.sub_options ?? []).filter((sub) => {
+    () => {
+      const filtered = (activeOption?.sub_options ?? []).filter((sub) => {
         const subLabel = sub.name.toLowerCase();
         return !normalizedPanelSearch || subLabel.includes(normalizedPanelSearch);
-      }),
-    [activeOption, normalizedPanelSearch]
+      });
+      return filtered.sort((a, b) => {
+        const aLockedPayment = PAYMENT_NODE_KEYS.has(a.key) && !hasPaymentAccess;
+        const bLockedPayment = PAYMENT_NODE_KEYS.has(b.key) && !hasPaymentAccess;
+        return Number(aLockedPayment) - Number(bLockedPayment);
+      });
+    },
+    [activeOption, hasPaymentAccess, normalizedPanelSearch]
   );
   const categoryMeta = CATEGORY_META[panelCategory] || CATEGORY_META.TRIGGERS;
   const hasConfiguredTrigger = nodes.some(n => n.categoryType === 'TRIGGERS' && n.configured);
@@ -1374,7 +1408,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
   const actionRequiresEmailIntegration = actionConfig?._key === 'send_email';
   const actionRequiresStripeIntegration = STRIPE_ACTION_KEYS.has(actionConfig?._key);
-  const actionIntegrationMissing = (actionRequiresEmailIntegration && !hasConnectedEmailIntegration)
+  const actionPaymentLocked = actionRequiresStripeIntegration && !hasPaymentAccess;
+  const actionIntegrationMissing = actionPaymentLocked
+    || (actionRequiresEmailIntegration && !hasConnectedEmailIntegration)
     || (actionRequiresStripeIntegration && !hasConnectedStripeIntegration);
   const selectedIntegrationAccount = selectedIntegration.providerMetadata?.display_name
     || selectedIntegration.providerMetadata?.account_id
@@ -2032,6 +2068,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     event.preventDefault();
     const node = nodeMap[nodeId];
     if (!node) return;
+    if (!hasPaymentAccess && isPaymentScenarioNode(node)) {
+      goToPaymentUpgrade();
+      return;
+    }
     dragRef.current = {
       id: nodeId,
       moved: false,
@@ -2274,6 +2314,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   };
 
   const handleOptionClick = (option) => {
+    if (option.key === 'payments' && !hasPaymentAccess) {
+      goToPaymentUpgrade();
+      return;
+    }
     const optionIcon = option.icon || categoryMeta.icon;
     const optionAccent = option.accent || categoryMeta.accent;
     if (option.sub_options?.length) {
@@ -2306,6 +2350,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   };
 
   const handleSubOptionClick = (subOption) => {
+    if (PAYMENT_NODE_KEYS.has(subOption.key) && !hasPaymentAccess) {
+      goToPaymentUpgrade();
+      return;
+    }
     const subIcon = activeOption?.icon || categoryMeta.icon;
     const subAccent = activeOption?.accent || categoryMeta.accent;
     const meta = CATEGORY_META[panelCategory] || CATEGORY_META.TRIGGERS;
@@ -5233,6 +5281,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
             {nodes.map((node) => {
               if (!node.configured || node.id === INITIAL_NODE.id && !node.configured) return null;
+              if (!hasPaymentAccess && isPaymentScenarioNode(node)) return null;
               const anchor = getNodeAnchor(node.id);
               if (!anchor) return null;
               const hasOutgoing = edges.some((edge) => edge.from === node.id);
@@ -5297,6 +5346,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               const isRunCompletedNode = scenarioRunState?.completedNodeIds?.includes(node.id);
               const isRunFutureNode = inRunPath && !isRunCompletedNode && !isRunActiveNode;
               const isRunUnrelatedNode = Boolean(scenarioRunState) && !inRunPath;
+              const isPaymentLockedNode = !hasPaymentAccess && isPaymentScenarioNode(node);
               return (
                 <div
                   key={node.id}
@@ -5304,7 +5354,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                     if (el) nodeRefs.current[node.id] = el;
                     else delete nodeRefs.current[node.id];
                   }}
-                  className={`sb-builder-node ${node.configured ? 'sb-matte-node' : ''} ${node.id !== INITIAL_NODE.id ? 'sb-post-intro-node' : ''} ${node.type === 'router' ? 'router-node' : ''} ${
+                  className={`sb-builder-node ${node.configured ? 'sb-matte-node' : ''} ${node.id !== INITIAL_NODE.id ? 'sb-post-intro-node' : ''} ${node.type === 'router' ? 'router-node' : ''} ${isPaymentLockedNode ? 'sb-builder-node--payment-locked' : ''} ${
                     isActive ? 'sb-active-node' : ''
                   } ${node.configured ? 'sb-is-configured' : 'sb-is-placeholder'} ${plusHoveredNodeId === node.id ? 'sb-plus-hovered' : ''} ${isEdgeDropCandidate ? 'sb-edge-drop-candidate' : ''} ${isEdgeDropTarget ? 'sb-edge-drop-target' : ''} ${isRunActiveNode ? 'sb-run-node-active' : ''} ${isRunPausedNode ? 'sb-run-node-paused' : ''} ${isRunCompletedNode ? 'sb-run-node-complete' : ''} ${isRunFutureNode ? 'sb-run-node-future' : ''} ${isRunUnrelatedNode ? 'sb-run-node-unrelated' : ''}`}
                   style={{ left: node.x, top: node.y, opacity: nodesOpacity, transition: 'opacity 0.3s ease' }}
@@ -5313,6 +5363,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                   onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                   onContextMenu={(event) => {
                     event.preventDefault();
+                    if (isPaymentLockedNode) {
+                      goToPaymentUpgrade();
+                      return;
+                    }
                     const canRunNode = (node.actionConfig?._key === 'search_records' || node.actionConfig?._key === 'search_appointments' || node.actionConfig?._key === 'create_customer' || node.actionConfig?._key === 'update_customer' || node.actionConfig?._key === 'create_payment' || node.actionConfig?._key === 'send_payment_link' || node.actionConfig?._key === 'create_invoice' || node.actionConfig?._key === 'send_invoice' || node.actionConfig?._key === 'refund_payment' || node.actionConfig?._key === 'cancel_subscription' || node.actionConfig?._key === 'send_email') && node.configured;
                     if (canRunNode || node.id !== INITIAL_NODE.id) {
                       setRunNodeModal(null);
@@ -5384,7 +5438,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                         {isRunActiveNode && <div className="sb-node-live-marker" aria-hidden="true" />}
 
                         {/* Add button */}
-                        {canAddChild(node) && (
+                        {canAddChild(node) && !isPaymentLockedNode && (
                           <button
                             className="sb-node-add"
                             type="button"
@@ -5401,6 +5455,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                       <div className="sb-node-label-below">
                         <h3 className="sb-node-below-title">{node.label}</h3>
                         {node.detail && <p className="sb-node-below-desc">{node.detail}</p>}
+                        {isPaymentLockedNode && (
+                          <span className="sb-payment-badge-wrapper"><span className="sb-payment-unlock-badge"><LockKeyhole size={10} /> Unlock with <span className="sb-payment-pro-text">Pro</span></span></span>
+                        )}
                       </div>
 
                       {/* Connecting Line Indicator */}
@@ -5750,9 +5807,20 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                         <h4 className="sb-action-config-title">Action Details</h4>
                       </div>
                     )}
-                    {actionRequiresEmailIntegration && !hasConnectedEmailIntegration ? (
+                    {actionPaymentLocked ? (
                       <div className="sb-panel-empty-state">
-                        <div className="sb-panel-empty-kicker">Email integration required</div>
+                        <div className="sb-panel-empty-kicker">Pro feature</div>
+                        <div className="sb-panel-empty-title">Unlock payments</div>
+                        <p className="sb-panel-empty-copy">
+                          Upgrade to Pro or Ultra to configure this payment action.
+                        </p>
+                        <button type="button" className="sb-panel-empty-cta" onClick={goToPaymentUpgrade}>
+                          View Plans
+                        </button>
+                      </div>
+                    ) : actionRequiresEmailIntegration && !hasConnectedEmailIntegration ? (
+                      <div className="sb-panel-empty-state">
+                        <div className="sb-panel-empty-kicker" style={{ backgroundImage: getCategoryTextGradient(panelCategory) }}>Email integration required</div>
                         <div className="sb-panel-empty-title">Connect your email</div>
                         <p className="sb-panel-empty-copy">
                           Connect your email to trigger powerful automations and workflows.
@@ -5767,7 +5835,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                       </div>
                     ) : actionRequiresStripeIntegration && !hasConnectedStripeIntegration ? (
                       <div className="sb-panel-empty-state">
-                        <div className="sb-panel-empty-kicker">Stripe integration required</div>
+                        <div className="sb-panel-empty-kicker" style={{ backgroundImage: getCategoryTextGradient(panelCategory) }}>Stripe integration required</div>
                         <div className="sb-panel-empty-title">Connect your Stripe account</div>
                         <p className="sb-panel-empty-copy">
                           Connect Stripe before configuring or running payment actions.
@@ -6438,13 +6506,15 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                     filteredOptions.map((option, index) => {
                       const hasChildren = option.sub_options?.length > 0;
                       const OptionIcon = option.icon || categoryMeta.icon;
+                      const isPaymentOptionLocked = option.key === 'payments' && !hasPaymentAccess;
                       return (
                         <button
                           key={option.key}
                           type="button"
-                          className="sb-panel-action-card"
+                          className={`sb-panel-action-card${isPaymentOptionLocked ? ' sb-panel-action-card--locked' : ''}`}
                           style={{ animationDelay: `${index * 0.04}s` }}
                           onClick={() => handleOptionClick(option)}
+                          aria-label={isPaymentOptionLocked ? 'Unlock payments on the pricing page' : undefined}
                         >
                           <div
                             className="sb-panel-action-icon"
@@ -6456,14 +6526,27 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                             <strong className="sb-panel-action-label">{option.option}</strong>
                             <span className="sb-panel-action-detail">{option.description}</span>
                           </div>
-                          {hasChildren && <ChevronRight size={18} style={{ opacity: 0.4, marginLeft: 'auto' }} />}
+                          {isPaymentOptionLocked ? (
+                            <span className="sb-payment-badge-wrapper"><span className="sb-payment-unlock-badge"><LockKeyhole size={11} /> Unlock with <span className="sb-payment-pro-text">Pro</span></span></span>
+                          ) : hasChildren && <ChevronRight size={18} style={{ opacity: 0.4, marginLeft: 'auto' }} />}
                         </button>
                       );
                     })
                   )
+                ) : activeOption?.key === 'payments' && !hasPaymentAccess ? (
+                  <div className="sb-panel-empty-state">
+                    <div className="sb-panel-empty-kicker">Pro feature</div>
+                    <div className="sb-panel-empty-title">Unlock payments</div>
+                    <p className="sb-panel-empty-copy">
+                      Upgrade to Pro or Ultra to create payment and invoice automations.
+                    </p>
+                    <button type="button" className="sb-panel-empty-cta" onClick={goToPaymentUpgrade}>
+                      View Plans
+                    </button>
+                  </div>
                 ) : activeOption?.key === 'payments' && !hasConnectedStripeIntegration ? (
                   <div className="sb-panel-empty-state">
-                    <div className="sb-panel-empty-kicker">Stripe integration required</div>
+                    <div className="sb-panel-empty-kicker" style={{ backgroundImage: getCategoryTextGradient(panelCategory) }}>Stripe integration required</div>
                     <div className="sb-panel-empty-title">Connect your Stripe account</div>
                     <p className="sb-panel-empty-copy">
                       Once Stripe is connected, this panel will show the available payment actions.
@@ -6478,7 +6561,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                   </div>
                 ) : activeOption?.key === 'email' && !hasConnectedEmailIntegration ? (
                   <div className="sb-panel-empty-state">
-                    <div className="sb-panel-empty-kicker">Email integration required</div>
+                    <div className="sb-panel-empty-kicker" style={{ backgroundImage: getCategoryTextGradient(panelCategory) }}>Email integration required</div>
                     <div className="sb-panel-empty-title">Connect your email</div>
                     <p className="sb-panel-empty-copy">
                       Once Gmail is connected, this panel will show the available email actions.
@@ -6496,11 +6579,12 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                 ) : (
                   filteredSubOptions.map((subOption, index) => {
                     const SubIcon = activeOption?.icon || categoryMeta.icon;
+                    const isPaymentSubOptionLocked = PAYMENT_NODE_KEYS.has(subOption.key) && !hasPaymentAccess;
                     return (
                       <button
                         key={subOption.key}
                         type="button"
-                        className="sb-panel-action-card"
+                        className={`sb-panel-action-card${isPaymentSubOptionLocked ? ' sb-panel-action-card--locked' : ''}`}
                         style={{ animationDelay: `${index * 0.04}s` }}
                         onClick={() => handleSubOptionClick(subOption)}
                       >
@@ -6514,7 +6598,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                         <strong className="sb-panel-action-label">{subOption.name}</strong>
                         <span className="sb-panel-action-detail">{subOption.description}</span>
                       </div>
-                      <ChevronRight size={18} style={{ opacity: 0.4, marginLeft: 'auto' }} />
+                      {isPaymentSubOptionLocked ? (
+                        <span className="sb-payment-badge-wrapper"><span className="sb-payment-unlock-badge"><LockKeyhole size={11} /> Unlock with <span className="sb-payment-pro-text">Pro</span></span></span>
+                      ) : <ChevronRight size={18} style={{ opacity: 0.4, marginLeft: 'auto' }} />}
                     </button>
                     );
                   })

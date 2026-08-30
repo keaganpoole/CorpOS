@@ -910,6 +910,33 @@
   cursor: grabbing;
 }
 
+.sb-builder-node--payment-locked {
+  cursor: pointer;
+  filter: none;
+}
+
+.sb-builder-node--payment-locked .sb-node-inner-wrap,
+.sb-builder-node--payment-locked .sb-node-connector-line {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.sb-builder-node--payment-locked .sb-node-below-title,
+.sb-builder-node--payment-locked .sb-node-below-desc {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.sb-builder-node--payment-locked:hover .sb-node-aura,
+.sb-builder-node--payment-locked:hover .sb-node-ring,
+.sb-builder-node--payment-locked:hover .sb-node-sphere {
+  transform: none;
+}
+
+.sb-builder-node--payment-locked .sb-payment-badge-wrapper {
+  margin: 8px 0 0;
+}
+
 .sb-node-inner-wrap {
   position: relative;
   width: 98px;
@@ -1520,7 +1547,7 @@
   justify-content: center;
   cursor: pointer;
   transition: color 0.2s ease, opacity 0.2s ease;
-  margin-right: 4px;
+  margin-right: 8px;
 }
 
 .sb-panel-delete:hover {
@@ -1658,6 +1685,110 @@
 .sb-panel-action-card:hover {
   background: rgba(255, 255, 255, 0.07);
   transform: translateX(4px);
+}
+
+.sb-panel-action-card--locked {
+  cursor: pointer;
+  filter: none;
+}
+
+.sb-panel-action-card--locked > .sb-panel-action-icon,
+.sb-panel-action-card--locked > .sb-panel-action-info {
+  opacity: 0.48;
+  filter: grayscale(1);
+}
+
+.sb-panel-action-card--locked:hover {
+  background: rgba(255, 255, 255, 0.045);
+  transform: none;
+}
+
+.sb-payment-badge-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 4px;
+  padding: 1px;
+  border-radius: 11px;
+  overflow: hidden;
+  transition: box-shadow 0.5s ease;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.045);
+}
+
+.sb-payment-badge-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 300%;
+  height: 300%;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(
+    from 90deg,
+    transparent 0%,
+    transparent 5%,
+    rgba(255, 255, 255, 0.1) 35%,
+    rgba(255, 255, 255, 0.2) 70%,
+    rgba(255, 255, 255, 0.34) 100%
+  );
+  opacity: 0;
+  z-index: 1;
+  transition: opacity 0.5s ease;
+}
+
+.sb-payment-badge-wrapper:hover::before {
+  opacity: 1;
+  animation: sb-payment-spin-glow 4s linear infinite;
+}
+
+.sb-payment-unlock-badge {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  background: rgba(30, 30, 30, 0.6);
+  color: #e4e4e7;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.sb-payment-badge-wrapper:hover .sb-payment-unlock-badge {
+  border-color: transparent;
+  background: rgba(30, 30, 30, 0.9);
+}
+
+.sb-payment-unlock-badge svg {
+  color: #a1a1aa;
+}
+
+.sb-payment-pro-text {
+  display: inline-block;
+  background-image: linear-gradient(90deg, var(--brandGradientStart) 0%, var(--brandGradientEnd) 50%, var(--brandGradientStart) 100%);
+  background-size: 200% auto;
+  animation: sb-payment-shine 2.5s linear infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@keyframes sb-payment-spin-glow {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes sb-payment-shine {
+  to { background-position: 200% center; }
 }
 
 .sb-panel-action-icon {
@@ -2405,14 +2536,14 @@
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
-  border-left: 3px solid #32f0d9;
+  border-left: 3px solid rgba(255, 255, 255, 0.18);
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .aether-rule-row:hover {
   background: rgba(255, 255, 255, 0.045);
   border-color: rgba(255, 255, 255, 0.09);
-  border-left-color: #32f0d9;
+  border-left-color: rgba(255, 255, 255, 0.28);
 }
 
 .aether-rule-select {
@@ -3171,6 +3302,26 @@
 .scenarios-container.scenarios-container--demo .sb-builder-node:hover:not(.sb-plus-hovered) .sb-node-below-desc {
   color: #747474;
   opacity: 0.8;
+}
+
+/* The homepage demo is an ungated preview; payment plan-lock visuals belong only to the live builder. */
+.scenarios-container.scenarios-container--demo .sb-payment-badge-wrapper {
+  display: none;
+}
+
+.scenarios-container.scenarios-container--demo .sb-panel-action-card--locked {
+  opacity: 1;
+  filter: none;
+}
+
+.scenarios-container.scenarios-container--demo .sb-panel-action-card--locked > .sb-panel-action-icon,
+.scenarios-container.scenarios-container--demo .sb-panel-action-card--locked > .sb-panel-action-info,
+.scenarios-container.scenarios-container--demo .sb-builder-node--payment-locked .sb-node-inner-wrap,
+.scenarios-container.scenarios-container--demo .sb-builder-node--payment-locked .sb-node-connector-line,
+.scenarios-container.scenarios-container--demo .sb-builder-node--payment-locked .sb-node-below-title,
+.scenarios-container.scenarios-container--demo .sb-builder-node--payment-locked .sb-node-below-desc {
+  opacity: 1;
+  filter: none;
 }
 
 .sb-vars-no-data {

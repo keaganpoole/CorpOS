@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Lightbulb, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getCookie } from '../utils/cookieUtils';
@@ -8,6 +11,8 @@ import colors from '../../color';
 import LegalFooter from '../components/LegalFooter';
 import { api } from '../sonar/lib/api';
 import { supabase } from '../supabaseClient';
+import ModalSpectrumLine from '../components/ModalSpectrumLine';
+import CubePreloader from '../sonar/components/CubePreloader';
 
 // --- Data ---
 const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
@@ -26,6 +31,7 @@ const plansConfig = [
         },
         features: [
             { label: "Everything in Pro", description: "Includes every Pro feature with more room to grow." },
+            { label: "Take Payments", description: "Includes a 1% platform fee on eligible AI-generated sales." },
             { label: "Advanced AI Reasoning", description: "Gives receptionists stronger decision-making for more complex conversations." },
             { label: "Voice Studio", description: "Customize voice experience more deeply for your team and brand." },
             { label: "Professional Business Setup", description: "A dedicated onboarding specialist handles the setup, configuration, and optimization of your AI receptionist so it’s ready to start taking calls for your business." },
@@ -46,7 +52,7 @@ const plansConfig = [
             { label: "Everything in Essentials", description: "Starts with all Essentials features already included." },
             { label: "25 Receptionists", description: "Run a larger receptionist team for different roles or workflows." },
             { label: "AI Outbound Calling", description: "Place consented operational calls for follow-ups, reminders, and service updates." },
-            { label: "Payments & Invoicing", description: "Receptionists can take payments, send invoices to customers, and more." },
+            { label: "Take Payments", description: "Receptionists can take payments and send invoices. A 1% platform fee applies to eligible AI-generated sales." },
             { label: "Unlock All Receptionists", description: "Full Access to the entire receptionist marketplace." },
             { label: "AI Texting Automation", description: "Not enabled at launch. Any future operational texting will require lawful consent and carrier approval." },
             { label: "Unlimited Contacts", description: "Keep your full contact list without contact-based restrictions." },
@@ -140,12 +146,67 @@ const useTextScramble = (ref) => {
     return fx;
 };
 
+const PaymentTipsModal = ({ onClose }) => {
+    const modal = (
+    <motion.div
+        className="fixed inset-0 z-[220] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onMouseDown={onClose}
+    >
+        <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
+            transition={{ duration: 0.18 }}
+            className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]"
+            onMouseDown={(event) => event.stopPropagation()}
+        >
+            <ModalSpectrumLine variant="tips" />
+            <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
+            <div className="p-7 sm:p-8">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="relative">
+                        <div className="mb-3 flex items-center gap-1.5">
+                            <Lightbulb className="h-4 w-4 shrink-0 -translate-y-[5px] text-zinc-600" aria-hidden="true" />
+                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Info</p>
+                        </div>
+                        <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">Accept payments</h2>
+                        <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">
+                            Let your AI receptionist take payments, collect deposits, and upsell services, all right over the phone.
+                        </p>
+                    </div>
+                    <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close payment tips">
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+                <div className="relative mt-7 space-y-4 text-sm leading-6 text-zinc-400">
+                    {[
+                        ['How it works.', 'Your AI receptionist learns what services you offer and uses that information to help customers pay over the phone.'],
+                        ['Platform fee.', 'Nodemere charges a 1% platform fee on successful, eligible sales generated through an AI receptionist and processed through a supported connected provider.'],
+                        ['What is excluded.', 'Taxes, tips, refunded payments, and disputed payments are excluded from the platform-fee calculation. Your provider’s processing fees are separate.'],
+                    ].map(([title, body], index) => (
+                        <div key={title} className="flex gap-3">
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: `rgba(255,255,255,${Math.max(0.35, 1 - (index * 0.14))})` }} />
+                            <div><p className="text-sm font-semibold text-zinc-200">{title}</p><p className="mt-1 text-sm leading-6 text-zinc-500">{body}</p></div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </motion.div>
+    </motion.div>
+    );
+    return createPortal(modal, document.body);
+};
+
 // --- Plan Card ---
 const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscriptionStatus, isTestMode }) => {
     const { session, refreshProfile } = useAuth();
     const navigate = useNavigate();
     const [isCheckoutLoading, setCheckoutLoading] = useState(false);
     const [openFeature, setOpenFeature] = useState(null);
+    const [paymentTipsOpen, setPaymentTipsOpen] = useState(false);
 
     const price = plan.price?.[cycle];
     const isCurrent = plan.name.toLowerCase() === currentUserPlan.toLowerCase();
@@ -245,7 +306,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                 if (cycle === 'annually' && annualSavings > 0) {
                     setTimeout(() => {
                         savingsEl.innerHTML = `Save $${annualSavings} per year!`;
-                        savingsEl.classList.add('animate', 'text-zinc-400');
+                        savingsEl.classList.add('animate', 'text-emerald-400');
                     }, 100);
                 }
             });
@@ -261,7 +322,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
                     <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-                    {plan.isRecommended && <span className="text-xs font-semibold pricing-recommended-text animate-glow" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
+                    {plan.isRecommended && <span className="text-xs font-semibold pricing-recommended-text" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
                 </div>
                 <p className="text-gray-400 mt-2">{plan.description}</p>
                 <div className="my-6">
@@ -272,7 +333,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                         </div>
                         <span className="text-gray-400 ml-2">/ month</span>
                     </div>
-                    <p className="text-center text-xs text-gray-500 h-5 mt-2">
+                    <p className="relative top-2 text-center text-xs text-gray-500 h-5 mt-2">
                         {cycle === 'annually' && price > 0 ? `Billed annually at $${(price * 12).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/year` : ''}
                     </p>
                     <p ref={savingsRef} className="savings-text text-center text-xs font-semibold h-5">{'\u00A0'}</p>
@@ -281,7 +342,8 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                     {plan.features.map((feature, featureIndex) => {
                         const featureLabel = typeof feature === 'string' ? feature : feature.label;
                         const featureDescription = typeof feature === 'string' ? null : feature.description;
-                        const showFeatureDescription = featureDescription && !featureLabel.toLowerCase().startsWith('everything in ');
+                        const isPaymentFeature = featureLabel.toLowerCase().includes('payment');
+                        const showFeatureDescription = featureDescription && !featureLabel.toLowerCase().startsWith('everything in ') && !isPaymentFeature;
 
                         return (
                         <li key={featureLabel} className="relative flex items-center">
@@ -289,6 +351,16 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                                 <path stroke="url(#checkGradient)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path>
                             </svg>
                             <span className="text-gray-300 text-sm min-w-0 overflow-hidden text-ellipsis">{featureLabel}</span>
+                            {isPaymentFeature && (
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentTipsOpen(true)}
+                                    className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center text-gray-300 transition-colors hover:text-white"
+                                    aria-label={`More info about ${featureLabel}`}
+                                >
+                                    <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                            )}
                             {showFeatureDescription && (
                                 <div className="relative ml-2 flex-shrink-0">
                                     <button
@@ -318,6 +390,11 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                 </ul>
             </div>
             <div className="mt-8">
+                {['Pro', 'Ultra'].includes(plan.name) && (
+                    <p className="relative top-2 mb-[6px] text-center text-[11px] text-gray-500">
+                        1% fee on eligible AI-generated sales.
+                    </p>
+                )}
                 {hasOverages && (
                     <p className="mb-3 text-center text-[11px] text-gray-500">
                         Additional minutes billed at ${overageRate.toFixed(2)}/min.
@@ -346,6 +423,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                     </button>
                 )}
             </div>
+            <AnimatePresence>{paymentTipsOpen ? <PaymentTipsModal onClose={() => setPaymentTipsOpen(false)} /> : null}</AnimatePresence>
         </div>
     );
 };
@@ -362,6 +440,7 @@ const PricingPage = () => {
     const [stripeData, setStripeData] = useState(null);
     const [planEntitlements, setPlanEntitlements] = useState(null);
     const [plansError, setPlansError] = useState('');
+    const [plansLoading, setPlansLoading] = useState(true);
     const [isTestMode, setIsTestMode] = useState(false);
     const pillBgRef = useRef(null);
     const annualBtnRef = useRef(null);
@@ -426,6 +505,8 @@ const PricingPage = () => {
                 console.error("Error fetching plans:", err);
                 setPlanEntitlements([]);
                 setPlansError('Pricing plans could not be loaded from the server.');
+            } finally {
+                setPlansLoading(false);
             }
         };
         fetchPlans();
@@ -516,7 +597,11 @@ const PricingPage = () => {
                     </div>
                 </div>
                 <div className="relative text-center">
-                    {plansError ? (
+                    {plansLoading ? (
+                        <div className="flex min-h-[55vh] items-center justify-center" aria-label="Loading pricing plans">
+                            <CubePreloader size={28} />
+                        </div>
+                    ) : plansError ? (
                         <div className="py-10 text-sm text-gray-500">{plansError}</div>
                     ) : (
                         <div className="inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4">
@@ -524,9 +609,16 @@ const PricingPage = () => {
                         </div>
                     )}
                 </div>
-                <p className="mx-auto mt-7 max-w-3xl text-center text-xs leading-5 text-zinc-500">
-                    By starting a subscription, you agree to the <Link to="/terms" className="underline underline-offset-2">Terms of Service</Link> and <Link to="/privacy-policy" className="underline underline-offset-2">Privacy Policy</Link>. Paid subscriptions renew automatically at the selected billing interval unless canceled before the next renewal date. You can request cancellation at <a href="mailto:support@nodemere.ai" className="underline underline-offset-2">support@nodemere.ai</a>.
-                </p>
+                {!plansLoading && (
+                    <>
+                        <p className="mx-auto mt-7 max-w-3xl text-center text-xs leading-5 text-zinc-500">
+                            Payment feature pricing: a 1% platform fee applies to successful, eligible sales generated through an AI receptionist and processed through a supported connected payment provider. Taxes, tips, refunded payments, and disputed payments are excluded. Provider processing fees are separate.
+                        </p>
+                        <p className="mx-auto mt-3 max-w-3xl text-center text-xs leading-5 text-zinc-500">
+                            By starting a subscription, you agree to the <Link to="/terms" className="underline underline-offset-2">Terms of Service</Link> and <Link to="/privacy-policy" className="underline underline-offset-2">Privacy Policy</Link>. Paid subscriptions renew automatically at the selected billing interval unless canceled before the next renewal date. You can request cancellation at <a href="mailto:support@nodemere.ai" className="underline underline-offset-2">support@nodemere.ai</a>.
+                        </p>
+                    </>
+                )}
             </div>
             <LegalFooter />
         </div>

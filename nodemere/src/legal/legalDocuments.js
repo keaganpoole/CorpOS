@@ -1,8 +1,8 @@
-export const LEGAL_EFFECTIVE_DATE = 'August 11, 2026';
+export const LEGAL_EFFECTIVE_DATE = 'August 30, 2026';
 
-export const LEGAL_ACCEPTANCE_KEY = 'nodemere_legal_acceptance_v2026_08_11';
+export const LEGAL_ACCEPTANCE_KEY = 'nodemere_legal_acceptance_v2026_08_30';
 
-export const LEGAL_ACCEPTANCE_VERSION = '2026-08-11';
+export const LEGAL_ACCEPTANCE_VERSION = '2026-08-30';
 
 export const hasCurrentLegalAcceptance = (profile) => (
   profile?.terms_of_service?.[LEGAL_ACCEPTANCE_KEY]?.accepted === true
@@ -49,11 +49,19 @@ You are solely responsible for each call, text, message, script, recipient list,
 
 At launch, Nodemere does **not** authorize use of the Service for telemarketing, political messaging, debt collection, or marketing calls or texts. Availability of an outbound feature or a plan entitlement does not grant permission for those uses. Operational, transactional, and customer-service calls may be used only for contacts for whom you have documented, legally sufficient permission and only in accordance with applicable law. The [AI, Call Recording, and Communications Notice](/communications-notice) provides the current product disclosure and required opening language.
 
-## 4. Payments and Stripe Connect
+## 4. Payments and Connected Payment Providers
 
-Where you connect a Stripe account, payments are processed on your connected account. Unless we separately agree in writing, **you are the merchant of record** for your goods or services and are responsible for the sale, fulfillment, customer support, refunds, chargebacks, payment disputes, taxes, receipts, disclosures, and compliance obligations relating to those transactions. Nodemere does not hold your sales proceeds and is not responsible for your customers' payment disputes or refunds.
+Where you connect a supported payment provider account, payments are processed through your connected account. Unless we separately agree in writing, **you are the merchant of record** for your goods or services and are responsible for the sale, fulfillment, customer support, refunds, chargebacks, payment disputes, taxes, receipts, disclosures, and compliance obligations relating to those transactions. Nodemere does not hold your sales proceeds and is not responsible for your customers' payment disputes or refunds.
 
-Your Stripe relationship is also governed by Stripe's agreements. Stripe may assess processing fees, reserves, negative balances, or other amounts under its terms. If Nodemere later enables a disclosed platform fee, it will be collected only as described in the applicable order form, pricing page, or feature-specific notice.
+Your relationship with the connected payment provider is governed by that provider's agreements and policies. The provider may assess processing fees, currency-conversion fees, reserves, negative balances, payout fees, dispute fees, or other amounts under its terms. If you connect Stripe, Stripe's agreements and policies also apply. Nodemere is not a payment processor and does not control a third-party provider's approval, settlement, reserves, holds, fees, or account decisions.
+
+For eligible sales successfully generated through an AI receptionist and processed through a supported connected payment provider, Nodemere may charge a **1% platform fee**. An eligible sale is a transaction for the Customer's goods or services that is attributable to an AI receptionist interaction and successfully processed through the connected payment provider. The platform fee is calculated only on the eligible transaction amount, excluding separately stated taxes and tips. Refunded amounts and amounts subject to a payment dispute are excluded from the platform-fee calculation; if a fee was collected before a refund or dispute was recorded, Nodemere may reverse or credit the corresponding fee against a future amount due where reasonably practicable.
+
+The platform fee is separate from all connected payment-provider fees and other third-party charges. Unless an order form or applicable pricing page states otherwise, the Customer authorizes Nodemere to collect the platform fee using the method disclosed for the applicable payment flow, which may include deduction from applicable transaction proceeds where supported, invoicing the Customer, or charging an authorized payment method associated with the Customer's account. The Customer remains responsible for maintaining valid payment information and paying all amounts when due.
+
+The Customer is solely responsible for accurately configuring its services, prices, taxes, discounts, deposits, cancellation policies, refunds, and other sale terms; obtaining any required customer authorization; delivering the goods or services; issuing receipts and legally required disclosures; and resolving customer complaints, refunds, chargebacks, and disputes. The Customer must not use payment features for unlawful, deceptive, unauthorized, or prohibited transactions. Nodemere may withhold, suspend, or disable payment functionality for suspected fraud, unlawful activity, provider restrictions, unpaid fees, security concerns, or breach of these Terms.
+
+Nodemere may change the platform-fee rate, eligibility rules, calculation method, collection method, or supported providers by updating the applicable pricing page, order form, or feature-specific notice. A material change will apply prospectively after reasonable notice, unless a different effective date is required by law or agreed in writing. Continued use of the payment features after the effective date constitutes acceptance of the updated fee terms.
 
 ## 5. Fees, subscriptions, and cancellation
 
