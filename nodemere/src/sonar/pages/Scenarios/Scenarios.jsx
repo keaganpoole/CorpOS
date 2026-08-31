@@ -2704,6 +2704,11 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       if (!response.ok || !result?.authorization_url) {
         throw new Error(result?.detail || 'Failed to start integration.');
       }
+      const isLocalOAuth = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+      if (isLocalOAuth) {
+        window.location.assign(result.authorization_url);
+        return;
+      }
       const popup = window.open(result.authorization_url, 'sonar-integration-auth', 'width=540,height=720');
       if (!popup) {
         setIntegrationPopupPending(false);

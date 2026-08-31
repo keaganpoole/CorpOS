@@ -14,7 +14,7 @@ import binascii
 import hmac
 from types import SimpleNamespace
 from uuid import UUID, uuid4
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import date, datetime, timezone, timedelta
 from typing import List, Optional, Literal
 from urllib.parse import urlsplit, urlunsplit
@@ -76,10 +76,13 @@ from .config import (
     SECRET_KEY,
     ALGORITHM,
     TEST_MODE,
+    STRIPE_REAL_TEST_MODE,
     STRIPE_LIVE_SECRET_KEY,
     STRIPE_TEST_SECRET_KEY,
     stripe_connect_client_id,
+    stripe_connect_test_client_id,
     stripe_connect_redirect_uri,
+    stripe_application_fee_percent,
     elevenlabs_webhook_secret,
     elevenlabs_api_key,
     elevenlabs_agent_id_inbound,
@@ -380,6 +383,10 @@ def _coerce_boolean(value, default: bool = False) -> bool:
 def is_payment_test_mode() -> bool:
     """Read the database-controlled payment safety switch for each request."""
     global PAYMENT_TEST_MODE
+    if STRIPE_REAL_TEST_MODE:
+        PAYMENT_TEST_MODE = False
+        stripe.api_key = STRIPE_TEST_SECRET_KEY
+        return False
     row = get_system_config_row()
     if row.get("_system_config_read_error") or not row:
         # Fail closed: an unavailable safety switch must never enable live
@@ -389,6 +396,14 @@ def is_payment_test_mode() -> bool:
         PAYMENT_TEST_MODE = _coerce_boolean(row.get("test_mode"))
     stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
     return PAYMENT_TEST_MODE
+
+
+def is_real_stripe_test_mode() -> bool:
+    return bool(STRIPE_REAL_TEST_MODE)
+
+
+def _stripe_connect_client_id() -> Optional[str]:
+    return stripe_connect_test_client_id if is_real_stripe_test_mode() else stripe_connect_client_id
 
 
 def get_system_number_purchase_limit() -> int:
@@ -2286,7 +2301,7 @@ def _upsert_integration_row(user_id: str, provider: str, updates: dict) -> dict:
 
 def _stripe_platform_api_key(livemode: Optional[bool] = None) -> str:
     is_payment_test_mode()
-    use_live_key = (not PAYMENT_TEST_MODE) if livemode is None else livemode
+    use_live_key = (not (PAYMENT_TEST_MODE or is_real_stripe_test_mode())) if livemode is None else livemode
     api_key = STRIPE_LIVE_SECRET_KEY if use_live_key else STRIPE_TEST_SECRET_KEY
     if not api_key:
         raise HTTPException(
@@ -2305,7 +2320,7 @@ def _stripe_object_to_dict(value) -> dict:
 def _exchange_stripe_code(code: str) -> dict:
     if is_payment_test_mode():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Stripe account authorization is simulated while payment test mode is enabled.")
-    if not stripe_connect_client_id:
+    if not _stripe_connect_client_id():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Stripe Connect is not configured.",
@@ -2349,12 +2364,12 @@ def _deauthorize_stripe_integration(integration: Optional[dict]) -> None:
         return
     credentials = (integration or {}).get("credentials") or {}
     stripe_user_id = credentials.get("stripe_user_id") or (integration or {}).get("provider_metadata", {}).get("account_id")
-    if not stripe_user_id or not stripe_connect_client_id:
+    if not stripe_user_id or not _stripe_connect_client_id():
         return
     try:
         stripe.OAuth.deauthorize(
             api_key=_stripe_platform_api_key(credentials.get("livemode")),
-            client_id=stripe_connect_client_id,
+            client_id=_stripe_connect_client_id(),
             stripe_user_id=stripe_user_id,
         )
     except Exception as exc:
@@ -3198,10 +3213,10 @@ def set_payment_test_mode(enabled: bool):
     logging.info("Payment test mode set to %s", PAYMENT_TEST_MODE)
 
 def get_payment_mode_label() -> str:
-    return "test" if PAYMENT_TEST_MODE else "live"
+    return "test" if PAYMENT_TEST_MODE or is_real_stripe_test_mode() else "live"
 
 def get_payment_frontend_base_url() -> str:
-    if is_payment_test_mode():
+    if is_payment_test_mode() or is_real_stripe_test_mode():
         return os.environ.get("PAYMENT_TEST_FRONTEND_URL", "http://localhost:5173")
     return os.environ.get("PAYMENT_LIVE_FRONTEND_URL", "https://nodemere.com")
 
@@ -3437,6 +3452,19 @@ def build_scenario_customer_metadata(*, user_id: str, person_id: Optional[str] =
     metadata = build_invoice_metadata(person_id=person_id, appointment_id=appointment_id, service_id=service_id)
     metadata["user_id"] = str(user_id)
     return metadata
+
+
+def calculate_platform_application_fee(amount_cents: int) -> int:
+    """Calculate the platform fee in cents without ever exceeding the charge."""
+    try:
+        percent = Decimal(str(stripe_application_fee_percent or "0"))
+    except (InvalidOperation, TypeError, ValueError):
+        percent = Decimal("0")
+    amount = max(int(amount_cents or 0), 0)
+    if amount == 0 or percent <= 0:
+        return 0
+    fee = (Decimal(amount) * percent / Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return min(amount, max(int(fee), 0))
 
 def create_or_update_stripe_customer_for_user(
     *,
@@ -5658,6 +5686,14 @@ def update_payment_record(match_field: str, match_value: str, update_data: dict,
     return response.data[0] if response.data else None
 
 
+def is_uuid_value(value: Optional[str]) -> bool:
+    try:
+        UUID(str(value))
+        return True
+    except (TypeError, ValueError, AttributeError):
+        return False
+
+
 def normalize_payment_record_status(value: Optional[str], fallback: str = "pending") -> str:
     normalized = str(value or "").strip().lower()
     if not normalized:
@@ -6414,6 +6450,8 @@ async def create_sonar_scenario(payload: dict, current_user: dict = Depends(get_
     existing_count = count_user_rows("scenarios", user_id)
     enforce_plan_limit(context, "scenarios", existing_count, "max_scenarios")
     insert_payload = normalize_scenario_json_fields(payload or {})
+    if not insert_payload.get("id"):
+        insert_payload["id"] = str(uuid4())
     if scenario_uses_payment_features(insert_payload):
         require_payment_access(user_id)
     insert_payload["user_id"] = user_id
@@ -10063,6 +10101,7 @@ async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
         appointment_id=request.appointment_id,
     )
 
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
     stripe_payment_intent = None
     try:
         payment_intent_payload = {
@@ -10078,17 +10117,28 @@ async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
                 appointment_id=request.appointment_id,
             ),
         }
+        application_fee_amount = calculate_platform_application_fee(request.amount)
+        if application_fee_amount:
+            payment_intent_payload["application_fee_amount"] = application_fee_amount
         stripe_payment_intent = stripe.PaymentIntent.create(**stripe_request_options, **payment_intent_payload)
     except Exception as exc:
         logging.error("Stripe payment intent creation failed for user %s: %s", user_id, exc, exc_info=True)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe payment creation failed: {exc}") from exc
 
+    stripe_payment_status = str(stripe_payment_intent.status if stripe_payment_intent else "created").lower()
+    payment_record_status = (
+        "succeeded"
+        if stripe_payment_status == "succeeded"
+        else "failed"
+        if stripe_payment_status in {"canceled", "requires_payment_method"} and stripe_payment_intent.last_payment_error
+        else "pending"
+    )
     payment_row = build_payment_row(
         amount=request.amount,
         currency=request.currency,
         payment_method=request.payment_method_type,
         description=description,
-        status=(stripe_payment_intent.status if stripe_payment_intent else "created"),
+        status=payment_record_status,
         stripe_payment_intent_id=(stripe_payment_intent.id if stripe_payment_intent else None),
         receipt_url=None,
         error_message=None,
@@ -10212,8 +10262,16 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
         customer_phone=request.customer_phone,
         create_if_missing=True,
     )
+    stripe_request_options = _get_connected_stripe_request_options(user_id)
     payment_metadata = build_scenario_customer_metadata(user_id=user_id, person_id=request.person_id)
     try:
+
+        payment_intent_data = {
+            "metadata": payment_metadata,
+        }
+        application_fee_amount = calculate_platform_application_fee(request.amount)
+        if application_fee_amount:
+            payment_intent_data["application_fee_amount"] = application_fee_amount
 
         checkout_session = stripe.checkout.Session.create(
             **stripe_request_options,
@@ -10230,9 +10288,7 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
                 },
                         "quantity": 1,
             }],
-            payment_intent_data={
-                "metadata": payment_metadata,
-            },
+            payment_intent_data=payment_intent_data,
             success_url=f"{payment_mode_base_url}/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{payment_mode_base_url}/dashboard?payment=cancelled",
             metadata=payment_metadata,
@@ -10354,8 +10410,10 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
             collection_method="send_invoice",
             days_until_due=max(int(request.due_days or 7), 1),
             auto_advance=False,
+            pending_invoice_items_behavior="include",
             description=description or None,
             metadata=invoice_metadata,
+            **({"application_fee_amount": calculate_platform_application_fee(request.amount)} if calculate_platform_application_fee(request.amount) else {}),
         )
         payload = serialize_stripe_invoice(invoice)
         payload["customer_id"] = customer.get("id")
@@ -10473,7 +10531,7 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
         existing = supabase.table("payments").select("*").eq("stripe_payment_intent_id", request.payment_id).eq("user_id", user_id).limit(1).execute()
         if existing.data:
             payment_record = existing.data[0]
-        else:
+        elif is_uuid_value(request.payment_id):
             existing = supabase.table("payments").select("*").eq("id", request.payment_id).eq("user_id", user_id).limit(1).execute()
             if existing.data:
                 payment_record = existing.data[0]
@@ -11674,14 +11732,14 @@ async def authorize_user_integration(
             )
             authorization_url = f"{get_payment_frontend_base_url().rstrip('/')}/dashboard?integration=stripe&simulated=true"
         else:
-            if not stripe_connect_client_id:
+            if not _stripe_connect_client_id():
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe Connect is not configured.")
             _stripe_platform_api_key()
 
             redirect_uri = _get_stripe_redirect_uri(request)
             state_token = _build_integration_state(str(current_user.id), provider, return_to)
             params = {
-                "client_id": stripe_connect_client_id,
+                "client_id": _stripe_connect_client_id(),
                 "redirect_uri": redirect_uri,
                 "response_type": "code",
                 "scope": STRIPE_CONNECT_SCOPE,
@@ -11809,8 +11867,10 @@ async def gmail_integration_callback(
             }})();
             if (window.opener && !window.opener.closed) {{
               window.opener.postMessage(payload, targetOrigin);
+              setTimeout(function() {{ window.close(); }}, 350);
+            }} else {{
+              setTimeout(function() {{ window.location.replace({safe_target}); }}, 350);
             }}
-            setTimeout(function() {{ window.close(); }}, 350);
           }})();
         </script>
       </body>

@@ -14,6 +14,7 @@ except ImportError:
 # General
 load_project_env()
 TEST_MODE = os.environ.get("TEST_MODE", "false").strip().lower() in {"1", "true", "yes", "on"}
+STRIPE_REAL_TEST_MODE = os.environ.get("STRIPE_REAL_TEST_MODE", "false").strip().lower() in {"1", "true", "yes", "on"}
 UPDATE2 = os.environ.get("UPDATE2", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -26,9 +27,11 @@ STRIPE_LIVE_SECRET_KEY = os.environ.get("STRIPE_API_SECRET_KEY") or os.environ.g
 STRIPE_TEST_SECRET_KEY = os.environ.get("STRIPE_SECRET_TEST_KEY") or os.environ.get("STRIPE_TEST_SECRET_KEY")
 stripe_webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
 stripe_connect_client_id = os.environ.get("STRIPE_CONNECT_CLIENT_ID")
+stripe_connect_test_client_id = os.environ.get("STRIPE_CONNECT_TEST_CLIENT_ID")
 stripe_connect_redirect_uri = os.environ.get("STRIPE_CONNECT_REDIRECT_URI")
+stripe_application_fee_percent = os.environ.get("STRIPE_APPLICATION_FEE_PERCENT", "1")
 
-if TEST_MODE:
+if TEST_MODE or STRIPE_REAL_TEST_MODE:
     stripe.api_key = STRIPE_TEST_SECRET_KEY
 else:
     stripe.api_key = STRIPE_LIVE_SECRET_KEY
