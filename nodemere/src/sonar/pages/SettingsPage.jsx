@@ -61,6 +61,17 @@ const TIMEZONES = [
   'America/Toronto', 'America/Vancouver', 'Europe/London',
 ];
 
+const getTimezoneAbbreviation = (timeZone) => {
+  if (!timeZone) return '';
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'short' })
+      .formatToParts(new Date())
+      .find((part) => part.type === 'timeZoneName')?.value || '';
+  } catch {
+    return '';
+  }
+};
+
 // ─── Knowledge Base Templates ───────────────────────────────────────────────
 const KNOWLEDGE_TEMPLATES = {
   about: {
@@ -2395,6 +2406,16 @@ const limitKnowledgeText = (value) => String(value || '').slice(0, SETTINGS_LONG
 const escapeKnowledgeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const allSettingsBriefSections = () => allBusinessBriefSections();
 
+const restoreBusinessBriefFormatting = (value, sections) => {
+  let nextValue = String(value || '').replace(/\r\n/g, '\n').trim();
+  sections.forEach((section) => {
+    const label = escapeKnowledgeRegExp(section.label);
+    const pattern = new RegExp(`(^|[^\\n])(${label})(?=[A-Z0-9•*-])`, 'g');
+    nextValue = nextValue.replace(pattern, (match, prefix, heading) => `${prefix}\n\n${heading}:\n\n`);
+  });
+  return nextValue.replace(/\n{3,}/g, '\n\n').trim();
+};
+
 const hasBusinessBriefSection = (value, section) => (
   new RegExp(`(?:^|\\n\\n)${escapeKnowledgeRegExp(section.label)}:\\n\\n`, 'm').test(value || '')
 );
@@ -2456,14 +2477,14 @@ const EditableKnowledgeBrief = ({ value, onChange, editorRef }) => {
       suppressContentEditableWarning
       onBeforeInput={(event) => {
         if (!event.inputType?.startsWith('insert')) return;
-        const currentValue = event.currentTarget.textContent || '';
+        const currentValue = getKnowledgeEditorText(event.currentTarget);
         const selectedTextLength = window.getSelection?.()?.toString().length || 0;
         if (currentValue.length - selectedTextLength >= SETTINGS_LONG_TEXT_LIMIT) event.preventDefault();
       }}
       onPaste={(event) => {
         event.preventDefault();
         const editor = event.currentTarget;
-        const currentValue = editor.textContent || '';
+        const currentValue = getKnowledgeEditorText(editor);
         const pastedText = event.clipboardData.getData('text/plain');
         const selection = window.getSelection?.();
         const selectedTextLength = selection?.rangeCount ? String(selection.toString()).length : 0;
@@ -2472,7 +2493,7 @@ const EditableKnowledgeBrief = ({ value, onChange, editorRef }) => {
       }}
       onInput={(event) => {
         const editor = event.currentTarget;
-        let nextValue = editor.textContent || '';
+        let nextValue = getKnowledgeEditorText(editor);
         if (nextValue.length > SETTINGS_LONG_TEXT_LIMIT) {
           nextValue = nextValue.slice(0, SETTINGS_LONG_TEXT_LIMIT);
           editor.textContent = nextValue;
@@ -2483,7 +2504,7 @@ const EditableKnowledgeBrief = ({ value, onChange, editorRef }) => {
         onChange(nextValue);
       }}
       onClick={selectKnowledgePlaceholder}
-      onBlur={(event) => { event.currentTarget.innerHTML = escapeKnowledgeHtml(event.currentTarget.textContent || ''); }}
+      onBlur={(event) => { event.currentTarget.innerHTML = escapeKnowledgeHtml(getKnowledgeEditorText(event.currentTarget)); }}
       className={`${settingsFieldClass} h-[459px] overflow-y-auto whitespace-pre-wrap resize-none py-4 leading-6`}
     />
   );
@@ -2531,6 +2552,16 @@ const moveKnowledgeCaretToEnd = (element) => {
   selection.addRange(range);
 };
 
+const getKnowledgeEditorText = (editor) => {
+  const text = editor.innerText || editor.textContent || '';
+  return text
+    .replace(/\u00a0/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd();
+};
+
 const KnowledgeBaseEditor = ({ value, onChange, industry }) => {
   const [activeTab, setActiveTab] = useState('about');
   const [faqExampleIndex, setFaqExampleIndex] = useState(0);
@@ -2543,7 +2574,7 @@ const KnowledgeBaseEditor = ({ value, onChange, industry }) => {
 
   useEffect(() => {
     setFaqExampleIndex(0);
-    const currentValue = String(value.about || '');
+    const currentValue = restoreBusinessBriefFormatting(value.about, businessBriefSections);
     if (!currentValue.trim()) return;
     const refreshed = businessBriefSections.reduce((nextValue, section) => {
       if (!hasBusinessBriefSection(nextValue, section)) return nextValue;
@@ -2558,7 +2589,7 @@ const KnowledgeBaseEditor = ({ value, onChange, industry }) => {
       faq: allIndustryExampleValues('faq').includes(value.faq) ? '' : value.faq,
     };
     if (nextValue.about !== value.about || nextValue.policies !== value.policies || nextValue.faq !== value.faq) onChange(nextValue);
-  }, [industry]);
+  }, [industry, value.about]);
 
   const updateDoc = (nextValue) => onChange({ ...value, [activeTab]: limitKnowledgeText(nextValue) });
   const toggleBusinessBriefSection = (section) => {
@@ -3442,7 +3473,7 @@ const SettingsPage = () => {
                 <SelectInput
                   value={settings.business_timezone}
                   onChange={(v) => update('business_timezone', v)}
-                  options={TIMEZONES.map(tz => ({ value: tz, label: tz.replace('America/', '').replace('_', ' ') }))}
+                  options={TIMEZONES.map(tz => ({ value: tz, label: `${tz.replace('America/', '').replace('_', ' ')} (${getTimezoneAbbreviation(tz)})` }))}
                 />
               </Field>
             </div>
@@ -3450,7 +3481,7 @@ const SettingsPage = () => {
               <TextInput value={settings.business_street} onChange={(v) => update('business_street', v)} placeholder="123 Main St" />
             </Field>
             <div className="grid grid-cols-3 gap-4">
-              <Field label="City">
+              <Field label={<span className="flex items-center gap-2"><span>City</span><span className="rounded-full border border-white/[0.08] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-600">{getTimezoneAbbreviation(settings.business_timezone)}</span></span>}>
                 <TextInput value={settings.business_city} onChange={(v) => update('business_city', v)} placeholder="City" />
               </Field>
               <Field label="State">
@@ -3656,7 +3687,7 @@ const SettingsPage = () => {
                 <SelectInput
                   value={settings.business_timezone}
                   onChange={(v) => update('business_timezone', v)}
-                  options={TIMEZONES.map(tz => ({ value: tz, label: tz.replace('America/', '').replace('_', ' ') }))}
+                  options={TIMEZONES.map(tz => ({ value: tz, label: `${tz.replace('America/', '').replace('_', ' ')} (${getTimezoneAbbreviation(tz)})` }))}
                 />
               </Field>
             </div>
@@ -3664,7 +3695,7 @@ const SettingsPage = () => {
               <TextInput value={settings.business_street} onChange={(v) => update('business_street', v)} placeholder="123 Main St" />
             </Field>
             <div className="grid grid-cols-3 gap-4">
-              <Field label="City">
+              <Field label={<span className="flex items-center gap-2"><span>City</span><span className="rounded-full border border-white/[0.08] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-600">{getTimezoneAbbreviation(settings.business_timezone)}</span></span>}>
                 <TextInput value={settings.business_city} onChange={(v) => update('business_city', v)} placeholder="City" />
               </Field>
               <Field label="State">
