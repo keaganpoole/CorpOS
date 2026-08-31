@@ -383,10 +383,10 @@ def _coerce_boolean(value, default: bool = False) -> bool:
 def is_payment_test_mode() -> bool:
     """Read the database-controlled payment safety switch for each request."""
     global PAYMENT_TEST_MODE
-    if STRIPE_REAL_TEST_MODE:
-        PAYMENT_TEST_MODE = False
+    if TEST_MODE or STRIPE_REAL_TEST_MODE:
+        PAYMENT_TEST_MODE = True
         stripe.api_key = STRIPE_TEST_SECRET_KEY
-        return False
+        return True
     row = get_system_config_row()
     if row.get("_system_config_read_error") or not row:
         # Fail closed: an unavailable safety switch must never enable live

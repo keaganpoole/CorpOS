@@ -710,7 +710,6 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
 const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, onOutboundLateHours }) => {
   const dragPreviewRef = useRef(null);
   const [snapMinutes, setSnapMinutes] = useState(15);
-  const [visibleLayers, setVisibleLayers] = useState({ business: true, inbound: true, outbound: true });
   const [colorblindMode, setColorblindMode] = useState(false);
   const [drag, setDrag] = useState(null);
   const [hoveredBar, setHoveredBar] = useState(null);
@@ -750,6 +749,63 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
         },
       },
     }));
+  };
+
+  const toggleDay = (day) => {
+    updateSchedule((current) => {
+      const nextEnabled = !current.days[day].enabled;
+      return {
+        ...current,
+        days: {
+          ...current.days,
+          [day]: {
+            ...current.days[day],
+            enabled: nextEnabled,
+            layers: Object.fromEntries(SCHEDULE_LAYER_TYPES.map(({ id }) => [
+              id,
+              { ...current.days[day].layers[id], enabled: nextEnabled },
+            ])),
+          },
+        },
+      };
+    });
+  };
+
+  const toggleLayer = (day, layerId) => {
+    updateSchedule((current) => {
+      const nextLayers = {
+        ...current.days[day].layers,
+        [layerId]: {
+          ...current.days[day].layers[layerId],
+          enabled: !current.days[day].layers[layerId].enabled,
+        },
+      };
+      return {
+        ...current,
+        days: {
+          ...current.days,
+          [day]: {
+            ...current.days[day],
+            enabled: Object.values(nextLayers).some((layer) => layer.enabled),
+            layers: nextLayers,
+          },
+        },
+      };
+    });
+  };
+
+  const toggleAllLayer = (layerId) => {
+    updateSchedule((current) => {
+      const isCurrentlyEnabled = DAYS.some((day) => current.days[day]?.layers?.[layerId]?.enabled);
+      const nextDays = Object.fromEntries(DAYS.map((day) => {
+        const nextLayers = {
+          ...current.days[day].layers,
+          [layerId]: { ...current.days[day].layers[layerId], enabled: !isCurrentlyEnabled },
+        };
+        return [day, { ...current.days[day], enabled: Object.values(nextLayers).some((layer) => layer.enabled), layers: nextLayers }];
+      }));
+      return { ...current, days: nextDays };
+    });
   };
 
   const handlePointerDown = (event, day, layerId, handle) => {
@@ -856,8 +912,8 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
         <div className="flex flex-wrap items-center gap-4">
           <span className="flex items-center gap-1.5 font-medium text-zinc-500"><Layers className="h-3.5 w-3.5" /> Layers:</span>
           {activeLayerTypes.map((layer) => (
-            <button key={layer.id} type="button" onClick={() => setVisibleLayers((current) => ({ ...current, [layer.id]: !current[layer.id] }))} className={`flex items-center gap-1.5 text-[11px] font-medium transition ${visibleLayers[layer.id] ? 'text-zinc-300' : 'text-zinc-700'}`}>
-              <span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${layer.gradient} ${visibleLayers[layer.id] ? '' : 'opacity-30'}`} />{layer.label}
+            <button key={layer.id} type="button" onClick={() => toggleAllLayer(layer.id)} className={`flex items-center gap-1.5 text-[11px] font-medium transition ${DAYS.some((day) => schedule.days[day]?.layers?.[layer.id]?.enabled) ? 'text-zinc-300' : 'text-zinc-700'}`}>
+              <span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${layer.gradient} ${DAYS.some((day) => schedule.days[day]?.layers?.[layer.id]?.enabled) ? '' : 'opacity-30'}`} />{layer.label}
             </button>
           ))}
           <div className="flex items-center gap-2 text-[11px] text-zinc-500">
@@ -925,7 +981,7 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
             return (
               <div key={day} className={`group relative flex items-center rounded-xl border px-3 py-2 transition-all duration-200 ${dayValue.enabled ? 'border-white/[0.06] bg-white/[0.018] hover:bg-white/[0.035]' : 'border-transparent bg-black/20 opacity-50 hover:opacity-75'}`}>
                 <div className="flex w-28 shrink-0 items-center gap-2.5">
-                  <button type="button" onClick={() => updateSchedule((current) => ({ ...current, days: { ...current.days, [day]: { ...current.days[day], enabled: !current.days[day].enabled } } }))} className={`flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle ${day}`}><span className={`block h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
+                  <button type="button" onClick={() => toggleDay(day)} className={`flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle all schedules for ${day}`}><span className={`block h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
                   <span className={`text-xs font-semibold uppercase tracking-wider ${dayValue.enabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
                 </div>
                 <div data-settings-schedule-track={day} className="relative mx-2 flex h-14 min-w-0 flex-1 items-center">
@@ -939,18 +995,15 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
                       const isActiveBar = drag?.day === day && drag?.layerId === layerType.id;
                       const isHovered = hoveredBar === barKey;
                       const isDimmed = drag && !isActiveBar;
-                      if (!visibleLayers[layerType.id]) return <div key={layerType.id} className="h-2.5" />;
                       return (
                         <div key={layerType.id} className="group/bar relative h-2.5 w-full" onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)}>
-                          <div className="absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full border border-white/[0.03] bg-white/[0.04]" />
-                          {dayValue.enabled && layer.enabled ? (
-                            <div className={`absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} cursor-grab transition-all duration-75 active:cursor-grabbing ${isActiveBar ? 'z-20 scale-y-110 ring-2 ring-white/50' : 'z-10'} ${isDimmed ? 'opacity-30' : 'opacity-100'} ${isHovered ? 'brightness-125 shadow-lg' : ''}`} style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || isHovered ? layerType.glow : 'none' }} onPointerDown={(event) => handlePointerDown(event, day, layerType.id, 'center')}>
+                          <button type="button" onClick={() => toggleLayer(day, layerType.id)} aria-pressed={layer.enabled} aria-label={`${layer.enabled ? 'Disable' : 'Enable'} ${layerType.label} on ${day}`} title={`${layer.enabled ? 'Disable' : 'Enable'} ${layerType.label}`} className={`absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full border text-left transition ${layer.enabled ? 'border-white/[0.05] bg-white/[0.05]' : 'border-white/[0.03] bg-white/[0.02] opacity-60 hover:opacity-100'}`} />
+                          <div className={`absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} transition-all duration-75 ${layer.enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer grayscale'} ${isActiveBar ? 'z-20 scale-y-110 ring-2 ring-white/50' : 'z-10'} ${isDimmed ? 'opacity-30' : layer.enabled ? 'opacity-100' : 'opacity-25'} ${isHovered && layer.enabled ? 'brightness-125 shadow-lg' : ''}`} style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || (isHovered && layer.enabled) ? layerType.glow : 'none' }} onClick={() => { if (!layer.enabled) toggleLayer(day, layerType.id); }} onPointerDown={(event) => handlePointerDown(event, day, layerType.id, 'center')}>
                               <button type="button" aria-label={`Move ${layerType.label} start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'left'); }} className="absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
                               <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30"><span className="h-0.5 w-4 rounded-full bg-white/60" /></div>
                               <button type="button" aria-label={`Move ${layerType.label} end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'right'); }} className="absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
                             </div>
-                          ) : null}
-                          {dayValue.enabled && layer.enabled && (isHovered || isActiveBar) ? (
+                          {layer.enabled && (isHovered || isActiveBar) ? (
                             <div className="pointer-events-none absolute -top-7 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.08] bg-[#111] px-2 py-0.5 font-mono text-[11px] text-zinc-100 shadow-2xl" style={{ left: `${Math.min(92, Math.max(8, left + (width / 2)))}%` }}>
                               <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: layerType.color }} />
                               <span className="font-semibold text-white">{formatScheduleTime(layer.start)}</span>
@@ -979,10 +1032,6 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
                 <span>{layer.label.replace(' Hours', '')}: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyTotals[layer.id])}</strong></span>
               </span>
             ))}
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-zinc-600">
-            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-zinc-600 text-[9px] font-bold">i</span>
-            <span>Drag handles or entire bar to resize and adjust schedules.</span>
           </div>
         </div>
       </div>
@@ -1498,6 +1547,10 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [addForm, setAddForm] = useState(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importing, setImporting] = useState(false);
 
   // Load from Supabase on mount
   useEffect(() => {
@@ -1560,6 +1613,56 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
       setAddForm(null);
     } catch (err) {
       console.error('[ServicesManager] Failed to add:', err);
+    }
+  };
+
+  const importServices = async () => {
+    setImportError('');
+    try {
+      const parsed = JSON.parse(importText);
+      const imported = Array.isArray(parsed) ? parsed : parsed?.services;
+      if (!Array.isArray(imported) || imported.length === 0) {
+        throw new Error('Use a JSON array of services or an object with a services array.');
+      }
+      if (imported.some((service) => !service || typeof service !== 'object' || !String(service.name || '').trim())) {
+        throw new Error('Every imported service must include a name.');
+      }
+
+      const business = await ensureBusinessRecord({ createIfMissing: true });
+      const resolvedBusinessId = business?.id || businessId || null;
+      if (!resolvedBusinessId) throw new Error('Save business info before importing services.');
+      onBusinessLinked?.(resolvedBusinessId);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData?.user?.id;
+      if (!userId) throw new Error('User not found');
+
+      const rows = imported.map((service, index) => {
+        const normalized = normalizeServicePayload(service);
+        return {
+          name: normalized.name,
+          description: normalized.description,
+          category: normalized.category,
+          unit: normalized.unit,
+          price_type: normalized.price_type,
+          price_min: normalized.price_min,
+          price_max: normalized.price_max,
+          is_active: normalized.is_active,
+          id: crypto.randomUUID(),
+          user_id: userId,
+          business_id: resolvedBusinessId,
+          sort_order: services.length + index,
+        };
+      });
+      const { error } = await supabase.from('services').insert(rows);
+      if (error) throw error;
+      setServices((current) => [...current, ...rows]);
+      setImportModalOpen(false);
+      setImportText('');
+    } catch (err) {
+      setImportError(err.message || 'Could not import services.');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -1633,11 +1736,35 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
         <p className="text-[12px] font-medium text-zinc-600">
           {services.length} service{services.length === 1 ? '' : 's'} configured
         </p>
-        <button type="button" onClick={() => setAddForm({ name: '', description: '', price_type: 'fixed', price_min: '', price_max: '', unit: 'session', category: 'General', is_active: true })}
-          className="flex h-10 items-center justify-center rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200">
-          <span>Create service</span>
-        </button>
+        <div className="flex items-center gap-4">
+          <button type="button" onClick={() => { setImportError(''); setImportText(''); setImportModalOpen(true); }} className="flex h-10 items-center justify-center gap-1.5 px-2 text-[11px] font-bold text-zinc-500 transition hover:text-white">
+            <Upload className="h-3.5 w-3.5" />
+            <span>Import</span>
+          </button>
+          <button type="button" onClick={() => setAddForm({ name: '', description: '', price_type: 'fixed', price_min: '', price_max: '', unit: 'session', category: 'General', is_active: true })}
+            className="flex h-10 items-center justify-center rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200">
+            <span>Create service</span>
+          </button>
+        </div>
       </div>
+
+      <AnimatePresence>
+        {importModalOpen ? (
+          <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => !importing && setImportModalOpen(false)}>
+            <motion.div className="w-full max-w-[620px] overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} onMouseDown={(event) => event.stopPropagation()}>
+              <div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5">
+                <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Services & Pricing</p><h2 className="text-xl font-semibold tracking-[-0.04em] text-white">Import services</h2><p className="mt-2 text-sm leading-6 text-zinc-500">Paste a JSON array of services to add them to this business.</p></div>
+                <button type="button" onClick={() => setImportModalOpen(false)} disabled={importing} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white disabled:opacity-40" aria-label="Close import services"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="p-6">
+                <textarea value={importText} onChange={(event) => setImportText(event.target.value)} disabled={importing} className="h-64 w-full resize-none rounded-2xl border border-white/[0.08] bg-black/40 p-4 font-mono text-xs leading-5 text-zinc-200 outline-none transition focus:border-white/[0.18]" placeholder={'[{\n  "name": "Consultation",\n  "price_type": "fixed",\n  "price_min": 100,\n  "unit": "session",\n  "category": "General"\n}]'} />
+                {importError ? <p className="mt-3 text-[11px] font-medium text-rose-400">{importError}</p> : null}
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-white/[0.05] px-6 py-5"><button type="button" onClick={() => setImportModalOpen(false)} disabled={importing} className="h-10 rounded-full px-5 text-sm text-zinc-500 transition hover:text-white disabled:opacity-40">Cancel</button><button type="button" onClick={() => { setImporting(true); importServices(); }} disabled={importing || !importText.trim()} className="h-10 rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">{importing ? 'Importing...' : 'Import services'}</button></div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {/* Service list */}
       <div className="p-5 space-y-6">
@@ -2462,6 +2589,7 @@ const KnowledgeBaseEditor = ({ value, onChange, industry }) => {
     setFaqExampleIndex((index) => (index + 1) % faqExamples.length);
   };
 
+
   const tabs = [
     { key: 'about', label: 'Business Brief', icon: FileText, hint: 'What the company is, how it works, and who it serves' },
     { key: 'policies', label: 'Policies', icon: Shield, hint: 'Business rules, restrictions, requirements, and boundaries' },
@@ -2476,12 +2604,10 @@ const KnowledgeBaseEditor = ({ value, onChange, industry }) => {
         {tabs.map((tab) => {
           const TabIcon = tab.icon;
           const isActive = activeTab === tab.key;
-          const hasContent = String(value[tab.key] || '').trim().length > 0;
           return (
             <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${isActive ? 'bg-white/[0.06] text-white border border-white/[0.08]' : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.02] border border-transparent'}`}>
               <TabIcon size={13} />
               {tab.label}
-              {hasContent && !isActive ? <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" /> : null}
             </button>
           );
         })}
@@ -2821,6 +2947,7 @@ const SettingsPage = () => {
   const [error, setError] = useState(null);
   const [lateHoursTermsOpen, setLateHoursTermsOpen] = useState(false);
   const [lateHoursTermsSaving, setLateHoursTermsSaving] = useState(false);
+  const [scheduleHelpOpen, setScheduleHelpOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('business');
   const [businessAvatarUploading, setBusinessAvatarUploading] = useState(false);
   const businessAvatarInputRef = useRef(null);
@@ -3430,7 +3557,14 @@ const SettingsPage = () => {
                   <ActiveSettingsIcon size={18} className={activeSectionConfig.iconClass} />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">{activeSectionConfig.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-3xl font-semibold tracking-[-0.045em] text-white leading-none">{activeSectionConfig.title}</h3>
+                    {activeSection === 'appointments' ? (
+                      <button type="button" onClick={() => setScheduleHelpOpen(true)} className="flex h-5 w-5 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300" aria-label="Schedule help" title="Schedule help">
+                        <Lightbulb className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
                   <p className="mt-2 text-[13px] leading-5 text-zinc-600">{activeSectionConfig.hint}</p>
                 </div>
               </div>
@@ -3474,6 +3608,24 @@ const SettingsPage = () => {
           </section>
         </div>
       </div>
+
+      <AnimatePresence>
+        {scheduleHelpOpen ? (
+          <SettingsServiceInfoModal
+            maxWidthClass="max-w-[530px]"
+            title="Scheduling help"
+            intro="Adjust each schedule to match how your business operates and when you want your receptionist available. You can fine-tune these hours now and change them anytime as your needs change."
+            points={[
+              { title: 'Business Hours.', body: 'Set when the business is generally open for appointments and normal operations.' },
+              { title: 'Inbound Calls.', body: 'Set when the receptionist should answer incoming calls, even if the business itself is closed.' },
+              { title: 'Outbound Calls.', body: 'Set when the receptionist can place follow-up or return calls.' },
+              { title: 'Independent schedules.', body: 'Click a schedule track to enable or disable only that schedule for a day. The colored bar stays visible but dims when disabled.' },
+            ]}
+            footer="Drag an entire colored bar to move a schedule, or drag either end to adjust its start and end time."
+            onClose={() => setScheduleHelpOpen(false)}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {lateHoursTermsOpen ? (

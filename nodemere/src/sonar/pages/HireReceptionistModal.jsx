@@ -6,6 +6,7 @@ import {
   CalendarDays,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import CubePreloader from '../components/CubePreloader';
 
 const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalogIds = [], hiredVoiceIds = [] }) => {
   const [receptionists, setReceptionists] = useState([]);
@@ -161,9 +162,8 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center gap-4 py-20">
-            <Loader2 size={32} className="animate-spin text-zinc-500" />
-            <p className="text-[11px] text-zinc-600 font-bold uppercase tracking-widest">Loading receptionists...</p>
+          <div className="flex items-center justify-center py-20" aria-label="Loading receptionists">
+            <CubePreloader size={26} />
           </div>
         ) : receptionists.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-20">

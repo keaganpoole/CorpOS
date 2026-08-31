@@ -1567,7 +1567,6 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
 const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeChange, outboundLateHoursAccepted, onOutboundLateHours }) => {
   const dragPreviewRef = useRef(null);
   const [snapMinutes, setSnapMinutes] = useState(15);
-  const [visibleLayers, setVisibleLayers] = useState({ business: true, inbound: true, outbound: true });
   const [drag, setDrag] = useState(null);
   const [hoveredBar, setHoveredBar] = useState(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -1607,6 +1606,63 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
         },
       },
     }));
+  }, [updateSchedule]);
+
+  const toggleDay = useCallback((day) => {
+    updateSchedule((current) => {
+      const nextEnabled = !current.days[day].enabled;
+      return {
+        ...current,
+        days: {
+          ...current.days,
+          [day]: {
+            ...current.days[day],
+            enabled: nextEnabled,
+            layers: Object.fromEntries(scheduleLayerTypes.map(({ id }) => [
+              id,
+              { ...current.days[day].layers[id], enabled: nextEnabled },
+            ])),
+          },
+        },
+      };
+    });
+  }, [updateSchedule]);
+
+  const toggleLayer = useCallback((day, layerId) => {
+    updateSchedule((current) => {
+      const nextLayers = {
+        ...current.days[day].layers,
+        [layerId]: {
+          ...current.days[day].layers[layerId],
+          enabled: !current.days[day].layers[layerId].enabled,
+        },
+      };
+      return {
+        ...current,
+        days: {
+          ...current.days,
+          [day]: {
+            ...current.days[day],
+            enabled: Object.values(nextLayers).some((layer) => layer.enabled),
+            layers: nextLayers,
+          },
+        },
+      };
+    });
+  }, [updateSchedule]);
+
+  const toggleAllLayer = useCallback((layerId) => {
+    updateSchedule((current) => {
+      const isCurrentlyEnabled = days.some((day) => current.days[day]?.layers?.[layerId]?.enabled);
+      const nextDays = Object.fromEntries(days.map((day) => {
+        const nextLayers = {
+          ...current.days[day].layers,
+          [layerId]: { ...current.days[day].layers[layerId], enabled: !isCurrentlyEnabled },
+        };
+        return [day, { ...current.days[day], enabled: Object.values(nextLayers).some((layer) => layer.enabled), layers: nextLayers }];
+      }));
+      return { ...current, days: nextDays };
+    });
   }, [updateSchedule]);
 
   const handlePointerDown = (event, day, layerId, handle) => {
@@ -1715,8 +1771,8 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
         <div className="flex flex-wrap items-center gap-4">
           <span className="flex items-center gap-1.5 font-medium text-zinc-500"><Layers className="h-3.5 w-3.5" /> Layers:</span>
           {activeLayerTypes.map((layer) => (
-            <button key={layer.id} type="button" onClick={() => setVisibleLayers((current) => ({ ...current, [layer.id]: !current[layer.id] }))} className={`flex items-center gap-1.5 text-[11px] font-medium transition ${visibleLayers[layer.id] ? 'text-zinc-300' : 'text-zinc-700'}`}>
-              <span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${layer.gradient} ${visibleLayers[layer.id] ? '' : 'opacity-30'}`} />{layer.label}
+            <button key={layer.id} type="button" onClick={() => toggleAllLayer(layer.id)} className={`flex items-center gap-1.5 text-[11px] font-medium transition ${days.some((day) => schedule.days[day]?.layers?.[layer.id]?.enabled) ? 'text-zinc-300' : 'text-zinc-700'}`}>
+              <span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${layer.gradient} ${days.some((day) => schedule.days[day]?.layers?.[layer.id]?.enabled) ? '' : 'opacity-30'}`} />{layer.label}
             </button>
           ))}
           <div className="flex items-center gap-2 text-[11px] text-zinc-500">
@@ -1791,7 +1847,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
           return (
             <div key={day} className={`group relative flex items-center rounded-xl border px-3 py-2 transition-all duration-200 ${dayValue.enabled ? 'border-white/[0.06] bg-white/[0.018] hover:bg-white/[0.035]' : 'border-transparent bg-black/20 opacity-50 hover:opacity-75'}`}>
               <div className="flex w-28 shrink-0 items-center gap-2.5">
-                <button type="button" onClick={() => updateSchedule((current) => ({ ...current, days: { ...current.days, [day]: { ...current.days[day], enabled: !current.days[day].enabled } } }))} className={`flex h-4 w-7 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle ${day}`}><span className={`h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
+                <button type="button" onClick={() => toggleDay(day)} className={`flex h-4 w-7 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle all schedules for ${day}`}><span className={`h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
                 <span className={`text-xs font-semibold uppercase tracking-wider ${dayValue.enabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
               </div>
               <div data-schedule-track={day} className="relative mx-2 flex h-14 min-w-0 flex-1 items-center">
@@ -1805,16 +1861,15 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
                     const isActiveBar = drag?.day === day && drag?.layerId === layerType.id;
                     const isHovered = hoveredBar === barKey;
                     const isDimmed = drag && !isActiveBar;
-                    if (!visibleLayers[layerType.id]) return <div key={layerType.id} className="h-2.5" />;
                     return (
                       <div key={layerType.id} className="group/bar relative h-2.5 w-full" onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)}>
-                        <div className="absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full border border-white/[0.03] bg-white/[0.04]" />
-                        {dayValue.enabled && layer.enabled ? (
-                          <div
-                            className={`absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} cursor-grab transition-all duration-75 active:cursor-grabbing ${
+                        <button type="button" onClick={() => toggleLayer(day, layerType.id)} aria-pressed={layer.enabled} aria-label={`${layer.enabled ? 'Disable' : 'Enable'} ${layerType.label} on ${day}`} title={`${layer.enabled ? 'Disable' : 'Enable'} ${layerType.label}`} className={`absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full border text-left transition ${layer.enabled ? 'border-white/[0.05] bg-white/[0.05]' : 'border-white/[0.03] bg-white/[0.02] opacity-60 hover:opacity-100'}`} />
+                        <div
+                            className={`absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} transition-all duration-75 ${layer.enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer grayscale'} ${
                               isActiveBar ? 'z-20 scale-y-110 ring-2 ring-white/50' : 'z-10'
-                            } ${isDimmed ? 'opacity-30' : 'opacity-100'} ${isHovered ? 'brightness-125 shadow-lg' : ''}`}
-                            style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || isHovered ? layerType.glow : 'none' }}
+                            } ${isDimmed ? 'opacity-30' : layer.enabled ? 'opacity-100' : 'opacity-25'} ${isHovered && layer.enabled ? 'brightness-125 shadow-lg' : ''}`}
+                            style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || (isHovered && layer.enabled) ? layerType.glow : 'none' }}
+                            onClick={() => { if (!layer.enabled) toggleLayer(day, layerType.id); }}
                             onPointerDown={(event) => handlePointerDown(event, day, layerType.id, 'center')}
                           >
                             <button type="button" aria-label={`Move ${layerType.label} start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'left'); }} className="absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100">
@@ -1827,8 +1882,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
                               <span className="h-2 w-0.5 rounded-full bg-zinc-600" />
                             </button>
                           </div>
-                        ) : null}
-                        {dayValue.enabled && layer.enabled && (isHovered || isActiveBar) ? (
+                        {layer.enabled && (isHovered || isActiveBar) ? (
                           <div className="pointer-events-none absolute -top-7 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.08] bg-[#111] px-2 py-0.5 font-mono text-[11px] text-zinc-100 shadow-2xl" style={{ left: `${Math.min(92, Math.max(8, left + (width / 2)))}%` }}>
                             <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: layerType.color }} />
                             <span className="font-semibold text-white">{formatScheduleTime(layer.start)}</span>
@@ -1858,10 +1912,6 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
                 <span>{layer.label.replace(' Hours', '')}: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyTotals[layer.id])}</strong></span>
               </span>
             ))}
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-zinc-600">
-            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-zinc-600 text-[9px] font-bold">i</span>
-            <span>Drag handles or entire bar to resize and adjust schedules.</span>
           </div>
         </div>
       </div>
@@ -3155,7 +3205,7 @@ const Onboarding2Page = () => {
                   ? 'Set when the receptionist should answer incoming calls.'
                   : 'Set when the receptionist can place follow-up or return calls.',
             }))}
-            footer="Drag an entire bar to move a schedule, or drag either end to adjust its start and end time."
+            footer="Click a schedule track to enable or disable only that schedule for a day. Drag an entire colored bar to move a schedule, or drag either end to adjust its start and end time."
             onClose={() => setScheduleHelpOpen(false)}
           />
         ) : null}
