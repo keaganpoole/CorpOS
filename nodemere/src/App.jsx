@@ -19,6 +19,7 @@ import CustomerExperienceFeedback from './components/CustomerExperienceFeedback'
 
 // Sonar Dashboard
 import SonarDashboard from './sonar/SonarDashboard';
+import ProjectIntelligenceReport from './sonar/pages/ProjectIntelligenceReport';
 
 function DashboardGate() {
   const { session, profile, isLoading } = useAuth();
@@ -61,8 +62,9 @@ function AppContent() {
   const { isLoading, isAppLoading } = useAuth();
   const location = useLocation();
   const isVoiceCloneEntry = location.pathname.startsWith('/clone');
+  const isPublicStats = location.pathname === '/stats';
 
-  if ((isLoading || isAppLoading) && !isVoiceCloneEntry) {
+  if ((isLoading || isAppLoading) && !isVoiceCloneEntry && !isPublicStats) {
     return <SplashScreen />;
   }
 
@@ -99,6 +101,7 @@ function AppContent() {
         {/* --- Dashboard (Sonar) --- */}
         <Route path="/dashboard" element={<DashboardGate />} />
         <Route path="/dashboard/*" element={<DashboardGate />} />
+        <Route path="/stats" element={<ProjectIntelligenceReport publicView />} />
 
         {/* --- Fallback Route --- */}
         <Route path="*" element={<Navigate to="/" replace />} />

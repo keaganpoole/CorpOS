@@ -69,6 +69,7 @@ import ReportProblemModal from './components/ReportProblemModal';
 import CalendarPage from './pages/CalendarPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
+import ProjectIntelligenceReport from './pages/ProjectIntelligenceReport';
 import CubePreloader from './components/CubePreloader';
 import PlanLimitModal from '../components/modals/PlanLimitModal';
 import PlanChangePopupModal from '../components/modals/PlanChangePopupModal';
@@ -80,7 +81,7 @@ import logoImage from '../assets/logo.png';
 
 const DASHBOARD_ROUTE_STORAGE_KEY = 'sonar-dashboard-route';
 const DEFAULT_DASHBOARD_ROUTE = 'receptionists';
-const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'settings'];
+const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'stats', 'settings'];
 const POPUP_DISMISS_PERSISTS_SHOWN = false;
 
 const formatPlanName = (plan) => {
@@ -511,7 +512,8 @@ const createTasklistState = ({ business = null, agents = [], staff = [], purchas
 
 function getInitialDashboardRoute() {
   if (typeof window === 'undefined') return DEFAULT_DASHBOARD_ROUTE;
-  const routeFromPath = window.location.pathname.split('/').filter(Boolean)[1];
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  const routeFromPath = pathSegments[0] === 'stats' ? 'stats' : pathSegments[1];
   if (DASHBOARD_ROUTES.includes(routeFromPath)) return routeFromPath;
   const savedRoute = window.localStorage.getItem(DASHBOARD_ROUTE_STORAGE_KEY);
   return DASHBOARD_ROUTES.includes(savedRoute) ? savedRoute : DEFAULT_DASHBOARD_ROUTE;
@@ -2305,6 +2307,7 @@ const SonarDashboard = () => {
     { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios', beta: true },
     { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
+    { id: 'stats', icon: <BarChart3 size={18} />, label: 'Project Intelligence' },
   ];
 
   const renderView = () => {
@@ -2567,6 +2570,8 @@ const SonarDashboard = () => {
         return <CallLogsPage onToolbarMetaChange={setCallLogsToolbarMeta} />;
       case 'pipeline':
         return <LeadsPage hideTitle onToolbarMetaChange={setPeopleToolbarMeta} />;
+      case 'stats':
+        return <ProjectIntelligenceReport />;
       default:
         return <PlaceholderView title={currentRoute} body="Coming soon" />;
     }
@@ -2575,7 +2580,7 @@ const SonarDashboard = () => {
   return (
     <AudioPlayerProvider>
     <CallLogsProvider normalizeCall={normalizeCall}>
-    <div className="flex flex-col h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
+    <div className="sonar-dashboard-shell flex flex-col h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
       <style>{`
         .snap-x { scroll-snap-type: x proximity; }
         body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.015em; }
@@ -2586,7 +2591,7 @@ const SonarDashboard = () => {
       <div className="drag-region fixed top-0 left-0 right-0 h-8 z-50 pointer-events-none" />
 
       {/* Toolbar */}
-      <header className="shrink-0 h-14 border-b border-white/5 bg-[#020202] flex items-center px-10 z-30 relative">
+      <header className="sonar-dashboard-chrome shrink-0 h-14 border-b border-white/5 bg-[#020202] flex items-center px-10 z-30 relative">
         <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.03]">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
         </div>
@@ -2634,6 +2639,11 @@ const SonarDashboard = () => {
           active={currentRoute === 'settings'}
           title="Settings"
           description="Account & business configuration"
+        />
+        <StaticToolbarTitle
+          active={currentRoute === 'stats'}
+          title="Project Intelligence"
+          description="Source-aware project report"
         />
 
         {/* Center title */}
@@ -2690,7 +2700,7 @@ const SonarDashboard = () => {
         <aside
           onMouseEnter={() => setSidebarCollapsed(false)}
           onMouseLeave={() => setSidebarCollapsed(true)}
-          className={`group/sidebar flex flex-col border-r border-white/5 bg-[#020202] transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-[76px]' : 'w-[240px]'}`}
+          className={`sonar-dashboard-chrome group/sidebar flex flex-col border-r border-white/5 bg-[#020202] transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-[76px]' : 'w-[240px]'}`}
         >
           <div className="px-3 pt-10">
             <nav className="space-y-1">

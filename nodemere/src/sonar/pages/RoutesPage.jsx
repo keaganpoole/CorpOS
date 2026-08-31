@@ -11,7 +11,7 @@ import { api } from '../lib/api';
 const ENDPOINTS = [
   // Server Tools (called by ElevenLabs during calls)
   { group: 'Server Tools', path: '/api/tools/identify-caller', method: 'POST', desc: 'Identify caller by phone', icon: '🔍', wsEvent: 'identify' },
-  { group: 'Server Tools', path: '/api/tools/check-availability', method: 'POST', desc: 'Check appointment slots', icon: '📅', wsEvent: 'slots' },
+  { group: 'Server Tools', path: '/api/tools/check-availability', method: 'POST', desc: 'Check appointment slots using business and staff hours', icon: '📅', wsEvent: 'slots' },
   { group: 'Server Tools', path: '/api/tools/create-appointment', method: 'POST', desc: 'Book appointment', icon: '✅', wsEvent: 'book' },
   { group: 'Server Tools', path: '/api/tools/update-appointment', method: 'POST', desc: 'Reschedule appointment', icon: '🔄', wsEvent: 'reschedule' },
   { group: 'Server Tools', path: '/api/tools/cancel-appointment', method: 'POST', desc: 'Cancel appointment', icon: '❌', wsEvent: 'cancel' },

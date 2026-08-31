@@ -19,6 +19,7 @@ from datetime import date, datetime, timezone, timedelta
 from typing import List, Optional, Literal
 from urllib.parse import urlsplit, urlunsplit
 from email.utils import parsedate_to_datetime
+from zoneinfo import ZoneInfo
 
 SUPPRESSED_ACCESS_LOG_PATHS = {
     "/api/session",
@@ -143,6 +144,7 @@ from .contract_service import (
     save_cloned_receptionist_profile,
     sign_contract,
 )
+from .project_intelligence import get_project_intelligence, refresh_market_research
 
 try:
     from elevenlabs.client import ElevenLabs
@@ -3020,6 +3022,8 @@ def is_public_api_route(request: Request) -> bool:
         return True
     if path == "/api/sonar/pricing/plans":
         return True
+    if path == "/api/public/project-intelligence" and request.method == "GET":
+        return True
     if path == "/api/sonar/payments/test-mode" and request.method == "GET":
         return True
     if path.startswith("/api/contracts/"):
@@ -5045,6 +5049,119 @@ def normalize_working_hours_key(value: str) -> str:
     return "".join(ch for ch in str(value or "").strip().lower() if ch.isalpha())
 
 
+def get_business_timezone(business: Optional[dict]):
+    timezone_name = (business or {}).get("business_timezone") or "UTC"
+    try:
+        return ZoneInfo(str(timezone_name))
+    except Exception:
+        return timezone.utc
+
+
+def decimal_hours_to_minutes(value) -> Optional[int]:
+    try:
+        minutes = round(float(value) * 60)
+    except (TypeError, ValueError):
+        return None
+    return minutes if 0 <= minutes <= 1440 else None
+
+
+def get_business_schedule_for_date(business: Optional[dict], schedule_date: Optional[str], layer: str = "business"):
+    """Return a normalized schedule window for a business day and layer."""
+    if not isinstance(business, dict) or not schedule_date or layer not in SCHEDULE_LAYERS:
+        return None
+
+    normalized_date = normalize_appointment_date_value(schedule_date, fallback=None)
+    if not normalized_date:
+        return None
+    try:
+        weekday = datetime.fromisoformat(normalized_date).strftime("%A")
+    except ValueError:
+        return None
+
+    business_hours = parse_business_hours(business.get("business_hours"))
+    if not isinstance(business_hours, dict):
+        return None
+
+    # The current Settings/Onboarding format stores independent decimal-hour
+    # windows for business, inbound, and outbound use.
+    if business_hours.get("schema_version") == 1 and isinstance(business_hours.get("days"), dict):
+        day_value = business_hours["days"].get(weekday)
+        layer_value = (day_value or {}).get("layers", {}).get(layer) if isinstance(day_value, dict) else None
+        if not isinstance(day_value, dict) or not isinstance(layer_value, dict):
+            return None
+        start_minutes = decimal_hours_to_minutes(layer_value.get("start"))
+        end_minutes = decimal_hours_to_minutes(layer_value.get("end"))
+        if start_minutes is None or end_minutes is None or start_minutes >= end_minutes:
+            return None
+        return {
+            "enabled": bool(day_value.get("enabled")) and bool(layer_value.get("enabled")),
+            "start_minutes": start_minutes,
+            "end_minutes": end_minutes,
+        }
+
+    # Preserve compatibility with older flat business-hour records. They only
+    # describe the business layer; missing channel layers remain unrestricted.
+    if layer != "business":
+        return None
+    day_value = next(
+        (
+            value for key, value in business_hours.items()
+            if normalize_working_hours_key(key) == normalize_working_hours_key(weekday)
+            and isinstance(value, dict)
+        ),
+        None,
+    )
+    if not day_value:
+        return None
+    start_minutes = appointment_time_to_minutes(day_value.get("open"))
+    end_minutes = appointment_time_to_minutes(day_value.get("close"))
+    if start_minutes is None or end_minutes is None or start_minutes >= end_minutes:
+        return None
+    return {
+        "enabled": day_value.get("enabled") is not False,
+        "start_minutes": start_minutes,
+        "end_minutes": end_minutes,
+    }
+
+
+def is_business_available_during_hours(
+    business: Optional[dict],
+    appointment_date: Optional[str],
+    appointment_time: Optional[str],
+    duration: int,
+    layer: str = "business",
+):
+    schedule = get_business_schedule_for_date(business, appointment_date, layer=layer)
+    if schedule is None:
+        return True, None
+    if not schedule["enabled"]:
+        return False, f"Business {layer} hours are closed"
+
+    start_minutes = appointment_time_to_minutes(appointment_time)
+    if start_minutes is None:
+        return True, None
+    end_minutes = start_minutes + normalize_appointment_duration(duration)
+    if start_minutes < schedule["start_minutes"] or end_minutes > schedule["end_minutes"]:
+        return False, f"Requested time is outside business {layer} hours"
+    return True, None
+
+
+def is_business_call_window_open(business: Optional[dict], layer: str = "inbound", at: Optional[datetime] = None):
+    """Evaluate a live call window using the business's configured timezone."""
+    if not isinstance(business, dict):
+        return True, None
+    local_now = (at or datetime.now(timezone.utc)).astimezone(get_business_timezone(business))
+    schedule = get_business_schedule_for_date(business, local_now.date().isoformat(), layer=layer)
+    if schedule is None:
+        return True, None
+    if not schedule["enabled"]:
+        return False, f"Business {layer} hours are closed"
+    current_minutes = local_now.hour * 60 + local_now.minute
+    if current_minutes < schedule["start_minutes"] or current_minutes >= schedule["end_minutes"]:
+        return False, f"Business {layer} hours are closed"
+    return True, None
+
+
 def tokenize_search_terms(*values) -> list[str]:
     terms: list[str] = []
     for value in values:
@@ -5171,6 +5288,50 @@ def list_staff_conflicts(*, business_id, appointment_date, appointment_time, dur
         ):
             conflicts.append(row)
     return conflicts
+
+
+def validate_appointment_schedule(
+    business: Optional[dict],
+    appointment_date: str,
+    appointment_time: str,
+    duration: int,
+    staff_id=None,
+    exclude_appointment_id=None,
+):
+    within_business_hours, business_reason = is_business_available_during_hours(
+        business,
+        appointment_date,
+        appointment_time,
+        duration,
+        layer="business",
+    )
+    if not within_business_hours:
+        return False, business_reason, []
+
+    if not staff_id:
+        return True, None, []
+    staff = load_staff_record(staff_id, business_id=(business or {}).get("id"), require_active=False)
+    if not staff:
+        return False, "Staff member not found", []
+    within_staff_hours, staff_reason = is_staff_available_during_hours(
+        staff,
+        appointment_date,
+        appointment_time,
+        duration,
+    )
+    if not within_staff_hours:
+        return False, staff_reason, []
+    conflicts = list_staff_conflicts(
+        business_id=(business or {}).get("id"),
+        appointment_date=appointment_date,
+        appointment_time=appointment_time,
+        duration=duration,
+        staff_id=staff.get("id"),
+        exclude_appointment_id=exclude_appointment_id,
+    )
+    if conflicts:
+        return False, "Requested time conflicts with an existing appointment", conflicts
+    return True, None, []
 
 def parse_optional_datetime(value):
     if value is None or value == "":
@@ -6719,6 +6880,17 @@ async def twilio_inbound_webhook(request: Request):
     })
     business = context.get("business")
     resolved_user_id = context.get("user_id") or (business or {}).get("user_id")
+    inbound_open, inbound_reason = is_business_call_window_open(business, layer="inbound")
+    if not inbound_open:
+        logging.info(
+            "Rejecting inbound call outside configured inbound hours: business_id=%s reason=%s",
+            (business or {}).get("id"),
+            inbound_reason,
+        )
+        return Response(
+            content="<Response><Say>Our receptionist is unavailable right now. Please call back during our available hours.</Say><Hangup/></Response>",
+            media_type="application/xml",
+        )
     try:
         enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
     except HTTPException as exc:
@@ -6847,6 +7019,13 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
     context = resolve_business_context(call_payload)
     business = context.get("business")
     resolved_user_id = context.get("user_id") or (business or {}).get("user_id")
+    inbound_open, inbound_reason = is_business_call_window_open(business, layer="inbound")
+    if not inbound_open:
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": inbound_reason or "Inbound receptionist is unavailable",
+        }
     enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
     receptionist = (
         (context.get("receptionist") if receptionist_direction_allows("inbound", (context.get("receptionist") or {}).get("direction")) else None)
@@ -7483,10 +7662,37 @@ async def legacy_server_tool(
         }
 
     if normalized_tool == "check-availability":
-        appointment_date = first_present(payload, "date", "appointment_date")
-        appointment_time = first_present(payload, "time", "appointment_time")
+        if not business:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
+
+        raw_appointment_date = first_present(payload, "date", "appointment_date")
+        if raw_appointment_date is None or not str(raw_appointment_date).strip():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="date is required")
+        appointment_date = normalize_appointment_date_value(raw_appointment_date)
+        raw_appointment_time = first_present(payload, "time", "appointment_time")
+        appointment_time = (
+            normalize_appointment_time_value(raw_appointment_time)
+            if raw_appointment_time is not None and str(raw_appointment_time).strip()
+            else None
+        )
         appointment_duration = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
         business_id = business.get("id") if business else None
+        within_business_hours, business_reason = is_business_available_during_hours(
+            business,
+            appointment_date,
+            appointment_time,
+            appointment_duration,
+            layer="business",
+        )
+        if not within_business_hours:
+            return {
+                "ok": True,
+                "available": False,
+                "requested": {"date": appointment_date, "time": appointment_time, "duration": appointment_duration},
+                "reason": business_reason,
+                "conflicts": [],
+                "available_staff": [],
+            }
         requested_staff = load_staff_record(
             first_present(payload, "staff_id"),
             business_id=business_id,
@@ -7515,6 +7721,9 @@ async def legacy_server_tool(
                 duration=appointment_duration,
                 staff_id=requested_staff.get("id"),
             )
+            availability_reason = reason
+            if not availability_reason and conflicts:
+                availability_reason = "Requested time conflicts with an existing appointment"
             return {
                 "ok": True,
                 "available": within_hours and len(conflicts) == 0,
@@ -7524,7 +7733,7 @@ async def legacy_server_tool(
                     "duration": appointment_duration,
                     "staff_id": requested_staff.get("id"),
                 },
-                "reason": reason,
+                "reason": availability_reason or business_reason,
                 "conflicts": conflicts,
                 "staff": requested_staff,
                 "available_staff": [requested_staff] if within_hours and len(conflicts) == 0 else [],
@@ -7560,6 +7769,7 @@ async def legacy_server_tool(
             "ok": True,
             "available": len(available_staff) > 0,
             "requested": {"date": appointment_date, "time": appointment_time, "duration": appointment_duration},
+            "reason": None if available_staff else "No staff members are available for the requested time",
             "conflicts": aggregated_conflicts,
             "available_staff": available_staff,
         }
@@ -7636,16 +7846,34 @@ async def legacy_server_tool(
         }
 
     if normalized_tool == "create-appointment":
+        if not business:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
+        appointment_date = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
+        appointment_time = normalize_appointment_time_value(first_present(payload, "time", "appointment_time"))
+        appointment_duration = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
         person_id = safe_appointment_person_id(first_present(payload, "person_id"))
-        staff_id = safe_appointment_staff_id(
-            first_present(payload, "staff_id"),
-            business_id=business.get("id") if business else None,
-            require_active=False,
+        requested_staff_id = first_present(payload, "staff_id")
+        staff_id = safe_appointment_staff_id(requested_staff_id, business_id=business.get("id"), require_active=False)
+        if requested_staff_id is not None and staff_id is None:
+            return {"ok": False, "appointment": None, "reason": "Staff member not found"}
+        schedule_valid, schedule_reason, schedule_conflicts = validate_appointment_schedule(
+            business,
+            appointment_date,
+            appointment_time,
+            appointment_duration,
+            staff_id=staff_id,
         )
+        if not schedule_valid:
+            return {
+                "ok": False,
+                "appointment": None,
+                "reason": schedule_reason,
+                "conflicts": schedule_conflicts,
+            }
         appointment_row = {
-            "date": normalize_appointment_date_value(first_present(payload, "date", "appointment_date")),
-            "time": normalize_appointment_time_value(first_present(payload, "time", "appointment_time")),
-            "duration": normalize_appointment_duration(first_present(payload, "duration", "appointment_duration")),
+            "date": appointment_date,
+            "time": appointment_time,
+            "duration": appointment_duration,
             "status": normalize_appointment_status(first_present(payload, "status")),
             "receptionist_id": int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id")) or (receptionist or {}).get("id"),
             "notes": first_present(payload, "notes"),
@@ -7709,6 +7937,25 @@ async def legacy_server_tool(
             )
             if safe_staff_id is not None:
                 updates["staff_id"] = safe_staff_id
+        schedule_fields_changed = any(field in updates for field in ("date", "time", "duration", "staff_id"))
+        candidate_status = updates.get("status", existing.get("status"))
+        if schedule_fields_changed and str(candidate_status or "").strip().lower() not in {"cancelled", "completed", "missed"}:
+            appointment_business = business or load_business_by_id(existing.get("business_id"))
+            schedule_valid, schedule_reason, schedule_conflicts = validate_appointment_schedule(
+                appointment_business,
+                updates.get("date", existing.get("date")),
+                updates.get("time", existing.get("time")),
+                updates.get("duration", existing.get("duration")),
+                staff_id=updates.get("staff_id", existing.get("staff_id")),
+                exclude_appointment_id=appointment_id,
+            )
+            if not schedule_valid:
+                return {
+                    "ok": False,
+                    "appointment": None,
+                    "reason": schedule_reason,
+                    "conflicts": schedule_conflicts,
+                }
         if not updates:
             return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -8102,6 +8349,30 @@ async def get_sonar_system_summary(current_user: dict = Depends(get_current_user
         }
     except Exception:
         return {"ok": 0, "warnings": 0, "errors": 0, "activeAgents": 0, "totalAgents": 0}
+
+
+@app.get("/api/sonar/project-intelligence", tags=["Sonar Project Intelligence"])
+async def get_sonar_project_intelligence(current_user: dict = Depends(get_current_user)):
+    """Return the cached source analysis and cached market working set."""
+    return await asyncio.to_thread(get_project_intelligence)
+
+
+@app.get("/api/public/project-intelligence", tags=["Public Project Intelligence"])
+async def get_public_project_intelligence():
+    """Return the cached read-only intelligence report for the public /stats page."""
+    return await asyncio.to_thread(get_project_intelligence)
+
+
+@app.post("/api/sonar/project-intelligence/reanalyze", tags=["Sonar Project Intelligence"])
+async def reanalyze_sonar_project_intelligence(current_user: dict = Depends(get_current_user)):
+    """Force a source-tree walk after a code change."""
+    return await asyncio.to_thread(get_project_intelligence, True)
+
+
+@app.post("/api/sonar/project-intelligence/market/refresh", tags=["Sonar Project Intelligence"])
+async def refresh_sonar_market_research(current_user: dict = Depends(get_current_user)):
+    """Check the cached market sources without re-running the code analysis."""
+    return await asyncio.to_thread(refresh_market_research)
 
 @app.get("/api/events/live-pulse", tags=["Sonar Controller Compat"])
 async def get_live_pulse(limit: int = 30, current_user: dict = Depends(get_current_user)):
