@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import SplashScreenAlternate from '../components/SplashScreenAlternate';
 import ModalSpectrumLine from '../components/ModalSpectrumLine';
+import SnapDropdown from '../components/SnapDropdown';
 import {
   additionalBusinessBriefContexts,
   additionalIndustries,
@@ -1439,59 +1440,6 @@ const scheduleIsValid = (value) => (
 const formatWeeklyHours = (hours) => {
   const rounded = Math.round(Number(hours || 0) * 10) / 10;
   return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}h`;
-};
-
-const SnapDropdown = ({ value, onChange }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const options = [5, 15, 30, 60];
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = (event) => {
-      if (!ref.current?.contains(event.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((next) => !next)}
-        className="flex min-h-[34px] w-[104px] items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-left text-[11px] font-semibold tracking-[-0.02em] text-white transition hover:border-white/[0.14]"
-      >
-        <span className="truncate">{value} min</span>
-        <ChevronDown size={12} className={`shrink-0 text-zinc-600 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      <AnimatePresence>
-        {open ? (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            className="absolute left-0 top-full z-50 mt-1.5 max-h-56 min-w-full overflow-y-auto rounded-xl border border-white/[0.08] bg-[#111] py-1 shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
-          >
-            {options.map((option) => {
-              const active = value === option;
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => { onChange(option); setOpen(false); }}
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}
-                >
-                  <span className="min-w-0 flex-1 truncate">{option} min</span>
-                  {active ? <Check size={11} className="text-white" /> : null}
-                </button>
-              );
-            })}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
-  );
 };
 
 const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {

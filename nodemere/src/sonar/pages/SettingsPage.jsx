@@ -4,7 +4,7 @@ import {
   Settings, Building2, Phone, Bell, Calendar,
   Check, ChevronDown, ChevronUp, Sun, Moon,
   BookOpen, FileText, Shield, HelpCircle, Sparkles,
-  Eye, EyeOff, Lightbulb, Zap, Star, Info,
+  Eye, EyeOff, Lightbulb, AlertTriangle, Zap, Star, Info,
   Copy, Download, Layers, Plus, Trash2, Tag, DollarSign,
   ArrowRight, X, MessageSquareText, Users, Maximize2, Wand2,
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil,
@@ -16,6 +16,7 @@ import { api } from '../lib/api';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 import CubePreloader from '../components/CubePreloader';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
+import SnapDropdown from '../../components/SnapDropdown';
 import {
   allBusinessBriefSections,
   allIndustryExampleValues,
@@ -500,6 +501,7 @@ const createStaffFormState = (staff, baseHours = null) => ({
   is_active: staff?.is_active !== false,
   knowledge: staff ? (staff.knowledge || '') : DEFAULT_STAFF_KNOWLEDGE,
   working_hours: createDefaultHours(staff?.working_hours || baseHours),
+  acknowledgements: staff?.acknowledgements && typeof staff.acknowledgements === 'object' ? staff.acknowledgements : {},
 });
 
 const normalizeStaffPayload = (form, businessId) => {
@@ -518,7 +520,31 @@ const normalizeStaffPayload = (form, businessId) => {
     is_active: form.is_active !== false,
     working_hours: createDefaultHours(form.working_hours),
     knowledge: String(form.knowledge || '').trim() || null,
+    acknowledgements: form.acknowledgements && typeof form.acknowledgements === 'object' ? form.acknowledgements : {},
   };
+};
+
+const STAFF_ACKNOWLEDGEMENTS_STORAGE_KEY = 'nodemere_staff_acknowledgements_v1';
+
+const readStaffAcknowledgements = (staffKey) => {
+  if (!staffKey) return {};
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(STAFF_ACKNOWLEDGEMENTS_STORAGE_KEY) || '{}');
+    return stored?.[String(staffKey)] && typeof stored[String(staffKey)] === 'object' ? stored[String(staffKey)] : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveStaffAcknowledgement = (staffKey, warningKey) => {
+  if (!staffKey || !warningKey) return;
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(STAFF_ACKNOWLEDGEMENTS_STORAGE_KEY) || '{}');
+    stored[String(staffKey)] = { ...(stored[String(staffKey)] || {}), [warningKey]: true };
+    window.localStorage.setItem(STAFF_ACKNOWLEDGEMENTS_STORAGE_KEY, JSON.stringify(stored));
+  } catch {
+    // Local storage is only a fallback for unsaved drafts and should never block the UI.
+  }
 };
 
 const formatHourLabel = (value) => {
@@ -929,9 +955,7 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
           ))}
           <div className="flex items-center gap-2 text-[11px] text-zinc-500">
             <span>Snap</span>
-            <select value={snapMinutes} onChange={(event) => setSnapMinutes(Number(event.target.value))} className="h-8 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 text-[11px] font-semibold text-white outline-none">
-              {[5, 15, 30, 60].map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}
-            </select>
+            <SnapDropdown value={snapMinutes} onChange={setSnapMinutes} />
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1051,56 +1075,256 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
   );
 };
 
-const StaffHoursRow = ({ day, hours, onChange }) => {
-  const value = hours?.[day] || { enabled: false, open: '09:00', close: '17:00' };
+const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements = {}, onAcknowledge }) => {
+  const dragPreviewRef = useRef(null);
+  const [snapMinutes, setSnapMinutes] = useState(15);
+  const [drag, setDrag] = useState(null);
+  const [hoveredBar, setHoveredBar] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [outsideHoursNotice, setOutsideHoursNotice] = useState(false);
+  const outsideHoursAcknowledgedRef = useRef(Boolean(acknowledgements?.outside_business_hours));
+  const schedule = createDefaultHours(value);
+  const businessSchedule = businessHours ? cleanStructuredBusinessHours(businessHours) : null;
+  const timelineHours = 24;
+  const scheduleLayer = {
+    id: 'staff',
+    label: 'Staff Availability',
+    color: 'var(--brandGradientStart)',
+    gradient: 'from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)]',
+    glow: '0 0 16px color-mix(in srgb, var(--brandGradientStart) 38%, transparent)',
+  };
 
-  const update = (field, nextValue) => {
-    onChange({
-      ...hours,
-      [day]: { ...value, [field]: nextValue },
+  const weeklyHours = DAYS.reduce((total, day) => {
+    const dayValue = schedule[day];
+    return total + (dayValue?.enabled ? Math.max(0, timeToDecimalHour(dayValue.close, 17) - timeToDecimalHour(dayValue.open, 9)) : 0);
+  }, 0);
+
+  const updateSchedule = (updater) => {
+    const next = typeof updater === 'function' ? updater(schedule) : updater;
+    onChange(createDefaultHours(next));
+  };
+
+  const updateDay = (day, nextDay) => {
+    updateSchedule((current) => ({ ...current, [day]: nextDay }));
+  };
+
+  const hasOutsideBusinessHours = (nextSchedule) => {
+    if (!businessSchedule) return false;
+    return DAYS.some((day) => {
+      const staffDay = nextSchedule[day];
+      const businessDay = businessSchedule.days[day];
+      if (!staffDay?.enabled || !businessDay?.enabled || !businessDay.layers?.business?.enabled) return false;
+      const businessStart = Number(businessDay.layers.business.start);
+      const businessEnd = Number(businessDay.layers.business.end);
+      if (!Number.isFinite(businessStart) || !Number.isFinite(businessEnd)) return false;
+      return timeToDecimalHour(staffDay.open, 9) < businessStart || timeToDecimalHour(staffDay.close, 17) > businessEnd;
     });
   };
 
+  const resetToBusinessHours = () => {
+    if (!businessSchedule) {
+      setOutsideHoursNotice(false);
+      return;
+    }
+    const resetSchedule = DAYS.reduce((next, day) => {
+      const businessDay = businessSchedule.days[day];
+      const businessLayer = businessDay?.layers?.business;
+      const hasBusinessHours = businessDay?.enabled && businessLayer?.enabled
+        && Number.isFinite(Number(businessLayer.start))
+        && Number.isFinite(Number(businessLayer.end));
+      next[day] = hasBusinessHours
+        ? {
+            ...schedule[day],
+            enabled: true,
+            open: decimalHourToTime(Number(businessLayer.start)),
+            close: decimalHourToTime(Number(businessLayer.end)),
+          }
+        : { ...schedule[day], enabled: false };
+      return next;
+    }, {});
+    onChange(createDefaultHours(resetSchedule));
+    outsideHoursAcknowledgedRef.current = false;
+    setOutsideHoursNotice(false);
+  };
+
+  const acceptOutsideHoursNotice = () => {
+    outsideHoursAcknowledgedRef.current = true;
+    onAcknowledge?.('outside_business_hours');
+    setOutsideHoursNotice(false);
+  };
+
+  const toggleDay = (day) => {
+    updateDay(day, { ...schedule[day], enabled: !schedule[day].enabled });
+  };
+
+  const handlePointerDown = (event, day, handle) => {
+    const dayValue = schedule[day];
+    if (!dayValue?.enabled) return;
+    event.preventDefault();
+    const start = timeToDecimalHour(dayValue.open, 9);
+    const end = timeToDecimalHour(dayValue.close, 17);
+    dragPreviewRef.current = { day, handle, dayValue };
+    setDrag({ day, handle, startX: event.clientX, startValue: handle === 'left' ? start : handle === 'right' ? end : start });
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  useEffect(() => {
+    if (!drag) return undefined;
+    const handleMove = (event) => {
+      const track = document.querySelector(`[data-staff-schedule-track="${drag.day}"]`);
+      if (!track) return;
+      const width = track.getBoundingClientRect().width;
+      const delta = ((event.clientX - drag.startX) / width) * timelineHours;
+      const snap = snapMinutes / 60;
+      const dayValue = schedule[drag.day];
+      const currentStart = timeToDecimalHour(dayValue.open, 9);
+      const currentEnd = timeToDecimalHour(dayValue.close, 17);
+      const duration = Math.max(snap, currentEnd - currentStart);
+      let start = currentStart;
+      let end = currentEnd;
+      if (drag.handle === 'left') start = Math.round((drag.startValue + delta) / snap) * snap;
+      if (drag.handle === 'right') end = Math.round((drag.startValue + delta) / snap) * snap;
+      if (drag.handle === 'center') {
+        start = Math.round((drag.startValue + delta) / snap) * snap;
+        end = start + duration;
+      }
+      start = Math.max(0, Math.min(start, 24 - snap));
+      end = Math.max(start + snap, Math.min(end, 24));
+      if (drag.handle === 'center') {
+        end = Math.min(24, start + duration);
+        start = end - duration;
+      }
+      const nextDay = { ...dayValue, open: decimalHourToTime(start), close: decimalHourToTime(end) };
+      dragPreviewRef.current = { day: drag.day, dayValue: nextDay };
+      updateDay(drag.day, nextDay);
+    };
+    const stop = () => {
+      const preview = dragPreviewRef.current;
+      const nextSchedule = preview?.day && preview.dayValue ? { ...schedule, [preview.day]: preview.dayValue } : null;
+      const isOutsideBusinessHours = nextSchedule ? hasOutsideBusinessHours(nextSchedule) : false;
+      if (!isOutsideBusinessHours) outsideHoursAcknowledgedRef.current = false;
+      if (isOutsideBusinessHours && !outsideHoursAcknowledgedRef.current) {
+        setOutsideHoursNotice(true);
+      }
+      dragPreviewRef.current = null;
+      setDrag(null);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', stop);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', stop);
+    };
+  }, [drag, schedule, snapMinutes]);
+
+  const copyDay = (sourceDay) => {
+    const source = schedule[sourceDay];
+    updateSchedule((current) => Object.fromEntries(DAYS.map((day) => [day, { ...current[day], ...source }])));
+    setNotice(`${sourceDay} copied to all days`);
+  };
+
   return (
-    <div className="flex items-center gap-4 py-2.5 border-b border-white/[0.02] last:border-0">
-      <button
-        type="button"
-        onClick={() => update('enabled', !value.enabled)}
-        className={`flex h-6 w-10 items-center rounded-full border p-0.5 transition-all ${
-          value.enabled
-            ? 'border-transparent bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]'
-            : 'border-white/[0.08] bg-black/30'
-        }`}
-        aria-label={value.enabled ? `Disable ${day}` : `Enable ${day}`}
-      >
-        <div
-          className={`h-4 w-4 rounded-full transition-transform ${
-            value.enabled
-              ? 'translate-x-4 bg-zinc-900'
-              : 'translate-x-0 bg-zinc-200'
-          }`}
-        />
-      </button>
-      <span className="w-24 text-[12px] font-medium text-zinc-300">{day}</span>
-      {value.enabled ? (
-        <div className="ml-auto flex items-center gap-2">
-          <input
-            type="time"
-            value={value.open}
-            onChange={(e) => update('open', e.target.value)}
-            className="time-input-no-icon bg-[#070707]/85 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
-          />
-          <span className="text-[11px] text-zinc-600">to</span>
-          <input
-            type="time"
-            value={value.close}
-            onChange={(e) => update('close', e.target.value)}
-            className="time-input-no-icon bg-[#070707]/85 border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] text-zinc-300 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all appearance-none"
-          />
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="flex items-center gap-1.5 font-medium text-zinc-500"><CalendarClock className="h-3.5 w-3.5" /> Schedule:</span>
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-300"><span className="h-2.5 w-2.5 rounded-full bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)]" />{scheduleLayer.label}</span>
+          <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+            <span>Snap</span>
+            <SnapDropdown value={snapMinutes} onChange={setSnapMinutes} />
+          </div>
         </div>
-      ) : (
-        <span className="text-[11px] text-zinc-700 ml-auto italic">Closed</span>
-      )}
+      </div>
+
+      <div className="space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
+        <div className="flex pl-24 pr-12 text-[11px] font-mono text-zinc-600">
+          <div className="relative h-5 flex-1 select-none">{[0, 4, 8, 12, 16, 20, 24].map((hour) => <span key={hour} className="absolute -translate-x-1/2" style={{ left: `${(hour / timelineHours) * 100}%` }}>{formatScheduleTime(hour)}</span>)}</div>
+        </div>
+
+        <div className="space-y-1.5">
+          {DAYS.map((day) => {
+            const dayValue = schedule[day];
+            const start = timeToDecimalHour(dayValue.open, 9);
+            const end = timeToDecimalHour(dayValue.close, 17);
+            const left = Math.max(0, Math.min(100, (start / timelineHours) * 100));
+            const width = Math.max(0, Math.min(100 - left, ((end - start) / timelineHours) * 100));
+            const barKey = `staff-${day}`;
+            const isActiveBar = drag?.day === day;
+            const isHovered = hoveredBar === barKey;
+            return (
+              <div key={day} className={`group relative flex items-center rounded-xl border px-3 py-2 transition-all duration-200 ${dayValue.enabled ? 'border-white/[0.06] bg-white/[0.018] hover:bg-white/[0.035]' : 'border-transparent bg-black/20 opacity-50 hover:opacity-75'}`}>
+                <div className="flex w-20 shrink-0 items-center gap-2.5">
+                  <button type="button" onClick={() => toggleDay(day)} className={`flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle staff availability for ${day}`}><span className={`block h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${dayValue.enabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
+                </div>
+                <div data-staff-schedule-track={day} className="relative mx-2 flex h-10 min-w-0 flex-1 items-center">
+                  <div className="pointer-events-none absolute inset-0 flex justify-between opacity-10">{Array.from({ length: timelineHours + 1 }).map((_, index) => <span key={index} className="h-full w-px bg-white/40" />)}</div>
+                  <button type="button" onClick={() => dayValue.enabled && updateDay(day, { ...dayValue, enabled: true })} aria-label={`${dayValue.enabled ? 'Adjust' : 'Enable'} ${day} staff availability`} className="absolute inset-x-0 h-2.5 rounded-full border border-white/[0.03] bg-white/[0.02]" />
+                  {dayValue.enabled ? (
+                    <div className={`group/bar absolute h-2.5 rounded-full bg-gradient-to-r ${scheduleLayer.gradient} ${isActiveBar ? 'z-20 scale-y-125 ring-2 ring-white/50' : 'z-10'} ${isHovered ? 'brightness-125 shadow-lg' : ''}`} style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || isHovered ? scheduleLayer.glow : 'none' }} onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)} onPointerDown={(event) => handlePointerDown(event, day, 'center')}>
+                      <button type="button" aria-label={`Move ${day} availability start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, 'left'); }} className="absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30"><span className="h-0.5 w-4 rounded-full bg-white/60" /></div>
+                      <button type="button" aria-label={`Move ${day} availability end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, 'right'); }} className="absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
+                    </div>
+                  ) : null}
+                  {dayValue.enabled && (isHovered || isActiveBar) ? <div className="pointer-events-none absolute -top-7 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.08] bg-[#111] px-2 py-0.5 font-mono text-[11px] text-zinc-100 shadow-2xl" style={{ left: `${Math.min(92, Math.max(8, left + (width / 2)))}%` }}><span className="font-semibold text-white">{formatScheduleTime(start)}</span><span className="px-1 text-zinc-500">-</span><span className="font-semibold text-white">{formatScheduleTime(end)}</span><span className="ml-1.5 rounded bg-white/10 px-1 text-[10px] text-zinc-400">{formatScheduleDuration(end - start)}</span></div> : null}
+                </div>
+                <div className="flex w-10 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100">
+                  <button type="button" onClick={() => copyDay(day)} className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/10 hover:text-white" aria-label={`Copy ${day} schedule to all days`}><Copy className="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex min-h-[48px] items-center rounded-2xl border border-white/[0.06] bg-white/[0.018] px-4 text-[11px] text-zinc-500">
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)]" />Weekly availability: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyHours)}</strong></span>
+        </div>
+      </div>
+      {notice ? <div className="px-1 text-right text-[10px] text-emerald-300">{notice}</div> : null}
+      <AnimatePresence>
+        {outsideHoursNotice ? (
+          <motion.div
+            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={() => setOutsideHoursNotice(false)}
+          >
+            <motion.div
+              className="relative w-full max-w-[460px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]"
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <ModalSpectrumLine variant="warning" />
+              <div className="p-7 sm:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="relative">
+                    <div className="mb-3 flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4 shrink-0 -translate-y-[5px] text-zinc-600" aria-hidden="true" />
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Warning</p>
+                    </div>
+                    <h3 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">Easy there, overachiever.</h3>
+                    <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">This staff member is scheduled beyond your business hours. Appointments will only be offered during the times both schedules are open.</p>
+                  </div>
+                  <button type="button" onClick={() => setOutsideHoursNotice(false)} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close schedule note">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-white/[0.06] px-7 py-5 sm:px-8">
+                <button type="button" onClick={resetToBusinessHours} className="h-10 rounded-full px-5 text-sm font-medium text-zinc-500 transition hover:text-white">
+                  Nevermind
+                </button>
+                <button type="button" onClick={acceptOutsideHoursNotice} className="h-10 rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200">
+                  Accept
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };
@@ -1337,7 +1561,6 @@ const StaffDetailsModal = ({ staff, onClose, onEdit }) => {
         onClick={(e) => e.stopPropagation()}
         className="relative flex max-h-[calc(100vh-32px)] w-full max-w-[820px] flex-col overflow-hidden rounded-[32px] border border-white/[0.08] bg-[#070707]/95 text-left shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
       >
-        <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-[90px]" style={{ background: 'var(--modalBloom)' }} />
         <div className="relative flex items-start justify-between gap-5 border-b border-white/[0.05] px-7 py-6">
           <div className="min-w-0">
             <div className="mb-3 flex items-center gap-2">
@@ -1820,6 +2043,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
 
 export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defaultHours, hideIntro = false, hideToolbar = false, cardGridClassName = '', compactCards = false, loaderClassName = '', loadingFallback = null }) => {
   const [staffMembers, setStaffMembers] = useState([]);
+  const [businessHours, setBusinessHours] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1856,13 +2080,14 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
       if (!resolvedBusinessId) return;
 
-      const { data, error: loadError } = await supabase
-        .from('staff')
-        .select('*')
-        .eq('business_id', resolvedBusinessId)
-        .order('created_at', { ascending: false });
-      if (loadError) throw loadError;
-      setStaffMembers(data || []);
+      const [businessResponse, staffResponse] = await Promise.all([
+        supabase.from('businesses').select('business_hours').eq('id', resolvedBusinessId).maybeSingle(),
+        supabase.from('staff').select('*').eq('business_id', resolvedBusinessId).order('created_at', { ascending: false }),
+      ]);
+      if (businessResponse.error) throw businessResponse.error;
+      if (staffResponse.error) throw staffResponse.error;
+      setBusinessHours(businessResponse.data?.business_hours || null);
+      setStaffMembers(staffResponse.data || []);
     } catch (err) {
       console.error('[StaffManager] Failed to load:', err);
       setError(err.message || 'Failed to load staff');
@@ -1873,7 +2098,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
   const openCreateModal = () => {
     setEditingStaffId(null);
-    setForm(createStaffFormState(null, defaultHours));
+    setForm({ ...createStaffFormState(null, defaultHours), acknowledgements: readStaffAcknowledgements('new') });
     setStaffSlide(0);
     setAvatarUploadName('');
     setShowKnowledgeTips(false);
@@ -1884,7 +2109,10 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const openEditModal = (staff) => {
     setSelectedStaff(null);
     setEditingStaffId(staff.id);
-    setForm(createStaffFormState(staff, defaultHours));
+    setForm({
+      ...createStaffFormState(staff, defaultHours),
+      acknowledgements: { ...(staff.acknowledgements || {}), ...readStaffAcknowledgements(staff.id) },
+    });
     setStaffSlide(0);
     setAvatarUploadName('');
     setShowKnowledgeTips(false);
@@ -2078,6 +2306,25 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     { label: 'Photo', title: 'Upload Image', description: 'Upload a profile image that helps keep this staff member easy to recognize across the Team page.' },
   ];
 
+  const acknowledgeStaffWarning = (warningKey) => {
+    const staffKey = editingStaffId || 'new';
+    saveStaffAcknowledgement(staffKey, warningKey);
+    const nextAcknowledgements = { ...(form.acknowledgements || {}), [warningKey]: true };
+    setForm((prev) => ({
+      ...prev,
+      acknowledgements: { ...(prev.acknowledgements || {}), [warningKey]: true },
+    }));
+    if (editingStaffId) {
+      supabase
+        .from('staff')
+        .update({ acknowledgements: nextAcknowledgements })
+        .eq('id', editingStaffId)
+        .then(({ error: acknowledgementError }) => {
+          if (acknowledgementError) console.warn('[StaffManager] Failed to persist warning acknowledgement:', acknowledgementError);
+        });
+    }
+  };
+
   const renderStaffSlide = () => {
     if (staffSlide === 0) {
       return (
@@ -2112,11 +2359,13 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
     if (staffSlide === 1) {
       return (
-        <div className="custom-scrollbar max-h-[400px] overflow-auto rounded-[22px] border border-white/[0.06] bg-black/20 p-4 pr-3">
-          {DAYS.map((day) => (
-            <StaffHoursRow key={day} day={day} hours={form.working_hours} onChange={(nextHours) => setForm((prev) => ({ ...prev, working_hours: nextHours }))} />
-          ))}
-        </div>
+        <StaffScheduleBuilder
+          value={form.working_hours}
+          businessHours={businessHours}
+          acknowledgements={form.acknowledgements}
+          onAcknowledge={acknowledgeStaffWarning}
+          onChange={(nextHours) => setForm((prev) => ({ ...prev, working_hours: nextHours }))}
+        />
       );
     }
 
@@ -2282,9 +2531,9 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative max-h-[calc(100vh-24px)] w-full max-w-[700px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+              className={`relative max-h-[calc(100vh-24px)] w-full ${staffSlide === 1 ? 'max-w-[1080px]' : 'max-w-[700px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}
             >
-              <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-[90px]" style={{ background: 'var(--modalBloom)' }} />
+              <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
               <div className="relative p-6 sm:p-8">
                 <div className="mb-6 flex items-start justify-between gap-5">
                   <div className="min-w-0 flex-1">

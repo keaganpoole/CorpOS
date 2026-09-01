@@ -202,6 +202,7 @@ const normalizeVariant = (variant) => {
 
   if (['tip', 'tips', 'tutorial', 'guide', 'help'].includes(value)) return 'tips';
   if (['gasp', 'lightbulb_gasp', 'light_bulb_gasp'].includes(value)) return 'gasp';
+  if (['stutter', 'warning', 'warning_stutter', 'blink_warning'].includes(value)) return 'warning';
   if (['error', 'errors', 'warning', 'warnings', 'alert', 'danger'].includes(value)) return 'error';
   if (['plan', 'plan_change', 'plan_changed', 'billing', 'upgrade', 'downgrade'].includes(value)) return 'plan';
   if (['success', 'complete', 'completed', 'done'].includes(value)) return 'success';
@@ -212,8 +213,9 @@ const normalizeVariant = (variant) => {
 export const resolveModalSpectrumVariant = normalizeVariant;
 
 const ANIMATIONS = {
-    tips: 'lb01-flicker 2s var(--modal-ease-snap) forwards',
+  tips: 'lb01-flicker 2s var(--modal-ease-snap) forwards',
   gasp: 'lb10-gasp 2.2s var(--ease-cinematic) forwards',
+  warning: 'lb06-stutter 1.35s var(--modal-ease-snap) forwards',
   error: 'err_2 1.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
   plan: 'eventHorizonOpen 1.15s cubic-bezier(0.85, 0, 0.15, 1) forwards',
   general: 'popup-spectrum-run 1.2s ease-out 1 forwards',
@@ -224,6 +226,7 @@ const ANIMATIONS = {
 const REVEAL_DURATIONS = {
     tips: 2000,
   gasp: 2200,
+  warning: 1350,
   error: 1250,
   plan: 1150,
   general: 1200,
