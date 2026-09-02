@@ -28,15 +28,15 @@
 
 .nest-idle-word,
 .nest-content { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-.nest-idle-intro { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: clamp(9px, 1.5vw, 18px); padding: 0 16px; color: rgba(255,255,255,.9); font-size: 18px; font-weight: 590; letter-spacing: -.04em; text-align: center; white-space: nowrap; }
+.nest-idle-intro { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 16px; color: rgba(255,255,255,.3); font-size: 19px; line-height: 1.08; font-weight: 480; letter-spacing: -.04em; text-align: center; white-space: nowrap; }
 .nest-intro-word { display: inline-flex; align-items: baseline; transform-origin: center; }
-.nest-intro-anchor { position: relative; z-index: 1; font-weight: 620; }
+.nest-intro-anchor { position: relative; z-index: 1; font-weight: 480; }
 .nest-intro-remainder { display: flex; }
 .nest-intro-character { display: inline-block; overflow: hidden; white-space: nowrap; }
 .nest-intro-ampersand { display: inline-block; overflow: hidden; color: rgba(255,255,255,.3); white-space: nowrap; }
-.nest-idle-intro.is-collapsed { gap: 0; letter-spacing: -.075em; color: rgba(255,255,255,.86); }
+.nest-idle-intro.is-collapsed { gap: 1px; letter-spacing: -.075em; color: rgba(255,255,255,.86); }
 .nest-idle-intro.is-collapsed .nest-intro-word { transform: scaleX(1.02); font-weight: 590; }
-.nest-idle-intro.is-collapsed .nest-intro-anchor { font-size: 18px; transform: scaleX(1.04); }
+.nest-idle-intro.is-collapsed .nest-intro-anchor { font-size: 18px; font-weight: 620; transform: scaleX(1.04); }
 .nest-idle-word { font-size: 18px; font-weight: 400; letter-spacing: -.045em; color: rgba(255,255,255,.58); text-transform: uppercase; user-select: none; }
 
 .nest-content {
@@ -303,7 +303,7 @@
 }
 @media (max-width: 767px) {
   .nest-dock, .nest-dock.is-expanded { left: 70px; right: 60px; }
-  .nest-idle-intro { font-size: 15px; }
+  .nest-idle-intro { font-size: 11px; }
   .nest-content { --nest-footprint: calc(100% - 18px) !important; max-width: calc(100% - 18px); gap: 7px; }
   .nest-content-icon { width: 18px; height: 18px; }
   .nest-content-eyebrow, .nest-content-secondary, .nest-content-metric, .nest-live-indicator { display: none; }

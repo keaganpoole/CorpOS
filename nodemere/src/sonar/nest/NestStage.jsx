@@ -75,8 +75,8 @@ const IntroWord = ({ word, active, reducedMotion }) => (
   <motion.div className="nest-intro-word">
     <motion.span
       className="nest-intro-anchor"
-      initial={{ color: 'rgba(255,255,255,.72)' }}
-      animate={{ color: active ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.72)' }}
+      initial={{ color: 'rgba(255,255,255,.3)' }}
+      animate={{ color: active ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.3)' }}
       transition={{ duration: reducedMotion ? 0.01 : 0.4, ease: 'easeInOut' }}
     >
       {word[0]}
@@ -210,8 +210,8 @@ export default function NestStage({ event, concept, privacyMode = false, compact
             <IntroWord word={INTRO_WORDS[1]} active={introCollapsed} reducedMotion={reducedMotion} />
             <motion.span
               className="nest-intro-ampersand"
-              initial={{ width: 'auto', opacity: 1, margin: '0 8px' }}
-              animate={{ width: introCollapsed ? 0 : 'auto', opacity: introCollapsed ? 0 : 1, margin: introCollapsed ? '0 0px' : '0 8px' }}
+              initial={{ width: 'auto', opacity: 1, margin: '0 4px' }}
+              animate={{ width: introCollapsed ? 0 : 'auto', opacity: introCollapsed ? 0 : 1, margin: introCollapsed ? '0 0px' : '0 4px' }}
               transition={{ duration: reducedMotion ? 0.01 : 0.5, delay: introCollapsed && !reducedMotion ? 0.4 : 0 }}
             >
               &amp;
