@@ -69,10 +69,10 @@ const subjectForEvent = (event) => ({
   metric: '',
 });
 
-const ContentIcon = ({ Icon, mode, compact }) => {
+const ContentIcon = ({ Icon, mode, compact, partTwo = false }) => {
   if (mode === 'none') return null;
   return (
-    <span className={`nest-content-icon nest-icon-${mode}`}>
+    <span className={`nest-content-icon nest-icon-${mode} ${partTwo ? 'nest-icon-part-two' : ''}`}>
       <Icon size={compact ? 13 : 17} strokeWidth={1.6} />
     </span>
   );
@@ -80,7 +80,7 @@ const ContentIcon = ({ Icon, mode, compact }) => {
 
 const ReelPart = ({ event, content, Icon, compact, part }) => (
   <div className={`nest-content nest-reel-content nest-layout-${part === 1 ? 'return' : 'pivot'} nest-density-spacious nest-footprint-${part === 1 ? 'full' : 'medium'} nest-placement-center`}>
-      <ContentIcon Icon={Icon} mode={part === 1 ? 'none' : 'transform'} compact={compact} />
+      <ContentIcon Icon={Icon} mode={part === 1 ? 'none' : 'transform'} compact={compact} partTwo={part === 2} />
       <div className="nest-content-copy">
         <span className="nest-content-eyebrow">{content.eyebrow}</span>
         <span className="nest-content-primary">{content.primary}</span>
@@ -103,7 +103,10 @@ export default function NestStage({ event, concept, privacyMode = false, compact
   const [rolled, setRolled] = useState(false);
   const [detailFaded, setDetailFaded] = useState(false);
   const Icon = ICONS[event?.category] || Check;
-  const transition = { duration: reducedMotion ? 0.01 : 0.62, ease: [0.16, 1, 0.3, 1] };
+  const transition = { duration: reducedMotion ? 0.01 : 0.62, ease: [0.22, 1, 0.36, 1] };
+  const reelTransition = rolled
+    ? { duration: reducedMotion ? 0.01 : 0.72, ease: [0.22, 1, 0.36, 1] }
+    : transition;
 
   useLayoutEffect(() => {
     setRolled(false);
@@ -147,7 +150,7 @@ export default function NestStage({ event, concept, privacyMode = false, compact
               className="nest-reel-track"
               initial={{ y: '50%' }}
               animate={{ y: rolled ? '-50%' : '0%' }}
-              transition={transition}
+              transition={reelTransition}
             >
               <div className="nest-reel-item">
                 <ReelPart event={event} content={subject} Icon={Icon} compact={compact} part={1} />

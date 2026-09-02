@@ -63,6 +63,15 @@
 .nest-icon-pivot { width: 18px; transform-origin: center; }
 .nest-icon-transform { width: 20px; }
 .nest-icon-status { width: 19px; }
+.nest-icon-part-two { animation: nest-part-two-icon-settle 3.6s ease-in-out 180ms infinite; transform-origin: center; }
+.nest-category-calls .nest-icon-part-two { animation-name: nest-part-two-icon-breathe; animation-duration: 3.1s; }
+.nest-category-appointments .nest-icon-part-two { animation-name: nest-part-two-icon-tilt; animation-duration: 4.2s; }
+.nest-category-people .nest-icon-part-two { animation-name: nest-part-two-icon-pulse; animation-duration: 3.8s; }
+.nest-category-payments .nest-icon-part-two { animation-name: nest-part-two-icon-pop; animation-duration: 3.4s; }
+.nest-category-workflows .nest-icon-part-two { animation-name: nest-part-two-icon-rotate; animation-duration: 4.6s; }
+.nest-category-warnings .nest-icon-part-two { animation-name: nest-part-two-icon-emphasis; animation-duration: 2.8s; }
+.nest-category-milestones .nest-icon-part-two { animation-name: nest-part-two-icon-flash; animation-duration: 3.7s; }
+.nest-category-messages .nest-icon-part-two { animation-name: nest-part-two-icon-soften; animation-duration: 4.8s; }
 
 .nest-live-indicator { display: inline-flex; align-items: center; justify-content: center; width: 9px; height: 20px; margin-left: 2px; }
 .nest-live-indicator > span { width: 5px; height: 5px; border-radius: 50%; background: rgb(var(--nest-accent)); animation: nest-live-pulse 2.1s ease-in-out infinite; }
@@ -166,6 +175,25 @@
 .nest-category-messages .nest-content-icon { opacity: .45; }
 .nest-category-warnings .nest-content-primary { letter-spacing: -.02em; }
 .nest-category-calls .nest-icon-status svg { animation: nest-call-breathe 2.8s ease-in-out infinite; transform-origin: center; }
+
+@keyframes nest-part-two-icon-settle {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: .82; }
+  42% { transform: translateY(-1px) rotate(-2deg); opacity: .9; }
+  68% { transform: translateY(.5px) rotate(1deg); opacity: .84; }
+}
+@keyframes nest-part-two-icon-breathe { 0%, 100% { transform: scale(1); opacity: .78; } 50% { transform: scale(1.07); opacity: .94; } }
+@keyframes nest-part-two-icon-tilt { 0%, 100% { transform: rotate(0deg) scale(1); } 38% { transform: rotate(-8deg) scale(1.04); } 64% { transform: rotate(4deg) scale(1.01); } }
+@keyframes nest-part-two-icon-pulse { 0%, 100% { transform: scale(1); opacity: .78; } 45% { transform: scale(1.14); opacity: 1; } 62% { transform: scale(.98); opacity: .84; } }
+@keyframes nest-part-two-icon-pop { 0%, 100% { transform: scale(1) rotate(0deg); } 42% { transform: scale(.86) rotate(-4deg); } 56% { transform: scale(1.14) rotate(3deg); } 70% { transform: scale(1) rotate(0deg); } }
+@keyframes nest-part-two-icon-rotate { 0%, 100% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(14deg) scale(1.04); } }
+@keyframes nest-part-two-icon-emphasis { 0%, 66%, 100% { transform: scale(1) rotate(0deg); } 73% { transform: scale(1.14) rotate(-6deg); } 81% { transform: scale(1.08) rotate(6deg); } 89% { transform: scale(1) rotate(0deg); } }
+@keyframes nest-part-two-icon-flash { 0%, 100% { transform: scale(.96) rotate(-2deg); opacity: .7; } 38% { transform: scale(1.16) rotate(4deg); opacity: 1; } 50% { transform: scale(1) rotate(0deg); opacity: .82; } }
+@keyframes nest-part-two-icon-soften { 0%, 100% { transform: scale(1) rotate(0deg); opacity: .86; } 48% { transform: scale(.9) rotate(-4deg); opacity: .58; } 72% { transform: scale(1.04) rotate(2deg); opacity: .96; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .nest-icon-part-two { animation: none; }
+}
+
 .nest-density-compact .nest-content { gap: 10px; }
 .nest-density-spacious .nest-content { gap: 20px; }
 
