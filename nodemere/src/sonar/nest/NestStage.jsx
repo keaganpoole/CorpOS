@@ -69,6 +69,43 @@ const subjectForEvent = (event) => ({
   metric: '',
 });
 
+const INTRO_WORDS = ['Nodemere', 'Events', 'Signal', 'Terminal'];
+
+const IntroWord = ({ word, active, reducedMotion }) => (
+  <motion.div className="nest-intro-word">
+    <motion.span
+      className="nest-intro-anchor"
+      initial={{ color: 'rgba(255,255,255,.72)' }}
+      animate={{ color: active ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.72)' }}
+      transition={{ duration: reducedMotion ? 0.01 : 0.4, ease: 'easeInOut' }}
+    >
+      {word[0]}
+    </motion.span>
+    <div className="nest-intro-remainder" aria-hidden="true">
+      {[...word.slice(1)].map((character, charIdx) => (
+        <motion.span
+          key={`${word}-${charIdx}`}
+          className="nest-intro-character"
+          initial={{ width: 'auto', opacity: 1, y: 0, filter: 'blur(0px)' }}
+          animate={{
+            width: active ? 0 : 'auto',
+            opacity: active ? 0 : 1,
+            y: active ? -10 : 0,
+            filter: active ? 'blur(2px)' : 'blur(0px)',
+          }}
+          transition={{
+            duration: reducedMotion ? 0.01 : 0.5,
+            ease: 'circIn',
+            delay: active && !reducedMotion ? 0.4 + (word.length - charIdx) * 0.03 : 0,
+          }}
+        >
+          {character}
+        </motion.span>
+      ))}
+    </div>
+  </motion.div>
+);
+
 const ContentIcon = ({ Icon, mode, compact, partTwo = false }) => {
   if (mode === 'none') return null;
   return (
@@ -102,6 +139,8 @@ export default function NestStage({ event, concept, privacyMode = false, compact
   const [now, setNow] = useState(Date.now());
   const [rolled, setRolled] = useState(false);
   const [detailFaded, setDetailFaded] = useState(false);
+  const [introCollapsed, setIntroCollapsed] = useState(false);
+  const [introTight, setIntroTight] = useState(false);
   const Icon = ICONS[event?.category] || Check;
   const transition = { duration: reducedMotion ? 0.01 : 0.62, ease: [0.22, 1, 0.36, 1] };
   const reelTransition = rolled
@@ -123,6 +162,24 @@ export default function NestStage({ event, concept, privacyMode = false, compact
   }, [event?.id, concept?.id, reducedMotion]);
 
   useEffect(() => {
+    if (event) {
+      setIntroCollapsed(true);
+      setIntroTight(true);
+      return undefined;
+    }
+    setIntroCollapsed(false);
+    setIntroTight(false);
+    const introTimer = window.setTimeout(() => setIntroCollapsed(true), reducedMotion ? 1 : 2850);
+    // Keep the word spacing during the character exit, then close it only after
+    // the last delayed letter has finished so the final NEST word settles cleanly.
+    const tightenTimer = window.setTimeout(() => setIntroTight(true), reducedMotion ? 2 : 4000);
+    return () => {
+      window.clearTimeout(introTimer);
+      window.clearTimeout(tightenTimer);
+    };
+  }, [event?.id, reducedMotion]);
+
+  useEffect(() => {
     if (!event?.persistent) return undefined;
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -141,8 +198,26 @@ export default function NestStage({ event, concept, privacyMode = false, compact
     >
       <AnimatePresence mode="wait" initial={false}>
         {!event ? (
-          <motion.div key="nest-idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0.01 : 0.48 }} className="nest-idle-word">
-            nest
+          <motion.div
+            key="nest-typographic-intro"
+            className={`nest-idle-intro${introTight ? ' is-collapsed' : ''}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reducedMotion ? 0.01 : .48 }}
+          >
+            <IntroWord word={INTRO_WORDS[0]} active={introCollapsed} reducedMotion={reducedMotion} />
+            <IntroWord word={INTRO_WORDS[1]} active={introCollapsed} reducedMotion={reducedMotion} />
+            <motion.span
+              className="nest-intro-ampersand"
+              initial={{ width: 'auto', opacity: 1, margin: '0 8px' }}
+              animate={{ width: introCollapsed ? 0 : 'auto', opacity: introCollapsed ? 0 : 1, margin: introCollapsed ? '0 0px' : '0 8px' }}
+              transition={{ duration: reducedMotion ? 0.01 : 0.5, delay: introCollapsed && !reducedMotion ? 0.4 : 0 }}
+            >
+              &amp;
+            </motion.span>
+            <IntroWord word={INTRO_WORDS[2]} active={introCollapsed} reducedMotion={reducedMotion} />
+            <IntroWord word={INTRO_WORDS[3]} active={introCollapsed} reducedMotion={reducedMotion} />
           </motion.div>
         ) : (
           <motion.div key={`nest-reel:${event.id}`} className="nest-reel-viewport" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0.01 : 0.48 }}>
