@@ -66,7 +66,7 @@ const durationForEvent = (event) => {
   if (event?.category === 'messages') return 12000;
   if (event?.priority === 'critical') return 14000;
   if (event?.priority === 'major') return 9500;
-  return 4600;
+  return 7000;
 };
 
 const normalizeRealtimePayload = (table, payload, history = []) => {
@@ -206,6 +206,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   const [activeEvent, setActiveEvent] = useState(null);
   const [previewEvent, setPreviewEvent] = useState(null);
   const [liveCall, setLiveCall] = useState(null);
+  const [introStarted, setIntroStarted] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(() => localStorage.getItem('nodemere:nest:privacy') === 'true');
@@ -461,6 +462,10 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     });
   }, []);
 
+  const markIntroStarted = useCallback(() => {
+    setIntroStarted(true);
+  }, []);
+
   const displayEvent = previewEvent || activeEvent || liveCall;
   const selectedPreference = displayEvent ? selectedConcepts[displayEvent.category] : null;
   const hasSavedPreference = selectedPreference !== null && typeof selectedPreference === 'object';
@@ -474,6 +479,8 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     displayEvent,
     displayConcept,
     liveCall,
+    introStarted,
+    markIntroStarted,
     queueLength: queue.length,
     history,
     historyOpen,
@@ -485,7 +492,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     selectedConcepts,
     selectConcept,
     previewConcept,
-  }), [activeEvent, displayEvent, displayConcept, history, historyOpen, liveCall, previewConcept, previewEvent, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy]);
+  }), [activeEvent, displayEvent, displayConcept, history, historyOpen, introStarted, liveCall, markIntroStarted, previewConcept, previewEvent, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy]);
 
   return <NestContext.Provider value={value}>{children}</NestContext.Provider>;
 };

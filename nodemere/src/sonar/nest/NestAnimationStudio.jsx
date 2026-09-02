@@ -1,45 +1,20 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, RotateCcw, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NEST_CATEGORIES, NEST_CONCEPTS } from './nestRegistry';
 import { useNest } from './NestRuntime';
 
 export default function NestAnimationStudio({ open, onClose }) {
   const {
-    selectedConcepts,
-    selectConcept,
     previewConcept,
   } = useNest();
-  const [categoryId, setCategoryId] = useState(NEST_CATEGORIES[0].id);
-  const [designId, setDesignId] = useState(NEST_CATEGORIES[0].id);
-  const category = NEST_CATEGORIES.find((item) => item.id === categoryId) || NEST_CATEGORIES[0];
-  const concepts = NEST_CONCEPTS[category.id].filter((concept) => ['Full-Row Return', 'Icon Resolution'].includes(concept.name));
-  const saved = selectedConcepts[category.id];
-  const savedId = saved !== null && typeof saved === 'object' ? saved.conceptId : saved;
-  const design = concepts.find((item) => item.id === designId) || concepts.find((item) => item.id === savedId) || concepts[0];
-
-  const chooseCategory = (nextId) => {
-    const nextConcepts = NEST_CONCEPTS[nextId].filter((concept) => ['Full-Row Return', 'Icon Resolution'].includes(concept.name));
+  const [categoryId, setCategoryId] = useState(null);
+  const runCategory = (nextId) => {
+    const nextCategory = NEST_CATEGORIES.find((item) => item.id === nextId) || NEST_CATEGORIES[0];
+    const sequenceConcept = NEST_CONCEPTS[nextId].find((concept) => concept.name === 'Icon Resolution') || NEST_CONCEPTS[nextId][0];
     setCategoryId(nextId);
-    const saved = selectedConcepts[nextId];
-    const savedId = saved !== null && typeof saved === 'object' ? saved.conceptId : saved;
-    const savedDesign = nextConcepts.find((item) => item.id === savedId) || nextConcepts[0];
-    setDesignId(savedDesign.id);
-  };
-
-  const replay = () => {
-    previewConcept({ ...design, motion: 'rise' }, category);
-  };
-
-  const saveChoice = () => {
-    selectConcept(category.id, design.id);
-    previewConcept({ ...design, motion: 'rise' }, category);
-  };
-
-  const chooseDesign = (concept) => {
-    setDesignId(concept.id);
-    previewConcept({ ...concept, motion: 'rise' }, category);
+    previewConcept({ ...sequenceConcept, motion: 'rise' }, nextCategory);
   };
 
   if (typeof document === 'undefined') return null;
@@ -63,44 +38,14 @@ export default function NestAnimationStudio({ open, onClose }) {
               <button type="button" onClick={onClose} aria-label="Close Animation Studio"><X size={18} /></button>
             </header>
 
-            <div className="nest-studio-tabs custom-scrollbar">
+            <div className="nest-category-list custom-scrollbar">
               {NEST_CATEGORIES.map((item) => (
-                <button key={item.id} type="button" className={item.id === category.id ? 'is-active' : ''} onClick={() => chooseCategory(item.id)}>
-                  <span>{item.prefix}</span>{item.label}
+                <button key={item.id} type="button" className={item.id === categoryId ? 'is-active' : ''} onClick={() => runCategory(item.id)}>
+                  <span className="nest-category-list-prefix">{item.prefix}</span>
+                  <span>{item.label}</span>
+                  <span className="nest-category-list-action">Run sequence</span>
                 </button>
               ))}
-            </div>
-
-            <div className="nest-studio-preview">
-              <div className="nest-studio-preview-meta">
-                <span>{design.id}</span>
-                <div>
-                  <strong>Two-part notification sequence</strong>
-                  <p>Full-Row Return introduces the subject, then Icon Resolution reveals the detail.</p>
-                  <div className="nest-traits">{design.traits.map((trait) => <span key={trait}>{trait}</span>)}</div>
-                </div>
-                <button type="button" onClick={() => replay()}><RotateCcw size={14} /> Replay in header</button>
-                <div className="nest-choice-controls">
-                  <span className="nest-rise-note">Fixed sequence: Full-Row Return → Icon Resolution</span>
-                  <button type="button" className="nest-save-choice" onClick={saveChoice}><Check size={13} /> Save block</button>
-                </div>
-              </div>
-            </div>
-
-            <div className="nest-concept-grid custom-scrollbar">
-              {concepts.map((concept) => {
-                const selected = design.id === concept.id;
-                return (
-                  <article key={concept.id} className={selected ? 'is-selected' : ''}>
-                    <button type="button" className="nest-concept-main" onClick={() => chooseDesign(concept)}>
-                      <span className="nest-concept-id">{concept.id}</span>
-                      <strong>{concept.name}</strong>
-                      <p>{concept.description}</p>
-                      <div className="nest-traits">{concept.traits.map((trait) => <span key={trait}>{trait}</span>)}</div>
-                    </button>
-                  </article>
-                );
-              })}
             </div>
           </motion.section>
         </motion.div>

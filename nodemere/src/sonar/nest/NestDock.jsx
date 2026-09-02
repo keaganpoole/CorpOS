@@ -76,6 +76,8 @@ export default function NestDock({ onStageChange }) {
     setStudioOpen,
     studioOpen,
     privacyMode,
+    introStarted,
+    markIntroStarted,
   } = useNest();
   // Idle Nest stays quiet and centered. Any real event turns the usable toolbar
   // row into the Nest canvas; the selected concept decides how much of it to use.
@@ -89,7 +91,13 @@ export default function NestDock({ onStageChange }) {
   return (
     <>
       <div className={`nest-dock ${expanded ? 'is-expanded' : ''}`}>
-        <NestStage event={displayEvent} concept={displayConcept} privacyMode={privacyMode} />
+        <NestStage
+          event={displayEvent}
+          concept={displayConcept}
+          privacyMode={privacyMode}
+          introStarted={introStarted}
+          onIntroStart={markIntroStarted}
+        />
         <div className="nest-dock-tools no-drag">
           {queueLength > 0 && <span className="nest-queue-count" title={`${queueLength} queued Nest events`}>{queueLength}</span>}
           <button type="button" onClick={() => setHistoryOpen(true)} aria-label="Open Nest activity history" title="Nest history (Ctrl+Shift+H)">

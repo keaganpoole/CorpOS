@@ -37,7 +37,7 @@
 .nest-idle-intro.is-collapsed { gap: 1px; letter-spacing: -.075em; color: rgba(255,255,255,.86); }
 .nest-idle-intro.is-collapsed .nest-intro-word { transform: scaleX(1.02); font-weight: 590; }
 .nest-idle-intro.is-collapsed .nest-intro-anchor { font-size: 18px; font-weight: 620; transform: scaleX(1.04); }
-.nest-idle-word { font-size: 18px; font-weight: 400; letter-spacing: -.045em; color: rgba(255,255,255,.58); text-transform: uppercase; user-select: none; }
+.nest-idle-word { font-size: 18px; font-weight: 570; letter-spacing: -.045em; color: rgba(255,255,255,.58); text-transform: uppercase; user-select: none; }
 
 .nest-content {
   --nest-footprint: 34%;
