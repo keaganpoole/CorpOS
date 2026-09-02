@@ -13,6 +13,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../lib/api';
+import { DEFAULT_NEST_PREFERENCES, NEST_NOTIFICATION_GROUPS, normalizeNestPreferences } from '../nest/nestPreferences';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 import CubePreloader from '../components/CubePreloader';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
@@ -247,6 +248,7 @@ const defaultSettings = {
     general: {
       show_setup_guide: true,
     },
+    nest: DEFAULT_NEST_PREFERENCES,
   },
   knowledge_base: {
     about: '',
@@ -2228,6 +2230,12 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
           .single();
         if (insertError) throw insertError;
         setStaffMembers((prev) => [data, ...prev]);
+        api.claimNestMilestone('first_staff_member_added', {
+          source_id: data?.id,
+          message: data?.full_name || fullName,
+        }).catch((claimError) => {
+          console.warn('[StaffManager] Failed to claim Nest milestone:', claimError);
+        });
       } else {
         const { data, error: updateError } = await supabase
           .from('staff')
@@ -2533,7 +2541,6 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
               onClick={(e) => e.stopPropagation()}
               className={`relative max-h-[calc(100vh-24px)] w-full ${staffSlide === 1 ? 'max-w-[1080px]' : 'max-w-[700px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}
             >
-              <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
               <div className="relative p-6 sm:p-8">
                 <div className="mb-6 flex items-start justify-between gap-5">
                   <div className="min-w-0 flex-1">
@@ -3228,6 +3235,7 @@ const SettingsPage = () => {
   const [lateHoursTermsOpen, setLateHoursTermsOpen] = useState(false);
   const [lateHoursTermsSaving, setLateHoursTermsSaving] = useState(false);
   const [scheduleHelpOpen, setScheduleHelpOpen] = useState(false);
+  const [openNestNotificationGroups, setOpenNestNotificationGroups] = useState({});
   const [activeSection, setActiveSection] = useState('business');
   const [businessAvatarUploading, setBusinessAvatarUploading] = useState(false);
   const businessAvatarInputRef = useRef(null);
@@ -3399,6 +3407,7 @@ const SettingsPage = () => {
             ...defaultSettings.preferences.calls,
             ...((config.preferences || {}).calls || {}),
           },
+          nest: normalizeNestPreferences((config.preferences || {}).nest),
         },
         // Knowledge base from businesses table
         knowledge_base: {
@@ -3550,6 +3559,59 @@ const SettingsPage = () => {
     }));
   };
 
+  const updateNestPreference = (path, value) => {
+    setSettings((prev) => {
+      const current = normalizeNestPreferences(prev.preferences?.nest);
+      const next = { ...current };
+      if (path === 'enabled') next.enabled = value;
+      if (path.startsWith('categories.')) {
+        next.categories = { ...current.categories, [path.slice('categories.'.length)]: value };
+      }
+      if (path.startsWith('notifications.')) {
+        next.notifications = { ...current.notifications, [path.slice('notifications.'.length)]: value };
+      }
+      return { ...prev, preferences: { ...(prev.preferences || {}), nest: next } };
+    });
+  };
+
+  const toggleNestCategory = (group, value) => {
+    setSettings((prev) => {
+      const current = normalizeNestPreferences(prev.preferences?.nest);
+      const notifications = { ...current.notifications };
+      group.notifications.forEach(({ key }) => { notifications[key] = value; });
+      return {
+        ...prev,
+        preferences: {
+          ...(prev.preferences || {}),
+          nest: {
+            ...current,
+            categories: { ...current.categories, [group.key]: value },
+            notifications,
+          },
+        },
+      };
+    });
+  };
+
+  const toggleNestNotification = (group, notificationKey, value) => {
+    setSettings((prev) => {
+      const current = normalizeNestPreferences(prev.preferences?.nest);
+      const notifications = { ...current.notifications, [notificationKey]: value };
+      const categoryEnabled = group.notifications.some(({ key }) => notifications[key] !== false);
+      return {
+        ...prev,
+        preferences: {
+          ...(prev.preferences || {}),
+          nest: {
+            ...current,
+            categories: { ...current.categories, [group.key]: categoryEnabled },
+            notifications,
+          },
+        },
+      };
+    });
+  };
+
   const uploadBusinessAvatar = async (file) => {
     if (!file) return;
     if (!file.type?.startsWith('image/')) {
@@ -3680,31 +3742,86 @@ const SettingsPage = () => {
           </>
         );
       case 'preferences':
-        return (
-          <div className="space-y-4">
-            <div>
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">General</p>
-              <div className="rounded-2xl border border-white/[0.05] bg-zinc-950/40 p-5">
-                <div className="flex items-start justify-between gap-5">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <ListChecks size={15} className="settings-icon" />
-                      <h4 className="text-[13px] font-semibold text-zinc-100">Show Setup Guide</h4>
+        {
+          const nestPreferences = normalizeNestPreferences(settings.preferences?.nest);
+          return (
+            <div className="space-y-5">
+              <div>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">General</p>
+                <div className="rounded-2xl border border-white/[0.05] bg-zinc-950/40 p-5">
+                  <div className="flex items-start justify-between gap-5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <ListChecks size={15} className="settings-icon" />
+                        <h4 className="text-[13px] font-semibold text-zinc-100">Show Setup Guide</h4>
+                      </div>
+                      <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
+                        Shows the Getting Started checklist in the lower-right corner of the dashboard.
+                      </p>
                     </div>
-                    <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
-                      Shows the Getting Started checklist in the lower-right corner of the dashboard.
-                    </p>
+                    <Toggle
+                      value={settings.preferences?.general?.show_setup_guide !== false}
+                      onChange={(value) => updatePreference('general', 'show_setup_guide', value)}
+                    />
                   </div>
-                  <Toggle
-                    value={settings.preferences?.general?.show_setup_guide !== false}
-                    onChange={(value) => updatePreference('general', 'show_setup_guide', value)}
-                    color="cyan"
-                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Nest</p>
+                    <p className="mt-1 text-[12px] leading-5 text-zinc-500">Choose which Nest notifications appear in your dashboard.</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {NEST_NOTIFICATION_GROUPS.map((group) => {
+                    const GroupIcon = group.icon;
+                    const open = openNestNotificationGroups[group.key] === true;
+                    const categoryEnabled = nestPreferences.categories[group.key] !== false;
+                    return (
+                      <div key={group.key} className="overflow-hidden rounded-2xl border border-white/[0.05] bg-zinc-950/40">
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => setOpenNestNotificationGroups((current) => ({ ...current, [group.key]: !open }))}
+                            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                            aria-expanded={open}
+                          >
+                            <GroupIcon size={15} className="settings-icon shrink-0" />
+                            <span className="min-w-0">
+                              <span className="block text-[12px] font-semibold text-zinc-200">{group.label}</span>
+                              <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{group.description}</span>
+                            </span>
+                            {open ? <ChevronUp size={14} className="ml-auto text-zinc-600" /> : <ChevronDown size={14} className="ml-auto text-zinc-600" />}
+                          </button>
+                          <Toggle value={categoryEnabled} onChange={(value) => toggleNestCategory(group, value)} />
+                        </div>
+                        <AnimatePresence initial={false}>
+                          {open && (
+                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                              <div className="space-y-1 border-t border-white/[0.04] px-4 py-2">
+                                {group.notifications.map((notification) => (
+                                  <div key={notification.key} className="flex items-center justify-between gap-4 rounded-xl px-2 py-2 hover:bg-white/[0.02]">
+                                    <span className="text-[12px] text-zinc-400">{notification.label}</span>
+                                    <Toggle
+                                      value={categoryEnabled && nestPreferences.notifications[notification.key] !== false}
+                                      onChange={(value) => toggleNestNotification(group, notification.key, value)}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
-          </div>
-        );
+          );
+        }
       default:
         return (
           <>

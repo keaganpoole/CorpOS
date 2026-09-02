@@ -146,20 +146,6 @@ const POPUP_DEFINITIONS = [
     ),
   },
   {
-    id: 'receptionists_first_hire',
-    type: 'general',
-    placement: 'dashboard',
-    title: 'Receptionist Hired',
-    emoji: '🎉',
-    getDescription: () => 'Your AI receptionist is now on the team. Next, give them the right instructions and connect the workflows that help them turn calls into real outcomes.',
-    primaryActionLabel: 'Got it',
-    shouldShow: ({ currentRoute, recentlyHiredReceptionist, showHireModal }) => (
-      currentRoute === 'receptionists' &&
-      recentlyHiredReceptionist &&
-      !showHireModal
-    ),
-  },
-  {
     id: 'calendar_intro',
     type: 'general',
     placement: 'dashboard',
@@ -170,18 +156,6 @@ const POPUP_DEFINITIONS = [
     shouldShow: ({ currentRoute }) => currentRoute === 'calendar',
   },
   {
-    id: 'calendar_first_appointment',
-    type: 'general',
-    placement: 'dashboard',
-    title: 'First Appointment Booked',
-    emoji: '🎉',
-    getDescription: () => 'Your calendar has started filling up. Open appointments to review the details, confirm the booking context, and keep your front desk schedule clean.',
-    primaryActionLabel: 'Got it',
-    shouldShow: ({ currentRoute, calendarLoading, calendarHasAppointmentWithPerson }) => (
-      currentRoute === 'calendar' && !calendarLoading && calendarHasAppointmentWithPerson
-    ),
-  },
-  {
     id: 'people_intro',
     type: 'general',
     placement: 'dashboard',
@@ -190,16 +164,6 @@ const POPUP_DEFINITIONS = [
     primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'pipeline',
-  },
-  {
-    id: 'people_first_contact',
-    type: 'general',
-    placement: 'dashboard',
-    title: 'First Contact Added',
-    emoji: '🎉',
-    getDescription: () => 'Your CRM is starting to build. As more people are added, your receptionists get better context for calls, bookings, follow-ups, and customer-specific service.',
-    primaryActionLabel: 'Got it',
-    shouldShow: ({ currentRoute, peopleCount, peopleLoading }) => currentRoute === 'pipeline' && !peopleLoading && peopleCount > 0,
   },
   {
     id: 'scenarios_intro',
@@ -238,16 +202,6 @@ const POPUP_DEFINITIONS = [
     primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'live-monitoring',
-  },
-  {
-    id: 'live_monitoring_first_call',
-    type: 'general',
-    placement: 'dashboard',
-    title: 'First Live Call Seen',
-    emoji: '🎉',
-    getDescription: () => 'You have seen your front desk in motion. Use live activity to understand how calls flow, where customers need help, and where automation can get sharper.',
-    primaryActionLabel: 'Got it',
-    shouldShow: ({ currentRoute, liveCallSeen }) => currentRoute === 'live-monitoring' && liveCallSeen,
   },
   {
     id: 'call_logs_intro',
@@ -1793,7 +1747,6 @@ const SonarDashboard = () => {
   const [archivedAgentsLoading, setArchivedAgentsLoading] = useState(false);
   const [dismissedPopupIds, setDismissedPopupIds] = useState([]);
   const [manualPopupId, setManualPopupId] = useState(null);
-  const [recentlyHiredReceptionist, setRecentlyHiredReceptionist] = useState(false);
   const [backendTasklistState, setBackendTasklistState] = useState(null);
   const [showSetupGuide, setShowSetupGuide] = useState(true);
   const [planLimitDetail, setPlanLimitDetail] = useState(null);
@@ -1884,7 +1837,6 @@ const SonarDashboard = () => {
   useEffect(() => {
     setDismissedPopupIds([]);
     setManualPopupId(null);
-    setRecentlyHiredReceptionist(false);
     setBackendTasklistState(null);
     setShowSetupGuide(true);
     tasklistPersistRef.current = '';
@@ -2101,10 +2053,6 @@ const SonarDashboard = () => {
     updateAgentDirection,
     refresh,
   } = useSonarState();
-  const liveCallSeen = Array.isArray(session?.calls)
-    ? session.calls.length > 0
-    : Boolean(session?.active_call || session?.current_call || session?.call);
-
   const loadTasklistState = useCallback(async () => {
     if (!userId) {
       setBackendTasklistState(null);
@@ -2250,7 +2198,6 @@ const SonarDashboard = () => {
     teamView,
     agentsLoading,
     receptionistCount: enrichedAgents.length,
-    recentlyHiredReceptionist,
     showHireModal,
     calendarCount: calendarToolbarMeta.count,
     calendarLoading: calendarToolbarMeta.loading,
@@ -2262,7 +2209,6 @@ const SonarDashboard = () => {
     scenariosIntroClicked,
     callLogsCount: callLogsToolbarMeta.count,
     callLogsLoading: callLogsToolbarMeta.loading,
-    liveCallSeen,
   };
   const manualPopup = manualPopupId ? POPUP_DEFINITIONS.find((popup) => popup.id === manualPopupId) : null;
   const activeManualPopup = manualPopup && (() => {
@@ -2462,7 +2408,6 @@ const SonarDashboard = () => {
                       if (!result) throw new Error('Failed to hire receptionist');
                       await refresh();
                       await loadAgentScenarios();
-                      setRecentlyHiredReceptionist(true);
                       return result;
                     } catch (err) {
                       console.error('[Hire] Failed:', err.message);

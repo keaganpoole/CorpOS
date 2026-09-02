@@ -24,6 +24,29 @@ TERMINAL_CALL_STATUSES = {
 }
 SUCCESS_PAYMENT_STATUSES = {"paid", "succeeded", "successful", "complete", "completed"}
 FAILED_PAYMENT_STATUSES = {"failed", "declined", "canceled", "cancelled"}
+NEST_TABLE = "nest"
+
+# These are intentionally stable business-level keys. They are the durable
+# de-duplication boundary for milestones across browsers and devices.
+MILESTONE_KEYS = {
+    "first_receptionist_hired",
+    "first_staff_member_added",
+    "first_call_received",
+    "first_successful_call",
+    "first_receptionist_booking",
+    "first_person_added",
+    "first_appointment_booked",
+    "first_appointment_completed",
+    "first_scenario_created",
+    "first_scenario_run",
+    "first_successful_workflow",
+    "first_successful_payment",
+    "first_invoice_paid",
+    "first_repeat_customer",
+    "first_automated_booking",
+    "first_automated_follow_up",
+    "business_setup_completed",
+}
 
 
 def _text(value: Any) -> str:
@@ -242,7 +265,7 @@ def _stored_events(rows: list[dict]) -> list[dict]:
     for row in rows:
         events.append({
             "id": _text(row.get("id")) or f"nest:{_text(row.get('idempotency_key'))}",
-            "source": "nest_events",
+            "source": NEST_TABLE,
             "source_id": _text(row.get("source_id")),
             "category": _text(row.get("category")) or "workflows",
             "event_type": _text(row.get("event_type")) or "workflow_event",
@@ -288,7 +311,7 @@ def record_nest_event(
         "occurred_at": occurred_at,
     }
     try:
-        client.table("nest_events").upsert(
+        client.table(NEST_TABLE).upsert(
             row,
             on_conflict="business_id,idempotency_key",
         ).execute()
@@ -297,12 +320,135 @@ def record_nest_event(
         logging.warning("Nest event persistence skipped: %s", exc)
 
 
+def claim_nest_milestone(
+    client: Any,
+    *,
+    business_id: Any,
+    user_id: Any,
+    milestone_key: str,
+    title: str,
+    message: str = "",
+    category: str = "milestones",
+    priority: str = "major",
+    payload: dict | None = None,
+    source_id: Any = None,
+) -> bool:
+    """Atomically claim a milestone once for a business.
+
+    A plain insert is deliberate: the unique business/idempotency constraint
+    is the cross-device lock. A duplicate means another worker or device has
+    already claimed the milestone, so it should not be displayed again.
+    """
+
+    if business_id is None or not user_id or milestone_key not in MILESTONE_KEYS:
+        return False
+    row = {
+        "business_id": business_id,
+        "user_id": str(user_id),
+        "category": category,
+        "event_type": milestone_key,
+        "priority": priority,
+        "title": title[:160],
+        "message": message[:300],
+        "payload": payload or {},
+        "source_id": str(source_id) if source_id is not None else None,
+        "idempotency_key": f"milestone:{milestone_key}",
+        "occurred_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        client.table(NEST_TABLE).insert(row).execute()
+        return True
+    except Exception as exc:
+        # PostgreSQL's unique constraint is the expected result for a second
+        # device. Treat only duplicate-key failures as an ordinary miss.
+        error_text = str(exc).lower()
+        if "duplicate" in error_text or "23505" in error_text or "unique" in error_text:
+            return False
+        logging.warning("Nest milestone claim skipped: %s", exc)
+        return False
+
+
+def claim_call_milestones(client: Any, row: dict) -> None:
+    """Claim call milestones from a persisted call-log row when its facts are known."""
+
+    if not isinstance(row, dict):
+        return
+    business_id = row.get("business_id")
+    user_id = row.get("user_id")
+    if business_id is None or not user_id:
+        return
+
+    raw_payload = row.get("raw_payload") if isinstance(row.get("raw_payload"), dict) else {}
+    metadata = raw_payload.get("metadata") if isinstance(raw_payload.get("metadata"), dict) else {}
+    phone_metadata = metadata.get("phone_call") if isinstance(metadata.get("phone_call"), dict) else {}
+    direction = _text(
+        row.get("direction")
+        or row.get("call_direction")
+        or raw_payload.get("direction")
+        or raw_payload.get("call_direction")
+        or phone_metadata.get("direction")
+        or row.get("agent_name")
+    ).lower()
+    success = _status(row)
+    call_successful = _text(row.get("call_successful")).lower()
+    caller = _text(row.get("caller_name") or row.get("contact_name"))
+    detail = caller or ("Outgoing call" if "out" in direction else "Incoming call")
+
+    if "in" in direction and "out" not in direction:
+        claim_nest_milestone(
+            client,
+            business_id=business_id,
+            user_id=user_id,
+            milestone_key="first_call_received",
+            title="First call received",
+            message=detail,
+            source_id=row.get("id") or row.get("conversation_id"),
+            payload={"direction": "inbound"},
+        )
+
+    successful = success in {"completed", "done", "success", "successful"} or call_successful in {"true", "yes", "success", "successful", "completed", "done"}
+    if successful:
+        claim_nest_milestone(
+            client,
+            business_id=business_id,
+            user_id=user_id,
+            milestone_key="first_successful_call",
+            title="First successful call",
+            message=detail,
+            source_id=row.get("id") or row.get("conversation_id"),
+            payload={"direction": "outbound" if "out" in direction else "inbound" if "in" in direction else "unknown"},
+        )
+
+
+def claim_payment_milestones(client: Any, row: dict) -> None:
+    """Claim the first successful-payment milestone from a payment row."""
+
+    if not isinstance(row, dict):
+        return
+    status = _status(row)
+    if status not in SUCCESS_PAYMENT_STATUSES:
+        return
+    business_id = row.get("business_id")
+    user_id = row.get("user_id")
+    if business_id is None or not user_id:
+        return
+    amount = row.get("amount") or row.get("amount_received") or row.get("amount_total")
+    claim_nest_milestone(
+        client,
+        business_id=business_id,
+        user_id=user_id,
+        milestone_key="first_successful_payment",
+        title="First successful payment",
+        message=str(amount) if amount is not None else "",
+        source_id=row.get("id") or row.get("stripe_payment_intent_id") or row.get("stripe_session_id"),
+    )
+
 def get_nest_history(client: Any, *, business_id: Any, user_id: str, limit: int = 40) -> list[dict]:
     """Return a normalized, newest-first Nest history for one authenticated tenant."""
 
     per_source = max(8, min(40, limit))
     events = [
-        *_stored_events(_safe_rows(client, "nest_events", filters=(("business_id", business_id),), order_by="occurred_at", limit=per_source, quiet=True)),
+        *_stored_events(_safe_rows(client, NEST_TABLE, filters=(("business_id", business_id),), order_by="occurred_at", limit=per_source, quiet=True)),
         *_call_events(_safe_rows(client, "call_logs", filters=(("business_id", business_id),), limit=per_source)),
         *_appointment_events(_safe_rows(client, "appointments", filters=(("business_id", business_id),), limit=per_source)),
         *_people_events(_safe_rows(client, "people", filters=(("business_id", business_id),), limit=per_source)),

@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from .nest_events import claim_nest_milestone, record_nest_event
+
 BASE_TABLE_LABELS = {
     "people": {
         "first_name": "First Name",
@@ -2694,6 +2696,44 @@ class ScenarioFlowExecutor:
             if status_value == "failed":
                 update["failed_at"] = datetime.now(timezone.utc).isoformat()
             self.supabase.table("flow_executions").update(update).eq("id", execution_id).execute()
+            if status_value in {"completed", "failed"}:
+                scenario = context.get("_scenario") if isinstance(context.get("_scenario"), dict) else {}
+                business = context.get("business") if isinstance(context.get("business"), dict) else {}
+                business_id = business.get("id") or scenario.get("business_id") or context.get("business_id")
+                user_id = business.get("user_id") or scenario.get("user_id") or scenario.get("created_by") or context.get("user_id")
+                failed = status_value == "failed"
+                claim_nest_milestone(
+                    self.supabase,
+                    business_id=business_id,
+                    user_id=user_id,
+                    milestone_key="first_scenario_run",
+                    title="First scenario run",
+                    message=str(context.get("_scenarioName") or scenario.get("name") or ""),
+                    source_id=execution_id,
+                )
+                if not failed:
+                    claim_nest_milestone(
+                        self.supabase,
+                        business_id=business_id,
+                        user_id=user_id,
+                        milestone_key="first_successful_workflow",
+                        title="First successful workflow",
+                        message=str(context.get("_scenarioName") or scenario.get("name") or ""),
+                        source_id=execution_id,
+                    )
+                record_nest_event(
+                    self.supabase,
+                    business_id=business_id,
+                    user_id=user_id,
+                    category="warnings" if failed else "workflows",
+                    event_type="workflow_failed" if failed else "workflow_completed",
+                    title="Workflow needs attention" if failed else "Workflow completed",
+                    message=str(context.get("_scenarioName") or scenario.get("name") or ""),
+                    priority="critical" if failed else "routine",
+                    payload={"execution_id": execution_id, "error": error} if failed else {"execution_id": execution_id},
+                    source_id=execution_id,
+                    idempotency_key=f"workflow:{execution_id}:{status_value}",
+                )
         except Exception as exc:
             logging.error("[FlowExecutor] Failed to update execution: %s", exc)
 

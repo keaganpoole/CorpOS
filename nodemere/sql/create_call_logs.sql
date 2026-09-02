@@ -7,6 +7,7 @@ ALTER TABLE public.call_logs
   ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'elevenlabs',
   ADD COLUMN IF NOT EXISTS caller_phone text NULL,
   ADD COLUMN IF NOT EXISTS caller_name text NULL,
+  ADD COLUMN IF NOT EXISTS direction text NULL,
   ADD COLUMN IF NOT EXISTS person_id bigint NULL,
   ADD COLUMN IF NOT EXISTS business_id bigint NULL,
   ADD COLUMN IF NOT EXISTS conversation_id text NULL,

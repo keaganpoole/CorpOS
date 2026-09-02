@@ -145,6 +145,8 @@ from .contract_service import (
     sign_contract,
 )
 from .project_intelligence import get_project_intelligence, refresh_market_research
+from .business_intelligence import get_business_intelligence
+from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_nest_event
 
 try:
     from elevenlabs.client import ElevenLabs
@@ -3870,6 +3872,187 @@ def add_person_custom_dynamic_variables(dynamic_variables: dict, person: Optiona
     return dynamic_variables
 
 
+def load_appointment_schema_rows(business_id: Optional[str]) -> list[dict]:
+    if business_id is None:
+        return []
+    try:
+        response = (
+            supabase.table("appointments_schema")
+            .select("field_key,label,field_type,config,is_active,position,created_at")
+            .eq("business_id", str(business_id))
+            .eq("is_active", True)
+            .order("position", ascending=True)
+            .order("created_at", ascending=True)
+            .execute()
+        )
+        return response.data or []
+    except Exception as exc:
+        logging.warning("Failed to load appointment schema rows: %s", exc)
+        return []
+
+
+def load_appointment_schema_types(business_id: Optional[str]) -> dict:
+    return {
+        str(row.get("field_key")): row.get("field_type")
+        for row in load_appointment_schema_rows(business_id)
+        if row.get("field_key")
+    }
+
+
+def load_appointment_schema_labels(business_id: Optional[str]) -> dict:
+    return {
+        str(row.get("field_key")): row.get("label")
+        for row in load_appointment_schema_rows(business_id)
+        if row.get("field_key")
+    }
+
+
+def coerce_appointment_custom_field_value(value, field_type: Optional[str] = None):
+    if value is None:
+        return None
+    if field_type == "boolean":
+        if isinstance(value, bool):
+            return value
+        normalized = str(value).strip().lower()
+        if normalized in {"true", "yes", "1", "on"}:
+            return True
+        if normalized in {"false", "no", "0", "off"}:
+            return False
+    if field_type == "number":
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return value
+    if field_type == "date":
+        return normalize_appointment_date_value(value, fallback=str(value).strip())
+    if field_type == "multi_select" and not isinstance(value, list):
+        return [value]
+    return value
+
+
+def normalize_appointment_payload_custom_fields(
+    payload: dict,
+    business_id: Optional[str],
+    existing_custom_fields: Optional[dict] = None,
+) -> dict:
+    normalized = {**(payload or {})}
+    field_types = load_appointment_schema_types(business_id)
+    merged_custom_fields = {
+        **((existing_custom_fields or {}) if isinstance(existing_custom_fields, dict) else {}),
+        **((normalized.get("custom_fields") or {}) if isinstance(normalized.get("custom_fields"), dict) else {}),
+    }
+
+    for key in list(normalized.keys()):
+        if not str(key).startswith("custom_"):
+            continue
+        merged_custom_fields[key] = coerce_appointment_custom_field_value(
+            normalized.pop(key),
+            field_types.get(str(key)),
+        )
+
+    if merged_custom_fields:
+        normalized["custom_fields"] = {
+            key: value for key, value in merged_custom_fields.items() if value is not None
+        }
+    elif "custom_fields" in normalized and not isinstance(normalized.get("custom_fields"), dict):
+        normalized.pop("custom_fields", None)
+
+    return normalized
+
+
+APPOINTMENT_INTAKE_BASE_FIELDS = {
+    "person_id": {"label": "Customer / Person", "type": "person_lookup"},
+    "service_id": {"label": "Service", "type": "service_lookup"},
+    "date": {"label": "Date", "type": "date"},
+    "time": {"label": "Start Time", "type": "time"},
+    "duration": {"label": "Duration", "type": "number"},
+    "status": {"label": "Status", "type": "select"},
+    "source": {"label": "Source", "type": "select"},
+    "notes": {"label": "Notes", "type": "textarea"},
+    "receptionist_id": {"label": "Assigned Receptionist", "type": "receptionist_lookup"},
+}
+
+
+def build_appointment_intake_fields(business: Optional[dict]) -> list[dict]:
+    if not business:
+        return []
+
+    business_id = business.get("id")
+    raw_config = business.get("appointments_field_config")
+    config = raw_config if isinstance(raw_config, dict) else {}
+    enabled_keys = [
+        str(field_key)
+        for field_key, field_settings in config.items()
+        if isinstance(field_settings, dict) and field_settings.get("intakeEnabled") is True
+    ]
+    if not enabled_keys:
+        return []
+
+    custom_schema_by_key = {
+        str(row.get("field_key")): row
+        for row in load_appointment_schema_rows(str(business_id) if business_id is not None else None)
+        if row.get("field_key")
+    }
+    intake_fields = []
+    for field_key in enabled_keys:
+        if field_key in {"created_at", "updated_at", "scenario_id"}:
+            continue
+        field_settings = config.get(field_key) if isinstance(config.get(field_key), dict) else {}
+        custom_row = custom_schema_by_key.get(field_key, {})
+        config_blob = custom_row.get("config") if isinstance(custom_row.get("config"), dict) else {}
+        fallback_meta = APPOINTMENT_INTAKE_BASE_FIELDS.get(field_key, {})
+        label = (
+            field_settings.get("name")
+            or custom_row.get("label")
+            or fallback_meta.get("label")
+            or field_key
+        )
+        field_type = (
+            custom_row.get("field_type")
+            or config_blob.get("field_type")
+            or fallback_meta.get("type")
+            or "text"
+        )
+        description = (
+            field_settings.get("description")
+            or config_blob.get("description")
+            or ""
+        )
+        intake_fields.append({
+            "key": field_key,
+            "label": label,
+            "type": field_type,
+            "description": description,
+            "required": True,
+            "custom": field_key.startswith("custom_"),
+        })
+    return intake_fields
+
+
+def add_appointment_intake_dynamic_variables(dynamic_variables: dict, business: Optional[dict]):
+    intake_fields = build_appointment_intake_fields(business)
+    dynamic_variables["appointment_intake_fields_enabled_count"] = len(intake_fields)
+    if not intake_fields:
+        dynamic_variables["appointment_intake_fields"] = "[]"
+        dynamic_variables["appointment_intake_fields_summary"] = ""
+        dynamic_variables["appointment_intake_collection_guidance"] = ""
+        return dynamic_variables
+
+    summary_parts = []
+    for field in intake_fields:
+        label = str(field.get("label") or field.get("key") or "").strip()
+        description = str(field.get("description") or "").strip()
+        summary_parts.append(f"{label}: {description}" if description else label)
+
+    dynamic_variables["appointment_intake_fields"] = json.dumps(intake_fields, ensure_ascii=True)
+    dynamic_variables["appointment_intake_fields_summary"] = " | ".join(summary_parts)
+    dynamic_variables["appointment_intake_collection_guidance"] = (
+        "When booking an appointment, prioritize collecting every field in appointment_intake_fields. "
+        "Treat them as required before the appointment is considered complete."
+    )
+    return dynamic_variables
+
+
 PEOPLE_INTAKE_BASE_FIELDS = {
     "first_name": {"label": "First Name", "type": "text"},
     "last_name": {"label": "Last Name", "type": "text"},
@@ -5687,6 +5870,7 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
     call_successful = first_present(data, "analysis.call_successful", "call_successful")
     outcome_value = first_present(data, "outcome", "analysis.outcome", "call_outcome", "conversation_initiation_client_data.dynamic_variables.outcome")
     provider_call_sid = first_present(data, "provider_call_sid", "metadata.call_sid", "metadata.phone_call.call_sid") or first_present(telephony_body, "CallSid", "call_sid")
+    direction = _extract_call_direction({"raw_payload": payload})
 
     receptionist = lookup_hired_receptionist(
         hired_receptionist_id=hired_receptionist_id,
@@ -5707,6 +5891,7 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
         "scenario_id": uuid_or_none(scenario_id),
         "caller_phone": normalize_phone_number(from_number),
         "caller_name": str(caller_name) if caller_name else None,
+        "direction": direction,
         "from_number": normalize_phone_number(from_number),
         "to_number": normalize_phone_number(to_number),
         "started_at": started_at.isoformat() if started_at else None,
@@ -5831,7 +6016,9 @@ def insert_payment_record(payment_row: dict):
         response = supabase.table("payments").insert(payment_row).execute()
         if not response.data:
             raise RuntimeError("Payment record was not persisted")
-        return response.data[0]
+        saved = response.data[0]
+        claim_payment_milestones(supabase, saved)
+        return saved
     except Exception as exc:
         logging.error("Failed to insert payment row: %s", exc, exc_info=True)
         raise HTTPException(
@@ -5844,7 +6031,16 @@ def update_payment_record(match_field: str, match_value: str, update_data: dict,
     if user_id:
         query = query.eq("user_id", user_id)
     response = query.execute()
-    return response.data[0] if response.data else None
+    saved = response.data[0] if response.data else None
+    if not saved:
+        refreshed_query = supabase.table("payments").select("*").eq(match_field, match_value)
+        if user_id:
+            refreshed_query = refreshed_query.eq("user_id", user_id)
+        refreshed = refreshed_query.limit(1).execute()
+        saved = refreshed.data[0] if refreshed.data else None
+    if saved:
+        claim_payment_milestones(supabase, saved)
+    return saved
 
 
 def is_uuid_value(value: Optional[str]) -> bool:
@@ -6623,6 +6819,15 @@ async def create_sonar_scenario(payload: dict, current_user: dict = Depends(get_
     response = supabase_admin.table("scenarios").insert(insert_payload).execute()
     if not response.data:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Scenario could not be created")
+    claim_nest_milestone(
+        supabase_admin,
+        business_id=insert_payload.get("business_id"),
+        user_id=user_id,
+        milestone_key="first_scenario_created",
+        title="First scenario created",
+        message=str(insert_payload.get("name") or ""),
+        source_id=insert_payload.get("id"),
+    )
     if scenario_engine:
         await scenario_engine.load_scenarios()
     return response.data[0]
@@ -6957,6 +7162,10 @@ async def twilio_inbound_webhook(request: Request):
         register_payload["conversation_initiation_client_data"]["scenario_context"],
         business,
     )
+    add_appointment_intake_dynamic_variables(
+        register_payload["conversation_initiation_client_data"]["scenario_context"],
+        business,
+    )
     matched_person = lookup_person_record(
         phone_number=from_number,
         business_id=str(business.get("id")) if business and business.get("id") is not None else None,
@@ -7073,7 +7282,8 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
         "twilio_to_number": call_payload.get("to_number"),
         "twilio_call_sid": call_payload.get("call_id"),
     }
-    dynamic_variables["intake_fields"] = json.dumps(build_people_intake_fields(business), ensure_ascii=True)
+    add_people_intake_dynamic_variables(dynamic_variables, business)
+    add_appointment_intake_dynamic_variables(dynamic_variables, business)
     matched_person = lookup_person_record(
         phone_number=call_payload.get("from_number"),
         business_id=str(business.get("id")) if business and business.get("id") is not None else None,
@@ -7241,6 +7451,7 @@ async def set_agent_data(request: Request, _internal: None = Depends(require_int
         response = supabase.table("call_logs").insert(update_fields).execute()
         saved = response.data[0] if getattr(response, "data", None) else update_fields
 
+    claim_call_milestones(supabase, saved)
     return {"ok": True, "call_log": saved}
 
 @app.api_route("/api/tools/{tool_name}", methods=["GET", "POST"], tags=["Server Tools"])
@@ -7457,6 +7668,16 @@ async def legacy_server_tool(
         merged_payload = {**intake_values, **payload}
         merged_payload.pop("intake_values", None)
         merged_payload.pop("intake_values_json", None)
+        custom_fields_json = first_present(merged_payload, "custom_fields_json")
+        if custom_fields_json:
+            try:
+                parsed_custom_fields = json.loads(str(custom_fields_json))
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string") from exc
+            if not isinstance(parsed_custom_fields, dict):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string")
+            merged_payload.update(parsed_custom_fields)
+        merged_payload.pop("custom_fields_json", None)
 
         if first_present(merged_payload, "phone", "customer_phone", "caller_number"):
             merged_payload["phone"] = first_present(merged_payload, "phone", "customer_phone", "caller_number")
@@ -7848,11 +8069,52 @@ async def legacy_server_tool(
     if normalized_tool == "create-appointment":
         if not business:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
-        appointment_date = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
-        appointment_time = normalize_appointment_time_value(first_present(payload, "time", "appointment_time"))
-        appointment_duration = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
-        person_id = safe_appointment_person_id(first_present(payload, "person_id"))
-        requested_staff_id = first_present(payload, "staff_id")
+        intake_values = payload.get("intake_values") if isinstance(payload.get("intake_values"), dict) else {}
+        intake_values_json = first_present(payload, "intake_values_json")
+        if intake_values_json:
+            try:
+                parsed_intake_values = json.loads(str(intake_values_json))
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="intake_values_json must be a valid JSON object string") from exc
+            if not isinstance(parsed_intake_values, dict):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="intake_values_json must be a valid JSON object string")
+            intake_values = {**intake_values, **parsed_intake_values}
+        merged_payload = {**intake_values, **payload}
+        merged_payload.pop("intake_values", None)
+        merged_payload.pop("intake_values_json", None)
+        custom_fields_json = first_present(merged_payload, "custom_fields_json")
+        if custom_fields_json:
+            try:
+                parsed_custom_fields = json.loads(str(custom_fields_json))
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string") from exc
+            if not isinstance(parsed_custom_fields, dict):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string")
+            merged_payload.update(parsed_custom_fields)
+        merged_payload.pop("custom_fields_json", None)
+        missing_intake_fields = [
+            {
+                "key": field.get("key"),
+                "label": field.get("label") or field.get("key"),
+                "type": field.get("type"),
+                "custom": bool(field.get("custom")),
+            }
+            for field in build_appointment_intake_fields(business)
+            if field.get("required") is True and not is_present_intake_value(merged_payload.get(field.get("key")))
+        ]
+        if missing_intake_fields:
+            return {
+                "ok": False,
+                "appointment": None,
+                "reason": "Missing required appointment intake fields",
+                "missing_intake_fields": missing_intake_fields,
+            }
+
+        appointment_date = normalize_appointment_date_value(first_present(merged_payload, "date", "appointment_date"))
+        appointment_time = normalize_appointment_time_value(first_present(merged_payload, "time", "appointment_time"))
+        appointment_duration = normalize_appointment_duration(first_present(merged_payload, "duration", "appointment_duration"))
+        person_id = safe_appointment_person_id(first_present(merged_payload, "person_id"))
+        requested_staff_id = first_present(merged_payload, "staff_id")
         staff_id = safe_appointment_staff_id(requested_staff_id, business_id=business.get("id"), require_active=False)
         if requested_staff_id is not None and staff_id is None:
             return {"ok": False, "appointment": None, "reason": "Staff member not found"}
@@ -7874,15 +8136,27 @@ async def legacy_server_tool(
             "date": appointment_date,
             "time": appointment_time,
             "duration": appointment_duration,
-            "status": normalize_appointment_status(first_present(payload, "status")),
-            "receptionist_id": int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id")) or (receptionist or {}).get("id"),
-            "notes": first_present(payload, "notes"),
+            "status": normalize_appointment_status(first_present(merged_payload, "status")),
+            "receptionist_id": int_or_none(first_present(merged_payload, "receptionist_id", "hired_receptionist_id")) or (receptionist or {}).get("id"),
+            "notes": first_present(merged_payload, "notes"),
             "person_id": person_id,
-            "service_id": safe_appointment_service_id(first_present(payload, "service_id")),
+            "service_id": safe_appointment_service_id(first_present(merged_payload, "service_id")),
             "staff_id": staff_id,
             "business_id": business.get("id") if business else None,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
+        if first_present(merged_payload, "source") is not None:
+            appointment_row["source"] = first_present(merged_payload, "source")
+        appointment_custom_payload = {
+            key: value for key, value in merged_payload.items()
+            if key == "custom_fields" or str(key).startswith("custom_")
+        }
+        normalized_custom_payload = normalize_appointment_payload_custom_fields(
+            appointment_custom_payload,
+            business.get("id"),
+        )
+        if isinstance(normalized_custom_payload.get("custom_fields"), dict):
+            appointment_row["custom_fields"] = normalized_custom_payload["custom_fields"]
         response = supabase.table("appointments").insert(appointment_row).execute()
         created = response.data[0] if response.data else appointment_row
         created = {"action": "create_appointment", "table": "appointments", **created}
@@ -7904,10 +8178,24 @@ async def legacy_server_tool(
         appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
         if not appointment_id:
             return {"ok": True, "appointment": {"action": "update_appointment", "skipped": True, "reason": "appointment_id is required"}}
-        existing_response = supabase.table("appointments").select("*").eq("id", appointment_id).limit(1).execute()
+        existing_query = supabase.table("appointments").select("*").eq("id", appointment_id)
+        if business and business.get("id") is not None:
+            existing_query = existing_query.eq("business_id", business.get("id"))
+        existing_response = existing_query.limit(1).execute()
         existing = existing_response.data[0] if existing_response.data else None
         if not existing:
             return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "Appointment not found"}}
+        update_payload = {**payload}
+        custom_fields_json = first_present(update_payload, "custom_fields_json")
+        if custom_fields_json:
+            try:
+                parsed_custom_fields = json.loads(str(custom_fields_json))
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string") from exc
+            if not isinstance(parsed_custom_fields, dict):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string")
+            update_payload.update(parsed_custom_fields)
+        update_payload.pop("custom_fields_json", None)
         updates = {}
         if first_present(payload, "date", "appointment_date") is not None:
             updates["date"] = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
@@ -7937,6 +8225,17 @@ async def legacy_server_tool(
             )
             if safe_staff_id is not None:
                 updates["staff_id"] = safe_staff_id
+        custom_update_payload = {
+            key: value for key, value in update_payload.items()
+            if key == "custom_fields" or str(key).startswith("custom_")
+        }
+        normalized_custom_payload = normalize_appointment_payload_custom_fields(
+            custom_update_payload,
+            business.get("id") if business else existing.get("business_id"),
+            existing.get("custom_fields"),
+        )
+        if isinstance(normalized_custom_payload.get("custom_fields"), dict):
+            updates["custom_fields"] = normalized_custom_payload["custom_fields"]
         schedule_fields_changed = any(field in updates for field in ("date", "time", "duration", "staff_id"))
         candidate_status = updates.get("status", existing.get("status"))
         if schedule_fields_changed and str(candidate_status or "").strip().lower() not in {"cancelled", "completed", "missed"}:
@@ -7969,7 +8268,10 @@ async def legacy_server_tool(
         appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
         if not appointment_id:
             return {"ok": True, "appointment": {"action": "cancel_appointment", "skipped": True, "reason": "appointment_id is required"}}
-        existing_response = supabase.table("appointments").select("*").eq("id", appointment_id).limit(1).execute()
+        existing_query = supabase.table("appointments").select("*").eq("id", appointment_id)
+        if business and business.get("id") is not None:
+            existing_query = existing_query.eq("business_id", business.get("id"))
+        existing_response = existing_query.limit(1).execute()
         existing = existing_response.data[0] if existing_response.data else None
         if not existing:
             return {"ok": True, "appointment": {"id": appointment_id, "action": "cancel_appointment", "skipped": True, "reason": "Appointment not found"}}
@@ -8007,6 +8309,7 @@ async def legacy_server_tool(
         }
         response = supabase.table("call_logs").insert(call_log).execute()
         saved = response.data[0] if response.data else call_log
+        claim_call_milestones(supabase, saved)
         increment_business_usage_summary(call_log.get("business_id"), duration_seconds)
         return {"ok": True, "call_log": saved}
 
@@ -8025,6 +8328,19 @@ async def legacy_server_tool(
             severity="info",
             event_type="transfer_call",
             payload=transfer_payload,
+        )
+        record_nest_event(
+            supabase,
+            business_id=transfer_payload.get("business_id"),
+            user_id=transfer_payload.get("user_id"),
+            category="calls",
+            event_type="call_transferred",
+            title="Call transferred",
+            message=str(transfer_payload.get("target_number") or ""),
+            priority="major",
+            payload=transfer_payload,
+            source_id=transfer_payload.get("requested_at"),
+            idempotency_key=f"call-transfer:{transfer_payload.get('requested_at')}",
         )
         return {"ok": True, "status": "queued", "transfer": transfer_payload}
 
@@ -8181,6 +8497,7 @@ async def elevenlabs_post_call_webhook(
         ) from exc
 
     saved = response.data[0] if getattr(response, "data", None) else call_log
+    claim_call_milestones(supabase, saved)
     previous_duration_seconds = parse_usage_seconds(existing[0].get("duration_seconds")) if existing else 0
     saved_duration_seconds = parse_usage_seconds(saved.get("duration_seconds") or call_log.get("duration_seconds"))
     usage_business_id = saved.get("business_id") or call_log.get("business_id") or (existing[0].get("business_id") if existing else None)
@@ -8355,6 +8672,106 @@ async def get_sonar_system_summary(current_user: dict = Depends(get_current_user
 async def get_sonar_project_intelligence(current_user: dict = Depends(get_current_user)):
     """Return the cached source analysis and cached market working set."""
     return await asyncio.to_thread(get_project_intelligence)
+
+
+@app.get("/api/sonar/business-intelligence", tags=["Sonar Business Intelligence"])
+async def get_sonar_business_intelligence(current_user: dict = Depends(get_current_user)):
+    """Return a tenant-scoped, evidence-backed operating report."""
+    try:
+        return await asyncio.to_thread(get_business_intelligence, supabase, user_id=str(current_user.id))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@app.get("/api/sonar/nest/history", tags=["Sonar Nest"])
+async def get_sonar_nest_history(limit: int = 40, current_user: dict = Depends(get_current_user)):
+    """Return a small tenant-scoped history normalized from existing business activity."""
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        return {"events": []}
+    events = await asyncio.to_thread(
+        get_nest_history,
+        supabase,
+        business_id=business.get("id"),
+        user_id=str(current_user.id),
+        limit=max(1, min(limit, 100)),
+    )
+    return {"events": events}
+
+
+@app.post("/api/sonar/nest/claim", tags=["Sonar Nest"])
+async def claim_sonar_nest_milestone(payload: dict, current_user: dict = Depends(get_current_user)):
+    """Claim a verified business milestone for cross-device Nest delivery."""
+
+    milestone_key = str((payload or {}).get("milestone_key") or "").strip()
+    if milestone_key not in MILESTONE_KEYS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported Nest milestone")
+
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+
+    # The client may report a source event, but the server verifies that the
+    # business data exists before it can create a durable milestone row.
+    source_checks = {
+        "first_receptionist_hired": ("hired_receptionists", "business_id"),
+        "first_staff_member_added": ("staff", "business_id"),
+        "first_call_received": ("call_logs", "business_id"),
+        "first_successful_call": ("call_logs", "business_id"),
+        "first_receptionist_booking": ("appointments", "business_id"),
+        "first_person_added": ("people", "business_id"),
+        "first_appointment_booked": ("appointments", "business_id"),
+        "first_appointment_completed": ("appointments", "business_id"),
+        "first_scenario_created": ("scenarios", "business_id"),
+        "first_scenario_run": ("flow_executions", "business_id"),
+        "first_successful_workflow": ("flow_executions", "business_id"),
+        "first_successful_payment": ("payments", "business_id"),
+    }
+    source = source_checks.get(milestone_key)
+    if source:
+        source_table, business_field = source
+        source_query = supabase_admin.table(source_table).select("id").eq(business_field, business["id"])
+        if milestone_key == "first_appointment_completed":
+            source_query = source_query.eq("status", "completed")
+        elif milestone_key == "first_successful_workflow":
+            source_query = source_query.eq("status", "completed")
+        elif milestone_key == "first_successful_payment":
+            source_query = source_query.in_("status", ["paid", "succeeded", "successful", "complete", "completed"])
+        elif milestone_key == "first_call_received":
+            source_query = source_query.ilike("direction", "in%")
+        if not source_query.limit(1).execute().data:
+            return {"claimed": False, "reason": "Milestone source has not been verified"}
+
+    titles = {
+        "first_receptionist_hired": "First receptionist hired",
+        "first_staff_member_added": "First staff member added",
+        "first_call_received": "First call received",
+        "first_successful_call": "First successful call",
+        "first_receptionist_booking": "First receptionist booking",
+        "first_person_added": "First person added",
+        "first_appointment_booked": "First appointment booked",
+        "first_appointment_completed": "First appointment completed",
+        "first_scenario_created": "First scenario created",
+        "first_scenario_run": "First scenario run",
+        "first_successful_workflow": "First successful workflow",
+        "first_successful_payment": "First successful payment",
+        "first_invoice_paid": "First invoice paid",
+        "first_repeat_customer": "First repeat customer",
+        "first_automated_booking": "First automated booking",
+        "first_automated_follow_up": "First automated follow-up",
+        "business_setup_completed": "Business setup completed",
+    }
+    claimed = claim_nest_milestone(
+        supabase_admin,
+        business_id=business["id"],
+        user_id=str(current_user.id),
+        milestone_key=milestone_key,
+        title=titles[milestone_key],
+        message=str((payload or {}).get("message") or ""),
+        source_id=(payload or {}).get("source_id"),
+        payload=(payload or {}).get("payload") if isinstance((payload or {}).get("payload"), dict) else {},
+    )
+    return {"claimed": claimed}
 
 
 @app.get("/api/public/project-intelligence", tags=["Public Project Intelligence"])
@@ -9199,6 +9616,15 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
     )
     response = supabase.table("people").insert(insert_payload).execute()
     created = response.data[0] if response.data else insert_payload
+    claim_nest_milestone(
+        supabase,
+        business_id=created.get("business_id") or (business or {}).get("id"),
+        user_id=created.get("user_id") or user_id,
+        milestone_key="first_person_added",
+        title="First person added",
+        message=" ".join(part for part in (created.get("first_name"), created.get("last_name")) if part),
+        source_id=created.get("id"),
+    )
     schedule_backend_scenario_execution("record_created", {
         "record_id": created.get("id"),
         "person_id": created.get("id"),
@@ -9339,6 +9765,156 @@ async def list_sonar_appointments(limit: int = 100, current_user: dict = Depends
     return response.data or []
 
 
+@app.post("/api/sonar/appointments", tags=["Sonar Appointments"])
+async def create_sonar_appointment(payload: dict, current_user: dict = Depends(get_current_user)):
+    business = load_business_by_user_id(str(current_user.id))
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+
+    appointment_date = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
+    appointment_time = normalize_appointment_time_value(first_present(payload, "time", "appointment_time"))
+    appointment_duration = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
+    person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+    requested_staff_id = first_present(payload, "staff_id")
+    staff_id = safe_appointment_staff_id(requested_staff_id, business_id=business["id"], require_active=False)
+    if requested_staff_id is not None and staff_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Staff member not found")
+
+    schedule_valid, schedule_reason, schedule_conflicts = validate_appointment_schedule(
+        business,
+        appointment_date,
+        appointment_time,
+        appointment_duration,
+        staff_id=staff_id,
+    )
+    if not schedule_valid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"reason": schedule_reason, "conflicts": schedule_conflicts},
+        )
+
+    appointment_row = {
+        "date": appointment_date,
+        "time": appointment_time,
+        "duration": appointment_duration,
+        "status": normalize_appointment_status(first_present(payload, "status")),
+        "receptionist_id": int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id")),
+        "notes": first_present(payload, "notes"),
+        "person_id": person_id,
+        "service_id": safe_appointment_service_id(first_present(payload, "service_id")),
+        "staff_id": staff_id,
+        "business_id": business["id"],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if first_present(payload, "source") is not None:
+        appointment_row["source"] = first_present(payload, "source")
+    custom_payload = {
+        key: value for key, value in payload.items()
+        if key == "custom_fields" or str(key).startswith("custom_")
+    }
+    normalized_custom_payload = normalize_appointment_payload_custom_fields(
+        custom_payload,
+        business["id"],
+    )
+    if isinstance(normalized_custom_payload.get("custom_fields"), dict):
+        appointment_row["custom_fields"] = normalized_custom_payload["custom_fields"]
+
+    response = supabase.table("appointments").insert(appointment_row).execute()
+    created = response.data[0] if response.data else appointment_row
+    claim_nest_milestone(
+        supabase,
+        business_id=created.get("business_id") or business.get("id"),
+        user_id=str(current_user.id),
+        milestone_key="first_appointment_booked",
+        title="First appointment booked",
+        message=" · ".join(part for part in (created.get("date"), created.get("time")) if part),
+        source_id=created.get("id"),
+    )
+    appointment_business_id = created.get("business_id") or business.get("id")
+    appointment_status = str(created.get("status") or "").strip().lower()
+    if appointment_status == "completed":
+        claim_nest_milestone(
+            supabase,
+            business_id=appointment_business_id,
+            user_id=str(current_user.id),
+            milestone_key="first_appointment_completed",
+            title="First appointment completed",
+            message=" · ".join(part for part in (created.get("date"), created.get("time")) if part),
+            source_id=created.get("id"),
+        )
+    try:
+        receptionist_id = created.get("receptionist_id")
+        if receptionist_id is not None:
+            receptionist_bookings = (
+                supabase.table("appointments")
+                .select("id")
+                .eq("business_id", appointment_business_id)
+                .eq("receptionist_id", receptionist_id)
+                .limit(2)
+                .execute()
+                .data
+                or []
+            )
+            if len(receptionist_bookings) == 1:
+                claim_nest_milestone(
+                    supabase,
+                    business_id=appointment_business_id,
+                    user_id=str(current_user.id),
+                    milestone_key="first_receptionist_booking",
+                    title="First receptionist booking",
+                    message=" · ".join(part for part in (created.get("date"), created.get("time")) if part),
+                    source_id=created.get("id"),
+                )
+        person_id = created.get("person_id")
+        if person_id is not None:
+            person_appointments = (
+                supabase.table("appointments")
+                .select("id")
+                .eq("business_id", appointment_business_id)
+                .eq("person_id", person_id)
+                .limit(2)
+                .execute()
+                .data
+                or []
+            )
+            if len(person_appointments) == 2:
+                claim_nest_milestone(
+                    supabase,
+                    business_id=appointment_business_id,
+                    user_id=str(current_user.id),
+                    milestone_key="first_repeat_customer",
+                    title="First repeat customer",
+                    message=str(person_id),
+                    source_id=created.get("id"),
+                )
+        appointment_source = str(created.get("source") or "").strip().lower()
+        if appointment_source in {"scenario", "automation", "automated", "workflow"}:
+            claim_nest_milestone(
+                supabase,
+                business_id=appointment_business_id,
+                user_id=str(current_user.id),
+                milestone_key="first_automated_booking",
+                title="First automated booking",
+                message=" · ".join(part for part in (created.get("date"), created.get("time")) if part),
+                source_id=created.get("id"),
+            )
+    except Exception as exc:
+        logging.warning("Nest appointment milestone checks skipped: %s", exc)
+    emit_scenario_trigger(
+        "appointment_created",
+        {
+            "appointment": created,
+            "appointment_id": created.get("id"),
+            "person_id": created.get("person_id"),
+            "service_id": created.get("service_id"),
+            "staff_id": created.get("staff_id"),
+            "business_id": business["id"],
+        },
+    )
+    emit_appointment_change_triggers(None, created, business_id=business["id"], include_updated=False)
+    return created
+
+
 @app.put("/api/sonar/appointments/{appointment_id}", tags=["Sonar Appointments"])
 async def update_sonar_appointment(appointment_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
     appointment_id = uuid_or_none(appointment_id)
@@ -9382,18 +9958,58 @@ async def update_sonar_appointment(appointment_id: str, payload: dict, current_u
         )
         if safe_staff_id is not None:
             updates["staff_id"] = safe_staff_id
+    custom_payload = {
+        key: value for key, value in payload.items()
+        if key == "custom_fields" or str(key).startswith("custom_")
+    }
+    normalized_custom_payload = normalize_appointment_payload_custom_fields(
+        custom_payload,
+        (business or {}).get("id") or existing_response.data[0].get("business_id"),
+        existing_response.data[0].get("custom_fields"),
+    )
+    if isinstance(normalized_custom_payload.get("custom_fields"), dict):
+        updates["custom_fields"] = normalized_custom_payload["custom_fields"]
     if not updates:
         return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
 
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     response = supabase.table("appointments").update(updates).eq("id", appointment_id).execute()
     updated = response.data[0] if response.data else {**existing_response.data[0], **updates}
+    if str(updated.get("status") or "").strip().lower() == "completed":
+        claim_nest_milestone(
+            supabase,
+            business_id=updated.get("business_id") or (business or {}).get("id"),
+            user_id=str(current_user.id),
+            milestone_key="first_appointment_completed",
+            title="First appointment completed",
+            message=" · ".join(part for part in (updated.get("date"), updated.get("time")) if part),
+            source_id=updated.get("id") or appointment_id,
+        )
     emit_appointment_change_triggers(
         existing_response.data[0],
         updated,
         business_id=updated.get("business_id") or (business or {}).get("id"),
     )
     return updated
+
+
+@app.delete("/api/sonar/appointments/{appointment_id}", tags=["Sonar Appointments"])
+async def delete_sonar_appointment(appointment_id: str, current_user: dict = Depends(get_current_user)):
+    appointment_id = uuid_or_none(appointment_id)
+    if not appointment_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid appointment ID")
+
+    business = load_business_by_user_id(str(current_user.id))
+    query = supabase.table("appointments").select("id").eq("id", appointment_id)
+    if business:
+        query = query.eq("business_id", business["id"])
+    existing_response = query.limit(1).execute()
+    if not existing_response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    supabase.table("appointments").delete().eq("id", appointment_id).execute()
+    return {"ok": True, "id": appointment_id, "action": "delete_appointment"}
+
 
 @app.get("/api/sonar/appointments/stats", tags=["Sonar Appointments"])
 async def get_sonar_appointment_stats(current_user: dict = Depends(get_current_user)):
@@ -9541,6 +10157,15 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
             }
         response = supabase.table("hired_receptionists").insert(insert_payload).execute()
         created = response.data[0] if response.data else insert_payload
+        claim_nest_milestone(
+            supabase,
+            business_id=created.get("business_id") or (business_row or {}).get("id"),
+            user_id=created.get("user_id") or current_user_id,
+            milestone_key="first_receptionist_hired",
+            title="First receptionist hired",
+            message=created.get("full_name") or created.get("first_name") or "",
+            source_id=created.get("id"),
+        )
         push_live_event(
             "Agent hired.",
             actor="system",

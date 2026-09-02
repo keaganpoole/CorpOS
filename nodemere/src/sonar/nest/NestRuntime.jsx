@@ -8,6 +8,7 @@ import {
   getDailyNestQuote,
   getNestConcept,
 } from './nestRegistry';
+import { DEFAULT_NEST_PREFERENCES, normalizeNestPreferences } from './nestPreferences';
 
 const NestContext = createContext(null);
 const MAX_HISTORY = 50;
@@ -73,9 +74,6 @@ const normalizeRealtimePayload = (table, payload, history = []) => {
   const row = payload?.new || {};
   const old = payload?.old || {};
   const change = payload?.eventType || payload?.event || 'UPDATE';
-  const alreadyHadCategory = (category) => history.some((event) => event.category === category);
-  const alreadyHadEvent = (eventType) => history.some((event) => event.event_type === eventType);
-
   if (table === 'appointments') {
     const nextStatus = normalizeStatus(row);
     const oldStatus = normalizeStatus(old);
@@ -83,9 +81,8 @@ const normalizeRealtimePayload = (table, payload, history = []) => {
     let title = 'Appointment updated';
     let priority = 'routine';
     if (change === 'INSERT') {
-      type = alreadyHadCategory('appointments') ? 'appointment_booked' : 'first_appointment';
-      title = type === 'first_appointment' ? 'First appointment booked' : 'Appointment booked';
-      priority = type === 'first_appointment' ? 'major' : 'routine';
+      type = 'appointment_booked';
+      title = 'Appointment booked';
     } else if (['cancelled', 'canceled'].includes(nextStatus) && nextStatus !== oldStatus) {
       type = 'appointment_cancelled';
       title = 'Appointment cancelled';
@@ -101,18 +98,19 @@ const normalizeRealtimePayload = (table, payload, history = []) => {
       title = 'Appointment rescheduled';
     }
     return {
-      id: eventId(table, row, type), category: type === 'first_appointment' ? 'milestones' : 'appointments',
+      id: eventId(table, row, type), source: table, source_id: row.id || null,
+      milestone_key: change === 'INSERT' ? 'first_appointment_booked' : type === 'appointment_completed' ? 'first_appointment_completed' : null,
+      category: 'appointments',
       event_type: type, title, message: formatAppointmentWhen(row), priority, occurred_at: eventStamp(row), payload: row,
     };
   }
 
   if (table === 'people' && change === 'INSERT') {
-    const first = !alreadyHadCategory('people');
     return {
-      id: eventId(table, row, first ? 'first_person' : 'person_added'),
-      category: first ? 'milestones' : 'people', event_type: first ? 'first_person' : 'person_added',
-      title: first ? 'First person added' : 'New person added', message: displayName(row),
-      priority: first ? 'major' : 'routine', occurred_at: eventStamp(row), payload: row,
+      id: eventId(table, row, 'person_added'), source: table, source_id: row.id || null, milestone_key: 'first_person_added',
+      category: 'people', event_type: 'person_added',
+      title: 'New person added', message: displayName(row),
+      priority: 'routine', occurred_at: eventStamp(row), payload: row,
     };
   }
 
@@ -122,7 +120,8 @@ const normalizeRealtimePayload = (table, payload, history = []) => {
     if (status === oldStatus && change !== 'INSERT') return null;
     if (PAYMENT_SUCCESS.has(status)) {
       return {
-        id: eventId(table, row, 'payment_received'), category: 'payments', event_type: 'payment_received',
+        id: eventId(table, row, 'payment_received'), source: table, source_id: row.id || null,
+        milestone_key: 'first_successful_payment', category: 'payments', event_type: 'payment_received',
         title: 'Payment received', message: formatAmount(row), priority: 'major', occurred_at: eventStamp(row), payload: row,
       };
     }
@@ -135,17 +134,16 @@ const normalizeRealtimePayload = (table, payload, history = []) => {
   }
 
   if (table === 'hired_receptionists' && change === 'INSERT') {
-    const first = !alreadyHadEvent('receptionist_hired');
     return {
-      id: eventId(table, row, 'receptionist_hired'), category: 'milestones', event_type: 'receptionist_hired',
-      title: first ? 'First receptionist hired' : 'Receptionist hired', message: row.name || row.receptionist_name || 'Your front desk is growing',
-      priority: first ? 'major' : 'routine', occurred_at: eventStamp(row), payload: row,
+      id: eventId(table, row, 'receptionist_hired'), source: table, source_id: row.id || null, milestone_key: 'first_receptionist_hired', category: 'milestones', event_type: 'receptionist_hired',
+      title: 'Receptionist hired', message: row.name || row.receptionist_name || 'Your front desk is growing',
+      priority: 'routine', occurred_at: eventStamp(row), payload: row,
     };
   }
 
-  if (table === 'nest_events' && change === 'INSERT') {
+  if (table === 'nest' && change === 'INSERT') {
     return {
-      id: row.id || eventId(table, row, row.event_type || 'workflow_event'),
+      id: row.id || eventId(table, row, row.event_type || 'workflow_event'), source: 'nest', source_id: row.source_id || null,
       category: row.category || 'workflows', event_type: row.event_type || 'workflow_event',
       title: row.title || 'Workflow activity', message: row.message || '',
       priority: row.priority || 'routine', occurred_at: row.occurred_at || eventStamp(row), payload: row.payload || row,
@@ -186,10 +184,17 @@ const callLifecycleEvent = (call, status) => {
   const name = displayName(row) || call?.name || (direction.startsWith('out') ? 'Outgoing call' : 'Incoming call');
   const failed = status === 'failed';
   const missed = ['missed', 'busy', 'no-answer', 'no_answer'].includes(status);
+  const inbound = direction.startsWith('in');
+  const milestoneKeys = [
+    ...(inbound ? ['first_call_received'] : []),
+    ...(!failed && !missed && status === 'completed' ? ['first_successful_call'] : []),
+  ];
   return {
     id: eventId('call_logs', row, failed ? 'call_failed' : missed ? 'call_missed' : 'call_completed'),
     category: failed ? 'warnings' : 'calls',
     event_type: failed ? 'call_failed' : missed ? 'call_missed' : 'call_completed',
+    direction: direction.startsWith('out') ? 'outbound' : direction.startsWith('in') ? 'inbound' : 'unknown',
+    source: 'call_logs', source_id: row.id || null, milestone_keys: milestoneKeys,
     title: failed ? 'Call needs attention' : missed ? 'Call missed' : 'Call completed',
     message: name,
     priority: failed ? 'critical' : missed ? 'major' : 'routine',
@@ -214,6 +219,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     ...DEFAULT_NEST_CONCEPTS,
     ...safeJsonParse(localStorage.getItem('nodemere:nest:concepts'), {}),
   }));
+  const [nestPreferences, setNestPreferences] = useState(DEFAULT_NEST_PREFERENCES);
   const historyRef = useRef([]);
   const activeRef = useRef(null);
   const seenRef = useRef(new Set());
@@ -226,6 +232,21 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
 
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { activeRef.current = activeEvent; }, [activeEvent]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return undefined;
+    let cancelled = false;
+    supabase.from('account_settings').select('preferences').eq('user_id', session.user.id).limit(1).maybeSingle()
+      .then(({ data, error }) => {
+        if (!cancelled && !error) setNestPreferences(normalizeNestPreferences(data?.preferences?.nest));
+      });
+    const channel = supabase.channel(`nest-preferences-${session.user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'account_settings', filter: `user_id=eq.${session.user.id}` }, (payload) => {
+        setNestPreferences(normalizeNestPreferences(payload?.new?.preferences?.nest));
+      })
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [session?.user?.id]);
 
   const persistHistory = useCallback((events) => {
     try { localStorage.setItem(historyStorageKey, JSON.stringify(events.slice(0, MAX_HISTORY))); } catch { /* storage is optional */ }
@@ -240,6 +261,10 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   }, [persistHistory]);
 
   const enqueue = useCallback((incoming, { preview = false } = {}) => {
+    const categoryEnabled = nestPreferences.enabled !== false
+      && nestPreferences.categories?.[incoming?.category] !== false;
+    const notificationKey = incoming?.milestone_key || incoming?.event_type;
+    if (!preview && (!categoryEnabled || nestPreferences.notifications?.[notificationKey] === false)) return;
     if (!incoming?.id || (!preview && seenRef.current.has(incoming.id))) return;
     const event = {
       priority: 'routine',
@@ -253,6 +278,13 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     }
 
     const currentActive = activeRef.current;
+    if (event.source === 'nest' && event.source_id) {
+      setQueue((current) => current.filter((queued) => queued.source_id !== event.source_id));
+      if (currentActive?.source_id === event.source_id && currentActive.source !== 'nest') {
+        setActiveEvent(event);
+        return;
+      }
+    }
     if (event.priority === 'critical' && currentActive && PRIORITY[currentActive.priority] < PRIORITY.critical) {
       setQueue((current) => [currentActive, ...current]);
       setActiveEvent(event);
@@ -266,7 +298,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       const next = [...current, event];
       return next.sort((a, b) => PRIORITY[b.priority] - PRIORITY[a.priority]);
     });
-  }, [addToHistory]);
+  }, [addToHistory, nestPreferences]);
 
   const previewConcept = useCallback((concept, category) => {
     const categoryDefinition = category;
@@ -335,7 +367,15 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     if (!businessId || !session?.access_token) return undefined;
     const handle = (table) => (payload) => {
       const normalized = normalizeRealtimePayload(table, payload, historyRef.current);
-      if (normalized) enqueue(normalized);
+      if (!normalized) return;
+      const milestoneKeys = normalized.milestone_keys || (normalized.milestone_key ? [normalized.milestone_key] : []);
+      const alreadyClaimed = milestoneKeys.length > 0 && normalized.source_id
+        && historyRef.current.some((event) => (
+          event.source === 'nest'
+          && event.source_id === String(normalized.source_id)
+          && milestoneKeys.includes(event.event_type)
+        ));
+      if (!alreadyClaimed) enqueue(normalized);
     };
     let channel = supabase.channel(`nest-live-${businessId}-${session.user?.id || 'user'}`);
     channel = channel
@@ -344,7 +384,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments', filter: `business_id=eq.${businessId}` }, handle('payments'))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'hired_receptionists', filter: `business_id=eq.${businessId}` }, handle('hired_receptionists'))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'businesses', filter: `id=eq.${businessId}` }, handle('businesses'))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'nest_events', filter: `business_id=eq.${businessId}` }, handle('nest_events'))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'nest', filter: `business_id=eq.${businessId}` }, handle('nest'))
       .subscribe((status, error) => {
         if (error) console.warn('[Nest] Realtime subscription error:', error);
         else if (status === 'SUBSCRIBED') console.info('[Nest] Realtime connected');
@@ -371,7 +411,10 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     }
 
     const activeCall = (calls || []).find((call) => ACTIVE_CALL_STATUSES.has(normalizeStatus(callRow(call))));
-    if (!activeCall) {
+    const callsEnabled = nestPreferences.enabled !== false
+      && nestPreferences.categories?.calls !== false
+      && nestPreferences.notifications?.call_active !== false;
+    if (!activeCall || !callsEnabled) {
       setLiveCall(null);
       return;
     }
@@ -381,6 +424,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       id: `live-call:${activeCall.id}`,
       category: 'calls',
       event_type: 'call_active',
+      direction: direction.startsWith('out') ? 'outbound' : direction.startsWith('in') ? 'inbound' : 'unknown',
       title: direction.startsWith('out') ? 'Outgoing call' : 'Call in progress',
       message: displayName(row) || activeCall.name || (direction.startsWith('out') ? 'Connecting' : 'Live now'),
       priority: 'routine',
@@ -388,7 +432,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       occurred_at: row.started_at || row.created_at || new Date().toISOString(),
       payload: row,
     });
-  }, [calls, callsLoading, enqueue]);
+  }, [calls, callsLoading, enqueue, nestPreferences]);
 
   useEffect(() => {
     if (!tasklistState || typeof tasklistState !== 'object') return;
@@ -401,6 +445,16 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     if (tasklistBaselineRef.current === null) {
       tasklistBaselineRef.current = completed;
       return;
+    }
+    const previouslyComplete = Object.values(tasklistBaselineRef.current).length > 0
+      && tasklistBaselineRef.current.size === completed.size
+      && [...completed].every((key) => tasklistBaselineRef.current.has(key));
+    const setupComplete = Object.values(tasklistState).length > 0
+      && Object.values(tasklistState).every((task) => task?.completed === true);
+    if (setupComplete && !previouslyComplete) {
+      api.claimNestMilestone('business_setup_completed').catch((error) => {
+        console.warn('[Nest] Failed to claim setup milestone:', error);
+      });
     }
     completed.forEach((key) => {
       if (!tasklistBaselineRef.current.has(key)) {

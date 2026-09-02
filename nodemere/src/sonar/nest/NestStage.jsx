@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
-  BadgeDollarSign, CalendarCheck, Check, PhoneIncoming, Quote,
+  ArrowDown, ArrowUp, ArrowUpDown, BadgeDollarSign, CalendarCheck, Check, PhoneIncoming, Quote,
   Route, Sparkles, TriangleAlert, UserPlus,
 } from 'lucide-react';
 
@@ -20,6 +20,31 @@ const PRIVATE_MESSAGES = {
 const SUBJECTS = {
   calls: 'Live call', appointments: 'Calendar', people: 'People', payments: 'Payment',
   workflows: 'Workflow', warnings: 'Warning', milestones: 'New milestone', messages: 'Message',
+};
+
+const normalizeCallDirection = (event) => {
+  const payload = event?.payload && typeof event.payload === 'object' ? event.payload : {};
+  const raw = String(
+    event?.direction
+      || payload.direction
+      || payload.call_direction
+      || payload.conversation_metadata?.phone_call?.direction
+      || payload.conversation_initiation_data?.dynamic_variables?.direction
+      || payload.conversation_initiation_data?.dynamic_variables?.call_direction
+      || '',
+  ).trim().toLowerCase();
+  if (raw.includes('out')) return 'outbound';
+  if (raw.includes('in')) return 'inbound';
+  return 'unknown';
+};
+
+const iconForEvent = (event) => {
+  if (event?.category !== 'calls') return ICONS[event?.category] || Check;
+  const direction = normalizeCallDirection(event);
+  if (direction === 'inbound') return ArrowDown;
+  if (direction === 'outbound') return ArrowUp;
+  if (event?.event_type === 'call_transferred') return ArrowUpDown;
+  return PhoneIncoming;
 };
 
 const formatElapsed = (startedAt, now) => {
@@ -146,7 +171,7 @@ export default function NestStage({ event, concept, privacyMode = false, compact
   // restart the full terminal text.
   const [showIntro, setShowIntro] = useState(() => !introStarted);
   const introPlayedRef = useRef(introStarted);
-  const Icon = ICONS[event?.category] || Check;
+  const Icon = iconForEvent(event);
   const transition = { duration: reducedMotion ? 0.01 : 0.62, ease: [0.22, 1, 0.36, 1] };
   const reelTransition = rolled
     ? { duration: reducedMotion ? 0.01 : 0.72, ease: [0.22, 1, 0.36, 1] }

@@ -4,7 +4,12 @@
 
 create extension if not exists pgcrypto;
 
-create table if not exists public.nest_events (
+-- Call direction is needed for the Nest inbound/outbound visual treatment.
+-- Keep this safe for installations where call_logs already exists.
+alter table if exists public.call_logs
+  add column if not exists direction text null;
+
+create table if not exists public.nest (
   id uuid primary key default gen_random_uuid(),
   business_id bigint not null references public.businesses(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -21,14 +26,14 @@ create table if not exists public.nest_events (
   unique (business_id, idempotency_key)
 );
 
-create index if not exists idx_nest_events_business_occurred
-  on public.nest_events (business_id, occurred_at desc);
+create index if not exists idx_nest_business_occurred
+  on public.nest (business_id, occurred_at desc);
 
-alter table public.nest_events enable row level security;
+alter table public.nest enable row level security;
 
-drop policy if exists "Users can read their Nest events" on public.nest_events;
+drop policy if exists "Users can read their Nest events" on public.nest;
 create policy "Users can read their Nest events"
-  on public.nest_events
+  on public.nest
   for select
   to authenticated
   using (user_id = auth.uid());
@@ -40,8 +45,8 @@ begin
     from pg_publication_tables
     where pubname = 'supabase_realtime'
       and schemaname = 'public'
-      and tablename = 'nest_events'
+      and tablename = 'nest'
   ) then
-    alter publication supabase_realtime add table public.nest_events;
+    alter publication supabase_realtime add table public.nest;
   end if;
 end $$;
