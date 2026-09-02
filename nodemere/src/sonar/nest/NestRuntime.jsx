@@ -8,7 +8,7 @@ import {
   getDailyNestQuote,
   getNestConcept,
 } from './nestRegistry';
-import { DEFAULT_NEST_PREFERENCES, normalizeNestPreferences } from './nestPreferences';
+import { DEFAULT_NEST_PREFERENCES, NEST_NOTIFICATION_GROUP_BY_KEY, normalizeNestPreferences } from './nestPreferences';
 
 const NestContext = createContext(null);
 const MAX_HISTORY = 50;
@@ -68,6 +68,55 @@ const durationForEvent = (event) => {
   if (event?.priority === 'critical') return 14000;
   if (event?.priority === 'major') return 9500;
   return 7000;
+};
+
+const previewNotificationFixture = (key, label, category) => {
+  const fixture = {
+    category,
+    event_type: key,
+    title: label,
+    message: 'Test Business',
+    priority: category === 'warnings' ? 'critical' : category === 'milestones' ? 'major' : 'routine',
+    occurred_at: new Date().toISOString(),
+    payload: { preview: true },
+  };
+  const overrides = {
+    call_active: { title: 'Call in progress', message: 'Jordan Lee', direction: 'inbound', payload: { caller_name: 'Jordan Lee', direction: 'inbound', status: 'in-progress' } },
+    call_completed: { title: 'Call completed', message: 'Jordan Lee · 4m 18s', direction: 'inbound', payload: { caller_name: 'Jordan Lee', direction: 'inbound', status: 'completed' } },
+    call_missed: { title: 'Call missed', message: 'Morgan Smith · (207) 555-0148', direction: 'inbound', priority: 'major', payload: { caller_name: 'Morgan Smith', caller_phone: '(207) 555-0148', direction: 'inbound', status: 'missed' } },
+    call_failed: { title: 'Call needs attention', message: 'Taylor Reed · Connection failed', direction: 'inbound', priority: 'critical', payload: { caller_name: 'Taylor Reed', direction: 'inbound', status: 'failed' } },
+    call_transferred: { title: 'Call transferred', message: 'Jordan Lee → Alex Morgan', direction: 'unknown', priority: 'major', payload: { caller_name: 'Jordan Lee', transferred_to: 'Alex Morgan' } },
+    usage_warning: { title: 'Call minutes running low', message: '42 minutes remaining', priority: 'critical', payload: { used_call_seconds: 69480, included_call_seconds: 72000 } },
+    minutes_exhausted: { title: 'Call minutes exhausted', message: 'Review your plan to keep calls running', priority: 'critical', payload: { used_call_seconds: 72000, included_call_seconds: 72000 } },
+    appointment_booked: { title: 'Appointment booked', message: 'Tomorrow · 10:30 AM', payload: { date: 'Tomorrow', time: '10:30 AM', customer_name: 'Alex Morgan' } },
+    appointment_rescheduled: { title: 'Appointment rescheduled', message: 'Friday · 2:00 PM', payload: { date: 'Friday', time: '2:00 PM', customer_name: 'Alex Morgan' } },
+    appointment_cancelled: { title: 'Appointment cancelled', message: 'Alex Morgan · Tomorrow · 10:30 AM', payload: { customer_name: 'Alex Morgan', date: 'Tomorrow', time: '10:30 AM', status: 'cancelled' } },
+    appointment_updated: { title: 'Appointment updated', message: 'Alex Morgan · Tomorrow · 10:30 AM', payload: { customer_name: 'Alex Morgan', date: 'Tomorrow', time: '10:30 AM' } },
+    appointment_completed: { title: 'Appointment completed', message: 'Alex Morgan · Today · 9:00 AM', payload: { customer_name: 'Alex Morgan', date: 'Today', time: '9:00 AM', status: 'completed' } },
+    appointment_missed: { title: 'Appointment missed', message: 'Alex Morgan · Today · 9:00 AM', priority: 'major', payload: { customer_name: 'Alex Morgan', date: 'Today', time: '9:00 AM', status: 'missed' } },
+    person_added: { title: 'New person added', message: 'Alex Morgan', payload: { first_name: 'Alex', last_name: 'Morgan', phone: '(207) 555-0182' } },
+    person_updated: { title: 'Person record updated', message: 'Alex Morgan', payload: { first_name: 'Alex', last_name: 'Morgan' } },
+    first_repeat_customer: { title: 'Returning customer recognized', message: 'Alex Morgan booked again', category: 'milestones', priority: 'major' },
+    receptionist_hired: { title: 'Receptionist hired', message: 'Maya is ready to help', payload: { name: 'Maya' } },
+    receptionist_activated: { title: 'Receptionist activated', message: 'Maya is live', payload: { name: 'Maya' } },
+    first_staff_member_added: { title: 'First staff member added', message: 'Alex Morgan', category: 'milestones', priority: 'major' },
+    staff_availability_missing: { title: 'Staff availability missing', message: 'Add working hours before booking', category: 'warnings', priority: 'major' },
+    no_staff_available: { title: 'No staff available for booking', message: 'No available staff matched this appointment', category: 'warnings', priority: 'major' },
+    scenario_created: { title: 'Scenario created', message: 'Appointment follow-up', category: 'workflows' },
+    scenario_run: { title: 'Scenario run', message: 'Appointment follow-up', category: 'workflows' },
+    workflow_completed: { title: 'Workflow completed', message: 'Appointment follow-up', category: 'workflows' },
+    workflow_failed: { title: 'Workflow failed', message: 'Appointment follow-up · Needs attention', category: 'warnings', priority: 'critical' },
+    scenario_configuration_needed: { title: 'Scenario needs configuration', message: 'Connect a calendar to continue', category: 'warnings', priority: 'major' },
+    payment_received: { title: 'Payment received', message: '$420.00', payload: { amount: 420, currency: 'USD', status: 'paid' } },
+    payment_failed: { title: 'Payment failed', message: '$420.00 · Card declined', category: 'warnings', priority: 'critical', payload: { amount: 420, currency: 'USD', status: 'failed' } },
+    payment_refunded: { title: 'Payment refunded', message: '$120.00 returned to Alex Morgan', category: 'payments', priority: 'major' },
+    invoice_created: { title: 'Invoice created', message: 'INV-1042 · $850.00', category: 'payments' },
+    invoice_paid: { title: 'Invoice paid', message: 'INV-1042 · $850.00', category: 'payments', priority: 'major' },
+    invoice_overdue: { title: 'Invoice overdue', message: 'INV-1042 · $850.00', category: 'warnings', priority: 'major' },
+    revenue_milestone: { title: 'Revenue milestone reached', message: '$10,000 in revenue', category: 'milestones', priority: 'major' },
+    daily_quote: { title: getDailyNestQuote(new Date()), message: '', category: 'messages' },
+  };
+  return { ...fixture, ...(overrides[key] || {}) };
 };
 
 const normalizeRealtimePayload = (table, payload, history = []) => {
@@ -261,9 +310,11 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   }, [persistHistory]);
 
   const enqueue = useCallback((incoming, { preview = false } = {}) => {
-    const categoryEnabled = nestPreferences.enabled !== false
-      && nestPreferences.categories?.[incoming?.category] !== false;
     const notificationKey = incoming?.milestone_key || incoming?.event_type;
+    const preferenceGroup = NEST_NOTIFICATION_GROUP_BY_KEY[notificationKey] || incoming?.category;
+    const categoryEnabled = nestPreferences.enabled !== false
+      && nestPreferences.categories?.[preferenceGroup] !== false;
+    if (!preview && incoming?.category === 'workflows' && incoming?.event_type !== 'workflow_failed') return;
     if (!preview && (!categoryEnabled || nestPreferences.notifications?.[notificationKey] === false)) return;
     if (!incoming?.id || (!preview && seenRef.current.has(incoming.id))) return;
     const event = {
@@ -318,6 +369,18 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     // Studio previews are an independent visual layer: they replace the Nest
     // immediately without entering history or interrupting real event queueing.
     if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
+    setPreviewEvent(event);
+    previewTimerRef.current = window.setTimeout(() => setPreviewEvent(null), event.duration_ms);
+  }, []);
+
+  const previewNotification = useCallback(({ key, label, category }) => {
+    if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
+    const event = {
+      id: `preview:notification:${key}:${Date.now()}`,
+      ...previewNotificationFixture(key, label, category),
+      duration_ms: 7600,
+      preview: true,
+    };
     setPreviewEvent(event);
     previewTimerRef.current = window.setTimeout(() => setPreviewEvent(null), event.duration_ms);
   }, []);
@@ -546,7 +609,8 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     selectedConcepts,
     selectConcept,
     previewConcept,
-  }), [activeEvent, displayEvent, displayConcept, history, historyOpen, introStarted, liveCall, markIntroStarted, previewConcept, previewEvent, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy]);
+    previewNotification,
+  }), [activeEvent, displayEvent, displayConcept, history, historyOpen, introStarted, liveCall, markIntroStarted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy]);
 
   return <NestContext.Provider value={value}>{children}</NestContext.Provider>;
 };

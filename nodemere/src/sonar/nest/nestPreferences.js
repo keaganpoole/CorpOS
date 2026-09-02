@@ -38,8 +38,7 @@ export const NEST_NOTIFICATION_GROUPS = [
   {
     key: 'workflows', label: 'Scenarios & automations', icon: Workflow, description: 'Scenario activity, outcomes, and failures.',
     notifications: [
-      ['scenario_created', 'Scenario created'], ['scenario_run', 'Scenario run'], ['workflow_completed', 'Workflow completed'],
-      ['workflow_failed', 'Workflow failed'], ['scenario_configuration_needed', 'Scenario needs configuration'],
+      ['workflow_failed', 'Scenario failed'],
     ],
   },
   {
@@ -56,8 +55,7 @@ export const NEST_NOTIFICATION_GROUPS = [
       ['first_receptionist_hired', 'First receptionist hired'], ['first_staff_member_added', 'First staff member added'],
       ['first_call_received', 'First call received'], ['first_successful_call', 'First successful call'],
       ['first_person_added', 'First person added'], ['first_appointment_booked', 'First appointment booked'],
-      ['first_appointment_completed', 'First appointment completed'], ['first_scenario_created', 'First scenario created'],
-      ['first_scenario_run', 'First scenario run'], ['first_successful_workflow', 'First successful workflow'],
+      ['first_appointment_completed', 'First appointment completed'],
       ['first_successful_payment', 'First successful payment'], ['first_receptionist_booking', 'First receptionist booking'],
       ['first_repeat_customer', 'First repeat customer'], ['first_automated_booking', 'First automated booking'],
       ['business_setup_completed', 'Business setup completed'],
@@ -87,6 +85,10 @@ export const DEFAULT_NEST_PREFERENCES = {
     NEST_NOTIFICATION_GROUPS.flatMap(({ notifications }) => notifications.map(({ key }) => [key, true]))
   ),
 };
+
+export const NEST_NOTIFICATION_GROUP_BY_KEY = Object.fromEntries(
+  NEST_NOTIFICATION_GROUPS.flatMap(({ key: groupKey, notifications }) => notifications.map(({ key }) => [key, groupKey]))
+);
 
 export const normalizeNestPreferences = (value = {}) => ({
   ...DEFAULT_NEST_PREFERENCES,

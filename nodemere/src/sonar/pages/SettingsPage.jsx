@@ -7,13 +7,14 @@ import {
   Eye, EyeOff, Lightbulb, AlertTriangle, Zap, Star, Info,
   Copy, Download, Layers, Plus, Trash2, Tag, DollarSign,
   ArrowRight, X, MessageSquareText, Users, Maximize2, Wand2,
-  CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil,
+  CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil, Play,
   Loader2, CreditCard, ExternalLink,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../lib/api';
 import { DEFAULT_NEST_PREFERENCES, NEST_NOTIFICATION_GROUPS, normalizeNestPreferences } from '../nest/nestPreferences';
+import { useNest } from '../nest/NestRuntime';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 import CubePreloader from '../components/CubePreloader';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
@@ -3227,6 +3228,7 @@ const BillingSettings = ({ profile }) => {
 
 const SettingsPage = () => {
   const { session: authSession, profile, refreshProfile } = useAuth();
+  const { previewNotification } = useNest();
   const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -3803,11 +3805,22 @@ const SettingsPage = () => {
                               <div className="space-y-1 border-t border-white/[0.04] px-4 py-2">
                                 {group.notifications.map((notification) => (
                                   <div key={notification.key} className="flex items-center justify-between gap-4 rounded-xl px-2 py-2 hover:bg-white/[0.02]">
-                                    <span className="text-[12px] text-zinc-400">{notification.label}</span>
-                                    <Toggle
-                                      value={categoryEnabled && nestPreferences.notifications[notification.key] !== false}
-                                      onChange={(value) => toggleNestNotification(group, notification.key, value)}
-                                    />
+                                    <span className="min-w-0 text-[12px] text-zinc-400">{notification.label}</span>
+                                    <div className="flex shrink-0 items-center gap-3">
+                                      <button
+                                        type="button"
+                                        onClick={() => previewNotification({ key: notification.key, label: notification.label, category: group.key })}
+                                        className="flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.08] text-zinc-500 transition-colors hover:border-cyan-400/40 hover:text-cyan-300"
+                                        aria-label={`Preview ${notification.label}`}
+                                        title="Preview notification"
+                                      >
+                                        <Play size={10} fill="currentColor" />
+                                      </button>
+                                      <Toggle
+                                        value={categoryEnabled && nestPreferences.notifications[notification.key] !== false}
+                                        onChange={(value) => toggleNestNotification(group, notification.key, value)}
+                                      />
+                                    </div>
                                   </div>
                                 ))}
                               </div>

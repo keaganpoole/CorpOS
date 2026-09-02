@@ -47,6 +47,8 @@ const iconForEvent = (event) => {
   return PhoneIncoming;
 };
 
+const iconForPartOne = (event) => event?.category === 'calls' ? PhoneIncoming : iconForEvent(event);
+
 const formatElapsed = (startedAt, now) => {
   const started = new Date(startedAt).getTime();
   if (!Number.isFinite(started)) return 'Live now';
@@ -59,37 +61,120 @@ const splitDetail = (value = '') => {
   return { first: parts[0] || '', second: parts.slice(1).join(' · ') };
 };
 
+const payloadForEvent = (event) => event?.payload && typeof event.payload === 'object' ? event.payload : {};
+const eventPerson = (event) => {
+  const payload = payloadForEvent(event);
+  return [payload.first_name, payload.last_name].filter(Boolean).join(' ').trim()
+    || payload.name || payload.caller_name || payload.customer_name || '';
+};
+const eventContact = (event) => payloadForEvent(event).phone || payloadForEvent(event).email || '';
+const eventDirection = (event) => {
+  const direction = normalizeCallDirection(event);
+  return direction === 'inbound' ? 'Inbound call' : direction === 'outbound' ? 'Outbound call' : '';
+};
+const milestoneContext = (event, safeMessage) => {
+  if (safeMessage && safeMessage !== 'Test Business') return safeMessage;
+  const fallback = {
+    first_receptionist_hired: 'Your AI front desk is ready to help',
+    first_staff_member_added: 'Your team is ready for bookings',
+    first_call_received: 'Your front desk answered its first call',
+    first_successful_call: 'Your front desk completed its first successful call',
+    first_person_added: 'Your customer records are underway',
+    first_appointment_booked: 'Your calendar is ready for business',
+    first_appointment_completed: 'Your first customer appointment is complete',
+    first_scenario_created: 'Your first automation is ready to run',
+    first_scenario_run: 'Your first automation has run',
+    first_successful_workflow: 'Your automation completed its first successful outcome',
+    first_successful_payment: 'Your business has started collecting payments',
+    first_receptionist_booking: 'Your receptionist booked its first appointment',
+    first_repeat_customer: 'A customer has returned to your business',
+    first_automated_booking: 'Your automation booked an appointment',
+    business_setup_completed: 'Your business is ready for the next step',
+  };
+  return fallback[event?.event_type] || 'Business progress recorded';
+};
+
+const outcomeForEvent = (event) => ({
+  call_active: 'Live now', call_completed: 'Completed', call_missed: 'Missed', call_failed: 'Failed', call_transferred: 'Transferred',
+  usage_warning: 'Warning', minutes_exhausted: 'Exhausted',
+  appointment_booked: 'Booked', appointment_rescheduled: 'Rescheduled', appointment_cancelled: 'Cancelled',
+  appointment_updated: 'Updated', appointment_completed: 'Completed', appointment_missed: 'Missed',
+  person_added: 'Added', person_updated: 'Updated',
+  payment_received: 'Received', payment_failed: 'Failed', payment_refunded: 'Refunded',
+  invoice_created: 'Created', invoice_paid: 'Paid', invoice_overdue: 'Overdue',
+  workflow_failed: 'Failed', scenario_configuration_needed: 'Needs setup',
+  several_missed_calls: 'Missed calls', several_failed_calls: 'Failed calls', integration_failure: 'Failed',
+  no_receptionist_available: 'Unavailable', no_staff_available: 'Unavailable', staff_availability_missing: 'Needs setup',
+  no_activity: 'No activity',
+  business_setup_completed: 'Setup complete',
+  daily_quote: 'Today',
+}[event?.event_type] || (event?.category === 'milestones' ? 'Milestone reached' : 'Updated'));
+
+const duplicateKey = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+const removeRepeatedDetails = (content, event) => {
+  const primary = String(content.primary || '').trim();
+  const secondary = String(content.secondary || '').trim();
+  const metric = String(content.metric || '').trim();
+  const blocked = new Set([duplicateKey(primary), duplicateKey(event?.title)]);
+  const uniqueSecondary = secondary && !blocked.has(duplicateKey(secondary)) ? content.secondary : '';
+  const metricKey = duplicateKey(metric);
+  return {
+    ...content,
+    secondary: uniqueSecondary,
+    metric: metric && !blocked.has(metricKey) && metricKey !== duplicateKey(uniqueSecondary) ? content.metric : '',
+  };
+};
+
 const contentForEvent = (event, now, privacyMode) => {
   const category = event.category;
+  const payload = payloadForEvent(event);
   const safeMessage = privacyMode ? PRIVATE_MESSAGES[category] : (event.message || '');
   const elapsed = event.persistent ? formatElapsed(event.occurred_at, now) : '';
   const detail = splitDetail(safeMessage);
+  const person = privacyMode ? '' : eventPerson(event);
+  const contact = privacyMode ? '' : eventContact(event);
+  const direction = privacyMode ? '' : eventDirection(event);
+  const appointmentWhen = [payload.date, payload.time].filter(Boolean).join(' · ');
 
-  switch (category) {
+  const content = (() => { switch (category) {
     case 'calls':
-      return { eyebrow: event.persistent ? 'Live call' : 'Call activity', primary: safeMessage || event.title, secondary: event.title, metric: elapsed };
+      return { eyebrow: event.persistent ? 'Live call' : 'Call activity', primary: safeMessage || person || 'Call activity', secondary: direction || 'Call update', metric: elapsed || outcomeForEvent(event) };
     case 'appointments':
-      return { eyebrow: 'Calendar', primary: detail.first || event.title, secondary: event.title, metric: detail.second };
+      return { eyebrow: 'Appointment', primary: person || detail.first || 'Customer appointment', secondary: appointmentWhen || (person ? detail.second : 'Scheduled appointment'), metric: outcomeForEvent(event) };
     case 'people':
-      return { eyebrow: 'People', primary: safeMessage || event.title, secondary: event.title, metric: '' };
+      return {
+        eyebrow: 'Customer',
+        primary: person || (event.event_type === 'person_updated' ? 'Customer record' : safeMessage || 'Customer record'),
+        secondary: contact || (event.event_type === 'person_updated' ? 'Contact information changed' : 'Details updated'),
+        metric: outcomeForEvent(event),
+      };
     case 'payments':
-      return { eyebrow: 'Payment', primary: safeMessage || event.title, secondary: event.title, metric: 'Received' };
+      return { eyebrow: 'Payment', primary: safeMessage || 'Payment update', secondary: person || 'Business payment', metric: outcomeForEvent(event) };
     case 'workflows':
-      return { eyebrow: 'Workflow', primary: safeMessage || event.title, secondary: event.title, metric: 'Complete' };
+      return { eyebrow: 'Automation', primary: safeMessage || 'Scenario failure', secondary: 'Scenario needs attention', metric: 'Review scenario' };
     case 'warnings':
-      return { eyebrow: 'Attention', primary: event.title, secondary: safeMessage, metric: safeMessage };
+      {
+        const warningDetail = splitDetail(safeMessage);
+        return {
+          eyebrow: 'Attention',
+          primary: warningDetail.first || 'Review this issue',
+          secondary: warningDetail.second || person || 'Review in dashboard',
+          metric: event.payload?.next_step || event.payload?.action || outcomeForEvent(event),
+        };
+      }
     case 'milestones':
-      return { eyebrow: 'Milestone', primary: event.title, secondary: safeMessage, metric: '' };
+      return { eyebrow: 'Milestone', primary: milestoneContext(event, safeMessage), secondary: 'Business progress', metric: outcomeForEvent(event) };
     case 'messages':
-      return { eyebrow: 'For today', primary: event.title, secondary: safeMessage, metric: '' };
+      return { eyebrow: 'For today', primary: safeMessage || 'A small step toward steady progress', secondary: event.event_type === 'daily_quote' ? 'Daily business quote' : 'Progress message', metric: outcomeForEvent(event) };
     default:
       return { eyebrow: 'Nest', primary: event.title, secondary: safeMessage, metric: '' };
-  }
+  } })();
+  return removeRepeatedDetails(content, event);
 };
 
 const subjectForEvent = (event) => ({
-  eyebrow: '',
-  primary: SUBJECTS[event.category] || 'Nest',
+  eyebrow: 'Nest notification',
+  primary: event.event_type === 'daily_quote' ? 'Daily business quote or progress message' : event.title || SUBJECTS[event.category] || 'Nest',
   secondary: '',
   metric: '',
 });
@@ -131,18 +216,18 @@ const IntroWord = ({ word, active, reducedMotion }) => (
   </motion.div>
 );
 
-const ContentIcon = ({ Icon, mode, compact, partTwo = false }) => {
+const ContentIcon = ({ Icon, mode, compact, partTwo = false, partOne = false }) => {
   if (mode === 'none') return null;
   return (
-    <span className={`nest-content-icon nest-icon-${mode} ${partTwo ? 'nest-icon-part-two' : ''}`}>
-      <Icon size={compact ? 13 : 17} strokeWidth={1.6} />
+    <span className={`nest-content-icon nest-icon-${mode} ${partTwo ? 'nest-icon-part-two' : ''} ${partOne ? 'nest-icon-part-one' : ''}`}>
+      <Icon size={partOne ? (compact ? 16 : 22) : (compact ? 13 : 17)} strokeWidth={1.6} />
     </span>
   );
 };
 
 const ReelPart = ({ event, content, Icon, compact, part }) => (
   <div className={`nest-content nest-reel-content nest-layout-${part === 1 ? 'return' : 'pivot'} nest-density-spacious nest-footprint-${part === 1 ? 'full' : 'medium'} nest-placement-center`}>
-      <ContentIcon Icon={Icon} mode={part === 1 ? 'none' : 'transform'} compact={compact} partTwo={part === 2} />
+      <ContentIcon Icon={part === 1 ? iconForPartOne(event) : Icon} mode="transform" compact={compact} partOne={part === 1} partTwo={part === 2} />
       <div className="nest-content-copy">
         <span className="nest-content-eyebrow">{content.eyebrow}</span>
         <span className="nest-content-primary">{content.primary}</span>

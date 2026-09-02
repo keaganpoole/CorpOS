@@ -73,14 +73,23 @@
 .nest-icon-transform { width: 20px; }
 .nest-icon-status { width: 19px; }
 .nest-icon-part-two { animation: nest-part-two-icon-settle 3.6s ease-in-out 180ms infinite; transform-origin: center; }
+.nest-icon-part-one { animation: nest-part-two-icon-settle 3.6s ease-in-out 180ms infinite; transform-origin: center; }
 .nest-category-calls .nest-icon-part-two { animation-name: nest-part-two-icon-breathe; animation-duration: 3.1s; }
+.nest-category-calls .nest-icon-part-one { animation-name: nest-part-two-icon-breathe; animation-duration: 3.1s; }
 .nest-category-appointments .nest-icon-part-two { animation-name: nest-part-two-icon-tilt; animation-duration: 4.2s; }
+.nest-category-appointments .nest-icon-part-one { animation-name: nest-part-two-icon-tilt; animation-duration: 4.2s; }
 .nest-category-people .nest-icon-part-two { animation-name: nest-part-two-icon-pulse; animation-duration: 3.8s; }
+.nest-category-people .nest-icon-part-one { animation-name: nest-part-two-icon-pulse; animation-duration: 3.8s; }
 .nest-category-payments .nest-icon-part-two { animation-name: nest-part-two-icon-pop; animation-duration: 3.4s; }
+.nest-category-payments .nest-icon-part-one { animation-name: nest-part-two-icon-pop; animation-duration: 3.4s; }
 .nest-category-workflows .nest-icon-part-two { animation-name: nest-part-two-icon-rotate; animation-duration: 4.6s; }
+.nest-category-workflows .nest-icon-part-one { animation-name: nest-part-two-icon-rotate; animation-duration: 4.6s; }
 .nest-category-warnings .nest-icon-part-two { animation-name: nest-part-two-icon-emphasis; animation-duration: 2.8s; }
+.nest-category-warnings .nest-icon-part-one { animation-name: nest-part-two-icon-emphasis; animation-duration: 2.8s; }
 .nest-category-milestones .nest-icon-part-two { animation-name: nest-part-two-icon-flash; animation-duration: 3.7s; }
+.nest-category-milestones .nest-icon-part-one { animation-name: nest-part-two-icon-flash; animation-duration: 3.7s; }
 .nest-category-messages .nest-icon-part-two { animation-name: nest-part-two-icon-soften; animation-duration: 4.8s; }
+.nest-category-messages .nest-icon-part-one { animation-name: nest-part-two-icon-soften; animation-duration: 4.8s; }
 
 .nest-live-indicator { display: inline-flex; align-items: center; justify-content: center; width: 9px; height: 20px; margin-left: 2px; }
 .nest-live-indicator > span { width: 5px; height: 5px; border-radius: 50%; background: rgb(var(--nest-accent)); animation: nest-live-pulse 2.1s ease-in-out infinite; }
@@ -158,10 +167,10 @@
 .nest-layout-alert .nest-content-primary { font-size: 19px; font-weight: 630; }
 .nest-layout-alert .nest-content-secondary { color: rgba(255,255,255,.56); font-size: 13px; }
 
-.nest-layout-return .nest-content-icon,
 .nest-layout-return .nest-content-eyebrow,
 .nest-layout-return .nest-content-secondary,
 .nest-layout-return .nest-content-metric { display: none; }
+.nest-layout-return .nest-icon-part-one { width: 28px; height: 28px; }
 .nest-layout-return .nest-content-primary { max-width: 780px; color: rgba(255,255,255,.9); font-size: 19px; font-weight: 480; text-align: center; }
 
 /* Category-specific information hierarchy */
@@ -200,7 +209,7 @@
 @keyframes nest-part-two-icon-soften { 0%, 100% { transform: scale(1) rotate(0deg); opacity: .86; } 48% { transform: scale(.9) rotate(-4deg); opacity: .58; } 72% { transform: scale(1.04) rotate(2deg); opacity: .96; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .nest-icon-part-two { animation: none; }
+  .nest-icon-part-two, .nest-icon-part-one { animation: none; }
 }
 
 .nest-density-compact .nest-content { gap: 10px; }
@@ -306,6 +315,7 @@
   .nest-idle-intro { font-size: 11px; }
   .nest-content { --nest-footprint: calc(100% - 18px) !important; max-width: calc(100% - 18px); gap: 7px; }
   .nest-content-icon { width: 18px; height: 18px; }
+  .nest-layout-return .nest-icon-part-one { width: 20px; height: 20px; }
   .nest-content-eyebrow, .nest-content-secondary, .nest-content-metric, .nest-live-indicator { display: none; }
   .nest-content-primary { max-width: 150px; font-size: 11px !important; }
   .nest-dock-tools { right: 38px; }
