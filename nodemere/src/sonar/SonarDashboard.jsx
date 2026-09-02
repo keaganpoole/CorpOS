@@ -67,15 +67,16 @@ import SettingsPage from './pages/SettingsPage';
 import { StaffManager } from './pages/SettingsPage';
 import ReportProblemModal from './components/ReportProblemModal';
 import CalendarPage from './pages/CalendarPage';
-import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
-import ProjectIntelligenceReport from './pages/ProjectIntelligenceReport';
+import BusinessIntelligenceReport from './pages/BusinessIntelligenceReport';
 import CubePreloader from './components/CubePreloader';
 import PlanLimitModal from '../components/modals/PlanLimitModal';
 import PlanChangePopupModal from '../components/modals/PlanChangePopupModal';
 import ModalSpectrumLine, { resolveModalSpectrumVariant } from '../components/ModalSpectrumLine';
 import { AudioPlayerProvider, PersistentAudioPlayer } from './contexts/AudioPlayerContext';
 import { CallLogsProvider, useCallLogs } from './contexts/CallLogsContext';
+import { NestProvider } from './nest/NestRuntime';
+import NestDock from './nest/NestDock';
 import { useAuth } from '../contexts/AuthContext';
 import logoImage from '../assets/logo.png';
 
@@ -630,10 +631,10 @@ function CallLogsToolbarTitle({ active, action = null }) {
   if (!active) return null;
 
   return (
-    <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
+    <div className="nest-toolbar-title absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
       <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">Call Logs</span>
-      <span className="hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
-      <span className="hidden text-[12px] font-medium text-zinc-500 md:inline">
+      <span className="nest-toolbar-meta hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
+      <span className="nest-toolbar-meta hidden text-[12px] font-medium text-zinc-500 md:inline">
         {loading ? 'Loading calls' : `${calls.length}${hasMore ? '+' : ''} recent calls`}
       </span>
       {action}
@@ -645,10 +646,10 @@ function PeopleToolbarTitle({ active, count, loading, action = null }) {
   if (!active) return null;
 
   return (
-    <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
+    <div className="nest-toolbar-title absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
       <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">People</span>
-      <span className="hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
-      <span className="hidden text-[12px] font-medium text-zinc-500 md:inline">
+      <span className="nest-toolbar-meta hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
+      <span className="nest-toolbar-meta hidden text-[12px] font-medium text-zinc-500 md:inline">
         {loading ? 'Loading people' : `${count} People`}
       </span>
       {action}
@@ -660,7 +661,7 @@ function StaticToolbarTitle({ active, title, description, beta = false, action =
   if (!active) return null;
 
   return (
-    <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
+    <div className="nest-toolbar-title absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
       <span className="inline-flex items-center gap-2 text-[13px] font-semibold tracking-[-0.02em] text-white">
         {title}
         {beta && (
@@ -669,8 +670,8 @@ function StaticToolbarTitle({ active, title, description, beta = false, action =
           </span>
         )}
       </span>
-      <span className="hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
-      <span className="hidden text-[12px] font-medium text-zinc-500 md:inline">{description}</span>
+      <span className="nest-toolbar-meta hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
+      <span className="nest-toolbar-meta hidden text-[12px] font-medium text-zinc-500 md:inline">{description}</span>
       {action}
     </div>
   );
@@ -680,10 +681,10 @@ function CalendarToolbarTitle({ active, count, loading, action = null }) {
   if (!active) return null;
 
   return (
-    <div className="absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
+    <div className="nest-toolbar-title absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
       <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">Calendar</span>
-      <span className="hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
-      <span className="hidden text-[12px] font-medium text-zinc-500 md:inline">
+      <span className="nest-toolbar-meta hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
+      <span className="nest-toolbar-meta hidden text-[12px] font-medium text-zinc-500 md:inline">
         {loading ? 'Loading appointments' : `${count} Appointments`}
       </span>
       {action}
@@ -1797,6 +1798,7 @@ const SonarDashboard = () => {
   const [showSetupGuide, setShowSetupGuide] = useState(true);
   const [planLimitDetail, setPlanLimitDetail] = useState(null);
   const [showPlanChangePopup, setShowPlanChangePopup] = useState(false);
+  const [nestStageExpanded, setNestStageExpanded] = useState(false);
   const tasklistPersistRef = useRef('');
   const userId = authSession?.user?.id || profile?.id || null;
 
@@ -2305,9 +2307,8 @@ const SonarDashboard = () => {
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
     { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
     { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios', beta: true },
-    { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Live Monitoring' },
+    { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Business Intelligence' },
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
-    { id: 'stats', icon: <BarChart3 size={18} />, label: 'Project Intelligence' },
   ];
 
   const renderView = () => {
@@ -2561,7 +2562,7 @@ const SonarDashboard = () => {
           />
         );
       case 'live-monitoring':
-        return <LiveMonitoringPage />;
+        return <BusinessIntelligenceReport />;
       case 'settings':
         return <SettingsPage />;
       case 'calendar':
@@ -2571,7 +2572,7 @@ const SonarDashboard = () => {
       case 'pipeline':
         return <LeadsPage hideTitle onToolbarMetaChange={setPeopleToolbarMeta} />;
       case 'stats':
-        return <ProjectIntelligenceReport />;
+        return <BusinessIntelligenceReport />;
       default:
         return <PlaceholderView title={currentRoute} body="Coming soon" />;
     }
@@ -2580,18 +2581,25 @@ const SonarDashboard = () => {
   return (
     <AudioPlayerProvider>
     <CallLogsProvider normalizeCall={normalizeCall}>
+    <NestProvider
+      businessId={staffBusinessId || businessUsage?.business_id || profile?.business_id}
+      tasklistState={backendTasklistState}
+    >
     <div className="sonar-dashboard-shell flex flex-col h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
       <style>{`
         .snap-x { scroll-snap-type: x proximity; }
         body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.015em; }
         .drag-region { -webkit-app-region: drag; }
         .no-drag { -webkit-app-region: no-drag; }
+        .nest-toolbar-title, .nest-toolbar-meta { transition: opacity 420ms cubic-bezier(.16,1,.3,1), transform 420ms cubic-bezier(.16,1,.3,1); }
+        .nest-stage-expanded .nest-toolbar-title { pointer-events: none; opacity: 0; transform: translate(-7px, -50%); }
+        .nest-stage-expanded .nest-toolbar-meta { opacity: 0; transform: translateX(-5px); }
       `}</style>
 
       <div className="drag-region fixed top-0 left-0 right-0 h-8 z-50 pointer-events-none" />
 
       {/* Toolbar */}
-      <header className="sonar-dashboard-chrome shrink-0 h-14 border-b border-white/5 bg-[#020202] flex items-center px-10 z-30 relative">
+      <header className={`sonar-dashboard-chrome shrink-0 h-14 border-b border-white/5 bg-[#020202] flex items-center px-10 z-30 relative ${nestStageExpanded ? 'nest-stage-expanded' : ''}`}>
         <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.03]">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
         </div>
@@ -2646,18 +2654,7 @@ const SonarDashboard = () => {
           description="Source-aware project report"
         />
 
-        {/* Center title */}
-        <div className="absolute left-1/2 z-10 hidden -translate-x-1/2 items-center xl:flex">
-          <div className="relative flex flex-col items-center">
-            <div className="relative">
-              <div className="absolute -left-6 top-1/2 h-5 w-[1px] -translate-y-1/2 bg-white/10" />
-              <div className="absolute -right-6 top-1/2 h-5 w-[1px] -translate-y-1/2 bg-white/10" />
-              <h1 className="text-[22px] font-light tracking-[0.52em] text-white/15 uppercase leading-none cursor-default">
-                NODEMERE
-              </h1>
-            </div>
-          </div>
-        </div>
+        <NestDock onStageChange={setNestStageExpanded} />
         <div className="ml-auto flex items-center">
           <button
             type="button"
@@ -2665,7 +2662,7 @@ const SonarDashboard = () => {
               setAccountMenuOpen(false);
               setReportProblemOpen(true);
             }}
-            className="no-drag mr-2 hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-[10px] font-semibold tracking-[-0.01em] text-zinc-600 transition-colors hover:bg-white/[0.04] hover:text-zinc-300 lg:inline-flex"
+            className={`no-drag mr-2 hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-[10px] font-semibold tracking-[-0.01em] text-zinc-600 transition-all duration-300 hover:bg-white/[0.04] hover:text-zinc-300 lg:inline-flex ${nestStageExpanded ? 'pointer-events-none translate-x-1 opacity-0' : ''}`}
           >
             <CircleQuestionMark size={14} />
             <span>Report a problem</span>
@@ -2782,6 +2779,7 @@ const SonarDashboard = () => {
       )}
       <PersistentAudioPlayer />
     </div>
+    </NestProvider>
     </CallLogsProvider>
     </AudioPlayerProvider>
   );
