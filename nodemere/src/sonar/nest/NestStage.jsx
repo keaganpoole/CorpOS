@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   BadgeDollarSign, CalendarCheck, Check, PhoneIncoming, Quote,
@@ -69,46 +69,54 @@ const subjectForEvent = (event) => ({
   metric: '',
 });
 
-const getMotion = (mode, reducedMotion) => {
-  if (reducedMotion) return { hidden: { opacity: 0 }, visible: { opacity: 1 }, exit: { opacity: 0 } };
-  const motions = {
-    fade: { hidden: { opacity: 0 }, visible: { opacity: 1 }, exit: { opacity: 0 } },
-    dissolve: { hidden: { opacity: 0, filter: 'blur(3px)' }, visible: { opacity: 1, filter: 'blur(0px)' }, exit: { opacity: 0, filter: 'blur(2px)' } },
-    rise: { hidden: { opacity: 0, y: 9 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -5 } },
-    stagger: { hidden: { opacity: 0, y: 7 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -4 } },
-    flip: { hidden: { opacity: 0, y: 7, rotateX: -52 }, visible: { opacity: 1, y: 0, rotateX: 0 }, exit: { opacity: 0, y: -7, rotateX: 42 } },
-    expand: { hidden: { opacity: 0, clipPath: 'inset(0 20% 0 20%)' }, visible: { opacity: 1, clipPath: 'inset(0 0% 0 0%)' }, exit: { opacity: 0, clipPath: 'inset(0 14% 0 14%)' } },
-    'icon-type': { hidden: { opacity: 0, x: -7 }, visible: { opacity: 1, x: 0 }, exit: { opacity: 0, x: 5 } },
-  };
-  return motions[mode] || motions.fade;
-};
-
-const ContentIcon = ({ Icon, mode, compact, reducedMotion }) => {
+const ContentIcon = ({ Icon, mode, compact }) => {
   if (mode === 'none') return null;
   return (
-    <motion.span
-      className={`nest-content-icon nest-icon-${mode}`}
-      initial={reducedMotion ? false : { opacity: 0, scale: mode === 'transform' ? 1.45 : 0.82, rotate: mode === 'transform' ? -18 : -5 }}
-      animate={{ opacity: 1, scale: 1, rotate: 0 }}
-      transition={{ duration: reducedMotion ? 0.01 : 0.64, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-    >
+    <span className={`nest-content-icon nest-icon-${mode}`}>
       <Icon size={compact ? 13 : 17} strokeWidth={1.6} />
-    </motion.span>
+    </span>
   );
 };
+
+const ReelPart = ({ event, content, Icon, compact, part }) => (
+  <div className={`nest-content nest-reel-content nest-layout-${part === 1 ? 'return' : 'pivot'} nest-density-spacious nest-footprint-${part === 1 ? 'full' : 'medium'} nest-placement-center`}>
+      <ContentIcon Icon={Icon} mode={part === 1 ? 'none' : 'transform'} compact={compact} />
+      <div className="nest-content-copy">
+        <span className="nest-content-eyebrow">{content.eyebrow}</span>
+        <span className="nest-content-primary">{content.primary}</span>
+        {content.secondary && content.secondary !== content.primary && (
+          <span className="nest-content-secondary">{content.secondary}</span>
+        )}
+        {content.metric && content.metric !== content.secondary && (
+          <span className="nest-content-metric">{content.metric}</span>
+        )}
+      </div>
+      {part === 2 && event.persistent && (
+        <span className="nest-live-indicator" aria-label="Live"><span /></span>
+      )}
+  </div>
+);
 
 export default function NestStage({ event, concept, privacyMode = false, compact = false, className = '' }) {
   const reducedMotion = useReducedMotion();
   const [now, setNow] = useState(Date.now());
-  const [phase, setPhase] = useState(1);
+  const [rolled, setRolled] = useState(false);
+  const [detailFaded, setDetailFaded] = useState(false);
   const Icon = ICONS[event?.category] || Check;
-  const layout = concept?.layout || 'sequence';
+  const transition = { duration: reducedMotion ? 0.01 : 0.62, ease: [0.16, 1, 0.3, 1] };
 
-  useEffect(() => {
-    setPhase(1);
+  useLayoutEffect(() => {
+    setRolled(false);
+    setDetailFaded(false);
     if (!event) return undefined;
-    const timer = window.setTimeout(() => setPhase(2), reducedMotion ? 1 : 2000);
-    return () => window.clearTimeout(timer);
+    // The track starts one viewport below the mask.  It settles Part 1, holds,
+    // then advances exactly one viewport so Part 2 replaces it on that same strip.
+    const rollTimer = window.setTimeout(() => setRolled(true), reducedMotion ? 1 : 3100);
+    const fadeTimer = window.setTimeout(() => setDetailFaded(true), reducedMotion ? 2 : 6380);
+    return () => {
+      window.clearTimeout(rollTimer);
+      window.clearTimeout(fadeTimer);
+    };
   }, [event?.id, concept?.id, reducedMotion]);
 
   useEffect(() => {
@@ -118,42 +126,36 @@ export default function NestStage({ event, concept, privacyMode = false, compact
     return () => window.clearInterval(timer);
   }, [event?.persistent, event?.id]);
 
-  const content = useMemo(() => event ? (phase === 1 ? subjectForEvent(event) : contentForEvent(event, now, privacyMode)) : null, [event, now, phase, privacyMode]);
-  const stageConcept = phase === 1
-    ? { ...concept, id: `${concept?.id || 'nest'}:subject`, layout: 'return', motion: 'rise', icon: 'none', footprint: 'full' }
-    : { ...concept, id: `${concept?.id || 'nest'}:detail`, layout: 'pivot', motion: 'icon-type', icon: 'transform' };
-  const stageMotionVariants = getMotion(stageConcept.motion, reducedMotion);
-  const transition = { duration: reducedMotion ? 0.01 : 0.62, ease: [0.16, 1, 0.3, 1] };
-  const stagger = stageConcept.motion === 'stagger' ? 0.13 : 0.085;
+  const subject = useMemo(() => event ? subjectForEvent(event) : null, [event]);
+  const detail = useMemo(() => event ? contentForEvent(event, now, privacyMode) : null, [event, now, privacyMode]);
 
   return (
     <div
-      className={`nest-stage nest-layout-${phase === 1 ? 'return' : 'pivot'} nest-motion-${stageConcept.motion} nest-density-${concept?.density || 'balanced'} nest-footprint-${phase === 1 ? 'full' : concept?.footprint || 'compact'} nest-placement-${concept?.placement || 'center'} nest-category-${event?.category || 'idle'} ${compact ? 'is-compact' : ''} ${className}`}
+      className={`nest-stage nest-motion-rise nest-density-spacious nest-placement-center nest-category-${event?.category || 'idle'} ${compact ? 'is-compact' : ''} ${className}`}
       aria-live={event?.priority === 'critical' ? 'assertive' : 'polite'}
       aria-atomic="true"
       data-priority={event?.priority || 'idle'}
     >
       <AnimatePresence mode="wait" initial={false}>
         {!event ? (
-          <motion.div key="nest-idle" initial={{ opacity: 0, y: 2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }} transition={{ ...transition, duration: reducedMotion ? 0.01 : 0.48 }} className="nest-idle-word">
+          <motion.div key="nest-idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0.01 : 0.48 }} className="nest-idle-word">
             nest
           </motion.div>
         ) : (
-          <motion.div layout="position" key={`${event.id}:${concept?.id || layout}:${phase}`} className="nest-content" initial="hidden" animate="visible" exit={phase === 1 ? { opacity: 0, y: -9 } : { opacity: 0 }} variants={stageMotionVariants} transition={transition}>
-            <ContentIcon Icon={Icon} mode={stageConcept.icon || 'quiet'} compact={compact} reducedMotion={reducedMotion} />
-            <div className="nest-content-copy">
-              <motion.span className="nest-content-eyebrow" variants={stageMotionVariants} transition={{ ...transition, delay: 0.04 }}>{content.eyebrow}</motion.span>
-              <motion.span className="nest-content-primary" variants={stageMotionVariants} transition={{ ...transition, delay: 0.04 + stagger }}>{content.primary}</motion.span>
-              {content.secondary && content.secondary !== content.primary && (
-                <motion.span className="nest-content-secondary" variants={stageMotionVariants} transition={{ ...transition, delay: 0.04 + stagger * 2 }}>{content.secondary}</motion.span>
-              )}
-              {content.metric && content.metric !== content.secondary && (
-                <motion.span className="nest-content-metric" variants={stageMotionVariants} transition={{ ...transition, delay: 0.04 + stagger * 2.5 }}>{content.metric}</motion.span>
-              )}
-            </div>
-            {(event.persistent || concept?.icon === 'status') && (
-              <motion.span className="nest-live-indicator" aria-label={event.persistent ? 'Live' : 'Ready'} initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4, duration: 0.5 }}><span /></motion.span>
-            )}
+          <motion.div key={`nest-reel:${event.id}`} className="nest-reel-viewport" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0.01 : 0.48 }}>
+            <motion.div
+              className="nest-reel-track"
+              initial={{ y: '50%' }}
+              animate={{ y: rolled ? '-50%' : '0%' }}
+              transition={transition}
+            >
+              <div className="nest-reel-item">
+                <ReelPart event={event} content={subject} Icon={Icon} compact={compact} part={1} />
+              </div>
+              <motion.div className="nest-reel-item" animate={{ opacity: detailFaded ? 0 : 1 }} transition={{ duration: reducedMotion ? 0.01 : 0.62 }}>
+                <ReelPart event={event} content={detail} Icon={Icon} compact={compact} part={2} />
+              </motion.div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
