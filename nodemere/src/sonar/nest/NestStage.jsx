@@ -269,10 +269,14 @@ export default function NestStage({ event, concept, privacyMode = false, compact
     // The track starts one viewport below the mask.  It settles Part 1, holds,
     // then advances exactly one viewport so Part 2 replaces it on that same strip.
     const rollTimer = window.setTimeout(() => setRolled(true), reducedMotion ? 1 : 3100);
-    const fadeTimer = window.setTimeout(() => setDetailFaded(true), reducedMotion ? 2 : 6380);
+    // Persistent live-call events stay visible for the whole call. The normal
+    // notification detail fade would otherwise leave NEST mounted but blank.
+    const fadeTimer = event.persistent
+      ? null
+      : window.setTimeout(() => setDetailFaded(true), reducedMotion ? 2 : 6380);
     return () => {
       window.clearTimeout(rollTimer);
-      window.clearTimeout(fadeTimer);
+      if (fadeTimer) window.clearTimeout(fadeTimer);
     };
   }, [event?.id, concept?.id, reducedMotion]);
 

@@ -51,7 +51,16 @@ def _text(value: Any) -> str:
 
 
 def _status(row: dict) -> str:
-    return _text(row.get("status") or row.get("call_status") or row.get("call_successful")).lower()
+    raw = _text(row.get("status") or row.get("call_status") or row.get("call_successful")).lower()
+    if raw in {"true", "yes", "success", "successful", "done", "complete"}:
+        return "completed"
+    if raw in {"false", "no"}:
+        return "failed"
+    if not raw and (row.get("failure_reason") or row.get("error") or row.get("error_message")):
+        return "failed"
+    if not raw and row.get("ended_at"):
+        return "completed"
+    return raw
 
 
 def _occurred_at(row: dict, *keys: str) -> str:
@@ -288,12 +297,13 @@ def record_nest_event(
     payload: dict | None = None,
     source_id: Any = None,
     idempotency_key: str | None = None,
+    occurred_at: str | None = None,
 ) -> None:
     """Persist one normalized server event without allowing Nest failures to affect work."""
 
     if business_id is None or not user_id:
         return
-    occurred_at = datetime.now(timezone.utc).isoformat()
+    occurred_at = occurred_at or datetime.now(timezone.utc).isoformat()
     row = {
         "business_id": business_id,
         "user_id": str(user_id),
@@ -315,6 +325,46 @@ def record_nest_event(
     except Exception as exc:
         # Deployments may briefly run application code before the migration lands.
         logging.warning("Nest event persistence skipped: %s", exc)
+
+
+def record_call_nest_event(client: Any, row: dict) -> None:
+    """Persist one terminal call notification directly from the call-log writer."""
+
+    if not isinstance(row, dict):
+        return
+    status = _status(row)
+    if status not in TERMINAL_CALL_STATUSES:
+        return
+    business_id = row.get("business_id")
+    user_id = row.get("user_id")
+    if business_id is None or not user_id:
+        return
+    direction = _text(row.get("direction") or row.get("call_direction") or "incoming").lower()
+    caller = _text(row.get("caller_name") or row.get("contact_name"))
+    completed = status == "completed"
+    event_type = "call_completed" if completed else "call_failed" if status == "failed" else "call_missed"
+    title = "Call completed" if completed else "Call needs attention" if status == "failed" else "Call missed"
+    priority = "routine" if completed else "critical" if status == "failed" else "major"
+    message = caller or ("Outgoing call" if direction.startswith("out") else "Incoming call")
+    source_id = row.get("id") or row.get("conversation_id")
+    record_nest_event(
+        client,
+        business_id=business_id,
+        user_id=user_id,
+        category="calls" if completed else "warnings",
+        event_type=event_type,
+        title=title,
+        message=message,
+        priority=priority,
+        payload={
+            "status": status,
+            "direction": direction,
+            "duration_seconds": row.get("duration_seconds") or 0,
+        },
+        source_id=source_id,
+        idempotency_key=f"call:{source_id}:{event_type}",
+        occurred_at=_occurred_at(row, "ended_at", "event_timestamp", "started_at"),
+    )
 
 
 def claim_nest_milestone(

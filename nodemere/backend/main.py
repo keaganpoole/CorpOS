@@ -146,7 +146,7 @@ from .contract_service import (
 )
 from .project_intelligence import get_project_intelligence, refresh_market_research
 from .business_intelligence import get_business_intelligence
-from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_nest_event
+from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_call_nest_event, record_nest_event
 
 try:
     from elevenlabs.client import ElevenLabs
@@ -5068,6 +5068,44 @@ def build_call_route_payload(payload: dict, request: Request):
     }
     return call_payload
 
+def upsert_active_call_log(call_payload: dict, *, user_id: Optional[str], business_id: Optional[str], receptionist: Optional[dict]) -> None:
+    """Create the live call row that NEST uses until the post-call webhook arrives."""
+    provider_call_sid = call_payload.get("call_id")
+    conversation_id = call_payload.get("conversation_id")
+    if not provider_call_sid and not conversation_id:
+        logging.warning("Cannot create live call log without a call or conversation identifier.")
+        return
+
+    row = {
+        "source": "elevenlabs_initiation",
+        "provider_call_sid": str(provider_call_sid) if provider_call_sid else None,
+        "conversation_id": str(conversation_id) if conversation_id else None,
+        "user_id": user_id,
+        "business_id": business_id,
+        "hired_receptionist_id": (receptionist or {}).get("id"),
+        "receptionist_name": get_receptionist_display_name(receptionist),
+        "from_number": call_payload.get("from_number"),
+        "to_number": call_payload.get("to_number"),
+        "direction": call_payload.get("direction") or "inbound",
+        "started_at": call_payload.get("received_at") or datetime.now(timezone.utc).isoformat(),
+        "status": "in-progress",
+        "raw_payload": call_payload.get("raw_payload") or {},
+    }
+    row = {key: value for key, value in row.items() if value is not None}
+    try:
+        existing = []
+        if conversation_id:
+            existing = supabase.table("call_logs").select("id").eq("conversation_id", str(conversation_id)).limit(1).execute().data or []
+        if not existing and provider_call_sid:
+            existing = supabase.table("call_logs").select("id").eq("provider_call_sid", str(provider_call_sid)).limit(1).execute().data or []
+        if existing:
+            supabase.table("call_logs").update(row).eq("id", existing[0]["id"]).execute()
+        else:
+            supabase.table("call_logs").insert(row).execute()
+    except Exception as exc:
+        # The call itself must continue even if NEST's live indicator cannot be persisted.
+        logging.warning("Failed to persist live ElevenLabs call log: %s", exc, exc_info=True)
+
 def normalize_intent_key(intent_key: str) -> str:
     normalized = (intent_key or "").strip().lower().replace(" ", "_").replace("-", "_")
     return INTENT_KEY_ALIASES.get(normalized, normalized)
@@ -7258,6 +7296,13 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
         "forwarding_target_number": get_business_forwarding_target_number(business),
     }
 
+    upsert_active_call_log(
+        call_payload,
+        user_id=context.get("user_id") or (business or {}).get("user_id"),
+        business_id=business.get("id") if business else None,
+        receptionist=receptionist,
+    )
+
     event = emit_scenario_trigger(call_payload["trigger_key"], event_payload)
     push_live_event(
         f"Call route trigger received ({call_payload['trigger_key']}).",
@@ -8310,6 +8355,7 @@ async def legacy_server_tool(
         response = supabase.table("call_logs").insert(call_log).execute()
         saved = response.data[0] if response.data else call_log
         claim_call_milestones(supabase, saved)
+        record_call_nest_event(supabase, saved)
         increment_business_usage_summary(call_log.get("business_id"), duration_seconds)
         return {"ok": True, "call_log": saved}
 
@@ -8483,6 +8529,29 @@ async def elevenlabs_post_call_webhook(
                 .data
                 or []
             )
+        if not existing and call_log.get("provider_call_sid"):
+            existing = (
+                supabase.table("call_logs")
+                .select("id,audio_storage_path,duration_seconds,business_id")
+                .eq("provider_call_sid", str(call_log["provider_call_sid"]))
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+        if not existing and call_log.get("business_id") and call_log.get("from_number"):
+            existing = (
+                supabase.table("call_logs")
+                .select("id,audio_storage_path,duration_seconds,business_id")
+                .eq("business_id", str(call_log["business_id"]))
+                .eq("from_number", call_log["from_number"])
+                .eq("status", "in-progress")
+                .order("started_at", desc=True)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
         if existing:
             if existing[0].get("audio_storage_path") and not call_log.get("audio_storage_path"):
                 call_log["audio_storage_path"] = existing[0]["audio_storage_path"]
@@ -8496,8 +8565,9 @@ async def elevenlabs_post_call_webhook(
             detail="Failed to persist call log",
         ) from exc
 
-    saved = response.data[0] if getattr(response, "data", None) else call_log
+    saved = response.data[0] if getattr(response, "data", None) else {**(existing[0] if existing else {}), **call_log}
     claim_call_milestones(supabase, saved)
+    record_call_nest_event(supabase, saved)
     previous_duration_seconds = parse_usage_seconds(existing[0].get("duration_seconds")) if existing else 0
     saved_duration_seconds = parse_usage_seconds(saved.get("duration_seconds") or call_log.get("duration_seconds"))
     usage_business_id = saved.get("business_id") or call_log.get("business_id") or (existing[0].get("business_id") if existing else None)
