@@ -362,7 +362,7 @@ export default function NestStage({ event, concept, privacyMode = false, compact
               className="nest-idle-word"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              exit={{ opacity: 0, transition: { duration: reducedMotion ? 0.01 : 0.38 } }}
               transition={{ duration: reducedMotion ? 0.01 : .48 }}
             >
               NEST

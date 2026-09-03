@@ -1723,7 +1723,6 @@ const SonarDashboard = () => {
   const { session: authSession, profile, refreshProfile } = useAuth();
   const [currentRoute, setCurrentRoute] = useState(getInitialDashboardRoute);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [glitch, setGlitch] = useState(false);
   const [marketplaceAgent, setMarketplaceAgent] = useState(null);
   const [pendingModel, setPendingModel] = useState(null);
   const [receptionistsAgent, setReceptionistsAgent] = useState(null);
@@ -2238,16 +2237,6 @@ const SonarDashboard = () => {
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    const g = setInterval(() => {
-      if (Math.random() > 0.97) {
-        setGlitch(true);
-        setTimeout(() => setGlitch(false), 120);
-      }
-    }, 2500);
-    return () => clearInterval(g);
-  }, []);
-
   const navItems = [
     { id: 'receptionists', icon: <IdCardLanyard size={18} />, label: 'Team' },
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
@@ -2536,9 +2525,9 @@ const SonarDashboard = () => {
         body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.015em; }
         .drag-region { -webkit-app-region: drag; }
         .no-drag { -webkit-app-region: no-drag; }
-        .nest-toolbar-title, .nest-toolbar-meta { transition: opacity 420ms cubic-bezier(.16,1,.3,1), transform 420ms cubic-bezier(.16,1,.3,1); }
-        .nest-stage-expanded .nest-toolbar-title { pointer-events: none; opacity: 0; transform: translate(-7px, -50%); }
-        .nest-stage-expanded .nest-toolbar-meta { opacity: 0; transform: translateX(-5px); }
+        .nest-toolbar-title, .nest-toolbar-meta { transition: opacity 420ms cubic-bezier(.16,1,.3,1); }
+        .nest-stage-expanded .nest-toolbar-title { pointer-events: none; opacity: 0; }
+        .nest-stage-expanded .nest-toolbar-meta { opacity: 0; }
       `}</style>
 
       <div className="drag-region fixed top-0 left-0 right-0 h-8 z-50 pointer-events-none" />
@@ -2548,18 +2537,11 @@ const SonarDashboard = () => {
         <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.03]">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
         </div>
-        <div className={`absolute inset-0 bg-white/5 pointer-events-none z-[60] transition-opacity duration-75 ${glitch ? 'opacity-100' : 'opacity-0'}`} />
         <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
         {/* Logo */}
-        <div className={`absolute left-[38px] z-10 -translate-x-1/2 transition-transform duration-75 ${glitch ? 'translate-x-[1px] skew-x-[1px]' : ''}`}>
+        <div className="absolute left-[38px] z-10 -translate-x-1/2">
           <img src={logoImage} alt="Nodemere" className="h-8 w-auto select-none" />
-          {glitch && (
-            <div className="absolute inset-0 opacity-30 blur-[2px] pointer-events-none select-none">
-              <img src={logoImage} alt="" className="absolute left-[-2px] top-[-2px] h-8 w-auto" />
-              <img src={logoImage} alt="" className="absolute left-[2px] top-[2px] h-8 w-auto" />
-            </div>
-          )}
         </div>
         <CallLogsToolbarTitle active={currentRoute === 'call-logs'} />
         <PeopleToolbarTitle
@@ -2607,7 +2589,7 @@ const SonarDashboard = () => {
               setAccountMenuOpen(false);
               setReportProblemOpen(true);
             }}
-            className={`no-drag mr-2 hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-[10px] font-semibold tracking-[-0.01em] text-zinc-600 transition-all duration-300 hover:bg-white/[0.04] hover:text-zinc-300 lg:inline-flex ${nestStageExpanded ? 'pointer-events-none translate-x-1 opacity-0' : ''}`}
+            className={`no-drag mr-2 hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-[10px] font-semibold tracking-[-0.01em] text-zinc-600 transition-all duration-300 hover:bg-white/[0.04] hover:text-zinc-300 lg:inline-flex ${nestStageExpanded ? 'pointer-events-none opacity-0' : ''}`}
           >
             <CircleQuestionMark size={14} />
             <span>Report a problem</span>
