@@ -11,8 +11,6 @@ import {
 } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
 import { APPOINTMENT_FIELDS, formatDate, formatTime, formatTimestampFull, titleCase } from '../lib/appointmentSchema';
-import { DEFAULT_FIELD_CONFIG, fetchBusinessFieldConfig, migrateLegacyFieldConfig } from '../lib/appointmentFieldConfig';
-import { fetchCustomFields, getCurrentBusinessId, getCustomValue, isCustomFieldKey } from '../lib/appointmentCustomFields';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const HOMEPAGE_TAG_COLORS = {
@@ -116,8 +114,8 @@ function getAppointmentTitle(appointment, servicesById) {
   return service?.name || appointment._serviceName || 'Appointment';
 }
 
-function getFieldLabel(field, fieldConfig = {}) {
-  return fieldConfig[field.key || field.id]?.name || field.label || field.key || field.id;
+function getFieldLabel(field) {
+  return field.label || field.key || field.id;
 }
 
 function hasFieldValue(value) {
@@ -129,7 +127,7 @@ function hasFieldValue(value) {
 
 function formatDetailValue(field, appointment, { servicesById, receptionistsById }) {
   const fieldKey = field.key || field.id;
-  const rawValue = isCustomFieldKey(fieldKey) ? getCustomValue(appointment.custom_fields, fieldKey) : appointment[fieldKey];
+  const rawValue = appointment[fieldKey];
 
   if (fieldKey === 'service_id') {
     const serviceName = servicesById.get(String(rawValue || ''))?.name || appointment._serviceName || '';
@@ -148,9 +146,9 @@ function formatDetailValue(field, appointment, { servicesById, receptionistsById
   return rawValue;
 }
 
-function CalendarDetailFieldsPopover({ fields, fieldConfig, selectedFieldIds, onToggleField }) {
+function CalendarDetailFieldsPopover({ fields, selectedFieldIds, onToggleField }) {
   const [query, setQuery] = useState('');
-  const filtered = fields.filter((field) => getFieldLabel(field, fieldConfig).toLowerCase().includes(query.toLowerCase()));
+  const filtered = fields.filter((field) => getFieldLabel(field).toLowerCase().includes(query.toLowerCase()));
 
   return (
     <motion.div
@@ -186,7 +184,7 @@ function CalendarDetailFieldsPopover({ fields, fieldConfig, selectedFieldIds, on
             >
               <span className="w-4">{selected && <Check size={12} className="text-white" />}</span>
               <span className={`min-w-0 flex-1 truncate text-[11px] font-semibold tracking-[-0.02em] ${selected ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                {getFieldLabel(field, fieldConfig)}
+                {getFieldLabel(field)}
               </span>
             </button>
           );
@@ -241,8 +239,6 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   const [activeAppointmentPrompt, setActiveAppointmentPrompt] = useState(null);
   const [showDetailFieldPicker, setShowDetailFieldPicker] = useState(false);
   const [detailFieldIds, setDetailFieldIds] = useState(loadDetailFieldSelection);
-  const [customFields, setCustomFields] = useState([]);
-  const [fieldConfig, setFieldConfig] = useState(DEFAULT_FIELD_CONFIG);
   const detailFieldPickerRef = useRef(null);
 
   const servicesById = useMemo(
@@ -251,13 +247,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   );
   const receptionistCatalogById = lookups?.receptionistCatalogById || new Map();
   const receptionistsById = lookups?.receptionistsById || new Map();
-  const detailFields = useMemo(
-    () => [
-      ...APPOINTMENT_FIELDS.filter((field) => field.table),
-      ...customFields,
-    ],
-    [customFields],
-  );
+  const detailFields = useMemo(() => APPOINTMENT_FIELDS.filter((field) => field.table), []);
   const detailFieldsByKey = useMemo(
     () => new Map(detailFields.map((field) => [field.key, field])),
     [detailFields],
@@ -290,27 +280,6 @@ export default function CalendarMonthView({ data = null, className = '', selecte
     const timer = window.setTimeout(() => setHasAnimatedDots(true), 120);
     return () => window.clearTimeout(timer);
   }, [hasAnimatedDots]);
-
-  useEffect(() => {
-    let active = true;
-    const loadSchema = async () => {
-      try {
-        const businessId = await getCurrentBusinessId();
-        const [{ rawConfig }, nextCustomFields] = await Promise.all([
-          fetchBusinessFieldConfig(businessId),
-          fetchCustomFields(businessId),
-        ]);
-        const nextFieldConfig = await migrateLegacyFieldConfig(businessId, rawConfig);
-        if (!active) return;
-        setFieldConfig(nextFieldConfig);
-        setCustomFields(nextCustomFields);
-      } catch (err) {
-        console.error('[CalendarMonthView] Failed to load appointment fields:', err.message);
-      }
-    };
-    loadSchema();
-    return () => { active = false; };
-  }, []);
 
   useEffect(() => {
     if (!showDetailFieldPicker) return undefined;
@@ -384,7 +353,6 @@ export default function CalendarMonthView({ data = null, className = '', selecte
               {showDetailFieldPicker && (
                 <CalendarDetailFieldsPopover
                   fields={detailFields}
-                  fieldConfig={fieldConfig}
                   selectedFieldIds={detailFieldIds}
                   onToggleField={toggleDetailField}
                 />
@@ -710,7 +678,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                               {visibleDetailFields.map(({ field, value }, detailIndex) => (
                                 <div key={field.key} className={detailIndex < visibleDetailFields.length - 1 ? 'mb-2' : ''}>
                                   <div className="mb-1 text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-600">
-                                    {getFieldLabel(field, fieldConfig)}
+                                    {getFieldLabel(field)}
                                   </div>
                                   <div className="text-[11px] leading-5 text-zinc-400">
                                     {String(value)}

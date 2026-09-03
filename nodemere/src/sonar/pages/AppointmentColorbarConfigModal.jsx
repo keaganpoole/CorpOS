@@ -9,7 +9,6 @@ import {
   COLORBAR_PRESETS, OPERATORS, loadColorbarRules, saveColorbarRules,
 } from '../lib/appointmentFieldConfig';
 import { TABLE_COLUMNS, getFieldDef } from '../lib/appointmentSchema';
-import { isCustomFieldKey } from '../lib/appointmentCustomFields';
 
 const uid = () => {
   try { return crypto.randomUUID(); } catch {}
@@ -176,25 +175,21 @@ const optionValues = (options = []) => options
   .map((option) => (typeof option === 'string' ? option : option?.value))
   .filter(Boolean);
 
-const buildConditionFields = ({ columns = [], customFields = [], fieldConfig = {} } = {}) => {
-  const customByKey = new Map(customFields.map((field) => [field.key, field]));
+const buildConditionFields = ({ columns = [], fieldConfig = {} } = {}) => {
   const sourceColumns = columns.length
     ? columns.filter((col) => !['select', 'avatar'].includes(col.id))
     : TABLE_COLUMNS.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({ id: field.key, label: field.label }));
 
   return sourceColumns
     .map((column) => {
-      const customField = customByKey.get(column.id);
-      const baseField = customField || getFieldDef(column.id);
+      const baseField = getFieldDef(column.id);
       if (!baseField) return null;
 
-      const configured = fieldConfig[column.id] || {};
       const type = normalizeConditionType(baseField.type);
       const field = {
         key: column.id,
-        label: configured.name || column.label || baseField.label,
+        label: column.label || baseField.label,
         type,
-        custom: isCustomFieldKey(column.id),
       };
 
       if (type === 'select' || type === 'multi_select') field.options = optionValues(baseField.options);
@@ -453,9 +448,9 @@ const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
 };
 
 // ─── Main Colorbar Config Modal ────────────────────────────────────────────
-const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customFields = [], fieldConfig = {} }) => {
+const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], fieldConfig = {} }) => {
   const [rules, setRules] = useState([]);
-  const fields = useMemo(() => buildConditionFields({ columns, customFields, fieldConfig }), [columns, customFields, fieldConfig]);
+  const fields = useMemo(() => buildConditionFields({ columns, fieldConfig }), [columns, fieldConfig]);
   const defaultField = fields[0]?.key || '';
   const scrollRef = useRef(null);
 

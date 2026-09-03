@@ -4,20 +4,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2,
   User, Phone, Mail, Flag, Compass, Clock, Tag, Search as SearchIcon, FileText, Activity,
-  Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays, Trash2,
-  ToggleLeft,
+  Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Trash2,
 } from 'lucide-react';
 import {
-  TABLE_COLUMNS, SOURCE_OPTIONS, formatDate, formatTime, formatTimestamp, normalizeOptionValue, getFieldDef,
+  TABLE_COLUMNS, formatDate, formatTime, formatTimestamp, normalizeOptionValue, getFieldDef,
 } from '../lib/appointmentSchema';
 import {
   DEFAULT_FIELD_CONFIG, fetchBusinessFieldConfig, loadFieldConfig, migrateLegacyFieldConfig,
   saveFieldConfig, loadColorbarRules, saveColorbarRules, evaluateColorbar,
 } from '../lib/appointmentFieldConfig';
-import {
-  CUSTOM_FIELD_TYPES, createCustomField, fetchCustomFields, getCurrentBusinessId, getCustomValue,
-  isCustomFieldKey, setCustomFieldValue, updateCustomField, updateCustomFieldPositions, deleteCustomField, syncCustomFieldOptionValues,
-} from '../lib/appointmentCustomFields';
+import { getCurrentBusinessId } from '../lib/customFields';
 import FieldSettingsModal from './FieldSettingsModal';
 import AppointmentColorbarConfigModal from './AppointmentColorbarConfigModal';
 import CubePreloader from '../components/CubePreloader';
@@ -26,13 +22,6 @@ const ICONS = {
   user: User, phone: Phone, mail: Mail, flag: Flag, compass: Compass, clock: Clock, tag: Tag,
   search: SearchIcon, 'file-text': FileText, activity: Activity, users: Users, 'map-pin': MapPin,
   map: MapIcon, shield: Shield, 'dollar-sign': DollarSign, target: Target, navigation: Navigation,
-};
-
-const FIELD_TYPE_ICONS = {
-  boolean: ToggleLeft,
-  text: Type,
-  number: Hash,
-  date: CalendarDays,
 };
 
 const getClampedOverlayPosition = (rect, {
@@ -761,7 +750,7 @@ const DraggableHeader = ({
   col, index, sortBy, sortDir, onSort, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, dragOverIndex,
   fieldConfig = {}, onFieldSettings, headerRef, isZoneCandidate,
 }) => {
-  const displayName = fieldConfig[col.id]?.name || col.label;
+  const displayName = col.label;
   const iconName = fieldConfig[col.id]?.icon;
   const IconComp = iconName ? ICONS[iconName] : null;
   const zoneEligible = isZoneEligibleColumn(col);
@@ -787,22 +776,8 @@ const DraggableHeader = ({
   );
 };
 
-const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConfig = {}, customFields = [], selection = null, lookupOptions = {}, receptionistsById = new Map(), getLatestAppointment = null }) => {
+const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConfig = {}, selection = null, lookupOptions = {}, receptionistsById = new Map() }) => {
   const getConfiguredOptions = (key, fallbackOptions = []) => fieldConfig[key]?.options || fallbackOptions;
-  const customField = customFields.find((field) => field.key === colId);
-  if (customField) {
-    const value = getCustomValue(appointment.custom_fields, colId);
-    const saveCustom = (nextValue) => {
-      const latestAppointment = getLatestAppointment?.(appointment.id) || appointment;
-      autoSave(appointment.id, 'custom_fields', setCustomFieldValue(latestAppointment.custom_fields, colId, nextValue));
-    };
-    if (customField.type === 'boolean') return <InlineBoolean value={value} onSave={saveCustom} />;
-    if (customField.type === 'number') return <InlineNumber value={value} onSave={saveCustom} />;
-    if (customField.type === 'date') return <InlineDateOnly value={value} onSave={saveCustom} />;
-    if (customField.type === 'select') return <InlineSelect value={value} options={customField.options || []} onSave={saveCustom} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-    if (customField.type === 'multi_select') return <InlineMultiSelect value={value} options={customField.options || []} onSave={saveCustom} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-    return <InlineText value={value} onSave={saveCustom} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
-  }
 
   switch (colId) {
     case 'select': {
@@ -861,8 +836,6 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
         </div>
       );
     }
-    case 'source':
-      return <InlineSelect value={appointment.source} options={getConfiguredOptions('source', SOURCE_OPTIONS)} onSave={(v) => autoSave(appointment.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
     default: {
       const field = getFieldDef(colId);
       if (!field) return null;
@@ -879,7 +852,7 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
   }
 };
 
-const buildColumns = (customFields = [], fieldConfig = {}) => [
+const buildColumns = (fieldConfig = {}) => [
   { id: 'select', label: '', width: '20px', sortKey: null },
   { id: 'avatar', label: '', width: '24px', sortKey: null },
   ...TABLE_COLUMNS.filter((field) => !fieldConfig[field.key]?.hidden || isColumnLocked(field.key)).map((field) => ({
@@ -904,20 +877,6 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
     }[field.type] || '160px',
     sortKey: field.key,
   })),
-  ...customFields.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({
-    id: field.key,
-    label: field.label,
-    width: field.tableWidth || {
-      boolean: '110px',
-      text: '180px',
-      number: '120px',
-      date: '150px',
-      select: '140px',
-      multi_select: '220px',
-    }[field.type] || '160px',
-    sortKey: null,
-    custom: true,
-  })),
 ];
 
 const APPOINTMENTS_TABLE_VIEW_KEY = 'SONAR_appointments_table_view';
@@ -927,7 +886,8 @@ const parseColumnWidth = (width) => {
   return Number.isFinite(numeric) ? numeric : 160;
 };
 
-const getColumnLabel = (column, fieldConfig = {}) => fieldConfig[column.id]?.name || column.label || column.id;
+const getColumnLabel = (column) => column.label || column.id;
+
 const ensureRequiredColumnVisibility = (config = {}) => {
   const next = { ...config };
   REQUIRED_COLUMN_IDS.forEach((columnId) => {
@@ -936,7 +896,7 @@ const ensureRequiredColumnVisibility = (config = {}) => {
   return next;
 };
 
-const getAllDataColumns = (customFields = [], fieldConfig = {}) => [
+const getAllDataColumns = (fieldConfig = {}) => [
   ...TABLE_COLUMNS.map((field) => ({
     id: field.key,
     label: field.label,
@@ -959,21 +919,7 @@ const getAllDataColumns = (customFields = [], fieldConfig = {}) => [
     }[field.type] || '160px',
     sortKey: field.key,
   })),
-  ...customFields.map((field) => ({
-    id: field.key,
-    label: field.label,
-    width: field.tableWidth || {
-      boolean: '110px',
-      text: '180px',
-      number: '120px',
-      date: '150px',
-      select: '140px',
-      multi_select: '220px',
-    }[field.type] || '160px',
-    sortKey: null,
-    custom: true,
-  })),
-].map((column) => ({ ...column, label: getColumnLabel(column, fieldConfig) }));
+].map((column) => ({ ...column, label: getColumnLabel(column) }));
 
 const loadAppointmentsTableView = () => {
   try {
@@ -1203,15 +1149,11 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   }));
   const density = viewSettings.rowHeight ?? 3;
   const [businessId, setBusinessId] = useState(null);
-  const [customFields, setCustomFields] = useState([]);
   const [fieldConfig, setFieldConfig] = useState(() => ensureRequiredColumnVisibility(loadFieldConfig()));
-  const [columns, setColumns] = useState(() => buildColumns([], DEFAULT_FIELD_CONFIG));
+  const [columns, setColumns] = useState(() => buildColumns(DEFAULT_FIELD_CONFIG));
   const [colorbarRules, setColorbarRules] = useState(() => loadColorbarRules());
   const [settingsField, setSettingsField] = useState(null);
   const [showColorbarStudio, setShowColorbarStudio] = useState(false);
-  const [showColumnOptions, setShowColumnOptions] = useState(false);
-  const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, bottom: undefined, left: 0 });
-  const columnOptionsButtonRef = useRef(null);
   const tableScrollRef = useRef(null);
   const headerStickyRef = useRef(null);
   const headerRowRef = useRef(null);
@@ -1232,10 +1174,9 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   const orderButtonRef = useRef(null);
   const rowHeightButtonRef = useRef(null);
 
-  const column_options = CUSTOM_FIELD_TYPES;
   const anySelected = selectedIds.length > 0;
   const zones = useMemo(() => getSavedZones(fieldConfig), [fieldConfig]);
-  const allDataColumns = useMemo(() => getAllDataColumns(customFields, fieldConfig), [customFields, fieldConfig]);
+  const allDataColumns = useMemo(() => getAllDataColumns(fieldConfig), [fieldConfig]);
   const lookupOptions = useMemo(() => ({
     people: people.map((person) => ({
       value: String(person.id),
@@ -1265,15 +1206,11 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
     const load = async () => {
       try {
         const nextBusinessId = await getCurrentBusinessId();
-        const [{ rawConfig }, nextCustomFields] = await Promise.all([
-          fetchBusinessFieldConfig(nextBusinessId),
-          fetchCustomFields(nextBusinessId),
-        ]);
+        const { rawConfig } = await fetchBusinessFieldConfig(nextBusinessId);
         const nextFieldConfig = ensureRequiredColumnVisibility(await migrateLegacyFieldConfig(nextBusinessId, rawConfig));
         if (!active) return;
         setBusinessId(nextBusinessId);
         setFieldConfig(nextFieldConfig);
-        setCustomFields(nextCustomFields);
       } catch (err) {
         console.error('[AppointmentsTable] Failed to load table schema:', err.message);
       }
@@ -1284,7 +1221,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
 
   useEffect(() => {
     setColumns((prev) => {
-      const built = buildColumns(customFields, fieldConfig);
+      const built = buildColumns(fieldConfig);
       const prevOrder = prev.map((col) => col.id);
       const byId = new Map(built.map((col) => [col.id, col]));
       const next = [];
@@ -1297,11 +1234,11 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
       byId.forEach((col) => next.push(col));
       return next;
     });
-  }, [customFields, fieldConfig]);
+  }, [fieldConfig]);
 
   useEffect(() => {
-    onSchemaChange?.({ columns, customFields, fieldConfig });
-  }, [columns, customFields, fieldConfig, onSchemaChange]);
+    onSchemaChange?.({ columns, fieldConfig });
+  }, [columns, fieldConfig, onSchemaChange]);
 
   const measureHeaderMetrics = useCallback(() => {
     if (!headerRowRef.current) return;
@@ -1352,34 +1289,9 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   };
 
   const handleFieldSave = (key, config) => {
-    const next = { ...fieldConfig, [key]: { ...fieldConfig[key], ...config } };
+    const { name: _ignoredName, ...calendarConfig } = config || {};
+    const next = { ...fieldConfig, [key]: { ...fieldConfig[key], ...calendarConfig } };
     persistFieldConfig(next);
-    if (isCustomFieldKey(key)) {
-      const nextFields = customFields.map((field) => (
-        field.key === key ? { ...field, label: config.name || field.label, description: config.description ?? field.description ?? '', options: config.options ?? field.options ?? [] } : field
-      ));
-      setCustomFields(nextFields);
-      setColumns((prev) => prev.map((col) => (
-        col.id === key ? { ...col, label: config.name || col.label } : col
-      )));
-      if (businessId) {
-        const fieldMeta = customFields.find((field) => field.key === key);
-        const previousOptions = Array.isArray(fieldMeta?.options) ? fieldMeta.options : [];
-        const nextOptions = Array.isArray(config.options) ? config.options : previousOptions;
-        updateCustomField(key, businessId, {
-          label: config.name || key,
-          config: {
-            ...(fieldMeta?.config || {}),
-            tableWidth: fieldMeta?.tableWidth,
-            description: config.description ?? fieldMeta?.description ?? '',
-            options: config.options ?? fieldMeta?.options ?? [],
-          },
-        }).then(() => syncCustomFieldOptionValues(key, businessId, previousOptions, nextOptions, fieldMeta?.type))
-        .catch((err) => {
-          console.error('[AppointmentsTable] Failed to save custom field settings:', err.message);
-        });
-      }
-    }
     setSettingsField(null);
   };
 
@@ -1388,20 +1300,8 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
       ...fieldConfig,
       [key]: { ...fieldConfig[key], hidden: true },
     };
-    if (isCustomFieldKey(key)) {
-      const { [key]: _, ...remainingFieldConfig } = next;
-      persistFieldConfig(remainingFieldConfig);
-      setColumns((prev) => prev.filter((col) => col.id !== key));
-      setCustomFields((prev) => prev.filter((field) => field.key !== key));
-      if (businessId) {
-        deleteCustomField(key, businessId).catch((err) => {
-          console.error('[AppointmentsTable] Failed to delete custom field:', err.message);
-        });
-      }
-    } else {
-      persistFieldConfig(next);
-      setColumns((prev) => prev.filter((col) => col.id !== key));
-    }
+    persistFieldConfig(next);
+    setColumns((prev) => prev.filter((col) => col.id !== key));
 
     setSettingsField(null);
   };
@@ -1410,77 +1310,6 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
     const payload = typeof field === 'object' && field !== null ? field : { [field]: value };
     onUpdateAppointment(appointmentId, payload);
   }, [onUpdateAppointment]);
-  const getLatestAppointment = useCallback((appointmentId) => (
-    appointments.find((appointment) => appointment.id === appointmentId) || null
-  ), [appointments]);
-
-  const handleCreateColumn = async (type) => {
-    if (!businessId) return;
-    const nextField = await createCustomField(type, customFields, businessId);
-    const nextFields = [...customFields, nextField];
-    setCustomFields(nextFields);
-    setColumns((prev) => [
-      ...prev,
-      {
-        id: nextField.key,
-        label: nextField.label,
-        width: nextField.tableWidth,
-        sortKey: null,
-        custom: true,
-      },
-    ]);
-    setFieldConfig((prev) => {
-      const icon = { boolean: 'shield', text: 'file-text', number: 'activity', date: 'clock', select: 'tag', multi_select: 'layers' }[type] || 'tag';
-      const next = { ...prev, [nextField.key]: { name: nextField.label, icon } };
-      if (businessId) {
-        saveFieldConfig(businessId, next).catch((err) => {
-          console.error('[AppointmentsTable] Failed to save new field config:', err.message);
-        });
-      }
-      return next;
-    });
-    setShowColumnOptions(false);
-    setSettingsField(nextField.key);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const scroller = tableScrollRef.current;
-        if (!scroller) return;
-        scroller.scrollTo({ left: scroller.scrollWidth, behavior: 'smooth' });
-      });
-    });
-  };
-
-  const updateColumnOptionsPosition = useCallback(() => {
-    const rect = columnOptionsButtonRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const next = getClampedOverlayPosition(rect, { minWidth: 168, preferredHeight: 240, gap: 8 });
-    if (!next) return;
-    setColumnOptionsPosition({ top: next.top, bottom: next.bottom, left: next.left });
-  }, []);
-
-  const toggleColumnOptions = () => {
-    updateColumnOptionsPosition();
-    setShowColumnOptions((open) => !open);
-  };
-
-  useEffect(() => {
-    if (!showColumnOptions) return undefined;
-    updateColumnOptionsPosition();
-    const close = (event) => {
-      if (columnOptionsButtonRef.current?.contains(event.target)) return;
-      if (event.target.closest?.('[data-column-options-menu="true"]')) return;
-      setShowColumnOptions(false);
-    };
-    window.addEventListener('resize', updateColumnOptionsPosition);
-    window.addEventListener('scroll', updateColumnOptionsPosition, true);
-    document.addEventListener('mousedown', close);
-    return () => {
-      window.removeEventListener('resize', updateColumnOptionsPosition);
-      window.removeEventListener('scroll', updateColumnOptionsPosition, true);
-      document.removeEventListener('mousedown', close);
-    };
-  }, [showColumnOptions, updateColumnOptionsPosition]);
-
   useEffect(() => {
     const close = () => setContextMenu(null);
     document.addEventListener('click', close);
@@ -1551,23 +1380,13 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
       const [moved] = next.splice(fromIndex, 1);
       if (!moved) return prev;
       next.splice(toIndex, 0, moved);
-      if (businessId) {
-        const orderedCustomKeys = next.filter((col) => col.custom).map((col) => col.id);
-        updateCustomFieldPositions(businessId, orderedCustomKeys).catch((err) => {
-          console.error('[AppointmentsTable] Failed to persist custom field positions:', err.message);
-        });
-        setCustomFields((fields) => fields.map((field) => ({
-          ...field,
-          position: orderedCustomKeys.indexOf(field.key),
-        })));
-      }
       return next;
     });
-  }, [businessId]);
+  }, []);
 
   const resetColumnOrder = useCallback(() => {
-    setColumns(buildColumns(customFields, fieldConfig));
-  }, [customFields, fieldConfig]);
+    setColumns(buildColumns(fieldConfig));
+  }, [fieldConfig]);
 
   const setColumnHidden = useCallback((key, hidden) => {
     if (isColumnLocked(key)) return;
@@ -1595,8 +1414,8 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
     if (!rules.length) return appointments;
     return [...appointments].sort((a, b) => {
       for (const rule of rules) {
-        const aValue = isCustomFieldKey(rule.field) ? getCustomValue(a.custom_fields, rule.field) : a[rule.field];
-        const bValue = isCustomFieldKey(rule.field) ? getCustomValue(b.custom_fields, rule.field) : b[rule.field];
+        const aValue = a[rule.field];
+        const bValue = b[rule.field];
         const emptyA = aValue == null || aValue === '';
         const emptyB = bValue == null || bValue === '';
         let result = 0;
@@ -1865,7 +1684,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
       style={{ width: col.width, minWidth: col.width }}
       className={col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'}
     >
-      <AppointmentCell colId={col.id} appointment={appointment} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} selection={{ anySelected, isSelected: selectedIds.includes(appointment.id), toggle: toggleSelectedId }} lookupOptions={lookupOptions} receptionistsById={receptionistsById} getLatestAppointment={getLatestAppointment} />
+      <AppointmentCell colId={col.id} appointment={appointment} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} selection={{ anySelected, isSelected: selectedIds.includes(appointment.id), toggle: toggleSelectedId }} lookupOptions={lookupOptions} receptionistsById={receptionistsById} />
     </div>
   );
 
@@ -2056,7 +1875,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
                     onMouseLeave={() => setHoveredZoneColumnId((current) => (current === metric.id ? null : current))}
                     className="absolute top-[1px] h-4 z-20"
                     style={{ left: metric.left + 4, width: Math.max(metric.width - 8, 0) }}
-                    aria-label={`Create zone from ${fieldConfig[metric.id]?.name || columns[metric.index]?.label || metric.id}`}
+                    aria-label={`Create zone from ${columns[metric.index]?.label || metric.id}`}
                   />
                 ))}
                 {draftSpan?.metrics.map((metric) => (
@@ -2139,18 +1958,6 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
               </div>
               <div className="flex items-center gap-3 py-2 pr-5 group" style={{ paddingTop: '15px', paddingLeft: splitPaneScrollPadding }}>
                 {scrollableColumns.map((col) => renderHeaderColumn(col, columns.findIndex((column) => column.id === col.id)))}
-                <div className="shrink-0 pl-1">
-                  <button
-                    ref={columnOptionsButtonRef}
-                    type="button"
-                    onClick={toggleColumnOptions}
-                    className="w-7 h-7 rounded-xl border border-white/[0.06] bg-white/[0.025] text-zinc-600 hover:text-white hover:border-white/[0.14] hover:bg-white/[0.05] transition-all flex items-center justify-center"
-                    aria-label="Add column"
-                  >
-                    <Plus size={13} />
-                  </button>
-                </div>
-                {showColumnOptions && <div className="w-[190px] shrink-0" />}
               </div>
             </div>
           </div>
@@ -2282,7 +2089,6 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
       <FloatingPopover anchorRef={rowHeightButtonRef} open={activeControl === 'height'} onClose={() => setActiveControl(null)} width={190}>
         <RowHeightPopover value={density} onChange={(rowHeight) => updateViewSettings({ rowHeight })} />
       </FloatingPopover>
-
       <AnimatePresence>
         {zonePalette && (
           <ZoneColorPalette
@@ -2320,45 +2126,14 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             </button>
           </motion.div>
         )}
-        {showColumnOptions && (
-          <motion.div
-            data-column-options-menu="true"
-            initial={{ opacity: 0, y: -4, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.96 }}
-            style={{ top: columnOptionsPosition.top, bottom: columnOptionsPosition.bottom, left: columnOptionsPosition.left }}
-            className="fixed z-[220] w-[168px] origin-top-left overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_12px_28px_rgba(0,0,0,0.64)]"
-          >
-            <div className="py-1">
-              {column_options.map((option, idx) => {
-                const IconComp = FIELD_TYPE_ICONS[option.type] || Tag;
-                return (
-                  <motion.button
-                    key={option.type}
-                    type="button"
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.025 }}
-                    onClick={() => handleCreateColumn(option.type)}
-                    className="w-full px-3 py-2 text-left transition-all hover:bg-white/[0.04] flex items-center gap-2.5 group/fieldtype"
-                  >
-                    <IconComp size={13} className="text-zinc-600 group-hover/fieldtype:text-zinc-300 transition-colors" />
-                    <span className="text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 group-hover/fieldtype:text-white transition-colors">{option.label}</span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
         {settingsField && (
-          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={handleFieldHide} onClose={() => setSettingsField(null)} />
+          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={handleFieldHide} onClose={() => setSettingsField(null)} allowNameEditing={false} showIntake={false} />
         )}
         {showColorbarStudio && (
           <AppointmentColorbarConfigModal
             onClose={() => setShowColorbarStudio(false)}
             onRulesChange={handleColorbarRulesChange}
             columns={columns}
-            customFields={customFields}
             fieldConfig={fieldConfig}
           />
         )}

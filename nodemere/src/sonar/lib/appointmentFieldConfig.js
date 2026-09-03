@@ -1,6 +1,6 @@
 import { STATUS_OPTIONS, SOURCE_OPTIONS } from './appointmentSchema';
 import { supabase } from './supabase';
-import { getCurrentBusinessId, getCustomValue, isCustomFieldKey } from './appointmentCustomFields';
+import { getCurrentBusinessId } from './customFields';
 
 const STORAGE_KEY = 'SONAR_appointments_field_config';
 const COLORBAR_KEY = 'SONAR_appointments_colorbar_rules';
@@ -165,7 +165,7 @@ export const evaluateColorbar = (appointment, rules) => {
 
 const checkCondition = (appointment, condition) => {
   const { field, operator, value } = condition;
-  const appointmentVal = isCustomFieldKey(field) ? getCustomValue(appointment?.custom_fields, field) : appointment[field];
+  const appointmentVal = appointment?.[field];
   if (appointmentVal == null && operator !== 'is_empty' && operator !== 'is_not_empty') return false;
 
   switch (operator) {

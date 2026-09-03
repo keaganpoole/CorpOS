@@ -308,6 +308,10 @@ const FieldSettingsModal = ({
   onHide,
   onClose,
   intakeEnabledCount = 0,
+  intakeCreationText = 'a new person record',
+  intakeSummaryText = 'new-record creation',
+  allowNameEditing = true,
+  showIntake = true,
 }) => {
   const [name, setName] = useState(fieldConfig?.name || fieldKey);
   const [icon, setIcon] = useState(fieldConfig?.icon || 'tag');
@@ -321,6 +325,8 @@ const FieldSettingsModal = ({
   const isCustomField = typeof fieldKey === 'string' && fieldKey.startsWith('custom_');
   const isDocsField = fieldMeta?.type === 'docs';
   const isOptionsField = fieldMeta?.type === 'select' || fieldMeta?.type === 'multi_select';
+  const initialIntakeEnabled = Boolean(fieldConfig?.intakeEnabled);
+  const previewIntakeEnabledCount = intakeEnabledCount + (intakeEnabled === initialIntakeEnabled ? 0 : (intakeEnabled ? 1 : -1));
   const normalizedOptions = useMemo(() => (
     Array.isArray(fieldConfig?.options)
       ? fieldConfig.options.map((opt) => getOptionValue(opt)).filter(Boolean)
@@ -392,11 +398,11 @@ const FieldSettingsModal = ({
   };
 
   const tabs = [
-    { key: 'name', label: 'Name & Icon', icon: <Type size={12} /> },
-    ...(!isDocsField ? [{ key: 'intake', label: 'Intake', icon: <ClipboardList size={12} /> }] : []),
+    { key: 'name', label: allowNameEditing ? 'Name & Icon' : 'Icon', icon: <Type size={12} /> },
+    ...(showIntake && !isDocsField ? [{ key: 'intake', label: 'Intake', icon: <ClipboardList size={12} /> }] : []),
     ...(hasOptions ? [{ key: 'colors', label: 'Options', icon: <Palette size={12} /> }] : []),
   ];
-  const intakeStyles = getIntakeBadgeStyles(intakeEnabledCount);
+  const intakeStyles = getIntakeBadgeStyles(previewIntakeEnabledCount);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -483,24 +489,26 @@ const FieldSettingsModal = ({
           <div className="space-y-5">
           {activeTab === 'name' && (
             <>
-              <div>
-                <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Display Name</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-white/[0.18] focus:!outline-none"
-                    placeholder="Field name..."
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-mono tracking-[-0.01em] text-zinc-700">
-                    {name.length}/30
+              {allowNameEditing && (
+                <div>
+                  <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Display Name</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full rounded-xl border border-white/[0.06] bg-black/40 px-4 py-3 text-[13px] leading-relaxed text-white transition-colors focus:border-white/[0.18] focus:!outline-none"
+                      placeholder="Field name..."
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-mono tracking-[-0.01em] text-zinc-700">
+                      {name.length}/30
+                    </div>
                   </div>
+                  <p className="mt-1.5 text-[8px] text-zinc-700">
+                    Shows as the name of the column.
+                  </p>
                 </div>
-                <p className="mt-1.5 text-[8px] text-zinc-700">
-                  Shows as the name of the column.
-                </p>
-              </div>
+              )}
 
               {isCustomField && (
                 <div>
@@ -543,19 +551,19 @@ const FieldSettingsModal = ({
             </>
           )}
 
-          {activeTab === 'intake' && (
+          {showIntake && activeTab === 'intake' && (
             <div className="space-y-6">
               <div className="flex items-end justify-between gap-4 border-b border-white/[0.05] pb-5">
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Intake Fields Enabled</div>
                   <div className="mt-2 flex items-end gap-2">
-                    <span className={`text-[30px] font-semibold leading-none tracking-[-0.05em] ${intakeStyles.accent}`}>{intakeEnabledCount}</span>
+                    <span className={`text-[30px] font-semibold leading-none tracking-[-0.05em] ${intakeStyles.accent}`}>{previewIntakeEnabledCount}</span>
                     <span className="pb-1 text-[11px] font-medium text-zinc-500">recommended under 6</span>
                   </div>
                 </div>
                 <div className={`flex items-center gap-2 pb-1 text-[10px] font-semibold tracking-[-0.02em] ${intakeStyles.accent}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${intakeStyles.dot}`} />
-                  {intakeEnabledCount >= 8 ? 'Heavy' : intakeEnabledCount >= 6 ? 'Balanced' : 'Lean'}
+                  {previewIntakeEnabledCount >= 8 ? 'Heavy' : previewIntakeEnabledCount >= 6 ? 'Balanced' : 'Lean'}
                 </div>
               </div>
 
@@ -581,7 +589,7 @@ const FieldSettingsModal = ({
                 <div className="min-w-0">
                   <label className="block text-[12px] font-semibold tracking-[-0.02em] text-white">Prioritize this field during intake</label>
                   <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
-                    When enabled, this field can be treated as required context for the inbound agent when creating a new person record.
+                    When enabled, this field can be treated as required context for the inbound agent when creating {intakeCreationText}.
                   </p>
                 </div>
               </div>
@@ -593,7 +601,7 @@ const FieldSettingsModal = ({
               )}
 
               <p className="border-t border-white/[0.04] pt-4 text-[10px] leading-relaxed text-zinc-600">
-                A smaller intake list gives the agent a cleaner path through new-record creation. Keeping the total under six helps reduce prompt size and token usage without stripping out the fields that matter.
+                A smaller intake list gives the agent a cleaner path through {intakeSummaryText}. Keeping the total under six helps reduce prompt size and token usage without stripping out the fields that matter.
               </p>
             </div>
           )}

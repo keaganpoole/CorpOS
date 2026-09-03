@@ -11,7 +11,6 @@ import {
   normalizeOptionValue,
 } from '../lib/appointmentSchema';
 import { DEFAULT_FIELD_CONFIG } from '../lib/appointmentFieldConfig';
-import { getCustomValue, isCustomFieldKey, setCustomFieldValue } from '../lib/appointmentCustomFields';
 
 const getOptionValue = (option) => normalizeOptionValue(typeof option === 'string' ? option : option?.value);
 const getConfiguredOptions = (field, fieldConfig) => fieldConfig?.[field.key]?.options || field.options || [];
@@ -210,24 +209,20 @@ const buildPanelFields = (tableSchema) => {
     { id: 'person_id', label: 'Customer / Person' },
     ...TABLE_COLUMNS.filter((field) => field.key !== 'person_id').map((field) => ({ id: field.key, label: field.label })),
   ];
-  const customFields = tableSchema?.customFields || [];
   const fieldConfig = tableSchema?.fieldConfig || DEFAULT_FIELD_CONFIG;
-  const customByKey = new Map(customFields.map((field) => [field.key, field]));
 
   return columns
     .filter((column) => column.id !== 'select' && column.id !== 'avatar')
     .map((column) => {
-      const customField = customByKey.get(column.id);
-      const baseField = customField || getFieldDef(column.id);
+      const baseField = getFieldDef(column.id);
       if (!baseField) return null;
       const config = fieldConfig[column.id] || {};
       return {
         ...baseField,
         key: column.id,
-        label: config.name || baseField.label || column.label,
+        label: baseField.label || column.label,
         options: config.options || baseField.options || [],
         optionColors: config.optionColors || {},
-        custom: Boolean(customField) || isCustomFieldKey(column.id),
         editable: baseField.editable !== false,
       };
     })
@@ -304,7 +299,7 @@ const AppointmentDetailPanel = ({ appointment, onSave, onDelete, onClose, isNew 
 
   const currentAppointment = useMemo(() => {
     const base = isNew ? {} : (appointment || {});
-    const merged = { ...base, ...edits, custom_fields: { ...(base.custom_fields || {}), ...(edits.custom_fields || {}) } };
+    const merged = { ...base, ...edits };
     return merged;
   }, [appointment, edits, isNew]);
 
@@ -316,13 +311,6 @@ const AppointmentDetailPanel = ({ appointment, onSave, onDelete, onClose, isNew 
 
   const handleChange = (field, value) => {
     setEdits((prev) => {
-      if (field.custom) {
-        return {
-          ...prev,
-          custom_fields: setCustomFieldValue(currentAppointment.custom_fields, field.key, value),
-        };
-      }
-
       const next = { ...prev, [field.key]: value };
       return next;
     });
@@ -412,12 +400,11 @@ const AppointmentDetailPanel = ({ appointment, onSave, onDelete, onClose, isNew 
         <div className="custom-scrollbar flex-1 overflow-y-auto px-7 py-5">
           <div className="space-y-4">
             {fields.map((field) => {
-              const value = field.custom ? getCustomValue(currentAppointment.custom_fields, field.key) : currentAppointment[field.key];
+              const value = currentAppointment[field.key];
               return (
                 <div key={field.key} className="space-y-2">
                   <label className="flex items-center justify-between gap-3">
                     <span className="min-w-0 truncate text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">{field.label}</span>
-                    {field.custom && <span className="shrink-0 rounded-md bg-white/[0.035] px-1.5 py-0.5 text-[9px] font-semibold tracking-[-0.02em] text-zinc-700">Custom</span>}
                   </label>
                   <FieldEditor
                     field={field}

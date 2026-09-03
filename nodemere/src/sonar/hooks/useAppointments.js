@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { getCurrentBusinessId } from '../lib/appointmentCustomFields';
+import { getCurrentBusinessId } from '../lib/customFields';
 import { computeEndTime, normalizeOptionValue, titleCase } from '../lib/appointmentSchema';
 import { api } from '../lib/api';
 
@@ -148,7 +148,7 @@ export function useAppointments() {
       const userId = authData?.user?.id || null;
 
       const [{ data: appointmentRows, error: appointmentsError }, { data: peopleRows, error: peopleError }, { data: serviceRows, error: servicesError }] = await Promise.all([
-        supabase.from('appointments').select('*').eq('business_id', businessId).order(sortBy, { ascending: sortDir === 'asc', nullsFirst: false }),
+        supabase.from('appointments').select('id,date,time,duration,status,source,notes,person_id,service_id,staff_id,business_id,receptionist_id,created_at,updated_at').eq('business_id', businessId).order(sortBy, { ascending: sortDir === 'asc', nullsFirst: false }),
         supabase.from('people').select('id,first_name,last_name,phone,email').eq('business_id', businessId).order('updated_at', { ascending: false }),
         supabase.from('services').select('id,name,category,is_active').eq('business_id', businessId).order('category', { ascending: true }).order('sort_order', { ascending: true }),
       ]);
@@ -269,13 +269,7 @@ export function useAppointments() {
       business_id: businessId,
     }, { isCreate: true });
 
-    const { data, error: err } = await supabase
-      .from('appointments')
-      .insert(payload)
-      .select()
-      .single();
-
-    if (err) throw err;
+    const data = await api.createAppointment(payload);
     markJustAdded(data.id);
     if (options.placement === 'end') {
       pendingInsertPlacementRef.current.set(data.id, 'end');
@@ -297,14 +291,10 @@ export function useAppointments() {
       return { ...row, ...payload };
     }));
 
-    const { data, error: err } = await supabase
-      .from('appointments')
-      .update(payload)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (err) {
+    let data;
+    try {
+      data = await api.updateAppointment(id, payload);
+    } catch (err) {
       if (previousRow) {
         setAppointments((prev) => prev.map((row) => (row.id === id ? previousRow : row)));
       }
@@ -316,11 +306,7 @@ export function useAppointments() {
   };
 
   const deleteAppointment = async (id) => {
-    const { error: err } = await supabase
-      .from('appointments')
-      .delete()
-      .eq('id', id);
-    if (err) throw err;
+    await api.deleteAppointment(id);
     setAppointments((prev) => prev.filter((row) => row.id !== id));
     if (selectedId === id) setSelectedId(null);
   };

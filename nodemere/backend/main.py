@@ -3872,187 +3872,6 @@ def add_person_custom_dynamic_variables(dynamic_variables: dict, person: Optiona
     return dynamic_variables
 
 
-def load_appointment_schema_rows(business_id: Optional[str]) -> list[dict]:
-    if business_id is None:
-        return []
-    try:
-        response = (
-            supabase.table("appointments_schema")
-            .select("field_key,label,field_type,config,is_active,position,created_at")
-            .eq("business_id", str(business_id))
-            .eq("is_active", True)
-            .order("position", ascending=True)
-            .order("created_at", ascending=True)
-            .execute()
-        )
-        return response.data or []
-    except Exception as exc:
-        logging.warning("Failed to load appointment schema rows: %s", exc)
-        return []
-
-
-def load_appointment_schema_types(business_id: Optional[str]) -> dict:
-    return {
-        str(row.get("field_key")): row.get("field_type")
-        for row in load_appointment_schema_rows(business_id)
-        if row.get("field_key")
-    }
-
-
-def load_appointment_schema_labels(business_id: Optional[str]) -> dict:
-    return {
-        str(row.get("field_key")): row.get("label")
-        for row in load_appointment_schema_rows(business_id)
-        if row.get("field_key")
-    }
-
-
-def coerce_appointment_custom_field_value(value, field_type: Optional[str] = None):
-    if value is None:
-        return None
-    if field_type == "boolean":
-        if isinstance(value, bool):
-            return value
-        normalized = str(value).strip().lower()
-        if normalized in {"true", "yes", "1", "on"}:
-            return True
-        if normalized in {"false", "no", "0", "off"}:
-            return False
-    if field_type == "number":
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return value
-    if field_type == "date":
-        return normalize_appointment_date_value(value, fallback=str(value).strip())
-    if field_type == "multi_select" and not isinstance(value, list):
-        return [value]
-    return value
-
-
-def normalize_appointment_payload_custom_fields(
-    payload: dict,
-    business_id: Optional[str],
-    existing_custom_fields: Optional[dict] = None,
-) -> dict:
-    normalized = {**(payload or {})}
-    field_types = load_appointment_schema_types(business_id)
-    merged_custom_fields = {
-        **((existing_custom_fields or {}) if isinstance(existing_custom_fields, dict) else {}),
-        **((normalized.get("custom_fields") or {}) if isinstance(normalized.get("custom_fields"), dict) else {}),
-    }
-
-    for key in list(normalized.keys()):
-        if not str(key).startswith("custom_"):
-            continue
-        merged_custom_fields[key] = coerce_appointment_custom_field_value(
-            normalized.pop(key),
-            field_types.get(str(key)),
-        )
-
-    if merged_custom_fields:
-        normalized["custom_fields"] = {
-            key: value for key, value in merged_custom_fields.items() if value is not None
-        }
-    elif "custom_fields" in normalized and not isinstance(normalized.get("custom_fields"), dict):
-        normalized.pop("custom_fields", None)
-
-    return normalized
-
-
-APPOINTMENT_INTAKE_BASE_FIELDS = {
-    "person_id": {"label": "Customer / Person", "type": "person_lookup"},
-    "service_id": {"label": "Service", "type": "service_lookup"},
-    "date": {"label": "Date", "type": "date"},
-    "time": {"label": "Start Time", "type": "time"},
-    "duration": {"label": "Duration", "type": "number"},
-    "status": {"label": "Status", "type": "select"},
-    "source": {"label": "Source", "type": "select"},
-    "notes": {"label": "Notes", "type": "textarea"},
-    "receptionist_id": {"label": "Assigned Receptionist", "type": "receptionist_lookup"},
-}
-
-
-def build_appointment_intake_fields(business: Optional[dict]) -> list[dict]:
-    if not business:
-        return []
-
-    business_id = business.get("id")
-    raw_config = business.get("appointments_field_config")
-    config = raw_config if isinstance(raw_config, dict) else {}
-    enabled_keys = [
-        str(field_key)
-        for field_key, field_settings in config.items()
-        if isinstance(field_settings, dict) and field_settings.get("intakeEnabled") is True
-    ]
-    if not enabled_keys:
-        return []
-
-    custom_schema_by_key = {
-        str(row.get("field_key")): row
-        for row in load_appointment_schema_rows(str(business_id) if business_id is not None else None)
-        if row.get("field_key")
-    }
-    intake_fields = []
-    for field_key in enabled_keys:
-        if field_key in {"created_at", "updated_at", "scenario_id"}:
-            continue
-        field_settings = config.get(field_key) if isinstance(config.get(field_key), dict) else {}
-        custom_row = custom_schema_by_key.get(field_key, {})
-        config_blob = custom_row.get("config") if isinstance(custom_row.get("config"), dict) else {}
-        fallback_meta = APPOINTMENT_INTAKE_BASE_FIELDS.get(field_key, {})
-        label = (
-            field_settings.get("name")
-            or custom_row.get("label")
-            or fallback_meta.get("label")
-            or field_key
-        )
-        field_type = (
-            custom_row.get("field_type")
-            or config_blob.get("field_type")
-            or fallback_meta.get("type")
-            or "text"
-        )
-        description = (
-            field_settings.get("description")
-            or config_blob.get("description")
-            or ""
-        )
-        intake_fields.append({
-            "key": field_key,
-            "label": label,
-            "type": field_type,
-            "description": description,
-            "required": True,
-            "custom": field_key.startswith("custom_"),
-        })
-    return intake_fields
-
-
-def add_appointment_intake_dynamic_variables(dynamic_variables: dict, business: Optional[dict]):
-    intake_fields = build_appointment_intake_fields(business)
-    dynamic_variables["appointment_intake_fields_enabled_count"] = len(intake_fields)
-    if not intake_fields:
-        dynamic_variables["appointment_intake_fields"] = "[]"
-        dynamic_variables["appointment_intake_fields_summary"] = ""
-        dynamic_variables["appointment_intake_collection_guidance"] = ""
-        return dynamic_variables
-
-    summary_parts = []
-    for field in intake_fields:
-        label = str(field.get("label") or field.get("key") or "").strip()
-        description = str(field.get("description") or "").strip()
-        summary_parts.append(f"{label}: {description}" if description else label)
-
-    dynamic_variables["appointment_intake_fields"] = json.dumps(intake_fields, ensure_ascii=True)
-    dynamic_variables["appointment_intake_fields_summary"] = " | ".join(summary_parts)
-    dynamic_variables["appointment_intake_collection_guidance"] = (
-        "When booking an appointment, prioritize collecting every field in appointment_intake_fields. "
-        "Treat them as required before the appointment is considered complete."
-    )
-    return dynamic_variables
-
-
 PEOPLE_INTAKE_BASE_FIELDS = {
     "first_name": {"label": "First Name", "type": "text"},
     "last_name": {"label": "Last Name", "type": "text"},
@@ -7200,10 +7019,6 @@ async def twilio_inbound_webhook(request: Request):
         register_payload["conversation_initiation_client_data"]["scenario_context"],
         business,
     )
-    add_appointment_intake_dynamic_variables(
-        register_payload["conversation_initiation_client_data"]["scenario_context"],
-        business,
-    )
     matched_person = lookup_person_record(
         phone_number=from_number,
         business_id=str(business.get("id")) if business and business.get("id") is not None else None,
@@ -7328,7 +7143,6 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
         "twilio_call_sid": call_payload.get("call_id"),
     }
     add_people_intake_dynamic_variables(dynamic_variables, business)
-    add_appointment_intake_dynamic_variables(dynamic_variables, business)
     matched_person = lookup_person_record(
         phone_number=call_payload.get("from_number"),
         business_id=str(business.get("id")) if business and business.get("id") is not None else None,
@@ -7713,17 +7527,6 @@ async def legacy_server_tool(
         merged_payload = {**intake_values, **payload}
         merged_payload.pop("intake_values", None)
         merged_payload.pop("intake_values_json", None)
-        custom_fields_json = first_present(merged_payload, "custom_fields_json")
-        if custom_fields_json:
-            try:
-                parsed_custom_fields = json.loads(str(custom_fields_json))
-            except json.JSONDecodeError as exc:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string") from exc
-            if not isinstance(parsed_custom_fields, dict):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string")
-            merged_payload.update(parsed_custom_fields)
-        merged_payload.pop("custom_fields_json", None)
-
         if first_present(merged_payload, "phone", "customer_phone", "caller_number"):
             merged_payload["phone"] = first_present(merged_payload, "phone", "customer_phone", "caller_number")
         if first_present(merged_payload, "email", "customer_email"):
@@ -8127,34 +7930,6 @@ async def legacy_server_tool(
         merged_payload = {**intake_values, **payload}
         merged_payload.pop("intake_values", None)
         merged_payload.pop("intake_values_json", None)
-        custom_fields_json = first_present(merged_payload, "custom_fields_json")
-        if custom_fields_json:
-            try:
-                parsed_custom_fields = json.loads(str(custom_fields_json))
-            except json.JSONDecodeError as exc:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string") from exc
-            if not isinstance(parsed_custom_fields, dict):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string")
-            merged_payload.update(parsed_custom_fields)
-        merged_payload.pop("custom_fields_json", None)
-        missing_intake_fields = [
-            {
-                "key": field.get("key"),
-                "label": field.get("label") or field.get("key"),
-                "type": field.get("type"),
-                "custom": bool(field.get("custom")),
-            }
-            for field in build_appointment_intake_fields(business)
-            if field.get("required") is True and not is_present_intake_value(merged_payload.get(field.get("key")))
-        ]
-        if missing_intake_fields:
-            return {
-                "ok": False,
-                "appointment": None,
-                "reason": "Missing required appointment intake fields",
-                "missing_intake_fields": missing_intake_fields,
-            }
-
         appointment_date = normalize_appointment_date_value(first_present(merged_payload, "date", "appointment_date"))
         appointment_time = normalize_appointment_time_value(first_present(merged_payload, "time", "appointment_time"))
         appointment_duration = normalize_appointment_duration(first_present(merged_payload, "duration", "appointment_duration"))
@@ -8192,16 +7967,6 @@ async def legacy_server_tool(
         }
         if first_present(merged_payload, "source") is not None:
             appointment_row["source"] = first_present(merged_payload, "source")
-        appointment_custom_payload = {
-            key: value for key, value in merged_payload.items()
-            if key == "custom_fields" or str(key).startswith("custom_")
-        }
-        normalized_custom_payload = normalize_appointment_payload_custom_fields(
-            appointment_custom_payload,
-            business.get("id"),
-        )
-        if isinstance(normalized_custom_payload.get("custom_fields"), dict):
-            appointment_row["custom_fields"] = normalized_custom_payload["custom_fields"]
         response = supabase.table("appointments").insert(appointment_row).execute()
         created = response.data[0] if response.data else appointment_row
         created = {"action": "create_appointment", "table": "appointments", **created}
@@ -8231,16 +7996,6 @@ async def legacy_server_tool(
         if not existing:
             return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "Appointment not found"}}
         update_payload = {**payload}
-        custom_fields_json = first_present(update_payload, "custom_fields_json")
-        if custom_fields_json:
-            try:
-                parsed_custom_fields = json.loads(str(custom_fields_json))
-            except json.JSONDecodeError as exc:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string") from exc
-            if not isinstance(parsed_custom_fields, dict):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields_json must be a valid JSON object string")
-            update_payload.update(parsed_custom_fields)
-        update_payload.pop("custom_fields_json", None)
         updates = {}
         if first_present(payload, "date", "appointment_date") is not None:
             updates["date"] = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
@@ -8270,17 +8025,6 @@ async def legacy_server_tool(
             )
             if safe_staff_id is not None:
                 updates["staff_id"] = safe_staff_id
-        custom_update_payload = {
-            key: value for key, value in update_payload.items()
-            if key == "custom_fields" or str(key).startswith("custom_")
-        }
-        normalized_custom_payload = normalize_appointment_payload_custom_fields(
-            custom_update_payload,
-            business.get("id") if business else existing.get("business_id"),
-            existing.get("custom_fields"),
-        )
-        if isinstance(normalized_custom_payload.get("custom_fields"), dict):
-            updates["custom_fields"] = normalized_custom_payload["custom_fields"]
         schedule_fields_changed = any(field in updates for field in ("date", "time", "duration", "staff_id"))
         candidate_status = updates.get("status", existing.get("status"))
         if schedule_fields_changed and str(candidate_status or "").strip().lower() not in {"cancelled", "completed", "missed"}:
@@ -9825,7 +9569,7 @@ async def create_sonar_service(payload: dict, current_user: dict = Depends(get_c
 @app.get("/api/sonar/appointments", tags=["Sonar Appointments"])
 async def list_sonar_appointments(limit: int = 100, current_user: dict = Depends(get_current_user)):
     business = load_business_by_user_id(str(current_user.id))
-    query = supabase.table("appointments").select("*")
+    query = supabase.table("appointments").select("id,date,time,duration,status,source,notes,person_id,service_id,staff_id,business_id,receptionist_id,created_at,updated_at")
     if business:
         try:
             query = query.eq("business_id", business["id"])
@@ -9878,17 +9622,6 @@ async def create_sonar_appointment(payload: dict, current_user: dict = Depends(g
     }
     if first_present(payload, "source") is not None:
         appointment_row["source"] = first_present(payload, "source")
-    custom_payload = {
-        key: value for key, value in payload.items()
-        if key == "custom_fields" or str(key).startswith("custom_")
-    }
-    normalized_custom_payload = normalize_appointment_payload_custom_fields(
-        custom_payload,
-        business["id"],
-    )
-    if isinstance(normalized_custom_payload.get("custom_fields"), dict):
-        appointment_row["custom_fields"] = normalized_custom_payload["custom_fields"]
-
     response = supabase.table("appointments").insert(appointment_row).execute()
     created = response.data[0] if response.data else appointment_row
     claim_nest_milestone(
@@ -10028,17 +9761,6 @@ async def update_sonar_appointment(appointment_id: str, payload: dict, current_u
         )
         if safe_staff_id is not None:
             updates["staff_id"] = safe_staff_id
-    custom_payload = {
-        key: value for key, value in payload.items()
-        if key == "custom_fields" or str(key).startswith("custom_")
-    }
-    normalized_custom_payload = normalize_appointment_payload_custom_fields(
-        custom_payload,
-        (business or {}).get("id") or existing_response.data[0].get("business_id"),
-        existing_response.data[0].get("custom_fields"),
-    )
-    if isinstance(normalized_custom_payload.get("custom_fields"), dict):
-        updates["custom_fields"] = normalized_custom_payload["custom_fields"]
     if not updates:
         return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
 

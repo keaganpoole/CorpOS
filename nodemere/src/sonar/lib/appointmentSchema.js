@@ -41,7 +41,7 @@ export const APPOINTMENT_FIELDS = [
   { key: 'time', label: 'Start Time', type: 'time', required: true, table: true, tableWidth: '130px', section: 'schedule', editable: true },
   { key: 'duration', label: 'Duration', type: 'number', min: 0, max: 1440, required: false, table: false, tableWidth: '120px', section: 'schedule', editable: true },
   { key: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS, required: false, table: true, tableWidth: '140px', section: 'appointment', editable: true },
-  { key: 'source', label: 'Source', type: 'select', options: SOURCE_OPTIONS, required: false, table: true, tableWidth: '140px', section: 'appointment', editable: true },
+  { key: 'source', label: 'Source', type: 'select', options: SOURCE_OPTIONS, required: false, table: false, tableWidth: '140px', section: 'appointment', editable: true },
   { key: 'notes', label: 'Notes', type: 'textarea', required: false, table: true, tableWidth: '280px', section: 'notes', editable: true },
   { key: 'receptionist_id', label: 'Assigned Receptionist', type: 'receptionist_lookup', required: false, table: true, tableWidth: '190px', section: 'assignment', editable: true },
   { key: 'scenario_id', label: 'Scenario', type: 'text', required: false, table: false, tableWidth: '180px', section: 'system', editable: false },
