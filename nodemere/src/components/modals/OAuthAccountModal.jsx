@@ -51,7 +51,7 @@ const OAuthAccountModal = ({ isOpen, onClose, encryptionKey, showNotification, s
             );
             return { ...acc, decryptedPassword: decryptedPass };
           } catch (e) {
-            console.error('Decryption failed for OAuth account:', e);
+            console.error("OAuthAccountModal.jsx:event_54");
             return { ...acc, decryptedPassword: '[Decryption Error]' };
           }
         }
@@ -59,7 +59,7 @@ const OAuthAccountModal = ({ isOpen, onClose, encryptionKey, showNotification, s
       }));
       setSavedOAuthAccounts(decryptedAccounts);
     } catch (err) {
-      console.error('Failed to fetch OAuth accounts:', err);
+      console.error("OAuthAccountModal.jsx:event_62");
       setError('Failed to load saved accounts.');
     }
   }, [session, encryptionKey, selectedProvider]);
@@ -111,7 +111,7 @@ const OAuthAccountModal = ({ isOpen, onClose, encryptionKey, showNotification, s
       setPassword('');
       setEditingAccount(null);
     } catch (err) {
-      console.error('Failed to save OAuth account:', err);
+      console.error("OAuthAccountModal.jsx:event_114");
       setError('Failed to save account. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -124,7 +124,7 @@ const OAuthAccountModal = ({ isOpen, onClose, encryptionKey, showNotification, s
       showNotification('Account deleted successfully!');
       fetchOAuthAccounts();
     } catch (err) {
-      console.error('Failed to delete OAuth account:', err);
+      console.error("OAuthAccountModal.jsx:event_127");
       setError('Failed to delete account. Please try again.');
     }
   };
@@ -286,4 +286,4 @@ const OAuthAccountModal = ({ isOpen, onClose, encryptionKey, showNotification, s
   );
 };
  
-export default OAuthAccountModal;  
+export default OAuthAccountModal;

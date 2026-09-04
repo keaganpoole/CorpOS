@@ -79,7 +79,7 @@ export const DashboardPage = () => {
                 try {
                     const { data: { user }, error: userError } = await supabase.auth.getUser();
                     if (userError || !user) {
-                        console.error('Error fetching user:', userError);
+                        console.error("DashboardPage.jsx:event_82");
                         navigate('/auth'); // Redirect to auth if no user
                         return;
                     }
@@ -88,7 +88,7 @@ export const DashboardPage = () => {
                     const { data, error } = await fetchUserPlanAndPopupStatus();
     
                     if (error) {
-                        console.error('Error fetching user plan and popup status:', error);
+                        console.error("DashboardPage.jsx:event_91");
                         return;
                     }
     
@@ -113,7 +113,7 @@ export const DashboardPage = () => {
 
                     const { data: swiperData, error: swiperError } = await fetchUserSwiperPopupStatus();
                     if (swiperError) {
-                      console.error('Error fetching swiper popup status:', swiperError);
+                      console.error("DashboardPage.jsx:event_116");
                     } else if (swiperData && (swiperData.popup_swiper === false || swiperData.popup_swiper === null)) {
                         newModalQueue.push('swiperIntro');
                     }
@@ -143,7 +143,7 @@ export const DashboardPage = () => {
   const handleClosePlanChangePopup = async () => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      console.error('Error fetching user for popup close:', userError);
+      console.error("DashboardPage.jsx:event_146");
       handleCloseModal('planChange');
       return;
     }
@@ -155,7 +155,7 @@ export const DashboardPage = () => {
       .single();
 
     if (profileError) {
-      console.error('Error fetching popup state:', profileError);
+      console.error("DashboardPage.jsx:event_158");
       handleCloseModal('planChange');
       return;
     }
@@ -172,7 +172,7 @@ export const DashboardPage = () => {
     });
 
     if (error) {
-      console.error('Error updating welcome popup:', error);
+      console.error("DashboardPage.jsx:event_175");
     }
     handleCloseModal('planChange');
   };
@@ -181,7 +181,7 @@ export const DashboardPage = () => {
     if (dontRemindAgain) {
       const { error } = await updateUserSwiperPopupStatus(true);
       if (error) {
-        console.error('Error updating swiper popup status:', error);
+        console.error("DashboardPage.jsx:event_184");
       }
     }
     handleCloseModal('swiperIntro');
@@ -191,13 +191,13 @@ export const DashboardPage = () => {
     if (dontRemindAgain) {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
-        console.error('Error fetching user for tutorial popup close:', userError);
+        console.error("DashboardPage.jsx:event_194");
         handleCloseModal('tutorial');
         return;
       }
       const { error } = await updateTableRecord('users', user.id, { hide_tutorial_modal: true });
       if (error) {
-        console.error('Error updating hide_tutorial_modal:', error);
+        console.error("DashboardPage.jsx:event_200");
       }
     }
     handleCloseModal('tutorial');

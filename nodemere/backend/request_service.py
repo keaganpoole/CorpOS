@@ -82,7 +82,7 @@ def create_request(
     url = f"{base_url.rstrip('/')}/{path_prefix.strip('/')}/{quote(token, safe='')}"
     # Raw request tokens must never be written to server logs. Delivery layers
     # receive the URL in memory and are responsible for sending it securely.
-    logging.info("[request] created request_type=%s request_id=%s", request_type, saved.get("id"))
+    logging.info('request_service.create_request.event_85')
     return {
         "success": True, "request_id": str(saved.get("id")), "session_id": str(saved.get("id")),
         "request_type": request_type, "status": "pending",
@@ -92,6 +92,8 @@ def create_request(
 
 def get_request_status(supabase, *, request_id=None, token=None, request_type=None, business_id=None) -> dict:
     row = load_request_by_token(supabase, token, request_type) if token else None
+    if row and business_id is not None and str(row.get("business_id")) != str(business_id):
+        return {"success":False,"status":"not_found","message":"Request not found"}
     if not row and request_id:
         query = supabase.table(REQUEST_TABLE).select("*").eq("id", str(request_id)).limit(1)
         if business_id is not None:

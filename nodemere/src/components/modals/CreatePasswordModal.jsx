@@ -155,7 +155,7 @@ const CreatePasswordModal = ({ isOpen, onClose, onCreate, encryptionKey, getOAut
                                 );
                                 return { ...login, decryptedPassword: decryptedPass };
                             } catch (e) {
-                                console.error('Decryption failed for saved OAuth login:', e);
+                                console.error("CreatePasswordModal.jsx:event_158");
                                 return { ...login, decryptedPassword: '[Decryption Error]' };
                             }
                         }
@@ -173,7 +173,7 @@ const CreatePasswordModal = ({ isOpen, onClose, onCreate, encryptionKey, getOAut
                         }
                     }
                 } catch (error) {
-                    console.error('Failed to fetch saved OAuth logins:', error);
+                    console.error("CreatePasswordModal.jsx:event_176");
                     setSavedOAuthLogins([]);
                     setShowSavedAccountsModal(false);
                 }
@@ -275,7 +275,7 @@ const CreatePasswordModal = ({ isOpen, onClose, onCreate, encryptionKey, getOAut
                 setSelectedTags([]);
             }
         } catch (error) {
-            console.error('Error fetching user tags:', error.message);
+            console.error("CreatePasswordModal.jsx:event_278");
             setUserCategories([]);
         }
     }, [session]);
@@ -432,7 +432,7 @@ const CreatePasswordModal = ({ isOpen, onClose, onCreate, encryptionKey, getOAut
                         companyTagDisplayElement.textContent = 'Account Identified';
                     }
                 } catch (error) {
-                    console.error('Error fetching account tag:', error.message);
+                    console.error("CreatePasswordModal.jsx:event_435");
                     companyTagDisplayElement.textContent = 'Account Identified';
                 }
             };
@@ -440,7 +440,7 @@ const CreatePasswordModal = ({ isOpen, onClose, onCreate, encryptionKey, getOAut
             fetchAndDisplayTag();
 
             const updateGradients = () => {
-                console.log('updateGradients: Calling applyDynamicGradient.', { logoSrc: logoElement.src, logoComplete: logoElement.complete });
+                console.debug("CreatePasswordModal.jsx:event_443");
                 applyDynamicGradient(colorThief.current, logoElement, tileGradientBg);
                 if (tileGradientBg) tileGradientBg.style.opacity = 0.8; 
                 applyDynamicGradient(colorThief.current, logoElement, modalDynamicBgRef.current);
@@ -503,7 +503,7 @@ const CreatePasswordModal = ({ isOpen, onClose, onCreate, encryptionKey, getOAut
             
             addTagBtnRef.current?.classList.remove('tag-btn-active');
         } catch (error) {
-            console.error('Error creating tag:', error.message);
+            console.error("CreatePasswordModal.jsx:event_506");
         }
     };
 
@@ -525,7 +525,7 @@ const CreatePasswordModal = ({ isOpen, onClose, onCreate, encryptionKey, getOAut
                 setSelectedTags(prev => prev.filter(tag => tag !== tagToDelete)); // Deselect if the deleted tag was selected
             }
         } catch (error) {
-            console.error('Error deleting tag:', error.message);
+            console.error("CreatePasswordModal.jsx:event_528");
         }
     }, [session, userCategories, selectedTags]);
 
@@ -542,14 +542,14 @@ const CreatePasswordModal = ({ isOpen, onClose, onCreate, encryptionKey, getOAut
                 const color2 = `rgb(${palette[1][0]}, ${palette[1][1]}, ${palette[1][2]})`;
                 targetElement.style.background = `radial-gradient(circle at center, ${color1} 0%, ${color2} 100%)`;
                 targetElement.style.opacity = 0.1; // Set to 0.1 opacity
-                console.log('applyDynamicGradient: Dynamic gradient applied.', { color1, color2 });
+                console.debug("CreatePasswordModal.jsx:event_545");
             } else {
                 console.log('applyDynamicGradient: Palette not diverse enough, applying fallback.');
                 targetElement.style.background = `radial-gradient(circle at center, rgba(17, 17, 17, 0.7) 0%, rgba(10, 10, 10, 0.7) 100%)`; // Near-black fallback
                 targetElement.style.opacity = 0.1; // Set to 0.1 opacity
             }
         } catch (e) {
-            console.error('applyDynamicGradient: Error getting palette, applying fallback.', e);
+            console.error("CreatePasswordModal.jsx:event_552");
             targetElement.style.background = `radial-gradient(circle at center, rgba(17, 17, 17, 0.7) 0%, rgba(10, 10, 10, 0.7) 100%)`; // Near-black fallback
             targetElement.style.opacity = 0.1; // Set to 0.1 opacity
         }

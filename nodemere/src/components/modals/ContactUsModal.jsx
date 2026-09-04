@@ -38,7 +38,7 @@ const ContactUsModal = ({ isOpen, onClose, showNotification }) => {
       setSubject('');
       setMessage('');
     } catch (err) {
-      console.error('Failed to send helpdesk message:', err);
+      console.error("ContactUsModal.jsx:event_41");
       setError('Failed to send message. Please try again.');
     } finally {
       setIsSubmitting(false);

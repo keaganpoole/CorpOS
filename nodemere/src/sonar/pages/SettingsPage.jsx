@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import WorkforceSecurity from '../../components/WorkforceSecurity';
 import { api } from '../lib/api';
 import { DEFAULT_NEST_PREFERENCES, NEST_NOTIFICATION_GROUPS, normalizeNestPreferences } from '../nest/nestPreferences';
 import { useNest } from '../nest/NestRuntime';
@@ -1818,7 +1819,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
       if (error) throw error;
       setServices(data || []);
     } catch (err) {
-      console.error('[ServicesManager] Failed to load:', err);
+      console.error("SettingsPage.jsx:event_1822");
     } finally {
       setLoading(false);
     }
@@ -1849,7 +1850,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
       setServices(prev => [...prev, { ...newSvc, id }]);
       setAddForm(null);
     } catch (err) {
-      console.error('[ServicesManager] Failed to add:', err);
+      console.error("SettingsPage.jsx:event_1853");
     }
   };
 
@@ -1919,7 +1920,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
       if (error) throw error;
       setServices(prev => prev.map(s => s.id === id ? { ...s, ...normalizedUpdates } : s));
     } catch (err) {
-      console.error('[ServicesManager] Failed to update:', err);
+      console.error("SettingsPage.jsx:event_1923");
     }
   };
 
@@ -1937,7 +1938,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
       setServices(prev => prev.filter(s => s.id !== id));
        setAddForm(null);
     } catch (err) {
-      console.error('[ServicesManager] Failed to delete:', err);
+      console.error("SettingsPage.jsx:event_1941");
     }
   };
 
@@ -2092,7 +2093,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       setBusinessHours(businessResponse.data?.business_hours || null);
       setStaffMembers(staffResponse.data || []);
     } catch (err) {
-      console.error('[StaffManager] Failed to load:', err);
+      console.error("SettingsPage.jsx:event_2096");
       setError(err.message || 'Failed to load staff');
     } finally {
       setLoading(false);
@@ -2181,17 +2182,16 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       const business = await ensureBusinessRecord({ createIfMissing: true });
       const resolvedBusinessId = business?.id || businessId || 'business';
       if (business?.id) onBusinessLinked?.(business.id);
-      const extension = file.name?.split('.').pop()?.toLowerCase() || 'jpg';
-      const path = `${userId}/${resolvedBusinessId}/${editingStaffId || 'new'}-${Date.now()}.${extension}`;
-      const { error: uploadError } = await supabase.storage
-        .from('staff-avatars')
-        .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type });
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from('staff-avatars').getPublicUrl(path);
-      setForm((prev) => ({ ...prev, avatar: data?.publicUrl || '' }));
+      const { data: sessionData } = await supabase.auth.getSession();
+      const body = new FormData(); body.append('file', file);
+      const response = await fetch(`${FORWARDING_API_BASE_URL}/api/sonar/staff/avatar`, { method:'POST',
+        headers:{ Authorization:`Bearer ${sessionData.session?.access_token || ''}` }, body });
+      if (!response.ok) throw new Error('Image upload failed. Use a valid PNG, JPEG or WebP under 5 MB.');
+      const data=await response.json();
+      setForm((prev) => ({ ...prev, avatar: data.url || '' }));
       setAvatarUploadName(file.name || 'Uploaded image');
     } catch (err) {
-      console.error('[StaffManager] Failed to upload avatar:', err);
+      console.error("SettingsPage.jsx:event_2195");
       setError(err.message || 'Failed to upload image. Confirm the Supabase avatars bucket exists and allows uploads.');
     } finally {
       setAvatarUploading(false);
@@ -2235,7 +2235,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
           source_id: data?.id,
           message: data?.full_name || fullName,
         }).catch((claimError) => {
-          console.warn('[StaffManager] Failed to claim Nest milestone:', claimError);
+          console.warn("SettingsPage.jsx:event_2239");
         });
       } else {
         const { data, error: updateError } = await supabase
@@ -2250,7 +2250,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       }
       closeModal();
     } catch (err) {
-      console.error('[StaffManager] Failed to save:', err);
+      console.error("SettingsPage.jsx:event_2254");
       setError(err.message || 'Failed to save staff member');
     } finally {
       setSaving(false);
@@ -2276,7 +2276,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       setDeleteStaffTarget((prev) => (prev?.id === staff.id ? null : prev));
       if (editingStaffId === staff.id) closeModal();
     } catch (err) {
-      console.error('[StaffManager] Failed to delete:', err);
+      console.error("SettingsPage.jsx:event_2280");
       setError(err.message || 'Failed to delete staff member');
     }
   };
@@ -2303,7 +2303,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         setForm((prev) => ({ ...prev, is_active: data.is_active }));
       }
     } catch (err) {
-      console.error('[StaffManager] Failed to toggle:', err);
+      console.error("SettingsPage.jsx:event_2307");
       setError(err.message || 'Failed to update staff status');
     }
   };
@@ -2329,7 +2329,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         .update({ acknowledgements: nextAcknowledgements })
         .eq('id', editingStaffId)
         .then(({ error: acknowledgementError }) => {
-          if (acknowledgementError) console.warn('[StaffManager] Failed to persist warning acknowledgement:', acknowledgementError);
+          if (acknowledgementError) console.warn("SettingsPage.jsx:event_2333");
         });
     }
   };
@@ -3086,7 +3086,7 @@ const BusinessForwardingSettings = ({ authSession }) => {
       const data = await response.json();
       setEntry(data?.current_entry || null);
     } catch (err) {
-      console.error('[SettingsPage] Failed to load forwarding state:', err);
+      console.error("SettingsPage.jsx:event_3090");
       setEntry(null);
       setError('Could not load forwarding status.');
     } finally {
@@ -3227,7 +3227,7 @@ const BillingSettings = ({ profile }) => {
 };
 
 const SettingsPage = () => {
-  const { session: authSession, profile, refreshProfile } = useAuth();
+  const { session: authSession, profile, refreshProfile, workforce } = useAuth();
   const { previewNotification } = useNest();
   const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
@@ -3419,7 +3419,7 @@ const SettingsPage = () => {
         },
       });
     } catch (err) {
-      console.error('[SettingsPage] Failed to load settings:', err);
+      console.error("SettingsPage.jsx:event_3423");
       setError('Failed to load settings');
     } finally {
       setLoading(false);
@@ -3501,7 +3501,7 @@ const SettingsPage = () => {
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2000);
     } catch (err) {
-      console.error('[SettingsPage] Failed to save settings:', err);
+      console.error("SettingsPage.jsx:event_3505");
       setError('Failed to save settings: ' + err.message);
     } finally {
       setSaving(false);
@@ -3541,7 +3541,7 @@ const SettingsPage = () => {
       await refreshProfile?.();
       setLateHoursTermsOpen(false);
     } catch (err) {
-      console.error('[SettingsPage] Failed to save late-hours terms:', err);
+      console.error("SettingsPage.jsx:event_3545");
       setError('Could not save that acknowledgment. Please try again.');
     } finally {
       setLateHoursTermsSaving(false);
@@ -3661,7 +3661,7 @@ const SettingsPage = () => {
         business_avatar: avatarUrl,
       }));
     } catch (err) {
-      console.error('[SettingsPage] Failed to upload business avatar:', err);
+      console.error("SettingsPage.jsx:event_3665");
       setError(err.message || 'Failed to upload business avatar.');
     } finally {
       setBusinessAvatarUploading(false);
@@ -3670,6 +3670,7 @@ const SettingsPage = () => {
   };
 
   const settingsSections = [
+    { id: 'security', title: 'Workforce & Security', icon: Shield, iconClass: 'settings-icon', hint: 'Members and authenticators' },
     { id: 'business', title: 'Business Info', icon: Building2, iconClass: 'settings-icon', hint: 'Name, contact, and location' },
     { id: 'forwarding', title: 'Connections', icon: PhoneCall, iconClass: 'settings-icon', hint: 'Call routing' },
     { id: 'billing', title: 'Billing', icon: CreditCard, iconClass: 'settings-icon', hint: 'Plan, invoices, and payment' },
@@ -3678,13 +3679,15 @@ const SettingsPage = () => {
     { id: 'appointments', title: 'Hours', icon: Calendar, iconClass: 'settings-icon', hint: 'Business availability' },
     { id: 'services', title: 'Services & Pricing', icon: Tag, iconClass: 'settings-icon', hint: 'Offer catalog and rates' },
     { id: 'knowledge', title: 'Knowledge Base', icon: BookOpen, iconClass: 'settings-icon', hint: 'Policies, FAQs, and context' },
-  ];
+  ].filter(section => workforce?.tenant?.role === 'OWNER' || section.id === 'security' || (workforce?.tenant?.role === 'MANAGER' && section.id === 'services'));
 
   const activeSectionConfig = settingsSections.find(section => section.id === activeSection) || settingsSections[0];
   const ActiveSettingsIcon = activeSectionConfig.icon;
 
   const renderSectionContent = () => {
-    switch (activeSection) {
+    switch (activeSectionConfig.id) {
+      case 'security':
+        return <WorkforceSecurity />;
       case 'forwarding':
         return <BusinessForwardingSettings authSession={authSession} />;
       case 'billing':

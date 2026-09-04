@@ -25,7 +25,7 @@ const PeoplePage = ({ hideTitle = false, onToolbarMetaChange = null }) => {
       await createLead({}, { placement: 'end' });
       setCreating(false);
     } catch (err) {
-      console.error('[PeoplePage] Inline create failed:', err.message);
+      console.error("LeadsPage.jsx:event_28");
     }
   };
 
@@ -40,7 +40,7 @@ const PeoplePage = ({ hideTitle = false, onToolbarMetaChange = null }) => {
     try {
       await updateLead(leadId, updates);
     } catch (err) {
-      console.error('[PeoplePage] Autosave failed:', err.message);
+      console.error("LeadsPage.jsx:event_43");
     }
   }, [updateLead]);
 

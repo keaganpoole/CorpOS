@@ -86,7 +86,7 @@ const PhoneHelperPage = () => {
       const response = await getThreads();
       setThreads(response.data);
     } catch (error) {
-      console.error("Error fetching threads:", error);
+      console.error("PhoneHelperPage.jsx:event_89");
     }
   };
 
@@ -98,14 +98,14 @@ const PhoneHelperPage = () => {
     const checkBreezyIntroPopup = async () => {
       const { data: user, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
-        console.error('Error fetching user (inside useEffect for Breezy intro):', userError);
+        console.error("PhoneHelperPage.jsx:event_101");
         return;
       }
 
       const { data, error } = await fetchUserBreezyIntroStatusAndFirstName();
 
       if (error) {
-        console.error('Error fetching user breezy intro status:', error);
+        console.error("PhoneHelperPage.jsx:event_108");
         return;
       }
 
@@ -156,7 +156,7 @@ const PhoneHelperPage = () => {
         // REMOVED: This line was incorrectly overwriting the message history.
         // newMessages = [{ sender: 'user', text: messageToSend }];
       } catch (error) {
-        console.error("Error initiating new thread:", error);
+        console.error("PhoneHelperPage.jsx:event_159");
         setInputValue(messageToSend);
         return;
       }
@@ -175,7 +175,7 @@ const PhoneHelperPage = () => {
       setMessages(prevMessages => [...prevMessages, { sender: 'ai', text: aiMessage }]);
       fetchThreads();
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("PhoneHelperPage.jsx:event_178");
       setIsTyping(false);
       if (error.response && error.response.status === 429) {
         setLimitModalContent({
@@ -200,7 +200,7 @@ const PhoneHelperPage = () => {
         setMessages([initialMessage]);
         setLimitReached(false);
       } catch (error) {
-        console.error("Error initiating new thread:", error);
+        console.error("PhoneHelperPage.jsx:event_203");
       }
     }
   };
@@ -223,14 +223,14 @@ const PhoneHelperPage = () => {
       }));
       setMessages(formattedMessages);
     } catch (error) {
-      console.error("Error fetching messages for thread:", error);
+      console.error("PhoneHelperPage.jsx:event_226");
     }
   };
 
   const handleCloseBreezyIntroPopup = async () => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      console.error('Error fetching user for breezy intro popup close:', userError);
+      console.error("PhoneHelperPage.jsx:event_233");
       setShowBreezyIntroPopup(false);
       return;
     }
@@ -238,7 +238,7 @@ const PhoneHelperPage = () => {
     const { error } = await updateTableRecord('users', user.id, { breezy_intro_popup: true });
 
     if (error) {
-      console.error('Error updating breezy_intro_popup:', error);
+      console.error("PhoneHelperPage.jsx:event_241");
     }
     setShowBreezyIntroPopup(false);
   };

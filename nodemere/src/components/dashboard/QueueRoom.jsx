@@ -16,7 +16,7 @@ const QueueRoom = () => {
       setMessages(response.data);
     } catch (err) {
       setError(err);
-      console.error("Failed to fetch queue messages:", err);
+      console.error("QueueRoom.jsx:event_19");
     } finally {
       setLoading(false);
     }
@@ -33,7 +33,7 @@ const QueueRoom = () => {
       fetchMessages();
     } catch (err) {
       setError(err);
-      console.error("Failed to approve message:", err);
+      console.error("QueueRoom.jsx:event_36");
       alert("Failed to approve message. Please try again.");
     }
   };

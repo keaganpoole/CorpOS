@@ -9,9 +9,9 @@ const api = axios.create({ baseURL: '' });
 export const trackVisitor = async (userAgent) => {
     try {
         // Log visitor to Supabase if needed
-        console.log('[Visitor]', userAgent);
+        console.debug("apiService.js:event_12");
     } catch (error) {
-        console.error('[Visitor] Tracking failed:', error);
+        console.error("apiService.js:event_14");
     }
 };
 

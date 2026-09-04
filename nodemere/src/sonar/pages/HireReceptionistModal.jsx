@@ -43,7 +43,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
       setReceptionists(availableReceptionists);
     } catch (err) {
-      console.error('[HireReceptionistModal] Failed to load receptionists:', err);
+      console.error("HireReceptionistModal.jsx:event_46");
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
     setPlayingVoice(receptionistId);
 
     audio.play().catch(err => {
-      console.error('Failed to play voice:', err);
+      console.error("HireReceptionistModal.jsx:event_96");
       setPlayingVoice(null);
     });
 
@@ -110,7 +110,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
       await onHire?.(receptionist);
       onClose?.();
     } catch (err) {
-      console.error('[HireReceptionistModal] Failed to hire receptionist:', err);
+      console.error("HireReceptionistModal.jsx:event_113");
       setHireError(err?.message || 'Failed to hire receptionist');
     } finally {
       setHiringId(null);

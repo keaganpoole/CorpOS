@@ -266,7 +266,7 @@ const StunningPasswordCard = memo(({ password: initialPassword, onUpdate, onDele
           );
           setDecryptedPassword(decrypted);
         } catch (e) {
-          console.error('Decryption failed:', e);
+          console.error("PasswordsPage.jsx:event_269");
           setDecryptedPassword('[Decryption Error]');
         }
       }
@@ -276,15 +276,15 @@ const StunningPasswordCard = memo(({ password: initialPassword, onUpdate, onDele
 
   // New useEffect to fetch Clearbit logo
   useEffect(() => {
-    console.log("StunningPasswordCard: initialPassword.url", initialPassword.url);
+    console.debug("PasswordsPage.jsx:event_279");
     if (initialPassword.url) {
       setLogoUrl(initialPassword.url);
-      console.log("StunningPasswordCard: Setting logoUrl directly from initialPassword.url", initialPassword.url);
+      console.debug("PasswordsPage.jsx:event_282");
     } else if (initialPassword.account) {
       const domain = getDomainFromUrl(initialPassword.account);
       if (domain) {
         setLogoUrl(`https://img.logo.dev/${domain}?token=pk_Hs9X4-PFTGOl4sEhLWXJjg&size=32`);
-        console.log("StunningPasswordCard: Setting logoUrl from account name via Logo.dev", `https://img.logo.dev/${domain}?token=pk_Hs9X4-PFTGOl4sEhLWXJjg&size=32`);
+        console.debug("PasswordsPage.jsx:event_287");
       } else {
         setLogoUrl(null);
         console.log("StunningPasswordCard: No valid domain from account name, setting logoUrl to null");
@@ -406,7 +406,7 @@ const StunningPasswordCard = memo(({ password: initialPassword, onUpdate, onDele
                     alt={`${initialPassword.account} logo`} 
                     className="w-full h-full object-cover bg-transparent"
                     onError={(e) => { 
-                      console.log("Image failed to load, setting logoUrl to null.", logoUrl);
+                      console.debug("PasswordsPage.jsx:event_409");
                       e.target.style.display = 'none'; 
                       setLogoUrl(null); 
                     }} // Fallback to initials if logo fails to load
@@ -470,7 +470,7 @@ const StunningPasswordCard = memo(({ password: initialPassword, onUpdate, onDele
             <motion.button 
                 onClick={(e) => { e.stopPropagation(); setIsDetailsExpanded(prev => {
                   const newExpandedState = !prev;
-                  console.log(`Expand toggle clicked for ID: ${initialPassword.id}, Account: ${initialPassword.account}. New expanded state: ${newExpandedState}`);
+                  console.debug("PasswordsPage.jsx:event_473");
                   if (newExpandedState && cardSize === 'slim') {
                     setIsPasswordVisible(true);
                   }
@@ -663,11 +663,11 @@ const PasswordsPage = () => {
       setPasswords(data);
       console.log("Passwords fetched.");
     } catch (err) {
-      console.error("Failed to fetch passwords:", err);
+      console.error("PasswordsPage.jsx:event_666");
       setError(err.message);
     } finally {
       setIsLoading(false);
-      console.log("fetchPasswords finished. isLoading:", false);
+      console.debug("PasswordsPage.jsx:event_670");
     }
   }, [session, encryptionKey]);
 
@@ -682,7 +682,7 @@ const PasswordsPage = () => {
         if (error) throw error;
         setAccountTags(data);
       } catch (error) {
-        console.error('Error fetching account tags:', error.message);
+        console.error("PasswordsPage.jsx:event_685");
       }
     };
 
@@ -702,7 +702,7 @@ const PasswordsPage = () => {
       if (error) throw error;
       setCardSize(size);
     } catch (error) {
-      console.error('Error updating card size preference:', error.message);
+      console.error("PasswordsPage.jsx:event_705");
     }
   }, [session]);
 
@@ -729,13 +729,13 @@ const PasswordsPage = () => {
               const planDetails = await fetchPlanDetails(userProfile.plan);
               setUserPlanData(planDetails);
             } catch (planError) {
-              console.error("Failed to fetch plan details:", planError);
+              console.error("PasswordsPage.jsx:event_732");
             }
           }
         }
 
         if (lockoutError) {
-          console.error("Failed to fetch lockout data:", lockoutError);
+          console.error("PasswordsPage.jsx:event_738");
         } else if (lockoutData && lockoutData.masterkey_entry_fails >= 6) {
           // Calculate next 12:00 AM EST
           const now = new Date();
@@ -762,7 +762,7 @@ const PasswordsPage = () => {
         }
 
         if (masterKeyError) {
-          console.error("Failed to fetch master key data from Supabase:", masterKeyError);
+          console.error("PasswordsPage.jsx:event_765");
           needsSetup = true;
         } else if (masterKeyData && masterKeyData.encryption_hash && masterKeyData.encryption_salt) {
           storedMasterPasswordHash = masterKeyData.encryption_hash;
@@ -773,7 +773,7 @@ const PasswordsPage = () => {
           needsSetup = true;
         }
       } catch (err) {
-        console.error("Failed to fetch user profile or master key data:", err);
+        console.error("PasswordsPage.jsx:event_776");
         needsSetup = true; // Assume setup is needed if API call fails
       } finally {
         if (needsSetup) {
@@ -803,7 +803,7 @@ const PasswordsPage = () => {
     console.log("deriveKey: Deriving key from master PIN.");
     const salt = window.crypto.getRandomValues(new Uint8Array(16));
     const key = await deriveKeyFromPin(masterPin, salt);
-    console.log("deriveKey: Generated key:", key, "Salt:", salt);
+    console.debug("PasswordsPage.jsx:event_806");
     return { key, salt };
   };
 
@@ -821,7 +821,7 @@ const PasswordsPage = () => {
     }
 
     const { key, salt } = await deriveKey(masterPin);
-    console.log("handleSetMasterPassword: Key from deriveKey:", key);
+    console.debug("PasswordsPage.jsx:event_824");
     const masterPasswordHash = await getPinHash(masterPin);
     const masterPasswordSaltHex = uint8ArrayToHex(salt);
 
@@ -829,7 +829,7 @@ const PasswordsPage = () => {
       await updateMasterKeyData(masterPasswordSaltHex, masterPasswordHash);
       console.log("handleSetMasterPassword: Master key data updated in Supabase.");
     } catch (err) {
-      console.error("handleSetMasterPassword: Failed to update master key data in Supabase:", err);
+      console.error("PasswordsPage.jsx:event_832");
       // Potentially revert UI or show error to user
       throw err; // Re-throw to be caught by the modal's submit handler
     }
@@ -841,7 +841,7 @@ const PasswordsPage = () => {
       await updateIntroMasterKey(true);
       console.log("handleSetMasterPassword: intro_master_key updated in Supabase.");
     } catch (err) {
-      console.error("handleSetMasterPassword: Failed to update intro_master_key in Supabase:", err);
+      console.error("PasswordsPage.jsx:event_844");
     }
   }, [deriveKey]);
 
@@ -850,7 +850,7 @@ const PasswordsPage = () => {
     const { data: masterKeyData, error: fetchError } = await fetchMasterKeyData();
 
     if (fetchError || !masterKeyData || !masterKeyData.encryption_hash || !masterKeyData.encryption_salt) {
-      console.error("handleAuthenticate: Master password hash or salt not found in Supabase during authentication.", fetchError);
+      console.error("PasswordsPage.jsx:event_853");
       return false;
     }
 
@@ -862,7 +862,7 @@ const PasswordsPage = () => {
     if (enteredPinHash === storedMasterPasswordHash) {
       const salt = hexToUint8Array(storedMasterPasswordSalt);
       const key = await deriveKeyFromPin(enteredPin, salt);
-      console.log("handleAuthenticate: Derived key after successful authentication:", key);
+      console.debug("PasswordsPage.jsx:event_865");
       setEncryptionKey(key);
       setIsMasterPasswordModalOpen(false);
       console.log("handleAuthenticate: Authentication successful, encryption key set, modal closing.");
@@ -904,7 +904,7 @@ const PasswordsPage = () => {
     const { data: masterKeyData, error: fetchError } = await fetchMasterKeyData();
 
     if (fetchError || !masterKeyData || !masterKeyData.encryption_hash) {
-      console.error("Master password hash not found in Supabase during change attempt.", fetchError);
+      console.error("PasswordsPage.jsx:event_907");
       return false;
     }
 
@@ -947,7 +947,7 @@ const PasswordsPage = () => {
             await updatePassword(p.id, { password: newEncryptedPassword });
             return { ...p, password: newEncryptedPassword };
           } catch (e) {
-            console.error(`Failed to re-encrypt password for ${p.account}:`, e);
+            console.error("PasswordsPage.jsx:event_950");
             return p; // Return original if re-encryption fails
           }
         }
@@ -959,7 +959,7 @@ const PasswordsPage = () => {
       setIsChangePinModalOpen(false);
       return true;
     } catch (err) {
-      console.error("Error during master PIN change and re-encryption:", err);
+      console.error("PasswordsPage.jsx:event_962");
       return false;
     }
   }, [deriveKey, encryptionKey, passwords, updatePassword]);
@@ -1052,7 +1052,7 @@ const PasswordsPage = () => {
       setUserTotalPasswordsCount(prev => prev + 1); // Increment client-side count
       console.log("handleCreatePassword: Password created successfully.");
     } catch (err) {
-      console.error("handleCreatePassword: Failed to create password", err);
+      console.error("PasswordsPage.jsx:event_1055");
       if (err.response && err.response.status === 429) {
         setLimitModalContent({
           title: 'Password Limit Reached',
@@ -1078,7 +1078,7 @@ const PasswordsPage = () => {
       const { data: updatedPassword } = await updatePassword(id, payload);
       setPasswords(prev => prev.map(p => p.id === id ? updatedPassword : p));
     } catch (err) {
-      console.error("Failed to update password", err);
+      console.error("PasswordsPage.jsx:event_1081");
     }
   };
 
@@ -1087,7 +1087,7 @@ const PasswordsPage = () => {
       await deletePassword(id);
       setPasswords(prev => prev.filter(p => p.id !== id));
     } catch (err) {
-      console.error("Failed to delete password", err);
+      console.error("PasswordsPage.jsx:event_1090");
     }
   };
 

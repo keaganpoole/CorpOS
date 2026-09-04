@@ -1,5 +1,9 @@
 import json
 import logging
+from .authorization import (scenario_tenant, validate_references, tenant_scope, current_tenant)
+from .security import issue_internal_context
+from .permissions import require_permission
+from .privacy import event_metadata, workflow_snapshot
 import os
 import re
 import calendar
@@ -643,7 +647,7 @@ def evaluate_rule(rule: dict, context: dict) -> bool:
         comparison = compare_ordered_values(value, expected)
         return comparison is not None and comparison >= 0
 
-    logging.warning("[ConditionEvaluator] Unknown operator: %s", operator)
+    logging.warning('scenario_engine.evaluate_rule.event_649')
     return False
 
 
@@ -673,7 +677,19 @@ def deep_merge_dicts(base: Optional[dict], updates: Optional[dict]) -> dict:
 class ScenarioActionExecutor:
     def __init__(self, supabase, callbacks: dict[str, Callable], base_url: str, plan_access_checker: Optional[Callable] = None):
         self.supabase = supabase
-        self.callbacks = callbacks
+        self.callbacks = dict(callbacks)
+        for name in ("create_payment", "create_customer", "update_customer", "create_invoice", "send_invoice", "send_payment_link", "refund_payment", "cancel_subscription", "send_email"):
+            callback = callbacks.get(name)
+            if callback:
+                async def authorized_callback(payload, _callback=callback, _name=name):
+                    tenant = current_tenant.get()
+                    if tenant is None:
+                        raise ValueError("Scenario callback requires trusted business context")
+                    validate_references(getattr(self.supabase,"raw",self.supabase), tenant, payload)
+                    if _name in {"refund_payment","cancel_subscription"}:
+                        require_permission(tenant, "billing.change")
+                    return await _callback(payload)
+                self.callbacks[name] = authorized_callback
         self.base_url = base_url.rstrip("/")
         self.plan_access_checker = plan_access_checker
 
@@ -866,11 +882,7 @@ class ScenarioActionExecutor:
         if table_key == "people" and str(field_key).startswith("custom_"):
             schema = self._get_people_custom_schema(context)
             if field_key not in schema:
-                logging.warning(
-                    "[ActionExecutor] Skipping inactive or missing custom field requirement: %s.%s",
-                    table_key,
-                    field_key,
-                )
+                logging.warning('scenario_engine._is_valid_agent_requirement.event_884')
                 return False
         return True
 
@@ -909,12 +921,7 @@ class ScenarioActionExecutor:
                     seen.add(token)
                     label = self._format_field_label(table_key, field_key, context)
                     if not self._is_agent_safe_label(label):
-                        logging.warning(
-                            "[ActionExecutor] Skipping unsafe agent-facing field label for requirement: %s.%s label=%s",
-                            table_key,
-                            field_key,
-                            label,
-                        )
+                        logging.warning('scenario_engine._infer_required_agent_fields.event_923')
                         continue
                     requirements.append(self._build_requirement_key_metadata(table_key, field_key, label, context))
         return requirements
@@ -1168,7 +1175,7 @@ class ScenarioActionExecutor:
                 if row.get("field_key")
             }
         except Exception as exc:
-            logging.warning("[ActionExecutor] Could not load people custom schema: %s", exc)
+            logging.warning('scenario_engine._get_people_custom_schema.event_1186')
             return {}
 
     def _get_people_custom_field_types(self, context: dict) -> dict:
@@ -1227,11 +1234,7 @@ class ScenarioActionExecutor:
             or context.get("elevenlabs_phone_number_id")
         )
         if persisted_phone_number_id:
-            logging.info(
-                "[ActionExecutor] Using assigned business line phone_number_id=%s business_id=%s",
-                persisted_phone_number_id,
-                business.get("id"),
-            )
+            logging.info('scenario_engine._find_elevenlabs_phone_number_id_for_business.event_1245')
         if not elevenlabs_key:
             return str(persisted_phone_number_id or "")
         if not business_twilio_number:
@@ -1252,24 +1255,14 @@ class ScenarioActionExecutor:
                     phone_number_id = str(item.get("phone_number_id") or "")
                     if phone_number_id:
                         if persisted_phone_number_id and str(persisted_phone_number_id) != phone_number_id:
-                            logging.info(
-                                "[ActionExecutor] Refreshing stale ElevenLabs phone number id for business %s: %s -> %s",
-                                business.get("id"),
-                                persisted_phone_number_id,
-                                phone_number_id,
-                            )
+                            logging.info('scenario_engine._find_elevenlabs_phone_number_id_for_business.event_1262')
                         business["elevenlabs_phone_number_id"] = phone_number_id
                         context["business"] = business
                         context["elevenlabs_phone_number_id"] = phone_number_id
-                        logging.info(
-                            "[ActionExecutor] Resolved assigned business line by phone number business_id=%s phone_number=%s phone_number_id=%s",
-                            business.get("id"),
-                            business_twilio_number,
-                            phone_number_id,
-                        )
+                        logging.info('scenario_engine._find_elevenlabs_phone_number_id_for_business.event_1271')
                         return phone_number_id
         except Exception as exc:
-            logging.warning("[ActionExecutor] Could not resolve ElevenLabs phone number for business: %s", exc)
+            logging.warning('scenario_engine._find_elevenlabs_phone_number_id_for_business.event_1283')
 
         return str(persisted_phone_number_id or "")
 
@@ -1282,6 +1275,14 @@ class ScenarioActionExecutor:
         return str(value)
 
     async def execute(self, node: dict, context: dict):
+        raw = getattr(self.supabase, "raw", self.supabase)
+        authority = scenario_tenant(raw, context.get("_scenario") or {
+            "user_id": context.get("user_id"), "business_id": context.get("business_id")})
+        validate_references(raw, authority, {k: v for k, v in context.items() if not k.startswith("_")})
+        with tenant_scope(authority):
+            return await self._execute_authorized(node, context)
+
+    async def _execute_authorized(self, node: dict, context: dict):
         key = ((node.get("actionConfig") or {}).get("_key") or node.get("subOptionKey") or "").strip()
         if not key:
             return {"success": True, "data": {"action": "noop"}}
@@ -1311,12 +1312,12 @@ class ScenarioActionExecutor:
         }
         handler = handlers.get(key)
         if not handler:
-            logging.warning("[ActionExecutor] Unknown action key: %s", key)
-            return {"success": False, "error": f"Unknown action: {key}"}
+            logging.warning('scenario_engine._execute_authorized.event_1337')
+            return {"success": False, "error": 'Operation failed'}
         return await handler(node, context)
 
     async def _send_sms_placeholder(self, node: dict, context: dict):
-        logging.info("[ActionExecutor] SMS action skipped: not configured")
+        logging.info('scenario_engine._send_sms_placeholder.event_1342')
         return {"success": True, "data": {"action": "send_to_customer", "skipped": True}}
 
     async def _hang_up(self, node: dict, context: dict):
@@ -1342,7 +1343,7 @@ class ScenarioActionExecutor:
                     pass
             response = query.execute()
             records = response.data or []
-            logging.info("🔎 %s: %s", table, len(records))
+            logging.info('scenario_engine._search_records.event_1368')
             return {
                 "success": True,
                 "data": {
@@ -1353,8 +1354,8 @@ class ScenarioActionExecutor:
                 },
             }
         except Exception as exc:
-            logging.error("[ActionExecutor] searchRecords failed: %s", exc)
-            return {"success": False, "error": str(exc)}
+            logging.error('scenario_engine._search_records.event_1375')
+            return {"success": False, "error": 'Operation failed'}
 
     async def _search_appointments(self, node: dict, context: dict):
         try:
@@ -1367,7 +1368,7 @@ class ScenarioActionExecutor:
             query = query.eq("business_id", business_id)
             response = query.execute()
             records = response.data or []
-            logging.info("Search appointments: %s", len(records))
+            logging.info('scenario_engine._search_appointments.event_1393')
             return {
                 "success": True,
                 "data": {
@@ -1378,15 +1379,15 @@ class ScenarioActionExecutor:
                 },
             }
         except Exception as exc:
-            logging.error("[ActionExecutor] searchAppointments failed: %s", exc)
-            return {"success": False, "error": str(exc)}
+            logging.error('scenario_engine._search_appointments.event_1400')
+            return {"success": False, "error": 'Operation failed'}
 
     async def _update_record(self, node: dict, context: dict):
         try:
             config = node.get("actionConfig") or {}
             table = str(config.get("target_table") or config.get("table") or "people").lower().replace(" ", "_")
             if table != "people":
-                return {"success": False, "error": f"Unsupported record table: {table}"}
+                return {"success": False, "error": 'Operation failed'}
             record_id = self._resolve_variables(config.get("record_id") or "", context)
             if not record_id:
                 return {"success": False, "error": "No record ID specified"}
@@ -1394,6 +1395,8 @@ class ScenarioActionExecutor:
             business = context.get("business") or {}
             business_id = business.get("id") or context.get("business_id")
             user_id = business.get("user_id") or context.get("user_id")
+            if business_id is None and not user_id:
+                return {"success": False, "error": "No business context for person"}
             existing_query = self.supabase.table(table).select("*").eq("id", str(record_id))
             if business_id is not None:
                 existing_query = existing_query.eq("business_id", business_id)
@@ -1402,7 +1405,7 @@ class ScenarioActionExecutor:
             existing_response = existing_query.limit(1).execute()
             existing = (existing_response.data or [None])[0]
             if not existing:
-                return {"success": False, "error": f"Person {record_id} was not found for this business"}
+                return {"success": False, "error": 'Operation failed'}
 
             updates = {}
             custom_updates = {}
@@ -1413,27 +1416,25 @@ class ScenarioActionExecutor:
                 if value in (None, ""):
                     continue
                 column_key = key[6:] if key.startswith("field_") else key
+                if column_key in {"id", "user_id", "business_id", "created_at", "updated_at"}:
+                    return {"success": False, "error": "Record ownership and system fields cannot be changed"}
                 resolved_value = self._resolve_variables(value, context)
                 if isinstance(resolved_value, str) and re.search(r"\{\{[^}]+\}\}", resolved_value):
-                    return {"success": False, "error": f"Unresolved person field template: {resolved_value}"}
+                    return {"success": False, "error": 'Operation failed'}
                 if table == "people" and column_key.startswith("custom_"):
                     custom_updates[column_key] = self._coerce_custom_field_value(resolved_value, custom_field_types.get(column_key))
                 else:
                     updates[column_key] = resolved_value
             if custom_updates:
-                existing_custom_fields = {}
-                try:
-                    existing_custom_response = self.supabase.table("people").select("custom_fields").eq("id", str(record_id)).execute()
-                    if existing_custom_response.data:
-                        existing_custom_fields = existing_custom_response.data[0].get("custom_fields") or {}
-                except Exception as exc:
-                    logging.warning("[ActionExecutor] Could not load existing custom_fields for people:%s: %s", record_id, exc)
+                existing_custom_fields = existing.get("custom_fields") or {}
                 updates["custom_fields"] = {**existing_custom_fields, **custom_updates}
             if not updates:
                 return {"success": False, "error": "No person fields to update"}
             updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-            self.supabase.table(table).update(updates).eq("id", str(record_id)).execute()
-            logging.info("📝 %s:%s updated", table, record_id)
+            update_query = self.supabase.table(table).update(updates).eq("id", str(record_id))
+            update_query = update_query.eq("business_id", business_id) if business_id is not None else update_query.eq("user_id", str(user_id))
+            update_query.execute()
+            logging.info('scenario_engine._update_record.event_1459')
             row = {**existing, **updates, "id": record_id}
             self._emit_scenario_trigger("record_updated", {
                 "record_id": row.get("id"),
@@ -1445,14 +1446,14 @@ class ScenarioActionExecutor:
             }, source_scenario_id=context.get("_scenarioId"), scenario_chain=context.get("scenario_chain"))
             return {"success": True, "data": {"action": "update_record", "table": table, **row}}
         except Exception as exc:
-            return {"success": False, "error": str(exc)}
+            return {"success": False, "error": 'Operation failed'}
 
     async def _create_record(self, node: dict, context: dict):
         try:
             config = node.get("actionConfig") or {}
             table = str(config.get("target_table") or config.get("table") or "people").lower().replace(" ", "_")
             if table != "people":
-                return {"success": False, "error": f"Unsupported record table: {table}"}
+                return {"success": False, "error": 'Operation failed'}
             row = {}
             custom_updates = {}
             custom_field_types = self._get_people_custom_field_types(context) if table == "people" else {}
@@ -1462,9 +1463,11 @@ class ScenarioActionExecutor:
                 if value in (None, ""):
                     continue
                 column_key = key[6:] if key.startswith("field_") else key
+                if column_key in {"id", "user_id", "business_id", "created_at", "updated_at"}:
+                    return {"success": False, "error": "Record ownership and system fields cannot be changed"}
                 resolved_value = self._resolve_variables(value, context)
                 if self._has_unresolved_template(resolved_value):
-                    return {"success": False, "error": f"Unresolved person field template: {resolved_value}"}
+                    return {"success": False, "error": 'Operation failed'}
                 if table == "people" and column_key.startswith("custom_"):
                     custom_updates[column_key] = self._coerce_custom_field_value(resolved_value, custom_field_types.get(column_key))
                 else:
@@ -1478,13 +1481,13 @@ class ScenarioActionExecutor:
             row.setdefault("updated_at", now)
             if table == "people":
                 business = context.get("business") or {}
-                row.setdefault("user_id", business.get("user_id") or context.get("user_id"))
-                row.setdefault("business_id", business.get("id") or context.get("business_id"))
+                row["user_id"] = business.get("user_id") or context.get("user_id")
+                row["business_id"] = business.get("id") or context.get("business_id")
                 if not row.get("user_id") and not row.get("business_id"):
                     return {"success": False, "error": "No business context for person"}
             response = self.supabase.table(table).insert(row).execute()
             created = response.data[0] if response.data else row
-            logging.info("🆕 %s:%s created", table, created.get("id"))
+            logging.info('scenario_engine._create_record.event_1512')
             if table == "people":
                 self._emit_scenario_trigger("record_created", {
                     "record_id": created.get("id"),
@@ -1496,7 +1499,7 @@ class ScenarioActionExecutor:
                 }, source_scenario_id=context.get("_scenarioId"), scenario_chain=context.get("scenario_chain"))
             return {"success": True, "data": {"action": "create_new_record", "table": table, **created}}
         except Exception as exc:
-            return {"success": False, "error": str(exc)}
+            return {"success": False, "error": 'Operation failed'}
 
     def _emit_scenario_trigger(
         self,
@@ -1520,7 +1523,7 @@ class ScenarioActionExecutor:
         except Exception as exc:
             # The mutation already succeeded. Do not turn a trigger delivery
             # problem into a false action failure, but keep it observable.
-            logging.error("[ActionExecutor] Failed to emit %s trigger: %s", trigger_key, exc, exc_info=True)
+            logging.error('scenario_engine._emit_scenario_trigger.event_1544')
 
     def _emit_appointment_change_triggers(
         self,
@@ -1545,7 +1548,7 @@ class ScenarioActionExecutor:
                 scenario_chain=scenario_chain,
             )
         except Exception as exc:
-            logging.error("[ActionExecutor] Failed to emit appointment triggers: %s", exc, exc_info=True)
+            logging.error('scenario_engine._emit_appointment_change_triggers.event_1569')
 
     async def _safe_appointment_person(self, raw_value: Any, business_id: Any = None):
         try:
@@ -1618,9 +1621,9 @@ class ScenarioActionExecutor:
                     "rec.appointment.time",
                 ]) or resolved_time
             if self._has_unresolved_template(resolved_date):
-                return {"success": False, "error": f"Unresolved appointment date template: {resolved_date}"}
+                return {"success": False, "error": 'Operation failed'}
             if self._has_unresolved_template(resolved_time):
-                return {"success": False, "error": f"Unresolved appointment time template: {resolved_time}"}
+                return {"success": False, "error": 'Operation failed'}
             raw_person_ref = self._resolve_variables(
                 config.get("person_id") or config.get("field_person_id") or "", context
             )
@@ -1633,7 +1636,7 @@ class ScenarioActionExecutor:
                     "person_id",
                 ]) or raw_person_ref
             if self._has_unresolved_template(raw_person_ref):
-                return {"success": False, "error": f"Unresolved appointment person_id template: {raw_person_ref}"}
+                return {"success": False, "error": 'Operation failed'}
             resolved_person_id, _resolved_person = await self._safe_appointment_person(
                 raw_person_ref or context.get("person", {}).get("id") or context.get("person_id"),
                 business_id=business_id,
@@ -1669,15 +1672,8 @@ class ScenarioActionExecutor:
                     raw_service_id,
                 )
             if self._has_unresolved_template(raw_service_id):
-                logging.error(
-                    "[ActionExecutor] unresolved appointment service_id raw=%s config_service_id=%s context_service=%s context_appointment=%s agent_keys=%s",
-                    raw_service_id,
-                    config.get("service_id") or config.get("field_service_id"),
-                    json.dumps(context.get("service") or {}, default=str),
-                    json.dumps(context.get("appointment") or {}, default=str),
-                    sorted((context.get("agent") or {}).keys()) if isinstance(context.get("agent"), dict) else [],
-                )
-                return {"success": False, "error": f"Unresolved appointment service_id template: {raw_service_id}"}
+                logging.error('scenario_engine._create_appointment.event_1693')
+                return {"success": False, "error": 'Operation failed'}
             resolved_service_id = await self._safe_appointment_service_id(raw_service_id, business_id=business_id)
             raw_staff_id = self._resolve_variables(config.get("staff_id") or config.get("field_staff_id") or "", context)
             if self._has_unresolved_template(raw_staff_id):
@@ -1689,14 +1685,14 @@ class ScenarioActionExecutor:
                     "staff_id",
                 ]) or raw_staff_id
             if self._has_unresolved_template(raw_staff_id):
-                return {"success": False, "error": f"Unresolved appointment staff_id template: {raw_staff_id}"}
+                return {"success": False, "error": 'Operation failed'}
             resolved_staff_id, _resolved_staff = await self._safe_appointment_staff_id(raw_staff_id, business_id)
             if raw_person_ref not in (None, "") and resolved_person_id is None:
-                return {"success": False, "error": f"Invalid appointment person_id: {raw_person_ref}"}
+                return {"success": False, "error": 'Operation failed'}
             if raw_service_id not in (None, "") and resolved_service_id is None:
-                return {"success": False, "error": f"Invalid appointment service_id: {raw_service_id}"}
+                return {"success": False, "error": 'Operation failed'}
             if raw_staff_id not in (None, "") and resolved_staff_id is None:
-                return {"success": False, "error": f"Invalid appointment staff_id: {raw_staff_id}"}
+                return {"success": False, "error": 'Operation failed'}
             row = {
                 "person_id": resolved_person_id,
                 "service_id": resolved_service_id,
@@ -1732,10 +1728,10 @@ class ScenarioActionExecutor:
                 source_scenario_id=context.get("_scenarioId"),
                 scenario_chain=context.get("scenario_chain"),
             )
-            logging.info("📅 Appointment created")
+            logging.info('scenario_engine._create_appointment.event_1760')
             return {"success": True, "data": {"action": "create_appointment", "table": "appointments", **created}}
         except Exception as exc:
-            return {"success": False, "error": str(exc)}
+            return {"success": False, "error": 'Operation failed'}
 
     async def _update_appointment(self, node: dict, context: dict):
         try:
@@ -1778,12 +1774,12 @@ class ScenarioActionExecutor:
                     elif key == "person_id":
                         safe_person_id, _safe_person = await self._safe_appointment_person(resolved, business_id=business_id)
                         if safe_person_id is None:
-                            return {"success": False, "error": f"Invalid appointment person_id: {resolved}"}
+                            return {"success": False, "error": 'Operation failed'}
                         updates[key] = safe_person_id
                     elif key == "service_id":
                         safe_service_id = await self._safe_appointment_service_id(resolved, business_id=business_id)
                         if safe_service_id is None:
-                            return {"success": False, "error": f"Invalid appointment service_id: {resolved}"}
+                            return {"success": False, "error": 'Operation failed'}
                         updates[key] = safe_service_id
                     elif key == "staff_id":
                         safe_staff_id, _safe_staff = await self._safe_appointment_staff_id(
@@ -1791,7 +1787,7 @@ class ScenarioActionExecutor:
                             (context.get("business") or {}).get("id") or context.get("business_id"),
                         )
                         if safe_staff_id is None:
-                            return {"success": False, "error": f"Invalid appointment staff_id: {resolved}"}
+                            return {"success": False, "error": 'Operation failed'}
                         updates[key] = safe_staff_id
                     elif key == "receptionist_id":
                         updates[key] = resolved
@@ -1810,10 +1806,10 @@ class ScenarioActionExecutor:
                 source_scenario_id=context.get("_scenarioId"),
                 scenario_chain=context.get("scenario_chain"),
             )
-            logging.info("📅 Appointment updated")
+            logging.info('scenario_engine._update_appointment.event_1838')
             return {"success": True, "data": {"action": "update_appointment", "table": "appointments", **row}}
         except Exception as exc:
-            return {"success": False, "error": str(exc)}
+            return {"success": False, "error": 'Operation failed'}
 
     async def _cancel_appointment(self, node: dict, context: dict):
         try:
@@ -1851,13 +1847,17 @@ class ScenarioActionExecutor:
                 source_scenario_id=context.get("_scenarioId"),
                 scenario_chain=context.get("scenario_chain"),
             )
-            logging.info("📅 Appointment cancelled")
+            logging.info('scenario_engine._cancel_appointment.event_1879')
             return {"success": True, "data": {"action": "cancel_appointment", "table": "appointments", **row}}
         except Exception as exc:
-            return {"success": False, "error": str(exc)}
+            return {"success": False, "error": 'Operation failed'}
 
     async def _call_customer(self, node: dict, context: dict):
         try:
+            business = context.get("business") or {}
+            business_id = (context.get("business") or {}).get("id") or context.get("business_id")
+            if business_id is None:
+                return {"success": False, "error": "No business context for call"}
             if self.plan_access_checker:
                 owner_id = str((context.get("business") or {}).get("user_id") or context.get("user_id") or "")
                 self.plan_access_checker(owner_id, context.get("business") or {}, direction="outbound")
@@ -1879,6 +1879,7 @@ class ScenarioActionExecutor:
                             self.supabase.table("people")
                             .select("*")
                             .eq("id", str(resolved_person_id))
+                            .eq("business_id", business_id)
                             .limit(1)
                             .execute()
                         )
@@ -1888,7 +1889,7 @@ class ScenarioActionExecutor:
                             context["customer"] = {**(context.get("customer") or {}), **person_row}
                             to_number = person_row.get("phone") or person_row.get("phone_number") or to_number
                     except Exception as exc:
-                        logging.warning("[ActionExecutor] Failed to resolve person phone for call_customer: %s", exc)
+                        logging.warning('scenario_engine._call_customer.event_1905')
             if not to_number:
                 return {"success": False, "error": "No phone number for call"}
 
@@ -1909,11 +1910,7 @@ class ScenarioActionExecutor:
             if not elevenlabs_key or not agent_id:
                 return {"success": False, "error": "ElevenLabs not configured"}
             if not phone_number_id:
-                logging.error(
-                    "[ActionExecutor] No assigned business line resolved for outbound call business_id=%s business_twilio_number=%s",
-                    (context.get("business") or {}).get("id"),
-                    normalize_phone_number((context.get("business") or {}).get("twilio_number")),
-                )
+                logging.error('scenario_engine._call_customer.event_1937')
                 return {"success": False, "error": "No outbound business phone number is configured"}
 
             required_agent_fields = self._infer_required_agent_fields(context.get("_scenario"), node.get("id"), context)
@@ -1949,6 +1946,7 @@ class ScenarioActionExecutor:
                 scenario_context["phone"] = customer_phone
                 scenario_context["customer_phone"] = customer_phone
             self._add_person_custom_dynamic_variables(scenario_context, context)
+            from .config import internal_tool_secret
             if downstream_data:
                 scenario_context["downstream_data"] = json.dumps(downstream_data, default=str)
             # ElevenLabs exposes the values inside dynamic_variables as the
@@ -1959,6 +1957,7 @@ class ScenarioActionExecutor:
             if downstream_data:
                 scenario_context_payload["downstream_data"] = downstream_data
             elevenlabs_dynamic_variables = dict(scenario_context)
+            elevenlabs_dynamic_variables["secret__nodemere_context"] = issue_internal_context(internal_tool_secret, business)
             elevenlabs_dynamic_variables["scenario_context"] = json.dumps(
                 scenario_context_payload,
                 default=str,
@@ -1975,18 +1974,7 @@ class ScenarioActionExecutor:
                 conversation_initiation_client_data["conversation_config_override"]["tts"] = {
                     "voice_id": scenario_context["elevenlabs_voice_id"],
                 }
-            logging.info("[ActionExecutor] outbound call dynamic variables: %s", json.dumps({
-                "user_id": scenario_context["user_id"],
-                "receptionist_name": scenario_context["receptionist_name"],
-                "receptionist_id": scenario_context["receptionist_id"],
-                "elevenlabs_voice_id": scenario_context["elevenlabs_voice_id"],
-                "direction": scenario_context["direction"],
-                "scenario_id": scenario_context["scenario_id"],
-                "flow_execution_id": scenario_context["flow_execution_id"],
-                "agent_phone_number_id": phone_number_id,
-                "to_number": normalize_phone_number(to_number),
-                "downstream_data": downstream_data,
-            }))
+            logging.info('scenario_engine._call_customer.event_2009')
 
             response = requests.post(
                 "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
@@ -2004,9 +1992,14 @@ class ScenarioActionExecutor:
                 timeout=30,
             )
             if not response.ok:
-                return {"success": False, "error": f"ElevenLabs error: {response.status_code} {response.text}"}
+                return {"success": False, "error": 'Operation failed'}
             result = response.json()
-            logging.info("📞 Call started")
+            if result.get("conversation_id"):
+                self.supabase.table("call_logs").insert({"conversation_id":result["conversation_id"],
+                    "provider_call_sid":result.get("callSid"),"business_id":business["id"],
+                    "user_id":business["user_id"],"direction":"outgoing","status":"in-progress",
+                    "source":"elevenlabs_initiation","started_at":datetime.now(timezone.utc).isoformat()}).execute()
+            logging.info('scenario_engine._call_customer.event_2040')
             return {
                 "success": True,
                 "pause": True,
@@ -2019,7 +2012,7 @@ class ScenarioActionExecutor:
                 },
             }
         except Exception as exc:
-            return {"success": False, "error": str(exc)}
+            return {"success": False, "error": 'Operation failed'}
 
     async def _transfer_call(self, node: dict, context: dict):
         config = node.get("actionConfig") or {}
@@ -2365,7 +2358,7 @@ class ScenarioFlowExecutor:
         edges = edges or []
 
         if not nodes:
-            logging.error("[FlowExecutor] Scenario has no nodes")
+            logging.error('scenario_engine.start.event_2399')
             return {"success": False, "error": "No nodes"}
 
         node_map = {node["id"]: node for node in nodes}
@@ -2377,7 +2370,7 @@ class ScenarioFlowExecutor:
         if not trigger_node:
             trigger_node = next((n for n in nodes if n.get("configured") and n.get("categoryType") == "TRIGGERS"), None) or next((n for n in nodes if n.get("configured")), None)
         if not trigger_node:
-            logging.error("[FlowExecutor] No configured trigger node found")
+            logging.error('scenario_engine.start.event_2411')
             return {"success": False, "error": "No trigger node"}
 
         context = {
@@ -2401,7 +2394,7 @@ class ScenarioFlowExecutor:
         else:
             execution_id = f"builder-run-{uuid4()}"
         context["_executionId"] = execution_id
-        logging.info("▶ %s (%s)", scenario.get("name"), trigger_node.get("label"))
+        logging.info('scenario_engine.start.event_2435')
         return await self._execute_from_node(
             trigger_node["id"],
             node_map,
@@ -2412,14 +2405,27 @@ class ScenarioFlowExecutor:
         )
 
     async def resume(self, execution_id: str, resume_data: Optional[dict] = None):
+        db=getattr(self.supabase,'raw',self.supabase)
+        rows=self.supabase.table('flow_executions').select('*').eq('id',execution_id).limit(1).execute().data or []
+        if not rows: return {'success':False,'error':'Execution not found'}
+        execution=rows[0]
+        scenarios=db.table('scenarios').select('*').eq('id',execution.get('scenario_id')).limit(1).execute().data or []
+        if not scenarios: return {'success':False,'error':'Scenario not found'}
+        authority=scenario_tenant(db,scenarios[0])
+        validate_references(db,authority,{'business_id':execution.get('business_id'),'user_id':execution.get('user_id')})
+        validate_references(db,authority,resume_data or {})
+        with tenant_scope(authority):
+            return await self._resume_authorized(execution_id,resume_data)
+
+    async def _resume_authorized(self, execution_id: str, resume_data: Optional[dict] = None):
         try:
-            logging.info("↩ Resume requested: exec=%s", execution_id)
+            logging.info('scenario_engine.resume.event_2447')
             response = self.supabase.table("flow_executions").select("*").eq("id", execution_id).limit(1).execute()
             execution = response.data[0] if response.data else None
             if not execution:
-                return {"success": False, "error": f"Execution {execution_id} not found"}
+                return {"success": False, "error": 'Execution not found'}
             if execution.get("status") != "paused":
-                return {"success": False, "error": f"Execution is {execution.get('status')}, not paused"}
+                return {"success": False, "error": 'Execution is not paused'}
 
             context = execution.get("flow_context")
             if isinstance(context, str):
@@ -2441,11 +2447,13 @@ class ScenarioFlowExecutor:
                     (pause_data or {}).get("paused_node_id"),
                 )
             self.action_executor._hydrate_agent_appointment_context(context)
-            context.update({k: v for k, v in resume_data.items() if k != "agent"})
+            context.update({k: v for k, v in resume_data.items()
+                            if k not in {"agent", "business", "business_id", "user_id", "receptionist"}
+                            and not k.startswith("_")})
 
             self.supabase.table("flow_executions").update({
                 "status": "running",
-                "flow_context": context,
+                "flow_context": workflow_snapshot(context),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }).eq("id", execution_id).execute()
 
@@ -2466,7 +2474,7 @@ class ScenarioFlowExecutor:
                 edge_map.setdefault(edge["from"], []).append(edge)
 
             next_node_id = (pause_data or {}).get("resume_node_id") or self._get_next_node(execution.get("current_node_id"), edge_map, context)
-            logging.info("▶ Resume: %s | exec=%s | next=%s", scenario.get("name"), execution_id, next_node_id or "end")
+            logging.info('scenario_engine.resume.event_2502')
             if not next_node_id:
                 if context.get("_iterator_state"):
                     iterator_result = await self._continue_iterator_from_state(
@@ -2487,7 +2495,7 @@ class ScenarioFlowExecutor:
                     await self._update_execution(execution_id, "completed", None, final_context)
                     return {"success": True, "completed": True, "context": final_context}
                 await self._update_execution(execution_id, "completed", None, context)
-                logging.info("✅ Complete: %s | exec=%s", scenario.get("name"), execution_id)
+                logging.info('scenario_engine.resume.event_2508')
                 return {"success": True, "completed": True, "context": context}
 
             await self._update_execution(execution_id, "running", next_node_id, context)
@@ -2521,8 +2529,8 @@ class ScenarioFlowExecutor:
                 return {"success": True, "completed": True, "context": final_context}
             return result
         except Exception as exc:
-            logging.error("❌ Resume failed: %s", exc)
-            return {"success": False, "error": str(exc)}
+            logging.error('scenario_engine.resume.event_2542')
+            return {"success": False, "error": 'Operation failed'}
 
     async def _execute_from_node(self, start_node_id: str, node_map: dict, edge_map: dict, context: dict, execution_id: Optional[str], scenario: dict, finalize_execution: bool = True):
         current_node_id = start_node_id
@@ -2544,12 +2552,12 @@ class ScenarioFlowExecutor:
             steps += 1
             node = node_map.get(current_node_id)
             if not node:
-                logging.error("[FlowExecutor] Node %s not found", current_node_id)
+                logging.error('scenario_engine._execute_from_node.event_2565')
                 error = f"Scenario references missing node: {current_node_id}"
                 await self._update_execution(execution_id, "failed", current_node_id, context, error)
                 return {"success": False, "error": error, "failed_at": current_node_id}
 
-            logging.info("• %s. %s", steps, node.get("label") or current_node_id)
+            logging.info('scenario_engine._execute_from_node.event_2585')
             if node.get("categoryType") == "TRIGGERS" and not (node.get("actionConfig") or {}).get("_key"):
                 current_node_id = self._get_next_node(current_node_id, edge_map, context)
                 continue
@@ -2563,9 +2571,9 @@ class ScenarioFlowExecutor:
                 else:
                     result = await self.action_executor.execute(node, context)
             except Exception as exc:
-                error = str(exc) or f"{node.get('label') or node_key} failed"
+                error = "Workflow step failed"
                 append_execution_trace(current_node_id, "failed")
-                logging.error("[FlowExecutor] %s failed: %s", node.get("label") or current_node_id, error, exc_info=True)
+                logging.error('scenario_engine._execute_from_node.event_2571')
                 await self._update_execution(execution_id, "failed", current_node_id, context, error)
                 return {"success": False, "error": error, "failed_at": current_node_id}
             if result.get("paused"):
@@ -2573,7 +2581,7 @@ class ScenarioFlowExecutor:
                 return result
             if not result.get("success"):
                 append_execution_trace(current_node_id, "failed")
-                logging.error("❌ %s: %s", node.get("label"), result.get("error"))
+                logging.error('scenario_engine._execute_from_node.event_2594')
                 await self._update_execution(execution_id, "failed", current_node_id, context, result.get("error"))
                 return {"success": False, "error": result.get("error"), "failed_at": current_node_id}
 
@@ -2602,12 +2610,15 @@ class ScenarioFlowExecutor:
                     context["appointments"] = data
                     if data.get("staff_id"):
                         try:
-                            staff_response = self.supabase.table("staff").select("*").eq("id", data.get("staff_id")).limit(1).execute()
+                            business_id = (context.get("business") or {}).get("id") or context.get("business_id")
+                            if business_id is None:
+                                raise ValueError("Business context is required to load appointment staff")
+                            staff_response = self.supabase.table("staff").select("*").eq("id", data.get("staff_id")).eq("business_id", business_id).limit(1).execute()
                             if staff_response.data:
                                 context["staff"] = staff_response.data[0]
                                 context["staff_id"] = staff_response.data[0].get("id")
                         except Exception as exc:
-                            logging.warning("[ScenarioEngine] Could not hydrate staff from appointment result: %s", exc)
+                            logging.warning('scenario_engine._execute_from_node.event_2616')
 
             if node.get("categoryType") == "UTILITIES" and node_key == "iterator":
                 iterator_context = result.get("context")
@@ -2626,7 +2637,7 @@ class ScenarioFlowExecutor:
                     "paused_node_id": node["id"],
                     "resume_node_id": next_node_id,
                 }
-                logging.info("⏸ Pause: %s | exec=%s | next=%s", node.get("label"), execution_id or "unknown", next_node_id or "end")
+                logging.info('scenario_engine._execute_from_node.event_2650')
                 await self._update_execution(execution_id, "paused", current_node_id, context, None, pause_data)
                 return {"success": True, "paused": True, "executionId": execution_id, "at_node": current_node_id, "resume_node_id": next_node_id}
 
@@ -2634,11 +2645,11 @@ class ScenarioFlowExecutor:
             current_node_id = self._get_next_node(current_node_id, edge_map, context)
 
         if steps >= max_steps:
-            logging.error("[FlowExecutor] Max steps reached")
+            logging.error('scenario_engine._execute_from_node.event_2673')
             await self._update_execution(execution_id, "failed", current_node_id, context, "Max steps exceeded")
             return {"success": False, "error": "Max steps exceeded"}
 
-        logging.info("✅ %s", scenario.get("name"))
+        logging.info('scenario_engine._execute_from_node.event_2677')
         if finalize_execution:
             await self._update_execution(execution_id, "completed", None, context)
         return {"success": True, "completed": True, "context": context}
@@ -2661,6 +2672,7 @@ class ScenarioFlowExecutor:
         return fallback.get("to") if fallback else None
 
     async def _create_execution_record(self, scenario: dict, trigger_node_id: str, context: dict, trigger_event: dict):
+        from .envelope import KeyUnavailable
         try:
             response = self.supabase.table("flow_executions").insert({
                 "scenario_id": scenario.get("id"),
@@ -2668,29 +2680,34 @@ class ScenarioFlowExecutor:
                 "business_id": scenario.get("business_id") or context.get("business_id"),
                 "status": "running",
                 "current_node_id": trigger_node_id,
-                "flow_context": context,
-                "trigger_event": trigger_event,
+                "flow_context": workflow_snapshot(context),
+                "trigger_event": event_metadata(trigger_event.get("payload", trigger_event)),
                 "started_at": datetime.now(timezone.utc).isoformat(),
             }).execute()
             return response.data[0].get("id") if response.data else None
+        except KeyUnavailable:
+            raise
         except Exception as exc:
-            logging.error("[FlowExecutor] Failed to create execution record: %s", exc)
+            logging.error('scenario_engine._create_execution_record.event_2698')
             return None
 
     async def _update_execution(self, execution_id: Optional[str], status_value: str, current_node_id: Optional[str], context: dict, error: Optional[str] = None, pause_data: Optional[dict] = None):
+        from .envelope import KeyUnavailable
         if not execution_id:
             return
         try:
             update = {
                 "status": status_value,
                 "current_node_id": current_node_id,
-                "flow_context": context,
+                "flow_context": workflow_snapshot(context, terminal=status_value in {"completed", "failed"}),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             if error:
-                update["error"] = error
+                update["error"] = "Workflow step failed"
             if pause_data:
-                update["pause_data"] = pause_data
+                update["pause_data"] = workflow_snapshot(pause_data)
+            if status_value in {"completed","failed"}:
+                update["pause_data"] = None
             if status_value == "completed":
                 update["completed_at"] = datetime.now(timezone.utc).isoformat()
             if status_value == "failed":
@@ -2734,8 +2751,10 @@ class ScenarioFlowExecutor:
                     source_id=execution_id,
                     idempotency_key=f"workflow:{execution_id}:{status_value}",
                 )
+        except KeyUnavailable:
+            raise
         except Exception as exc:
-            logging.error("[FlowExecutor] Failed to update execution: %s", exc)
+            logging.error('scenario_engine._update_execution.event_2759')
 
 
 class ScenarioEngine:
@@ -2751,16 +2770,16 @@ class ScenarioEngine:
         self.scheduler_worker_id = f"scenario-engine-{os.getpid()}"
 
     async def start(self):
-        logging.info("🚀 Scenarios engine started")
+        logging.info('scenario_engine.start.event_2790')
         await self.load_scenarios()
-        logging.info("🔌 Listening for scenario events")
+        logging.info('scenario_engine.start.event_2792')
 
     def start_scheduler(self):
         if self.scheduler_task and not self.scheduler_task.done():
             return
         message = f"[ScenarioEngine] Scheduler worker starting as {self.scheduler_worker_id}"
         print(message, flush=True)
-        logging.info(message)
+        logging.info('scenario_engine.start_scheduler.event_2799')
         self.scheduler_task = asyncio.create_task(self._scheduler_loop())
 
     async def stop_scheduler(self):
@@ -2774,6 +2793,16 @@ class ScenarioEngine:
         self.scheduler_task = None
 
     async def load_scenarios(self):
+        # The scheduler cache spans businesses, but each execution authorizes
+        # its stored tenant. A dashboard reload must not replace this shared
+        # cache with only that dashboard's scoped subset.
+        token=current_tenant.set(None)
+        try:
+            return await self._load_all_scenarios()
+        finally:
+            current_tenant.reset(token)
+
+    async def _load_all_scenarios(self):
         try:
             response = (
                 self.supabase.table("scenarios")
@@ -2788,16 +2817,12 @@ class ScenarioEngine:
             for scenario in active_scenarios:
                 definition_errors = validate_scenario_definition(scenario)
                 if definition_errors:
-                    logging.error(
-                        "[ScenarioEngine] Ignoring invalid active scenario %s: %s",
-                        scenario.get("id"),
-                        "; ".join(definition_errors),
-                    )
+                    logging.error('scenario_engine.load_scenarios.event_2797')
                     continue
                 self.scenarios.append(scenario)
             await self.sync_scheduled_jobs()
         except Exception as exc:
-            logging.error("[ScenarioEngine] Failed to load scenarios: %s", exc)
+            logging.error('scenario_engine.load_scenarios.event_2821')
             self.scenarios = []
         return self.scenarios
 
@@ -2811,7 +2836,7 @@ class ScenarioEngine:
             )
             scenarios = response.data or []
         except Exception as exc:
-            logging.warning("[ScenarioEngine] Could not sync scheduled scenario jobs: %s", exc)
+            logging.warning('scenario_engine.sync_scheduled_jobs.event_2835')
             return
 
         for scenario in scenarios:
@@ -2819,11 +2844,7 @@ class ScenarioEngine:
                 await self._sync_scheduled_job_for_scenario(scenario)
                 await self._sync_appointment_reminder_job_for_scenario(scenario)
             except Exception as exc:
-                logging.warning(
-                    "[ScenarioEngine] Could not sync job for scenario %s: %s",
-                    scenario.get("id"),
-                    exc,
-                )
+                logging.warning('scenario_engine.sync_scheduled_jobs.event_2828')
 
     async def _sync_scheduled_job_for_scenario(self, scenario: dict):
         scenario_id = scenario.get("id")
@@ -2928,6 +2949,9 @@ class ScenarioEngine:
             query = self.supabase.table("businesses").select("*")
             if business_id is not None:
                 query = query.eq("id", business_id)
+                if not user_id:
+                    return None
+                query = query.eq("user_id", str(user_id))
             elif user_id:
                 query = query.eq("user_id", user_id)
             else:
@@ -2935,7 +2959,7 @@ class ScenarioEngine:
             response = query.limit(1).execute()
             return response.data[0] if response.data else None
         except Exception as exc:
-            logging.warning("[ScenarioEngine] Could not load business for appointment reminder: %s", exc)
+            logging.warning('scenario_engine._load_scenario_business.event_2962')
             return None
 
     def _appointment_start_at(self, appointment: dict, business: Optional[dict]) -> Optional[datetime]:
@@ -2983,7 +3007,7 @@ class ScenarioEngine:
             )
             appointments = response.data or []
         except Exception as exc:
-            logging.warning("[ScenarioEngine] Could not load appointments for reminder: %s", exc)
+            logging.warning('scenario_engine._appointment_reminder_targets.event_3010')
             return [], business, reminder_minutes
 
         targets = []
@@ -3092,8 +3116,8 @@ class ScenarioEngine:
             )
             candidates = response.data or []
         except Exception as exc:
-            logging.warning("[ScenarioEngine] Could not find appointment reminder jobs: %s", exc)
-            return {"ok": False, "claimed": 0, "error": str(exc)}
+            logging.warning('scenario_engine.run_due_appointment_reminder_jobs.event_3119')
+            return {"ok": False, "claimed": 0, "error": 'Operation failed'}
 
         runs = []
         for candidate in candidates:
@@ -3224,14 +3248,14 @@ class ScenarioEngine:
     async def _scheduler_loop(self):
         while True:
             try:
-                logging.info("[ScenarioEngine] Scheduler worker tick: %s", self.scheduler_worker_id)
+                logging.info('scenario_engine._scheduler_loop.event_3251')
                 print(f"[ScenarioEngine] Scheduler worker tick: {self.scheduler_worker_id}", flush=True)
                 await self.run_due_scheduled_jobs()
                 await self.run_due_appointment_reminder_jobs()
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                logging.error("[ScenarioEngine] Scheduled job worker failed: %s", exc, exc_info=True)
+                logging.error('scenario_engine._scheduler_loop.event_3243')
             await asyncio.sleep(30)
 
     async def run_due_scheduled_jobs(self):
@@ -3242,8 +3266,8 @@ class ScenarioEngine:
             }).execute()
             jobs = response.data or []
         except Exception as exc:
-            logging.warning("[ScenarioEngine] Could not claim due scenario jobs: %s", exc)
-            return {"ok": False, "claimed": 0, "error": str(exc)}
+            logging.warning('scenario_engine.run_due_scheduled_jobs.event_3269')
+            return {"ok": False, "claimed": 0, "error": 'Operation failed'}
 
         runs = []
         for job in jobs:
@@ -3329,7 +3353,7 @@ class ScenarioEngine:
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 }).eq("id", job_id).execute()
             except Exception as exc:
-                logging.error("[ScenarioEngine] Could not mark job failed: %s", exc)
+                logging.error('scenario_engine._mark_job_failed.event_3341')
         return {"ok": False, "error": error}
 
     async def handle_event(self, event_type: str, payload: Optional[dict] = None):
@@ -3345,16 +3369,13 @@ class ScenarioEngine:
                 continue
             scenario_chain = payload.get("scenario_chain") if isinstance(payload.get("scenario_chain"), list) else []
             if str(scenario.get("id")) in {str(item) for item in scenario_chain}:
-                logging.info(
-                    "[ScenarioEngine] Skipping scenario %s because it already exists in the event chain",
-                    scenario.get("id"),
-                )
+                logging.info('scenario_engine.handle_event.event_3372')
                 continue
             trigger_node = match
             flow_context = await self._build_flow_context(scenario, event_type, payload)
             if not self._trigger_matches_config(trigger_node, event_type, payload, flow_context):
                 continue
-            logging.info("⚡ %s → %s", event_type, scenario.get("name"))
+            logging.info('scenario_engine.handle_event.event_3396')
             result = await self.flow_executor.start(
                 scenario,
                 {"event_type": event_type, "payload": payload},
@@ -3433,11 +3454,12 @@ class ScenarioEngine:
         event_business_id = payload.get("business_id")
         scenario_user_id = scenario.get("user_id") or scenario.get("created_by")
         scenario_business_id = scenario.get("business_id")
-        if event_business_id and scenario_business_id:
-            return str(event_business_id) == str(scenario_business_id)
+        comparisons = []
+        if event_business_id is not None and scenario_business_id is not None:
+            comparisons.append(str(event_business_id) == str(scenario_business_id))
         if event_user_id and scenario_user_id:
-            return str(event_user_id) == str(scenario_user_id)
-        return True
+            comparisons.append(str(event_user_id) == str(scenario_user_id))
+        return bool(comparisons) and all(comparisons)
 
     async def trigger_scenario(self, scenario_id: str, payload: Optional[dict] = None, event_type: str = "manual_trigger"):
         response = self.supabase.table("scenarios").select("*").eq("id", scenario_id).limit(1).execute()
@@ -3465,7 +3487,7 @@ class ScenarioEngine:
         return await self.flow_executor.resume(execution_id, resume_data or {})
 
     async def list_executions(self, limit: int = 20):
-        response = self.supabase.table("flow_executions").select("*").order("started_at", desc=True).limit(limit).execute()
+        response = self.supabase.table("flow_executions").select("id,scenario_id,business_id,user_id,status,current_node_id,started_at,updated_at,completed_at,failed_at").order("started_at", desc=True).limit(limit).execute()
         return response.data or []
 
     async def get_execution(self, execution_id: str):
@@ -3617,7 +3639,7 @@ class ScenarioEngine:
             )
             rows = response.data or []
         except Exception as exc:
-            logging.warning("[ScenarioEngine] Could not fetch purchased numbers for business %s: %s", business.get("id"), exc)
+            logging.warning('scenario_engine._hydrate_business_with_assigned_line.event_3645')
             return business
 
         active_assigned = next(
@@ -3645,9 +3667,37 @@ class ScenarioEngine:
         return hydrated
 
     async def _build_flow_context(self, scenario: dict, event_type: str, payload: dict):
+        # Resolve authority BEFORE hydrating any record. Payload snapshots and
+        # IDs never decide which tenant a scenario runs as.
+        user_id = scenario.get("user_id") or scenario.get("created_by")
+        if not user_id:
+            raise ValueError("Scenario owner is required")
+        business_query = self.supabase.table("businesses").select("*").eq("user_id", str(user_id))
+        if scenario.get("business_id") is not None:
+            business_query = business_query.eq("id", scenario["business_id"])
+        business_response = business_query.limit(1).execute()
+        if not business_response.data:
+            raise ValueError("Scenario business not found")
+        business = self._hydrate_business_with_assigned_line(business_response.data[0]) or business_response.data[0]
+        business_id = business["id"]
+        # Treat snapshots as hints only; never retain an unverified record object.
+        payload = dict(payload or {})
+        for alias in ("appointment", "appointments", "person", "customer", "people", "record", "staff", "payment", "invoice", "receptionist"):
+            snapshot = payload.pop(alias, None)
+            field = {"person": "person_id", "customer": "person_id", "people": "person_id", "record": "person_id", "appointments": "appointment_id"}.get(alias, alias + "_id")
+            if isinstance(snapshot, dict) and snapshot.get("id"):
+                payload.setdefault(field, snapshot["id"])
+        authority = scenario_tenant(getattr(self.supabase, "raw", self.supabase), scenario)
+        # Phase 1 binds top-level ownership; inconsistent nested claims fail closed.
+        payload.pop("business", None)
+        payload["business_id"], payload["user_id"] = business_id, str(user_id)
+        validate_references(getattr(self.supabase, "raw", self.supabase), authority, payload)
         context = {
             **payload,
             "event_type": event_type,
+            "business": business,
+            "business_id": business_id,
+            "user_id": str(user_id),
         }
 
         if isinstance(payload.get("appointment"), dict):
@@ -3659,57 +3709,58 @@ class ScenarioEngine:
         appointment_id = payload.get("appointment_id")
         if appointment_id:
             try:
-                response = self.supabase.table("appointments").select("*").eq("id", appointment_id).limit(1).execute()
+                response = self.supabase.table("appointments").select("*").eq("id", appointment_id).eq("business_id", business_id).limit(1).execute()
                 if response.data:
                     context["appointment"] = response.data[0]
                     context["appointments"] = response.data[0]
                     context.setdefault("person_id", response.data[0].get("person_id"))
                     context.setdefault("staff_id", response.data[0].get("staff_id"))
             except Exception as exc:
-                logging.warning("[ScenarioEngine] Could not fetch appointment: %s", exc)
+                logging.warning('scenario_engine._build_flow_context.event_3704')
 
         staff_id = payload.get("staff_id")
         if not staff_id and isinstance(context.get("appointment"), dict):
             staff_id = context["appointment"].get("staff_id")
         if staff_id:
             try:
-                response = self.supabase.table("staff").select("*").eq("id", staff_id).limit(1).execute()
+                response = self.supabase.table("staff").select("*").eq("id", staff_id).eq("business_id", business_id).limit(1).execute()
                 if response.data:
                     context["staff"] = response.data[0]
                     context["staff_id"] = response.data[0].get("id")
                     context.setdefault("business_id", response.data[0].get("business_id"))
             except Exception as exc:
-                logging.warning("[ScenarioEngine] Could not fetch staff: %s", exc)
+                logging.warning('scenario_engine._build_flow_context.event_3717')
 
-        person_id = payload.get("person_id") or payload.get("record_id") or payload.get("id")
+        person_id = payload.get("person_id") or payload.get("record_id") or context.get("person_id") or payload.get("id")
         if person_id:
             try:
-                response = self.supabase.table("people").select("*").eq("id", person_id).limit(1).execute()
+                response = self.supabase.table("people").select("*").eq("id", person_id).eq("business_id", business_id).limit(1).execute()
                 if response.data:
                     context["person"] = response.data[0]
                     context["customer"] = response.data[0]
                     context["people"] = response.data[0]
+                    context["record"] = response.data[0]
                     context["person_id"] = response.data[0].get("id")
                     context.setdefault("user_id", response.data[0].get("user_id"))
                     context.setdefault("business_id", response.data[0].get("business_id"))
             except Exception as exc:
-                logging.warning("[ScenarioEngine] Could not fetch person: %s", exc)
+                logging.warning('scenario_engine._build_flow_context.event_3732')
 
         if "person" not in context and payload.get("customer_id"):
             try:
                 customer_query = self.supabase.table("people").select("*").eq("stripe_customer_id", payload.get("customer_id"))
-                if payload.get("user_id"):
-                    customer_query = customer_query.eq("user_id", payload.get("user_id"))
+                customer_query = customer_query.eq("business_id", business_id)
                 response = customer_query.limit(1).execute()
                 if response.data:
                     context["person"] = response.data[0]
                     context["customer"] = response.data[0]
                     context["people"] = response.data[0]
+                    context["record"] = response.data[0]
                     context["person_id"] = response.data[0].get("id")
                     context.setdefault("user_id", response.data[0].get("user_id"))
                     context.setdefault("business_id", response.data[0].get("business_id"))
             except Exception as exc:
-                logging.warning("[ScenarioEngine] Could not fetch person by stripe_customer_id: %s", exc)
+                logging.warning('scenario_engine._build_flow_context.event_3748')
 
         payment_payload = payload.get("payment")
         if payment_payload:
@@ -3718,22 +3769,22 @@ class ScenarioEngine:
         payment_id = payload.get("payment_id") or payload.get("stripe_payment_intent_id") or payload.get("stripe_session_id")
         if payment_id and not payment_payload:
             try:
-                response = self.supabase.table("payments").select("*").eq("id", payment_id).limit(1).execute()
+                response = self.supabase.table("payments").select("*").eq("id", payment_id).eq("user_id", str(user_id)).limit(1).execute()
                 if response.data:
                     context["payment"] = response.data[0]
                     context["payments"] = response.data[0]
                 elif payload.get("stripe_payment_intent_id"):
-                    response = self.supabase.table("payments").select("*").eq("stripe_payment_intent_id", payload["stripe_payment_intent_id"]).limit(1).execute()
+                    response = self.supabase.table("payments").select("*").eq("stripe_payment_intent_id", payload["stripe_payment_intent_id"]).eq("user_id", str(user_id)).limit(1).execute()
                     if response.data:
                         context["payment"] = response.data[0]
                         context["payments"] = response.data[0]
                 elif payload.get("stripe_session_id"):
-                    response = self.supabase.table("payments").select("*").eq("stripe_session_id", payload["stripe_session_id"]).limit(1).execute()
+                    response = self.supabase.table("payments").select("*").eq("stripe_session_id", payload["stripe_session_id"]).eq("user_id", str(user_id)).limit(1).execute()
                     if response.data:
                         context["payment"] = response.data[0]
                         context["payments"] = response.data[0]
             except Exception as exc:
-                logging.warning("[ScenarioEngine] Could not fetch payment: %s", exc)
+                logging.warning('scenario_engine._build_flow_context.event_3772')
 
         invoice_payload = payload.get("invoice")
         if invoice_payload:
@@ -3741,12 +3792,12 @@ class ScenarioEngine:
             context["invoices"] = invoice_payload
         elif payload.get("invoice_id"):
             try:
-                response = self.supabase.table("invoices").select("*").eq("id", payload["invoice_id"]).limit(1).execute()
+                response = self.supabase.table("invoices").select("*").eq("id", payload["invoice_id"]).eq("user_id", str(user_id)).limit(1).execute()
                 if response.data:
                     context["invoice"] = response.data[0]
                     context["invoices"] = response.data[0]
             except Exception as exc:
-                logging.warning("[ScenarioEngine] Could not fetch invoice: %s", exc)
+                logging.warning('scenario_engine._build_flow_context.event_3785')
 
         customer_payload = payload.get("customer")
         if customer_payload:
@@ -3761,33 +3812,6 @@ class ScenarioEngine:
             context.setdefault("subscription_id", subscription_payload.get("id") or subscription_payload.get("subscription_id"))
         elif payload.get("subscription_id"):
             context.setdefault("subscription_id", payload.get("subscription_id"))
-
-        business_payload = payload.get("business")
-        if isinstance(business_payload, dict) and business_payload.get("id") is not None:
-            context["business"] = business_payload
-            context["business_id"] = business_payload.get("id")
-            context.setdefault("user_id", business_payload.get("user_id"))
-
-        business_id = payload.get("business_id") or context.get("business_id")
-        user_id = payload.get("user_id") or context.get("user_id") or scenario.get("user_id") or scenario.get("created_by")
-        if user_id:
-            context.setdefault("user_id", user_id)
-        try:
-            if context.get("business"):
-                response = None
-            elif business_id:
-                response = self.supabase.table("businesses").select("*").eq("id", business_id).limit(1).execute()
-            elif user_id:
-                response = self.supabase.table("businesses").select("*").eq("user_id", user_id).limit(1).execute()
-            else:
-                response = None
-            if response and response.data:
-                hydrated_business = self._hydrate_business_with_assigned_line(response.data[0]) or response.data[0]
-                context["business"] = hydrated_business
-                context["business_id"] = hydrated_business.get("id")
-                context["user_id"] = hydrated_business.get("user_id")
-        except Exception as exc:
-            logging.warning("[ScenarioEngine] Could not fetch business: %s", exc)
 
         try:
             business = context.get("business") or {}
@@ -3808,7 +3832,7 @@ class ScenarioEngine:
                 ]
                 context["receptionist"] = (eligible or receptionist_response.data)[0]
         except Exception as exc:
-            logging.warning("[ScenarioEngine] Could not fetch receptionist: %s", exc)
+            logging.warning('scenario_engine._build_flow_context.event_3820')
 
         return context
 

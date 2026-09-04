@@ -245,7 +245,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                 if (error) throw error;
                 await refreshProfile?.();
             } catch (error) {
-                console.error("Error selecting free plan:", error);
+                console.error("PricingPage.jsx:event_248");
                 alert(`Could not select the Free plan. Please try again. Error: ${error.message || error}`);
                 setCheckoutLoading(false);
                 return;
@@ -278,7 +278,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                 window.location.href = url;
             }
         } catch (error) {
-            console.error("Error creating checkout session:", error);
+            console.error("PricingPage.jsx:event_281");
             alert(`Could not initiate checkout. Please try again. Error: ${error.message || error}`);
             setCheckoutLoading(false);
         }
@@ -454,7 +454,7 @@ const PricingPage = () => {
                 const response = await axios.get(apiUrl('/api/sonar/payments/test-mode'));
                 setIsTestMode(Boolean(response.data.testMode));
             } catch (error) {
-                console.error("Error fetching server config:", error);
+                console.error("PricingPage.jsx:event_457");
             }
         };
 
@@ -502,7 +502,7 @@ const PricingPage = () => {
                     setPlansError('No public plans were returned from the pricing API.');
                 }
             } catch (err) {
-                console.error("Error fetching plans:", err);
+                console.error("PricingPage.jsx:event_505");
                 setPlanEntitlements([]);
                 setPlansError('Pricing plans could not be loaded from the server.');
             } finally {

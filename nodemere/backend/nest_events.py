@@ -8,6 +8,7 @@ ledger while still giving users a small, durable cross-device history.
 from __future__ import annotations
 
 import logging
+from .privacy import event_metadata
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
@@ -117,7 +118,7 @@ def _safe_rows(
         return response.data or []
     except Exception as exc:  # Some installations do not have every optional table/column.
         if not quiet:
-            logging.warning("Nest history skipped %s: %s", table, exc)
+            logging.warning('nest_events._safe_rows.event_120')
         return []
 
 
@@ -310,9 +311,9 @@ def record_nest_event(
         "category": category,
         "event_type": event_type,
         "priority": priority,
-        "title": title[:160],
-        "message": message[:300],
-        "payload": payload or {},
+        "title": "Business notification",
+        "message": "",
+        "payload": event_metadata(payload),
         "source_id": str(source_id) if source_id is not None else None,
         "idempotency_key": idempotency_key or f"{event_type}:{source_id or occurred_at}",
         "occurred_at": occurred_at,
@@ -324,7 +325,7 @@ def record_nest_event(
         ).execute()
     except Exception as exc:
         # Deployments may briefly run application code before the migration lands.
-        logging.warning("Nest event persistence skipped: %s", exc)
+        logging.warning('nest_events.record_nest_event.event_327')
 
 
 def record_call_nest_event(client: Any, row: dict) -> None:
@@ -396,8 +397,8 @@ def claim_nest_milestone(
         "event_type": milestone_key,
         "priority": priority,
         "title": title[:160],
-        "message": message[:300],
-        "payload": payload or {},
+        "message": "",
+        "payload": event_metadata(payload),
         "source_id": str(source_id) if source_id is not None else None,
         "idempotency_key": f"milestone:{milestone_key}",
         "occurred_at": datetime.now(timezone.utc).isoformat(),
@@ -411,7 +412,7 @@ def claim_nest_milestone(
         error_text = str(exc).lower()
         if "duplicate" in error_text or "23505" in error_text or "unique" in error_text:
             return False
-        logging.warning("Nest milestone claim skipped: %s", exc)
+        logging.warning('nest_events.claim_nest_milestone.event_414')
         return False
 
 

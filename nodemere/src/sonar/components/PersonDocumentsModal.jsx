@@ -128,12 +128,14 @@ const PersonDocumentsModal = ({ person, documents = [], initialDocument, onClose
       return undefined;
     }
     let active = true;
+    let objectUrl = '';
     setDocumentUrl('');
     setPreviewError('');
     setLoadingPreview(true);
     api.getPersonDocumentUrl(person.id, selectedDocument.id)
       .then((result) => {
-        if (!active) return;
+        objectUrl = result?.url || '';
+        if (!active) { if (objectUrl) URL.revokeObjectURL(objectUrl); return; }
         if (!result?.url) throw new Error('The document could not be opened.');
         setDocumentUrl(result.url);
       })
@@ -143,27 +145,13 @@ const PersonDocumentsModal = ({ person, documents = [], initialDocument, onClose
       .finally(() => {
         if (active) setLoadingPreview(false);
       });
-    return () => { active = false; };
+    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [person?.id, selectedDocument]);
 
   useEffect(() => {
-    const previewableDocuments = visibleDocuments.filter((document) => isImage(document) || isPdf(document));
-    if (!person?.id || !previewableDocuments.length) {
-      setThumbnailUrls({});
-      return undefined;
-    }
-    let active = true;
+    // Do not download every document just to draw thumbnails. Content is fetched
+    // only when selected; use the existing generic file tiles for the list.
     setThumbnailUrls({});
-    Promise.all(previewableDocuments.map(async (document) => {
-      const result = await api.getPersonDocumentUrl(person.id, document.id);
-      return result?.url ? [document.id, result.url] : null;
-    })).then((results) => {
-      if (!active) return;
-      setThumbnailUrls(Object.fromEntries(results.filter(Boolean)));
-    }).catch(() => {
-      if (active) setThumbnailUrls({});
-    });
-    return () => { active = false; };
   }, [visibleDocuments, person?.id]);
 
   useEffect(() => {
@@ -387,7 +375,7 @@ const PersonDocumentsModal = ({ person, documents = [], initialDocument, onClose
                   <img src={documentUrl} alt={selectedDocument.file_name} className="h-full w-full object-contain" />
                 )}
                 {!loadingPreview && !previewError && documentUrl && isPdf(selectedDocument) && (
-                  <iframe title={selectedDocument.file_name} src={documentUrl} className="h-full w-full border-0 bg-white" />
+                  <iframe sandbox="" referrerPolicy="no-referrer" title={selectedDocument.file_name} src={documentUrl} className="h-full w-full border-0 bg-white" />
                 )}
                 {!loadingPreview && !previewError && documentUrl && !isImage(selectedDocument) && !isPdf(selectedDocument) && (
                   <div className="max-w-[300px] px-6 text-center">

@@ -918,7 +918,7 @@ function useLiveAnalytics(periodKey, dateRange) {
         };
 
         const [callsRes, appointmentsRes, customersRes, paymentsRes] = await Promise.all([
-          supabase.from('call_logs').select('id,created_at,started_at,duration_seconds,conversation_initiation_data,raw_payload').gte('created_at', since),
+          supabase.from('call_logs').select('id,created_at,started_at,duration_seconds,direction').gte('created_at', since),
           supabase.from('appointments').select('id,created_at,status').gte('created_at', since),
           supabase.from('people').select('id,created_at').gte('created_at', since),
           supabase.from('payments').select('id,created_at,amount,status').gte('created_at', since),
@@ -1029,7 +1029,7 @@ function useLiveAnalytics(periodKey, dateRange) {
 
         setAnalytics(analyticsCatalog.map((item) => ({ ...item, ...byKey[item.key] })));
       } catch (err) {
-        console.error('[LiveMonitoring] analytics refresh failed:', err);
+        console.error("LiveMonitoringPage.jsx:event_1032");
       }
     };
 
@@ -1059,7 +1059,7 @@ function useLiveAnalytics(periodKey, dateRange) {
   return analytics;
 }
 
-function useLiveSankeyState() {
+export function useLiveSankeyState() {
   const [flowState, setFlowState] = useState({
     linkStates: {},
     nodeStates: {},
@@ -1088,7 +1088,7 @@ function useLiveSankeyState() {
         .eq('id', scenarioId)
         .limit(1)
         .maybeSingle();
-      if (error) console.warn('[LiveMonitoring] scenario lookup failed:', error.message);
+      if (error) console.warn("LiveMonitoringPage.jsx:event_1091");
       scenarioCacheRef.current.set(scenarioId, data || null);
       return data || null;
     };
@@ -1289,7 +1289,7 @@ function useLiveSankeyState() {
         .limit(limit);
 
       if (checkpointsRes.error) {
-        console.warn('[LiveMonitoring] checkpoints query failed:', checkpointsRes.error.message);
+        console.warn("LiveMonitoringPage.jsx:event_1292");
       }
 
       const rows = (checkpointsRes.data || [])
@@ -1305,27 +1305,27 @@ function useLiveSankeyState() {
           limit: 100,
           mode: initialLoadCompleteRef.current ? 'live' : 'history',
         }).catch((err) => {
-          console.warn('[LiveMonitoring] checkpoint realtime recovery failed:', err);
+          console.warn("LiveMonitoringPage.jsx:event_1308");
         });
       }, 350);
     };
 
     loadRecentCheckpoints({ limit: 1000, mode: 'history' })
-      .catch((err) => console.warn('[LiveMonitoring] checkpoint warmup failed:', err))
+      .catch((err) => console.warn("LiveMonitoringPage.jsx:event_1314"))
       .finally(() => {
         initialLoadCompleteRef.current = true;
       });
 
     const handleInsert = (payload) => {
-      console.info('[LiveMonitoring] realtime checkpoint received:', payload.new);
-      applyCheckpoint(payload.new).catch((err) => console.warn('[LiveMonitoring] checkpoint apply failed:', err));
+      console.debug("LiveMonitoringPage.jsx:event_1320");
+      applyCheckpoint(payload.new).catch((err) => console.warn("LiveMonitoringPage.jsx:event_1321"));
     };
 
     const checkpointChannel = supabase
       .channel('live-monitoring-checkpoints')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checkpoints' }, handleInsert)
       .subscribe((status, err) => {
-        console.info('[LiveMonitoring] checkpoint realtime status:', status, err || '');
+        console.debug("LiveMonitoringPage.jsx:event_1328");
         if (status === 'SUBSCRIBED') {
           recoverRecentCheckpoints();
           return;
@@ -1345,7 +1345,7 @@ function useLiveSankeyState() {
   return flowState;
 }
 
-function RealtimeSankey({ flowState }) {
+export function RealtimeSankey({ flowState }) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   const tooltipRef = useRef(null);

@@ -1233,7 +1233,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
           setReceptionists(catalogReceptionists);
         }
       } catch (error) {
-        console.warn('[CalendarShowcase] Failed to load receptionist catalog:', error);
+        console.warn("CalendarShowcase.jsx:event_1236");
       }
     };
 

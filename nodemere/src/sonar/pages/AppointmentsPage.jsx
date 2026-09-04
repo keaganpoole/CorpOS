@@ -34,7 +34,7 @@ const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate 
         notes: '',
       }, { placement: 'end' });
     } catch (err) {
-      console.error('[AppointmentsPage] Inline create failed:', err.message);
+      console.error("AppointmentsPage.jsx:event_37");
     } finally {
       setCreating(false);
     }
@@ -44,7 +44,7 @@ const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate 
     try {
       await updateAppointment(appointmentId, updates);
     } catch (err) {
-      console.error('[AppointmentsPage] Autosave failed:', err.message);
+      console.error("AppointmentsPage.jsx:event_47");
     }
   }, [updateAppointment]);
 

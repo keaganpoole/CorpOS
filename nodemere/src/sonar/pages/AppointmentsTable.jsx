@@ -1212,7 +1212,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
         setBusinessId(nextBusinessId);
         setFieldConfig(nextFieldConfig);
       } catch (err) {
-        console.error('[AppointmentsTable] Failed to load table schema:', err.message);
+        console.error("AppointmentsTable.jsx:event_1215");
       }
     };
     load();
@@ -1284,7 +1284,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
     try {
       await saveFieldConfig(businessId, next);
     } catch (err) {
-      console.error('[AppointmentsTable] Failed to save field config:', err.message);
+      console.error("AppointmentsTable.jsx:event_1287");
     }
   };
 

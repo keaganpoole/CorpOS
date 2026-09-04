@@ -24,6 +24,7 @@ export const AudioPlayerProvider = ({ children }) => {
 
     const isSameTrack = track?.id === nextTrack.id && track?.src === nextTrack.src;
     if (!isSameTrack) {
+      if (track?.src?.startsWith('blob:')) URL.revokeObjectURL(track.src);
       setTrack(nextTrack);
       setCurrentTime(0);
       setDuration(nextTrack.duration || 0);
@@ -34,7 +35,7 @@ export const AudioPlayerProvider = ({ children }) => {
     try {
       await audio.play();
     } catch (error) {
-      console.error('[AudioPlayer] Playback failed:', error);
+      console.error("AudioPlayerContext.jsx:event_37");
     }
   };
 
@@ -68,11 +69,17 @@ export const AudioPlayerProvider = ({ children }) => {
       audio.removeAttribute('src');
       audio.load();
     }
+    if (track?.src?.startsWith('blob:')) URL.revokeObjectURL(track.src);
     setTrack(null);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
   };
+
+  useEffect(() => {
+    const source = track?.src;
+    return () => { if (source?.startsWith('blob:')) URL.revokeObjectURL(source); };
+  }, [track?.src]);
 
   const value = useMemo(() => ({
     track,

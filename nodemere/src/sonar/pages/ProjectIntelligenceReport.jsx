@@ -25,6 +25,8 @@ import { api } from '../lib/api';
 import CubePreloader from '../components/CubePreloader';
 import SplashScreenAlternate from '../../components/SplashScreenAlternate';
 
+let projectIntelligenceCache = null;
+
 const TYPE_STYLES = {
   Measured: 'border-sky-400/20 bg-sky-400/[0.07] text-sky-300',
   Calculated: 'border-violet-400/20 bg-violet-400/[0.07] text-violet-300',
@@ -248,6 +250,7 @@ export default function ProjectIntelligenceReport({ publicView = false }) {
     try {
       const next = await loader();
       if (!next) throw new Error('The analysis service did not return a report.');
+      projectIntelligenceCache = next;
       setReport(next);
       if (successMessage) setStatus(successMessage);
     } catch (requestError) {
@@ -259,12 +262,20 @@ export default function ProjectIntelligenceReport({ publicView = false }) {
 
   useEffect(() => {
     let mounted = true;
+    if (projectIntelligenceCache) {
+      setReport(projectIntelligenceCache);
+      setLoading(false);
+      return () => { mounted = false; };
+    }
     (async () => {
       try {
         const next = await (publicView ? api.getPublicProjectIntelligence() : api.getProjectIntelligence());
         if (mounted) {
           if (!next) setError('The analysis service did not return a report.');
-          else setReport(next);
+          else {
+            projectIntelligenceCache = next;
+            setReport(next);
+          }
           setLoading(false);
         }
       } catch (requestError) {

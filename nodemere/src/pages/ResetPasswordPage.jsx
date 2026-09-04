@@ -51,17 +51,17 @@ const ResetPasswordPage = () => {
             const { data, error } = await supabase.auth.updateUser({ password: password });
 
             if (error) {
-                console.error('Supabase password update failed:', error.message);
+                console.error("ResetPasswordPage.jsx:event_54");
                 throw error;
             }
 
-            console.log('Password successfully updated for user:', data.user?.email);
+            console.debug("ResetPasswordPage.jsx:event_58");
             setSuccessMessage('Your password has been updated successfully! Redirecting to dashboard...');
             setTimeout(() => {
                 navigate('/dashboard');
             }, 3000); // Redirect after 3 seconds
         } catch (apiError) {
-            console.error('Password update failed in ResetPasswordPage:', apiError.message || "An unexpected error occurred.");
+            console.error("ResetPasswordPage.jsx:event_64");
             setError(`Failed to update password: ${apiError.message || 'An unexpected error occurred.'}`);
         } finally {
             setIsSubmitting(false);

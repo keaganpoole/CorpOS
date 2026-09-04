@@ -46,20 +46,20 @@ const BreakroomLoginModal = ({ onLogin }) => {
             }
         } catch (err) {
             // --- Enhanced Error Logging ---
-            console.error("Breakroom Login Error:", err);
+            console.error("BreakroomLoginModal.jsx:event_49");
             if (err.response) {
                 // The request was made and the server responded with a status code
                 // that falls out of the range of 2xx
-                console.error("Error Response Data:", err.response.data);
-                console.error("Error Response Status:", err.response.status);
+                console.error("BreakroomLoginModal.jsx:event_53");
+                console.error("BreakroomLoginModal.jsx:event_54");
                 setError(err.response.data.detail || `Error: ${err.response.status}`);
             } else if (err.request) {
                 // The request was made but no response was received
-                console.error("Error Request:", err.request);
+                console.error("BreakroomLoginModal.jsx:event_58");
                 setError("Network error. Could not connect to the server.");
             } else {
                 // Something happened in setting up the request that triggered an Error
-                console.error("Error Message:", err.message);
+                console.error("BreakroomLoginModal.jsx:event_62");
                 setError("An unexpected error occurred. Please try again.");
             }
             // --- End Enhanced Error Logging ---

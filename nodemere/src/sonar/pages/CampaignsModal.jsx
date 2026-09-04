@@ -60,7 +60,7 @@ const CampaignCard = ({ campaign, onUpdate, onDelete, isSelected, onAssign, onUn
       });
       setSaved(true);
       setTimeout(() => { setSaved(false); setEditing(false); }, 800);
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("CampaignsModal.jsx:event_63"); }
     finally { setSaving(false); }
   };
 
@@ -217,7 +217,7 @@ const NewCampaignForm = ({ onCreate, onCancel }) => {
         'Lead Count Goal': parseInt(form['Lead Count Goal']) || null,
       });
       onCancel();
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("CampaignsModal.jsx:event_220"); }
     finally { setCreating(false); }
   };
 
@@ -331,7 +331,7 @@ const CampaignsModal = ({ agent, onClose, onCampaignAssigned }) => {
     try {
       await supabase.from('research_campaigns').update({ Status: 'Assigned', assigned_to: agentName }).eq('id', campaign.id);
       if (onCampaignAssigned) onCampaignAssigned();
-    } catch (err) { console.error('[CampaignsModal] Assign failed:', err); }
+    } catch (err) { console.error("CampaignsModal.jsx:event_334"); }
   };
 
   const handleUnassign = async (campaign) => {
@@ -341,7 +341,7 @@ const CampaignsModal = ({ agent, onClose, onCampaignAssigned }) => {
     try {
       await supabase.from('research_campaigns').update({ Status: 'Unassigned', assigned_to: null }).eq('id', campaign.id);
       if (onCampaignAssigned) onCampaignAssigned();
-    } catch (err) { console.error('[CampaignsModal] Unassign failed:', err); }
+    } catch (err) { console.error("CampaignsModal.jsx:event_344"); }
   };
 
   const filtered = statusFilter === 'All' ? campaigns : campaigns.filter(c => c?.Status === statusFilter);

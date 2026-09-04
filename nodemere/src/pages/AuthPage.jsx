@@ -12,9 +12,9 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'ht
 const FRONTEND_PUBLIC_URL = import.meta.env.VITE_FRONTEND_PUBLIC_URL || window.location.origin;
 const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
 
-console.log('AuthPage: import.meta.env.DEV =', import.meta.env.DEV);
-console.log('AuthPage: import.meta.env.VITE_FRONTEND_PUBLIC_URL =', import.meta.env.VITE_FRONTEND_PUBLIC_URL);
-console.log('AuthPage: FRONTEND_PUBLIC_URL =', FRONTEND_PUBLIC_URL);
+console.debug("AuthPage.jsx:event_15");
+console.debug("AuthPage.jsx:event_16");
+console.debug("AuthPage.jsx:event_17");
 
 const AuthPage = () => {
     const { login, session, profile, isLoading: isAuthLoading } = useAuth();
@@ -60,7 +60,7 @@ const AuthPage = () => {
                             window.location.href = url;
                         }
                     } catch (error) {
-                        console.error("Error creating checkout session after login:", error);
+                        console.error("AuthPage.jsx:event_63");
                         alert("Could not initiate checkout after login. Please try again.");
                         navigate('/dashboard');
                     }
@@ -165,19 +165,19 @@ const AuthPage = () => {
         setError('');
         setSuccessMessage('');
         setIsLoading(true);
-        console.log('Attempting password reset for email:', formData.email);
+        console.debug("AuthPage.jsx:event_168");
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
                 redirectTo: FRONTEND_PUBLIC_URL + '/reset-password',
             });
             if (error) {
-                console.error('Supabase password reset request failed:', error.message);
+                console.error("AuthPage.jsx:event_174");
                 throw error;
             }
-            console.log('Password reset email successfully sent to:', formData.email);
+            console.debug("AuthPage.jsx:event_177");
             setSuccessMessage('Password reset email sent! Please check your inbox.');
         } catch (apiError) {
-            console.error('Password reset failed in AuthPage:', apiError.message || "An unexpected error occurred.");
+            console.error("AuthPage.jsx:event_180");
             setError(`Password reset failed: ${apiError.message || "An unexpected error occurred."}`);
         } finally {
             setIsLoading(false);

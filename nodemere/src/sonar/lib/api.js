@@ -59,7 +59,7 @@ async function fetchJSON(endpoint) {
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
-    console.error(`[SONARAPI] Fetch failed: ${endpoint}`, err.message);
+    console.error("api.js:event_62");
     return null;
   }
 }
@@ -78,7 +78,11 @@ export const api = {
   updateAppointment: (id, appointment) => putJSON(`/api/sonar/appointments/${encodeURIComponent(id)}`, appointment),
   deleteAppointment: (id) => deleteJSON(`/api/sonar/appointments/${encodeURIComponent(id)}`),
   getPeopleDocuments: () => fetchJSON('/api/sonar/people/documents'),
-  getPersonDocumentUrl: (personId, documentId) => fetchJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}/url`),
+  getPersonDocumentUrl: async (personId, documentId) => {
+    const res = await fetch(`${API_BASE}/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}/download`, {headers:await buildAuthHeaders()});
+    if (!res.ok) throw await parseApiError(res);
+    return {url:URL.createObjectURL(await res.blob())};
+  },
   renamePersonDocument: (personId, documentId, fileName) => putJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}`, { file_name: fileName }),
   deletePersonDocument: (personId, documentId) => deleteJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}`),
   createPerson: (person) => postJSON('/api/sonar/people', person),
@@ -143,7 +147,7 @@ async function postJSON(endpoint, body) {
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
-    console.error(`[SONARAPI] POST failed: ${endpoint}`, err.message);
+    console.error("api.js:event_150");
     throw err;
   }
 }
@@ -159,7 +163,7 @@ async function putJSON(endpoint, body) {
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
-    console.error(`[SONARAPI] PUT failed: ${endpoint}`, err.message);
+    console.error("api.js:event_166");
     throw err;
   }
 }
@@ -175,7 +179,7 @@ async function patchJSON(endpoint, body) {
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
-    console.error(`[SONARAPI] PATCH failed: ${endpoint}`, err.message);
+    console.error("api.js:event_182");
     throw err;
   }
 }
@@ -190,7 +194,7 @@ async function deleteJSON(endpoint) {
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
-    console.error(`[SONARAPI] DELETE failed: ${endpoint}`, err.message);
+    console.error("api.js:event_197");
     throw err;
   }
 }
@@ -236,7 +240,7 @@ export function connectWebSocket(onStateChange) {
         }
       }
     } catch (err) {
-      console.error('[SONAR] WS parse error:', err.message);
+      console.error("api.js:event_243");
     }
   };
 
@@ -248,7 +252,7 @@ export function connectWebSocket(onStateChange) {
   };
 
   ws.onerror = (err) => {
-    console.error('[SONAR] WebSocket error:', err.message);
+    console.error("api.js:event_255");
   };
 }
 

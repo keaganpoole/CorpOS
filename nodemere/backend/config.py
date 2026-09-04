@@ -3,6 +3,8 @@
 import os
 import stripe
 from supabase import create_client, Client
+from .authorization import ScopedClient
+from .protected_data import ProtectedClient
 
 try:
     from .env_loader import load_project_env
@@ -124,9 +126,14 @@ try:
             "A Supabase API key is required. Set SUPABASE_SERVICE_ROLE_KEY, "
             "SUPABASE_PUBLISHABLE_KEY, SUPABASE_ANON_KEY, or SUPABASE_KEY."
         )
-    supabase: Client = create_client(url, key)
-    supabase_admin: Client = create_client(url, service_role_key or key)
+    supabase = ScopedClient(ProtectedClient(create_client(url, key)))
+    supabase_admin = ScopedClient(ProtectedClient(create_client(url, service_role_key or key)))
     supabase_auth: Client = create_client(url, public_key or key)
 except Exception as e:
-    print(f"ERROR: Supabase client creation failed: {e}")
+    print("ERROR: Supabase client creation failed; check server configuration.")
     raise
+
+
+def new_auth_client():
+    """Password/signup methods mutate sessions; never run them on shared clients."""
+    return create_client(url, public_key or key)

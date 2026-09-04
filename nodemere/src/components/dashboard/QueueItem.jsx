@@ -21,7 +21,7 @@ const QueueItem = ({ messageId, leadName, campaignName, messageContent, timestam
   };
 
   const handleReject = () => {
-    console.log(`Rejected message for thread: ${messageId}`);
+    console.debug("QueueItem.jsx:event_24");
     // API call to reject
   };
 
@@ -32,7 +32,7 @@ const QueueItem = ({ messageId, leadName, campaignName, messageContent, timestam
   const handleSave = () => {
     setIsEditing(false);
     // Potentially save the draft to the server
-    console.log(`Saved draft for thread: ${messageId}`, editedMessage);
+    console.debug("QueueItem.jsx:event_35");
   };
 
   const handleCancelEdit = () => {

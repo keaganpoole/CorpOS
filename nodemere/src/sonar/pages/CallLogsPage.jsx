@@ -253,6 +253,7 @@ export function normalizeCall(row) {
     receptionistAvatar: row.receptionist_avatar || (avatarName && avatarName !== 'receptionist' ? `${AVATAR_BASE}/${avatarName}.jpg` : ''),
     isFavorited: Boolean(row.is_favorited),
     audioUrl: row.audio_url || '',
+    hasAudio: Boolean(row.has_audio),
     transcript: normalizeTranscript(row.transcript_jsonb, row.transcript_text),
     raw: row,
   };
@@ -524,7 +525,9 @@ function TranscriptBubble({ entry, receptionistAvatar, receptionistName, custome
 }
 
 function AudioStrip({ call, now }) {
-  const hasAudio = Boolean(call.audioUrl);
+  const hasAudio = Boolean(call.hasAudio);
+  const { session } = useAuth();
+  const [playbackError, setPlaybackError] = useState('');
   const audioPlayer = useAudioPlayer();
   const track = {
     id: call.id,
@@ -533,7 +536,7 @@ function AudioStrip({ call, now }) {
     subtitle: `${call.phone} - ${formatCallTime(call.time, now)}`,
     duration: call.duration || 0,
   };
-  const isActiveTrack = audioPlayer.track?.id === call.id && audioPlayer.track?.src === call.audioUrl;
+  const isActiveTrack = audioPlayer.track?.id === call.id;
   const isPlaying = isActiveTrack && audioPlayer.isPlaying;
   const currentTime = isActiveTrack ? audioPlayer.currentTime : 0;
   const duration = isActiveTrack ? (audioPlayer.duration || call.duration || 0) : (call.duration || 0);
@@ -542,11 +545,26 @@ function AudioStrip({ call, now }) {
   const progressPercent = `${Math.round(progress * 100)}%`;
   const togglePlayback = async () => {
     if (!hasAudio) return;
-    await audioPlayer.toggleTrack(track);
+    setPlaybackError('');
+    try {
+      if (isActiveTrack) { await audioPlayer.toggleTrack(audioPlayer.track); return; }
+      const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs/${encodeURIComponent(call.id)}/playback`, { method:'POST', headers:{Authorization:`Bearer ${session.access_token}`} });
+      if (!response.ok) throw new Error('Recording access failed. Verify your access and try again.');
+      const result = await response.json();
+      let source = result.url;
+      if (result.requires_authorization) {
+        // Relative, fixed-origin endpoint only. Do not forward JWTs to storage.
+        const audioResponse = await fetch(`${API_BASE_URL}/api/sonar/call-logs/${encodeURIComponent(call.id)}/audio`, {headers:{Authorization:`Bearer ${session.access_token}`}});
+        if (!audioResponse.ok) throw new Error('Recording access failed.');
+        source = URL.createObjectURL(await audioResponse.blob());
+      }
+      await audioPlayer.toggleTrack({...track, src:source});
+    } catch (error) { setPlaybackError(error.message); }
   };
 
   return (
     <div className="rounded-xl bg-white/[0.035] px-3 py-3">
+      {playbackError && <p role="alert" className="mb-2 text-xs text-red-300">{playbackError}</p>}
       {hasAudio ? (
         <div className="flex items-center gap-3">
           <button
@@ -744,7 +762,21 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
     });
   }, [calls, searchQuery]);
 
-  const selectedCall = filteredCalls.find((call) => call.id === selectedId) || filteredCalls[0] || null;
+  const selectedBaseCall = filteredCalls.find((call) => call.id === selectedId) || filteredCalls[0] || null;
+  const [callDetails, setCallDetails] = useState(null);
+  useEffect(() => {
+    setCallDetails(null);
+    if (!selectedBaseCall?.id || !session?.access_token) return undefined;
+    const controller = new AbortController();
+    fetch(`${API_BASE_URL}/api/sonar/call-logs/${encodeURIComponent(selectedBaseCall.id)}/details`, {
+      headers:{ Authorization:`Bearer ${session.access_token}` }, signal:controller.signal,
+    }).then(async response => { if (!response.ok) throw new Error('Could not load call details'); return response.json(); })
+      .then(setCallDetails).catch(error => { if (error.name !== 'AbortError') setError(error.message); });
+    return () => controller.abort();
+  }, [selectedBaseCall?.id, session?.access_token]);
+  const selectedCall = selectedBaseCall && callDetails?.id === selectedBaseCall.id
+    ? {...selectedBaseCall, transcript:normalizeTranscript(callDetails.transcript_jsonb,callDetails.transcript_text), raw:{...selectedBaseCall.raw,...callDetails}}
+    : selectedBaseCall;
   const selectedDeleteCount = selectedForDelete.length;
 
   return (

@@ -70,7 +70,7 @@ const Breakroom = () => {
         ]);
 
         if (plansRes.error || tiersRes.error) {
-          console.error("Commission Fetch Error:", plansRes.error || tiersRes.error);
+          console.error("Breakroom.jsx:event_73");
           setCommissionStructure({ data: [], tiers: [] });
           return;
         }
@@ -80,11 +80,7 @@ const Breakroom = () => {
         // Match backend logic: default to 1.0 if record or value is missing
         const globalMultiplier = masterRes.data?.points_multiplier ?? 1.0;
         
-        console.log("Commission Calculation Debug:", { 
-          plans, 
-          tiers, 
-          globalMultiplier 
-        });
+        console.debug("Breakroom.jsx:event_83");
 
         if (plans && tiers) {
           const formattedData = [];
@@ -134,7 +130,7 @@ const Breakroom = () => {
           setCommissionStructure({ data: [], tiers: [] });
         }
       } catch (error) {
-        console.error("Error fetching commission data:", error);
+        console.error("Breakroom.jsx:event_137");
         setCommissionStructure({ data: [], tiers: [] });
       }
     };

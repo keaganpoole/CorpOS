@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { api } from './api';
 
 export const CUSTOM_FIELD_PREFIX = 'custom_';
 
@@ -182,16 +183,11 @@ export const deleteCustomField = async (fieldKey, businessId) => {
     .map((row) => {
       const nextCustomFields = { ...(row.custom_fields || {}) };
       delete nextCustomFields[fieldKey];
-      return supabase
-        .from('people')
-        .update({ custom_fields: nextCustomFields })
-        .eq('id', row.id);
+      return api.updatePerson(row.id, { custom_fields: nextCustomFields });
     });
 
   if (updates.length) {
-    const results = await Promise.all(updates);
-    const failed = results.find(({ error }) => error);
-    if (failed?.error) throw failed.error;
+    await Promise.all(updates);
   }
 };
 
@@ -244,18 +240,11 @@ export const syncCustomFieldOptionValues = async (fieldKey, businessId, previous
       nextCustomFields[fieldKey] = nextValue;
     }
 
-    return [
-      supabase
-        .from('people')
-        .update({ custom_fields: nextCustomFields })
-        .eq('id', row.id),
-    ];
+    return [api.updatePerson(row.id, { custom_fields: nextCustomFields })];
   });
 
   if (updates.length) {
-    const results = await Promise.all(updates);
-    const failed = results.find(({ error }) => error);
-    if (failed?.error) throw failed.error;
+    await Promise.all(updates);
   }
 };
 

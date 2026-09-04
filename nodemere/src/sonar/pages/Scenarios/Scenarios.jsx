@@ -897,10 +897,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     try {
       const rows = (await api.getScenarios()) || [];
       setScenarios(rows);
-      console.log('[Scenarios] Loaded', rows.length, 'scenarios');
+      console.debug("Scenarios.jsx:event_900");
       return rows;
     } catch (err) {
-      console.error('[Scenarios] Error fetching scenarios:', err);
+      console.error("Scenarios.jsx:event_903");
       return [];
     }
   }, [applyScenarioOwnershipFilter, userId]);
@@ -917,7 +917,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       if (error && error.code !== 'PGRST116') throw error;
       setBuilderTimezone(data?.business_timezone || LOCAL_TIMEZONE);
     } catch (error) {
-      console.warn('[Scenarios] Failed to load business timezone:', error?.message || error);
+      console.warn("Scenarios.jsx:event_920");
       setBuilderTimezone(LOCAL_TIMEZONE);
     }
   }, [userId]);
@@ -950,7 +950,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       setPeopleCustomFields(fields);
       setPeopleCustomVariableFields(fields);
     } catch (error) {
-      console.warn('[Scenarios] Could not load custom people fields:', error?.message || error);
+      console.warn("Scenarios.jsx:event_953");
       setPeopleCustomFields([]);
       setPeopleCustomVariableFields([]);
     }
@@ -1146,7 +1146,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       if (error?.name === 'AbortError' || error?.message?.includes('signal is aborted')) {
         return;
       }
-      console.warn('[Scenarios] Failed to load integrations:', message, error);
+      console.warn("Scenarios.jsx:event_1149");
       setIntegrationError(message);
     } finally {
       window.clearTimeout(timeoutId);
@@ -1320,7 +1320,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       setScheduleMode('scheduled');
       setShowScheduleModal(true);
     } catch (error) {
-      console.error('[Scenarios] Failed to save call usage acknowledgment:', error);
+      console.error("Scenarios.jsx:event_1323");
       setShowRecurringWarningModal(false);
       setScheduleMode('scheduled');
       setShowScheduleModal(true);
@@ -1350,7 +1350,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         await api.updateScenario(currentScenario.id, { is_active: newActive });
       } catch (error) {
         setScenarioIsActive(!newActive);
-        console.error('[Scenarios] Failed to update scenario status:', error);
+        console.error("Scenarios.jsx:event_1353");
       }
     }
   };
@@ -1451,7 +1451,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       try {
         await refreshIntegrations();
       } catch (error) {
-        console.warn('[Scenarios] Integration poll failed:', error?.message || error);
+        console.warn("Scenarios.jsx:event_1454");
       }
     }, 1500);
 
@@ -2847,9 +2847,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         setNodesOpacity(1);
       }, 50);
       
-      console.log('[Scenarios] Loaded scenario:', scenario.name);
+      console.debug("Scenarios.jsx:event_2850");
     } catch (err) {
-      console.error('[Scenarios] Error loading scenario:', err);
+      console.error("Scenarios.jsx:event_2852");
     }
   };
 
@@ -2877,7 +2877,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       setImportJsonValue('');
       setImportJsonError('');
     } catch (error) {
-      console.error('[Scenarios] Failed to import scenario JSON:', error);
+      console.error("Scenarios.jsx:event_2880");
       setImportJsonError(error?.message || 'Failed to import scenario JSON.');
     }
   }, [handleLoadScenario]);
@@ -3110,7 +3110,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         result = { data, error: null };
       }
     } catch (error) {
-      console.error('[Scenarios] Error saving scenario:', error);
+      console.error("Scenarios.jsx:event_3113");
       setSaveValidationError(error.message || 'Scenario could not be saved.');
       setShowSaveModal(true);
       return;
@@ -3119,13 +3119,13 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     const { data, error } = result;
     
     if (error) {
-      console.error('[Scenarios] Error saving scenario:', error);
+      console.error("Scenarios.jsx:event_3122");
       setSaveValidationError(error.message || 'Scenario could not be saved.');
       setShowSaveModal(true);
       return;
     }
     
-    console.log('[Scenarios] Scenario saved:', data);
+    console.debug("Scenarios.jsx:event_3128");
     
     // Refresh the scenarios list
     await loadScenarios();
@@ -3133,7 +3133,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     try {
       await authorizedApiFetch('/api/scenarios/reload', { method: 'POST' });
     } catch (reloadError) {
-      console.warn('[Scenarios] Scenario saved, but backend reload failed:', reloadError?.message || reloadError);
+      console.warn("Scenarios.jsx:event_3136");
     }
     
     // Close modal and switch back to list view
@@ -3573,11 +3573,11 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     if (typeof value !== 'string' || !value.includes('{{')) return value;
     return value.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
       const parts = ref.split('.');
-      if (parts.length < 2) { console.log(`[Resolve] ❌ Bad format: ${ref}`); return match; }
+      if (parts.length < 2) { console.debug("Scenarios.jsx:event_3576"); return match; }
       const isSourcePrefixed = parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist';
       const nodeId = isSourcePrefixed ? parts[1] : parts[0];
       const fieldPath = isSourcePrefixed ? parts.slice(2) : parts.slice(1);
-      if (fieldPath.length === 0) { console.log(`[Resolve] ❌ Bad format: ${ref}`); return match; }
+      if (fieldPath.length === 0) { console.debug("Scenarios.jsx:event_3580"); return match; }
       const lookupKeys = isSourcePrefixed ? getTableRefCandidates(nodeId) : [nodeId];
       let outputData = null;
       for (const key of lookupKeys) {
@@ -3586,10 +3586,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
           break;
         }
       }
-      if (!outputData) { console.log(`[Resolve] ❌ No outputData for ${nodeId}`); return match; }
+      if (!outputData) { console.debug("Scenarios.jsx:event_3589"); return match; }
       const current = readRuntimePath(outputData, fieldPath);
-      if (current == null) { console.log(`[Resolve] ❌ Final value is null for ${ref}`); return match; }
-      console.log(`[Resolve] ✅ ${ref} → ${String(current).slice(0, 80)}`);
+      if (current == null) { console.debug("Scenarios.jsx:event_3591"); return match; }
+      console.debug("Scenarios.jsx:event_3592");
       return String(current);
     });
   };
@@ -3953,7 +3953,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     if (!config) return;
 
     const actionKey = config._key || config.key;
-    console.log('[Run Node] Starting executeRunnableNode', { nodeId, actionKey, manualValues });
+    console.debug("Scenarios.jsx:event_3956");
     const flowResultsMap = runtimeResultsMap || buildFlowResultsMap(nodeId);
     const hasManualValue = (fieldKey) => Object.prototype.hasOwnProperty.call(manualValues, fieldKey);
     const getValue = (fieldKey) => resolveRunFieldValue(
@@ -3969,23 +3969,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         setNodeRunState(nodeId, isMeaningful ? 'success' : 'empty');
         const elapsedMs = Date.now() - runStartedAt;
         if (isMeaningful) {
-          console.log('[Run Node] executeRunnableNode completed', {
-            nodeId,
-            actionKey,
-            durationMs: elapsedMs,
-            resultSummary: Array.isArray(result)
-              ? { type: 'array', count: result.length }
-              : result && typeof result === 'object'
-                ? { type: 'object', keys: Object.keys(result).slice(0, 12) }
-                : { type: typeof result, value: result },
-          });
+          console.debug("Scenarios.jsx:event_3972");
         } else {
-          console.warn('[Run Node] executeRunnableNode returned empty result', {
-            nodeId,
-            actionKey,
-            durationMs: elapsedMs,
-            result,
-          });
+          console.warn("Scenarios.jsx:event_3983");
         }
       };
       const elapsed = Date.now() - runStartedAt;
@@ -4024,7 +4010,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       if (actionKey === 'search_records' || actionKey === 'search_appointments') {
         const tableKey = actionKey === 'search_appointments' ? 'appointments' : 'people';
         const limit = config.search_limit || 10;
-        console.log('[Run Node] search request', { nodeId, actionKey, tableKey, limit });
+        console.debug("Scenarios.jsx:event_4027");
         const endpoint = actionKey === 'search_appointments'
           ? `/api/sonar/appointments?limit=${encodeURIComponent(limit)}`
           : `/api/sonar/people?limit=${encodeURIComponent(limit)}`;
@@ -4033,13 +4019,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         if (!resp.ok || result?.detail || result?.error) {
           throw new Error(result?.detail || result?.error || 'Search failed');
         }
-        console.log('[Run Node] search response', {
-          nodeId,
-          actionKey,
-          tableKey,
-          count: Array.isArray(result) ? result.length : null,
-          sample: Array.isArray(result) && result.length > 0 ? result[0] : null,
-        });
+        console.debug("Scenarios.jsx:event_4036");
         setNodes(prev => prev.map(n => n.id === nodeId
           ? { ...n, searchResults: result, outputData: result }
           : n
@@ -4048,7 +4028,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       }
 
       if (actionKey === 'create_customer') {
-        console.log('[Run Node] create_customer request', { nodeId });
+        console.debug("Scenarios.jsx:event_4051");
         const resp = await authorizedApiFetch('/api/sonar/create-customer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4066,7 +4046,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       }
 
       if (actionKey === 'call_customer') {
-        console.log('[Run Node] call_customer request', { nodeId, personId: getValue('person_id') || null });
+        console.debug("Scenarios.jsx:event_4069");
         const resp = await authorizedApiFetch('/api/sonar/call-customer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4082,7 +4062,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       }
 
       if (actionKey === 'update_customer') {
-        console.log('[Run Node] update_customer request', { nodeId, customerId: getValue('customer_id') || null });
+        console.debug("Scenarios.jsx:event_4085");
         const resp = await authorizedApiFetch('/api/sonar/update-customer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4102,7 +4082,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
       if (actionKey === 'create_payment') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-        console.log('[Run Node] create_payment request', { nodeId, amountCents });
+        console.debug("Scenarios.jsx:event_4105");
         const resp = await authorizedApiFetch('/api/sonar/create-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4127,7 +4107,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
       if (actionKey === 'send_payment_link') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-        console.log('[Run Node] send_payment_link request', { nodeId, amountCents });
+        console.debug("Scenarios.jsx:event_4130");
         const resp = await authorizedApiFetch('/api/sonar/send-payment-link', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4150,7 +4130,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
       if (actionKey === 'create_invoice') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-        console.log('[Run Node] create_invoice request', { nodeId, amountCents });
+        console.debug("Scenarios.jsx:event_4153");
         const resp = await authorizedApiFetch('/api/sonar/create-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4176,7 +4156,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
       if (actionKey === 'refund_payment') {
         const amountCents = getValue('amount') ? Math.round(Number(getValue('amount')) * 100) : null;
-        console.log('[Run Node] refund_payment request', { nodeId, paymentId: getValue('payment_id') || null, amountCents });
+        console.debug("Scenarios.jsx:event_4179");
         const resp = await authorizedApiFetch('/api/sonar/refund-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4193,7 +4173,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       }
 
       if (actionKey === 'cancel_subscription') {
-        console.log('[Run Node] cancel_subscription request', { nodeId, subscriptionId: getValue('subscription_id') || null });
+        console.debug("Scenarios.jsx:event_4196");
         const resp = await authorizedApiFetch('/api/sonar/cancel-subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4210,7 +4190,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       }
 
       if (actionKey === 'send_invoice') {
-        console.log('[Run Node] send_invoice request', { nodeId, invoiceId: getValue('invoice_id') || null });
+        console.debug("Scenarios.jsx:event_4213");
         const resp = await authorizedApiFetch('/api/sonar/send-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4231,7 +4211,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
           subject: getValue('subject') || '',
           body: getValue('body') || '',
         };
-        console.log('[Run Node] send_email request', { nodeId, body });
+        console.debug("Scenarios.jsx:event_4234");
         const resp = await fetch(`${API_BASE_URL}/api/sonar/send-email`, {
           method: 'POST',
           headers: {
@@ -4260,7 +4240,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
           }
         });
 
-        console.log('[Run Node] record request', { nodeId, actionKey, tableKey: 'people', resolvedRecordId, updateData });
+        console.debug("Scenarios.jsx:event_4263");
 
         let result;
         if (actionKey === 'update_record' && resolvedRecordId) {
@@ -4293,7 +4273,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
       throw new Error(`Run Node is not implemented for "${actionKey}".`);
     } catch (error) {
-      console.error('[Run Node] executeRunnableNode failed', { nodeId, actionKey, error: error?.message || error });
+      console.error("Scenarios.jsx:event_4296");
       const elapsed = Date.now() - runStartedAt;
       const remaining = Math.max(0, 900 - elapsed);
       if (remaining > 0) {
@@ -4336,7 +4316,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const runScenario = async () => {
     if (isRunning) return;
     setIsRunning(true);
-    const log = (msg) => { console.log(`[Scenario Run] ${msg}`); setRunProgress(msg); };
+    const log = (msg) => { console.debug("Scenarios.jsx:event_4339"); setRunProgress(msg); };
     log('▶ Starting...');
 
     const triggerNode = nodes.find(n => n.categoryType === 'TRIGGERS');
@@ -4379,8 +4359,9 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
           const limit = config.search_limit || 10;
           const businessId = await getCurrentBusinessId();
           const userId = session?.user?.id || null;
-          console.log(`[Scenario Run]   ├ Query: ${tableKey} | limit: ${limit} | scope: ${actionKey === 'search_appointments' ? `business ${businessId || '(default)'}` : `user ${userId || '(default)'}`}`);
-          let query = supabase.from(tableKey).select('*').limit(limit);
+          console.debug("Scenarios.jsx:event_4382");
+          const columns = tableKey === 'invoices' ? 'id,user_id,person_id,appointment_id,service_id,payment_id,stripe_invoice_id,stripe_customer_id,amount_due,amount_paid,currency,status,due_date,paid_at,created_at,updated_at' : '*';
+          let query = supabase.from(tableKey).select(columns).limit(limit);
           if (actionKey === 'search_appointments') {
             if (businessId) query = query.eq('business_id', businessId);
           } else if (userId) {
@@ -4394,10 +4375,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             resultsMap[tableKey] = resultData;
             resultsMap[normalizeTableRefKey(tableKey)] = resultData;
             log(`✅ ${step} ${node.label} — ${resultData.length} records found`);
-            console.log(`[Scenario Run]   └ ${tableKey} → ${resultData.length} rows`);
+            console.debug("Scenarios.jsx:event_4397");
           } else {
             log(`❌ ${step} ${node.label} — error: ${error.message}`);
-            console.error(`[Scenario Run]   └ Error:`, error.message);
+            console.error("Scenarios.jsx:event_4400");
           }
         } else if (actionKey === 'create_customer') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4407,7 +4388,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
             customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/create-customer | person: ${body.person_id || '(none)'}`);
+          console.debug("Scenarios.jsx:event_4410");
           const resp = await authorizedApiFetch('/api/sonar/create-customer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4415,10 +4396,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             resultsMap[node.id] = result;
             resultsMap.customer = result;
             log(`✅ ${step} ${node.label} — customer: ${result.customer_id || result.id}`);
-            console.log(`[Scenario Run]   └ Customer: ${result.customer_id || result.id}`);
+            console.debug("Scenarios.jsx:event_4418");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("Scenarios.jsx:event_4421");
           }
         } else if (actionKey === 'update_customer') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4429,7 +4410,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
             customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/update-customer | customer: ${body.customer_id || '(lookup)'}`);
+          console.debug("Scenarios.jsx:event_4432");
           const resp = await authorizedApiFetch('/api/sonar/update-customer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4437,10 +4418,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             resultsMap[node.id] = result;
             resultsMap.customer = result;
             log(`✅ ${step} ${node.label} — customer: ${result.customer_id || result.id}`);
-            console.log(`[Scenario Run]   └ Customer: ${result.customer_id || result.id}`);
+            console.debug("Scenarios.jsx:event_4440");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("Scenarios.jsx:event_4443");
           }
         } else if (actionKey === 'create_payment') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4456,7 +4437,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
             customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
+          console.debug("Scenarios.jsx:event_4459");
           const resp = await authorizedApiFetch('/api/sonar/create-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4465,10 +4446,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             resultsMap.payment = result;
             resultsMap.payments = result;
             log(`✅ ${step} ${node.label} — status: ${result.status} | intent: ${result.id}`);
-            console.log(`[Scenario Run]   └ PaymentIntent: ${result.id} | status: ${result.status}`);
+            console.debug("Scenarios.jsx:event_4468");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("Scenarios.jsx:event_4471");
           }
         } else if (actionKey === 'send_payment_link') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4483,7 +4464,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
             customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/send-payment-link | person: ${body.person_id || '(none)'}`);
+          console.debug("Scenarios.jsx:event_4486");
           const resp = await authorizedApiFetch('/api/sonar/send-payment-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4492,12 +4473,12 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             resultsMap.payment = result;
             resultsMap.payments = result;
             log(`✅ ${step} ${node.label} — customer: ${result.customer_id} | payment URL: ${result.payment_url ? 'yes' : 'no'}`);
-            console.log(`[Scenario Run]   ├ Customer: ${result.customer_id}`);
-            console.log(`[Scenario Run]   ├ SetupIntent: ${result.setup_intent_id}`);
-            console.log(`[Scenario Run]   └ Payment URL: ${result.payment_url || result.checkout_error || 'none'}`);
+            console.debug("Scenarios.jsx:event_4495");
+            console.debug("Scenarios.jsx:event_4496");
+            console.debug("Scenarios.jsx:event_4497");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("Scenarios.jsx:event_4500");
           }
         } else if (actionKey === 'create_invoice') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4515,7 +4496,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             service_id: resolveVariableRefs(resolveTableVariableRefs(config.service_id, resultsMap), resultsMap) || config.service_id || null,
             due_days: resolveVariableRefs(resolveTableVariableRefs(config.due_days, resultsMap), resultsMap) || config.due_days || 7,
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/create-invoice | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
+          console.debug("Scenarios.jsx:event_4518");
           const resp = await authorizedApiFetch('/api/sonar/create-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4524,17 +4505,17 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             resultsMap.invoice = result;
             resultsMap.invoices = result;
             log(`✅ ${step} ${node.label} — invoice: ${result.invoice_id || result.id} | status: ${result.status || 'draft'}`);
-            console.log(`[Scenario Run]   └ Invoice: ${result.invoice_id || result.id} | status: ${result.status || 'draft'}`);
+            console.debug("Scenarios.jsx:event_4527");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("Scenarios.jsx:event_4530");
           }
         } else if (actionKey === 'send_invoice') {
           const config = node.actionConfig || node.appointmentConfig;
           const body = {
             invoice_id: resolveVariableRefs(resolveTableVariableRefs(config.invoice_id, resultsMap), resultsMap) || config.invoice_id || null,
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/send-invoice | invoice: ${body.invoice_id || '(none)'}`);
+          console.debug("Scenarios.jsx:event_4537");
           const resp = await authorizedApiFetch('/api/sonar/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4543,10 +4524,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             resultsMap.invoice = result;
             resultsMap.invoices = result;
             log(`✅ ${step} ${node.label} — invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
-            console.log(`[Scenario Run]   └ Invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
+            console.debug("Scenarios.jsx:event_4546");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("Scenarios.jsx:event_4549");
           }
         } else if (actionKey === 'refund_payment') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4557,7 +4538,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             amount: amountCents,
             refund_reason: resolveVariableRefs(resolveTableVariableRefs(config.refund_reason, resultsMap), resultsMap) || config.refund_reason || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/refund-payment | payment: ${body.payment_id || '(none)'}`);
+          console.debug("Scenarios.jsx:event_4560");
           const resp = await authorizedApiFetch('/api/sonar/refund-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4566,10 +4547,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             resultsMap.payment = result;
             resultsMap.payments = result;
             log(`✅ ${step} ${node.label} — refund: ${result.refund_id || result.id || 'created'}`);
-            console.log(`[Scenario Run]   └ Refund: ${result.refund_id || result.id || 'created'}`);
+            console.debug("Scenarios.jsx:event_4569");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("Scenarios.jsx:event_4572");
           }
         } else if (actionKey === 'cancel_subscription') {
           const config = node.actionConfig;
@@ -4578,7 +4559,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             customer_id: resolveVariableRefs(resolveTableVariableRefs(config.customer_id, resultsMap), resultsMap) || config.customer_id || null,
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/cancel-subscription | subscription: ${body.subscription_id || '(lookup)'}`);
+          console.debug("Scenarios.jsx:event_4581");
           const resp = await authorizedApiFetch('/api/sonar/cancel-subscription', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4586,10 +4567,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             resultsMap[node.id] = result;
             resultsMap.subscription = result;
             log(`✅ ${step} ${node.label} — subscription: ${result.subscription_id || result.id}`);
-            console.log(`[Scenario Run]   └ Subscription: ${result.subscription_id || result.id}`);
+            console.debug("Scenarios.jsx:event_4589");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("Scenarios.jsx:event_4592");
           }
         } else if (actionKey === 'send_email') {
           if (!session?.access_token) {
@@ -4602,7 +4583,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             subject: resolveVariableRefs(resolveTableVariableRefs(config.subject, resultsMap), resultsMap) || config.subject || '',
             body: resolveVariableRefs(resolveTableVariableRefs(config.body, resultsMap), resultsMap) || config.body || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/send-email | to: ${body.to || '(none)'}`);
+          console.debug("Scenarios.jsx:event_4605");
           const resp = await fetch(`${API_BASE_URL}/api/sonar/send-email`, {
             method: 'POST',
             headers: {
@@ -4616,10 +4597,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
             resultsMap[node.id] = result;
             log(`✅ ${step} ${node.label} — email sent`);
-            console.log(`[Scenario Run]   └ Email: ${result.id} | provider: ${result.provider}`);
+            console.debug("Scenarios.jsx:event_4619");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("Scenarios.jsx:event_4622");
           }
         } else if (actionKey === 'update_record' || actionKey === 'create_new_record') {
           const config = node.actionConfig;
@@ -4635,8 +4616,8 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             const columnKey = key.startsWith('field_') ? key.slice(6) : key;
             updateData[columnKey] = resolveVariableRefs(resolveTableVariableRefs(value, resultsMap), resultsMap);
           }
-          console.log(`[Scenario Run]   ├ Resolved update data:`, JSON.stringify(updateData));
-          console.log(`[Scenario Run]   ├ ${actionKey === 'update_record' ? 'PATCH' : 'POST'} /api/sonar/${tableKey} | data:`, JSON.stringify(updateData));
+          console.debug("Scenarios.jsx:event_4638");
+          console.debug("Scenarios.jsx:event_4639");
           if (tableKey === 'people') {
             const customUpdates = {};
             Object.keys(updateData).forEach((columnKey) => {
@@ -4678,10 +4659,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               resultsMap[tableKey] = data;
               resultsMap[normalizeTableRefKey(tableKey)] = data;
               log(`✅ ${step} ${node.label} — updated ${tableKey} record ${resolvedRecordId}`);
-              console.log(`[Scenario Run]   └ Updated: ${JSON.stringify(updateData)}`);
+              console.debug("Scenarios.jsx:event_4681");
             } else {
               log(`❌ ${step} ${node.label} — error: ${error.message}`);
-              console.error(`[Scenario Run]   └ Error:`, error.message);
+              console.error("Scenarios.jsx:event_4684");
             }
           } else if (actionKey === 'create_new_record') {
             let data;
@@ -4699,19 +4680,19 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               resultsMap[tableKey] = data;
               resultsMap[normalizeTableRefKey(tableKey)] = data;
               log(`✅ ${step} ${node.label} — created ${tableKey} record ${data.id}`);
-              console.log(`[Scenario Run]   └ Created: ${data.id}`);
+              console.debug("Scenarios.jsx:event_4702");
             } else {
               log(`❌ ${step} ${node.label} — error: ${error.message}`);
-              console.error(`[Scenario Run]   └ Error:`, error.message);
+              console.error("Scenarios.jsx:event_4705");
             }
           }
         } else {
           log(`⏭ ${step} ${node.label} — no executor for "${actionKey}" (skipped)`);
-          console.log(`[Scenario Run]   └ Node has no run executor. Type: ${actionKey}`);
+          console.debug("Scenarios.jsx:event_4710");
         }
       } catch (err) {
         log(`❌ ${step} ${node.label} — failed: ${err.message}`);
-        console.error(`[Scenario Run]   └ Exception:`, err);
+        console.error("Scenarios.jsx:event_4714");
       }
 
       await new Promise(r => setTimeout(r, 300));
@@ -4976,7 +4957,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         await delay(status === 'paused' ? 1200 : 650);
       }
     } catch (error) {
-      console.error('[Scenario Run] Scenario execution failed', error);
+      console.error("Scenarios.jsx:event_4979");
       setRunProgress(error?.message || 'Scenario execution failed');
     } finally {
       builderRunPollRef.current.cancelled = true;
@@ -5000,7 +4981,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   };
 
   const handleDeleteScenario = (scenario) => {
-    console.log('[Scenarios] Deleting scenario:', scenario.name);
+    console.debug("Scenarios.jsx:event_5003");
     setScenarioPendingDelete(scenario);
     setDeleteConfirmModal(true);
   };
@@ -5017,12 +4998,12 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     try {
       await api.deleteScenario(scenario.id);
     } catch (error) {
-      console.error('[Scenarios] Error deleting scenario:', error);
+      console.error("Scenarios.jsx:event_5020");
       setDeleteConfirmModal(false);
       return;
     }
     
-    console.log('[Scenarios] Deleted scenario:', scenario.name);
+    console.debug("Scenarios.jsx:event_5025");
     
     // Refresh the scenarios list
     await loadScenarios();
@@ -5043,11 +5024,11 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     try {
       await api.updateScenario(scenario.id, { status: newStatus });
     } catch (error) {
-      console.error('[Scenarios] Error updating scenario status:', error);
+      console.error("Scenarios.jsx:event_5046");
       return;
     }
     
-    console.log('[Scenarios] Updated scenario status:', scenario.name, '->', newStatus);
+    console.debug("Scenarios.jsx:event_5050");
     
     // Refresh the scenarios list
     await loadScenarios();
@@ -5095,7 +5076,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       setJsonCopied(true);
       window.setTimeout(() => setJsonCopied(false), 1400);
     } catch (error) {
-      console.error('[Scenarios] Failed to copy scenario JSON:', error);
+      console.error("Scenarios.jsx:event_5098");
     }
   };
 
@@ -7418,7 +7399,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                       try {
                         await handleRunNodeRequest(menu.nodeId);
                       } catch (err) {
-                        console.error('[Run Node] Request failed:', err.message);
+                        console.error("Scenarios.jsx:event_7421");
                       }
                     }}
                   >

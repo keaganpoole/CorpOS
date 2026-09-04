@@ -898,10 +898,10 @@ export default function ScenariosPage({
 
       const rows = data || [];
       setScenarios(rows);
-      console.log('[Scenarios] Loaded', rows.length, 'scenarios');
+      console.debug("HomepageScenariosDemo.jsx:event_901");
       return rows;
     } catch (err) {
-      console.error('[Scenarios] Error fetching scenarios:', err);
+      console.error("HomepageScenariosDemo.jsx:event_904");
       return [];
     }
   }, [applyScenarioOwnershipFilter, demoMode, userId]);
@@ -923,7 +923,7 @@ export default function ScenariosPage({
       if (error && error.code !== 'PGRST116') throw error;
       setBuilderTimezone(data?.business_timezone || LOCAL_TIMEZONE);
     } catch (error) {
-      console.warn('[Scenarios] Failed to load business timezone:', error?.message || error);
+      console.warn("HomepageScenariosDemo.jsx:event_926");
       setBuilderTimezone(LOCAL_TIMEZONE);
     }
   }, [demoMode, userId]);
@@ -967,7 +967,7 @@ export default function ScenariosPage({
       setPeopleCustomFields(fields);
       setPeopleCustomVariableFields(fields);
     } catch (error) {
-      console.warn('[Scenarios] Could not load custom people fields:', error?.message || error);
+      console.warn("HomepageScenariosDemo.jsx:event_970");
       setPeopleCustomFields([]);
       setPeopleCustomVariableFields([]);
     }
@@ -1165,7 +1165,7 @@ export default function ScenariosPage({
       const message = error?.name === 'AbortError'
         ? 'Loading integrations timed out. You can still continue and try connecting directly.'
         : (error?.message || 'Failed to load integrations.');
-      console.warn('[Scenarios] Failed to load integrations:', message, error);
+      console.warn("HomepageScenariosDemo.jsx:event_1168");
       setIntegrationError(message);
     } finally {
       window.clearTimeout(timeoutId);
@@ -1400,7 +1400,7 @@ export default function ScenariosPage({
       try {
         await refreshIntegrations();
       } catch (error) {
-        console.warn('[Scenarios] Integration poll failed:', error?.message || error);
+        console.warn("HomepageScenariosDemo.jsx:event_1403");
       }
     }, 1500);
 
@@ -2785,9 +2785,9 @@ export default function ScenariosPage({
         setNodesOpacity(1);
       }, 50);
       
-      console.log('[Scenarios] Loaded scenario:', scenario.name);
+      console.debug("HomepageScenariosDemo.jsx:event_2788");
     } catch (err) {
-      console.error('[Scenarios] Error loading scenario:', err);
+      console.error("HomepageScenariosDemo.jsx:event_2790");
     }
   };
 
@@ -2908,12 +2908,12 @@ export default function ScenariosPage({
     const { data, error } = result;
     
     if (error) {
-      console.error('[Scenarios] Error saving scenario:', error);
+      console.error("HomepageScenariosDemo.jsx:event_2911");
       setShowSaveModal(false);
       return;
     }
     
-    console.log('[Scenarios] Scenario saved:', data);
+    console.debug("HomepageScenariosDemo.jsx:event_2916");
     
     // Refresh the scenarios list
     await loadScenarios();
@@ -2921,7 +2921,7 @@ export default function ScenariosPage({
     try {
       await authorizedApiFetch('/api/scenarios/reload', { method: 'POST' });
     } catch (reloadError) {
-      console.warn('[Scenarios] Scenario saved, but backend reload failed:', reloadError?.message || reloadError);
+      console.warn("HomepageScenariosDemo.jsx:event_2924");
     }
     
     // Close modal and switch back to list view
@@ -3360,11 +3360,11 @@ export default function ScenariosPage({
     if (typeof value !== 'string' || !value.includes('{{')) return value;
     return value.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
       const parts = ref.split('.');
-      if (parts.length < 2) { console.log(`[Resolve] ❌ Bad format: ${ref}`); return match; }
+      if (parts.length < 2) { console.debug("HomepageScenariosDemo.jsx:event_3363"); return match; }
       const isSourcePrefixed = parts[0] === 'rec' || parts[0] === 'agent' || parts[0] === 'receptionist';
       const nodeId = isSourcePrefixed ? parts[1] : parts[0];
       const fieldPath = isSourcePrefixed ? parts.slice(2) : parts.slice(1);
-      if (fieldPath.length === 0) { console.log(`[Resolve] ❌ Bad format: ${ref}`); return match; }
+      if (fieldPath.length === 0) { console.debug("HomepageScenariosDemo.jsx:event_3367"); return match; }
       const lookupKeys = isSourcePrefixed ? getTableRefCandidates(nodeId) : [nodeId];
       let outputData = null;
       for (const key of lookupKeys) {
@@ -3373,10 +3373,10 @@ export default function ScenariosPage({
           break;
         }
       }
-      if (!outputData) { console.log(`[Resolve] ❌ No outputData for ${nodeId}`); return match; }
+      if (!outputData) { console.debug("HomepageScenariosDemo.jsx:event_3376"); return match; }
       const current = readRuntimePath(outputData, fieldPath);
-      if (current == null) { console.log(`[Resolve] ❌ Final value is null for ${ref}`); return match; }
-      console.log(`[Resolve] ✅ ${ref} → ${String(current).slice(0, 80)}`);
+      if (current == null) { console.debug("HomepageScenariosDemo.jsx:event_3378"); return match; }
+      console.debug("HomepageScenariosDemo.jsx:event_3379");
       return String(current);
     });
   };
@@ -3727,7 +3727,7 @@ export default function ScenariosPage({
     if (!config) return;
 
     const actionKey = config._key || config.key;
-    console.log('[Run Node] Starting executeRunnableNode', { nodeId, actionKey, manualValues });
+    console.debug("HomepageScenariosDemo.jsx:event_3730");
     const flowResultsMap = runtimeResultsMap || buildFlowResultsMap(nodeId);
     const hasManualValue = (fieldKey) => Object.prototype.hasOwnProperty.call(manualValues, fieldKey);
     const getValue = (fieldKey) => resolveRunFieldValue(
@@ -3743,23 +3743,9 @@ export default function ScenariosPage({
         setNodeRunState(nodeId, isMeaningful ? 'success' : 'empty');
         const elapsedMs = Date.now() - runStartedAt;
         if (isMeaningful) {
-          console.log('[Run Node] executeRunnableNode completed', {
-            nodeId,
-            actionKey,
-            durationMs: elapsedMs,
-            resultSummary: Array.isArray(result)
-              ? { type: 'array', count: result.length }
-              : result && typeof result === 'object'
-                ? { type: 'object', keys: Object.keys(result).slice(0, 12) }
-                : { type: typeof result, value: result },
-          });
+          console.debug("HomepageScenariosDemo.jsx:event_3746");
         } else {
-          console.warn('[Run Node] executeRunnableNode returned empty result', {
-            nodeId,
-            actionKey,
-            durationMs: elapsedMs,
-            result,
-          });
+          console.warn("HomepageScenariosDemo.jsx:event_3757");
         }
       };
       const elapsed = Date.now() - runStartedAt;
@@ -3812,7 +3798,7 @@ export default function ScenariosPage({
       if (actionKey === 'search_records' || actionKey === 'search_appointments') {
         const tableKey = actionKey === 'search_appointments' ? 'appointments' : 'people';
         const limit = config.search_limit || 10;
-        console.log('[Run Node] search request', { nodeId, actionKey, tableKey, limit });
+        console.debug("HomepageScenariosDemo.jsx:event_3815");
         const endpoint = actionKey === 'search_appointments'
           ? `/api/sonar/appointments?limit=${encodeURIComponent(limit)}`
           : `/api/sonar/people?limit=${encodeURIComponent(limit)}`;
@@ -3821,13 +3807,7 @@ export default function ScenariosPage({
         if (!resp.ok || result?.detail || result?.error) {
           throw new Error(result?.detail || result?.error || 'Search failed');
         }
-        console.log('[Run Node] search response', {
-          nodeId,
-          actionKey,
-          tableKey,
-          count: Array.isArray(result) ? result.length : null,
-          sample: Array.isArray(result) && result.length > 0 ? result[0] : null,
-        });
+        console.debug("HomepageScenariosDemo.jsx:event_3824");
         setNodes(prev => prev.map(n => n.id === nodeId
           ? { ...n, searchResults: result, outputData: result }
           : n
@@ -3836,7 +3816,7 @@ export default function ScenariosPage({
       }
 
       if (actionKey === 'create_customer') {
-        console.log('[Run Node] create_customer request', { nodeId });
+        console.debug("HomepageScenariosDemo.jsx:event_3839");
         const resp = await authorizedApiFetch('/api/sonar/create-customer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3854,7 +3834,7 @@ export default function ScenariosPage({
       }
 
       if (actionKey === 'update_customer') {
-        console.log('[Run Node] update_customer request', { nodeId, customerId: getValue('customer_id') || null });
+        console.debug("HomepageScenariosDemo.jsx:event_3857");
         const resp = await authorizedApiFetch('/api/sonar/update-customer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3874,7 +3854,7 @@ export default function ScenariosPage({
 
       if (actionKey === 'create_payment') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-        console.log('[Run Node] create_payment request', { nodeId, amountCents });
+        console.debug("HomepageScenariosDemo.jsx:event_3877");
         const resp = await authorizedApiFetch('/api/sonar/create-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3899,7 +3879,7 @@ export default function ScenariosPage({
 
       if (actionKey === 'send_payment_link') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-        console.log('[Run Node] send_payment_link request', { nodeId, amountCents });
+        console.debug("HomepageScenariosDemo.jsx:event_3902");
         const resp = await authorizedApiFetch('/api/sonar/send-payment-link', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3922,7 +3902,7 @@ export default function ScenariosPage({
 
       if (actionKey === 'create_invoice') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
-        console.log('[Run Node] create_invoice request', { nodeId, amountCents });
+        console.debug("HomepageScenariosDemo.jsx:event_3925");
         const resp = await authorizedApiFetch('/api/sonar/create-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3948,7 +3928,7 @@ export default function ScenariosPage({
 
       if (actionKey === 'refund_payment') {
         const amountCents = getValue('amount') ? Math.round(Number(getValue('amount')) * 100) : null;
-        console.log('[Run Node] refund_payment request', { nodeId, paymentId: getValue('payment_id') || null, amountCents });
+        console.debug("HomepageScenariosDemo.jsx:event_3951");
         const resp = await authorizedApiFetch('/api/sonar/refund-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3965,7 +3945,7 @@ export default function ScenariosPage({
       }
 
       if (actionKey === 'cancel_subscription') {
-        console.log('[Run Node] cancel_subscription request', { nodeId, subscriptionId: getValue('subscription_id') || null });
+        console.debug("HomepageScenariosDemo.jsx:event_3968");
         const resp = await authorizedApiFetch('/api/sonar/cancel-subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3982,7 +3962,7 @@ export default function ScenariosPage({
       }
 
       if (actionKey === 'send_invoice') {
-        console.log('[Run Node] send_invoice request', { nodeId, invoiceId: getValue('invoice_id') || null });
+        console.debug("HomepageScenariosDemo.jsx:event_3985");
         const resp = await authorizedApiFetch('/api/sonar/send-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4003,7 +3983,7 @@ export default function ScenariosPage({
           subject: getValue('subject') || '',
           body: getValue('body') || '',
         };
-        console.log('[Run Node] send_email request', { nodeId, body });
+        console.debug("HomepageScenariosDemo.jsx:event_4006");
         const resp = await fetch(`${API_BASE_URL}/api/sonar/send-email`, {
           method: 'POST',
           headers: {
@@ -4032,7 +4012,7 @@ export default function ScenariosPage({
           }
         });
 
-        console.log('[Run Node] record request', { nodeId, actionKey, tableKey: 'people', resolvedRecordId, updateData });
+        console.debug("HomepageScenariosDemo.jsx:event_4035");
 
         let result;
         if (actionKey === 'update_record' && resolvedRecordId) {
@@ -4065,7 +4045,7 @@ export default function ScenariosPage({
 
       throw new Error(`Run Node is not implemented for "${actionKey}".`);
     } catch (error) {
-      console.error('[Run Node] executeRunnableNode failed', { nodeId, actionKey, error: error?.message || error });
+      console.error("HomepageScenariosDemo.jsx:event_4068");
       const elapsed = Date.now() - runStartedAt;
       const remaining = Math.max(0, 900 - elapsed);
       if (remaining > 0) {
@@ -4108,7 +4088,7 @@ export default function ScenariosPage({
   const runScenario = async () => {
     if (isRunning) return;
     setIsRunning(true);
-    const log = (msg) => { console.log(`[Scenario Run] ${msg}`); setRunProgress(msg); };
+    const log = (msg) => { console.debug("HomepageScenariosDemo.jsx:event_4111"); setRunProgress(msg); };
     log('▶ Starting...');
 
     const triggerNode = nodes.find(n => n.categoryType === 'TRIGGERS');
@@ -4151,8 +4131,9 @@ export default function ScenariosPage({
           const limit = config.search_limit || 10;
           const businessId = await getCurrentBusinessId();
           const userId = session?.user?.id || null;
-          console.log(`[Scenario Run]   ├ Query: ${tableKey} | limit: ${limit} | scope: ${actionKey === 'search_appointments' ? `business ${businessId || '(default)'}` : `user ${userId || '(default)'}`}`);
-          let query = supabase.from(tableKey).select('*').limit(limit);
+          console.debug("HomepageScenariosDemo.jsx:event_4154");
+          const columns = tableKey === 'invoices' ? 'id,user_id,person_id,appointment_id,service_id,payment_id,stripe_invoice_id,stripe_customer_id,amount_due,amount_paid,currency,status,due_date,paid_at,created_at,updated_at' : '*';
+          let query = supabase.from(tableKey).select(columns).limit(limit);
           if (actionKey === 'search_appointments') {
             if (businessId) query = query.eq('business_id', businessId);
           } else if (userId) {
@@ -4166,10 +4147,10 @@ export default function ScenariosPage({
             resultsMap[tableKey] = resultData;
             resultsMap[normalizeTableRefKey(tableKey)] = resultData;
             log(`✅ ${step} ${node.label} — ${resultData.length} records found`);
-            console.log(`[Scenario Run]   └ ${tableKey} → ${resultData.length} rows`);
+            console.debug("HomepageScenariosDemo.jsx:event_4169");
           } else {
             log(`❌ ${step} ${node.label} — error: ${error.message}`);
-            console.error(`[Scenario Run]   └ Error:`, error.message);
+            console.error("HomepageScenariosDemo.jsx:event_4172");
           }
         } else if (actionKey === 'create_customer') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4179,7 +4160,7 @@ export default function ScenariosPage({
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
             customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/create-customer | person: ${body.person_id || '(none)'}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4182");
           const resp = await authorizedApiFetch('/api/sonar/create-customer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4187,10 +4168,10 @@ export default function ScenariosPage({
             resultsMap[node.id] = result;
             resultsMap.customer = result;
             log(`✅ ${step} ${node.label} — customer: ${result.customer_id || result.id}`);
-            console.log(`[Scenario Run]   └ Customer: ${result.customer_id || result.id}`);
+            console.debug("HomepageScenariosDemo.jsx:event_4190");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("HomepageScenariosDemo.jsx:event_4193");
           }
         } else if (actionKey === 'update_customer') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4201,7 +4182,7 @@ export default function ScenariosPage({
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
             customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/update-customer | customer: ${body.customer_id || '(lookup)'}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4204");
           const resp = await authorizedApiFetch('/api/sonar/update-customer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4209,10 +4190,10 @@ export default function ScenariosPage({
             resultsMap[node.id] = result;
             resultsMap.customer = result;
             log(`✅ ${step} ${node.label} — customer: ${result.customer_id || result.id}`);
-            console.log(`[Scenario Run]   └ Customer: ${result.customer_id || result.id}`);
+            console.debug("HomepageScenariosDemo.jsx:event_4212");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("HomepageScenariosDemo.jsx:event_4215");
           }
         } else if (actionKey === 'create_payment') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4228,7 +4209,7 @@ export default function ScenariosPage({
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
             customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/create-payment | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4231");
           const resp = await authorizedApiFetch('/api/sonar/create-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4237,10 +4218,10 @@ export default function ScenariosPage({
             resultsMap.payment = result;
             resultsMap.payments = result;
             log(`✅ ${step} ${node.label} — status: ${result.status} | intent: ${result.id}`);
-            console.log(`[Scenario Run]   └ PaymentIntent: ${result.id} | status: ${result.status}`);
+            console.debug("HomepageScenariosDemo.jsx:event_4240");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("HomepageScenariosDemo.jsx:event_4243");
           }
         } else if (actionKey === 'send_payment_link') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4255,7 +4236,7 @@ export default function ScenariosPage({
             customer_email: resolveVariableRefs(resolveTableVariableRefs(config.customer_email, resultsMap), resultsMap) || config.customer_email || '',
             customer_phone: resolveVariableRefs(resolveTableVariableRefs(config.customer_phone, resultsMap), resultsMap) || config.customer_phone || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/send-payment-link | person: ${body.person_id || '(none)'}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4258");
           const resp = await authorizedApiFetch('/api/sonar/send-payment-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4264,12 +4245,12 @@ export default function ScenariosPage({
             resultsMap.payment = result;
             resultsMap.payments = result;
             log(`✅ ${step} ${node.label} — customer: ${result.customer_id} | payment URL: ${result.payment_url ? 'yes' : 'no'}`);
-            console.log(`[Scenario Run]   ├ Customer: ${result.customer_id}`);
-            console.log(`[Scenario Run]   ├ SetupIntent: ${result.setup_intent_id}`);
-            console.log(`[Scenario Run]   └ Payment URL: ${result.payment_url || result.checkout_error || 'none'}`);
+            console.debug("HomepageScenariosDemo.jsx:event_4267");
+            console.debug("HomepageScenariosDemo.jsx:event_4268");
+            console.debug("HomepageScenariosDemo.jsx:event_4269");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("HomepageScenariosDemo.jsx:event_4272");
           }
         } else if (actionKey === 'create_invoice') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4287,7 +4268,7 @@ export default function ScenariosPage({
             service_id: resolveVariableRefs(resolveTableVariableRefs(config.service_id, resultsMap), resultsMap) || config.service_id || null,
             due_days: resolveVariableRefs(resolveTableVariableRefs(config.due_days, resultsMap), resultsMap) || config.due_days || 7,
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/create-invoice | amount: ${amountCents} | person: ${body.person_id || '(none)'}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4290");
           const resp = await authorizedApiFetch('/api/sonar/create-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4296,17 +4277,17 @@ export default function ScenariosPage({
             resultsMap.invoice = result;
             resultsMap.invoices = result;
             log(`✅ ${step} ${node.label} — invoice: ${result.invoice_id || result.id} | status: ${result.status || 'draft'}`);
-            console.log(`[Scenario Run]   └ Invoice: ${result.invoice_id || result.id} | status: ${result.status || 'draft'}`);
+            console.debug("HomepageScenariosDemo.jsx:event_4299");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("HomepageScenariosDemo.jsx:event_4302");
           }
         } else if (actionKey === 'send_invoice') {
           const config = node.actionConfig || node.appointmentConfig;
           const body = {
             invoice_id: resolveVariableRefs(resolveTableVariableRefs(config.invoice_id, resultsMap), resultsMap) || config.invoice_id || null,
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/send-invoice | invoice: ${body.invoice_id || '(none)'}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4309");
           const resp = await authorizedApiFetch('/api/sonar/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4315,10 +4296,10 @@ export default function ScenariosPage({
             resultsMap.invoice = result;
             resultsMap.invoices = result;
             log(`✅ ${step} ${node.label} — invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
-            console.log(`[Scenario Run]   └ Invoice: ${result.invoice_id || result.id} | status: ${result.status || 'sent'}`);
+            console.debug("HomepageScenariosDemo.jsx:event_4318");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("HomepageScenariosDemo.jsx:event_4321");
           }
         } else if (actionKey === 'refund_payment') {
           const config = node.actionConfig || node.appointmentConfig;
@@ -4329,7 +4310,7 @@ export default function ScenariosPage({
             amount: amountCents,
             refund_reason: resolveVariableRefs(resolveTableVariableRefs(config.refund_reason, resultsMap), resultsMap) || config.refund_reason || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/refund-payment | payment: ${body.payment_id || '(none)'}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4332");
           const resp = await authorizedApiFetch('/api/sonar/refund-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4338,10 +4319,10 @@ export default function ScenariosPage({
             resultsMap.payment = result;
             resultsMap.payments = result;
             log(`✅ ${step} ${node.label} — refund: ${result.refund_id || result.id || 'created'}`);
-            console.log(`[Scenario Run]   └ Refund: ${result.refund_id || result.id || 'created'}`);
+            console.debug("HomepageScenariosDemo.jsx:event_4341");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("HomepageScenariosDemo.jsx:event_4344");
           }
         } else if (actionKey === 'cancel_subscription') {
           const config = node.actionConfig;
@@ -4350,7 +4331,7 @@ export default function ScenariosPage({
             customer_id: resolveVariableRefs(resolveTableVariableRefs(config.customer_id, resultsMap), resultsMap) || config.customer_id || null,
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/cancel-subscription | subscription: ${body.subscription_id || '(lookup)'}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4353");
           const resp = await authorizedApiFetch('/api/sonar/cancel-subscription', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
@@ -4358,10 +4339,10 @@ export default function ScenariosPage({
             resultsMap[node.id] = result;
             resultsMap.subscription = result;
             log(`✅ ${step} ${node.label} — subscription: ${result.subscription_id || result.id}`);
-            console.log(`[Scenario Run]   └ Subscription: ${result.subscription_id || result.id}`);
+            console.debug("HomepageScenariosDemo.jsx:event_4361");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("HomepageScenariosDemo.jsx:event_4364");
           }
         } else if (actionKey === 'send_email') {
           if (!session?.access_token) {
@@ -4374,7 +4355,7 @@ export default function ScenariosPage({
             subject: resolveVariableRefs(resolveTableVariableRefs(config.subject, resultsMap), resultsMap) || config.subject || '',
             body: resolveVariableRefs(resolveTableVariableRefs(config.body, resultsMap), resultsMap) || config.body || '',
           };
-          console.log(`[Scenario Run]   ├ POST /api/sonar/send-email | to: ${body.to || '(none)'}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4377");
           const resp = await fetch(`${API_BASE_URL}/api/sonar/send-email`, {
             method: 'POST',
             headers: {
@@ -4388,10 +4369,10 @@ export default function ScenariosPage({
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
             resultsMap[node.id] = result;
             log(`✅ ${step} ${node.label} — email sent`);
-            console.log(`[Scenario Run]   └ Email: ${result.id} | provider: ${result.provider}`);
+            console.debug("HomepageScenariosDemo.jsx:event_4391");
           } else {
             log(`❌ ${step} ${node.label} — error: ${result.error || result.detail}`);
-            console.error(`[Scenario Run]   └ Error:`, result.error || result.detail);
+            console.error("HomepageScenariosDemo.jsx:event_4394");
           }
         } else if (actionKey === 'update_record' || actionKey === 'create_new_record') {
           const config = node.actionConfig;
@@ -4407,8 +4388,8 @@ export default function ScenariosPage({
             const columnKey = key.startsWith('field_') ? key.slice(6) : key;
             updateData[columnKey] = resolveVariableRefs(resolveTableVariableRefs(value, resultsMap), resultsMap);
           }
-          console.log(`[Scenario Run]   ├ Resolved update data:`, JSON.stringify(updateData));
-          console.log(`[Scenario Run]   ├ ${actionKey === 'update_record' ? 'PATCH' : 'POST'} /api/sonar/${tableKey} | data:`, JSON.stringify(updateData));
+          console.debug("HomepageScenariosDemo.jsx:event_4410");
+          console.debug("HomepageScenariosDemo.jsx:event_4411");
           if (tableKey === 'people') {
             const customUpdates = {};
             Object.keys(updateData).forEach((columnKey) => {
@@ -4441,10 +4422,10 @@ export default function ScenariosPage({
               resultsMap[tableKey] = data;
               resultsMap[normalizeTableRefKey(tableKey)] = data;
               log(`✅ ${step} ${node.label} — updated ${tableKey} record ${resolvedRecordId}`);
-              console.log(`[Scenario Run]   └ Updated: ${JSON.stringify(updateData)}`);
+              console.debug("HomepageScenariosDemo.jsx:event_4444");
             } else {
               log(`❌ ${step} ${node.label} — error: ${error.message}`);
-              console.error(`[Scenario Run]   └ Error:`, error.message);
+              console.error("HomepageScenariosDemo.jsx:event_4447");
             }
           } else if (actionKey === 'create_new_record') {
             // Create new record via Supabase
@@ -4455,19 +4436,19 @@ export default function ScenariosPage({
               resultsMap[tableKey] = data;
               resultsMap[normalizeTableRefKey(tableKey)] = data;
               log(`✅ ${step} ${node.label} — created ${tableKey} record ${data.id}`);
-              console.log(`[Scenario Run]   └ Created: ${data.id}`);
+              console.debug("HomepageScenariosDemo.jsx:event_4458");
             } else {
               log(`❌ ${step} ${node.label} — error: ${error.message}`);
-              console.error(`[Scenario Run]   └ Error:`, error.message);
+              console.error("HomepageScenariosDemo.jsx:event_4461");
             }
           }
         } else {
           log(`⏭ ${step} ${node.label} — no executor for "${actionKey}" (skipped)`);
-          console.log(`[Scenario Run]   └ Node has no run executor. Type: ${actionKey}`);
+          console.debug("HomepageScenariosDemo.jsx:event_4466");
         }
       } catch (err) {
         log(`❌ ${step} ${node.label} — failed: ${err.message}`);
-        console.error(`[Scenario Run]   └ Exception:`, err);
+        console.error("HomepageScenariosDemo.jsx:event_4470");
       }
 
       await new Promise(r => setTimeout(r, 300));
@@ -4710,7 +4691,7 @@ export default function ScenariosPage({
       setRunProgress('Scenario complete');
       setScenarioRunState((prev) => prev ? { ...prev, mode: 'complete', activeNodeId: null, activeEdgeId: null } : prev);
     } catch (error) {
-      console.error('[Scenario Run] Scenario execution failed', error);
+      console.error("HomepageScenariosDemo.jsx:event_4713");
     } finally {
       await delay(420);
       setView(originalView);
@@ -4733,7 +4714,7 @@ export default function ScenariosPage({
 
   const handleDeleteScenario = (scenario) => {
     // Show custom confirmation modal
-    console.log('[Scenarios] Deleting scenario:', scenario.name);
+    console.debug("HomepageScenariosDemo.jsx:event_4736");
     window.selectedScenarioForDelete = scenario;
     setDeleteConfirmModal(true);
   };
@@ -4754,12 +4735,12 @@ export default function ScenariosPage({
     const { error } = await deleteQuery;
     
     if (error) {
-      console.error('[Scenarios] Error deleting scenario:', error);
+      console.error("HomepageScenariosDemo.jsx:event_4757");
       setDeleteConfirmModal(false);
       return;
     }
     
-    console.log('[Scenarios] Deleted scenario:', scenario.name);
+    console.debug("HomepageScenariosDemo.jsx:event_4762");
     
     // Refresh the scenarios list
     await loadScenarios();
@@ -4785,11 +4766,11 @@ export default function ScenariosPage({
     );
     
     if (error) {
-      console.error('[Scenarios] Error updating scenario status:', error);
+      console.error("HomepageScenariosDemo.jsx:event_4788");
       return;
     }
     
-    console.log('[Scenarios] Updated scenario status:', scenario.name, '->', newStatus);
+    console.debug("HomepageScenariosDemo.jsx:event_4792");
     
     // Refresh the scenarios list
     await loadScenarios();
@@ -7018,7 +6999,7 @@ export default function ScenariosPage({
                       try {
                         await handleRunNodeRequest(menu.nodeId);
                       } catch (err) {
-                        console.error('[Run Node] Request failed:', err.message);
+                        console.error("HomepageScenariosDemo.jsx:event_7021");
                       }
                     }}
                   >

@@ -11,7 +11,9 @@ import math
 import requests
 import base64
 import binascii
+from dataclasses import replace
 import hmac
+from html import escape as escape_html
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -20,6 +22,9 @@ from typing import List, Optional, Literal
 from urllib.parse import urlsplit, urlunsplit
 from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
+from .privacy import (configure_private_logging, correlation_id, event_metadata, remove_secrets,
+    workflow_snapshot, execution_progress, UploadLimitMiddleware)
+from .audit import begin_request as begin_audit_request, finish_request as finish_audit_request
 
 SUPPRESSED_ACCESS_LOG_PATHS = {
     "/api/session",
@@ -46,8 +51,9 @@ class UvicornAccessFilter(logging.Filter):
 
 # --- Logging Configuration ---
 # Sets the root logger to output INFO level messages.
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-logging.info("Logging configured.")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(correlation_id)s - %(message)s')
+configure_private_logging()
+logging.info('main.startup.event_52')
 # Silence HTTPX / HTTPCORE internal debug logs
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -122,6 +128,11 @@ from .models import (
     UserIntegrationUpdate, UserIntegrationResponse,
 )
 from .dependencies import get_current_user, get_current_rep
+from .security import safe_oauth_return_to, script_safe_json, issue_internal_context, verify_internal_context
+from .authorization import (Tenant, current_tenant, current_identity, resolve_tenant,
+                            validate_references, require_record, owner_id as business_owner_id)
+from .config import new_auth_client
+from .permissions import require_permission, route_permission
 from .scenario_engine import ScenarioEngine, validate_scenario_definition
 from .verification_service import (
     complete_verification,
@@ -162,6 +173,11 @@ except Exception:
 # App Initialization
 # --------------------------------------------------------------------------
 app = FastAPI(title="Nodemere API")
+app.add_middleware(UploadLimitMiddleware)
+from .workforce import router as workforce_router
+app.include_router(workforce_router)
+from .record_reads import router as record_read_router
+app.include_router(record_read_router)
 NODEMERE_LEGAL_ACCEPTANCE_KEY = "nodemere_legal_acceptance_v2026_08_11"
 NODEMERE_LEGAL_ACCEPTANCE_VERSION = "2026-08-11"
 RESTRICTED_LAUNCH_INDUSTRY_TERMS = {
@@ -222,7 +238,8 @@ def is_event_visible_to_user(event: dict, user_id: str) -> bool:
 
 def push_live_event(message: str, *, actor: str = "system", severity: str = "info", event_type: Optional[str] = None, payload: Optional[dict] = None):
     timestamp = datetime.now(timezone.utc).isoformat()
-    event_payload = payload or {}
+    event_payload = event_metadata(payload)
+    message = "Application event"
     event = {
         "id": next_live_event_id(),
         "timestamp": timestamp,
@@ -302,7 +319,7 @@ def list_purchased_numbers_for_business(business_id: int) -> list[dict]:
         )
         return response.data or []
     except Exception as exc:
-        logging.warning("Failed to load purchased numbers for business %s: %s", business_id, exc)
+        logging.warning('main.list_purchased_numbers_for_business.event_314')
         return []
 
 
@@ -372,7 +389,7 @@ def get_system_config_row() -> dict:
         )
         return (response.data or [None])[0] or {}
     except Exception as exc:
-        logging.warning("Failed to load system_config: %s", exc)
+        logging.warning('main.get_system_config_row.event_384')
         return {"_system_config_read_error": True}
 
 
@@ -546,7 +563,7 @@ def deactivate_other_purchased_numbers(business_id: int, keep_id: Optional[str],
             if row.get("is_active"):
                 supabase.table("purchased_numbers").update({"is_active": False}).eq("id", row["id"]).execute()
     except Exception as exc:
-        logging.warning("Failed to deactivate purchased numbers for business %s: %s", business_id, exc)
+        logging.warning('main.deactivate_other_purchased_numbers.event_558')
 
 
 def get_account_call_routing() -> str:
@@ -562,7 +579,7 @@ def get_account_call_routing() -> str:
         normalized = str((row or {}).get("call_routing") or "all").strip().lower()
         return normalized if normalized in {"inbound", "outbound", "all"} else "all"
     except Exception as exc:
-        logging.warning("Failed to load account call routing: %s", exc)
+        logging.warning('main.get_account_call_routing.event_574')
         return "all"
 
 
@@ -582,7 +599,7 @@ def get_account_call_routing_for_user(user_id: Optional[str]) -> str:
         normalized = str((row or {}).get("call_routing") or "all").strip().lower()
         return normalized if normalized in {"inbound", "outbound", "all"} else "all"
     except Exception as exc:
-        logging.warning("Failed to load account call routing for user %s: %s", user_id, exc)
+        logging.warning('main.get_account_call_routing_for_user.event_594')
         return "all"
 
 
@@ -599,7 +616,7 @@ def caller_authentication_allowed(*, user_id: Optional[str] = None, business_id:
         calls = preferences.get("calls") if isinstance(preferences.get("calls"), dict) else {}
         return calls.get("allow_caller_authentication") is True
     except Exception as exc:
-        logging.warning("Failed to load caller authentication preference: %s", exc)
+        logging.warning('main.caller_authentication_allowed.event_611')
         return False
 
 
@@ -656,12 +673,7 @@ def clear_conflicting_receptionist_directions(agent_id: str, existing_agent: Opt
             return
         query.execute()
     except Exception as exc:
-        logger.warning(
-            "Failed to clear conflicting receptionist directions: agent_id=%s direction=%s error=%s",
-            agent_id,
-            next_direction,
-            exc,
-        )
+        logger.warning('main.clear_conflicting_receptionist_directions.event_668')
 
 
 def receptionist_direction_allows(call_direction: str, receptionist_direction: Optional[str]) -> bool:
@@ -833,7 +845,7 @@ def build_inbound_ai_disclosure(business_name: Optional[str], receptionist_name:
 
 async def verify_twilio_webhook_request(request: Request, expected_url: Optional[str]) -> None:
     if not twilio_auth_token or not expected_url or RequestValidator is None:
-        logging.error("Twilio webhook verification is not fully configured.")
+        logging.error('main.verify_twilio_webhook_request.event_845')
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Twilio webhook verification is not configured.",
@@ -846,7 +858,7 @@ async def verify_twilio_webhook_request(request: Request, expected_url: Optional
         parameters = {key: value for key, value in form.multi_items()}
         valid = RequestValidator(twilio_auth_token).validate(expected_url, parameters, signature)
     except Exception as exc:
-        logging.warning("Twilio webhook verification failed: %s", exc)
+        logging.warning('main.verify_twilio_webhook_request.event_858')
         valid = False
     if not valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Twilio signature.")
@@ -869,7 +881,7 @@ def find_twilio_outgoing_caller_id(phone_number: Optional[str]) -> Optional[dict
             if normalize_phone_number(item.get("phone_number")) == normalized:
                 return item
     except Exception as exc:
-        logging.warning("Failed to look up Twilio verified caller ID for %s: %s", normalized, exc)
+        logging.warning('main.find_twilio_outgoing_caller_id.event_881')
     return None
 
 
@@ -915,7 +927,7 @@ def delete_elevenlabs_phone_number(phone_number_id: Optional[str]) -> None:
     if not headers or not phone_number_id:
         return
     try:
-        logging.info("Deleting ElevenLabs phone number phone_number_id=%s", phone_number_id)
+        logging.info('main.delete_elevenlabs_phone_number.event_927')
         response = requests.delete(
             f"https://api.elevenlabs.io/v1/convai/phone-numbers/{phone_number_id}",
             headers=headers,
@@ -923,7 +935,7 @@ def delete_elevenlabs_phone_number(phone_number_id: Optional[str]) -> None:
         )
         response.raise_for_status()
     except Exception as exc:
-        logging.warning("Failed to delete ElevenLabs phone number %s: %s", phone_number_id, exc)
+        logging.warning('main.delete_elevenlabs_phone_number.event_935')
 
 
 def search_available_twilio_numbers(
@@ -964,15 +976,10 @@ def search_available_twilio_numbers(
     search_url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/AvailablePhoneNumbers/US/Local.json"
     response = requests.get(search_url, params=search_params, auth=auth, timeout=30)
     if not response.ok:
-        logging.error(
-            "Twilio number search failed status=%s params=%s body=%s",
-            response.status_code,
-            search_params,
-            response.text,
-        )
+        logging.error('main.search_available_twilio_numbers.event_976')
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Twilio number search failed ({response.status_code}).",
+            detail='The request could not be completed',
         )
 
     options = []
@@ -994,7 +1001,7 @@ def release_twilio_number_by_sid(incoming_phone_number_sid: Optional[str]) -> No
     if not twilio_account_sid or not auth or not incoming_phone_number_sid:
         return
     try:
-        logging.info("Releasing Twilio number sid=%s", incoming_phone_number_sid)
+        logging.info('main.release_twilio_number_by_sid.event_1006')
         response = requests.delete(
             f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/IncomingPhoneNumbers/{incoming_phone_number_sid}.json",
             auth=auth,
@@ -1002,7 +1009,7 @@ def release_twilio_number_by_sid(incoming_phone_number_sid: Optional[str]) -> No
         )
         response.raise_for_status()
     except Exception as exc:
-        logging.warning("Failed to release Twilio number sid %s: %s", incoming_phone_number_sid, exc)
+        logging.warning('main.release_twilio_number_by_sid.event_1009')
 
 
 def purchase_specific_twilio_number_for_business(business: dict, phone_number: str, label: Optional[str] = None) -> tuple[dict, dict, dict]:
@@ -1030,37 +1037,18 @@ def purchase_specific_twilio_number_for_business(business: dict, phone_number: s
         "PhoneNumber": normalized_phone_number,
         "FriendlyName": label or business.get("name") or f"Business {business.get('id')}",
     }
-    logging.info(
-        "Starting Twilio number purchase business_id=%s requested_number=%s label=%s purchase_count=%s purchase_limit=%s",
-        business.get("id"),
-        normalized_phone_number,
-        purchase_payload["FriendlyName"],
-        purchase_count,
-        purchase_limit,
-    )
+    logging.info('main.purchase_specific_twilio_number_for_business.event_1042')
     purchase_response = requests.post(incoming_url, data=purchase_payload, auth=auth, timeout=30)
     if not purchase_response.ok:
         detail = purchase_response.text
-        logging.warning(
-            "Twilio number purchase failed business_id=%s requested_number=%s status_code=%s detail=%s",
-            business.get("id"),
-            normalized_phone_number,
-            purchase_response.status_code,
-            detail[:300],
-        )
+        logging.warning('main.purchase_specific_twilio_number_for_business.event_1046')
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Twilio number purchase failed ({purchase_response.status_code}): {detail[:200]}",
+            detail='The request could not be completed',
         )
 
     purchased = purchase_response.json() or {}
-    logging.info(
-        "Twilio number purchased business_id=%s requested_number=%s purchased_number=%s incoming_sid=%s",
-        business.get("id"),
-        normalized_phone_number,
-        purchased.get("phone_number"),
-        purchased.get("sid"),
-    )
+    logging.info('main.purchase_specific_twilio_number_for_business.event_1066')
     purchased_row = save_purchased_number_record(
         int(business["id"]),
         purchased.get("phone_number") or normalized_phone_number,
@@ -1090,13 +1078,7 @@ def start_number_quality_test_call(phone_number_id: str, label: str) -> dict:
         )
 
     test_destination = get_twilio_voice_test_destination()
-    logging.info(
-        "Starting quality test call phone_number_id=%s outbound_agent_id=%s to=%s label=%s",
-        phone_number_id,
-        elevenlabs_agent_id_outbound,
-        test_destination,
-        label,
-    )
+    logging.info('main.start_number_quality_test_call.event_1102')
     response = requests.post(
         "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
         headers=headers,
@@ -1123,11 +1105,7 @@ def start_number_quality_test_call(phone_number_id: str, label: str) -> dict:
     )
     response.raise_for_status()
     payload = response.json() or {}
-    logging.info(
-        "Quality test call created phone_number_id=%s call_sid=%s",
-        phone_number_id,
-        payload.get("callSid") or payload.get("call_sid"),
-    )
+    logging.info('main.start_number_quality_test_call.event_1135')
     return payload
 
 
@@ -1165,24 +1143,10 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
         except (TypeError, ValueError):
             duration_seconds = 0
 
-        logging.info(
-            "Twilio quality check status sid=%s status=%s duration=%s from=%s to=%s answered_by=%s",
-            call_sid,
-            call_status,
-            duration_seconds,
-            call.get("from"),
-            call.get("to"),
-            answered_by,
-        )
+        logging.info('main.wait_for_twilio_quality_test_result.event_1154')
 
         if call_status in success_statuses:
-            logging.info(
-                "Twilio quality check passed sid=%s poll=%s status=%s duration=%s",
-                call_sid,
-                poll_count,
-                call_status,
-                duration_seconds,
-            )
+            logging.info('main.wait_for_twilio_quality_test_result.event_1146')
             return {
                 "passed": True,
                 "status": call_status,
@@ -1190,13 +1154,7 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
             }
 
         if duration_seconds > 0:
-            logging.info(
-                "Twilio quality check passed via duration sid=%s poll=%s status=%s duration=%s",
-                call_sid,
-                poll_count,
-                call_status,
-                duration_seconds,
-            )
+            logging.info('main.wait_for_twilio_quality_test_result.event_1160')
             return {
                 "passed": True,
                 "status": call_status or "completed",
@@ -1204,13 +1162,7 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
             }
 
         if call_status in terminal_fail_statuses:
-            logging.warning(
-                "Twilio quality check failed sid=%s poll=%s status=%s duration=%s",
-                call_sid,
-                poll_count,
-                call_status,
-                duration_seconds,
-            )
+            logging.warning('main.wait_for_twilio_quality_test_result.event_1174')
             return {
                 "passed": False,
                 "status": call_status,
@@ -1218,11 +1170,11 @@ async def wait_for_twilio_quality_test_result(call_sid: Optional[str], timeout_s
             }
 
         if call_status not in pending_statuses and call_status:
-            logging.info("Twilio quality check waiting on non-terminal status sid=%s status=%s", call_sid, call_status)
+            logging.info('main.wait_for_twilio_quality_test_result.event_1188')
 
         await asyncio.sleep(1.2)
 
-    logging.warning("Twilio quality check timed out sid=%s timeout_seconds=%s", call_sid, timeout_seconds)
+    logging.warning('main.wait_for_twilio_quality_test_result.event_1234')
     return {
         "passed": False,
         "status": "timed_out",
@@ -1300,24 +1252,13 @@ async def watch_twilio_inbound_call_for_forwarding_verification(business_id: int
                 None,
             )
             if matched_call:
-                logging.info(
-                    "Twilio inbound verification matched call sid=%s to=%s business_id=%s entry_id=%s",
-                    matched_call.get("sid"),
-                    matched_call.get("to"),
-                    business_id,
-                    entry_id,
-                )
+                logging.info('main.watch_twilio_inbound_call_for_forwarding_verification.event_1247')
                 maybe_auto_verify_business_forwarding(business, called_number=target_number)
                 return
 
             await asyncio.sleep(4)
     except Exception as exc:
-        logging.warning(
-            "Failed while watching Twilio inbound verification for business %s entry %s: %s",
-            business_id,
-            entry_id,
-            exc,
-        )
+        logging.warning('main.watch_twilio_inbound_call_for_forwarding_verification.event_1282')
     finally:
         PENDING_FORWARDING_VERIFICATION_TASKS.pop(task_key, None)
 
@@ -1353,7 +1294,7 @@ def find_recent_twilio_inbound_call(target_number: Optional[str], *, within_hour
         response.raise_for_status()
         calls = (response.json() or {}).get("calls") or []
     except Exception as exc:
-        logging.warning("Failed to fetch recent Twilio calls for %s: %s", normalized_target, exc)
+        logging.warning('main.find_recent_twilio_inbound_call.event_1295')
         return None
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=max(1, within_hours))
@@ -1383,12 +1324,7 @@ def maybe_auto_verify_business_forwarding_from_recent_twilio_call(business: Opti
     matched_call = find_recent_twilio_inbound_call(target_number)
     if not matched_call:
         return None
-    logging.info(
-        "Recent Twilio inbound call matched for auto-verification sid=%s to=%s business_id=%s",
-        matched_call.get("sid"),
-        matched_call.get("to"),
-        business.get("id"),
-    )
+    logging.info('main.maybe_auto_verify_business_forwarding_from_recent_twilio_call.event_1395')
     return maybe_auto_verify_business_forwarding(business, called_number=target_number)
 
 
@@ -1448,12 +1384,7 @@ def maybe_sync_business_caller_id_verification_from_twilio(business: Optional[di
     }
     config["numbers"] = numbers
     persist_business_forwarding_config(business["id"], config)
-    logging.info(
-        "Twilio outgoing caller ID already verified; synced forwarding entry business_id=%s entry_id=%s source_number=%s",
-        business.get("id"),
-        active_entry.get("id"),
-        source_number,
-    )
+    logging.info('main.maybe_sync_business_caller_id_verification_from_twilio.event_1460')
     return numbers[active_index]
 
 
@@ -1471,7 +1402,7 @@ def find_elevenlabs_phone_number(phone_number: Optional[str]) -> Optional[dict]:
         )
         response.raise_for_status()
     except Exception as exc:
-        logging.warning("Failed to list ElevenLabs phone numbers: %s", exc)
+        logging.warning('main.find_elevenlabs_phone_number.event_1403')
         return None
 
     for item in response.json() or []:
@@ -1493,7 +1424,7 @@ def import_elevenlabs_phone_number(phone_number: str, label: str) -> Optional[st
         "token": twilio_auth_token,
     }
     try:
-        logging.info("Importing Twilio number into ElevenLabs phone_number=%s label=%s", phone_number, label)
+        logging.info('main.import_elevenlabs_phone_number.event_1472')
         response = requests.post(
             "https://api.elevenlabs.io/v1/convai/phone-numbers",
             headers=headers,
@@ -1502,10 +1433,10 @@ def import_elevenlabs_phone_number(phone_number: str, label: str) -> Optional[st
         )
         response.raise_for_status()
         phone_number_id = (response.json() or {}).get("phone_number_id")
-        logging.info("Imported Twilio number into ElevenLabs phone_number=%s phone_number_id=%s", phone_number, phone_number_id)
+        logging.info('main.import_elevenlabs_phone_number.event_1481')
         return phone_number_id
     except Exception as exc:
-        logging.warning("Failed to import Twilio number into ElevenLabs: %s", exc)
+        logging.warning('main.import_elevenlabs_phone_number.event_1437')
         return None
 
 
@@ -1526,11 +1457,7 @@ def assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id: str) -> boo
         return False
 
     try:
-        logging.info(
-            "Assigning ElevenLabs phone number to inbound agent phone_number_id=%s inbound_agent_id=%s",
-            phone_number_id,
-            elevenlabs_agent_id_inbound,
-        )
+        logging.info('main.assign_elevenlabs_phone_number_to_inbound_agent.event_1505')
         response = requests.patch(
             f"https://api.elevenlabs.io/v1/convai/phone-numbers/{phone_number_id}",
             headers=headers,
@@ -1538,14 +1465,10 @@ def assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id: str) -> boo
             timeout=60,
         )
         response.raise_for_status()
-        logging.info(
-            "Assigned ElevenLabs phone number to inbound agent phone_number_id=%s inbound_agent_id=%s",
-            phone_number_id,
-            elevenlabs_agent_id_inbound,
-        )
+        logging.info('main.assign_elevenlabs_phone_number_to_inbound_agent.event_1517')
         return True
     except Exception as exc:
-        logging.warning("Failed to assign ElevenLabs phone number %s to inbound agent: %s", phone_number_id, exc)
+        logging.warning('main.assign_elevenlabs_phone_number_to_inbound_agent.event_1469')
         return False
 
 
@@ -1557,12 +1480,7 @@ def ensure_elevenlabs_phone_number_for_business(business: dict) -> dict:
     label = business.get("name") or business.get("twilio_number_label") or f"Business {business.get('id')}"
     existing_phone = find_elevenlabs_phone_number(phone_number)
     phone_number_id = existing_phone.get("phone_number_id") if existing_phone else None
-    logging.info(
-        "Ensuring ElevenLabs phone number for business business_id=%s phone_number=%s existing_phone_number_id=%s",
-        business.get("id"),
-        phone_number,
-        phone_number_id,
-    )
+    logging.info('main.ensure_elevenlabs_phone_number_for_business.event_1569')
 
     if not phone_number_id:
         phone_number_id = import_elevenlabs_phone_number(phone_number, label)
@@ -1633,12 +1551,12 @@ def ensure_twilio_number_is_configured_for_business(business: dict) -> dict:
         timeout=30,
     )
     if not list_response.ok:
-        logging.warning("Failed to list Twilio incoming numbers for %s: %s", business.get("twilio_number"), list_response.text[:200])
+        logging.warning('main.ensure_twilio_number_is_configured_for_business.event_1607')
         return business
 
     phone_numbers = (list_response.json() or {}).get("incoming_phone_numbers") or []
     if not phone_numbers:
-        logging.warning("Assigned Twilio number %s was not found in account.", business.get("twilio_number"))
+        logging.warning('main.ensure_twilio_number_is_configured_for_business.event_1612')
         return business
 
     incoming_sid = phone_numbers[0].get("sid")
@@ -1656,7 +1574,7 @@ def ensure_twilio_number_is_configured_for_business(business: dict) -> dict:
         timeout=30,
     )
     if not update_response.ok:
-        logging.warning("Failed to configure Twilio webhook for %s: %s", business.get("twilio_number"), update_response.text[:200])
+        logging.warning('main.ensure_twilio_number_is_configured_for_business.event_1630')
         return business
 
     save_purchased_number_record(
@@ -1706,7 +1624,7 @@ def provision_twilio_number_for_business(business: dict):
     if not search_response.ok:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Twilio number search failed ({search_response.status_code}).",
+            detail='The request could not be completed',
         )
 
     available_numbers = (search_response.json() or {}).get("available_phone_numbers") or []
@@ -1741,7 +1659,7 @@ def provision_twilio_number_for_business(business: dict):
         detail = purchase_response.text
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Twilio number purchase failed ({purchase_response.status_code}): {detail[:200]}",
+            detail='The request could not be completed',
         )
 
     purchased = purchase_response.json() or {}
@@ -1786,18 +1704,14 @@ def provision_twilio_number_for_business(business: dict):
 def schedule_backend_scenario_execution(event_type: str, payload: Optional[dict] = None):
     global scenario_engine
     if not scenario_engine:
-        logging.warning("[ScenarioEngine] Skipping event %s because scenario_engine is not initialized", event_type)
+        logging.warning('main.schedule_backend_scenario_execution.event_1760')
         return
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
-        logging.warning("[ScenarioEngine] Skipping event %s because no running event loop was found", event_type)
+        logging.warning('main.schedule_backend_scenario_execution.event_1710')
         return
-    logging.info(
-        "[ScenarioEngine] Queueing event type=%s payload_keys=%s",
-        event_type,
-        sorted((payload or {}).keys()),
-    )
+    logging.info('main.schedule_backend_scenario_execution.event_1805')
     loop.create_task(scenario_engine.handle_event(event_type, payload or {}))
 
 
@@ -1807,12 +1721,17 @@ push_live_event("FastAPI backend active on port 8000.", actor="system", severity
 @app.on_event("startup")
 async def startup_scenario_engine():
     global scenario_engine
+    from .audit import enforced
+    from .envelope import writes_enabled, keyring
+    enforced()  # Invalid production mode is a startup failure, not a silent bypass.
+    if writes_enabled(): keyring()
+    if os.getenv('NODEMERE_RECOVERY_MODE', '').lower() in {'1','true','yes','on'}: return
     try:
         if scenario_engine:
             await scenario_engine.start()
             scenario_engine.start_scheduler()
     except Exception as exc:
-        logging.error("Failed to start scenario engine: %s", exc, exc_info=True)
+        logging.error('main.startup_scenario_engine.event_1727')
 
 
 @app.on_event("shutdown")
@@ -1822,7 +1741,7 @@ async def shutdown_scenario_engine():
         if scenario_engine:
             await scenario_engine.stop_scheduler()
     except Exception as exc:
-        logging.error("Failed to stop scenario scheduler: %s", exc, exc_info=True)
+        logging.error('main.shutdown_scenario_engine.event_1737')
 
 
 # --------------------------------------------------------------------------
@@ -1992,22 +1911,39 @@ def _get_stripe_redirect_uri(request: Optional[Request] = None) -> str:
     )
 
 
+def _integration_state_key():
+    return hmac.digest(SECRET_KEY.encode(),b'nodemere/oauth-state/v2','sha256').hex()
+
+
 def _build_integration_state(user_id: str, provider: str, return_to: Optional[str] = None) -> str:
     payload = {
         "sub": user_id,
         "provider": provider,
-        "return_to": return_to or frontend_base_url or "",
+        "return_to": safe_oauth_return_to(return_to, frontend_base_url),
+        "aud": "nodemere-integration-state",
         "nonce": str(uuid4()),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    tenant = current_tenant.get()
+    if not tenant: raise HTTPException(403,'Authenticated Owner context required')
+    require_permission(tenant, "integrations")
+    payload.update({"actor_id": tenant.actor_id, "business_id": str(tenant.business_id), "aal": tenant.aal})
+    return jwt.encode(payload, _integration_state_key(), algorithm=ALGORITHM)
 
 
-def _decode_integration_state(state_token: str) -> dict:
+def _decode_integration_state(state_token: str, expected_provider: str) -> dict:
     try:
-        payload = jwt.decode(state_token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("provider") not in SUPPORTED_INTEGRATION_PROVIDERS:
+        payload = jwt.decode(state_token, _integration_state_key(), algorithms=[ALGORITHM], audience="nodemere-integration-state",
+                             options={"require_exp": True, "require_sub": True, "require_aud": True})
+        if payload.get("provider") != expected_provider or expected_provider not in SUPPORTED_INTEGRATION_PROVIDERS:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider state.")
+        payload["return_to"] = safe_oauth_return_to(payload.get("return_to"), frontend_base_url)
+        if not payload.get('actor_id'): raise HTTPException(400,'Restart the integration connection')
+        if payload.get("actor_id"):
+            tenant = resolve_tenant(getattr(supabase_admin, "raw", supabase_admin), payload["actor_id"], aal=payload.get("aal","aal1"))
+            require_permission(tenant, "integrations")
+            if str(tenant.business_id) != payload.get("business_id") or tenant.owner_id != payload.get("sub"):
+                raise HTTPException(403, "Integration authority changed")
         return payload
     except JWTError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid integration state.") from exc
@@ -2201,7 +2137,7 @@ def refresh_receptionist_call_metrics(receptionist_id: Optional[str]) -> Optiona
     try:
         supabase.table("hired_receptionists").update(updates).eq("id", receptionist_id_value).execute()
     except Exception as exc:
-        logging.warning("Failed to refresh receptionist metrics for %s: %s", receptionist_id_value, exc)
+        logging.warning('main.refresh_receptionist_call_metrics.event_2128')
     return metrics
 
 
@@ -2310,7 +2246,7 @@ def _stripe_platform_api_key(livemode: Optional[bool] = None) -> str:
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Stripe Connect {get_payment_mode_label()} platform key is not configured.",
+            detail='The request could not be completed',
         )
     return api_key
 
@@ -2337,7 +2273,7 @@ def _exchange_stripe_code(code: str) -> dict:
         )
         return _stripe_object_to_dict(token)
     except Exception as exc:
-        logging.error("Stripe OAuth token exchange failed: %s", exc, exc_info=True)
+        logging.error('main._exchange_stripe_code.event_2264')
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Stripe account authorization failed.",
@@ -2347,12 +2283,9 @@ def _exchange_stripe_code(code: str) -> dict:
 def _get_connected_stripe_request_options(user_id: str) -> dict:
     integration = _fetch_integration_row(user_id, "stripe")
     credentials = (integration or {}).get("credentials") or {}
-    provider_metadata = (integration or {}).get("provider_metadata") or {}
-    stripe_user_id = credentials.get("stripe_user_id") or provider_metadata.get("account_id")
+    stripe_user_id = credentials.get("stripe_user_id")
     livemode = credentials.get("livemode")
-    if livemode is None:
-        livemode = provider_metadata.get("livemode")
-    if not integration or integration.get("status") != "connected" or not stripe_user_id:
+    if not integration or integration.get("status") != "connected" or not stripe_user_id or not isinstance(livemode, bool):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Stripe is not connected. Connect Stripe in Integrations before running payment actions.",
@@ -2367,7 +2300,7 @@ def _deauthorize_stripe_integration(integration: Optional[dict]) -> None:
     if is_payment_test_mode():
         return
     credentials = (integration or {}).get("credentials") or {}
-    stripe_user_id = credentials.get("stripe_user_id") or (integration or {}).get("provider_metadata", {}).get("account_id")
+    stripe_user_id = credentials.get("stripe_user_id")
     if not stripe_user_id or not _stripe_connect_client_id():
         return
     try:
@@ -2377,7 +2310,7 @@ def _deauthorize_stripe_integration(integration: Optional[dict]) -> None:
             stripe_user_id=stripe_user_id,
         )
     except Exception as exc:
-        logging.warning("Stripe deauthorization failed for %s: %s", stripe_user_id, exc)
+        logging.warning('main._deauthorize_stripe_integration.event_2301')
 
 
 def _exchange_google_code(code: str, redirect_uri: str) -> dict:
@@ -2500,7 +2433,7 @@ def _send_gmail_email_for_user(user_id: str, to: str, subject: str, body: str) -
         json={"raw": encoded_message},
     )
     if not response.ok:
-        logging.error("Gmail send failed: %s", response.text)
+        logging.error('main._send_gmail_email_for_user.event_2479')
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to send message.")
     return response.json()
 
@@ -2540,7 +2473,7 @@ def _exchange_outlook_code(code: str, redirect_uri: str) -> dict:
         timeout=30,
     )
     if not token_response.ok:
-        logging.error("Outlook token exchange failed: %s", token_response.text)
+        logging.error('main._exchange_outlook_code.event_2519')
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook token exchange failed.")
     return token_response.json()
 
@@ -2561,7 +2494,7 @@ def _refresh_outlook_credentials(credentials: dict) -> dict:
         timeout=30,
     )
     if not token_response.ok:
-        logging.error("Outlook token refresh failed: %s", token_response.text)
+        logging.error('main._refresh_outlook_credentials.event_2540')
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outlook token refresh failed.")
     refreshed = token_response.json()
     next_credentials = dict(credentials or {})
@@ -2667,7 +2600,7 @@ def _send_outlook_email_for_user(user_id: str, to: str, subject: str, body: str)
         json=payload,
     )
     if not response.ok:
-        logging.error("Outlook send failed: %s", response.text)
+        logging.error('main._send_outlook_email_for_user.event_2646')
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to send message via Outlook.")
     return {"id": "sent", "status": "sent", "provider": "outlook"}
 
@@ -2981,8 +2914,15 @@ class IntentCheckpointRequest(BaseModel):
 # --------------------------------------------------------------------------
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    logging.error(f"Validation error for request {request.url}: {exc}")
-    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    logging.error('main.validation_exception_handler.event_3002')
+    return JSONResponse(status_code=422, content={"detail": "Invalid request data"})
+
+
+@app.exception_handler(Exception)
+async def private_error_handler(request: Request, exc: Exception):
+    logging.error('main.private_error_handler.event_1')
+    return JSONResponse(status_code=500, content={"detail":"The request could not be completed"},
+        headers={"Cache-Control":"private, no-store","Referrer-Policy":"no-referrer"})
 
 # --- CORS Configuration ---
 configured_origins = [
@@ -3010,9 +2950,16 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
+    request_id = getattr(request.state, 'audit_event', {}).get('request_id') or uuid4().hex
+    correlation_token = correlation_id.set(request_id)
+    try:
+        response = await call_next(request)
+    finally:
+        correlation_id.reset(correlation_token)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Cache-Control", "private, no-store")
+    response.headers.setdefault("X-Request-ID", request_id)
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     return response
@@ -3020,6 +2967,10 @@ async def add_security_headers(request: Request, call_next):
 
 def is_public_api_route(request: Request) -> bool:
     path = request.url.path
+    # These bootstrap endpoints still require get_current_user themselves, but
+    # must be reachable before membership/MFA enrollment has completed.
+    if path in {"/api/workforce/session", "/api/workforce/invitations/pending"} or (path.startswith("/api/workforce/invitations/") and path.endswith("/accept")):
+        return True
     if request.method == "OPTIONS":
         return True
     if path == "/api/sonar/pricing/plans":
@@ -3042,23 +2993,44 @@ def is_public_api_route(request: Request) -> bool:
 
 
 async def require_internal_tool_authorization(request: Request):
-    if is_payment_test_mode():
-        return
+    # Billing/provider simulation must never change this authentication boundary.
     if not internal_tool_secret:
-        logging.error("NODEMERE_INTERNAL_TOOL_SECRET is not configured; refusing internal tool request.")
+        logging.error('main.require_internal_tool_authorization.event_3027')
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Internal tool authentication is not configured.",
         )
     supplied = request.headers.get("x-nodemere-internal-secret") or ""
-    if not hmac.compare_digest(supplied, internal_tool_secret):
+    if not hmac.compare_digest(supplied.encode("utf-8"), internal_tool_secret.encode("utf-8")):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal tool authorization.")
+    token = request.headers.get("x-nodemere-context")
+    scoped_path = request.scope.get("path", "")
+    if (scoped_path.startswith(("/api/tools/", "/api/call/")) or scoped_path == "/api/scenarios/resume") and not token:
+        raise HTTPException(400, "A signed internal-tool business context is required")
+    if token:
+        claims = verify_internal_context(internal_tool_secret, token)
+        business = load_business_by_id(claims.get("business_id"))
+        if not business or str(business["user_id"]) != claims["sub"]:
+            raise HTTPException(403, "Tool business unavailable")
+        from .authorization import account_active
+        if not account_active(getattr(supabase_admin,'raw',supabase_admin),claims['sub']):
+            raise HTTPException(403,'Tool business account is unavailable')
+        current_tenant.set(Tenant(claims["sub"], business["id"], claims["sub"], service=True))
 
 
 @app.middleware("http")
 async def require_authenticated_api_request(request: Request, call_next):
+    if os.getenv('NODEMERE_RECOVERY_MODE', '').lower() in {'1','true','yes','on'}:
+        return JSONResponse(status_code=503, content={"detail":"Isolated recovery mode; application traffic is disabled"})
     path = request.url.path
-    if not path.startswith("/api/") or is_public_api_route(request):
+    # Retained source from the previous product is not an alternate Nodemere
+    # API. Keep it inert rather than exposing its old authorization model.
+    retired={'messages','breakroom','reps','money-table','leads','purchases','ai-agents','campaigns','prizes','passwords','lead-campaigns','oauth','helpdesk','track-visitor'}
+    if path.strip('/').split('/')[0] in retired:
+        return JSONResponse(status_code=410,content={"detail":"This legacy endpoint is retired"})
+    onboarding=path == '/users/me/onboarding'
+    protected = onboarding or path.startswith(("/api/", "/businesses/", "/users/me/integrations")) or path == "/create-checkout-session"
+    if not protected or is_public_api_route(request) or path.endswith("/callback"):
         return await call_next(request)
 
     authorization = request.headers.get("authorization") or ""
@@ -3067,14 +3039,58 @@ async def require_authenticated_api_request(request: Request, call_next):
     access_token = authorization.split(" ", 1)[1].strip()
     if not access_token:
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Authentication required."})
+    tenant = None
     try:
-        user_result = supabase_auth.auth.get_user(access_token)
-        if not user_result or not user_result.user:
-            raise ValueError("No authenticated user")
-        request.state.authenticated_user_id = str(user_result.user.id)
+        user = await get_current_user(SimpleNamespace(credentials=access_token))
+        request.state.authenticated_user_id = str(user.id)
+        raw_db=getattr(supabase_admin, "raw", supabase_admin)
+        tenant = resolve_tenant(raw_db, str(user.id), aal=getattr(user,"nodemere_aal","aal1"),allow_missing=onboarding)
+        if onboarding and tenant is None:
+            if raw_db.table('businesses').select('id').eq('user_id',str(user.id)).limit(1).execute().data:
+                raise HTTPException(403,'Active business membership required')
+        elif onboarding:
+            profile=raw_db.table('users').select('onboarded').eq('id',str(user.id)).limit(1).execute().data or [{}]
+            if tenant.role != 'OWNER': raise HTTPException(403,'Owner required for business setup')
+            if profile[0].get('onboarded') or tenant.mfa_required or getattr(user,'nodemere_mfa_enrolled',False):
+                require_permission(tenant,'administration')
+        if tenant and getattr(user,"nodemere_mfa_enrolled",False):
+            tenant = replace(tenant,mfa_required=True)
+        if not onboarding: require_permission(tenant, route_permission(path, request.method))
+        if tenant: begin_audit_request(request, supabase_admin, tenant)
+    except HTTPException as exc:
+        from .audit import denied_request
+        try: denied_request(request, supabase_admin, exc.status_code, tenant)
+        except HTTPException:
+            return JSONResponse(status_code=503, content={"detail":"Security audit service is unavailable"})
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     except Exception:
-        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Invalid or expired authentication token."})
-    return await call_next(request)
+        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content={"detail": "Business authorization is temporarily unavailable."})
+    identity_token = current_identity.set(user)
+    tenant_token = current_tenant.set(tenant)
+    from .audit import request_context
+    audit_token = request_context.set(getattr(request.state, 'audit_event', {}).get('request_id'))
+    try:
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and "application/json" in request.headers.get("content-type", ""):
+            try:
+                body = await request.json()
+                if tenant: validate_references(raw_db, tenant, body)
+                from .permissions import contains_privileged_scenario_action
+                if "/scenarios" in path and contains_privileged_scenario_action(body):
+                    require_permission(tenant, "billing.change")
+            except HTTPException as exc:
+                from .audit import denied_request
+                denied_request(request, supabase_admin, exc.status_code, tenant)
+                return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+            except (ValueError, TypeError):
+                return JSONResponse(status_code=400, content={"detail": "Invalid JSON request"})
+        response = await call_next(request)
+        return await finish_audit_request(request, response, supabase_admin)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    finally:
+        request_context.reset(audit_token)
+        current_tenant.reset(tenant_token)
+        current_identity.reset(identity_token)
 
 
 @app.middleware("http")
@@ -3094,7 +3110,7 @@ async def capture_route_hits(request: Request, call_next):
             duration_ms = int((time.perf_counter() - started_at) * 1000)
             push_route_hit(
                 request.method,
-                path,
+                getattr(request.scope.get('route'),'path','/unmatched'),
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
                 duration_ms,
                 infer_route_source(request),
@@ -3106,7 +3122,7 @@ async def capture_route_hits(request: Request, call_next):
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         push_route_hit(
             request.method,
-            path,
+            getattr(request.scope.get('route'),'path','/unmatched'),
             response.status_code,
             duration_ms,
             infer_route_source(request),
@@ -3125,7 +3141,7 @@ async def track_visitor(request: Request, visitor_data: VisitorCreate):
     user_agent = visitor_data.user_agent
     client_ip = request.client.host if request.client else "unknown"
     iplocation = visitor_data.iplocation # Assume iplocation might be provided, or fetch if not
-    logging.debug(f"Tracking visitor with client_ip: {client_ip}, user_agent: {user_agent}")
+    logging.debug('main.track_visitor.event_3180')
 
     # If iplocation is not provided, try to fetch it
     if not iplocation and client_ip and client_ip != "unknown" and client_ip != "127.0.0.1":
@@ -3137,20 +3153,20 @@ async def track_visitor(request: Request, visitor_data: VisitorCreate):
                     ip_info = response.json()
                     if ip_info and ip_info.get("status") == "success":
                         iplocation = f"{ip_info.get('city')}, {ip_info.get('regionName')}, {ip_info.get('country')}"
-                        logging.debug(f"Successfully fetched iplocation: {iplocation}")
+                        logging.debug('main.track_visitor.event_3089')
                     else:
-                        logging.warning(f"IP-API failed for {client_ip}: {ip_info.get('message', 'Unknown error')}")
+                        logging.warning('main.track_visitor.event_3091')
                 else:
-                    logging.warning(f"Failed to fetch IP location for {client_ip}. Status: {response.status_code}")
+                    logging.warning('main.track_visitor.event_3099')
         except httpx.RequestError as e:
-            logging.error(f"HTTPX error fetching IP location for {client_ip}: {e}", exc_info=True)
+            logging.error('main.track_visitor.event_3101')
         except Exception as e:
-            logging.error(f"Unexpected error fetching IP location for {client_ip}: {e}", exc_info=True)
+            logging.error('main.track_visitor.event_3103')
     else:
-        logging.debug(f"Skipping IP location fetch. iplocation provided: {bool(iplocation)}, client_ip: {client_ip}")
+        logging.debug('main.track_visitor.event_3160')
     
     if not user_agent:
-        logging.warning("Received /track-visitor request with no user_agent.")
+        logging.warning('main.track_visitor.event_3163')
         return {"message": "User agent is required for tracking.", "status": "skipped"}
 
     try:
@@ -3161,21 +3177,21 @@ async def track_visitor(request: Request, visitor_data: VisitorCreate):
             # Visitor exists, update last_visited and increment visits
             existing_visitor = response.data[0]
             current_visits = existing_visitor.get('visits', 0)
-            logging.debug(f"Current visits for {user_agent}: {current_visits}")
+            logging.debug('main.track_visitor.event_3119')
             
             update_data = {
                 "visits": current_visits + 1,
                 "last_visited": datetime.now(timezone.utc).isoformat(),
                 "iplocation": iplocation # Ensure iplocation is updated for returning visitors
             }
-            logging.debug(f"Updating visits to: {current_visits + 1}")
+            logging.debug('main.track_visitor.event_3126')
             update_response = supabase.table('visitors').update(update_data).eq('user_agent', user_agent).execute()
 
             if update_response.data:
-                logging.info(f"Returning visitor updated: {user_agent}, new visits: {current_visits + 1}")
+                logging.info('main.track_visitor.event_3130')
                 return {"message": "Returning visitor updated."}
             else:
-                logging.error(f"Failed to update returning visitor: {update_response.error}")
+                logging.error('main.track_visitor.event_3133')
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update returning visitor.")
         else:
             # Insert new visitor record
@@ -3189,14 +3205,14 @@ async def track_visitor(request: Request, visitor_data: VisitorCreate):
             insert_response = supabase.table('visitors').insert(insert_data).execute()
             
             if insert_response.data:
-                logging.info(f"New visitor tracked: {user_agent}, IP: {client_ip}, Location: {iplocation}")
+                logging.info('main.track_visitor.event_3147')
                 return {"message": "Visitor tracked successfully."}
             else:
-                logging.error(f"Failed to insert new visitor: {insert_response.error}")
+                logging.error('main.track_visitor.event_3150')
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to track visitor.")
     except Exception as e:
-        logging.error(f"Error tracking visitor: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.track_visitor.event_3153')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 
 # --------------------------------------------------------------------------
@@ -3216,7 +3232,7 @@ def set_payment_test_mode(enabled: bool):
     global PAYMENT_TEST_MODE
     PAYMENT_TEST_MODE = enabled
     stripe.api_key = STRIPE_TEST_SECRET_KEY if PAYMENT_TEST_MODE else STRIPE_LIVE_SECRET_KEY
-    logging.info("Payment test mode set to %s", PAYMENT_TEST_MODE)
+    logging.info('main.set_payment_test_mode.event_3271')
 
 def get_payment_mode_label() -> str:
     return "test" if PAYMENT_TEST_MODE or is_real_stripe_test_mode() else "live"
@@ -3329,7 +3345,7 @@ def ensure_no_unresolved_templates(*values):
         if isinstance(value, str) and "{{" in value and "}}" in value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unresolved variable reference received: {value}. Please resolve scenario variables before running this payment action.",
+                detail='The request could not be completed',
             )
 
 def build_invoice_metadata(*, person_id: Optional[str] = None, appointment_id: Optional[str] = None, service_id: Optional[str] = None):
@@ -3425,7 +3441,7 @@ def load_person_by_id_for_user(user_id: str, person_id: Optional[str]) -> Option
         )
         return response.data[0] if response.data else None
     except Exception as exc:
-        logging.warning("Failed to load person %s for user %s: %s", person_id, user_id, exc)
+        logging.warning('main.load_person_by_id_for_user.event_3383')
         return None
 
 def persist_person_stripe_customer_id(user_id: str, person_id: Optional[str], customer_id: Optional[str]) -> None:
@@ -3437,7 +3453,7 @@ def persist_person_stripe_customer_id(user_id: str, person_id: Optional[str], cu
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", str(person_id)).eq("user_id", str(user_id)).execute()
     except Exception as exc:
-        logging.debug("Could not persist stripe_customer_id for person %s: %s", person_id, exc)
+        logging.debug('main.persist_person_stripe_customer_id.event_3395')
 
 def resolve_connected_account_user_id(stripe_account_id: Optional[str]) -> Optional[str]:
     if not stripe_account_id:
@@ -3445,13 +3461,12 @@ def resolve_connected_account_user_id(stripe_account_id: Optional[str]) -> Optio
     try:
         rows = supabase.table("integrations").select("user_id,provider_metadata,credentials").eq("provider", "stripe").execute().data or []
         for row in rows:
-            provider_metadata = row.get("provider_metadata") or {}
             credentials = row.get("credentials") or {}
-            account_id = provider_metadata.get("account_id") or credentials.get("stripe_user_id")
+            account_id = credentials.get("stripe_user_id")
             if str(account_id or "").strip() == str(stripe_account_id).strip():
                 return row.get("user_id")
     except Exception as exc:
-        logging.warning("Failed to resolve connected Stripe account %s: %s", stripe_account_id, exc)
+        logging.warning('main.resolve_connected_account_user_id.event_3408')
     return None
 
 def build_scenario_customer_metadata(*, user_id: str, person_id: Optional[str] = None, appointment_id: Optional[str] = None, service_id: Optional[str] = None) -> dict:
@@ -3544,8 +3559,8 @@ def create_or_update_stripe_customer_for_user(
             return customer, person
         except Exception as exc:
             if not create_if_missing:
-                raise HTTPException(status_code=404, detail=f"Stripe customer not found: {resolved_customer_id}") from exc
-            logging.warning("Existing Stripe customer lookup failed for %s, creating a new one: %s", resolved_customer_id, exc)
+                raise HTTPException(status_code=404, detail='The request could not be completed') from exc
+            logging.warning('main.create_or_update_stripe_customer_for_user.event_3502')
 
     if not create_if_missing:
         raise HTTPException(status_code=400, detail="No Stripe customer could be resolved.")
@@ -3565,6 +3580,10 @@ def create_or_update_stripe_customer_for_user(
 
 
 def resolve_scenario_user_id_from_stripe_event(event: dict, metadata: Optional[dict] = None) -> Optional[str]:
+    # Connected-account metadata is editable by that account and cannot select
+    # another Nodemere tenant. Resolve ownership from the server-stored binding.
+    if event.get("account"):
+        return resolve_connected_account_user_id(event["account"])
     metadata = metadata or {}
     return (
         str(metadata.get("user_id")).strip()
@@ -3578,11 +3597,11 @@ def emit_payment_trigger(trigger_key: str, payload: dict):
         "payload": payload,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    logging.info("Payment trigger fired: %s", json.dumps(trigger_payload, default=str))
+    logging.info('main.emit_payment_trigger.event_3636')
     try:
         supabase.table("scenario_events").insert(trigger_payload).execute()
     except Exception as exc:
-        logging.debug("scenario_events insert skipped or failed: %s", exc)
+        logging.debug('main.emit_payment_trigger.event_3543')
     schedule_backend_scenario_execution(trigger_key, payload)
     return trigger_payload
 
@@ -3602,7 +3621,7 @@ def emit_scenario_trigger(trigger_key: str, payload: Optional[dict] = None, crea
         "payload": payload or {},
         "created_at": event_created_at.isoformat(),
     }
-    logging.info("Scenario trigger fired: %s", json.dumps(trigger_payload, default=str))
+    logging.info('main.emit_scenario_trigger.event_3660')
 
     saved_event = trigger_payload
     persisted = False
@@ -3611,7 +3630,7 @@ def emit_scenario_trigger(trigger_key: str, payload: Optional[dict] = None, crea
         saved_event = response.data[0] if getattr(response, "data", None) else trigger_payload
         persisted = True
     except Exception as exc:
-        logging.warning("Scenario trigger persistence skipped: %s", exc)
+        logging.warning('main.emit_scenario_trigger.event_3572')
 
     schedule_backend_scenario_execution(normalized_trigger_key, payload or {})
     return {"ok": True, "event": saved_event, "persisted": persisted}
@@ -3749,7 +3768,7 @@ def lookup_person_record(
             if set(build_phone_match_values(row.get("phone"))) & match_values:
                 return row
     except Exception as exc:
-        logging.warning("Failed to match person for call log: %s", exc)
+        logging.warning('main.lookup_person_record.event_3710')
     return None
 
 
@@ -3775,7 +3794,7 @@ def load_people_schema_labels(business_id: Optional[str]) -> dict:
         )
         return {row.get("field_key"): row.get("label") for row in rows if row.get("field_key")}
     except Exception as exc:
-        logging.warning("Failed to load people schema labels: %s", exc)
+        logging.warning('main.load_people_schema_labels.event_3736')
         return {}
 
 
@@ -3793,7 +3812,7 @@ def load_people_schema_rows(business_id: Optional[str]) -> list[dict]:
             or []
         )
     except Exception as exc:
-        logging.warning("Failed to load people schema rows: %s", exc)
+        logging.warning('main.load_people_schema_rows.event_3754')
         return []
 
 
@@ -3812,7 +3831,7 @@ def load_people_schema_types(business_id: Optional[str]) -> dict:
         )
         return {row.get("field_key"): row.get("field_type") for row in rows if row.get("field_key")}
     except Exception as exc:
-        logging.warning("Failed to load people schema field types: %s", exc)
+        logging.warning('main.load_people_schema_types.event_3773')
         return {}
 
 
@@ -4119,10 +4138,22 @@ def load_business_by_user_id(user_id: Optional[str]):
     if not user_id:
         return None
     try:
+        tenant = current_tenant.get()
+        if tenant:
+            if str(user_id) not in {tenant.actor_id, tenant.owner_id}:
+                raise HTTPException(403, "Conflicting business context")
+            return load_business_by_id(tenant.business_id)
         response = supabase.table("businesses").select("*").eq("user_id", str(user_id)).limit(1).execute()
         return hydrate_business_with_purchased_number_data(response.data[0]) if response.data else None
     except Exception:
         return None
+
+def require_business_for_user(user_id: str) -> dict:
+    business = load_business_by_user_id(user_id)
+    if not business or business.get("id") is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    return business
+
 
 def load_receptionist_by_id(receptionist_id: Optional[str]):
     if not receptionist_id:
@@ -4146,11 +4177,7 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
     business_id_value = int_or_none(business_id)
     user_id_value = str(user_id).strip() if user_id else None
     if not business_id_value and not user_id_value:
-        logging.info(
-            "Inbound receptionist lookup skipped: missing business_id and user_id. business_id=%s user_id=%s",
-            business_id,
-            user_id,
-        )
+        logging.info('main.find_inbound_receptionist_for_business.event_4174')
         return None
 
     rows_by_id = {}
@@ -4177,12 +4204,7 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
             for row in response.data or []:
                 rows_by_id[str(row.get("id"))] = row
     except Exception as exc:
-        logging.warning(
-            "Inbound receptionist lookup failed: business_id=%s user_id=%s error=%s",
-            business_id_value,
-            user_id_value,
-            exc,
-        )
+        logging.warning('main.find_inbound_receptionist_for_business.event_4146')
         return None
 
     candidates = [
@@ -4192,12 +4214,7 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
     ]
 
     if not candidates:
-        logging.info(
-            "Inbound receptionist lookup found no direction-eligible candidates: business_id=%s user_id=%s rows=%s",
-            business_id_value,
-            user_id_value,
-            len(rows_by_id),
-        )
+        logging.info('main.find_inbound_receptionist_for_business.event_4220')
         return None
 
     def sort_key(row: dict):
@@ -4211,15 +4228,7 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
         return (is_online, hired_at)
 
     selected = sorted(candidates, key=sort_key, reverse=True)[0]
-    logging.info(
-        "Inbound receptionist resolved: business_id=%s user_id=%s receptionist_id=%s receptionist_name=%s direction=%s candidates=%s",
-        business_id_value,
-        user_id_value,
-        selected.get("id"),
-        get_receptionist_display_name(selected),
-        normalize_receptionist_direction(selected.get("direction")),
-        len(candidates),
-    )
+    logging.info('main.find_inbound_receptionist_for_business.event_4281')
     return selected
 
 def find_business_by_forwarded_number(forwarded_number: Optional[str]):
@@ -4272,6 +4281,14 @@ def find_business_by_called_number(called_number: Optional[str]):
 
 def resolve_business_context(payload: Optional[dict] = None):
     payload = payload or {}
+    bound = current_tenant.get()
+    if bound:
+        validate_references(getattr(supabase_admin, "raw", supabase_admin), bound, payload)
+        business = load_business_by_id(bound.business_id)
+        return {"business": business, "user_id": bound.owner_id,
+                "receptionist": load_receptionist_by_id(first_present(payload, "receptionist_id", "hired_receptionist_id")),
+                "forwarded_from": normalize_phone_number(first_present(payload, "forwarded_from", "ForwardedFrom")),
+                "called_number": normalize_phone_number(first_present(payload, "to_number", "To", "Called"))}
 
     business_id = first_present(
         payload,
@@ -4356,6 +4373,13 @@ def resolve_business_context(payload: Optional[dict] = None):
     if not business and forwarded_from:
         business = find_business_by_forwarded_number(forwarded_from)
 
+    if business:
+        trusted = current_tenant.get() or Tenant(str(business["user_id"]), business["id"], str(business["user_id"]), service=True)
+        validate_references(getattr(supabase_admin, "raw", supabase_admin), trusted, payload)
+        if receptionist:
+            require_record(getattr(supabase_admin, "raw", supabase_admin), trusted, "hired_receptionists", receptionist["id"])
+        user_id = business["user_id"]
+
     return {
         "business": business,
         "user_id": str(user_id or business.get("user_id")) if (user_id or business) else None,
@@ -4400,6 +4424,18 @@ def serialize_business_profile_row(row: dict):
         "forwarding_config": normalize_forwarding_config(row.get("forwarding_config")),
     }
 
+
+# Tool responses deliberately exclude billing, security, consent evidence and
+# provider configuration. These are operational/public business facts only.
+TOOL_BUSINESS_FIELDS = ('id', 'name', 'phone', 'email', 'address', 'city', 'state',
+    'zip', 'website', 'about_us', 'policies', 'faq', 'business_hours', 'business_timezone', 'industry')
+TOOL_STAFF_FIELDS = ('id', 'full_name', 'first_name', 'last_name', 'role',
+    'is_active', 'working_hours', 'knowledge')
+
+
+def staff_tool_view(row):
+    return {key: row[key] for key in TOOL_STAFF_FIELDS if key in row} if row else None
+
 def parse_usage_seconds(value) -> int:
     try:
         return max(0, int(float(value or 0)))
@@ -4420,7 +4456,7 @@ def increment_business_usage_summary(business_id, duration_delta_seconds) -> Non
             }).execute()
             return
         except Exception as rpc_exc:
-            logging.warning("Business usage RPC unavailable, falling back to direct update: %s", rpc_exc)
+            logging.warning('main.increment_business_usage_summary.event_4386')
 
         response = (
             supabase.table("businesses")
@@ -4442,7 +4478,7 @@ def increment_business_usage_summary(business_id, duration_delta_seconds) -> Non
             "current_cycle_overage_seconds": overage_seconds,
         }).eq("id", business_id).execute()
     except Exception as exc:
-        logging.error("Failed to update business usage summary for business %s: %s", business_id, exc, exc_info=True)
+        logging.error('main.increment_business_usage_summary.event_4413')
 
 def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period_end=None, reset_usage=False) -> None:
     """Copy the active plan's minute allowance into the business usage summary."""
@@ -4486,7 +4522,7 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
             })
         supabase_admin.table("businesses").update(update_data).eq("id", business["id"]).execute()
     except Exception as exc:
-        logging.error("Failed to sync plan entitlement for user %s plan %s: %s", user_id, plan_name, exc, exc_info=True)
+        logging.error('main.sync_business_plan_entitlement.event_4457')
 
 
 # Plan access is evaluated from the authenticated user's current profile and
@@ -4529,7 +4565,7 @@ def get_user_plan_context(user_id: str) -> dict:
         if isinstance(plan_row and plan_row.get("entitlements"), dict):
             entitlements.update(plan_row["entitlements"])
     except Exception as exc:
-        logging.warning("Could not load entitlement row for %s: %s", plan_slug, exc)
+        logging.warning('main.get_user_plan_context.event_4495')
 
     return {
         "user": profile,
@@ -4740,7 +4776,7 @@ def get_usage_snapshot(user_id: str) -> dict:
 def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
     """Create one idempotent Stripe invoice item for the current usage cycle."""
     if is_payment_test_mode():
-        logging.info("Skipping Stripe overage invoice item because payment test mode is enabled.")
+        logging.info('main.attach_overage_to_upcoming_invoice.event_4775')
         return
     customer_id = invoice.get("customer")
     invoice_id = invoice.get("id")
@@ -4756,7 +4792,7 @@ def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
     )
     user = (user_response.data or [None])[0]
     if not user:
-        logging.warning("Cannot reconcile overage for unknown Stripe customer %s", customer_id)
+        logging.warning('main.attach_overage_to_upcoming_invoice.event_4791')
         return
 
     context = get_user_plan_context(str(user["id"]))
@@ -4816,9 +4852,9 @@ def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
             "status": "invoiced",
             "error_message": None,
         }).eq("user_id", str(user["id"])).eq("stripe_invoice_id", invoice_id).execute()
-        logging.info("Attached %s cents of call overage to Stripe invoice %s", event_payload["amount_cents"], invoice_id)
+        logging.info('main.attach_overage_to_upcoming_invoice.event_4815')
     except Exception as exc:
-        logging.error("Failed to attach call overage to invoice %s: %s", invoice_id, exc, exc_info=True)
+        logging.error('main.attach_overage_to_upcoming_invoice.event_4784')
         supabase_admin.table("billing_overage_events").update({
             "status": "failed",
             "error_message": str(exc)[:1000],
@@ -4834,7 +4870,7 @@ def reconcile_overage_invoice(invoice_id: Optional[str], status_value: str) -> N
     try:
         supabase_admin.table("billing_overage_events").update(update_data).eq("stripe_invoice_id", invoice_id).execute()
     except Exception as exc:
-        logging.error("Failed to reconcile overage invoice %s: %s", invoice_id, exc, exc_info=True)
+        logging.error('main.reconcile_overage_invoice.event_4800')
 
 def build_call_route_payload(payload: dict, request: Request):
     forwarded_from = first_present(payload, "forwarded_from", "forwardedFrom", "ForwardedFrom", "source_number")
@@ -4883,7 +4919,7 @@ def build_call_route_payload(payload: dict, request: Request):
         "provider": first_present(payload, "provider", "source") or ("elevenlabs" if first_present(payload, "agent_id") else "unknown"),
         "received_at": datetime.now(timezone.utc).isoformat(),
         "path": request.url.path,
-        "raw_payload": payload,
+        "raw_payload": event_metadata(payload),
     }
     return call_payload
 
@@ -4892,7 +4928,7 @@ def upsert_active_call_log(call_payload: dict, *, user_id: Optional[str], busine
     provider_call_sid = call_payload.get("call_id")
     conversation_id = call_payload.get("conversation_id")
     if not provider_call_sid and not conversation_id:
-        logging.warning("Cannot create live call log without a call or conversation identifier.")
+        logging.warning('main.upsert_active_call_log.event_4891')
         return
 
     row = {
@@ -4908,7 +4944,7 @@ def upsert_active_call_log(call_payload: dict, *, user_id: Optional[str], busine
         "direction": call_payload.get("direction") or "inbound",
         "started_at": call_payload.get("received_at") or datetime.now(timezone.utc).isoformat(),
         "status": "in-progress",
-        "raw_payload": call_payload.get("raw_payload") or {},
+        "raw_payload": event_metadata(call_payload.get("raw_payload")),
     }
     row = {key: value for key, value in row.items() if value is not None}
     try:
@@ -4923,7 +4959,7 @@ def upsert_active_call_log(call_payload: dict, *, user_id: Optional[str], busine
             supabase.table("call_logs").insert(row).execute()
     except Exception as exc:
         # The call itself must continue even if NEST's live indicator cannot be persisted.
-        logging.warning("Failed to persist live ElevenLabs call log: %s", exc, exc_info=True)
+        logging.warning('main.upsert_active_call_log.event_4889')
 
 def normalize_intent_key(intent_key: str) -> str:
     normalized = (intent_key or "").strip().lower().replace(" ", "_").replace("-", "_")
@@ -5022,23 +5058,23 @@ def normalize_appointment_time_value(value, fallback: str = "09:00") -> str:
     return fallback
 
 
-def safe_appointment_person_id(value):
+def safe_appointment_person_id(value, *, business_id):
     parsed = int_or_none(value)
-    if parsed is None:
+    if parsed is None or business_id is None:
         return None
     try:
-        response = supabase.table("people").select("id").eq("id", parsed).limit(1).execute()
+        response = supabase.table("people").select("id").eq("id", parsed).eq("business_id", business_id).limit(1).execute()
         return parsed if response.data else None
     except Exception:
         return None
 
 
-def safe_appointment_service_id(value):
+def safe_appointment_service_id(value, *, business_id):
     parsed = uuid_or_none(value)
-    if not parsed:
+    if not parsed or business_id is None:
         return None
     try:
-        response = supabase.table("services").select("id").eq("id", parsed).limit(1).execute()
+        response = supabase.table("services").select("id").eq("id", parsed).eq("business_id", business_id).limit(1).execute()
         return parsed if response.data else None
     except Exception:
         return None
@@ -5301,7 +5337,7 @@ def appointments_conflict(start_a: Optional[int], duration_a: int, start_b: Opti
 
 
 def list_staff_conflicts(*, business_id, appointment_date, appointment_time, duration, staff_id=None, exclude_appointment_id=None):
-    query = supabase.table("appointments").select("*")
+    query = supabase.table("appointments").select("id,staff_id,date,time,duration,status")
     if business_id is not None:
         query = query.eq("business_id", business_id)
     if appointment_date:
@@ -5326,7 +5362,8 @@ def list_staff_conflicts(*, business_id, appointment_date, appointment_time, dur
             appointment_time_to_minutes(row.get("time")),
             row.get("duration"),
         ):
-            conflicts.append(row)
+            # The caller needs busy intervals, not the other patient's record.
+            conflicts.append({key: row.get(key) for key in ('staff_id', 'date', 'time', 'duration')})
     return conflicts
 
 
@@ -5470,10 +5507,6 @@ def extract_transcript_turns(value):
             "role": item.get("role") or item.get("speaker") or "speaker",
             "message": text,
             "time_in_call_secs": item.get("time_in_call_secs"),
-            "tool_calls": item.get("tool_calls"),
-            "tool_results": item.get("tool_results"),
-            "feedback": item.get("feedback"),
-            "conversation_turn_metrics": item.get("conversation_turn_metrics"),
         })
     return turns
 
@@ -5487,7 +5520,7 @@ def extract_dynamic_variables(data: dict) -> dict:
         merged.update(scenario_context)
     return merged
 
-def storage_signed_url(path: Optional[str], expires_in: int = 3600) -> Optional[str]:
+def storage_signed_url(path: Optional[str], expires_in: int = 60) -> Optional[str]:
     if not path:
         return None
     try:
@@ -5495,30 +5528,40 @@ def storage_signed_url(path: Optional[str], expires_in: int = 3600) -> Optional[
         if isinstance(response, dict):
             return response.get("signedURL") or response.get("signed_url") or response.get("signedUrl")
     except Exception as exc:
-        logging.warning("Failed to create signed call recording URL for %s: %s", path, exc)
+        logging.warning('main.storage_signed_url.event_5461')
     return None
 
 def upload_call_recording(conversation_id: str, audio_base64: str, *, agent_id: Optional[str] = None) -> Optional[str]:
     if not conversation_id or not audio_base64:
         return None
+    if len(audio_base64) > 180 * 1024 * 1024:
+        raise HTTPException(413, 'Recording too large')
     try:
         audio_bytes = base64.b64decode(audio_base64, validate=True)
     except (binascii.Error, ValueError) as exc:
-        logging.warning("Invalid ElevenLabs full_audio payload for conversation_id=%s: %s", conversation_id, exc)
+        logging.warning('main.upload_call_recording.event_5470')
         return None
 
     safe_agent_id = sanitize_storage_segment(agent_id, "agent")
     safe_conversation_id = sanitize_storage_segment(conversation_id, uuid4().hex)
     storage_path = f"elevenlabs/{safe_agent_id}/{safe_conversation_id}.mp3"
+    from .envelope import seal_file, encryption_required
+    tenant = current_tenant.get()
+    if not tenant: raise HTTPException(403, 'Trusted recording business required')
+    if len(audio_bytes)>128*1024*1024: raise HTTPException(413,'Recording too large')
+    if encryption_required(getattr(supabase_admin,'raw',supabase_admin), tenant.business_id):
+        storage_path = f"business/{tenant.business_id}/{storage_path}.ndmenc"
+        audio_bytes = seal_file(getattr(supabase_admin, 'raw', supabase_admin), audio_bytes,
+                                business_id=tenant.business_id, bucket='call_recordings', path=storage_path)
     try:
         supabase_admin.storage.from_("call_recordings").upload(
             storage_path,
             audio_bytes,
-            file_options={"content-type": "audio/mpeg", "upsert": "true"},
+            file_options={"content-type": "application/octet-stream" if storage_path.endswith('.ndmenc') else "audio/mpeg", "upsert": "true"},
         )
         return storage_path
     except Exception as exc:
-        logging.error("Failed to upload call recording to Supabase Storage: %s", exc, exc_info=True)
+        logging.error('main.upload_call_recording.event_5484')
         return None
 
 def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id=None, phone_number=None):
@@ -5545,7 +5588,7 @@ def lookup_hired_receptionist(*, hired_receptionist_id=None, elevenlabs_agent_id
             if response.data:
                 return response.data[0]
     except Exception as exc:
-        logging.warning("Failed to match hired receptionist for call log: %s", exc)
+        logging.warning('main.lookup_hired_receptionist.event_5511')
     return None
 
 
@@ -5757,7 +5800,7 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
         "status": str(data.get("status")) if data.get("status") else ("failed" if webhook_type == "call_initiation_failure" else None),
         "outcome": str(outcome_value) if outcome_value else None,
         "summary": str(summary_value) if summary_value else None,
-        "transcript_text": stringify_transcript(transcript_value),
+        "transcript_text": None if transcript_turns else stringify_transcript(transcript_value),
         "transcript_jsonb": transcript_turns or None,
         "branch_id": str(data.get("branch_id")) if data.get("branch_id") else None,
         "version_id": str(data.get("version_id")) if data.get("version_id") else None,
@@ -5766,13 +5809,13 @@ def extract_call_log_from_elevenlabs_payload(payload: dict):
         "has_user_audio": data.get("has_user_audio"),
         "has_response_audio": data.get("has_response_audio"),
         "call_successful": str(call_successful) if call_successful else None,
-        "analysis_results": analysis or None,
-        "conversation_metadata": metadata or None,
-        "conversation_initiation_data": initiation_data or None,
-        "telephony_metadata": telephony_metadata,
+        "analysis_results": {"call_successful": call_successful},
+        "conversation_metadata": event_metadata(metadata),
+        "conversation_initiation_data": {"dynamic_variables": event_metadata(dynamic_variables)},
+        "telephony_metadata": event_metadata(telephony_metadata),
         "provider_call_sid": str(provider_call_sid) if provider_call_sid else None,
         "failure_reason": str(data.get("failure_reason")) if data.get("failure_reason") else None,
-        "raw_payload": payload,
+        "raw_payload": event_metadata(payload),
     }
 
 def emit_intent_checkpoint(request: IntentCheckpointRequest):
@@ -5780,7 +5823,7 @@ def emit_intent_checkpoint(request: IntentCheckpointRequest):
     if normalized_intent_key not in SUPPORTED_INTENT_KEYS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported intent_key: {request.intent_key}",
+            detail='The request could not be completed',
         )
 
     if request.timestamp:
@@ -5822,11 +5865,11 @@ def emit_intent_checkpoint(request: IntentCheckpointRequest):
         "session_id": payload["session_id"],
     }
 
-    logging.info("Intent checkpoint fired: %s", json.dumps(event_record, default=str))
+    logging.info('main.emit_intent_checkpoint.event_5907')
     try:
         response = supabase.table("checkpoints").insert(event_record).execute()
     except Exception as exc:
-        logging.error("Failed to persist intent checkpoint: %s", exc, exc_info=True)
+        logging.error('main.emit_intent_checkpoint.event_5792')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to persist intent checkpoint",
@@ -5877,7 +5920,7 @@ def insert_payment_record(payment_row: dict):
         claim_payment_milestones(supabase, saved)
         return saved
     except Exception as exc:
-        logging.error("Failed to insert payment row: %s", exc, exc_info=True)
+        logging.error('main.insert_payment_record.event_5843')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Payment was created externally but could not be recorded locally.",
@@ -6170,24 +6213,14 @@ def deliver_existing_secure_link_by_email(
             missing_configuration=exc.missing_configuration,
         )
     except requests.RequestException:
-        logging.warning(
-            "Secure email delivery network failure kind=%s request_id=%s business_id=%s",
-            kind,
-            request_result.get("request_id"),
-            context.get("business_id"),
-        )
+        logging.warning('main.deliver_existing_secure_link_by_email.event_6136')
         return _secure_link_delivery_failure(
             request_result=request_result,
             code="email_provider_unavailable",
             message="The email provider could not be reached. Please try again.",
         )
     except Exception:
-        logging.exception(
-            "Unexpected secure email delivery failure kind=%s request_id=%s business_id=%s",
-            kind,
-            request_result.get("request_id"),
-            context.get("business_id"),
-        )
+        logging.exception('main.deliver_existing_secure_link_by_email.event_6148')
         return _secure_link_delivery_failure(
             request_result=request_result,
             code="email_delivery_failed",
@@ -6295,7 +6328,7 @@ def get_client_ip(request: Request) -> Optional[str]:
 
 @app.post("/api/contracts", tags=["Voice Contracts"])
 async def create_voice_contract(payload: ContractCreateRequest, current_user: dict = Depends(get_current_user)):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     business = load_business_by_user_id(current_user_id)
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
@@ -6356,7 +6389,7 @@ async def sign_voice_contract(token: str, payload: ContractSignRequest, request:
         consent=payload.consent or {},
     )
     if not result.get("success"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
     return result
 
 
@@ -6370,7 +6403,7 @@ async def accept_voice_contract_consent(token: str, payload: ContractConsentRequ
         user_agent=request.headers.get("user-agent"),
     )
     if not result.get("success"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
     return result
 
 
@@ -6387,7 +6420,10 @@ async def get_voice_clone_state(token: str):
 @app.post("/api/contracts/{token}/clone", tags=["Voice Contracts"])
 async def create_instant_voice_clone(token: str, request: Request):
     try:
-        form = await request.form()
+        contract=get_contract_public_state(supabase_admin,token)
+        if not contract.get('success') or contract.get('status') not in {'signed','cloned'}:
+            raise HTTPException(403,'This voice upload link is unavailable')
+        form = await request.form(max_files=6,max_fields=3)
         voice_name = str(form.get("voice_name") or "").strip()
         remove_background_noise = str(form.get("remove_background_noise") or "true").lower() in {"1", "true", "yes", "on"}
         raw_files = form.getlist("files")
@@ -6395,7 +6431,10 @@ async def create_instant_voice_clone(token: str, request: Request):
         for uploaded in raw_files:
             if uploaded is None or not hasattr(uploaded, "read"):
                 continue
-            content = await uploaded.read()
+            try:
+                content = await uploaded.read(25*1024*1024+1)
+            finally:
+                await uploaded.close()
             uploaded_files.append(SimpleNamespace(
                 filename=getattr(uploaded, "filename", "sample.webm"),
                 content_type=getattr(uploaded, "content_type", None),
@@ -6410,13 +6449,13 @@ async def create_instant_voice_clone(token: str, request: Request):
             remove_background_noise=remove_background_noise,
         )
         if not result.get("success"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
         return result
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Voice clone request failed: %s", exc, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": "Voice cloning failed. Please try again.", "debug": str(exc)}) from exc
+        logging.error('main.create_instant_voice_clone.event_6381')
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": "Voice cloning failed. Please try again."}) from exc
 
 
 @app.post("/api/contracts/{token}/receptionist-profile", tags=["Voice Contracts"])
@@ -6430,7 +6469,10 @@ async def complete_cloned_receptionist_profile(
     image: Optional[UploadFile] = File(None),
 ):
     try:
-        content = await image.read() if image else None
+        contract=get_contract_public_state(supabase_admin,token)
+        if not contract.get('success') or contract.get('status') not in {'signed','cloned'}:
+            raise HTTPException(403,'This profile link is unavailable')
+        content = await image.read(5*1024*1024+1) if image else None
         result = save_cloned_receptionist_profile(
             supabase_admin,
             token=token,
@@ -6444,14 +6486,14 @@ async def complete_cloned_receptionist_profile(
             image_content=content,
         )
         if not result.get("success"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
         return result
     except HTTPException:
         raise
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": str(exc)}) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": "Invalid profile data"}) from exc
     except Exception as exc:
-        logging.error("Cloned receptionist profile save failed: %s", exc, exc_info=True)
+        logging.error('main.complete_cloned_receptionist_profile.event_6417')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"message": "Could not save the cloned receptionist."}) from exc
 
 
@@ -6462,13 +6504,17 @@ async def get_document_upload_state(token: str):
 
 @app.post("/api/upload/{token}/files", tags=["Document Upload"])
 async def upload_document_file(token: str, request: Request):
+    uploaded = None
     try:
-        form = await request.form()
+        state = get_document_request(supabase_admin, token)
+        if not state.get("success") or state.get("status") != "pending":
+            raise HTTPException(403, "This upload link is unavailable")
+        form = await request.form(max_files=1, max_fields=2)
         uploaded = form.get("file")
         if uploaded is None or not hasattr(uploaded, "read"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="file is required")
         notice_accepted = str(form.get("acknowledged") or "").strip().lower() in {"1", "true", "yes", "on"}
-        content = await uploaded.read()
+        content = await uploaded.read(10 * 1024 * 1024 + 1)
         result = store_document(
             supabase_admin,
             token=token,
@@ -6479,15 +6525,16 @@ async def upload_document_file(token: str, request: Request):
         )
         if not result.get("success"):
             detail = {"message": result.get("message") or "Upload failed", "status": result.get("status")}
-            if result.get("debug"):
-                detail["debug"] = result.get("debug")
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
         return result
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Document upload request failed: %s", exc, exc_info=True)
+        logging.error('main.upload_document_file.event_6452')
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
+    finally:
+        if uploaded is not None and hasattr(uploaded,"close"):
+            await uploaded.close()
 
 
 @app.get("/api/verification/{token}", tags=["Verification"])
@@ -6626,8 +6673,15 @@ def execution_belongs_to_user(execution: dict, user_id: str) -> bool:
 
 
 def build_authenticated_scenario_event_payload(payload: Optional[dict], current_user_id: str) -> dict:
-    business = load_business_by_user_id(current_user_id)
+    business = require_business_for_user(current_user_id)
     event_payload = dict(payload or {})
+    # Browser-supplied snapshots are not authoritative database records. Keep
+    # identifiers/ordinary trigger fields; the engine hydrates scoped records.
+    for key in ("business", "person", "people", "record", "customer", "appointment",
+                "appointments", "staff", "payment", "payments", "invoice", "invoices",
+                "receptionist", "agent", "subscription"):
+        event_payload.pop(key, None)
+    event_payload = {key: value for key, value in event_payload.items() if not key.startswith("_")}
     event_payload["user_id"] = current_user_id
     if business and business.get("id") is not None:
         event_payload["business_id"] = business.get("id")
@@ -6639,14 +6693,14 @@ def build_authenticated_scenario_event_payload(payload: Optional[dict], current_
 async def trigger_scenario(request: ScenarioTriggerRequest, current_user: dict = Depends(get_current_user)):
     return emit_scenario_trigger(
         request.trigger_key,
-        build_authenticated_scenario_event_payload(request.payload, str(current_user.id)),
+        build_authenticated_scenario_event_payload(request.payload, business_owner_id(current_user)),
         request.created_at,
     )
 
 
 @app.get("/api/sonar/scenarios", tags=["Sonar Scenarios"])
 async def list_sonar_scenarios(current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     response = (
         supabase_admin.table("scenarios")
         .select("*")
@@ -6659,11 +6713,14 @@ async def list_sonar_scenarios(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/sonar/scenarios", tags=["Sonar Scenarios"])
 async def create_sonar_scenario(payload: dict, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     context = require_plan_access(user_id, "scenarios")
     existing_count = count_user_rows("scenarios", user_id)
     enforce_plan_limit(context, "scenarios", existing_count, "max_scenarios")
     insert_payload = normalize_scenario_json_fields(payload or {})
+    from .permissions import contains_privileged_scenario_action
+    if contains_privileged_scenario_action(insert_payload):
+        require_permission(current_tenant.get(), 'billing.change')
     if not insert_payload.get("id"):
         insert_payload["id"] = str(uuid4())
     if scenario_uses_payment_features(insert_payload):
@@ -6692,7 +6749,7 @@ async def create_sonar_scenario(payload: dict, current_user: dict = Depends(get_
 
 @app.put("/api/sonar/scenarios/{scenario_id}", tags=["Sonar Scenarios"])
 async def update_sonar_scenario(scenario_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     require_plan_access(user_id, "scenarios")
     existing_response = (
         supabase_admin.table("scenarios")
@@ -6706,7 +6763,11 @@ async def update_sonar_scenario(scenario_id: str, payload: dict, current_user: d
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
     updates = {key: value for key, value in normalize_scenario_json_fields(payload or {}).items() if key not in {"id", "user_id", "created_by", "business_id", "created_at"}}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-    next_scenario = {**existing_response.data[0], **updates}
+    existing_scenario = normalize_scenario_json_fields(existing_response.data[0])
+    next_scenario = {**existing_scenario, **updates}
+    from .permissions import contains_privileged_scenario_action
+    if contains_privileged_scenario_action(existing_scenario) or contains_privileged_scenario_action(next_scenario):
+        require_permission(current_tenant.get(), 'billing.change')
     if scenario_uses_payment_features(next_scenario):
         require_payment_access(user_id)
     validate_scenario_if_active(next_scenario)
@@ -6724,7 +6785,7 @@ async def update_sonar_scenario(scenario_id: str, payload: dict, current_user: d
 
 @app.delete("/api/sonar/scenarios/{scenario_id}", tags=["Sonar Scenarios"])
 async def delete_sonar_scenario(scenario_id: str, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     require_plan_access(user_id, "scenarios")
     response = (
         supabase_admin.table("scenarios")
@@ -6743,7 +6804,7 @@ async def delete_sonar_scenario(scenario_id: str, current_user: dict = Depends(g
 async def trigger_scenario_legacy_alias(request: ScenarioTriggerRequest, current_user: dict = Depends(get_current_user)):
     return emit_scenario_trigger(
         request.trigger_key,
-        build_authenticated_scenario_event_payload(request.payload, str(current_user.id)),
+        build_authenticated_scenario_event_payload(request.payload, business_owner_id(current_user)),
         request.created_at,
     )
 
@@ -6751,17 +6812,17 @@ async def trigger_scenario_legacy_alias(request: ScenarioTriggerRequest, current
 async def trigger_specific_scenario(scenario_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
     if not scenario_engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
-    require_plan_access(str(current_user.id), "scenarios")
+    require_plan_access(business_owner_id(current_user), "scenarios")
     scenario_response = scenario_engine.supabase.table("scenarios").select("id,user_id,created_by").eq("id", scenario_id).limit(1).execute()
     scenario = (scenario_response.data or [None])[0]
-    if not scenario or not scenario_belongs_to_user(scenario, str(current_user.id)):
+    if not scenario or not scenario_belongs_to_user(scenario, business_owner_id(current_user)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
     result = await scenario_engine.trigger_scenario(
         scenario_id,
-        build_authenticated_scenario_event_payload(payload, str(current_user.id)),
+        build_authenticated_scenario_event_payload(payload, business_owner_id(current_user)),
     )
     if not result.get("ok"):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result.get("error") or "Scenario not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The request could not be completed')
     return result
 
 @app.post("/api/scenarios/run-builder", tags=["Scenarios"])
@@ -6778,13 +6839,13 @@ async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_c
         try:
             nodes_data = json.loads(nodes_data)
         except Exception as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid nodes_data: {exc}") from exc
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed') from exc
     if not isinstance(nodes_data, list) or not nodes_data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="scenario.nodes_data required")
 
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     require_plan_access(user_id, "scenarios")
-    business = load_business_by_user_id(user_id)
+    business = require_business_for_user(user_id)
     # The builder payload is untrusted input. Always bind a test run to the
     # authenticated tenant instead of accepting user/business IDs supplied in
     # imported JSON or by a caller.
@@ -6801,14 +6862,9 @@ async def run_builder_scenario(payload: dict, current_user: dict = Depends(get_c
         )
 
     event_type = str(payload.get("event_type") or "manual_trigger")
-    event_payload = payload.get("payload") if isinstance(payload.get("payload"), dict) else {}
-    event_payload.setdefault("user_id", user_id)
-    if business and business.get("id") is not None:
-        event_payload.setdefault("business_id", business.get("id"))
-        # _build_flow_context can reuse this already-resolved tenant row. The
-        # previous path queried businesses once here and again immediately
-        # inside the flow context builder before doing any scenario work.
-        event_payload.setdefault("business", business)
+    event_payload = build_authenticated_scenario_event_payload(
+        payload.get("payload") if isinstance(payload.get("payload"), dict) else {}, user_id
+    )
 
     trigger_node = next((node for node in nodes_data if (node or {}).get("categoryType") == "TRIGGERS" and (node or {}).get("configured")), None)
     if not trigger_node:
@@ -6844,7 +6900,7 @@ async def resume_scenario_execution(payload: dict, _internal: None = Depends(req
     }
     existing_execution = await scenario_engine.get_execution(str(execution_id))
     if not existing_execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Execution {execution_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The request could not be completed')
 
     current_context = existing_execution.get("flow_context")
     if isinstance(current_context, str):
@@ -6856,12 +6912,12 @@ async def resume_scenario_execution(payload: dict, _internal: None = Depends(req
     if isinstance(agent_payload, dict):
         current_context["agent"] = deep_merge_dicts(current_context.get("agent"), agent_payload)
     current_context.update({k: v for k, v in call_payload.items() if v is not None})
+    execution_status = str(existing_execution.get("status") or "").lower()
     supabase.table("flow_executions").update({
-        "flow_context": current_context,
+        "flow_context": workflow_snapshot(current_context, terminal=execution_status in {'completed','failed'}),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", str(execution_id)).execute()
 
-    execution_status = str(existing_execution.get("status") or "").lower()
     if execution_status != "paused":
         return {
             "ok": True,
@@ -6879,7 +6935,7 @@ async def resume_scenario_execution(payload: dict, _internal: None = Depends(req
         return {"ok": True, **result}
     detail = result.get("error") or "Resume failed"
     if "not found" in str(detail).lower():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The request could not be completed')
     if "not paused" in str(detail).lower():
         return {
             "ok": True,
@@ -6887,30 +6943,30 @@ async def resume_scenario_execution(payload: dict, _internal: None = Depends(req
             "execution_id": str(execution_id),
             "status": execution_status or None,
         }
-    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail)
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.get("/api/scenarios/executions", tags=["Scenarios"])
 async def list_scenario_executions(limit: int = 20, current_user: dict = Depends(get_current_user)):
     if not scenario_engine:
         return []
     executions = await scenario_engine.list_executions(max(1, min(limit, 100)))
-    return [execution for execution in executions if execution_belongs_to_user(execution, str(current_user.id))]
+    return [execution for execution in executions if execution_belongs_to_user(execution, business_owner_id(current_user))]
 
 @app.get("/api/scenarios/executions/{execution_id}", tags=["Scenarios"])
 async def get_scenario_execution(execution_id: str, current_user: dict = Depends(get_current_user)):
     if not scenario_engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
     execution = await scenario_engine.get_execution(execution_id)
-    if not execution or not execution_belongs_to_user(execution, str(current_user.id)):
+    if not execution or not execution_belongs_to_user(execution, business_owner_id(current_user)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Execution not found")
-    return execution
+    return execution_progress(execution)
 
 @app.post("/api/scenarios/reload", tags=["Scenarios"])
 async def reload_scenarios(current_user: dict = Depends(get_current_user)):
     if not scenario_engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Scenario engine unavailable")
     scenarios = await scenario_engine.load_scenarios()
-    return {"ok": True, "count": len(scenarios)}
+    return {"ok": True, "count": sum(str(s.get('business_id')) == str(current_tenant.get().business_id) for s in scenarios)}
 
 @app.post("/twilio/inbound", tags=["Twilio"])
 async def twilio_inbound_webhook(request: Request):
@@ -6925,11 +6981,7 @@ async def twilio_inbound_webhook(request: Request):
             detail="ElevenLabs inbound calling is not configured.",
         )
     if not from_number or not to_number:
-        logging.error(
-            "Twilio inbound webhook missing From/To. content_type=%s payload=%s",
-            request.headers.get("content-type"),
-            json.dumps(payload, default=str),
-        )
+        logging.error('main.twilio_inbound_webhook.event_6926')
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Twilio inbound webhook requires From and To numbers.",
@@ -6942,13 +6994,13 @@ async def twilio_inbound_webhook(request: Request):
     })
     business = context.get("business")
     resolved_user_id = context.get("user_id") or (business or {}).get("user_id")
+    if not business or not resolved_user_id:
+        raise HTTPException(403,'Called number is not assigned to an active business')
+    from .authorization import scenario_tenant, tenant_scope
+    call_tenant=scenario_tenant(getattr(supabase_admin,'raw',supabase_admin), {'business_id':business['id'],'user_id':resolved_user_id})
     inbound_open, inbound_reason = is_business_call_window_open(business, layer="inbound")
     if not inbound_open:
-        logging.info(
-            "Rejecting inbound call outside configured inbound hours: business_id=%s reason=%s",
-            (business or {}).get("id"),
-            inbound_reason,
-        )
+        logging.info('main.twilio_inbound_webhook.event_6945')
         return Response(
             content="<Response><Say>Our receptionist is unavailable right now. Please call back during our available hours.</Say><Hangup/></Response>",
             media_type="application/xml",
@@ -6957,12 +7009,7 @@ async def twilio_inbound_webhook(request: Request):
         enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
     except HTTPException as exc:
         detail = exc.detail if isinstance(exc.detail, dict) else {}
-        logging.warning(
-            "Rejecting inbound call before ElevenLabs registration: code=%s user_id=%s business_id=%s",
-            detail.get("code") or "billing_blocked",
-            resolved_user_id,
-            (business or {}).get("id"),
-        )
+        logging.warning('main.twilio_inbound_webhook.event_6917')
         return Response(
             content="<Response><Say>We are unable to connect this call right now. Please contact the account owner.</Say><Hangup/></Response>",
             media_type="application/xml",
@@ -6993,6 +7040,8 @@ async def twilio_inbound_webhook(request: Request):
         "receptionist_name": get_receptionist_display_name(receptionist),
     }
     emit_scenario_trigger("incoming_call", event_payload)
+    with tenant_scope(call_tenant):
+        upsert_active_call_log(event_payload,user_id=resolved_user_id,business_id=business['id'],receptionist=receptionist)
 
     register_payload = {
         "agent_id": elevenlabs_agent_id_inbound,
@@ -7046,15 +7095,13 @@ async def twilio_inbound_webhook(request: Request):
     register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
         "agent": {"first_message": required_opening},
     }
+    register_payload["conversation_initiation_client_data"]["dynamic_variables"]["secret__nodemere_context"] = issue_internal_context(internal_tool_secret, business)
     if receptionist and receptionist.get("elevenlabs_voice_id"):
         register_payload["conversation_initiation_client_data"]["conversation_config_override"]["tts"] = {
             "voice_id": receptionist.get("elevenlabs_voice_id"),
         }
 
-    logging.info(
-        "ElevenLabs inbound register-call payload: %s",
-        json.dumps(register_payload, default=str),
-    )
+    logging.info('main.twilio_inbound_webhook.event_7139')
 
     response = requests.post(
         "https://api.elevenlabs.io/v1/convai/twilio/register-call",
@@ -7066,10 +7113,10 @@ async def twilio_inbound_webhook(request: Request):
         timeout=30,
     )
     if not response.ok:
-        logging.error("ElevenLabs register-call failed: %s %s", response.status_code, response.text[:400])
+        logging.error('main.twilio_inbound_webhook.event_7065')
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"ElevenLabs register-call failed ({response.status_code}).",
+            detail='The request could not be completed',
         )
 
     return Response(content=response.text, media_type="application/xml")
@@ -7157,10 +7204,7 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
             str(business.get("id")) if business and business.get("id") is not None else None,
         )
     dynamic_variables = {key: value for key, value in dynamic_variables.items() if value is not None}
-    logging.info(
-        "ElevenLabs call route dynamic variables response: %s",
-        json.dumps(dynamic_variables, default=str),
-    )
+    logging.info('main.route_call_compat.event_7245')
 
     response_payload = {
         "ok": True,
@@ -7199,13 +7243,7 @@ async def set_agent_data(request: Request, _internal: None = Depends(require_int
 
     if flow_execution_id and update_key is not None:
         agent_updates = build_agent_update_map(update_key, update_value)
-        logging.info(
-            "[set_agent_data] flow_execution_id=%s key=%s value=%s merged_updates=%s",
-            str(flow_execution_id),
-            str(update_key),
-            json.dumps(update_value, default=str),
-            json.dumps(agent_updates, default=str),
-        )
+        logging.info('main.set_agent_data.event_7195')
         execution_rows = (
             supabase.table("flow_executions")
             .select("id,status,flow_context")
@@ -7218,7 +7256,7 @@ async def set_agent_data(request: Request, _internal: None = Depends(require_int
         if not execution_rows:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Execution {flow_execution_id} not found",
+                detail='The request could not be completed',
             )
 
         execution = execution_rows[0]
@@ -7286,7 +7324,7 @@ async def set_agent_data(request: Request, _internal: None = Depends(require_int
         "user_id": str(user_id) if user_id else None,
         "business_id": int_or_none(business_id),
         "person_id": int_or_none(person_id),
-        "raw_payload": payload,
+        "raw_payload": event_metadata(payload),
     }
     update_fields = {key: value for key, value in update_fields.items() if value is not None}
 
@@ -7303,7 +7341,7 @@ async def set_agent_data(request: Request, _internal: None = Depends(require_int
     if existing:
         merged_payload = existing[0].get("raw_payload") if isinstance(existing[0].get("raw_payload"), dict) else {}
         merged_payload = {**merged_payload, "agent_data": updates_payload}
-        update_fields["raw_payload"] = merged_payload
+        update_fields["raw_payload"] = event_metadata(merged_payload)
         response = supabase.table("call_logs").update(update_fields).eq("id", existing[0]["id"]).execute()
         saved = response.data[0] if getattr(response, "data", None) else update_fields
     else:
@@ -7326,6 +7364,8 @@ async def legacy_server_tool(
     receptionist = context.get("receptionist")
 
     normalized_tool = (tool_name or "").strip().lower().replace("_", "-")
+    if not business or business.get("id") is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Business context is required for internal tools.")
 
     if normalized_tool in {"check-verification-status", "check-authentication", "verify-authentication", "auth-verify"}:
         context = build_verification_request_context({**payload, "business": business, "user_id": user_id})
@@ -7431,7 +7471,7 @@ async def legacy_server_tool(
         return {"ok": True, "services": data, "count": len(data)}
 
     if normalized_tool == "get-staff":
-        query = supabase.table("staff").select("*")
+        query = supabase.table("staff").select(','.join(TOOL_STAFF_FIELDS))
         if business and business.get("id"):
             try:
                 query = query.eq("business_id", business["id"])
@@ -7467,7 +7507,7 @@ async def legacy_server_tool(
 
         staff_results = []
         for row in matched_rows:
-            next_row = {key: value for key, value in row.items() if key != "_match_score"}
+            next_row = staff_tool_view(row)
             if include_availability:
                 within_hours, availability_reason = is_staff_available_during_hours(
                     row,
@@ -7500,7 +7540,8 @@ async def legacy_server_tool(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business context not found")
         return {
             "ok": True,
-            "business": serialize_business_profile_row(business),
+            "business": {key: value for key, value in serialize_business_profile_row(business).items()
+                         if key in TOOL_BUSINESS_FIELDS},
             "forwarding_target_number": get_business_forwarding_target_number(business),
         }
 
@@ -7804,11 +7845,11 @@ async def legacy_server_tool(
                 },
                 "reason": availability_reason or business_reason,
                 "conflicts": conflicts,
-                "staff": requested_staff,
-                "available_staff": [requested_staff] if within_hours and len(conflicts) == 0 else [],
+                "staff": staff_tool_view(requested_staff),
+                "available_staff": [staff_tool_view(requested_staff)] if within_hours and len(conflicts) == 0 else [],
             }
 
-        staff_query = supabase.table("staff").select("*")
+        staff_query = supabase.table("staff").select(','.join(TOOL_STAFF_FIELDS))
         if business_id is not None:
             staff_query = staff_query.eq("business_id", business_id)
         staff_rows = staff_query.eq("is_active", True).limit(200).execute().data or []
@@ -7833,7 +7874,7 @@ async def legacy_server_tool(
             if staff_conflicts:
                 aggregated_conflicts.extend(staff_conflicts)
                 continue
-            available_staff.append(staff_row)
+            available_staff.append(staff_tool_view(staff_row))
         return {
             "ok": True,
             "available": len(available_staff) > 0,
@@ -7933,7 +7974,7 @@ async def legacy_server_tool(
         appointment_date = normalize_appointment_date_value(first_present(merged_payload, "date", "appointment_date"))
         appointment_time = normalize_appointment_time_value(first_present(merged_payload, "time", "appointment_time"))
         appointment_duration = normalize_appointment_duration(first_present(merged_payload, "duration", "appointment_duration"))
-        person_id = safe_appointment_person_id(first_present(merged_payload, "person_id"))
+        person_id = safe_appointment_person_id(first_present(merged_payload, "person_id"), business_id=(business or {}).get("id"))
         requested_staff_id = first_present(merged_payload, "staff_id")
         staff_id = safe_appointment_staff_id(requested_staff_id, business_id=business.get("id"), require_active=False)
         if requested_staff_id is not None and staff_id is None:
@@ -7960,7 +8001,7 @@ async def legacy_server_tool(
             "receptionist_id": int_or_none(first_present(merged_payload, "receptionist_id", "hired_receptionist_id")) or (receptionist or {}).get("id"),
             "notes": first_present(merged_payload, "notes"),
             "person_id": person_id,
-            "service_id": safe_appointment_service_id(first_present(merged_payload, "service_id")),
+            "service_id": safe_appointment_service_id(first_present(merged_payload, "service_id"), business_id=(business or {}).get("id")),
             "staff_id": staff_id,
             "business_id": business.get("id") if business else None,
             "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -8010,11 +8051,11 @@ async def legacy_server_tool(
         if first_present(payload, "notes") is not None:
             updates["notes"] = first_present(payload, "notes")
         if first_present(payload, "person_id") is not None:
-            safe_person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+            safe_person_id = safe_appointment_person_id(first_present(payload, "person_id"), business_id=(business or {}).get("id"))
             if safe_person_id is not None:
                 updates["person_id"] = safe_person_id
         if first_present(payload, "service_id") is not None:
-            safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"))
+            safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"), business_id=(business or {}).get("id"))
             if safe_service_id is not None:
                 updates["service_id"] = safe_service_id
         if first_present(payload, "staff_id") is not None:
@@ -8094,7 +8135,7 @@ async def legacy_server_tool(
             "outcome": first_present(payload, "outcome"),
             "summary": first_present(payload, "summary"),
             "transcript_text": first_present(payload, "transcript", "transcript_text"),
-            "raw_payload": payload,
+            "raw_payload": event_metadata(payload),
         }
         response = supabase.table("call_logs").insert(call_log).execute()
         saved = response.data[0] if response.data else call_log
@@ -8134,7 +8175,7 @@ async def legacy_server_tool(
         )
         return {"ok": True, "status": "queued", "transfer": transfer_payload}
 
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown server tool: {tool_name}")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The request could not be completed')
 
 @app.post("/api/webhooks/elevenlabs/post-call", tags=["Server Tools"])
 async def elevenlabs_post_call_webhook(
@@ -8144,7 +8185,7 @@ async def elevenlabs_post_call_webhook(
 ):
     raw_body = await request.body()
     if not elevenlabs_webhook_secret:
-        logging.error("ELEVENLABS_WEBHOOK_SECRET is not configured; refusing ElevenLabs webhook.")
+        logging.error('main.elevenlabs_post_call_webhook.event_8142')
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="ElevenLabs webhook verification is not configured.",
@@ -8165,7 +8206,7 @@ async def elevenlabs_post_call_webhook(
                     secret=elevenlabs_webhook_secret,
                 )
             except Exception as exc:
-                logging.warning("Invalid ElevenLabs webhook HMAC signature: %s", exc)
+                logging.warning('main.elevenlabs_post_call_webhook.event_8101')
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature") from exc
     else:
         bearer_secret = None
@@ -8189,6 +8230,26 @@ async def elevenlabs_post_call_webhook(
         "conversation_initiation_client_data.dynamic_variables.system__conversation_id",
     )
 
+    from .authorization import trusted_call_tenant, tenant_scope
+    dynamic=extract_dynamic_variables(event_data)
+    capability=dynamic.get("secret__nodemere_context")
+    provider_sid=first_present(event_data,"metadata.phone_call.call_sid","metadata.call_sid","provider_call_sid")
+    claims=verify_internal_context(internal_tool_secret,capability,allow_expired=True) if capability else None
+    if claims and int(claims['exp']) <= int(time.time()):
+        # A verified provider can deliver a late event for an already-bound
+        # call. Expired capabilities must never establish a new call binding.
+        trusted_call_tenant(getattr(supabase_admin,"raw",supabase_admin),
+            conversation_id=conversation_id,provider_call_sid=provider_sid)
+    tenant=trusted_call_tenant(getattr(supabase_admin,"raw",supabase_admin),claims=claims,
+        conversation_id=conversation_id,provider_call_sid=provider_sid)
+    validate_references(getattr(supabase_admin,"raw",supabase_admin),tenant,dynamic)
+    with tenant_scope(tenant):
+        return await persist_elevenlabs_event(payload)
+
+
+async def persist_elevenlabs_event(payload):
+    webhook_type,event_timestamp,event_data=get_elevenlabs_event_data(payload)
+    conversation_id=first_present(event_data,"conversation_id","conversation_initiation_client_data.dynamic_variables.system__conversation_id")
     if webhook_type == "post_call_audio":
         audio_storage_path = upload_call_recording(
             str(conversation_id) if conversation_id else "",
@@ -8202,7 +8263,9 @@ async def elevenlabs_post_call_webhook(
             "conversation_id": str(conversation_id) if conversation_id else None,
             "has_audio": True if audio_storage_path else None,
             "audio_storage_path": audio_storage_path,
-            "raw_payload": payload,
+            "raw_payload": event_metadata(payload),
+            "business_id": current_tenant.get().business_id,
+            "user_id": current_tenant.get().owner_id,
         }
         updates = {key: value for key, value in updates.items() if value is not None}
         try:
@@ -8224,24 +8287,20 @@ async def elevenlabs_post_call_webhook(
                 response = supabase.table("call_logs").insert(updates).execute()
                 saved = response.data[0] if getattr(response, "data", None) else updates
         except Exception as exc:
-            logging.error("Failed to persist ElevenLabs audio webhook: %s", exc, exc_info=True)
+            logging.error('main.elevenlabs_post_call_webhook.event_8160')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to persist call audio",
             ) from exc
-        return {"ok": True, "type": webhook_type, "call_log": saved}
+        return {"ok": True, "type": webhook_type, "call_log_id": saved.get("id")}
 
     call_log = extract_call_log_from_elevenlabs_payload(payload)
-    logging.info("ElevenLabs post-call webhook received: %s", json.dumps(call_log, default=str))
-    business_context = resolve_business_context({
-        "user_id": call_log.get("user_id"),
-        "to_number": call_log.get("to_number"),
-        "forwarded_from": first_present(event_data, "forwarded_from", "metadata.forwarded_from", "conversation_initiation_client_data.dynamic_variables.forwarded_from"),
-    })
-    if business_context.get("user_id") and not call_log.get("user_id"):
-        call_log["user_id"] = business_context["user_id"]
-    if business_context.get("business") and not call_log.get("business_id"):
-        call_log["business_id"] = business_context["business"].get("id")
+    logging.info('main.elevenlabs_post_call_webhook.event_8322')
+    tenant=current_tenant.get()
+    business_context={"business":load_business_by_id(tenant.business_id),"user_id":tenant.owner_id}
+    call_log["business_id"]=tenant.business_id
+    call_log["user_id"]=tenant.owner_id
+    validate_references(getattr(supabase_admin,"raw",supabase_admin),tenant,{k:v for k,v in call_log.items() if k in {"hired_receptionist_id","scenario_id"}})
     enrich_call_log_with_person(
         call_log,
         payload_data=event_data,
@@ -8252,10 +8311,7 @@ async def elevenlabs_post_call_webhook(
     if not verification_called_number and str(call_log.get("direction") or "").lower() == "inbound":
         verification_called_number = ((business_context.get("business") or {}).get("twilio_number"))
         if verification_called_number:
-            logging.info(
-                "ElevenLabs post-call webhook inferred inbound assigned number for verification: %s",
-                verification_called_number,
-            )
+            logging.info('main.elevenlabs_post_call_webhook.event_8203')
     maybe_auto_verify_business_forwarding(
         business_context.get("business"),
         called_number=verification_called_number,
@@ -8303,7 +8359,7 @@ async def elevenlabs_post_call_webhook(
         else:
             response = supabase.table("call_logs").insert(call_log).execute()
     except Exception as exc:
-        logging.error("Failed to persist call log: %s", exc, exc_info=True)
+        logging.error('main.elevenlabs_post_call_webhook.event_8254')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to persist call log",
@@ -8338,6 +8394,8 @@ async def elevenlabs_post_call_webhook(
         or {}
     )
     if flow_execution_id and scenario_engine:
+        from .authorization import require_record
+        require_record(getattr(supabase_admin,"raw",supabase_admin),tenant,"flow_executions",flow_execution_id)
         try:
             resume_result = await scenario_engine.resume_execution(
                 str(flow_execution_id),
@@ -8365,16 +8423,16 @@ async def elevenlabs_post_call_webhook(
                     else:
                         saved["call_report"] = call_report
                 except Exception as exc:
-                    logging.error("Failed to persist call report for call log %s: %s", saved.get("id"), exc, exc_info=True)
+                    logging.error('main.elevenlabs_post_call_webhook.event_8292')
         except Exception as exc:
-            logging.error("Failed to resume scenario execution %s: %s", flow_execution_id, exc, exc_info=True)
+            logging.error('main.elevenlabs_post_call_webhook.event_8300')
 
-    return {"ok": True, "call_log": saved}
+    return {"ok": True, "call_log_id": saved.get("id")}
 
 @app.get("/api/agents", tags=["Sonar Controller Compat"])
 async def get_sonar_agents(include_archived: bool = False, current_user: dict = Depends(get_current_user)):
     try:
-        current_user_id = str(current_user.id)
+        current_user_id = business_owner_id(current_user)
         response = (
             supabase
             .table('hired_receptionists')
@@ -8406,12 +8464,12 @@ async def get_sonar_agents(include_archived: bool = False, current_user: dict = 
             })
         return agents
     except Exception as exc:
-        logging.error("Failed to fetch Sonar agents: %s", exc, exc_info=True)
+        logging.error('main.get_sonar_agents.event_8357')
         return []
 
 @app.post("/api/agents/{agent_id}/restore", tags=["Sonar Controller Compat"])
 async def restore_agent(agent_id: str, current_user: dict = Depends(get_current_user)):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     existing_response = (
         supabase
         .table('hired_receptionists')
@@ -8459,7 +8517,7 @@ async def get_sonar_system_summary(current_user: dict = Depends(get_current_user
             supabase
             .table('hired_receptionists')
             .select('id,direction')
-            .eq('user_id', str(current_user.id))
+            .eq('user_id', business_owner_id(current_user))
             .execute()
             .data
             or []
@@ -8492,22 +8550,22 @@ async def get_sonar_project_intelligence(current_user: dict = Depends(get_curren
 async def get_sonar_business_intelligence(current_user: dict = Depends(get_current_user)):
     """Return a tenant-scoped, evidence-backed operating report."""
     try:
-        return await asyncio.to_thread(get_business_intelligence, supabase, user_id=str(current_user.id))
+        return await asyncio.to_thread(get_business_intelligence, supabase, user_id=business_owner_id(current_user))
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The request could not be completed') from exc
 
 
 @app.get("/api/sonar/nest/history", tags=["Sonar Nest"])
 async def get_sonar_nest_history(limit: int = 40, current_user: dict = Depends(get_current_user)):
     """Return a small tenant-scoped history normalized from existing business activity."""
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         return {"events": []}
     events = await asyncio.to_thread(
         get_nest_history,
         supabase,
         business_id=business.get("id"),
-        user_id=str(current_user.id),
+        user_id=business_owner_id(current_user),
         limit=max(1, min(limit, 100)),
     )
     return {"events": events}
@@ -8521,7 +8579,7 @@ async def claim_sonar_nest_milestone(payload: dict, current_user: dict = Depends
     if milestone_key not in MILESTONE_KEYS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported Nest milestone")
 
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
@@ -8578,7 +8636,7 @@ async def claim_sonar_nest_milestone(payload: dict, current_user: dict = Depends
     claimed = claim_nest_milestone(
         supabase_admin,
         business_id=business["id"],
-        user_id=str(current_user.id),
+        user_id=business_owner_id(current_user),
         milestone_key=milestone_key,
         title=titles[milestone_key],
         message=str((payload or {}).get("message") or ""),
@@ -8607,7 +8665,7 @@ async def refresh_sonar_market_research(current_user: dict = Depends(get_current
 
 @app.get("/api/events/live-pulse", tags=["Sonar Controller Compat"])
 async def get_live_pulse(limit: int = 30, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     return [
         event for event in LIVE_PULSE_EVENTS
         if is_event_visible_to_user(event, user_id)
@@ -8615,7 +8673,7 @@ async def get_live_pulse(limit: int = 30, current_user: dict = Depends(get_curre
 
 @app.get("/api/logs", tags=["Sonar Controller Compat"])
 async def get_system_logs(limit: int = 50, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     return [
         event for event in SYSTEM_LOG_EVENTS
         if str(event.get("user_id") or "") == user_id
@@ -8623,15 +8681,15 @@ async def get_system_logs(limit: int = 50, current_user: dict = Depends(get_curr
 
 @app.get("/api/control-state", tags=["Sonar Controller Compat"])
 async def get_control_state(current_user: dict = Depends(get_current_user)):
-    return get_tenant_control_state(str(current_user.id))
+    return get_tenant_control_state(business_owner_id(current_user))
 
 @app.get("/api/session", tags=["Sonar Controller Compat"])
 async def get_session_state(current_user: dict = Depends(get_current_user)):
-    return get_tenant_session_state(str(current_user.id))
+    return get_tenant_session_state(business_owner_id(current_user))
 
 @app.get("/api/pipeline", tags=["Sonar Controller Compat"])
 async def get_pipeline_state(current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         return {"stages": [], "totalRelics": 0, "qualifiedLeads": 0, "activeOutreach": 0}
     business_id = business.get("id")
@@ -8648,7 +8706,7 @@ async def get_pipeline_state(current_user: dict = Depends(get_current_user)):
     except Exception:
         payments = []
     try:
-        call_logs = supabase.table('call_logs').select('id').eq('user_id', str(current_user.id)).execute().data or []
+        call_logs = supabase.table('call_logs').select('id').eq('user_id', business_owner_id(current_user)).execute().data or []
     except Exception:
         call_logs = []
 
@@ -8666,12 +8724,12 @@ async def get_pipeline_state(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/cron", tags=["Sonar Controller Compat"])
 async def get_cron_jobs(current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     return [job for job in CRON_JOBS if str(job.get("user_id") or "") == user_id]
 
 @app.post("/api/cron", tags=["Sonar Controller Compat"])
 async def create_cron_job(job: dict, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     cron_job = {
         "id": f"cron-{len(CRON_JOBS) + 1}",
         **job,
@@ -8684,7 +8742,7 @@ async def create_cron_job(job: dict, current_user: dict = Depends(get_current_us
 @app.delete("/api/cron/{job_id}", tags=["Sonar Controller Compat"])
 async def delete_cron_job(job_id: str, current_user: dict = Depends(get_current_user)):
     global CRON_JOBS
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     CRON_JOBS = [
         job for job in CRON_JOBS
         if job.get("id") != job_id or str(job.get("user_id") or "") != user_id
@@ -8694,7 +8752,7 @@ async def delete_cron_job(job_id: str, current_user: dict = Depends(get_current_
 
 @app.get("/api/reactions", tags=["Sonar Controller Compat"])
 async def get_reactions(current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     try:
         return supabase.table('reactions').select('*').eq('user_id', user_id).execute().data or []
     except Exception:
@@ -8702,7 +8760,7 @@ async def get_reactions(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/reactions", tags=["Sonar Controller Compat"])
 async def add_reaction(data: dict, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     reaction_data = {**data, "user_id": user_id}
     try:
         response = supabase.table('reactions').insert(reaction_data).execute()
@@ -8719,13 +8777,13 @@ async def get_openrouter_models(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/pending-restarts", tags=["Sonar Controller Compat"])
 async def get_pending_restarts(current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     return [item for item in PENDING_RESTARTS if str(item.get("user_id") or "") == user_id]
 
 @app.delete("/api/pending-restarts/{restart_id}", tags=["Sonar Controller Compat"])
 async def clear_pending_restart(restart_id: str, current_user: dict = Depends(get_current_user)):
     global PENDING_RESTARTS
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     PENDING_RESTARTS = [
         item for item in PENDING_RESTARTS
         if item.get("id") != restart_id or str(item.get("user_id") or "") != user_id
@@ -8734,7 +8792,7 @@ async def clear_pending_restart(restart_id: str, current_user: dict = Depends(ge
 
 @app.post("/api/agents/{agent_id}/call-types", tags=["Sonar Controller Compat"])
 async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest, current_user: dict = Depends(get_current_user)):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     payload_dict = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
     next_direction = normalize_receptionist_direction(
         payload_dict.get("direction")
@@ -8768,7 +8826,7 @@ async def update_agent_call_types(agent_id: str, payload: AgentCallTypesRequest,
 
 @app.post("/api/agents/{agent_id}/model", tags=["Sonar Controller Compat"])
 async def update_agent_model(agent_id: str, payload: AgentModelRequest, current_user: dict = Depends(get_current_user)):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     try:
         response = (
             supabase.table('hired_receptionists')
@@ -8789,7 +8847,7 @@ async def update_agent_model(agent_id: str, payload: AgentModelRequest, current_
 
 @app.patch("/api/agents/{agent_id}", tags=["Sonar Controller Compat"])
 async def patch_agent(agent_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     existing_response = (
         supabase
         .table('hired_receptionists')
@@ -8839,7 +8897,7 @@ async def patch_agent(agent_id: str, payload: dict, current_user: dict = Depends
 
 @app.delete("/api/agents/{agent_id}", tags=["Sonar Controller Compat"])
 async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_user)):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     existing_response = (
         supabase
         .table('hired_receptionists')
@@ -8899,7 +8957,7 @@ async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_u
 
 @app.post("/api/control/runtime", tags=["Sonar Controller Compat"])
 async def set_runtime_mode(payload: RuntimeModeRequest, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     control_state = get_tenant_control_state(user_id)
     session_state = get_tenant_session_state(user_id)
     control_state["runtime_mode"] = payload.mode
@@ -8909,7 +8967,7 @@ async def set_runtime_mode(payload: RuntimeModeRequest, current_user: dict = Dep
 
 @app.post("/api/control/stage", tags=["Sonar Controller Compat"])
 async def set_control_stage(payload: StageRequest, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     control_state = get_tenant_control_state(user_id)
     control_state["stage"] = payload.stage
     push_live_event(f"Stage set to {payload.stage}.", actor="system", severity="info", event_type="stage_changed", payload={"stage": payload.stage, "user_id": user_id})
@@ -8917,7 +8975,7 @@ async def set_control_stage(payload: StageRequest, current_user: dict = Depends(
 
 @app.post("/api/control/ping-max", tags=["Sonar Controller Compat"])
 async def ping_max(current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     get_tenant_session_state(user_id)["last_ping_at"] = datetime.now(timezone.utc).isoformat()
     push_live_event("Ping sent.", actor="system", severity="info", event_type="ping_sent", payload={"user_id": user_id})
     return {"ok": True}
@@ -8926,7 +8984,7 @@ async def ping_max(current_user: dict = Depends(get_current_user)):
 async def people_webhook(payload: dict, current_user: dict = Depends(get_current_user)):
     event_type = payload.get("type", "people_update")
     record = payload.get("record") if isinstance(payload.get("record"), dict) else {}
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     push_live_event(
         f"People event: {event_type}.",
         actor="system",
@@ -8938,14 +8996,14 @@ async def people_webhook(payload: dict, current_user: dict = Depends(get_current
 
 @app.get("/api/sonar/business/profile", tags=["Sonar Business"])
 async def get_sonar_business_profile(current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
     return serialize_business_profile_row(business)
 
 @app.put("/api/sonar/business/profile", tags=["Sonar Business"])
 async def update_sonar_business_profile(payload: dict, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
@@ -8980,22 +9038,26 @@ async def upload_sonar_business_avatar(file: UploadFile = File(...), current_use
     if content_type not in allowed_content_types:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload a JPEG, PNG, WEBP, or GIF image.")
 
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         response = (
             supabase_admin.table("businesses")
-            .insert({"user_id": str(current_user.id)})
+            .insert({"user_id": business_owner_id(current_user)})
             .execute()
         )
         business = response.data[0] if getattr(response, "data", None) else None
     if not business:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create business record.")
 
-    content = await file.read()
+    content = await file.read(5*1024*1024+1)
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image must be 5MB or smaller.")
 
-    extension = allowed_content_types[content_type]
+    from .upload_validation import normalize_avatar
+    try: content=normalize_avatar(content)
+    except Exception: raise HTTPException(400,'Use a valid PNG, JPEG or WebP image under 5 MB')
+    content_type='image/png'
+    extension = 'png'
     storage_path = f"{current_user.id}/{business['id']}/avatar-{uuid4().hex}.{extension}"
     try:
         supabase_admin.storage.from_("business-avatars").upload(
@@ -9015,23 +9077,41 @@ async def upload_sonar_business_avatar(file: UploadFile = File(...), current_use
             supabase_admin.table("businesses")
             .update({"avatar": avatar_url})
             .eq("id", business["id"])
-            .eq("user_id", str(current_user.id))
+            .eq("user_id", business_owner_id(current_user))
             .execute()
         )
         updated = update_response.data[0] if getattr(update_response, "data", None) else {**business, "avatar": avatar_url}
         return {"ok": True, "business": serialize_business_profile_row(updated), "avatar": avatar_url}
     except Exception as exc:
-        logging.error("Failed to upload business avatar for user %s: %s", current_user.id, exc, exc_info=True)
+        logging.error('main.upload_sonar_business_avatar.event_8972')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to upload business avatar.") from exc
+
+@app.post("/api/sonar/staff/avatar", tags=["Sonar Staff"])
+async def upload_staff_avatar(file: UploadFile = File(...), current_user=Depends(get_current_user)):
+    from .upload_validation import normalize_avatar
+    tenant=current_tenant.get()
+    if tenant is None: raise HTTPException(403,'Business authorization required')
+    try:
+        content=normalize_avatar(await file.read(5*1024*1024+1))
+    except Exception:
+        raise HTTPException(400,'Use a valid PNG, JPEG or WebP image under 5 MB')
+    finally:
+        await file.close()
+    path=f'{tenant.owner_id}/{tenant.business_id}/avatar-{uuid4().hex}.png'
+    storage=supabase_admin.storage.from_('staff-avatars')
+    storage.upload(path,content,{'content-type':'image/png','upsert':'false'})
+    url=storage.get_public_url(path)
+    return {'url':url if isinstance(url,str) else url.get('publicUrl')}
+
 
 @app.get("/api/sonar/people", tags=["Sonar People"])
 async def list_sonar_people(limit: int = 100, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     query = supabase.table("people").select("*")
     if business:
         query = query.eq("business_id", business["id"])
     else:
-        query = query.eq("user_id", str(current_user.id))
+        query = query.eq("user_id", business_owner_id(current_user))
     response = query.order("created_at", desc=True).limit(max(1, min(limit, 500))).execute()
     return response.data or []
 
@@ -9205,13 +9285,13 @@ def attach_document_receptionists(documents: list[dict], *, user_id: str, busine
                     "attribution": "current_inbound_assignment" if is_fallback else "conversation",
                 }
     except Exception as exc:
-        logging.warning("Failed to attach receptionist attribution to documents: %s", exc)
+        logging.warning('main.attach_document_receptionists.event_9156')
     return documents
 
 
 @app.get("/api/sonar/people/documents", tags=["Sonar People"])
 async def list_sonar_people_documents(current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         return []
     try:
@@ -9225,25 +9305,27 @@ async def list_sonar_people_documents(current_user: dict = Depends(get_current_u
         )
         documents = attach_document_receptionists(
             response.data or [],
-            user_id=str(current_user.id),
+            user_id=business_owner_id(current_user),
             business_id=business["id"],
         )
         return [serialize_sonar_person_document(row, row.get("receptionist")) for row in documents]
     except Exception as exc:
-        logging.error("Failed to list dashboard documents for business %s: %s", business.get("id"), exc, exc_info=True)
+        logging.error('main.list_sonar_people_documents.event_9181')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not load documents.") from exc
 
 
 @app.get("/api/sonar/people/{person_id}/documents/{document_id}/url", tags=["Sonar People"])
-async def get_sonar_person_document_url(person_id: str, document_id: str, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+async def get_sonar_person_document_url(person_id: str, document_id: UUID, current_user: dict = Depends(get_current_user)):
+    # The existing dashboard already uses the authorized blob download route.
+    # Never mint a reusable storage capability for newly encrypted content.
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
     try:
         response = (
             supabase_admin.table("people_docs")
             .select("id,person_id,file_name,content_type,storage_bucket,storage_path")
-            .eq("id", document_id)
+            .eq("id", str(document_id))
             .eq("person_id", person_id)
             .eq("business_id", business["id"])
             .limit(1)
@@ -9254,24 +9336,35 @@ async def get_sonar_person_document_url(person_id: str, document_id: str, curren
         document = response.data[0]
         if document.get("storage_bucket") != DOCUMENT_BUCKET or not document.get("storage_path"):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file is unavailable")
-        signed = supabase_admin.storage.from_(DOCUMENT_BUCKET).create_signed_url(document["storage_path"], 900)
-        url = (
-            signed.get("signedURL") or signed.get("signed_url") or signed.get("signedUrl")
-            if isinstance(signed, dict)
-            else None
-        )
-        if not url:
-            raise RuntimeError("Storage did not return a signed document URL.")
         return {
-            "url": url,
-            "expires_in_seconds": 900,
+            "url": f"/api/sonar/people/{person_id}/documents/{document_id}/download",
+            "requires_authorization": True,
             "document": serialize_sonar_person_document(document),
         }
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Failed to create dashboard document URL for document %s: %s", document_id, exc, exc_info=True)
+        logging.error('main.get_sonar_person_document_url.event_9221')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not open document.") from exc
+
+
+@app.get("/api/sonar/people/{person_id}/documents/{document_id}/download", tags=["Sonar People"])
+async def download_person_document(person_id: str, document_id: UUID, current_user=Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    rows = supabase_admin.table("people_docs").select("storage_bucket,storage_path,content_type,file_size").eq("id",str(document_id)).eq("person_id",person_id).eq("business_id",business["id"]).limit(1).execute().data
+    if not rows or rows[0].get("storage_bucket") != DOCUMENT_BUCKET:
+        raise HTTPException(404,"Document unavailable")
+    row=rows[0]
+    if int(row.get("file_size") or 0)>10*1024*1024: raise HTTPException(413,"Document too large")
+    content=supabase_admin.storage.from_(DOCUMENT_BUCKET).download(row["storage_path"])
+    if len(content)>15*1024*1024: raise HTTPException(413,"Document too large")
+    from .envelope import open_file, MAGIC, KeyUnavailable
+    if row['storage_path'].endswith('.ndmenc') and not content.startswith(MAGIC): raise KeyUnavailable()
+    content=open_file(getattr(supabase_admin,'raw',supabase_admin),content,business_id=business['id'],bucket=DOCUMENT_BUCKET,path=row['storage_path'])
+    if len(content)>10*1024*1024: raise HTTPException(413,"Document too large")
+    media=row.get("content_type")
+    if media not in {"application/pdf","image/jpeg","image/png","image/webp"}: media="application/octet-stream"
+    return Response(content=content,media_type=media,headers={"Content-Disposition":'attachment; filename="document"',"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"})
 
 
 @app.put("/api/sonar/people/{person_id}/documents/{document_id}", tags=["Sonar People"])
@@ -9281,7 +9374,7 @@ async def rename_sonar_person_document(
     payload: SonarDocumentRenameRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
     file_name = normalize_sonar_document_name(payload.file_name)
@@ -9300,13 +9393,13 @@ async def rename_sonar_person_document(
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Failed to rename dashboard document %s: %s", document_id, exc, exc_info=True)
+        logging.error('main.rename_sonar_person_document.event_9251')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not rename document.") from exc
 
 
 @app.delete("/api/sonar/people/{person_id}/documents/{document_id}", tags=["Sonar People"])
 async def delete_sonar_person_document(person_id: str, document_id: str, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
     try:
@@ -9336,7 +9429,7 @@ async def delete_sonar_person_document(person_id: str, document_id: str, current
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Failed to delete dashboard document %s: %s", document_id, exc, exc_info=True)
+        logging.error('main.delete_sonar_person_document.event_9287')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not delete document.") from exc
 
 
@@ -9346,7 +9439,7 @@ async def create_sonar_bug_report(
     request: Request,
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     business = load_business_by_user_id(user_id)
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
@@ -9372,7 +9465,7 @@ async def create_sonar_bug_report(
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Failed to save bug report for user %s: %s", user_id, exc, exc_info=True)
+        logging.error('main.create_sonar_bug_report.event_9305')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not submit the problem report.") from exc
 
 @app.get("/api/sonar/people/search", tags=["Sonar People"])
@@ -9398,12 +9491,12 @@ async def search_sonar_people(q: str, limit: int = 25, current_user: dict = Depe
 
 @app.get("/api/sonar/people/{person_id}", tags=["Sonar People"])
 async def get_sonar_person(person_id: str, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     query = supabase.table("people").select("*").eq("id", person_id)
     if business:
         query = query.eq("business_id", business["id"])
     else:
-        query = query.eq("user_id", str(current_user.id))
+        query = query.eq("user_id", business_owner_id(current_user))
     response = query.limit(1).execute()
     if not response.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
@@ -9411,8 +9504,8 @@ async def get_sonar_person(person_id: str, current_user: dict = Depends(get_curr
 
 @app.post("/api/sonar/people", tags=["Sonar People"])
 async def create_sonar_person(payload: dict, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
-    user_id = str(current_user.id)
+    business = require_business_for_user(business_owner_id(current_user))
+    user_id = business_owner_id(current_user)
     context = require_plan_access(user_id, "contacts")
     enforce_plan_limit(
         context,
@@ -9442,7 +9535,7 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
     schedule_backend_scenario_execution("record_created", {
         "record_id": created.get("id"),
         "person_id": created.get("id"),
-        "user_id": created.get("user_id") or str(current_user.id),
+        "user_id": created.get("user_id") or business_owner_id(current_user),
         "business_id": created.get("business_id") or (business or {}).get("id"),
         "person": created,
         "record": created,
@@ -9452,12 +9545,12 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
 @app.put("/api/sonar/people/{person_id}", tags=["Sonar People"])
 async def update_sonar_person(person_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
     try:
-        business = load_business_by_user_id(str(current_user.id))
+        business = load_business_by_user_id(business_owner_id(current_user))
         existing_query = supabase.table("people").select("*").eq("id", person_id)
         if business:
             existing_query = existing_query.eq("business_id", business["id"])
         else:
-            existing_query = existing_query.eq("user_id", str(current_user.id))
+            existing_query = existing_query.eq("user_id", business_owner_id(current_user))
         existing_response = existing_query.limit(1).execute()
         if not existing_response.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
@@ -9480,40 +9573,40 @@ async def update_sonar_person(person_id: str, payload: dict, current_user: dict 
         if business:
             refreshed_query = refreshed_query.eq("business_id", business["id"])
         else:
-            refreshed_query = refreshed_query.eq("user_id", str(current_user.id))
+            refreshed_query = refreshed_query.eq("user_id", business_owner_id(current_user))
         refreshed_response = refreshed_query.limit(1).execute()
         updated = refreshed_response.data[0] if refreshed_response.data else {**existing_response.data[0], **updates}
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Failed to update person %s with payload %s: %s", person_id, payload, exc, exc_info=True)
+        logging.error('main.update_sonar_person.event_9419')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc) or "Failed to update person",
+            detail='The request could not be completed',
         ) from exc
 
     try:
         schedule_backend_scenario_execution("record_updated", {
             "record_id": updated.get("id") or person_id,
             "person_id": updated.get("id") or person_id,
-            "user_id": updated.get("user_id") or existing_response.data[0].get("user_id") or str(current_user.id),
+            "user_id": updated.get("user_id") or existing_response.data[0].get("user_id") or business_owner_id(current_user),
             "business_id": updated.get("business_id") or existing_response.data[0].get("business_id") or (business or {}).get("id"),
             "person": updated,
             "record": updated,
         })
     except Exception as exc:
-        logging.error("Failed to emit record_updated scenario event for person %s: %s", person_id, exc, exc_info=True)
+        logging.error('main.update_sonar_person.event_9435')
 
     return updated
 
 @app.delete("/api/sonar/people/{person_id}", tags=["Sonar People"])
 async def delete_sonar_person(person_id: str, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     existing_query = supabase.table("people").select("id").eq("id", person_id)
     if business:
         existing_query = existing_query.eq("business_id", business["id"])
     else:
-        existing_query = existing_query.eq("user_id", str(current_user.id))
+        existing_query = existing_query.eq("user_id", business_owner_id(current_user))
     existing_response = existing_query.limit(1).execute()
     if not existing_response.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
@@ -9523,7 +9616,7 @@ async def delete_sonar_person(person_id: str, current_user: dict = Depends(get_c
     schedule_backend_scenario_execution("record_deleted", {
         "record_id": person_id,
         "person_id": person_id,
-        "user_id": deleted.get("user_id") or str(current_user.id),
+        "user_id": deleted.get("user_id") or business_owner_id(current_user),
         "business_id": deleted.get("business_id") or (business or {}).get("id"),
         "person": deleted,
         "record": deleted,
@@ -9532,26 +9625,20 @@ async def delete_sonar_person(person_id: str, current_user: dict = Depends(get_c
 
 @app.get("/api/sonar/services", tags=["Sonar Services"])
 async def list_sonar_services(current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
-    query = supabase.table("services").select("*")
-    if business:
-        try:
-            query = query.eq("business_id", business["id"])
-        except Exception:
-            pass
+    business = load_business_by_user_id(business_owner_id(current_user))
+    if not business:
+        return []
+    query = supabase.table("services").select("*").eq("business_id", business["id"])
     response = query.order("category").order("sort_order").execute()
     return response.data or []
 
 
 @app.get("/api/sonar/staff", tags=["Sonar Staff"])
 async def list_sonar_staff(active_only: bool = True, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
-    query = supabase.table("staff").select("*")
-    if business:
-        try:
-            query = query.eq("business_id", business["id"])
-        except Exception:
-            pass
+    business = load_business_by_user_id(business_owner_id(current_user))
+    if not business:
+        return []
+    query = supabase.table("staff").select("*").eq("business_id", business["id"])
     if active_only:
         query = query.eq("is_active", True)
     response = query.order("full_name").limit(200).execute()
@@ -9559,36 +9646,33 @@ async def list_sonar_staff(active_only: bool = True, current_user: dict = Depend
 
 @app.post("/api/sonar/services", tags=["Sonar Services"])
 async def create_sonar_service(payload: dict, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
-    insert_payload = {**payload}
-    if business and "business_id" not in insert_payload:
-        insert_payload["business_id"] = business["id"]
+    business = require_business_for_user(business_owner_id(current_user))
+    insert_payload = {key: value for key, value in payload.items() if key not in {"id", "user_id", "business_id"}}
+    insert_payload["business_id"] = business["id"]
     response = supabase.table("services").insert(insert_payload).execute()
     return response.data[0] if response.data else insert_payload
 
 @app.get("/api/sonar/appointments", tags=["Sonar Appointments"])
 async def list_sonar_appointments(limit: int = 100, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
+    if not business:
+        return []
     query = supabase.table("appointments").select("id,date,time,duration,status,source,notes,person_id,service_id,staff_id,business_id,receptionist_id,created_at,updated_at")
-    if business:
-        try:
-            query = query.eq("business_id", business["id"])
-        except Exception:
-            pass
+    query = query.eq("business_id", business["id"])
     response = query.order("date").order("time").limit(max(1, min(limit, 500))).execute()
     return response.data or []
 
 
 @app.post("/api/sonar/appointments", tags=["Sonar Appointments"])
 async def create_sonar_appointment(payload: dict, current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(str(current_user.id))
+    business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
     appointment_date = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
     appointment_time = normalize_appointment_time_value(first_present(payload, "time", "appointment_time"))
     appointment_duration = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
-    person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+    person_id = safe_appointment_person_id(first_present(payload, "person_id"), business_id=(business or {}).get("id"))
     requested_staff_id = first_present(payload, "staff_id")
     staff_id = safe_appointment_staff_id(requested_staff_id, business_id=business["id"], require_active=False)
     if requested_staff_id is not None and staff_id is None:
@@ -9615,7 +9699,7 @@ async def create_sonar_appointment(payload: dict, current_user: dict = Depends(g
         "receptionist_id": int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id")),
         "notes": first_present(payload, "notes"),
         "person_id": person_id,
-        "service_id": safe_appointment_service_id(first_present(payload, "service_id")),
+        "service_id": safe_appointment_service_id(first_present(payload, "service_id"), business_id=(business or {}).get("id")),
         "staff_id": staff_id,
         "business_id": business["id"],
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -9627,7 +9711,7 @@ async def create_sonar_appointment(payload: dict, current_user: dict = Depends(g
     claim_nest_milestone(
         supabase,
         business_id=created.get("business_id") or business.get("id"),
-        user_id=str(current_user.id),
+        user_id=business_owner_id(current_user),
         milestone_key="first_appointment_booked",
         title="First appointment booked",
         message=" · ".join(part for part in (created.get("date"), created.get("time")) if part),
@@ -9639,7 +9723,7 @@ async def create_sonar_appointment(payload: dict, current_user: dict = Depends(g
         claim_nest_milestone(
             supabase,
             business_id=appointment_business_id,
-            user_id=str(current_user.id),
+            user_id=business_owner_id(current_user),
             milestone_key="first_appointment_completed",
             title="First appointment completed",
             message=" · ".join(part for part in (created.get("date"), created.get("time")) if part),
@@ -9662,7 +9746,7 @@ async def create_sonar_appointment(payload: dict, current_user: dict = Depends(g
                 claim_nest_milestone(
                     supabase,
                     business_id=appointment_business_id,
-                    user_id=str(current_user.id),
+                    user_id=business_owner_id(current_user),
                     milestone_key="first_receptionist_booking",
                     title="First receptionist booking",
                     message=" · ".join(part for part in (created.get("date"), created.get("time")) if part),
@@ -9684,7 +9768,7 @@ async def create_sonar_appointment(payload: dict, current_user: dict = Depends(g
                 claim_nest_milestone(
                     supabase,
                     business_id=appointment_business_id,
-                    user_id=str(current_user.id),
+                    user_id=business_owner_id(current_user),
                     milestone_key="first_repeat_customer",
                     title="First repeat customer",
                     message=str(person_id),
@@ -9695,14 +9779,14 @@ async def create_sonar_appointment(payload: dict, current_user: dict = Depends(g
             claim_nest_milestone(
                 supabase,
                 business_id=appointment_business_id,
-                user_id=str(current_user.id),
+                user_id=business_owner_id(current_user),
                 milestone_key="first_automated_booking",
                 title="First automated booking",
                 message=" · ".join(part for part in (created.get("date"), created.get("time")) if part),
                 source_id=created.get("id"),
             )
     except Exception as exc:
-        logging.warning("Nest appointment milestone checks skipped: %s", exc)
+        logging.warning('main.create_sonar_appointment.event_9626')
     emit_scenario_trigger(
         "appointment_created",
         {
@@ -9724,10 +9808,8 @@ async def update_sonar_appointment(appointment_id: str, payload: dict, current_u
     if not appointment_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid appointment ID")
 
-    business = load_business_by_user_id(str(current_user.id))
-    existing_query = supabase.table("appointments").select("*").eq("id", appointment_id)
-    if business:
-        existing_query = existing_query.eq("business_id", business["id"])
+    business = require_business_for_user(business_owner_id(current_user))
+    existing_query = supabase.table("appointments").select("*").eq("id", appointment_id).eq("business_id", business["id"])
     existing_response = existing_query.limit(1).execute()
     if not existing_response.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
@@ -9746,11 +9828,11 @@ async def update_sonar_appointment(appointment_id: str, payload: dict, current_u
     if first_present(payload, "notes") is not None:
         updates["notes"] = first_present(payload, "notes")
     if first_present(payload, "person_id") is not None:
-        safe_person_id = safe_appointment_person_id(first_present(payload, "person_id"))
+        safe_person_id = safe_appointment_person_id(first_present(payload, "person_id"), business_id=(business or {}).get("id"))
         if safe_person_id is not None:
             updates["person_id"] = safe_person_id
     if first_present(payload, "service_id") is not None:
-        safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"))
+        safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"), business_id=(business or {}).get("id"))
         if safe_service_id is not None:
             updates["service_id"] = safe_service_id
     if first_present(payload, "staff_id") is not None:
@@ -9765,13 +9847,13 @@ async def update_sonar_appointment(appointment_id: str, payload: dict, current_u
         return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
 
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-    response = supabase.table("appointments").update(updates).eq("id", appointment_id).execute()
+    response = supabase.table("appointments").update(updates).eq("id", appointment_id).eq("business_id", business["id"]).execute()
     updated = response.data[0] if response.data else {**existing_response.data[0], **updates}
     if str(updated.get("status") or "").strip().lower() == "completed":
         claim_nest_milestone(
             supabase,
             business_id=updated.get("business_id") or (business or {}).get("id"),
-            user_id=str(current_user.id),
+            user_id=business_owner_id(current_user),
             milestone_key="first_appointment_completed",
             title="First appointment completed",
             message=" · ".join(part for part in (updated.get("date"), updated.get("time")) if part),
@@ -9791,15 +9873,13 @@ async def delete_sonar_appointment(appointment_id: str, current_user: dict = Dep
     if not appointment_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid appointment ID")
 
-    business = load_business_by_user_id(str(current_user.id))
-    query = supabase.table("appointments").select("id").eq("id", appointment_id)
-    if business:
-        query = query.eq("business_id", business["id"])
+    business = require_business_for_user(business_owner_id(current_user))
+    query = supabase.table("appointments").select("id").eq("id", appointment_id).eq("business_id", business["id"])
     existing_response = query.limit(1).execute()
     if not existing_response.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
-    supabase.table("appointments").delete().eq("id", appointment_id).execute()
+    supabase.table("appointments").delete().eq("id", appointment_id).eq("business_id", business["id"]).execute()
     return {"ok": True, "id": appointment_id, "action": "delete_appointment"}
 
 
@@ -9819,7 +9899,7 @@ async def list_hired_receptionists(current_user: dict = Depends(get_current_user
     response = (
         supabase.table("hired_receptionists")
         .select("*")
-        .eq("user_id", str(current_user.id))
+        .eq("user_id", business_owner_id(current_user))
         .order("hired_at", desc=True)
         .execute()
     )
@@ -9864,7 +9944,7 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
     if not catalog_id and not custom_voice_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="catalog_id is required")
 
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     plan_context = require_plan_access(current_user_id, "receptionists")
     enforce_plan_limit(
         plan_context,
@@ -9969,7 +10049,7 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Failed to hire receptionist %s for user %s: %s", catalog_id, current_user_id, exc, exc_info=True)
+        logging.error('main.hire_receptionist.event_9889')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to hire receptionist")
 
 @app.get("/api/sonar/receptionists/catalog", tags=["Sonar Receptionists"])
@@ -9995,7 +10075,7 @@ async def list_receptionist_catalog(current_user: dict = Depends(get_current_use
         for row in custom_voice_response.data or []:
             clone_rows.append(normalize_custom_voice_receptionist(row))
     except Exception as exc:
-        logging.warning("Failed to append custom voices to receptionist catalog: %s", exc)
+        logging.warning('main.list_receptionist_catalog.event_9915')
     return [*catalog_rows, *clone_rows]
 
 @app.get("/api/sonar/call-logs", tags=["Sonar Calls"])
@@ -10009,8 +10089,8 @@ async def list_call_logs(
     safe_offset = max(0, offset)
     query = (
         supabase.table("call_logs")
-        .select("*")
-        .eq("user_id", str(current_user.id))
+        .select("id,business_id,user_id,caller_name,caller_phone,from_number,started_at,event_timestamp,created_at,duration_seconds,status,outcome,summary,call_successful,direction,receptionist_name,agent_name,hired_receptionist_id,is_favorited,has_audio")
+        .eq("user_id", business_owner_id(current_user))
         .order("created_at", desc=True)
         .range(safe_offset, safe_offset + safe_limit - 1)
     )
@@ -10039,9 +10119,8 @@ async def list_call_logs(
             row,
             payload_data=row.get("raw_payload") if isinstance(row.get("raw_payload"), dict) else {},
             business_id=row.get("business_id"),
-            user_id=str(current_user.id),
+            user_id=business_owner_id(current_user),
         )
-        row["audio_url"] = storage_signed_url(row.get("audio_storage_path"))
         row["receptionist_avatar"] = None
         if row.get("hired_receptionist_id"):
             try:
@@ -10055,8 +10134,47 @@ async def list_call_logs(
                 if receptionist_response.data:
                     row["receptionist_avatar"] = receptionist_response.data[0].get("avatar")
             except Exception as exc:
-                logging.warning("Failed to load receptionist avatar for call log %s: %s", row.get("id"), exc)
+                logging.warning('main.list_call_logs.event_9975')
     return rows
+
+
+@app.post("/api/sonar/call-logs/search", tags=["Sonar Calls"])
+async def search_call_logs(payload: dict, current_user=Depends(get_current_user)):
+    return await list_call_logs(limit=int(payload.get("limit",20)), offset=int(payload.get("offset",0)), q=str(payload.get("q", ""))[:200], current_user=current_user)
+
+
+@app.get("/api/sonar/call-logs/{call_log_id}/details", tags=["Sonar Calls"])
+async def call_log_details(call_log_id: UUID, current_user=Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    row = supabase.table("call_logs").select("id,transcript_jsonb,transcript_text,call_report").eq("id",str(call_log_id)).eq("business_id",business["id"]).limit(1).execute().data
+    if not row: raise HTTPException(404,"Call not found")
+    return remove_secrets(row[0])
+
+
+@app.post("/api/sonar/call-logs/{call_log_id}/playback", tags=["Sonar Calls"])
+async def call_log_playback(call_log_id: UUID, current_user=Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    rows = supabase.table("call_logs").select("id,audio_storage_path").eq("id",str(call_log_id)).eq("business_id",business["id"]).limit(1).execute().data
+    if not rows or not rows[0].get("audio_storage_path"): raise HTTPException(404,"Recording unavailable")
+    if rows[0]['audio_storage_path'].endswith('.ndmenc'):
+        return {'url': f'/api/sonar/call-logs/{call_log_id}/audio', 'requires_authorization': True}
+    url = storage_signed_url(rows[0]["audio_storage_path"], expires_in=60)
+    if not url: raise HTTPException(503,"Recording unavailable")
+    return {"url":url,"expires_in_seconds":60}
+
+
+@app.get('/api/sonar/call-logs/{call_log_id}/audio', tags=['Sonar Calls'])
+async def call_log_audio(call_log_id: UUID, current_user=Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    rows = supabase.table('call_logs').select('id,audio_storage_path').eq('id',str(call_log_id)).eq('business_id',business['id']).limit(1).execute().data
+    if not rows or not rows[0].get('audio_storage_path'): raise HTTPException(404,'Recording unavailable')
+    path = rows[0]['audio_storage_path']
+    content = supabase_admin.storage.from_('call_recordings').download(path)
+    from .envelope import open_file, MAGIC, KeyUnavailable
+    if len(content) > 180*1024*1024: raise HTTPException(413,'Recording too large')
+    if path.endswith('.ndmenc') and not content.startswith(MAGIC): raise KeyUnavailable()
+    content = open_file(getattr(supabase_admin,'raw',supabase_admin),content,business_id=business['id'],bucket='call_recordings',path=path)
+    return Response(content=content,media_type='audio/mpeg',headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'})
 
 
 @app.post("/api/sonar/call-logs/delete", tags=["Sonar Calls"])
@@ -10072,7 +10190,7 @@ async def delete_call_logs(payload: dict, current_user: dict = Depends(get_curre
     existing = (
         supabase.table("call_logs")
         .select("id")
-        .eq("user_id", str(current_user.id))
+        .eq("user_id", business_owner_id(current_user))
         .in_("id", normalized_ids)
         .execute()
     )
@@ -10080,7 +10198,7 @@ async def delete_call_logs(payload: dict, current_user: dict = Depends(get_curre
     if not matched_ids:
         return {"ok": True, "deleted_ids": [], "deleted_count": 0}
 
-    supabase.table("call_logs").delete().eq("user_id", str(current_user.id)).in_("id", matched_ids).execute()
+    supabase.table("call_logs").delete().eq("user_id", business_owner_id(current_user)).in_("id", matched_ids).execute()
     return {"ok": True, "deleted_ids": matched_ids, "deleted_count": len(matched_ids)}
 
 @app.patch("/api/sonar/call-logs/{call_log_id}/favorite", tags=["Sonar Calls"])
@@ -10092,17 +10210,17 @@ async def update_call_log_favorite(call_log_id: str, payload: dict, current_user
     response = (
         supabase.table("call_logs")
         .update({"is_favorited": is_favorited})
-        .eq("user_id", str(current_user.id))
+        .eq("user_id", business_owner_id(current_user))
         .eq("id", str(call_log_id))
         .execute()
     )
     if not response.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call log not found")
-    return {"ok": True, "call_log": response.data[0]}
+    return {"ok": True, "call_log": {"id":response.data[0]["id"], "is_favorited":is_favorited}}
 
 @app.get("/api/sonar/call-logs/stats", tags=["Sonar Calls"])
 async def get_call_log_stats(current_user: dict = Depends(get_current_user)):
-    rows = _fetch_call_log_rows(user_id=str(current_user.id))
+    rows = _fetch_call_log_rows(user_id=business_owner_id(current_user))
     overall_metrics = _accumulate_receptionist_metrics(rows)
 
     by_receptionist = {}
@@ -10193,7 +10311,7 @@ async def get_queue_messages(current_user: dict = Depends(get_current_user)):
         return formatted_data
 
     except Exception as e:
-        logging.error(f"Failed to get queue for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.get_queue_messages.event_10113')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve queue messages.")
 
 @app.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Messages"])
@@ -10213,7 +10331,7 @@ async def delete_message(message_id: UUID, current_user: dict = Depends(get_curr
     except HTTPException as e:
         raise e
     except Exception as e:
-        logging.error(f"Failed to delete message {message_id} for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.delete_message.event_10133')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete message.")
 
 @app.put("/messages/{message_id}/status", status_code=status.HTTP_200_OK, tags=["Messages"])
@@ -10247,63 +10365,63 @@ async def update_message_status(message_id: UUID, updated_message_content: dict,
     except HTTPException as e:
         raise e
     except Exception as e:
-        logging.error(f"Failed to update message {message_id} status for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.update_message_status.event_10167')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update message status.")
 
 # --- Authentication Endpoint ---
 @app.post("/token", response_model=TokenResponse, tags=["Authentication"])
 async def login_for_access_token(form_data: AuthLoginRequest):
     try:
-        response = supabase.auth.sign_in_with_password({"email": form_data.email, "password": form_data.password})
+        response = new_auth_client().auth.sign_in_with_password({"email": form_data.email, "password": form_data.password})
         if response.session:
             return response.session.model_dump()
         else:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login failed: No session returned.")
     except AuthApiError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=e.message or "Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='The request could not be completed', headers={"WWW-Authenticate": "Bearer"})
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 # --- Breakroom (Reps) Endpoints ---
 @app.post("/breakroom/login", response_model=RepTokenResponse, tags=["Reps"])
 async def login_for_rep_access_token(form_data: RepLoginRequest):
-    logging.info("--- [STEP 1] Breakroom login process started. ---")
+    logging.info('main.login_for_rep_access_token.event_10344')
     try:
-        logging.info(f"--- [STEP 2] Querying database for rep_id: '{form_data.rep_id}'. ---")
+        logging.info('main.login_for_rep_access_token.event_10254')
         rep_response = supabase.table('reps').select('*').eq('rep_id', form_data.rep_id).single().execute()
         
         if not rep_response.data:
-            logging.warning(f"--- [FAIL] Rep login failed: Rep ID '{form_data.rep_id}' not found in the database. ---")
+            logging.warning('main.login_for_rep_access_token.event_10193')
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rep ID not found.")
         
-        logging.info("--- [STEP 3] Rep ID found in the database. Proceeding to password verification. ---")
+        logging.info('main.login_for_rep_access_token.event_10261')
         rep = rep_response.data
         
         received_password = form_data.password
         db_password = rep.get('rep_password')
         
-        logging.info(f"--- [STEP 4] Comparing passwords. Received: '{received_password}' (Length: {len(received_password)}), Database: '{db_password}' (Length: {len(db_password) if db_password else 'N/A'}). ---")
+        logging.info('main.login_for_rep_access_token.event_10267')
         
         passwords_match = received_password == db_password
         
         if not passwords_match:
-            logging.warning(f"--- [FAIL] Password mismatch for rep_id '{form_data.rep_id}'. ---")
+            logging.warning('main.login_for_rep_access_token.event_10207')
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password.")
 
-        logging.info("--- [STEP 5] Passwords match. Creating access token. ---")
+        logging.info('main.login_for_rep_access_token.event_10275')
         access_token_expires = timedelta(minutes=60)
         access_token = create_access_token(
             data={"sub": rep.get('rep_id')}, expires_delta=access_token_expires
         )
         
-        logging.info("--- [SUCCESS] Access token created. Login successful. ---")
+        logging.info('main.login_for_rep_access_token.event_10281')
         return {"access_token": access_token, "token_type": "bearer"}
 
     except HTTPException as e:
         # Re-raising HTTPException to let FastAPI handle it, no extra logging needed here.
         raise e
     except Exception as e:
-        logging.error(f"--- [ERROR] An unexpected error occurred during login for rep_id {form_data.rep_id}: {e} ---", exc_info=True)
+        logging.error('main.login_for_rep_access_token.event_10223')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An internal error occurred.")
 
 @app.get("/reps/me", response_model=RepResponse, tags=["Reps"])
@@ -10314,8 +10432,8 @@ async def read_current_rep(current_rep_id: str = Depends(get_current_rep)):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Current rep's profile not found.")
         return RepResponse.model_validate(response.data).model_dump()
     except Exception as e:
-        logging.error(f"Error fetching rep profile for rep_id {current_rep_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.read_current_rep.event_10234')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.patch("/reps/{rep_id}/deduct-points", response_model=RepResponse, tags=["Reps"])
 async def deduct_rep_points(rep_id: UUID, points_data: dict, current_rep_id: str = Depends(get_current_rep)):
@@ -10341,8 +10459,8 @@ async def deduct_rep_points(rep_id: UUID, points_data: dict, current_rep_id: str
     except HTTPException as e:
         raise e
     except Exception as e:
-        logging.error(f"Error deducting points for rep {rep_id} by {current_rep_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.deduct_rep_points.event_10261')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.get("/money-table", response_model=List[MoneyTablePlan], tags=["Reps"])
 async def get_money_table_data(current_rep: str = Depends(get_current_rep)):
@@ -10392,7 +10510,7 @@ async def get_money_table_data(current_rep: str = Depends(get_current_rep)):
         return money_table_data
 
     except Exception as e:
-        logging.error(f"Error fetching money table data: {e}", exc_info=True)
+        logging.error('main.get_money_table_data.event_10312')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve money table data.")
 
 
@@ -10406,7 +10524,7 @@ async def get_plans():
         prices = stripe.Price.list(active=True, limit=100)
         return {"products": products.data, "prices": prices.data}
     except Exception as e:
-        logging.error(f"Error fetching plans: {e}")
+        logging.error('main.get_plans.event_10326')
         raise HTTPException(status_code=500, detail="Failed to fetch plans")
 
 
@@ -10423,7 +10541,7 @@ async def get_sonar_pricing_plans():
         ).data or []
     except Exception as e:
         # Keep Stripe pricing available while the optional entitlement table is being deployed.
-        logging.warning("Could not load Sonar plan entitlements: %s", e)
+        logging.warning('main.get_sonar_pricing_plans.event_10343')
         plan_rows = []
 
     return {**stripe_data, "plans": plan_rows}
@@ -10509,20 +10627,20 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, current
 
   except stripe.error.InvalidRequestError as e:
     if "No such customer" in str(e):
-      logging.warning(f"Stale customer ID for user {current_user_id}. Creating a new one.")
+      logging.warning('main.create_checkout_session.event_10429')
       supabase.table('users').update({'stripe_customer_id': None}).eq('id', str(current_user_id)).execute()
       return await create_checkout_session(request, current_user)
     else:
-      logging.error(f"Stripe InvalidRequestError: {e}", exc_info=True)
-      raise HTTPException(status_code=500, detail=str(e))
+      logging.error('main.create_checkout_session.event_10433')
+      raise HTTPException(status_code=500, detail='The request could not be completed')
   except Exception as e:
-    logging.error(f"Error creating checkout session for user {current_user_id}: {e}", exc_info=True)
+    logging.error('main.create_checkout_session.event_10436')
     raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.post("/api/sonar/billing/portal", tags=["Billing"])
 async def create_billing_portal_session(current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     if is_payment_test_mode():
         base_url = get_payment_frontend_base_url().rstrip('/')
         return {
@@ -10553,32 +10671,32 @@ async def create_billing_portal_session(current_user: dict = Depends(get_current
             return_url=return_url,
         )
     except stripe.error.InvalidRequestError as exc:
-        logging.warning("Stripe Billing Portal rejected customer %s for user %s: %s", customer_id, user_id, exc)
+        logging.warning('main.create_billing_portal_session.event_10473')
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "billing_customer_invalid", "message": "Billing Portal is not available for this account yet."},
         ) from exc
     except Exception as exc:
-        logging.error("Failed to create Billing Portal session for user %s: %s", user_id, exc, exc_info=True)
+        logging.error('main.create_billing_portal_session.event_10479')
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not open Stripe Billing Portal.") from exc
     return {"url": portal_session.url}
 
 
 @app.get("/api/sonar/billing/usage", tags=["Billing"])
 async def get_billing_usage(current_user: dict = Depends(get_current_user)):
-    usage = get_usage_snapshot(str(current_user.id))
+    usage = get_usage_snapshot(business_owner_id(current_user))
     recent_events = []
     try:
         recent_events = (
             supabase_admin.table("billing_overage_events")
             .select("stripe_invoice_id,billable_minutes,amount_cents,currency,status,error_message,created_at,reconciled_at")
-            .eq("user_id", str(current_user.id))
+            .eq("user_id", business_owner_id(current_user))
             .order("created_at", desc=True)
             .limit(5)
             .execute()
         ).data or []
     except Exception as exc:
-        logging.warning("Could not load overage reconciliation history: %s", exc)
+        logging.warning('main.get_billing_usage.event_10498')
     return {**usage, "recent_overage_events": recent_events}
 
 @app.get("/api/sonar/payments/test-mode", tags=["Sonar Payments"])
@@ -10609,7 +10727,7 @@ async def create_payment(
     request: PaymentCreateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _create_payment_for_user(request, str(current_user.id))
+    return await _create_payment_for_user(request, business_owner_id(current_user))
 
 
 @app.post("/api/sonar/create-customer", tags=["Sonar Payments"])
@@ -10617,7 +10735,7 @@ async def create_customer(
     request: CustomerCreateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _create_customer_for_user(request, str(current_user.id))
+    return await _create_customer_for_user(request, business_owner_id(current_user))
 
 
 @app.post("/api/sonar/call-customer", tags=["Sonar Calls"])
@@ -10628,7 +10746,7 @@ async def call_customer(payload: dict, current_user: dict = Depends(get_current_
         payload.get("main_content"),
     )
 
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     business = load_business_by_user_id(user_id)
     enforce_call_minutes(user_id, business, direction="outbound")
     receptionist = find_inbound_receptionist_for_business(
@@ -10671,7 +10789,7 @@ async def call_customer(payload: dict, current_user: dict = Depends(get_current_
 
     result = await scenario_engine.action_executor._call_customer(node, context)
     if not result.get("success"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.get("error") or "Call failed")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
     return result.get("data") or {}
 
 
@@ -10694,7 +10812,7 @@ async def update_customer(
     request: CustomerUpdateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _update_customer_for_user(request, str(current_user.id))
+    return await _update_customer_for_user(request, business_owner_id(current_user))
 
 
 async def _update_customer_for_user(request: CustomerUpdateRequest, user_id: str):
@@ -10714,7 +10832,7 @@ async def _update_customer_for_user(request: CustomerUpdateRequest, user_id: str
 
 async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
     require_payment_access(user_id)
-    description = request.description or ""
+    description = "Business payment"
     payment_method_type = (request.payment_method_type or "card").lower()
     payment_method = "us_bank_account" if payment_method_type == "ach" else payment_method_type
     ensure_no_unresolved_templates(
@@ -10810,8 +10928,8 @@ async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
             payment_intent_payload["application_fee_amount"] = application_fee_amount
         stripe_payment_intent = stripe.PaymentIntent.create(**stripe_request_options, **payment_intent_payload)
     except Exception as exc:
-        logging.error("Stripe payment intent creation failed for user %s: %s", user_id, exc, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe payment creation failed: {exc}") from exc
+        logging.error('main._create_payment_for_user.event_10730')
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail='The request could not be completed') from exc
 
     stripe_payment_status = str(stripe_payment_intent.status if stripe_payment_intent else "created").lower()
     payment_record_status = (
@@ -10864,7 +10982,7 @@ async def send_payment_link(
     request: PaymentLinkCreateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _send_payment_link_for_user(request, str(current_user.id))
+    return await _send_payment_link_for_user(request, business_owner_id(current_user))
 
 
 @app.post("/api/sonar/create-payment-profile", tags=["Sonar Payments"])
@@ -10872,12 +10990,12 @@ async def create_payment_profile(
     request: PaymentLinkCreateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _send_payment_link_for_user(request, str(current_user.id))
+    return await _send_payment_link_for_user(request, business_owner_id(current_user))
 
 
 async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id: str):
     require_payment_access(user_id)
-    description = request.description or ""
+    description = "Business payment"
     payment_mode_base_url = get_payment_frontend_base_url()
     ensure_no_unresolved_templates(
         request.person_id,
@@ -10969,7 +11087,7 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
                 "price_data": {
                     "currency": request.currency,
                     "product_data": {
-                        **({"name": request.customer_name} if request.customer_name else {"name": "Payment Link"}),
+                        "name": "Business payment",
                         **({"description": description} if description else {}),
                     },
                     "unit_amount": request.amount,
@@ -11019,20 +11137,20 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
         })
         return response_payload
     except Exception as exc:
-        logging.error("Error creating payment link: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+        logging.error('main._send_payment_link_for_user.event_10939')
+        raise HTTPException(status_code=500, detail='The request could not be completed')
 
 @app.post("/api/sonar/create-invoice", tags=["Sonar Payments"])
 async def create_invoice(
     request: InvoiceCreateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _create_invoice_for_user(request, str(current_user.id))
+    return await _create_invoice_for_user(request, business_owner_id(current_user))
 
 
 async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
     require_payment_access(user_id)
-    description = request.description or ""
+    description = "Business invoice"
     ensure_no_unresolved_templates(
         request.person_id,
         request.customer_id,
@@ -11107,15 +11225,15 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
         payload["customer_id"] = customer.get("id")
         return payload
     except Exception as exc:
-        logging.error("Error creating invoice: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+        logging.error('main._create_invoice_for_user.event_11027')
+        raise HTTPException(status_code=500, detail='The request could not be completed')
 
 @app.post("/api/sonar/send-invoice", tags=["Sonar Payments"])
 async def send_invoice(
     request: InvoiceSendRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _send_invoice_for_user(request, str(current_user.id))
+    return await _send_invoice_for_user(request, business_owner_id(current_user))
 
 
 async def _send_invoice_for_user(request: InvoiceSendRequest, user_id: str):
@@ -11151,8 +11269,8 @@ async def _send_invoice_for_user(request: InvoiceSendRequest, user_id: str):
         fresh_invoice = stripe.Invoice.retrieve(request.invoice_id, **stripe_request_options)
         return serialize_stripe_invoice(fresh_invoice)
     except Exception as exc:
-        logging.error("Error sending invoice: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+        logging.error('main._send_invoice_for_user.event_11071')
+        raise HTTPException(status_code=500, detail='The request could not be completed')
 
 
 @app.post("/api/sonar/refund-payment", tags=["Sonar Payments"])
@@ -11160,7 +11278,7 @@ async def refund_payment(
     request: RefundPaymentRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _refund_payment_for_user(request, str(current_user.id))
+    return await _refund_payment_for_user(request, business_owner_id(current_user))
 
 
 async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
@@ -11242,8 +11360,8 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
             )
         )
     except Exception as exc:
-        logging.error("Refund creation failed for user %s payment %s: %s", user_id, payment_intent_id, exc, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe refund failed: {exc}") from exc
+        logging.error('main._refund_payment_for_user.event_11162')
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail='The request could not be completed') from exc
 
     refunded_amount = int(refund.get("amount") or 0)
     current_amount = int((payment_record or {}).get("amount") or 0)
@@ -11280,7 +11398,7 @@ async def cancel_subscription(
     request: CancelSubscriptionRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await _cancel_subscription_for_user(request, str(current_user.id))
+    return await _cancel_subscription_for_user(request, business_owner_id(current_user))
 
 
 async def _cancel_subscription_for_user(request: CancelSubscriptionRequest, user_id: str):
@@ -11355,8 +11473,8 @@ async def _cancel_subscription_for_user(request: CancelSubscriptionRequest, user
             stripe.Subscription.cancel(subscription_id, **stripe_request_options)
         )
     except Exception as exc:
-        logging.error("Subscription cancel failed for user %s subscription %s: %s", user_id, subscription_id, exc, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Stripe subscription cancel failed: {exc}") from exc
+        logging.error('main._cancel_subscription_for_user.event_11275')
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail='The request could not be completed') from exc
 
     result = serialize_stripe_subscription(subscription)
     result["customer_id"] = subscription.get("customer")
@@ -11371,7 +11489,7 @@ async def send_scenario_email(
     ensure_no_unresolved_templates(request.to, request.subject, request.body)
     if not request.to or not request.subject:
         raise HTTPException(status_code=400, detail="Email recipient and subject are required.")
-    result = _send_email_for_user(str(current_user.id), request.to, request.subject, request.body or "")
+    result = _send_email_for_user(business_owner_id(current_user), request.to, request.subject, request.body or "")
     return {
         **result,
         "id": result.get("id"),
@@ -11486,7 +11604,7 @@ scenario_engine = ScenarioEngine(
 
 @app.post("/api/sonar/update-payment", tags=["Sonar Payments"])
 async def update_payment(request: PaymentUpdateRequest, current_user: dict = Depends(get_current_user)):
-    user_id = str(current_user.id)
+    user_id = business_owner_id(current_user)
     require_payment_access(user_id)
     ensure_no_unresolved_templates(request.payment_id, request.description, request.notes)
     payment_record = None
@@ -11546,32 +11664,23 @@ async def update_payment(request: PaymentUpdateRequest, current_user: dict = Dep
 @app.post("/stripe-webhook", tags=["Billing"])
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
     if not stripe_webhook_secret:
-        logging.error("STRIPE_WEBHOOK_SECRET is not configured; refusing Stripe webhook.")
+        logging.error('main.stripe_webhook.event_11531')
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Stripe webhook authentication is not configured.")
     raw_body = await request.body()
-    logging.info(
-        "[Stripe Webhook] Incoming request signature_present=%s body_bytes=%s",
-        bool(stripe_signature),
-        len(raw_body or b""),
-    )
+    logging.info('main.stripe_webhook.event_11626')
     try:
         event = stripe.Webhook.construct_event(payload=raw_body, sig_header=stripe_signature, secret=stripe_webhook_secret)
     except ValueError:
-        logging.warning("[Stripe Webhook] Invalid payload")
+        logging.warning('main.stripe_webhook.event_11473')
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError:
-        logging.warning("[Stripe Webhook] Invalid signature")
+        logging.warning('main.stripe_webhook.event_11476')
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     event_type = event["type"]
     connected_account_id = event.get("account")
     is_connected_account_event = bool(connected_account_id)
-    logging.info(
-        "[Stripe Webhook] Event accepted type=%s connected_account=%s livemode=%s",
-        event_type,
-        connected_account_id,
-        event.get("livemode"),
-    )
+    logging.info('main.stripe_webhook.event_11643')
 
     if event_type == 'checkout.session.completed':
         session = event['data']['object']
@@ -11581,21 +11690,11 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 session_id=session.get("id"),
                 status="succeeded" if payment_status == "paid" else payment_status or "succeeded",
             )
-            logging.info(
-                "[Stripe Webhook] checkout.session.completed id=%s connected=%s payment_status=%s metadata_keys=%s",
-                session.get("id"),
-                is_connected_account_event,
-                payment_status,
-                sorted((session.get("metadata") or {}).keys()),
-            )
+            logging.info('main.stripe_webhook.event_11492')
             if is_connected_account_event and payment_status == "paid":
                 metadata = session.get("metadata") or {}
                 user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
-                logging.info(
-                    "[Stripe Webhook] checkout.session.completed resolved user_id=%s person_id=%s",
-                    user_id,
-                    metadata.get("person_id"),
-                )
+                logging.info('main.stripe_webhook.event_11496')
                 if user_id:
                     emit_payment_trigger("payment_received", {
                         "checkout_session": session,
@@ -11644,7 +11743,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 if product.name:
                     plan_name = product.name.lower() # Store plan name in lowercase
 
-        logging.info(f"Extracted Plan: {plan_name}, Source: {source}, Billing Period: {billing_period}")
+        logging.info('main.stripe_webhook.event_11620')
 
         # Determine subscription status based on trial presence
         subscription_status = subscription.get('status')
@@ -11679,7 +11778,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             datetime.fromtimestamp(subscription.get('current_period_end'), timezone.utc).isoformat() if subscription.get('current_period_end') else None,
             reset_usage=current_plan != plan_name,
         )
-        logging.info(f"Checkout session completed for user with customer ID: {customer_id}. Plan changed: {current_plan} -> {plan_name}")
+        logging.info('main.stripe_webhook.event_11655')
 
     elif event_type == 'invoice.upcoming':
         invoice = event['data']['object']
@@ -11701,7 +11800,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             amount_paid = invoice.get('amount_paid') # amount_paid is in cents
             
             if not customer_id or amount_paid is None or amount_paid <= 0:
-                logging.warning(f"Skipping invoice.paid event due to missing data. Customer: {customer_id}, Amount: {amount_paid}")
+                logging.warning('main.stripe_webhook.event_11596')
                 return {"status": "skipped"}
             
             # 1. Update user's subscription_status to "active" and increment months_subscribed
@@ -11717,7 +11816,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 
                 # Validate that the subscription ID from the DB exists before proceeding
                 if not subscription_id_from_db:
-                    logging.error(f"User {user_id} has no stripe_subscription_id in Supabase. Skipping invoice.paid processing.")
+                    logging.error('main.stripe_webhook.event_11612')
                     return {"status": "skipped - no subscription ID in database"}
 
                 # Update user's subscription status to active and increment months_subscribed
@@ -11732,7 +11831,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 
                 user_status_update_response = supabase.table('users').update(user_update_data).eq('id', user_id).execute() # type: ignore
                 if not user_status_update_response.data:
-                    logging.error(f"Supabase update for user {user_id} subscription status affected no rows.", exc_info=True)
+                    logging.error('main.stripe_webhook.event_11627')
                     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update user's subscription status.")
                 sync_business_plan_entitlement(
                     user_id,
@@ -11741,12 +11840,12 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                     datetime.fromtimestamp(invoice.get('period_end'), timezone.utc).isoformat() if invoice.get('period_end') else None,
                     reset_usage=True,
                 )
-                logging.info(f"User {user_id} subscription status updated to 'active' and months_subscribed incremented to {updated_months_subscribed}.")
+                logging.info('main.stripe_webhook.event_11636')
                 # 2. Commission Calculation for Rep
                 if associate_rep_id:
-                    logging.info(f"Attempting to find rep with full name: {associate_rep_id}")
+                    logging.info('main.stripe_webhook.event_11639')
                     rep_data_response = supabase.table('reps').select('id, tier, points').eq('associate_full_name', associate_rep_id).single().execute()
-                    logging.debug(f"Rep data response: {rep_data_response.data}")
+                    logging.debug('main.stripe_webhook.event_11641')
                     
                     if rep_data_response.data:
                         rep_db_id = rep_data_response.data['id']
@@ -11755,16 +11854,16 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 
                         if rep_tier_name:
                             tier_data_response = supabase.table('tiers').select('multiplier_new_acquisition, multiplier_rebill').eq('name', rep_tier_name).single().execute() # type: ignore
-                            logging.debug(f"Tier data response for tier '{rep_tier_name}': {tier_data_response.data}")
+                            logging.debug('main.stripe_webhook.event_11650')
                             if tier_data_response.data:
                                 multiplier = 0
                                 # Use the previous status to determine the multiplier
                                 if current_subscription_status == 'trialing':
                                     multiplier = tier_data_response.data.get('multiplier_new_acquisition', 0)
-                                    logging.info(f"Applying new acquisition multiplier for rep {associate_rep_id}.")
+                                    logging.info('main.stripe_webhook.event_11656')
                                 else:
                                     multiplier = tier_data_response.data.get('multiplier_rebill', 0)
-                                    logging.info(f"Applying rebill multiplier for rep {associate_rep_id}.")
+                                    logging.info('main.stripe_webhook.event_11659')
 
                                 billed_amount_dollars = amount_paid / 100
                                 commission_points = billed_amount_dollars * multiplier
@@ -11788,32 +11887,32 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                                 # Update the user's record with the last awarded points and total points
                                 user_points_update_response = supabase.table('users').update({'last_awarded_points': rounded_points_to_add, 'total_points': new_total_points}).eq('id', user_id).execute() # type: ignore
                                 if not user_points_update_response.data:
-                                    logging.error(f"Supabase update for user {user_id} with last_awarded_points and total_points affected no rows.", exc_info=True)
+                                    logging.error('main.stripe_webhook.event_11683')
                                     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update user's awarded points.")
-                                logging.info(f"User {user_id} awarded {rounded_points_to_add} points to rep {associate_rep_id}.")
-                                logging.info(f"User {user_id} total_points updated to {new_total_points}.")
+                                logging.info('main.stripe_webhook.event_11685')
+                                logging.info('main.stripe_webhook.event_11686')
 
 
                                 rep_points_update_response = supabase.table('reps').update({'points': updated_points}).eq('id', rep_db_id).execute() # type: ignore
                                 if not rep_points_update_response.data:
-                                    logging.error(f"Supabase update for rep {rep_db_id} points affected no rows.", exc_info=True)
+                                    logging.error('main.stripe_webhook.event_11691')
                                     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update rep's points.")
-                                logging.info(f"Commission calculated (Tier: {commission_points:.2f}, Final: {final_commission_points:.2f}, Rounded: {rounded_points_to_add}) and added to rep {associate_rep_id}. New total: {updated_points}")
+                                logging.info('main.stripe_webhook.event_11693')
                             else:
-                                logging.warning(f"Tier '{rep_tier_name}' not found in 'tiers' table for commission calculation.")
+                                logging.warning('main.stripe_webhook.event_11695')
                         else:
-                            logging.warning(f"Rep '{associate_rep_id}' does not have a tier assigned for commission calculation.")
+                            logging.warning('main.stripe_webhook.event_11697')
                     else:
-                        logging.warning(f"Rep '{associate_rep_id}' not found in 'reps' table. Skipping commission update.")
+                        logging.warning('main.stripe_webhook.event_11699')
                 else:
-                    logging.warning(f"User {user_id} does not have an associate for commission calculation.")
+                    logging.warning('main.stripe_webhook.event_11701')
             else:
-                logging.warning(f"User not found for stripe_customer_id {customer_id} during invoice.paid event.")
+                logging.warning('main.stripe_webhook.event_11703')
         except HTTPException:
             raise # Re-raise HTTPExceptions
         except Exception as e:
-            logging.error(f"An unexpected error occurred during invoice.paid event processing for customer {customer_id}: {e}", exc_info=True)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An internal error occurred during invoice.paid processing: {str(e)}")
+            logging.error('main.stripe_webhook.event_11707')
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
     elif event_type == 'invoice.payment_failed':
         invoice = event['data']['object']
@@ -11863,9 +11962,9 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                     "status": invoice.get("status"),
                 })
             else:
-                logging.error(f"User not found for stripe_customer_id {customer_id} during payment_failed event.")
+                logging.error('main.stripe_webhook.event_11758')
         else:
-            logging.error(f"Customer ID missing in invoice.payment_failed event.")
+            logging.error('main.stripe_webhook.event_11760')
     elif event_type == 'invoice.voided':
         invoice = event['data']['object']
         if not is_connected_account_event:
@@ -11880,14 +11979,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         )
         metadata = payment_intent.get("metadata") or {}
         user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
-        logging.info(
-            "[Stripe Webhook] payment_intent.succeeded id=%s connected=%s resolved_user_id=%s person_id=%s metadata_keys=%s",
-            payment_intent.get("id"),
-            is_connected_account_event,
-            user_id,
-            metadata.get("person_id"),
-            sorted(metadata.keys()),
-        )
+        logging.info('main.stripe_webhook.event_11775')
         if user_id:
             emit_payment_trigger("payment_received", {
                 "payment_intent": payment_intent,
@@ -12048,11 +12140,11 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 
                 supabase.table('users').update(update_data).eq('id', user_id).execute()
                 sync_business_plan_entitlement(user_id, "free", reset_usage=True)
-                logging.info(f"User {user_id} (customer {customer_id}) subscription deleted. Status set to 'canceled'. Subscription ID: {subscription_id}")
+                logging.info('main.stripe_webhook.event_11936')
             else:
-                logging.warning(f"User not found for stripe_customer_id {customer_id} during customer.subscription.deleted event.")
+                logging.warning('main.stripe_webhook.event_11938')
         else:
-            logging.error(f"Missing customer_id or subscription_id in customer.subscription.deleted event.")
+            logging.error('main.stripe_webhook.event_11940')
     return {"status": "success"}
 
 
@@ -12073,7 +12165,7 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Current Nodemere legal terms must be accepted to create an account.",
             )
-        auth_response = supabase.auth.sign_up({"email": auth_data.email, "password": auth_data.password})
+        auth_response = new_auth_client().auth.sign_up({"email": auth_data.email, "password": auth_data.password})
         if not auth_response.user:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Supabase signup failed")
         
@@ -12104,23 +12196,23 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
     except HTTPException:
         raise
     except AuthApiError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.get("/users/me", tags=["Users"])
 async def read_current_user(current_user: dict = Depends(get_current_user)):
-    logging.info(f"read_current_user called for user ID: {current_user.id}")
+    logging.info('main.read_current_user.event_12187')
     try:
         response = supabase_admin.table('users').select('*').eq('id', str(current_user.id)).limit(1).execute()
-        logging.info(f"Supabase select response (raw): {response}")
+        logging.info('main.read_current_user.event_12089')
         
         if not response.data or not response.data[0]:
-            logging.info(f"User profile not found in public.users for ID: {current_user.id}. Attempting to create default profile.")
+            logging.info('main.read_current_user.event_12027')
             
             user_email = current_user.email
             user_metadata = getattr(current_user, "user_metadata", {}) or {}
-            logging.info(f"Retrieved email from current_user object: {user_email}")
+            logging.info('main.read_current_user.event_12031')
 
             profile_data = {
                 "id": str(current_user.id),
@@ -12129,13 +12221,13 @@ async def read_current_user(current_user: dict = Depends(get_current_user)):
                 "phone": user_metadata.get("phone"),
                 "onboarded": False,
             }
-            logging.info(f"Prepared profile_data for insertion: {profile_data}")
+            logging.info('main.read_current_user.event_12040')
             
             insert_response = supabase_admin.table('users').insert(profile_data).execute()
-            logging.info(f"Supabase insert response: {insert_response}")
+            logging.info('main.read_current_user.event_12043')
 
             if not insert_response.data:
-                logging.error(f"Failed to create user profile in public.users for ID: {current_user.id}. Supabase response: {insert_response.error}")
+                logging.error('main.read_current_user.event_12040')
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create user profile after OAuth login.")
             
             # Return the newly created profile
@@ -12143,8 +12235,8 @@ async def read_current_user(current_user: dict = Depends(get_current_user)):
         
         return UserResponse.model_validate(response.data[0]).model_dump()
     except Exception as e:
-        logging.error(f"Error in read_current_user for user {current_user.id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.read_current_user.event_12054')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 
 @app.get("/users/me/privacy-requests", tags=["Users"])
@@ -12165,6 +12257,11 @@ async def create_privacy_request(payload: dict, current_user: dict = Depends(get
     request_type = str((payload or {}).get("request_type") or "").strip().lower()
     if request_type not in {"access", "deletion", "correction"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="request_type must be access, deletion, or correction")
+    if request_type == "deletion":
+        from .authorization import authorize_account_closure
+        authorize_account_closure(getattr(supabase_admin,'raw',supabase_admin), str(current_user.id), getattr(current_user,'nodemere_aal','aal1'))
+    elif request_type == "access" and getattr(current_user,'nodemere_aal','aal1') != 'aal2':
+        raise HTTPException(403,'Verify your authenticator before requesting an export')
     details = str((payload or {}).get("details") or "").strip()[:2000] or None
     existing = (
         supabase_admin.table("account_data_requests")
@@ -12194,6 +12291,8 @@ async def create_privacy_request(payload: dict, current_user: dict = Depends(get
 
 @app.post("/users/me/account/close", tags=["Users"])
 async def close_account(current_user: dict = Depends(get_current_user)):
+    from .authorization import authorize_account_closure
+    authorize_account_closure(getattr(supabase_admin,'raw',supabase_admin), str(current_user.id), getattr(current_user,'nodemere_aal','aal1'))
     user_id = str(current_user.id)
     profile_response = (
         supabase_admin.table("users")
@@ -12279,12 +12378,12 @@ async def accept_legal_terms(
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Unable to record legal acceptance for user %s: %s", current_user_id, exc, exc_info=True)
+        logging.error('main.accept_legal_terms.event_12190')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to record legal acceptance.") from exc
 
 @app.get("/users/me/integrations", response_model=List[UserIntegrationResponse], tags=["Users"])
 async def list_user_integrations(current_user: dict = Depends(get_current_user)):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     try:
         rows = (
             supabase_admin.table("integrations")
@@ -12318,7 +12417,7 @@ async def list_user_integrations(current_user: dict = Depends(get_current_user))
         ]
         return [integration.model_dump() for integration in integrations]
     except Exception as e:
-        logging.error(f"Failed to list integrations for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.list_user_integrations.event_12229')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load integrations.")
 
 @app.put("/users/me/integrations/{provider}", response_model=UserIntegrationResponse, tags=["Users"])
@@ -12331,20 +12430,14 @@ async def upsert_user_integration(
     if provider not in SUPPORTED_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
 
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     if provider == "stripe":
         require_payment_access(current_user_id)
-    update_data = payload.model_dump(exclude_unset=True)
+    # Connection identity, scopes, status and metadata are written only by the
+    # server-side authorize/callback/disconnect flows. The UI may select providers.
+    update_data = payload.model_dump(exclude_unset=True, include={"selected"})
 
     try:
-        if "status" in update_data and not update_data["status"]:
-            update_data["status"] = "not_connected"
-        if "provider_metadata" in update_data and update_data["provider_metadata"] is None:
-            update_data["provider_metadata"] = {}
-        if "scopes" in update_data and update_data["scopes"] is None:
-            update_data["scopes"] = []
-        if "selected" in update_data and update_data["selected"] and not update_data.get("status"):
-            update_data["status"] = "selected"
         saved = _upsert_integration_row(current_user_id, provider, update_data)
         return UserIntegrationResponse.model_validate(
             _serialize_public_integration(saved, current_user_id)
@@ -12352,7 +12445,7 @@ async def upsert_user_integration(
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"Failed to save {provider} integration for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.upsert_user_integration.event_12257')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save integration.")
 
 @app.get("/users/me/integrations/{provider}/authorize", response_model=IntegrationAuthorizeResponse, tags=["Users"])
@@ -12367,14 +12460,14 @@ async def authorize_user_integration(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
 
     if provider == "stripe":
-        require_payment_access(str(current_user.id))
+        require_payment_access(business_owner_id(current_user))
 
     if provider == "gmail":
         if not google_client_id or not google_client_secret:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Google OAuth is not configured.")
 
         redirect_uri = _get_google_redirect_uri(request)
-        state_token = _build_integration_state(str(current_user.id), provider, return_to)
+        state_token = _build_integration_state(business_owner_id(current_user), provider, return_to)
         params = {
             "client_id": google_client_id,
             "redirect_uri": redirect_uri,
@@ -12391,7 +12484,7 @@ async def authorize_user_integration(
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Outlook OAuth is not configured.")
 
         redirect_uri = _get_outlook_redirect_uri(request)
-        state_token = _build_integration_state(str(current_user.id), provider, return_to)
+        state_token = _build_integration_state(business_owner_id(current_user), provider, return_to)
         params = {
             "client_id": outlook_client_id,
             "redirect_uri": redirect_uri,
@@ -12405,7 +12498,7 @@ async def authorize_user_integration(
     elif provider == "stripe":
         if is_payment_test_mode():
             _upsert_integration_row(
-                str(current_user.id),
+                business_owner_id(current_user),
                 provider,
                 {
                     "selected": True,
@@ -12425,7 +12518,7 @@ async def authorize_user_integration(
             _stripe_platform_api_key()
 
             redirect_uri = _get_stripe_redirect_uri(request)
-            state_token = _build_integration_state(str(current_user.id), provider, return_to)
+            state_token = _build_integration_state(business_owner_id(current_user), provider, return_to)
             params = {
                 "client_id": _stripe_connect_client_id(),
                 "redirect_uri": redirect_uri,
@@ -12440,7 +12533,7 @@ async def authorize_user_integration(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create authorization URL.")
     if not (provider == "stripe" and is_payment_test_mode()):
         _upsert_integration_row(
-            str(current_user.id),
+            business_owner_id(current_user),
             provider,
             {
                 "selected": True,
@@ -12466,11 +12559,11 @@ async def gmail_integration_callback(
 
     try:
         if error:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
         if not code or not state:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth callback parameters.")
 
-        state_payload = _decode_integration_state(state)
+        state_payload = _decode_integration_state(state, "gmail")
         user_id = str(state_payload["sub"])
         frontend_target = state_payload.get("return_to") or frontend_target
         redirect_uri = _get_google_redirect_uri(request)
@@ -12525,22 +12618,22 @@ async def gmail_integration_callback(
     except HTTPException as exc:
         message = exc.detail
     except Exception as exc:
-        logging.error(f"Failed Gmail OAuth callback: {exc}", exc_info=True)
+        logging.error('main.gmail_integration_callback.event_12430')
         message = "Gmail could not be connected."
 
-    callback_payload = json.dumps({
+    callback_payload = script_safe_json({
         "type": "sonar.integration.oauth_complete",
         "provider": "gmail",
         "success": success,
         "message": message,
     })
-    safe_target = json.dumps(frontend_target)
+    safe_target = script_safe_json(frontend_target)
     html = f"""
     <!doctype html>
     <html>
       <body style="font-family: Inter, sans-serif; background:#09090b; color:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;">
         <div style="text-align:center;">
-          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{message}</div>
+          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{escape_html(str(message))}</div>
           <div style="font-size:13px; color:rgba(255,255,255,0.6);">You can close this window.</div>
         </div>
         <script>
@@ -12580,11 +12673,11 @@ async def outlook_integration_callback(
 
     try:
         if error:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
         if not code or not state:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth callback parameters.")
 
-        state_payload = _decode_integration_state(state)
+        state_payload = _decode_integration_state(state, "outlook")
         user_id = str(state_payload["sub"])
         frontend_target = state_payload.get("return_to") or frontend_target
         redirect_uri = _get_outlook_redirect_uri(request)
@@ -12638,22 +12731,22 @@ async def outlook_integration_callback(
     except HTTPException as exc:
         message = exc.detail
     except Exception as exc:
-        logging.error(f"Failed Outlook OAuth callback: {exc}", exc_info=True)
+        logging.error('main.outlook_integration_callback.event_12543')
         message = "Outlook could not be connected."
 
-    callback_payload = json.dumps({
+    callback_payload = script_safe_json({
         "type": "sonar.integration.oauth_complete",
         "provider": "outlook",
         "success": success,
         "message": message,
     })
-    safe_target = json.dumps(frontend_target)
+    safe_target = script_safe_json(frontend_target)
     html = f"""
     <!doctype html>
     <html>
       <body style="font-family: Inter, sans-serif; background:#09090b; color:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;">
         <div style="text-align:center;">
-          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{message}</div>
+          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{escape_html(str(message))}</div>
           <div style="font-size:13px; color:rgba(255,255,255,0.6);">You can close this window.</div>
         </div>
         <script>
@@ -12692,11 +12785,11 @@ async def stripe_integration_callback(
 
     try:
         if error:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_description or error)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
         if not code or not state:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth callback parameters.")
 
-        state_payload = _decode_integration_state(state)
+        state_payload = _decode_integration_state(state, "stripe")
         user_id = str(state_payload["sub"])
         frontend_target = state_payload.get("return_to") or frontend_target
         require_payment_access(user_id)
@@ -12747,22 +12840,22 @@ async def stripe_integration_callback(
     except HTTPException as exc:
         message = exc.detail
     except Exception as exc:
-        logging.error("Failed Stripe OAuth callback: %s", exc, exc_info=True)
+        logging.error('main.stripe_integration_callback.event_12652')
         message = "Stripe could not be connected."
 
-    callback_payload = json.dumps({
+    callback_payload = script_safe_json({
         "type": "sonar.integration.oauth_complete",
         "provider": "stripe",
         "success": success,
         "message": message,
     })
-    safe_target = json.dumps(frontend_target)
+    safe_target = script_safe_json(frontend_target)
     html = f"""
     <!doctype html>
     <html>
       <body style="font-family: Inter, sans-serif; background:#09090b; color:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;">
         <div style="text-align:center;">
-          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{message}</div>
+          <div style="font-size:18px; font-weight:600; margin-bottom:8px;">{escape_html(str(message))}</div>
           <div style="font-size:13px; color:rgba(255,255,255,0.6);">You can close this window.</div>
         </div>
         <script>
@@ -12792,7 +12885,7 @@ async def disconnect_user_integration(provider: str, current_user: dict = Depend
     provider = provider.lower().strip()
     if provider not in SUPPORTED_INTEGRATION_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration provider not supported.")
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
     if provider == "stripe":
         _deauthorize_stripe_integration(_fetch_integration_row(current_user_id, provider))
     _upsert_integration_row(
@@ -12823,20 +12916,20 @@ async def list_integration_messages(
 
     if provider == "outlook":
         params = {"$top": limit, "$select": "id,conversationId,subject,from,toRecipients,bodyPreview,receivedDateTime,body", "$orderby": "receivedDateTime desc"}
-        response = _outlook_api_request(str(current_user.id), "GET", GRAPH_MESSAGES_URL, params=params)
+        response = _outlook_api_request(business_owner_id(current_user), "GET", GRAPH_MESSAGES_URL, params=params)
         if not response.ok:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Outlook messages.")
         values = response.json().get("value") or []
         messages = [IntegrationEmailListItem.model_validate(_parse_outlook_message(msg)).model_dump() for msg in values]
     else:
-        response = _gmail_api_request(str(current_user.id), "GET", GMAIL_MESSAGES_URL, params={"maxResults": limit})
+        response = _gmail_api_request(business_owner_id(current_user), "GET", GMAIL_MESSAGES_URL, params={"maxResults": limit})
         if not response.ok:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to load Gmail messages.")
         message_refs = response.json().get("messages") or []
         messages = []
         for ref in message_refs:
             msg_response = _gmail_api_request(
-                str(current_user.id),
+                business_owner_id(current_user),
                 "GET",
                 f"{GMAIL_MESSAGES_URL}/{ref.get('id')}",
                 params={"format": "full"},
@@ -12859,7 +12952,7 @@ async def get_integration_message(
 
     if provider == "outlook":
         response = _outlook_api_request(
-            str(current_user.id),
+            business_owner_id(current_user),
             "GET",
             f"{GRAPH_MESSAGES_URL}/{message_id}",
         )
@@ -12869,7 +12962,7 @@ async def get_integration_message(
         # Fetch full body if truncated
         if (result.get("body") or {}).get("contentType") != "text":
             body_response = _outlook_api_request(
-                str(current_user.id),
+                business_owner_id(current_user),
                 "GET",
                 f"{GRAPH_MESSAGES_URL}/{message_id}?$select=id,body",
             )
@@ -12880,7 +12973,7 @@ async def get_integration_message(
         return IntegrationEmailMessageResponse.model_validate(_parse_outlook_message(result)).model_dump()
     else:
         response = _gmail_api_request(
-            str(current_user.id),
+            business_owner_id(current_user),
             "GET",
             f"{GMAIL_MESSAGES_URL}/{message_id}",
             params={"format": "full"},
@@ -12901,9 +12994,9 @@ async def send_integration_email(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email sending is not available for this provider.")
 
     if provider == "outlook":
-        result = _send_outlook_email_for_user(str(current_user.id), payload.to, payload.subject, payload.body)
+        result = _send_outlook_email_for_user(business_owner_id(current_user), payload.to, payload.subject, payload.body)
     else:
-        result = _send_gmail_email_for_user(str(current_user.id), payload.to, payload.subject, payload.body)
+        result = _send_gmail_email_for_user(business_owner_id(current_user), payload.to, payload.subject, payload.body)
     return {
         "id": result.get("id"),
         "thread_id": result.get("thread_id") or result.get("threadId"),
@@ -12913,7 +13006,7 @@ async def send_integration_email(
 @app.put("/users/me", tags=["Users"])
 async def update_user_profile(user_update_data: UserUpdate, current_user: dict = Depends(get_current_user)):
     current_user_id = current_user.id
-    update_data = user_update_data.model_dump(exclude_unset=True)
+    update_data = user_update_data.model_dump(exclude_unset=True, include={"full_name", "phone", "pref_card_size", "hide_tutorial_modal"})
     if not update_data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No update data provided")
     
@@ -12932,7 +13025,7 @@ async def update_user_profile(user_update_data: UserUpdate, current_user: dict =
 
         return UserResponse.model_validate(user_data).model_dump()
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.post("/users/me/login-status", status_code=status.HTTP_204_NO_CONTENT, tags=["Users"])
 async def update_login_status(status_update: LoginStatusUpdate, current_user: dict = Depends(get_current_user)):
@@ -12941,7 +13034,7 @@ async def update_login_status(status_update: LoginStatusUpdate, current_user: di
         update_data = status_update.model_dump()
         supabase.table('users').update(update_data).eq('id', str(current_user_id)).execute()
     except Exception as e:
-        logging.error(f"ERROR: Could not update login status for user {current_user_id}: {e}")
+        logging.error('main.update_login_status.event_12846')
 
 @app.post("/users/me/onboarding/prepare", status_code=status.HTTP_200_OK, tags=["Users"])
 async def prepare_onboarding(current_user: dict = Depends(get_current_user)):
@@ -12967,7 +13060,7 @@ async def prepare_onboarding(current_user: dict = Depends(get_current_user)):
             supabase_admin.table('users').insert(profile_data).execute()
         return {"ready": True, "user_id": current_user_id}
     except Exception as e:
-        logging.error(f"Failed to prepare onboarding for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.prepare_onboarding.event_12872')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to prepare onboarding data.",
@@ -12979,7 +13072,7 @@ async def complete_onboarding(
     request: Request,
     current_user: dict = Depends(get_current_user),
 ):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
 
     try:
         if onboarding_data.mark_onboarded and not (onboarding_data.business_name or '').strip():
@@ -13099,10 +13192,10 @@ async def complete_onboarding(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail='The request could not be completed',
         )
     except Exception as e:
-        logging.error(f"Failed to complete onboarding for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.complete_onboarding.event_13007')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save onboarding data.",
@@ -13113,7 +13206,7 @@ async def complete_onboarding(
 async def get_business_forwarding(
     current_user: dict = Depends(get_current_user),
 ):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
 
     try:
         business = get_business_record_for_user(current_user_id)
@@ -13156,7 +13249,7 @@ async def get_business_forwarding(
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"Failed to load forwarding config for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.get_business_forwarding.event_13061')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to load forwarding settings.",
@@ -13172,7 +13265,7 @@ async def search_business_forwarding_numbers(
     limit: int = 100,
     current_user: dict = Depends(get_current_user),
 ):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
 
     try:
         business = get_business_record_for_user(current_user_id)
@@ -13203,7 +13296,7 @@ async def search_business_forwarding_numbers(
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Failed to search forwarding numbers for user %s: %s", current_user_id, exc, exc_info=True)
+        logging.error('main.search_business_forwarding_numbers.event_13108')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to load available phone numbers.",
@@ -13215,17 +13308,11 @@ async def claim_business_forwarding_number(
     payload: BusinessForwardingNumberClaimRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
 
     try:
         business = get_business_record_for_user(current_user_id)
-        logging.info(
-            "Claim forwarding number requested user_id=%s business_id=%s requested_number=%s current_active_number=%s",
-            current_user_id,
-            business.get("id"),
-            normalize_phone_number(payload.phone_number),
-            business.get("twilio_number"),
-        )
+        logging.info('main.claim_business_forwarding_number.event_13189')
         previous_active_purchased_number = get_active_purchased_number_for_business(
             int(business["id"]),
             kind="assigned_line",
@@ -13238,13 +13325,7 @@ async def claim_business_forwarding_number(
             payload.phone_number,
             payload.label or business.get("name") or "Dedicated forwarding line",
         )
-        logging.info(
-            "Forwarding number purchased and saved business_id=%s purchased_number=%s purchased_row_id=%s incoming_sid=%s",
-            business.get("id"),
-            purchased.get("phone_number"),
-            purchased_row.get("id") if isinstance(purchased_row, dict) else None,
-            purchased.get("sid"),
-        )
+        logging.info('main.claim_business_forwarding_number.event_13208')
 
         elevenlabs_business = ensure_elevenlabs_phone_number_for_business(updated_business)
         phone_number_id = elevenlabs_business.get("elevenlabs_phone_number_id") or find_elevenlabs_phone_number(
@@ -13254,12 +13335,7 @@ async def claim_business_forwarding_number(
             phone_number_id = phone_number_id.get("phone_number_id")
 
         if not phone_number_id:
-            logging.warning(
-                "Forwarding number setup failed before quality test business_id=%s purchased_number=%s incoming_sid=%s reason=missing_elevenlabs_phone_number_id",
-                business.get("id"),
-                purchased.get("phone_number"),
-                purchased.get("sid"),
-            )
+            logging.warning('main.claim_business_forwarding_number.event_13147')
             release_twilio_number_by_sid(purchased.get("sid"))
             save_purchased_number_record(
                 int(business["id"]),
@@ -13285,25 +13361,11 @@ async def claim_business_forwarding_number(
             str(phone_number_id),
             payload.label or elevenlabs_business.get("name") or "Dedicated forwarding line",
         )
-        logging.info(
-            "Forwarding number quality test started business_id=%s purchased_number=%s phone_number_id=%s call_sid=%s",
-            business.get("id"),
-            purchased.get("phone_number"),
-            phone_number_id,
-            test_call.get("callSid") or test_call.get("call_sid"),
-        )
+        logging.info('main.claim_business_forwarding_number.event_13255')
         quality_result = await wait_for_twilio_quality_test_result(
             test_call.get("callSid") or test_call.get("call_sid")
         )
-        logging.info(
-            "Forwarding number quality test completed business_id=%s purchased_number=%s phone_number_id=%s passed=%s status=%s technical_reason=%s",
-            business.get("id"),
-            purchased.get("phone_number"),
-            phone_number_id,
-            quality_result.get("passed"),
-            quality_result.get("status"),
-            quality_result.get("technical_reason"),
-        )
+        logging.info('main.claim_business_forwarding_number.event_13265')
 
         if not quality_result.get("passed"):
             delete_elevenlabs_phone_number(str(phone_number_id))
@@ -13327,15 +13389,7 @@ async def claim_business_forwarding_number(
                 },
             )
             cleared_business = hydrate_business_with_purchased_number_data(business) or business
-            logging.warning(
-                "Forwarding number quality test failed and cleaned up business_id=%s purchased_number=%s incoming_sid=%s phone_number_id=%s message=%s technical_reason=%s",
-                business.get("id"),
-                purchased.get("phone_number"),
-                purchased.get("sid"),
-                phone_number_id,
-                failure_message,
-                quality_result.get("technical_reason"),
-            )
+            logging.warning('main.claim_business_forwarding_number.event_13206')
 
             return {
                 "ok": False,
@@ -13372,14 +13426,7 @@ async def claim_business_forwarding_number(
         ):
             delete_elevenlabs_phone_number(str(previous_elevenlabs_phone_number_id))
         activated_business = hydrate_business_with_purchased_number_data(business) or business
-        logging.info(
-            "Forwarding number activated business_id=%s active_number=%s incoming_sid=%s phone_number_id=%s activated_row_id=%s",
-            business.get("id"),
-            activated_business.get("twilio_number"),
-            purchased.get("sid"),
-            phone_number_id,
-            activated_row.get("id") if isinstance(activated_row, dict) else None,
-        )
+        logging.info('main.claim_business_forwarding_number.event_13342')
 
         push_live_event(
             "Dedicated Twilio number passed quality check.",
@@ -13410,7 +13457,7 @@ async def claim_business_forwarding_number(
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Failed to claim forwarding number for user %s: %s", current_user_id, exc, exc_info=True)
+        logging.error('main.claim_business_forwarding_number.event_13282')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to set up that phone number.",
@@ -13422,7 +13469,7 @@ async def start_business_forwarding_caller_id_verification(
     payload: BusinessCallerIdVerificationStartRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    current_user_id = str(current_user.id)
+    current_user_id = business_owner_id(current_user)
 
     try:
         if not get_system_verify_caller_id_enabled():
@@ -13518,7 +13565,7 @@ async def start_business_forwarding_caller_id_verification(
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error("Failed to start caller ID verification for user %s: %s", current_user_id, exc, exc_info=True)
+        logging.error('main.start_business_forwarding_caller_id_verification.event_13390')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to start caller ID verification.",
@@ -13544,7 +13591,7 @@ async def twilio_outgoing_caller_id_status(request: Request):
         response = supabase.table("businesses").select("id,name,forwarding_config").execute()
         businesses = response.data or []
     except Exception as exc:
-        logging.error("Failed to load businesses for caller ID status callback: %s", exc, exc_info=True)
+        logging.error('main.twilio_outgoing_caller_id_status.event_13397')
         return Response(status_code=200)
 
     for business in businesses:
@@ -13769,7 +13816,7 @@ async def update_business_forwarding(
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"Failed to update forwarding config for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.update_business_forwarding.event_13622')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save forwarding settings.",
@@ -13788,10 +13835,10 @@ async def get_leads_for_user(current_user: dict = Depends(get_current_user)):
         ).execute()
         return response.data
     except Exception as e:
-        logging.error(f"Failed to get leads for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.get_leads_for_user.event_13641')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail=f"An internal error occurred while fetching leads: {str(e)}"
+            detail='The request could not be completed'
         )
 
 @app.post("/leads", response_model=LeadResponse, status_code=status.HTTP_201_CREATED, tags=["Leads"])
@@ -13805,7 +13852,7 @@ async def create_lead_for_user(lead_data: LeadCreate, current_user: dict = Depen
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create lead")
         return response.data[0]
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.put("/leads/{lead_id}", response_model=LeadResponse, tags=["Leads"])
 async def update_lead_for_user(lead_id: UUID, lead_update_data: LeadUpdate, current_user: dict = Depends(get_current_user)):
@@ -13832,8 +13879,8 @@ async def update_lead_for_user(lead_id: UUID, lead_update_data: LeadUpdate, curr
         
         return LeadResponse.model_validate(response.data[0]).model_dump()
     except Exception as e:
-        logging.error(f"AN ERROR OCCURRED during lead update for user {current_user_id} and lead {lead_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred during lead update: {str(e)}")
+        logging.error('main.update_lead_for_user.event_13685')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.delete("/leads/{lead_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Leads"])
 async def delete_lead_for_user(lead_id: UUID, current_user: dict = Depends(get_current_user)):
@@ -13844,7 +13891,7 @@ async def delete_lead_for_user(lead_id: UUID, current_user: dict = Depends(get_c
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found or you do not have permission to delete it.")
         supabase.table('leads').delete().eq('id', str(lead_id)).execute()
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 # --- Purchases Endpoints ---
 @app.post("/purchases", response_model=PurchaseResponse, status_code=status.HTTP_201_CREATED, tags=["Purchases"])
@@ -13853,16 +13900,16 @@ async def create_purchase(purchase_data: PurchaseCreate, current_user: dict = De
     try:
         lead_owner_check = supabase.table('leads').select('user').eq('id', str(purchase_data.lead)).single().execute()
     except Exception as e:
-        logging.error(f"DATABASE ERROR during lead ownership check for lead {purchase_data.lead}: {e}")
+        logging.error('main.create_purchase.event_13706')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error checking lead ownership.")
 
     if not lead_owner_check.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Lead {purchase_data.lead} not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The request could not be completed')
 
     lead_owner_id = lead_owner_check.data['user']
 
     if str(lead_owner_id) != str(current_user_id):
-        logging.warning(f"PERMISSION DENIED: User '{current_user_id}' does not own lead '{purchase_data.lead}'. Owner is '{lead_owner_id}'.")
+        logging.warning('main.create_purchase.event_13832')
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
 
     new_purchase = purchase_data.model_dump()
@@ -13880,8 +13927,8 @@ async def create_purchase(purchase_data: PurchaseCreate, current_user: dict = De
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create purchase")
         return response.data[0]
     except Exception as e:
-        logging.error(f"DATABASE ERROR creating purchase for lead {purchase_data.lead}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.create_purchase.event_13733')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.put("/purchases/{purchase_id}", response_model=PurchaseResponse, tags=["Purchases"])
 async def update_purchase(purchase_id: UUID, purchase_update: PurchaseUpdate, current_user: dict = Depends(get_current_user)):
@@ -13889,11 +13936,11 @@ async def update_purchase(purchase_id: UUID, purchase_update: PurchaseUpdate, cu
     try:
         owner_check = supabase.table('purchases').select('user').eq('id', str(purchase_id)).single().execute()
     except Exception as e:
-        logging.error(f"DATABASE ERROR during ownership check for purchase {purchase_id}: {e}")
+        logging.error('main.update_purchase.event_13742')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error checking purchase ownership.")
 
     if not owner_check.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Purchase {purchase_id} not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The request could not be completed')
 
     if str(owner_check.data['user']) != str(current_user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
@@ -13911,7 +13958,7 @@ async def update_purchase(purchase_id: UUID, purchase_update: PurchaseUpdate, cu
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase not found or update failed")
         return response.data[0]
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.delete("/purchases/{purchase_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Purchases"])
 async def delete_purchase(purchase_id: UUID, current_user: dict = Depends(get_current_user)):
@@ -13919,7 +13966,7 @@ async def delete_purchase(purchase_id: UUID, current_user: dict = Depends(get_cu
     try:
         owner_check = supabase.table('purchases').select('user').eq('id', str(purchase_id)).single().execute()
     except Exception as e:
-        logging.error(f"DATABASE ERROR during ownership check for purchase {purchase_id}: {e}")
+        logging.error('main.delete_purchase.event_13772')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error checking purchase ownership.")
     
     if not owner_check.data:
@@ -13931,7 +13978,7 @@ async def delete_purchase(purchase_id: UUID, current_user: dict = Depends(get_cu
     try:
         supabase.table('purchases').delete().eq('id', str(purchase_id)).execute()
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 # =============================================================================
 # HELPDESK ENDPOINTS
@@ -13948,8 +13995,8 @@ async def submit_helpdesk_message(message_data: HelpdeskMessage):
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to submit helpdesk message")
         return {"message": "Helpdesk message submitted successfully!"}
     except Exception as e:
-        logging.error(f"Error submitting helpdesk message: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.submit_helpdesk_message.event_13801')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
     
 
 
@@ -13969,7 +14016,7 @@ async def get_available_ai_agents(current_user: dict = Depends(get_current_user)
         
         return response.data
     except Exception as e:
-        logging.error(f"Error getting available AI agents for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.get_available_ai_agents.event_13822')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve AI agents")
 
 # =============================================================================
@@ -13987,8 +14034,8 @@ async def create_campaign(campaign_data: CampaignCreate, current_user: dict = De
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create campaign")
         return response.data[0]
     except Exception as e:
-        logging.error(f"Error creating campaign for user {current_user_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.create_campaign.event_13840')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.get("/campaigns", response_model=List[CampaignResponse], tags=["Campaigns"])
 async def get_campaigns(current_user: dict = Depends(get_current_user)):
@@ -13997,7 +14044,7 @@ async def get_campaigns(current_user: dict = Depends(get_current_user)):
         response = supabase.table('campaigns').select('*').eq('user', str(current_user_id)).execute()
         return response.data
     except Exception as e:
-        logging.error(f"Error getting campaigns for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.get_campaigns.event_13850')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve campaigns")
 
 @app.get("/campaigns/{campaign_id}", response_model=CampaignResponse, tags=["Campaigns"])
@@ -14009,7 +14056,7 @@ async def get_campaign(campaign_id: UUID, current_user: dict = Depends(get_curre
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found or permission denied")
         return response.data
     except Exception as e:
-        logging.error(f"Error getting campaign {campaign_id} for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.get_campaign.event_13862')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve campaign")
 
 @app.put("/campaigns/{campaign_id}", response_model=CampaignResponse, tags=["Campaigns"])
@@ -14029,7 +14076,7 @@ async def update_campaign(campaign_id: UUID, campaign_data: CampaignUpdate, curr
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign update failed")
         return response.data[0]
     except Exception as e:
-        logging.error(f"Error updating campaign {campaign_id} for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.update_campaign.event_13882')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update campaign")
 
 @app.delete("/campaigns/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Campaigns"])
@@ -14042,7 +14089,7 @@ async def delete_campaign(campaign_id: UUID, current_user: dict = Depends(get_cu
 
         supabase.table('campaigns').delete().eq('id', str(campaign_id)).execute()
     except Exception as e:
-        logging.error(f"Error deleting campaign {campaign_id} for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.delete_campaign.event_13895')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete campaign")
 
 # =============================================================================
@@ -14058,8 +14105,8 @@ async def create_prize(prize_data: PrizeCreate, current_rep_id: str = Depends(ge
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create prize")
         return response.data[0]
     except Exception as e:
-        logging.error(f"Error creating prize for rep {current_rep_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.create_prize.event_13911')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.get("/prizes", response_model=List[PrizeResponse], tags=["Prizes"])
 async def get_all_prizes(current_rep_id: str = Depends(get_current_rep)):
@@ -14067,7 +14114,7 @@ async def get_all_prizes(current_rep_id: str = Depends(get_current_rep)):
         response = supabase.table('prizes').select('*').execute()
         return response.data
     except Exception as e:
-        logging.error(f"Error getting all prizes for rep {current_rep_id}: {e}", exc_info=True)
+        logging.error('main.get_all_prizes.event_13920')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve prizes")
 
 @app.get("/prizes/{prize_id}", response_model=PrizeResponse, tags=["Prizes"])
@@ -14078,7 +14125,7 @@ async def get_prize(prize_id: UUID, current_rep_id: str = Depends(get_current_re
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prize not found")
         return response.data
     except Exception as e:
-        logging.error(f"Error getting prize {prize_id} for rep {current_rep_id}: {e}", exc_info=True)
+        logging.error('main.get_prize.event_13931')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve prize")
 
 @app.put("/prizes/{prize_id}", response_model=PrizeResponse, tags=["Prizes"])
@@ -14093,7 +14140,7 @@ async def update_prize(prize_id: UUID, prize_data: PrizeUpdate, current_rep_id: 
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prize not found or update failed")
         return response.data[0]
     except Exception as e:
-        logging.error(f"Error updating prize {prize_id} for rep {current_rep_id}: {e}", exc_info=True)
+        logging.error('main.update_prize.event_13946')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update prize")
 
 @app.delete("/prizes/{prize_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Prizes"])
@@ -14103,31 +14150,31 @@ async def delete_prize(prize_id: UUID, current_rep_id: str = Depends(get_current
         if not response.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prize not found")
     except Exception as e:
-        logging.error(f"Error deleting prize {prize_id} for rep {current_rep_id}: {e}", exc_info=True)
+        logging.error('main.delete_prize.event_13956')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete prize")
 
 @app.post("/prizes/{prize_id}/redeem", response_model=RepResponse, tags=["Prizes"])
 async def redeem_prize(prize_id: UUID, current_rep_id: str = Depends(get_current_rep)):
-    logging.info(f"--- [REDEEM PRIZE] Redemption process started for prize_id: {prize_id} by rep_id: {current_rep_id} ---")
+    logging.info('main.redeem_prize.event_14179')
     try:
         # 1. Fetch prize details
-        logging.info(f"--- [REDEEM PRIZE] Fetching prize details for prize_id: {prize_id} ---")
+        logging.info('main.redeem_prize.event_14081')
         prize_response = supabase.table('prizes').select('name, points').eq('id', str(prize_id)).single().execute()
         
         if not prize_response.data:
-            logging.warning(f"--- [REDEEM PRIZE] Prize not found: {prize_id} ---")
+            logging.warning('main.redeem_prize.event_13968')
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prize not found.")
         
         prize = prize_response.data
         prize_cost = prize.get('points', 0)
-        logging.info(f"--- [REDEEM PRIZE] Prize found: {prize.get('name')}, Cost: {prize_cost} points ---")
+        logging.info('main.redeem_prize.event_14090')
 
         # 2. Fetch rep profile
-        logging.info(f"--- [REDEEM PRIZE] Fetching rep profile for rep_id: {current_rep_id} ---")
+        logging.info('main.redeem_prize.event_14093')
         rep_response = supabase.table('reps').select('id, points, first_name, last_name').eq('rep_id', current_rep_id).single().execute()
         
         if not rep_response.data:
-            logging.warning(f"--- [REDEEM PRIZE] Representative profile not found for rep_id: {current_rep_id} ---")
+            logging.warning('main.redeem_prize.event_13980')
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Representative profile not found.")
         
         rep = rep_response.data
@@ -14135,52 +14182,52 @@ async def redeem_prize(prize_id: UUID, current_rep_id: str = Depends(get_current
         rep_db_id = rep.get('id')
         rep_first_name = rep.get('first_name')
         rep_last_name = rep.get('last_name')
-        logging.info(f"--- [REDEEM PRIZE] Rep found: DB ID: {rep_db_id}, Current Points: {rep_current_points}, Name: {rep_first_name} {rep_last_name} ---")
+        logging.info('main.redeem_prize.event_14058')
 
         # 3. Check if rep has enough points
         if rep_current_points < prize_cost:
-            logging.warning(f"--- [REDEEM PRIZE] Insufficient points. Rep has {rep_current_points}, prize costs {prize_cost} ---")
+            logging.warning('main.redeem_prize.event_13992')
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient points to redeem this prize.")
 
         # 4. Deduct points from rep and increment prize purchases_count
         updated_rep_points = rep_current_points - prize_cost
-        logging.info(f"--- [REDEEM PRIZE] Updating rep points to {updated_rep_points} ---")
+        logging.info('main.redeem_prize.event_14067')
 
         # Update rep's points
         update_rep_response = supabase.table('reps').update({'points': updated_rep_points}).eq('id', rep_db_id).execute()
         if update_rep_response.data:
-            logging.info(f"--- [REDEEM PRIZE] Rep points updated successfully. ---")
+            logging.info('main.redeem_prize.event_14002')
         else:
-            logging.error(f"--- [REDEEM PRIZE] Failed to update rep points for rep_db_id: {rep_db_id}. Response: {update_rep_response} ---")
+            logging.error('main.redeem_prize.event_14004')
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update representative's points.")
         
         # Increment prize's purchases_count using RPC
-        logging.info(f"--- [REDEEM PRIZE] Calling RPC to increment prize purchases_count for prize_id: {prize_id} ---")
+        logging.info('main.redeem_prize.event_14078')
         rpc_response = supabase.rpc('increment_prize_purchases_count', {'prize_id_param': str(prize_id)}).execute()
-        logging.info(f"--- [REDEEM PRIZE] RPC 'increment_prize_purchases_count' executed successfully. Response data: {rpc_response.data} ---")
+        logging.info('main.redeem_prize.event_14080')
 
         # Add rep info to prize purchases JSONB column
         rep_purchase_info = {"first_name": rep_first_name, "last_name": rep_last_name, "redeemed_at": datetime.now(timezone.utc).isoformat()}
-        logging.info(f"--- [REDEEM PRIZE] Calling RPC to add rep info to prize purchases for prize_id: {prize_id} with info: {rep_purchase_info} ---")
+        logging.info('main.redeem_prize.event_14084')
         add_purchase_response = supabase.rpc('add_rep_to_prize_purchases', {'prize_id_param': str(prize_id), 'rep_info_param': rep_purchase_info}).execute()
-        logging.info(f"--- [REDEEM PRIZE] RPC 'add_rep_to_prize_purchases' executed successfully. Response data: {add_purchase_response.data} ---")
+        logging.info('main.redeem_prize.event_14086')
 
 
         # 5. Fetch and return updated rep profile
-        logging.info(f"--- [REDEEM PRIZE] Fetching updated rep profile for rep_id: {current_rep_id} ---")
+        logging.info('main.redeem_prize.event_14090')
         updated_rep_profile_response = supabase.table('reps').select('*').eq('rep_id', current_rep_id).single().execute()
         if not updated_rep_profile_response.data:
-            logging.error(f"--- [REDEEM PRIZE] Failed to retrieve updated rep profile for rep_id: {current_rep_id} after redemption. ---")
+            logging.error('main.redeem_prize.event_14023')
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve updated rep profile.")
         
-        logging.info(f"--- [REDEEM PRIZE] Prize redemption successful for rep_id: {current_rep_id}. New points: {updated_rep_profile_response.data.get('points')} ---")
+        logging.info('main.redeem_prize.event_14096')
         return RepResponse.model_validate(updated_rep_profile_response.data).model_dump()
 
     except HTTPException as e:
-        logging.error(f"--- [REDEEM PRIZE] HTTPException during redemption: {e.detail} (Status: {e.status_code}) ---", exc_info=True)
+        logging.error('main.redeem_prize.event_14030')
         raise e
     except Exception as e:
-        logging.error(f"--- [REDEEM PRIZE] An unexpected error occurred during prize redemption for prize_id {prize_id} by rep {current_rep_id}: {e} ---", exc_info=True)
+        logging.error('main.redeem_prize.event_14033')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An internal error occurred during prize redemption.")
 
 # =============================================================================
@@ -14193,7 +14240,7 @@ async def get_passwords_for_user(current_user: dict = Depends(get_current_user))
         response = supabase.table('passwords').select('id, account, username, password, phone, notes, user, isFavorite, tag, url, oauth, date_created, date_updated').eq('user', str(current_user_id)).execute()
         return response.data
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.post("/passwords", response_model=PasswordResponse, status_code=status.HTTP_201_CREATED, tags=["Passwords"])
 async def create_password_for_user(password_data: PasswordCreate, current_user: dict = Depends(get_current_user)):
@@ -14209,7 +14256,7 @@ async def create_password_for_user(password_data: PasswordCreate, current_user: 
 
     plan_response = supabase.table("plans").select("*").eq("plan", user_plan_name).single().execute()
     if not plan_response.data:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Plan '{user_plan_name}' not found.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='The request could not be completed')
     
     plan = plan_response.data
 
@@ -14231,7 +14278,7 @@ async def create_password_for_user(password_data: PasswordCreate, current_user: 
         if password_data.tag is not None:
             new_password_data['tag'] = password_data.tag
         
-        logging.info(f"Attempting to insert new password data: {new_password_data}") # Added logging
+        logging.info('main.create_password_for_user.event_14154') # Added logging
         insert_response = supabase.table('passwords').insert(new_password_data).execute()
         
         if not insert_response.data:
@@ -14241,7 +14288,7 @@ async def create_password_for_user(password_data: PasswordCreate, current_user: 
             
         return insert_response.data[0]
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.put("/passwords/{password_id}", response_model=PasswordResponse, tags=["Passwords"])
 async def update_password_for_user(password_id: UUID, password_update_data: PasswordUpdate, current_user: dict = Depends(get_current_user)):
@@ -14262,7 +14309,7 @@ async def update_password_for_user(password_id: UUID, password_update_data: Pass
         
         return PasswordResponse.model_validate(response.data[0]).model_dump()
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred during password update: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.delete("/passwords/{password_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Passwords"])
 async def delete_password_for_user(password_id: UUID, current_user: dict = Depends(get_current_user)):
@@ -14274,7 +14321,7 @@ async def delete_password_for_user(password_id: UUID, current_user: dict = Depen
         supabase.table('passwords').delete().eq('id', str(password_id)).execute()
 
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 # =============================================================================
 # LEAD CAMPAIGN ENDPOINTS (Analytics)
@@ -14294,7 +14341,7 @@ async def get_all_lead_campaigns(current_user: dict = Depends(get_current_user))
 
         return response.data
     except Exception as e:
-        logging.error(f"Failed to get lead-campaigns for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.get_all_lead_campaigns.event_14147')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not retrieve lead campaigns.")
 
 # =============================================================================
@@ -14311,8 +14358,8 @@ async def create_oauth_account(oauth_data: OAuthAccountCreate, current_user: dic
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create OAuth account")
         return response.data[0]
     except Exception as e:
-        logging.error(f"Error creating OAuth account for user {current_user_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.create_oauth_account.event_14164')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
 @app.get("/oauth", response_model=List[OAuthAccountResponse], tags=["OAuth"])
 async def get_oauth_accounts(current_user: dict = Depends(get_current_user)):
@@ -14321,7 +14368,7 @@ async def get_oauth_accounts(current_user: dict = Depends(get_current_user)):
         response = supabase.table('oauth').select('*').eq('user', str(current_user_id)).execute()
         return response.data
     except Exception as e:
-        logging.error(f"Error getting OAuth accounts for user {current_user_id}: {e}", exc_info=True)
+        logging.error('main.get_oauth_accounts.event_14174')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve OAuth accounts")
 
 @app.delete("/oauth/{oauth_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["OAuth"])
@@ -14334,5 +14381,5 @@ async def delete_oauth_account(oauth_id: UUID, current_user: dict = Depends(get_
         
         supabase.table('oauth').delete().eq('id', str(oauth_id)).execute()
     except Exception as e:
-        logging.error(f"Error deleting OAuth account {oauth_id} for user {current_user_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logging.error('main.delete_oauth_account.event_14187')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')

@@ -83,7 +83,7 @@ const MasterNav = () => {
   }, [location.pathname, navItems]);
 
   const handleNavigation = (path, index) => {
-    console.log('Navigating to:', path);
+    console.debug("MasterNav.jsx:event_86");
     navigate(path);
   };
 

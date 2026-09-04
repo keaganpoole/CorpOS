@@ -232,7 +232,7 @@ const CustomerExperienceFeedback = () => {
       if (result.data) setReview(result.data);
       return result.data || null;
     } catch (error) {
-      console.warn('[Customer feedback] Could not persist review state:', error.message);
+      console.warn("CustomerExperienceFeedback.jsx:event_235");
       return null;
     }
   }, [answers, businessId, context, review?.id, userId]);
@@ -299,7 +299,7 @@ const CustomerExperienceFeedback = () => {
             .limit(50);
           if (error && error.code !== 'PGRST116') {
             reviewLookupFailed = true;
-            console.warn('[Customer feedback] Review table is not available yet:', error.message);
+            console.warn("CustomerExperienceFeedback.jsx:event_302");
           } else {
             existingReviews = Array.isArray(data) ? data : [];
             existingReview = existingReviews[0] || null;
@@ -361,7 +361,7 @@ const CustomerExperienceFeedback = () => {
           }
         }
       } catch (error) {
-        console.warn('[Customer feedback] Could not load eligibility context:', error.message);
+        console.warn("CustomerExperienceFeedback.jsx:event_364");
       } finally {
         if (!cancelled) setIsReady(true);
       }

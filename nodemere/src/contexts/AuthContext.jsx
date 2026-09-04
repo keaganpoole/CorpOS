@@ -1,7 +1,8 @@
 // src/contexts/AuthContext.jsx — Sonar Auth (simplified, no Nodemere backend)
 
 import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase, setWorkforceContext } from '../supabaseClient';
+import { needsMfa } from '../lib/workforceSecurity';
 
 const AuthContext = createContext(null);
 
@@ -12,6 +13,36 @@ export const AuthProvider = ({ children }) => {
     const [isProfileLoaded, setIsProfileLoaded] = useState(false);
     const [isAppLoading, setIsAppLoading] = useState(false);
     const currentUserIdRef = useRef(null);
+    const [workforce, setWorkforce] = useState(null);
+    const refreshWorkforce = useCallback(async () => {
+        const { data } = await supabase.auth.getSession();
+        const active = data.session;
+        if (!active) { setWorkforce(null); setWorkforceContext(null); return null; }
+        try {
+            const response = await fetch(`${window.sonar?.apiUrl || import.meta.env.VITE_API_URL || ''}/api/workforce/session`, { headers: { Authorization: `Bearer ${active.access_token}` } });
+            if (!response.ok) throw new Error('Workforce access is unavailable. Check that the backend and security migrations are ready.');
+            const body = await response.json();
+            const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            if (assurance.error) throw new Error('Could not verify authentication assurance. Please sign in again.');
+            const value = { tenant: body.tenant, policy_requires_mfa: body.policy_requires_mfa, needsMfa: needsMfa(assurance.data, body.tenant) };
+            if (currentUserIdRef.current !== active.user.id) return null;
+            setWorkforceContext(body.tenant); setWorkforce(value); return value;
+        } catch (error) {
+            if (currentUserIdRef.current === active.user.id) { setWorkforceContext(null); setWorkforce({ error: error.message }); }
+            return null;
+        }
+    }, []);
+
+    useEffect(() => {
+        if (session?.access_token) refreshWorkforce();
+        else { setWorkforce(null); setWorkforceContext(null); }
+    }, [session?.access_token, refreshWorkforce]);
+    useEffect(() => {
+        if (!session?.user) return undefined;
+        const timer = setInterval(refreshWorkforce, 60000);
+        window.addEventListener('focus', refreshWorkforce);
+        return () => { clearInterval(timer); window.removeEventListener('focus', refreshWorkforce); };
+    }, [session?.user?.id, refreshWorkforce]);
 
     const ensureProfile = useCallback(async (user) => {
         const { data: existingProfile, error } = await supabase
@@ -65,6 +96,9 @@ export const AuthProvider = ({ children }) => {
                 setSession(nextSession ?? null);
 
                 if (!nextUserId) {
+                    setWorkforce(null);
+                    setWorkforceContext(null);
+                    supabase.removeAllChannels();
                     setProfile(null);
                     setIsProfileLoaded(true);
                     return;
@@ -99,7 +133,7 @@ export const AuthProvider = ({ children }) => {
                 if (!isCancelled) setProfile(data || null);
             })
             .catch((error) => {
-                console.error('[Auth] Failed to hydrate user profile:', error);
+                console.error("AuthContext.jsx:event_136");
                 if (!isCancelled) setProfile(null);
             })
             .finally(() => {
@@ -115,6 +149,8 @@ export const AuthProvider = ({ children }) => {
 
     const value = {
         session,
+        workforce,
+        refreshWorkforce,
         profile,
         isLoading,
         isAppLoading,
@@ -142,6 +178,10 @@ export const AuthProvider = ({ children }) => {
             if (error) throw error;
         },
         logout: async () => {
+            setWorkforce(null);
+            setWorkforceContext(null);
+            setProfile(null);
+            await supabase.removeAllChannels();
             await supabase.auth.signOut();
         },
     };

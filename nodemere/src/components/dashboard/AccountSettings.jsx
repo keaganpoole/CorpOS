@@ -55,7 +55,7 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      console.error('Error logging out:', error.message);
+      console.error("AccountSettings.jsx:event_58");
       showFeedback('Error logging out.', 'error');
     } else {
       navigate('/auth');
@@ -74,7 +74,7 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
       window.location.assign(result.url);
     } catch (error) {
       showFeedback('Could not open Stripe Billing Portal.', 'error');
-      console.error('Error opening Stripe Billing Portal:', error);
+      console.error("AccountSettings.jsx:event_77");
     }
   };
 
@@ -84,7 +84,7 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
       await supabase.auth.signOut();
       navigate('/auth');
     } catch (error) {
-      console.error('Error closing account:', error);
+      console.error("AccountSettings.jsx:event_87");
       if (error.status === 409) {
         setIsDeleteAccountModalOpen(false);
         setIsBillingModalOpen(true);
@@ -97,7 +97,7 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
 
   const handleUpdateBillingInfo = async (billingInfo) => {
     // Placeholder for Stripe API call to update billing info
-    console.log('Updating billing info:', billingInfo);
+    console.debug("AccountSettings.jsx:event_100");
     showFeedback('Billing information updated successfully!', 'success');
     setIsBillingModalOpen(false);
   };
@@ -114,7 +114,7 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
       updateProfile({ device: deviceInfo }); // Update local profile context
       setIsDeviceInfoModalOpen(false);
     } catch (error) {
-      console.error('Error updating device details:', error.message);
+      console.error("AccountSettings.jsx:event_117");
       showFeedback('Error updating device details.', 'error');
     }
   };

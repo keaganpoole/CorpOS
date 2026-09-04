@@ -489,7 +489,7 @@ class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
-    console.error('[SONAR] Page crashed:', error, errorInfo);
+    console.error("SonarDashboard.jsx:event_492");
   }
 
   render() {
@@ -1720,7 +1720,7 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
 };
 
 const SonarDashboard = () => {
-  const { session: authSession, profile, refreshProfile } = useAuth();
+  const { session: authSession, profile, refreshProfile, workforce } = useAuth();
   const [currentRoute, setCurrentRoute] = useState(getInitialDashboardRoute);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [marketplaceAgent, setMarketplaceAgent] = useState(null);
@@ -1790,7 +1790,7 @@ const SonarDashboard = () => {
       })
       .eq('id', userId);
     if (error) {
-      console.error('[Welcome popup] Failed to save dismissal:', error);
+      console.error("SonarDashboard.jsx:event_1793");
       return;
     }
     refreshProfile?.();
@@ -1826,7 +1826,7 @@ const SonarDashboard = () => {
       .eq('id', userId);
 
     if (error) {
-      console.error('[Popups] Failed to update popup state:', error);
+      console.error("SonarDashboard.jsx:event_1829");
       return;
     }
 
@@ -1880,7 +1880,7 @@ const SonarDashboard = () => {
         detail: { preferences: nextPreferences },
       }));
     } catch (error) {
-      console.error('[Tasklist] Failed to save setup guide preference:', error);
+      console.error("SonarDashboard.jsx:event_1883");
     }
   }, [staffBusinessId, userId]);
 
@@ -1896,7 +1896,7 @@ const SonarDashboard = () => {
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error && error.code !== 'PGRST116') {
-          console.error('[Tasklist] Failed to load setup guide preference:', error);
+          console.error("SonarDashboard.jsx:event_1899");
           return;
         }
         setShowSetupGuide(data?.preferences?.general?.show_setup_guide !== false);
@@ -1919,7 +1919,7 @@ const SonarDashboard = () => {
     if (!userId) return;
     supabase.from('businesses').select('id,avatar,current_cycle_used_seconds,current_cycle_included_seconds,current_cycle_overage_seconds,current_cycle_started_at,current_cycle_ends_at').eq('user_id', userId).limit(1).maybeSingle()
       .then(({ data, error }) => {
-        if (error) console.error('[Team] Failed to load business:', error);
+        if (error) console.error("SonarDashboard.jsx:event_1922");
         if (data?.id) {
           setStaffBusinessId(data.id);
           setBusinessUsage(data);
@@ -1995,7 +1995,7 @@ const SonarDashboard = () => {
         });
       }
       setAgentScenarios(map);
-    } catch (err) { console.error('[App] Failed to load scenarios:', err); }
+    } catch (err) { console.error("SonarDashboard.jsx:event_1998"); }
   };
 
   useEffect(() => {
@@ -2091,19 +2091,19 @@ const SonarDashboard = () => {
         ]);
 
         if (staffResponse.error) {
-          console.error('[Tasklist] Failed to load staff state:', staffResponse.error);
+          console.error("SonarDashboard.jsx:event_2094");
         } else {
           staffRows = staffResponse.data || [];
         }
 
         if (purchasedNumbersResponse.error) {
-          console.error('[Tasklist] Failed to load purchased number state:', purchasedNumbersResponse.error);
+          console.error("SonarDashboard.jsx:event_2100");
         } else {
           purchasedNumberRows = purchasedNumbersResponse.data || [];
         }
 
         if (customFieldsResponse.error) {
-          console.error('[Tasklist] Failed to load intake field state:', customFieldsResponse.error);
+          console.error("SonarDashboard.jsx:event_2106");
         } else {
           activeCustomFieldKeys = (customFieldsResponse.data || [])
             .map((field) => field.field_key)
@@ -2131,13 +2131,13 @@ const SonarDashboard = () => {
         .eq('id', userId);
 
       if (updateError) {
-        console.error('[Tasklist] Failed to persist tasklist state:', updateError);
+        console.error("SonarDashboard.jsx:event_2134");
         return;
       }
 
       refreshProfile?.();
     } catch (error) {
-      console.error('[Tasklist] Failed to load tasklist state:', error);
+      console.error("SonarDashboard.jsx:event_2140");
     }
   }, [agents, refreshProfile, userId]);
 
@@ -2242,11 +2242,14 @@ const SonarDashboard = () => {
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
     { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
     { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios', beta: true },
-    { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Business Intelligence' },
+    { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Reports' },
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
-  ];
+  ].filter(item => workforce?.tenant?.role !== 'STAFF' || ['calendar','pipeline'].includes(item.id));
 
   const renderView = () => {
+    if (workforce?.tenant?.role === 'STAFF' && !['calendar','pipeline','settings'].includes(currentRoute)) {
+      return <div className="p-8 text-zinc-300">Use Calendar or People for front-desk work. Other sections require a Manager or Owner.</div>;
+    }
     switch (currentRoute) {
       case 'receptionists':
         return (
@@ -2399,7 +2402,7 @@ const SonarDashboard = () => {
                       await loadAgentScenarios();
                       return result;
                     } catch (err) {
-                      console.error('[Hire] Failed:', err.message);
+                      console.error("SonarDashboard.jsx:event_2402");
                       throw err;
                     }
                   }}
@@ -2473,7 +2476,7 @@ const SonarDashboard = () => {
                               await refresh();
                               await loadAgentScenarios();
                             } catch (err) {
-                              console.error('[Receptionist Removal] Failed:', err);
+                              console.error("SonarDashboard.jsx:event_2476");
                             }
                           }}
                           className="px-5 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-black uppercase tracking-wider hover:bg-rose-400 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)] active:scale-95"

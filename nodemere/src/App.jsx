@@ -15,6 +15,7 @@ import VoiceClonePage from './pages/VoiceClonePage';
 import SplashScreen from './components/SplashScreen';
 import LegalDocumentPage from './components/LegalDocumentPage';
 import CookieNotice from './components/CookieNotice';
+import { WorkforceGate } from './components/WorkforceSecurity';
 import CustomerExperienceFeedback from './components/CustomerExperienceFeedback';
 
 // Sonar Dashboard
@@ -22,7 +23,7 @@ import SonarDashboard from './sonar/SonarDashboard';
 import ProjectIntelligenceReport from './sonar/pages/ProjectIntelligenceReport';
 
 function DashboardGate() {
-  const { session, profile, isLoading } = useAuth();
+  const { session, profile, isLoading, workforce } = useAuth();
 
   if (isLoading) {
     return <SplashScreen />;
@@ -32,11 +33,7 @@ function DashboardGate() {
     return <Navigate to="/auth" replace />;
   }
 
-  if (!profile?.onboarded) {
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  return <SonarDashboard />;
+  return <WorkforceGate>{!profile?.onboarded && !workforce?.tenant ? <Navigate to="/onboarding" replace /> : <SonarDashboard />}</WorkforceGate>;
 }
 
 function OnboardingGate() {

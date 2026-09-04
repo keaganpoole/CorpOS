@@ -107,7 +107,7 @@ const CalendarPage = () => {
 
   const handleCreateAppointment = (appointment) => {
     // This is where you would typically update your state or make an API call
-    console.log("New appointment created:", appointment);
+    console.debug("CalendarPage.jsx:event_110");
   };
 
   const goToNextMonth = () => {

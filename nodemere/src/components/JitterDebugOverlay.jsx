@@ -143,7 +143,7 @@ export default function JitterDebugOverlay() {
       capture.push(current);
       if (capture.length > 720) capture.shift();
       host.textContent = display(current);
-      if (log && sections.some((section) => section?.state === 'locked')) console.debug('[jitterDebug]', current);
+      if (log && sections.some((section) => section?.state === 'locked')) console.debug("JitterDebugOverlay.jsx:event_146");
       raf = window.requestAnimationFrame(sample);
     };
 

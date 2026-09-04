@@ -174,6 +174,64 @@
   padding: 0;
 }
 
+/* Nest keeps its existing layout, with a quiet, layered entry when opened. */
+.canvas-content-nest .canvas-hero,
+.canvas-content-nest .page-card,
+.canvas-content-nest .page-extra-card {
+  opacity: 0;
+  animation: nest-page-enter 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.canvas-content-nest .canvas-hero {
+  animation-delay: 40ms;
+}
+
+.canvas-content-nest .page-card:nth-child(1) {
+  animation-delay: 120ms;
+}
+
+.canvas-content-nest .page-card:nth-child(2) {
+  animation-delay: 170ms;
+}
+
+.canvas-content-nest .page-card:nth-child(3) {
+  animation-delay: 220ms;
+}
+
+.canvas-content-nest .page-extra-card:nth-child(1) {
+  animation-delay: 290ms;
+}
+
+.canvas-content-nest .page-extra-card:nth-child(2) {
+  animation-delay: 340ms;
+}
+
+.canvas-content-nest .page-extra-card:nth-child(3) {
+  animation-delay: 390ms;
+}
+
+@keyframes nest-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-content-nest .canvas-hero,
+  .canvas-content-nest .page-card,
+  .canvas-content-nest .page-extra-card {
+    opacity: 1;
+    animation: none;
+  }
+}
+
 .scenario-builder-wrapper {
   flex: 1;
   min-height: 100%;

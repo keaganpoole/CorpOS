@@ -10,7 +10,7 @@ const ReferralHandler = ({ referralSource }) => {
     useEffect(() => {
         // Set a cookie indicating the referral source
         setCookie('referredBySales', 'true', 7); // Cookie lasts for 7 days
-        console.log(`Referral from ${referralSource} detected. Cookie set.`);
+        console.debug("ReferralHandler.jsx:event_13");
         // Redirect to the homepage
         navigate('/', { replace: true });
     }, [referralSource, navigate]);

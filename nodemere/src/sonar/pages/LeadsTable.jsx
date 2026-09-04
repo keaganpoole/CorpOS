@@ -1186,7 +1186,7 @@ const LeadsTable = ({
       const documents = await api.getPeopleDocuments();
       setPersonDocuments(Array.isArray(documents) ? documents : []);
     } catch (error) {
-      console.error('[LeadsTable] Failed to load person documents:', error?.message);
+      console.error("LeadsTable.jsx:event_1189");
     }
   }, [demoMode]);
 
@@ -1214,7 +1214,7 @@ const LeadsTable = ({
         setFieldConfig(nextFieldConfig);
         setCustomFields(nextCustomFields);
       } catch (err) {
-        console.error('[LeadsTable] Failed to load table schema:', err.message);
+        console.error("LeadsTable.jsx:event_1217");
       }
     };
     load();
@@ -1298,7 +1298,7 @@ const LeadsTable = ({
     try {
       await saveFieldConfig(businessId, next);
     } catch (err) {
-      console.error('[LeadsTable] Failed to save field config:', err.message);
+      console.error("LeadsTable.jsx:event_1301");
     }
   };
 
@@ -1327,7 +1327,7 @@ const LeadsTable = ({
           },
         }).then(() => syncCustomFieldOptionValues(key, businessId, previousOptions, nextOptions, fieldMeta?.type))
         .catch((err) => {
-          console.error('[LeadsTable] Failed to save custom field settings:', err.message);
+          console.error("LeadsTable.jsx:event_1330");
         });
       }
     }
@@ -1346,7 +1346,7 @@ const LeadsTable = ({
       setCustomFields((prev) => prev.filter((field) => field.key !== key));
       if (!demoMode && businessId) {
         deleteCustomField(key, businessId).catch((err) => {
-          console.error('[LeadsTable] Failed to delete custom field:', err.message);
+          console.error("LeadsTable.jsx:event_1349");
         });
       }
     } else {
@@ -1409,7 +1409,7 @@ const LeadsTable = ({
       const next = { ...prev, [nextField.key]: { name: nextField.label, icon } };
       if (!demoMode && businessId) {
         saveFieldConfig(businessId, next).catch((err) => {
-          console.error('[LeadsTable] Failed to save new field config:', err.message);
+          console.error("LeadsTable.jsx:event_1412");
         });
       }
       return next;
@@ -1529,7 +1529,7 @@ const LeadsTable = ({
       if (!demoMode && businessId) {
         const orderedCustomKeys = next.filter((col) => col.custom).map((col) => col.id);
         updateCustomFieldPositions(businessId, orderedCustomKeys).catch((err) => {
-          console.error('[LeadsTable] Failed to persist custom field positions:', err.message);
+          console.error("LeadsTable.jsx:event_1532");
         });
         setCustomFields((fields) => fields.map((field) => ({
           ...field,

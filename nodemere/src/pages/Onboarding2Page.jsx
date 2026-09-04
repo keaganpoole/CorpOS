@@ -2274,7 +2274,7 @@ const Onboarding2Page = () => {
     axios.post(`${API_BASE_URL}/users/me/onboarding/prepare`, null, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     }).catch((error) => {
-      console.error('Failed to prepare onboarding:', error);
+      console.error("Onboarding2Page.jsx:event_2277");
       setSubmitError('Could not prepare your setup. Please refresh and try again.');
     });
   }, [session?.access_token]);
@@ -2496,10 +2496,10 @@ const Onboarding2Page = () => {
       await axios.post(`${API_BASE_URL}/users/me/onboarding`, buildOnboardingPayload(markOnboarded), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      localStorage.setItem('sonar-onboarding2-draft', JSON.stringify(form));
+      localStorage.removeItem('sonar-onboarding2-draft'); // Draft is already saved to the authorized backend.
       return true;
     } catch (error) {
-      console.error('Failed to save onboarding:', error);
+      console.error("Onboarding2Page.jsx:event_2502");
       setSubmitError(error.response?.data?.detail || 'Could not save onboarding. Please try again.');
       return false;
     }
@@ -2596,7 +2596,7 @@ const Onboarding2Page = () => {
       setLocalLateHoursTerms(acceptedTerms);
       setLateHoursTermsOpen(false);
     } catch (error) {
-      console.error('Failed to save late-hours terms locally:', error);
+      console.error("Onboarding2Page.jsx:event_2599");
       setSubmitError('Could not save that acknowledgment. Please try again.');
     } finally {
       setLateHoursTermsSaving(false);

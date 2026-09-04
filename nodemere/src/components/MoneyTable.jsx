@@ -158,7 +158,7 @@ const MoneyTable = () => {
           links: allLinks,
         });
       } catch (err) {
-        console.error("Error fetching data for MoneyTable:", err);
+        console.error("MoneyTable.jsx:event_161");
         setError("Failed to load chart data. Please try again later.");
       } finally {
         setLoading(false);

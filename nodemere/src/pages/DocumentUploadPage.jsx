@@ -39,14 +39,14 @@ function DocumentUploadPage() {
       if (!response.ok) {
         const detail = data.detail || {};
         const message = typeof detail === 'string' ? detail : detail.message;
-        if (detail.debug) console.error('Document upload debug:', detail.debug);
+        if (detail.debug) console.error("DocumentUploadPage.jsx:event_42");
         setState({ loading: false, status: detail.status || data.status || 'upload_failed', message: message || 'The file could not be uploaded. Please try again.' });
         return;
       }
       setState({ loading: false, status: data.status, message: data.message || '' });
       if (data.success) setFile(null);
     } catch (error) {
-      console.error('Document upload request failed:', error);
+      console.error("DocumentUploadPage.jsx:event_49");
       setState({ loading: false, status: 'error', message: 'The file could not be uploaded. Please try again.' });
     } finally {
       setSubmitting(false);
@@ -80,7 +80,7 @@ function DocumentUploadPage() {
             Only upload the document requested by {businessName || 'the requesting business'}. Your document will be securely stored and processed by Nodemere on behalf of {businessName || 'the requesting business'} and may be viewed by that business's authorized staff. Do not upload payment-card details, health records, government IDs, or other sensitive information unless {businessName || 'the requesting business'} has given you a secure, approved process for it.
           </div>
           <label className="document-upload-picker" htmlFor="document-file">Choose file</label>
-          <input id="document-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+          <input id="document-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.docx" onChange={(event) => setFile(event.target.files?.[0] || null)} />
           {file && <p className="document-upload-filename">{file.name}</p>}
           <label className="document-upload-acknowledgment">
             <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />

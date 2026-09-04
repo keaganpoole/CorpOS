@@ -307,7 +307,7 @@ const [reactions, setReactions] = useState([]);
         }
       }
     } catch (err) {
-      console.error('[SonarState] Failed to save receptionist call filter:', err.message || err);
+      console.error("useSonarState.js:event_310");
       setControlState(prev => ({ ...prev, calls_filter: previous }));
       setAgents(prev => prev.map(agent => {
         const currentStatus = String(agent.status || '').trim().toLowerCase();

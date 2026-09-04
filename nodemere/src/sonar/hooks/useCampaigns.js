@@ -20,7 +20,7 @@ export function useCampaigns() {
       if (err) throw err;
       if (!abortRef.current) setCampaigns(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('[useCampaigns] Fetch error:', err);
+      console.error("useCampaigns.js:event_23");
       if (!abortRef.current) {
         setError(err?.message || 'Failed to fetch campaigns');
         setCampaigns([]);

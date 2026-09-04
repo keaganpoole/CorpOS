@@ -9,6 +9,7 @@ postgrest
 storage3
 websockets
 python-jose[cryptography]
+cryptography
 stripe
 apscheduler
 openai

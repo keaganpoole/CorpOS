@@ -136,14 +136,20 @@ export function useLeads() {
         body: JSON.stringify({ type: eventType, record, old_record: oldRecord }),
       });
     } catch (err) {
-      console.warn('[useLeads] Failed to notify backend:', err.message);
+      console.warn("useLeads.js:event_139");
     }
   }, []);
 
   useEffect(() => {
     const channel = supabase
       .channel('people-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'people' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'people' }, async (payload) => {
+        // Realtime is an invalidation signal, never an unaudited PHI read.
+        if (payload.eventType !== 'DELETE') {
+          const {data, error} = await supabase.from('people').select('*').eq('id',payload.new.id).maybeSingle();
+          if (error || !data || abortRef.current) return;
+          payload = {...payload, new:data};
+        }
         if (payload.eventType === 'INSERT') {
           setLeads((prev) => {
             const withoutExisting = prev.filter((row) => row.id !== payload.new.id);
@@ -155,13 +161,13 @@ export function useLeads() {
             return [payload.new, ...withoutExisting];
           });
           markLeadJustAdded(payload.new.id);
-          notifyBackend('INSERT', payload.new, null);
+          notifyBackend('INSERT', {id:payload.new.id}, null);
         } else if (payload.eventType === 'UPDATE') {
           setLeads((prev) => prev.map((row) => (row.id === payload.new.id ? payload.new : row)));
-          notifyBackend('UPDATE', payload.new, null);
+          notifyBackend('UPDATE', {id:payload.new.id}, null);
         } else if (payload.eventType === 'DELETE') {
           setLeads((prev) => prev.filter((row) => row.id !== payload.old.id));
-          notifyBackend('DELETE', null, payload.old);
+          notifyBackend('DELETE', null, {id:payload.old.id});
         }
       })
       .subscribe();

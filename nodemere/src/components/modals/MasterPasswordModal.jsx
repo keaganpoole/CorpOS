@@ -82,7 +82,7 @@ const MasterPasswordModal = ({ isOpen, onAuthenticate, onClose, isLockedOut }) =
             }
         } catch (err) {
             setError('Authentication failed. Please try again.');
-            console.error('Error during authentication:', err);
+            console.error("MasterPasswordModal.jsx:event_85");
             setIsShaking(true);
             setTimeout(() => {
                 setPin('');

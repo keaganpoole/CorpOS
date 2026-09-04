@@ -5,6 +5,7 @@ stripe
 supabase
 python-dotenv
 python-jose[cryptography]
+cryptography
 apscheduler
 pydantic[email]
 openai

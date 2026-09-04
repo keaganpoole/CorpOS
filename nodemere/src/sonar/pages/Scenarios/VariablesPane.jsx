@@ -7,6 +7,7 @@ import { getOutputVariables, isStripeResponseNode } from '../../../sonar/lib/fie
 import { api } from '../../lib/api';
 import { fetchCustomFields, getCurrentBusinessId, getCustomValue, isCustomFieldKey } from '../../lib/customFields';
 import { getSmartActionByKey } from './smartActions';
+import { renderSafeTemplateHTML } from '../../lib/safeTemplateHTML';
 
 const SMART_ACTION_MAP = {};
 try {
@@ -541,7 +542,7 @@ const TABLE_DEFS = [
     ],
     fetch: async () => {
       try {
-        const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false }).limit(20);
+        const { data } = await supabase.from('invoices').select('id,amount_due,amount_paid,currency,status,stripe_customer_id,due_date,created_at').order('created_at', { ascending: false }).limit(20);
         return data || [];
       } catch { return []; }
     },
@@ -789,12 +790,11 @@ export const getVariableRef = (tableKey, fieldKey, sourcePrefix = '') => {
 
 export const renderVarChipsHTML = (value) => {
   if (!value || typeof value !== 'string') return '';
-  let result = value.replace(/\{smart:([^}]+)\}/g, (match, key) => {
-    const action = SMART_ACTION_MAP[key];
+  return renderSafeTemplateHTML(value, { smart: (match, key) => {
+    const action = escapeHtml(SMART_ACTION_MAP[key]);
     if (!action) return match;
     return `<span class="sb-var-chip" style="background:linear-gradient(135deg,rgba(56,189,248,0.12),rgba(168,85,247,0.12));color:#a855f7;border:1px solid rgba(168,85,247,0.25);display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;gap:2px;">⚡ ${action}</span>`;
-  });
-  result = result.replace(/\{\{([^}]+)\}\}/g, (match, ref) => {
+  }, variable: (match, ref) => {
     const parts = ref.split('.');
     if (parts.length === 1) {
       const tableKey = normalizeParsedTableKey(parts[0]);
@@ -835,15 +835,14 @@ export const renderVarChipsHTML = (value) => {
     }
     if (parts[0] === 'agent' || parts[0] === 'receptionist') {
       const receptionistColor = TABLE_COLORS.appointments || '#38bdf8';
-      return `<span class="sb-var-chip" style="background:${receptionistColor}18;color:${receptionistColor};border:1px solid ${receptionistColor}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Receptionist.${parts[1]}</span>`;
+      return `<span class="sb-var-chip" style="background:${receptionistColor}18;color:${receptionistColor};border:1px solid ${receptionistColor}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">Receptionist.${escapeHtml(parts[1])}</span>`;
     }
     const tableKey = normalizeParsedTableKey(parts[0]);
     const color = TABLE_COLORS[tableKey] || '#a78bfa';
     const tableLabel = TABLE_LABELS[parts[0]] || TABLE_LABELS[tableKey] || parts[0];
     const fieldLabel = getFieldDisplayLabel(tableKey, parts[1]);
     return `<span class="sb-var-chip" style="background:${color}18;color:${color};border:1px solid ${color}25;display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.7;vertical-align:middle;">${escapeHtml(tableLabel)}.${escapeHtml(fieldLabel)}</span>`;
-  });
-  return result;
+  }});
 };
 
 export const parseVariables = (value) => {

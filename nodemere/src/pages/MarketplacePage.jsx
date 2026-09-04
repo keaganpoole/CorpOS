@@ -117,7 +117,7 @@ export default function MarketplacePage() {
                     setPrizes(prizesResponse.data);
 
                 } catch (error) {
-                    console.error("Error fetching rep profile or prizes with rep_token:", error);
+                    console.error("MarketplacePage.jsx:event_120");
                     localStorage.removeItem('rep_token'); // Invalid token, remove it
                     setRepProfile(null);
                     setPrizes([]); // Clear prizes if rep authentication fails
@@ -157,7 +157,7 @@ export default function MarketplacePage() {
                 setPrizes(prizesResponse.data);
 
             } catch (error) {
-                console.error("Error re-fetching rep profile or prizes after login:", error);
+                console.error("MarketplacePage.jsx:event_160");
                 localStorage.removeItem('rep_token');
                 setRepProfile(null);
                 setPrizes([]);
@@ -179,7 +179,7 @@ export default function MarketplacePage() {
                     { headers: { Authorization: `Bearer ${repToken}` } }
                 );
             } catch (error) {
-                console.error("Error updating marketplace_intro_popup:", error);
+                console.error("MarketplacePage.jsx:event_182");
             }
         }
     };
@@ -209,7 +209,7 @@ export default function MarketplacePage() {
             setUserPoints(response.data.points); // Update points from backend response
             setIsOrdering(true);
         } catch (error) {
-            console.error("Error redeeming prize:", error);
+            console.error("MarketplacePage.jsx:event_212");
             setError(error.response?.data?.detail || "Failed to redeem prize.");
         }
     };

@@ -19,7 +19,7 @@ import requests
 
 GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
-EMAIL_KIND = Literal["verification", "document_upload"]
+EMAIL_KIND = Literal["verification", "document_upload", "workforce_invitation"]
 
 
 class EmailDeliveryError(Exception):
@@ -73,6 +73,9 @@ def _validate_link(link: str) -> str:
 
 
 def _email_copy(kind: EMAIL_KIND, business_name: str) -> tuple[str, str, str, str]:
+    if kind == "workforce_invitation":
+        return ("You have a Nodemere workforce invitation", "Open Nodemere",
+                "Sign in using this email address to review your business invitation. Invitations expire after seven days.", "Workforce invitation")
     if kind == "verification":
         return (
             f"Verify your identity with {business_name}",

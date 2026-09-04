@@ -237,8 +237,13 @@ export function useAppointments() {
   useEffect(() => {
     const channel = supabase
       .channel('appointments-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, async (payload) => {
         if (businessIdRef.current && payload.new?.business_id && payload.new.business_id !== businessIdRef.current) return;
+        if (payload.eventType !== 'DELETE') {
+          const {data,error} = await supabase.from('appointments').select('*').eq('id',payload.new.id).maybeSingle();
+          if (error || !data || abortRef.current) return;
+          payload={...payload,new:data};
+        }
         if (payload.eventType === 'INSERT') {
           setAppointments((prev) => {
             const withoutExisting = prev.filter((row) => row.id !== payload.new.id);

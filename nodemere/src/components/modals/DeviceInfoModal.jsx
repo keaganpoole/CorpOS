@@ -17,7 +17,7 @@ const DeviceInfoModal = ({ user, onUpdate, onClose, initialDeviceData, isUpdateM
       const { data, error } = await supabase.from('devices').select('make');
       
       if (error) {
-        console.error('Error fetching makes:', error);
+        console.error("DeviceInfoModal.jsx:event_20");
         return;
       }
       
@@ -46,7 +46,7 @@ const DeviceInfoModal = ({ user, onUpdate, onClose, initialDeviceData, isUpdateM
           .eq('make', selectedMake);
 
         if (error) {
-          console.error('Error fetching models:', error);
+          console.error("DeviceInfoModal.jsx:event_49");
           return;
         }
 

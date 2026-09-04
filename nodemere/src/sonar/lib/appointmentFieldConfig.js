@@ -1,5 +1,6 @@
 import { STATUS_OPTIONS, SOURCE_OPTIONS } from './appointmentSchema';
 import { supabase } from './supabase';
+import { readTransient, writeTransient } from '../../lib/browserPrivacy';
 import { getCurrentBusinessId } from './customFields';
 
 const STORAGE_KEY = 'SONAR_appointments_field_config';
@@ -140,16 +141,10 @@ export const migrateLegacyFieldConfig = async (businessId, rawRemoteConfig) => {
   return legacyConfig;
 };
 
-export const loadColorbarRules = () => {
-  try {
-    const stored = localStorage.getItem(COLORBAR_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return [];
-};
+export const loadColorbarRules = () => readTransient(COLORBAR_KEY);
 
 export const saveColorbarRules = (rules) => {
-  localStorage.setItem(COLORBAR_KEY, JSON.stringify(rules));
+  writeTransient(COLORBAR_KEY, rules);
 };
 
 export const evaluateColorbar = (appointment, rules) => {

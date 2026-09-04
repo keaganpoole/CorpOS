@@ -131,7 +131,7 @@ export default function EmporiumPage() {
                     setUserPoints(repProfileResponse.data.points || 0);
                     setShowRepLogin(false);
                 } catch (error) {
-                    console.error("Error fetching rep profile with rep_token:", error);
+                    console.error("EmporiumPage.jsx:event_134");
                     localStorage.removeItem('rep_token');
                     setRepProfile(null);
                     setShowRepLogin(true);
@@ -157,7 +157,7 @@ export default function EmporiumPage() {
                     setPointsMultiplier(data.points_multiplier || 1);
                 }
             } catch (error) {
-                console.error("Error fetching points multiplier:", error.message);
+                console.error("EmporiumPage.jsx:event_160");
                 setError("Failed to load points multiplier.");
             }
         };
@@ -179,7 +179,7 @@ export default function EmporiumPage() {
                 setRepProfile(repProfileResponse.data);
                 setUserPoints(repProfileResponse.data.points || 0);
             } catch (error) {
-                console.error("Error re-fetching rep profile after login:", error);
+                console.error("EmporiumPage.jsx:event_182");
                 localStorage.removeItem('rep_token');
                 setRepProfile(null);
                 setShowRepLogin(true);
@@ -226,7 +226,7 @@ export default function EmporiumPage() {
                 setError("No products found for your search.");
             }
         } catch (err) {
-            console.error("Error searching Walmart API:", err);
+            console.error("EmporiumPage.jsx:event_229");
             setError("Failed to search for products. Please try again later.");
         } finally {
             setIsSearching(false);
@@ -271,7 +271,7 @@ export default function EmporiumPage() {
 
             setIsOrdering(true);
         } catch (err) {
-            console.error("Error redeeming product:", err);
+            console.error("EmporiumPage.jsx:event_274");
             setError(err.message || "Failed to redeem product.");
         }
     };

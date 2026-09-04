@@ -35,7 +35,14 @@ const sanitizeHistoryEvent = (event) => {
   return { ...event, message: looksLikePayload ? '' : rawMessage };
 };
 
-const normalizeStatus = (row = {}) => String(row.status || row.call_status || row.call_successful || '').trim().toLowerCase();
+const normalizeStatus = (row = {}) => {
+  const raw = String(row.status || row.call_status || row.call_successful || '').trim().toLowerCase();
+  if (['true', 'yes', 'success', 'successful', 'done', 'complete'].includes(raw)) return 'completed';
+  if (['false', 'no'].includes(raw)) return 'failed';
+  if (!raw && (row.failure_reason || row.error || row.error_message)) return 'failed';
+  if (!raw && row.ended_at) return 'completed';
+  return raw;
+};
 const eventStamp = (row = {}) => row.updated_at || row.ended_at || row.started_at || row.event_timestamp || row.created_at || new Date().toISOString();
 const eventId = (source, row, type) => `${source}:${row?.id || 'unknown'}:${type}:${eventStamp(row)}`;
 const displayName = (row = {}) => {
@@ -253,7 +260,7 @@ const callLifecycleEvent = (call, status) => {
 };
 
 export const NestProvider = ({ children, businessId, tasklistState }) => {
-  const { session } = useAuth();
+  const { session, workforce } = useAuth();
   const { calls, loading: callsLoading } = useCallLogs();
   const [history, setHistory] = useState([]);
   const [queue, setQueue] = useState([]);
@@ -290,15 +297,16 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
         if (!cancelled && !error) setNestPreferences(normalizeNestPreferences(data?.preferences?.nest));
       });
     const channel = supabase.channel(`nest-preferences-${session.user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'account_settings', filter: `user_id=eq.${session.user.id}` }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'account_settings', filter: `business_id=eq.${workforce?.tenant?.business_id || businessId}` }, (payload) => {
         setNestPreferences(normalizeNestPreferences(payload?.new?.preferences?.nest));
       })
       .subscribe();
     return () => { cancelled = true; supabase.removeChannel(channel); };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, workforce?.tenant?.business_id, businessId]);
 
   const persistHistory = useCallback((events) => {
-    try { localStorage.setItem(historyStorageKey, JSON.stringify(events.slice(0, MAX_HISTORY))); } catch { /* storage is optional */ }
+    // History is in-memory only. Remove this application's legacy PHI cache.
+    try { localStorage.removeItem(historyStorageKey); } catch { /* storage is optional */ }
   }, [historyStorageKey]);
 
   const addToHistory = useCallback((event) => {
@@ -406,8 +414,8 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   }, [activeEvent, queue]);
 
   useEffect(() => {
-    const localHistory = safeJsonParse(localStorage.getItem(historyStorageKey), []);
-    const localEvents = Array.isArray(localHistory) ? localHistory.map(sanitizeHistoryEvent).filter(Boolean) : [];
+    persistHistory([]);
+    const localEvents = [];
     localEvents.forEach((event) => seenRef.current.add(event.id));
     setHistory(localEvents.slice(0, MAX_HISTORY));
     if (!session?.access_token) return;
@@ -449,7 +457,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'businesses', filter: `id=eq.${businessId}` }, handle('businesses'))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'nest', filter: `business_id=eq.${businessId}` }, handle('nest'))
       .subscribe((status, error) => {
-        if (error) console.warn('[Nest] Realtime subscription error:', error);
+        if (error) console.warn("NestRuntime.jsx:event_460");
         else if (status === 'SUBSCRIBED') console.info('[Nest] Realtime connected');
       });
     return () => { supabase.removeChannel(channel); };
@@ -516,7 +524,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       && Object.values(tasklistState).every((task) => task?.completed === true);
     if (setupComplete && !previouslyComplete) {
       api.claimNestMilestone('business_setup_completed').catch((error) => {
-        console.warn('[Nest] Failed to claim setup milestone:', error);
+        console.warn("NestRuntime.jsx:event_527");
       });
     }
     completed.forEach((key) => {

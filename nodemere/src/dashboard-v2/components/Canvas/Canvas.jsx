@@ -15,7 +15,7 @@ export default function Canvas({ page }) {
           <PageDetail accent={page.accent} />
         </div>
       ) : (
-        <div className="canvas-content">
+        <div key={page.id} className={`canvas-content canvas-content-${page.id}`}>
           <div className="canvas-hero">
             <p className="hero-label">{page.tagline}</p>
             <h1>{page.label}</h1>

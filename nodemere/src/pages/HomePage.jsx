@@ -767,7 +767,7 @@ const HomePage = () => {
         const userAgent = navigator.userAgent;
         await trackVisitor(userAgent);
       } catch (error) {
-        console.error("Error tracking visitor:", error);
+        console.error("HomePage.jsx:event_770");
       }
     };
 

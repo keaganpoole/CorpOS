@@ -183,7 +183,7 @@ def get_custom_voice_for_contract(supabase, contract_id: str) -> dict | None:
         )
         return (response.data or [None])[0]
     except Exception as exc:
-        logging.warning("Could not load custom voice for contract %s: %s", contract_id, exc)
+        logging.warning('contract_service.get_custom_voice_for_contract.event_186')
         return None
 
 
@@ -348,7 +348,7 @@ def build_signed_contract_pdf(contract: dict, *, signer_name: str, signer_email:
         pdf.roundRect(margin, y - 74, 240, 76, 6, fill=1, stroke=0)
         pdf.drawImage(signature_image, margin, y - 68, width=220, height=66, mask="auto", preserveAspectRatio=True, anchor="sw")
     except Exception as exc:
-        logging.warning("Could not render signature image in PDF: %s", exc)
+        logging.warning('contract_service.build_signed_contract_pdf.event_351')
         pdf.drawString(margin, y - 28, "[Signature image unavailable]")
     y -= 90
 
@@ -526,6 +526,9 @@ def clone_voice(supabase, *, token: str, api_key: str, voice_name: str, uploaded
             return {"success": False, "status": "too_large", "message": "Each audio sample must be 25 MB or smaller."}
         if content_type not in ALLOWED_AUDIO_TYPES:
             return {"success": False, "status": "unsupported", "message": "Use MP3, WAV, M4A, OGG, or WEBM audio."}
+        from .upload_validation import validate_audio
+        try: validate_audio(content,content_type)
+        except ValueError: return {"success":False,"status":"unsupported","message":"The file is not a supported audio container."}
         saved_samples.append(upload_sample_to_storage(supabase, contract_id=contract_id, filename=filename, content_type=content_type, content=content))
         samples_for_api.append({"file_name": filename, "content_type": content_type, "content": content})
 
@@ -552,7 +555,7 @@ def clone_voice(supabase, *, token: str, api_key: str, voice_name: str, uploaded
         "status": custom_voice_status,
         "sample_count": len(saved_samples),
         "sample_storage_paths": saved_samples,
-        "provider_response": elevenlabs_result,
+        "provider_response": {"voice_id":voice_id},
         "created_at": timestamp,
         "updated_at": timestamp,
     }
@@ -668,7 +671,10 @@ def save_cloned_receptionist_profile(
         if len(image_content) > MAX_PROFILE_IMAGE_BYTES:
             raise ValueError("Image must be 5 MB or smaller.")
 
-        safe_name = safe_filename(image_filename, f"receptionist.{extension}")
+        from .upload_validation import normalize_avatar
+        image_content=normalize_avatar(image_content)
+        normalized_type='image/png'
+        safe_name = 'avatar.png'
         storage_path = f"cloned-receptionists/{safe_storage_segment(contract.get('user_id') or contract.get('business_id') or 'public')}/{custom_voice['id']}/avatar-{uuid4().hex}-{safe_name}"
         supabase.storage.from_(CLONED_RECEPTIONIST_AVATAR_BUCKET).upload(
             storage_path,

@@ -21,7 +21,7 @@ const ScenariosModal = ({ agent, onClose, onScenarioAssigned }) => {
     try {
       setScenarios((await api.getScenarios()) || []);
     } catch (err) {
-      console.error('[ScenariosModal] Failed to load scenarios:', err);
+      console.error("ScenariosModal.jsx:event_24");
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ const ScenariosModal = ({ agent, onClose, onScenarioAssigned }) => {
       loadScenarios();
       onScenarioAssigned?.();
     } catch (err) {
-      console.error('[ScenariosModal] Failed to assign scenario:', err);
+      console.error("ScenariosModal.jsx:event_47");
     }
   };
 
@@ -55,7 +55,7 @@ const ScenariosModal = ({ agent, onClose, onScenarioAssigned }) => {
       loadScenarios();
       onScenarioAssigned?.();
     } catch (err) {
-      console.error('[ScenariosModal] Failed to unassign scenario:', err);
+      console.error("ScenariosModal.jsx:event_58");
     }
   };
 
@@ -66,7 +66,7 @@ const ScenariosModal = ({ agent, onClose, onScenarioAssigned }) => {
       
       loadScenarios();
     } catch (err) {
-      console.error('[ScenariosModal] Failed to toggle scenario status:', err);
+      console.error("ScenariosModal.jsx:event_69");
     }
   };
 

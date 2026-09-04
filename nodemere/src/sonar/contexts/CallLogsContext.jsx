@@ -7,7 +7,7 @@ const CallLogsContext = createContext(null);
 const CALL_LOGS_PAGE_SIZE = 20;
 
 export const CallLogsProvider = ({ children, normalizeCall }) => {
-  const { session } = useAuth();
+  const { session, workforce } = useAuth();
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -20,7 +20,7 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
   const activeQueryRef = useRef('');
 
   const loadCallLogs = async ({ initial = false, force = false, append = false, searchQuery = activeQueryRef.current } = {}) => {
-    if (!session?.access_token) {
+    if (!session?.access_token || workforce?.tenant?.role === 'STAFF') {
       setCalls([]);
       setLoading(false);
       setLoadingMore(false);
@@ -40,15 +40,13 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
     setLoadingMore(append);
     setError('');
     try {
-      const params = new URLSearchParams({
-        limit: String(CALL_LOGS_PAGE_SIZE),
-        offset: String(offset),
-      });
-      if (normalizedQuery) params.set('q', normalizedQuery);
-      const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs?${params.toString()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs/search`, {
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ limit: CALL_LOGS_PAGE_SIZE, offset, q: normalizedQuery }),
       });
       if (!response.ok) throw new Error(`Call logs request failed (${response.status})`);
       const data = await response.json();
@@ -77,7 +75,7 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
   };
 
   useEffect(() => {
-    if (!session?.access_token) {
+    if (!session?.access_token || workforce?.tenant?.role === 'STAFF') {
       setCalls([]);
       setLoading(false);
       setLoadingMore(false);
@@ -98,23 +96,27 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
     };
 
     loadCallLogs({ initial: true });
+    const pollingTimer = window.setInterval(() => {
+      if (!cancelled) loadCallLogs({ force: true });
+    }, 5000);
     const channel = supabase
       .channel(`call-logs-dashboard-cache-${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs', filter: `business_id=eq.${workforce?.tenant?.business_id}` }, scheduleRefresh)
       .subscribe((status, error) => {
         if (error) {
-          console.warn('[CallLogs] realtime subscription error:', error);
+          console.warn("CallLogsContext.jsx:event_107");
           return;
         }
-        console.info('[CallLogs] realtime status:', status);
+        console.debug("CallLogsContext.jsx:event_110");
       });
 
     return () => {
       cancelled = true;
       if (refreshTimer) window.clearTimeout(refreshTimer);
+      window.clearInterval(pollingTimer);
       supabase.removeChannel(channel);
     };
-  }, [session?.access_token]);
+  }, [session?.access_token, workforce?.tenant?.business_id, workforce?.tenant?.role]);
 
   const value = useMemo(() => ({
     calls,

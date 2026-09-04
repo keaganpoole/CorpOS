@@ -12,6 +12,7 @@ import {
   CALL_ROUTE_OPTIONS,
 } from './leadSchema';
 import { supabase } from './supabase';
+import { readTransient, writeTransient } from '../../lib/browserPrivacy';
 import { getCurrentBusinessId, getCustomValue, isCustomFieldKey } from './customFields';
 
 const STORAGE_KEY = 'SONAR_field_config';
@@ -191,15 +192,11 @@ export const migrateLegacyFieldConfig = async (businessId, rawRemoteConfig) => {
 };
 
 export const loadColorbarRules = () => {
-  try {
-    const stored = localStorage.getItem(COLORBAR_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return [];
+  return readTransient(COLORBAR_KEY);
 };
 
 export const saveColorbarRules = (rules) => {
-  localStorage.setItem(COLORBAR_KEY, JSON.stringify(rules));
+  writeTransient(COLORBAR_KEY, rules);
 };
 
 export const evaluateColorbar = (lead, rules) => {
