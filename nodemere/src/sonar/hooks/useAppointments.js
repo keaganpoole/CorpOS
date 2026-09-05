@@ -147,13 +147,12 @@ export function useAppointments() {
       if (authError) throw authError;
       const userId = authData?.user?.id || null;
 
-      const [{ data: appointmentRows, error: appointmentsError }, { data: peopleRows, error: peopleError }, { data: serviceRows, error: servicesError }] = await Promise.all([
+      const [{ data: appointmentRows, error: appointmentsError }, peopleRows, { data: serviceRows, error: servicesError }] = await Promise.all([
         supabase.from('appointments').select('id,date,time,duration,status,source,notes,person_id,service_id,staff_id,business_id,receptionist_id,created_at,updated_at').eq('business_id', businessId).order(sortBy, { ascending: sortDir === 'asc', nullsFirst: false }),
-        supabase.from('people').select('id,first_name,last_name,phone,email').eq('business_id', businessId).order('updated_at', { ascending: false }),
+        api.getPeople(500),
         supabase.from('services').select('id,name,category,is_active').eq('business_id', businessId).order('category', { ascending: true }).order('sort_order', { ascending: true }),
       ]);
       if (appointmentsError) throw appointmentsError;
-      if (peopleError) throw peopleError;
       if (servicesError) throw servicesError;
 
       let receptionistRows = [];

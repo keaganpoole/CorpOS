@@ -155,7 +155,7 @@ end $$;
 
 do $$ declare t text; op text; begin
  for t in select tablename from pg_tables where schemaname='public' and tablename not in
- ('business_memberships','business_invitations','receptionist_catalog','sonar_plans','system_config') loop
+ ('business_memberships','business_invitations','receptionist_catalog','plans','system_config') loop
   if not exists(select 1 from pg_policies where schemaname='public' and tablename=t and policyname='phase2_tenant_guard') then continue; end if;
   foreach op in array array['SELECT','INSERT','UPDATE','DELETE'] loop
    execute format('drop policy if exists %I on public.%I','phase3_'||lower(op),t);

@@ -100,10 +100,11 @@ the usual local backend lifecycle when intentionally testing scheduled workers.
 
 This proves isolated development recovery, not a full hosted Supabase-project
 disaster restore or an automatic backup of all existing business files. The
-envelope coverage remains the explicit map in `security-phases5-7.md`; searchable
-demographics/notes and other uncovered fields still rely on authorization,
-audit controls and platform encryption. No encrypted-search architecture or
-old PIN-based PHI encryption was introduced.
+envelope coverage remains the explicit map in `security-phases5-7.md`. People
+identity/contact text, notes and custom fields now use that same server envelope
+system; structural metadata and other uncovered fields still rely on
+authorization, audit controls and platform encryption. No encrypted-search
+index or old PIN-based PHI encryption was introduced.
 
 The three provisionally accepted Phase 3–4 items remain separate: interactive
 Google OAuth → MFA; invitation receipt/acceptance; historical MFA/IP mismatch

@@ -66,7 +66,7 @@ const MoneyTable = () => {
         const { data: reps, error: repsError } = await fetchAllFromTable('reps', 'first_name, last_name, points');
         if (repsError) throw repsError;
 
-        const { data: plans, error: plansError } = await fetchAllFromTable('plans', 'plan, revenue');
+        const { data: plans, error: plansError } = await fetchAllFromTable('plans', 'slug');
         if (plansError) throw plansError;
 
         const { data: users, error: usersError } = await fetchAllFromTable('users', 'first_name, last_name, created_at, plan, associate, subscription_status, trial_start_date, total_points');
@@ -89,16 +89,16 @@ const MoneyTable = () => {
           }));
 
         // Ensure a consistent order for plans to match the hardcoded links
-        const planOrder = ['free', 'unlimited', 'unlimited_pro'];
-        const sortedPlans = [...plans].sort((a, b) => planOrder.indexOf(a.plan) - planOrder.indexOf(b.plan));
+        const planOrder = ['free', 'essentials', 'pro', 'ultra'];
+        const sortedPlans = [...plans].sort((a, b) => planOrder.indexOf(a.slug) - planOrder.indexOf(b.slug));
 
         const planNodes = sortedPlans.map(plan => ({
-          name: (plan.plan || '').replace('_', ' ').toUpperCase(),
+          name: (plan.slug || '').replace('_', ' ').toUpperCase(),
           type: 'category',
-          revenueValue: plan.revenue || 0, // Store revenue separately for display
+          revenueValue: 0, // Revenue is not part of the plan-entitlement catalog.
         }));
 
-        const totalRevenue = plans.reduce((sum, plan) => sum + (plan.revenue || 0), 0);
+        const totalRevenue = 0;
 
         const staticNodes = [
           ...planNodes,

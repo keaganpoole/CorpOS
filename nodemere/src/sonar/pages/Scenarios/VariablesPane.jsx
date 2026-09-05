@@ -486,8 +486,7 @@ const TABLE_DEFS = [
     ],
     fetch: async () => {
       try {
-        const { data } = await supabase.from('people').select('*').limit(20);
-        return data || [];
+        return await api.getPeople(20) || [];
       } catch { return []; }
     },
   },

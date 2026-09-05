@@ -106,7 +106,7 @@ do $$ declare f record; t text; cols text; begin
   execute format('revoke execute on function %s from public,anon,authenticated',f.signature);
   execute format('grant execute on function %s to service_role',f.signature);
  end loop;
- foreach t in array array['sonar_plans','receptionist_catalog','system_config'] loop
+ foreach t in array array['plans','receptionist_catalog','system_config'] loop
   if to_regclass('public.'||t) is null then continue; end if;
   execute format('revoke insert,update,delete,truncate on public.%I from public,anon,authenticated',t);
   select string_agg(quote_ident(attname),',') into cols from pg_attribute where attrelid=to_regclass('public.'||t) and attnum>0 and not attisdropped;

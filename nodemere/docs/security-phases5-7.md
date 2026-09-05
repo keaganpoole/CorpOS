@@ -109,6 +109,7 @@ Password/PIN/MFA changes do not require re-encrypting records.
 | `call_logs` | `transcript_text`, `transcript_jsonb`, `call_report`, `analysis_results`, `conversation_initiation_data` |
 | `flow_executions` | `flow_context`, `pause_data`, `trigger_event` |
 | `integrations` | `credentials`, including provider access/refresh tokens |
+| `people` | identity/contact text, notes/instructions, tags/custom fields, activity outcomes and customer/payment references |
 | New private documents | File bytes in `caller-documents` |
 | New call recordings | Audio bytes in `call_recordings` |
 
@@ -126,14 +127,16 @@ a business has a data key. Optimistic revision checks prevent stale encrypted
 updates from overwriting concurrent changes. Bulk updates are bounded; a
 conflict may leave earlier rows in that batch committed, so retry deliberately.
 
-**Not encrypted by this batch:** people demographics/notes/custom fields,
-appointment notes/custom fields, call-list summaries/notes/search fields,
+**Not encrypted by this batch:** People relationship/operational metadata such
+as IDs, tenant ownership, consent flags, timestamps and numeric counters;
+appointment notes/custom fields; call-list summaries/notes/search fields;
 document metadata, scenario definitions/configuration, and other fields outside
 the above map. They still rely on access controls and platform encryption at
 rest. Existing document/recording objects are not automatically rewritten.
 This coverage limitation must remain visible in any healthcare readiness claim.
-Extending encryption to searchable fields requires explicit search/read-path
-work; do not treat ciphertext as searchable plaintext or reuse the old PIN AES.
+People plaintext equality lookups now occur only after a bounded, tenant-scoped
+server read; do not treat ciphertext as searchable plaintext or reuse the old
+PIN AES.
 
 ### Practical scope and safeguards
 
@@ -145,9 +148,9 @@ recovery with independently held keys. These controls protect different threats;
 application encryption does not protect data from an already authorized,
 compromised application process while it is decrypting that data.
 
-Searchable identity/scheduling fields remain outside the envelope layer. That
-tradeoff requires a documented risk assessment and verified hosting/database
-controls, not a claim that those fields are no longer PHI. HHS explains that
+Scheduling fields and unencrypted structural metadata remain outside the
+envelope layer. That tradeoff requires a documented risk assessment and verified
+hosting/database controls, not a claim that those fields are no longer PHI. HHS explains that
 [encryption decisions follow the organization's risk assessment](https://www.hhs.gov/hipaa/for-professionals/faq/2001/is-the-use-of-encryption-mandatory-in-the-security-rule/index.html).
 This is not legal approval or an assertion that this implementation alone
 satisfies all HIPAA requirements. No additional enterprise architecture was added.
@@ -163,7 +166,7 @@ of billing test mode; encrypted records still require valid keys for reads.
 `backend/security_maintenance.py` defaults to dry-run and is not scheduled.
 Mutation requires both `--apply` and a matching `--confirm-business-id`.
 
-- `backfill --business-id N --table call_logs|flow_executions|integrations`:
+- `backfill --business-id N --table call_logs|flow_executions|integrations|people`:
   scans at most 100 rows, validates historical envelopes, verifies replacement
   ciphertext before writing and compares revisions. It reports counts and a
   cursor, never content. Continue with `--after` if a cursor is returned.
@@ -232,7 +235,9 @@ New migrations (tested twice each locally for repeatability):
    attribution, metadata-only direct People/Appointment read privileges.
 2. `sql/2026_09_04_phase6_envelope.sql`: wrapped DEK registry, protected rotation
    RPCs, revision checks and plaintext downgrade guards.
-3. `sql/2026_09_04_phase7_recovery_retention.sql`: disabled retention policy and
+3. `sql/2026_09_05_phase6_people_encryption.sql`: stable People ciphertext binding,
+   protected People columns and downgrade/binding guards.
+4. `sql/2026_09_04_phase7_recovery_retention.sql`: disabled retention policy and
    bounded, legal-hold-aware maintenance RPC.
 
 Do **not** rerun Phases 1–4 migrations after these: older blanket grant statements

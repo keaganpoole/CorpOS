@@ -14,7 +14,25 @@ FIELDS = {
                  'analysis_results': True, 'conversation_initiation_data': True},
     'flow_executions': {'flow_context': True, 'pause_data': True, 'trigger_event': True},
     'integrations': {'credentials': True},
+    # Keep relational/operational columns usable while encrypting the fields
+    # that can contain identity, contact, financial, or free-form PHI.
+    'people': {
+        'first_name': False, 'last_name': False, 'phone': False, 'email': False,
+        'street_address': False, 'city': False, 'state': False, 'zip_code': False,
+        'preferred_contact_method': False, 'preferred_language': False,
+        'best_time_to_contact': False, 'status': False, 'source': False,
+        'lead_source_detail': False, 'tags': True, 'last_call_status': False,
+        'last_intent': False, 'last_outcome': False, 'last_sms_status': False,
+        'last_email_status': False, 'assigned_staff': False, 'call_route': False,
+        'payment_status': False, 'invoice_id': False, 'notes': False,
+        'special_instructions': False, 'stripe_customer_id': False,
+        'stripe_payment_method_id': False, 'custom_fields': True,
+    },
 }
+
+# People retains its established bigint primary key. A separate immutable UUID
+# binds ciphertext to the row without changing any existing foreign keys.
+RECORD_ID_FIELDS = {'people': 'encryption_record_id'}
 
 
 class ProtectedClient:
@@ -37,22 +55,31 @@ class ProtectedClient:
     def decode(self, table, row):
         row = dict(row)
         engine = Envelope(self.database)
+        record_id = row.get(RECORD_ID_FIELDS.get(table, 'id'))
         for field in FIELDS[table]:
             if is_encrypted(row.get(field)):
+                if record_id is None: raise KeyUnavailable()
                 row[field] = engine.decode(row[field], business_id=self.business(table, row),
-                    resource=table, record_id=row['id'], field=field)
+                    resource=table, record_id=record_id, field=field)
         row.pop('security_revision', None)
+        if table in RECORD_ID_FIELDS: row.pop(RECORD_ID_FIELDS[table], None)
         return row
 
     def encode(self, table, values, existing=None):
         row = dict(values)
         engine = Envelope(self.database)
         context = {**(existing or {}), **row}
-        if context.get('id') is None: row['id'] = context['id'] = str(uuid4())
+        record_field = RECORD_ID_FIELDS.get(table, 'id')
+        if existing is None and table in RECORD_ID_FIELDS:
+            # Never accept this server-managed binding identifier from a caller.
+            row[record_field] = context[record_field] = str(uuid4())
+        elif context.get(record_field) is None:
+            row[record_field] = context[record_field] = str(uuid4())
         for field, json_column in FIELDS[table].items():
             if field in row and row[field] is not None:
                 row[field] = engine.encode(row[field], json_column=json_column,
-                    business_id=self.business(table, context), resource=table, record_id=context['id'], field=field)
+                    business_id=self.business(table, context), resource=table,
+                    record_id=context[record_field], field=field)
         return row
 
 
@@ -86,7 +113,11 @@ class ProtectedQuery:
         # from explicit projections afterward. Do not decrypt unrequested fields.
         requested = {c.strip() for c in columns.split(',')}
         if columns != '*' and requested & FIELDS[self.name].keys():
-            columns = ','.join(dict.fromkeys([*columns.split(','), 'id', 'user_id' if self.name == 'integrations' else 'business_id']))
+            columns = ','.join(dict.fromkeys([
+                *columns.split(','), 'id',
+                'user_id' if self.name == 'integrations' else 'business_id',
+                RECORD_ID_FIELDS.get(self.name, 'id'),
+            ]))
         result = self.filters(self.client.database.table(self.name).select(columns, **self.options)).execute()
         def decode(row):
             decoded = self.client.decode(self.name, row)

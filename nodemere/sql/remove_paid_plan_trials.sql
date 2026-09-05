@@ -3,7 +3,7 @@
 
 begin;
 
-update public.sonar_plans
+update public.plans
 set display = coalesce(display, '{}'::jsonb) || '{"cta":"Start plan"}'::jsonb,
     updated_at = now()
 where slug in ('essentials', 'pro', 'ultra');

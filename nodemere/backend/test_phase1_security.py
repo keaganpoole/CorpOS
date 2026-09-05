@@ -15,6 +15,7 @@ import socket
 import time
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -74,6 +75,8 @@ class FakeDatabase:
             "services": [{"id": STAFF, "business_id": 1}, {"id": OTHER_STAFF, "business_id": 2}],
             "payments": [{"id": APPT, "user_id": OWNER}, {"id": OTHER_APPT, "user_id": OTHER}],
             "invoices": [{"id": APPT, "user_id": OWNER}, {"id": OTHER_APPT, "user_id": OTHER}],
+            "plans": [{"slug": "free", "name": "Free", "stripe_product_name": "Free", "sort_order": 1,
+                       "is_public": True, "is_recommended": False, "display": {}, "entitlements": {}, "features": []}],
             "hired_receptionists": [],
             "users": [{"id": OWNER, "account_status": "active"}],
             "business_memberships": [{"user_id": OWNER, "business_id": 1, "role": "OWNER", "status": "active"},
@@ -116,6 +119,10 @@ class FakeQuery:
         self.operation, self.values = "update", values
         return self
 
+    def upsert(self, values):
+        self.operation, self.values = "upsert", values
+        return self
+
     def delete(self):
         self.operation = "delete"
         return self
@@ -132,6 +139,14 @@ class FakeQuery:
         elif self.operation == "update":
             for row in rows:
                 row.update(self.values)
+        elif self.operation == "upsert":
+            rows = [row for row in self.db.rows[self.name] if str(row.get("id")) == str(self.values.get("id"))]
+            if rows:
+                for row in rows:
+                    row.update(self.values)
+            else:
+                rows = [copy.deepcopy(self.values)]
+                self.db.rows[self.name].extend(rows)
         elif self.operation == "delete":
             for row in rows:
                 self.db.rows[self.name].remove(row)
@@ -227,6 +242,44 @@ class UserAuthTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(HTTPException) as error:
                     await dependencies.get_current_user(SimpleNamespace(credentials="valid"))
                 self.assertEqual(error.exception.status_code, 403)
+
+    async def test_oauth_legal_acceptance_creates_and_records_the_profile_when_needed(self):
+        db = FakeDatabase()
+        oauth_user = SimpleNamespace(
+            id="33333333-3333-4333-8333-333333333333",
+            email="oauth-legal-test@example.test",
+            user_metadata={"name": "OAuth Legal Test"},
+        )
+        acceptance = main.LegalAcceptanceRequest(
+            version=main.NODEMERE_LEGAL_ACCEPTANCE_VERSION,
+            accepted_terms=True,
+            certified_permitted_use=True,
+        )
+        request = Request({"type": "http", "headers": [], "client": ("127.0.0.1", 12345)})
+        with patch.object(main, "supabase_admin", db):
+            result = await main.accept_legal_terms(acceptance, request, oauth_user)
+        profile = next(row for row in db.rows["users"] if row["id"] == str(oauth_user.id))
+        recorded = profile["terms_of_service"][main.NODEMERE_LEGAL_ACCEPTANCE_KEY]
+        self.assertTrue(result["ok"])
+        self.assertTrue(recorded["accepted"])
+        self.assertEqual(recorded["version"], main.NODEMERE_LEGAL_ACCEPTANCE_VERSION)
+
+
+class PlanCatalogRenameTests(unittest.IsolatedAsyncioTestCase):
+    async def test_public_pricing_reads_the_renamed_catalog(self):
+        db = FakeDatabase()
+        stripe_data = {"products": [], "prices": []}
+        with patch.object(main, "supabase_admin", db), patch.object(main, "get_plans", new=AsyncMock(return_value=stripe_data)):
+            result = await main.get_sonar_pricing_plans()
+        self.assertEqual(result["plans"], db.rows["plans"])
+        self.assertFalse(any(name == "sonar_plans" for name, *_ in db.calls))
+
+    def test_rename_migration_precedes_display_copy_and_fails_on_a_name_collision(self):
+        rename = Path("sql/2026_09_04_000_rename_sonar_plans_to_plans.sql").read_text(encoding="utf-8")
+        copy = Path("sql/2026_09_04_essentials_restricted_workflow_copy.sql").read_text(encoding="utf-8")
+        self.assertIn("Cannot rename sonar_plans: public.plans already exists", rename)
+        self.assertIn("alter table public.sonar_plans rename to plans", rename)
+        self.assertIn("update public.plans", copy)
 
 
 class ProviderSignatureTests(unittest.IsolatedAsyncioTestCase):

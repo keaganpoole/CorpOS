@@ -4402,11 +4402,7 @@ export default function ScenariosPage({
             if (Object.keys(customUpdates).length > 0) {
               let existingCustomFields = {};
               if (actionKey === 'update_record' && resolvedRecordId) {
-                const { data } = await supabase
-                  .from('people')
-                  .select('custom_fields')
-                  .eq('id', resolvedRecordId)
-                  .single();
+                const data = await api.getPerson(resolvedRecordId);
                 existingCustomFields = data?.custom_fields || {};
               }
               updateData.custom_fields = { ...existingCustomFields, ...customUpdates };
@@ -4414,8 +4410,15 @@ export default function ScenariosPage({
           }
 
           if (actionKey === 'update_record' && resolvedRecordId) {
-            // Update existing record via Supabase
-            const { data, error } = await supabase.from(tableKey).update(updateData).eq('id', resolvedRecordId).select().single();
+            let data;
+            let error = null;
+            try {
+              data = tableKey === 'people'
+                ? await api.updatePerson(resolvedRecordId, updateData)
+                : (await supabase.from(tableKey).update(updateData).eq('id', resolvedRecordId).select().single()).data;
+            } catch (requestError) {
+              error = requestError;
+            }
             if (!error) {
               setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: data } : n));
               resultsMap[node.id] = data;
@@ -4428,8 +4431,15 @@ export default function ScenariosPage({
               console.error("HomepageScenariosDemo.jsx:event_4447");
             }
           } else if (actionKey === 'create_new_record') {
-            // Create new record via Supabase
-            const { data, error } = await supabase.from(tableKey).insert(updateData).select().single();
+            let data;
+            let error = null;
+            try {
+              data = tableKey === 'people'
+                ? await api.createPerson(updateData)
+                : (await supabase.from(tableKey).insert(updateData).select().single()).data;
+            } catch (requestError) {
+              error = requestError;
+            }
             if (!error) {
               setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: data } : n));
               resultsMap[node.id] = data;

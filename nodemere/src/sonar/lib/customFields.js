@@ -171,12 +171,7 @@ export const deleteCustomField = async (fieldKey, businessId) => {
 
   if (schemaError) throw schemaError;
 
-  const { data: peopleRows, error: peopleError } = await supabase
-    .from('people')
-    .select('id,custom_fields')
-    .eq('business_id', businessId);
-
-  if (peopleError) throw peopleError;
+  const peopleRows = await api.getPeople(500);
 
   const updates = (peopleRows || [])
     .filter((row) => row?.custom_fields && Object.prototype.hasOwnProperty.call(row.custom_fields, fieldKey))
@@ -205,12 +200,7 @@ export const syncCustomFieldOptionValues = async (fieldKey, businessId, previous
 
   const allowedOptions = new Set(nextOptions.filter(Boolean));
 
-  const { data: peopleRows, error: peopleError } = await supabase
-    .from('people')
-    .select('id,custom_fields')
-    .eq('business_id', businessId);
-
-  if (peopleError) throw peopleError;
+  const peopleRows = await api.getPeople(500);
 
   const updates = (peopleRows || []).flatMap((row) => {
     const currentValue = row?.custom_fields?.[fieldKey];

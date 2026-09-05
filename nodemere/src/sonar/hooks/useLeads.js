@@ -31,6 +31,18 @@ const TRIMMED_TEXT_FIELDS = new Set([
 ]);
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const sortPeople = (rows, key, direction) => [...rows].sort((left, right) => {
+  const a = left?.[key];
+  const b = right?.[key];
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  const comparison = typeof a === 'number' && typeof b === 'number'
+    ? a - b
+    : String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+  return direction === 'asc' ? comparison : -comparison;
+});
+
 const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
   const next = { ...payload };
   const now = new Date().toISOString();
@@ -100,13 +112,8 @@ export function useLeads() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: err } = await supabase
-        .from('people')
-        .select('*')
-        .order(sortBy, { ascending: sortDir === 'asc', nullsFirst: false });
-
-      if (err) throw err;
-      if (!abortRef.current) setLeads(data || []);
+      const data = await api.getPeople(500);
+      if (!abortRef.current) setLeads(sortPeople(data || [], sortBy, sortDir));
     } catch (err) {
       if (!abortRef.current) setError(err.message);
     } finally {
@@ -146,8 +153,8 @@ export function useLeads() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'people' }, async (payload) => {
         // Realtime is an invalidation signal, never an unaudited PHI read.
         if (payload.eventType !== 'DELETE') {
-          const {data, error} = await supabase.from('people').select('*').eq('id',payload.new.id).maybeSingle();
-          if (error || !data || abortRef.current) return;
+          const data = await api.getPerson(payload.new.id);
+          if (!data || abortRef.current) return;
           payload = {...payload, new:data};
         }
         if (payload.eventType === 'INSERT') {

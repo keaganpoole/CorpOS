@@ -165,7 +165,7 @@ Sound warm, polished, and reassuring. Clients may be unsure which treatment fits
 
 What customers should understand:
 - Treatments are personalized based on skin goals, comfort level, and treatment history.
-- Clients should mention allergies, sensitivities, pregnancy, recent procedures, or medical concerns before booking.
+- For health, medical, or other sensitive concerns, route the client to an authorized team member before collecting details.
 - Cleanliness, consistency, and client comfort are important parts of the experience.
 - Recurring appointments may be recommended depending on skin goals.
 
@@ -173,14 +173,14 @@ Service style:
 Appointments should feel calm, professional, and never rushed.
 
 Boundaries:
-Do not make medical claims or diagnose skin conditions. For medical concerns, recommend speaking with a qualified healthcare professional.`,
+Do not make medical claims or diagnose skin conditions. For medical or other sensitive concerns, route the client to an authorized team member.`,
     policies: `We require at least 24 hours' notice for cancellations or rescheduling.
 We charge a cancellation fee for missed appointments without notice.
 We require a card on file for appointments longer than 90 minutes.
 We do not accept walk-ins for advanced treatments.
 We require new clients to complete intake questions before their first appointment.
 We do not perform treatments on clients with active skin irritation unless the provider approves.
-We require clients to disclose allergies, sensitivities, pregnancy, and recent cosmetic procedures before booking.
+Questions involving allergies, sensitivities, pregnancy, or recent procedures are routed to an authorized team member before details are collected.
 We do not perform certain treatments within 14 days of injectables, peels, or laser procedures.
 We do not allow guests in treatment rooms unless approved in advance.
 We require clients under 18 to have parent or guardian consent.
@@ -207,7 +207,7 @@ Q: Can I book recurring appointments?
 A: Yes, recurring appointments can be discussed based on treatment goals.
 
 Q: What should I mention before booking?
-A: Clients should mention allergies, sensitivities, pregnancy, recent procedures, medications, and any skin concerns that may affect the appointment.`,
+A: An authorized team member can explain the approved intake process for information that may affect treatment suitability.`,
     serviceDescription: (serviceName) => `Service overview:
 This service is a personalized skincare treatment designed to refresh the skin, support skin health, and create a calm, restorative experience.
 
@@ -390,7 +390,7 @@ Sound professional, composed, and precise. Clients may have sensitive or deadlin
 
 What customers should understand:
 - New clients usually start with an initial consultation.
-- Useful intake details include the issue, goals, timeline, urgency, relevant documents, and preferred contact method.
+- Routine scheduling details include the preferred time, general service requested, and preferred contact method.
 - The team may need to review details before giving specific guidance.
 - Deadline-driven matters should be flagged for priority follow-up.
 
@@ -408,7 +408,7 @@ We require signed engagement letters before work begins.
 We require retainers for selected services.
 We do not accept walk-in consultations.
 We do not schedule consultations without collecting the client's legal name and contact information.
-We require relevant documents before document-review appointments.
+Document review, confidential matters, and identity-dependent requests are routed to an authorized team member.
 We do not discuss client matters with third parties without written authorization.
 We require billing questions to be routed to the office manager.
 We do not guarantee outcomes.
@@ -418,12 +418,12 @@ We charge for missed consultations unless waived by the firm.
 We do not accept work outside our licensed jurisdiction or service scope.
 We require urgent matters to be marked for same-day review.
 We do not provide free second opinions without approval.
-We require client identity verification for sensitive matters.`,
+We route sensitive, regulated, confidential, or identity-dependent requests to an authorized team member.`,
     faq: `Q: Do you offer consultations?
 A: Yes, initial consultations can be scheduled to understand the client's needs.
 
 Q: What should I prepare?
-A: Relevant documents, goals, deadlines, and background details are helpful.
+A: An authorized team member can explain the appropriate next steps and any approved document process.
 
 Q: Can you give advice immediately?
 A: The team may need to review the situation before giving specific guidance.
@@ -655,7 +655,7 @@ export const sharedBusinessBriefContext = {
     howWeWork: 'The company takes a personalized, consultative approach. It first learns what the client is hoping to accomplish, what they have tried before, and any preferences or considerations that should shape the experience.\n\nThe team then recommends an appropriate path, explains what the appointment involves, and keeps the experience comfortable and organized from start to finish. Consistency, cleanliness, and respectful care are central to how the company operates.',
     operations: 'The company operates as [brief description of the operation, e.g. a locally operated studio providing personalized beauty and wellness care by appointment].\n\n**Care team:** [Solo provider / In-house team / Combination]\n**Primary location:** [Location]\n**Operating territory:** [Studio-based / Mobile / Regional / Other]\n**Appointment model:** [By appointment / Walk-in / Combination]',
     credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to the care it provides.\n\n- **[License type]:** [License number] — [State / Jurisdiction]\n- **[License type]:** [License number] — [State / Jurisdiction]\n\n**Professional certifications:** [Certifications, if applicable]\n**Product or manufacturer certifications:** [Certifications, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
-    additionalContext: '**Insured:** [Yes / No / Details]\n**Languages supported:** [Languages]\n**Client considerations:** [Allergies, sensitivities, pregnancy, recent procedures, mobility needs, or comfort preferences]\n**Service limitations:** [Treatments, conditions, products, or appointment types the company does not support]\n**Preferred intake details:** [Skin goals, treatment history, event date, product sensitivities, or provider preference]',
+    additionalContext: '**Insured:** [Yes / No / Details]\n**Languages supported:** [Languages]\n**Sensitive-request handling:** [Authorized team member or handoff process for health, medical, or other sensitive concerns]\n**Service limitations:** [Treatments, conditions, products, or appointment types the company does not support]\n**Routine scheduling details:** [Event date, provider preference, or other non-sensitive booking details]',
   },
   'Automotive': {
     story: '[founder\'s name] opened the company in [year] after several years working hands-on with vehicle maintenance, diagnostics, and repair. Many of the shop\'s earliest customers came in for routine work like oil changes, brakes, inspections, tires, and warning lights, but a steady number continued returning whenever another vehicle issue came up. That repeat business gradually changed the company from a small repair option into a regular automotive shop for local drivers and families.\n\nThe company grew around that original customer base, gradually adding service bays, technicians, repair equipment, parts relationships, and capacity for more complex diagnostic work. Because many customers returned with the same vehicles over time, the shop developed around maintenance history, practical repair planning, and long-term familiarity with customer vehicles rather than isolated one-time visits. As the business became more established locally, it also built ties with nearby employers, small businesses, fleet operators, used-car buyers, and families with multiple vehicles.\n\nToday, the company serves a broader mix of individual drivers, commuters, families, businesses, and fleet accounts, but its beginnings are still part of how it operates. Routine maintenance remains part of the business, while much of its day-to-day work now includes diagnostics, repairs, safety concerns, estimates, and ongoing vehicle care. Its local relationships have continued alongside that growth, making the shop not only a place people visit when something breaks, but also a familiar part of how customers keep their vehicles dependable.',
@@ -691,7 +691,7 @@ export const sharedBusinessBriefContext = {
     howWeWork: 'The company takes a thoughtful, structured approach to professional work. It first understands the client\'s goals, situation, constraints, and definition of a useful outcome.\n\nThe team organizes the relevant information, explains the available path, and sets expectations about scope, timing, and next steps. Clients should understand both the recommendation and the reasoning behind it, with communication that remains clear throughout the engagement.',
     operations: 'The company operates as [brief description of the operation, e.g. an independent professional practice serving individuals and businesses through project-based and ongoing engagements].\n\n**Team structure:** [Solo practitioner / In-house team / Partner network / Combination]\n**Primary office:** [Location]\n**Operating territory:** [Local / Regional / National / Other]\n**Engagement model:** [Consultation / Project-based / Retainer / Combination]',
     credentials: 'The company maintains the licenses, registrations, and professional credentials applicable to the work it performs.\n\n- **[License or registration]:** [Number] - [State / Jurisdiction]\n- **[Certification]:** [Number] - [Issuing organization]\n\n**Professional certifications:** [Certifications, if applicable]\n**Regulatory registrations:** [Registrations, if applicable]\n**Industry affiliations:** [Associations or organizations, if applicable]',
-    additionalContext: '**Languages supported:** [Languages]\n**Confidentiality considerations:** [Information the receptionist should protect, avoid discussing, or route to the professional team]\n**Client intake priorities:** [Matter type, deadline, parties involved, existing documents, urgency, or preferred contact method]\n**Service limitations:** [Work types, jurisdictions, client types, or situations the company does not handle]\n**Referral relationships:** [Trusted partners or professionals for needs outside the company scope]',
+    additionalContext: '**Languages supported:** [Languages]\n**Restricted-request handling:** [Sensitive, regulated, confidential, or identity-dependent requests to route to an authorized team member]\n**Routine scheduling details:** [General service category, preferred time, deadline, or preferred contact method]\n**Service limitations:** [Work types, jurisdictions, client types, or situations the company does not handle]\n**Referral relationships:** [Trusted partners or professionals for needs outside the company scope]',
   },
   'Retail': {
     story: '[founder\'s name] opened the company in [year] after starting with a focused product idea, storefront, online shop, market presence, family retail background, or gap in the local shopping market. Many of the company\'s earliest customers came through neighborhood shopping, pop-up markets, online orders, tourists, gift buyers, or wholesale relationships, but a surprising number continued returning for new products, repeat purchases, recommendations, and seasonal needs. That repeat business gradually changed the company from a small retail concept into a more established shop.\n\nThe company grew around that original customer base, gradually adding staff, inventory systems, product categories, fulfillment processes, supplier relationships, and a clearer sense of what customers returned for. Because many shoppers came back repeatedly, the business developed around product familiarity, local taste, recurring gift needs, and customer questions rather than simple transactions. As the company became more established locally, it also built ties through markets, events, downtown associations, schools, charities, makers, artists, suppliers, and business groups.\n\nToday, the company serves a broader mix of local shoppers, online customers, gift buyers, wholesale buyers, tourists, and returning customers, but its beginnings are still part of how it operates. The original product focus remains part of the business, while much of its day-to-day work now includes new inventory, fulfillment, product guidance, pickup, delivery, shipping, and repeat customer needs. Its local involvement has continued alongside that growth, making the company not only a place people shop, but also a familiar part of the community.',

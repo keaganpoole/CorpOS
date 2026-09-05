@@ -5,9 +5,11 @@
 \endif
 \ir ../sql/2026_09_04_phase5_audit.sql
 \ir ../sql/2026_09_04_phase6_envelope.sql
+\ir ../sql/2026_09_05_phase6_people_encryption.sql
 \ir ../sql/2026_09_04_phase7_recovery_retention.sql
 \ir ../sql/2026_09_04_phase5_audit.sql
 \ir ../sql/2026_09_04_phase6_envelope.sql
+\ir ../sql/2026_09_05_phase6_people_encryption.sql
 \ir ../sql/2026_09_04_phase7_recovery_retention.sql
 
 begin;

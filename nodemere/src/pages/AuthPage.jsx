@@ -1,6 +1,6 @@
 // src/pages/AuthPage.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
@@ -11,13 +11,14 @@ import { LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
 const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 const FRONTEND_PUBLIC_URL = import.meta.env.VITE_FRONTEND_PUBLIC_URL || window.location.origin;
 const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
+const OAUTH_LEGAL_ACCEPTANCE_STORAGE_KEY = 'nodemere:oauth-legal-acceptance';
 
 console.debug("AuthPage.jsx:event_15");
 console.debug("AuthPage.jsx:event_16");
 console.debug("AuthPage.jsx:event_17");
 
 const AuthPage = () => {
-    const { login, session, profile, isLoading: isAuthLoading } = useAuth();
+    const { login, session, profile, refreshProfile, isLoading: isAuthLoading } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [isSignUp, setIsSignUp] = useState(location.state?.isSignUp || false);
@@ -30,6 +31,7 @@ const AuthPage = () => {
     const [canResend, setCanResend] = useState(false); // New state to control resend button
     const [isConfirmationSent, setIsConfirmationSent] = useState(false); // New state to track if confirmation was sent
     const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
+    const oauthAcceptanceInFlight = useRef(false);
 
     useEffect(() => {
         const timer = setTimeout(() => setIsLoaded(true), 10);
@@ -37,7 +39,34 @@ const AuthPage = () => {
     }, []);
 
     useEffect(() => {
-        if (session && !isAuthLoading) { // User is logged in
+        let cancelled = false;
+        const continueAfterAuthentication = async () => {
+            if (!session || isAuthLoading || oauthAcceptanceInFlight.current) return;
+            const pendingOAuthAcceptance = sessionStorage.getItem(OAUTH_LEGAL_ACCEPTANCE_STORAGE_KEY);
+            if (pendingOAuthAcceptance === LEGAL_ACCEPTANCE_VERSION) {
+                oauthAcceptanceInFlight.current = true;
+                setIsLoading(true);
+                try {
+                    await axios.post(
+                        `${API_BASE_URL}/users/me/legal-acceptance`,
+                        {
+                            version: LEGAL_ACCEPTANCE_VERSION,
+                            accepted_terms: true,
+                            certified_permitted_use: true,
+                        },
+                        { headers: { Authorization: `Bearer ${session.access_token}` } },
+                    );
+                    sessionStorage.removeItem(OAUTH_LEGAL_ACCEPTANCE_STORAGE_KEY);
+                    await refreshProfile();
+                } catch (acceptanceError) {
+                    if (!cancelled) setError('Google sign-in completed, but we could not record your legal acceptance. Please try again.');
+                    return;
+                } finally {
+                    oauthAcceptanceInFlight.current = false;
+                    if (!cancelled) setIsLoading(false);
+                }
+            }
+            if (cancelled) return;
             if (!profile?.onboarded) {
                 navigate('/onboarding');
                 return;
@@ -47,30 +76,26 @@ const AuthPage = () => {
             if (pendingPlan) {
                 localStorage.removeItem('pendingPlan');
                 const { priceId, planSlug, cycle } = JSON.parse(pendingPlan);
-                
-                const initiateStripeCheckout = async () => {
-                    try {
-                        const response = await axios.post(
-                            `${API_BASE_URL}/create-checkout-session`,
-                            { price_id: priceId, plan_slug: planSlug, billing_cycle: cycle },
-                            { headers: { Authorization: `Bearer ${session.access_token}` } }
-                        );
-                        const { url } = response.data;
-                        if (url) {
-                            window.location.href = url;
-                        }
-                    } catch (error) {
-                        console.error("AuthPage.jsx:event_63");
-                        alert("Could not initiate checkout after login. Please try again.");
-                        navigate('/dashboard');
-                    }
-                };
-                initiateStripeCheckout();
+                try {
+                    const response = await axios.post(
+                        `${API_BASE_URL}/create-checkout-session`,
+                        { price_id: priceId, plan_slug: planSlug, billing_cycle: cycle },
+                        { headers: { Authorization: `Bearer ${session.access_token}` } }
+                    );
+                    const { url } = response.data;
+                    if (url) window.location.href = url;
+                } catch (checkoutError) {
+                    console.error("AuthPage.jsx:event_63");
+                    alert("Could not initiate checkout after login. Please try again.");
+                    navigate('/dashboard');
+                }
             } else {
                 navigate('/dashboard');
             }
-        }
-    }, [session, profile, isAuthLoading, navigate]);
+        };
+        void continueAfterAuthentication();
+        return () => { cancelled = true; };
+    }, [session, profile?.onboarded, isAuthLoading, navigate, refreshProfile]);
 
     useEffect(() => {
         if (resendTimer > 0) {
@@ -146,15 +171,17 @@ const AuthPage = () => {
         setSuccessMessage('');
         setIsLoading(true);
         try {
+            if (isSignUp) sessionStorage.setItem(OAUTH_LEGAL_ACCEPTANCE_STORAGE_KEY, LEGAL_ACCEPTANCE_VERSION);
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: FRONTEND_PUBLIC_URL + '/onboarding',
+                    redirectTo: FRONTEND_PUBLIC_URL + (isSignUp ? '/auth' : '/onboarding'),
                 },
             });
             if (error) throw error;
             // Supabase will redirect, so no further action needed here for success
         } catch (apiError) {
+            sessionStorage.removeItem(OAUTH_LEGAL_ACCEPTANCE_STORAGE_KEY);
             setError(`Google sign-in failed: ${apiError.message || "An unexpected error occurred."}`);
         } finally {
             setIsLoading(false);
@@ -246,7 +273,7 @@ const AuthPage = () => {
                             className="mt-1 h-4 w-4 shrink-0 accent-white"
                             disabled={isLoading}
                         />
-                        <span>I am authorized to create this business account, agree to the <Link to="/terms" target="_blank" className="text-white underline underline-offset-2">Terms</Link>, <Link to="/privacy-policy" target="_blank" className="text-white underline underline-offset-2">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank" className="text-white underline underline-offset-2">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank" className="text-white underline underline-offset-2">AI & Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank" className="text-white underline underline-offset-2">DPA</Link>, and certify this account is for a permitted general U.S. business use.</span>
+                        <span>I am authorized to create this business account, agree to the <Link to="/terms" target="_blank" className="text-white underline underline-offset-2">Terms</Link>, <Link to="/privacy-policy" target="_blank" className="text-white underline underline-offset-2">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank" className="text-white underline underline-offset-2">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank" className="text-white underline underline-offset-2">AI & Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank" className="text-white underline underline-offset-2">DPA</Link>. I certify this account will be used only for permitted ordinary business workflows; restricted automated workflows require separate approval.</span>
                     </label>}
 
                     <button type="submit" className="w-full py-3 mt-6 text-sm font-semibold text-black bg-gradient-to-r from-[#f7f7f8] to-[#b5b6c4] rounded-full hover:opacity-90 transition-all duration-300 shadow-lg shadow-[#b5b6c4]/10 disabled:opacity-35 disabled:cursor-not-allowed" disabled={isSubmitDisabled}>

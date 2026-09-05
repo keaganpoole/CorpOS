@@ -35,7 +35,7 @@ def _build_authenticated_user(payload: dict):
     )
 
 
-async def get_current_user(token = Depends(http_bearer)):
+async def _get_current_user(token, allow_pending_deletion=False):
     # Only Supabase Auth may authenticate dashboard users. Locally signed OAuth
     # state and legacy rep tokens are NOT Supabase access tokens, even if they
     # contain a sub claim and share a historical signing key.
@@ -54,7 +54,9 @@ async def get_current_user(token = Depends(http_bearer)):
                 # defaults are copied; metadata cannot grant a plan or role.
                 supabase_admin.table("users").insert({"id":str(user_info.user.id),
                     "email":getattr(user_info.user,"email",None),"onboarded":False}).execute()
-            elif profile.data[0].get("account_status") in {"closed", "pending_deletion", "disabled"}:
+            elif profile.data[0].get("account_status") in {"closed", "disabled"} or (
+                profile.data[0].get("account_status") == "pending_deletion" and not allow_pending_deletion
+            ):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is closed.")
             # Only inspect assurance claims AFTER Supabase validated this exact
             # bearer token. OAuth provider metadata never establishes AAL2.
@@ -82,6 +84,14 @@ async def get_current_user(token = Depends(http_bearer)):
         # filter preserves this fixed stage code and request correlation ID.
         logging.warning("dependencies." + stage + ".event_1")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Authentication is temporarily unavailable. Please try again.") from None
+
+
+async def get_current_user(token = Depends(http_bearer)):
+    return await _get_current_user(token, allow_pending_deletion=False)
+
+
+async def get_current_user_for_recovery(token = Depends(http_bearer)):
+    return await _get_current_user(token, allow_pending_deletion=True)
 
 async def get_current_rep(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(

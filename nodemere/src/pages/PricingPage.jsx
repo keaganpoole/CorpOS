@@ -64,7 +64,8 @@ const plansConfig = [
     },
     {
         name: "Essentials",
-        description: "Launch a fully operational AI receptionist that answers calls, books appointments, and handles customers 24/7.",
+        description: "A focused AI receptionist for ordinary front-desk work, general questions, and routine scheduling.",
+        scopeNote: "Routine scheduling where permitted and where restricted information is not involved. Sensitive, confidential, regulated, protected, account-specific, or identity-dependent requests must be routed to an authorized person unless separately approved.",
         prices: {
             Standard: { monthly: 100, annually: 90 },
             Sales: { monthly: 100, annually: 90 },
@@ -325,6 +326,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                     {plan.isRecommended && <span className="text-xs font-semibold pricing-recommended-text" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
                 </div>
                 <p className="text-gray-400 mt-2">{plan.description}</p>
+                {plan.scopeNote && <p className="mt-3 text-xs leading-5 text-gray-500">{plan.scopeNote}</p>}
                 <div className="my-6">
                     <div className="flex items-baseline justify-center text-center">
                         <div className="flex items-start text-6xl font-extrabold text-white">
@@ -527,6 +529,7 @@ const PricingPage = () => {
             ...fallbackPlan,
             name: databasePlan.name,
             description: display.description || '',
+            scopeNote: display.scope_note || fallbackPlan.scopeNote || '',
             features: Array.isArray(databasePlan.features) ? databasePlan.features : [],
             isRecommended: Boolean(databasePlan.is_recommended),
             entitlements: databasePlan.entitlements || {},

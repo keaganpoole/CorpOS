@@ -4630,11 +4630,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             if (Object.keys(customUpdates).length > 0) {
               let existingCustomFields = {};
               if (actionKey === 'update_record' && resolvedRecordId) {
-                const { data } = await supabase
-                  .from('people')
-                  .select('custom_fields')
-                  .eq('id', resolvedRecordId)
-                  .single();
+                const data = await api.getPerson(resolvedRecordId);
                 existingCustomFields = data?.custom_fields || {};
               }
               updateData.custom_fields = { ...existingCustomFields, ...customUpdates };

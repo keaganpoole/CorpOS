@@ -64,7 +64,7 @@ const Breakroom = () => {
     const fetchCommissionData = async () => {
       try {
         const [plansRes, tiersRes, masterRes] = await Promise.all([
-          supabase.from('plans').select('plan, monthly_price, annual_price'), 
+          supabase.from('plans').select('slug, name, display'),
           supabase.from('tiers').select('*').order('name'),
           supabase.from('master').select('points_multiplier').eq('id', '0').single()
         ]);
@@ -86,33 +86,38 @@ const Breakroom = () => {
           const formattedData = [];
 
           plans.forEach(plan => {
-            const planName = (plan.plan || 'Unknown').replace('_', ' ').toUpperCase();
+            const planName = (plan.slug || plan.name || 'Unknown').replace('_', ' ').toUpperCase();
+            // The catalog deliberately does not persist Stripe prices. Legacy
+            // commission views may supply optional display values, otherwise
+            // they leave those rows out until a server-side pricing source is used.
+            const monthlyPrice = Number(plan.display?.monthly_price || 0);
+            const annualPrice = Number(plan.display?.annual_price || 0);
 
             // Monthly Calculation
-            if (plan.monthly_price > 0) {
+            if (monthlyPrice > 0) {
               const monthlyRow = {
                 plan: `${planName} (MONTHLY)`,
-                price: plan.monthly_price
+                price: monthlyPrice
               };
               tiers.forEach(tier => {
                 monthlyRow[tier.name] = {
-                  new: Math.round(plan.monthly_price * (tier.multiplier_new_acquisition || 0) * globalMultiplier),
-                  rebill: Math.round(plan.monthly_price * (tier.multiplier_rebill || 0) * globalMultiplier)
+                  new: Math.round(monthlyPrice * (tier.multiplier_new_acquisition || 0) * globalMultiplier),
+                  rebill: Math.round(monthlyPrice * (tier.multiplier_rebill || 0) * globalMultiplier)
                 };
               });
               formattedData.push(monthlyRow);
             }
 
             // Annual Calculation
-            if (plan.annual_price > 0) {
+            if (annualPrice > 0) {
               const annualRow = {
                 plan: `${planName} (ANNUAL)`,
-                price: plan.annual_price
+                price: annualPrice
               };
               tiers.forEach(tier => {
                 annualRow[tier.name] = {
-                  new: Math.round(plan.annual_price * (tier.multiplier_new_acquisition || 0) * globalMultiplier),
-                  rebill: Math.round(plan.annual_price * (tier.multiplier_rebill || 0) * globalMultiplier)
+                  new: Math.round(annualPrice * (tier.multiplier_new_acquisition || 0) * globalMultiplier),
+                  rebill: Math.round(annualPrice * (tier.multiplier_rebill || 0) * globalMultiplier)
                 };
               });
               formattedData.push(annualRow);

@@ -7,6 +7,7 @@ import { Toaster } from 'react-hot-toast';
 import HomePage from './pages/HomePage';
 import PricingPage from './pages/PricingPage';
 import AuthPage from './pages/AuthPage';
+import AccountRecoveryPage from './pages/AccountRecoveryPage';
 import Onboarding2Page from './pages/Onboarding2Page';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -14,6 +15,7 @@ import DocumentUploadPage from './pages/DocumentUploadPage';
 import VoiceClonePage from './pages/VoiceClonePage';
 import SplashScreen from './components/SplashScreen';
 import LegalDocumentPage from './components/LegalDocumentPage';
+import LegalAcceptanceGate from './components/LegalAcceptanceGate';
 import CookieNotice from './components/CookieNotice';
 import { WorkforceGate } from './components/WorkforceSecurity';
 import CustomerExperienceFeedback from './components/CustomerExperienceFeedback';
@@ -33,7 +35,11 @@ function DashboardGate() {
     return <Navigate to="/auth" replace />;
   }
 
-  return <WorkforceGate>{!profile?.onboarded && !workforce?.tenant ? <Navigate to="/onboarding" replace /> : <SonarDashboard />}</WorkforceGate>;
+  if (profile?.account_status === 'pending_deletion') {
+    return <AccountRecoveryPage />;
+  }
+
+  return <LegalAcceptanceGate><WorkforceGate>{!profile?.onboarded && !workforce?.tenant ? <Navigate to="/onboarding" replace /> : <SonarDashboard />}</WorkforceGate></LegalAcceptanceGate>;
 }
 
 function OnboardingGate() {
@@ -51,7 +57,7 @@ function OnboardingGate() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <Onboarding2Page />;
+  return <LegalAcceptanceGate><Onboarding2Page /></LegalAcceptanceGate>;
 }
 
 

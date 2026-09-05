@@ -61,7 +61,10 @@ class Runtime(Phase57):
                         joined=msg['payload'].get('status')=='ok' and bool(msg['payload'].get('response',{}).get('postgres_changes'))
                         if not joined:raise RuntimeError('Realtime did not register')
                     if msg.get('event')=='system':ready=msg['payload'].get('status')=='ok'
-            self.required(self.rest('PATCH','people',data={'notes':self.canary+' updated'},params={'id':'eq.'+str(self.personA['id'])}),'synthetic realtime write')
+            changed=self.main.supabase_admin.raw.table('people').update(
+                {'notes':self.canary+' updated'}
+            ).eq('id',self.personA['id']).execute().data or []
+            if not changed: raise RuntimeError('synthetic realtime write returned no row')
             async def collect(ws):
                 records=[];until=time.monotonic()+4
                 while time.monotonic()<until:

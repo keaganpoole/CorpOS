@@ -7,7 +7,7 @@ import {
   Eye, EyeOff, Lightbulb, AlertTriangle, Zap, Star, Info,
   Copy, Download, Layers, Plus, Trash2, Tag, DollarSign,
   ArrowRight, X, MessageSquareText, Users, Maximize2, Wand2,
-  CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil, Play,
+  CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil, Play, LogOut,
   Loader2, CreditCard, ExternalLink,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -18,6 +18,7 @@ import { DEFAULT_NEST_PREFERENCES, NEST_NOTIFICATION_GROUPS, normalizeNestPrefer
 import { useNest } from '../nest/NestRuntime';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 import CubePreloader from '../components/CubePreloader';
+import AccountLifecycleSection from '../components/AccountLifecycleSection';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import SnapDropdown from '../../components/SnapDropdown';
 import {
@@ -3679,7 +3680,8 @@ const SettingsPage = () => {
     { id: 'appointments', title: 'Hours', icon: Calendar, iconClass: 'settings-icon', hint: 'Business availability' },
     { id: 'services', title: 'Services & Pricing', icon: Tag, iconClass: 'settings-icon', hint: 'Offer catalog and rates' },
     { id: 'knowledge', title: 'Knowledge Base', icon: BookOpen, iconClass: 'settings-icon', hint: 'Policies, FAQs, and context' },
-  ].filter(section => workforce?.tenant?.role === 'OWNER' || section.id === 'security' || (workforce?.tenant?.role === 'MANAGER' && section.id === 'services'));
+    { id: 'account', title: 'Account', icon: LogOut, iconClass: 'settings-icon', hint: 'Access and data controls' },
+  ].filter(section => workforce?.tenant?.role === 'OWNER' || section.id === 'security' || section.id === 'account' || (workforce?.tenant?.role === 'MANAGER' && section.id === 'services'));
 
   const activeSectionConfig = settingsSections.find(section => section.id === activeSection) || settingsSections[0];
   const ActiveSettingsIcon = activeSectionConfig.icon;
@@ -3692,6 +3694,14 @@ const SettingsPage = () => {
         return <BusinessForwardingSettings authSession={authSession} />;
       case 'billing':
         return <BillingSettings profile={profile} />;
+      case 'account':
+        return (
+          <AccountLifecycleSection
+            businessName={settings.business_name}
+            profile={profile}
+            onManageBilling={() => setActiveSection('billing')}
+          />
+        );
       case 'intro':
         return (
           <>

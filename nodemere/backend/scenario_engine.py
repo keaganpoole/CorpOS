@@ -3748,17 +3748,33 @@ class ScenarioEngine:
 
         if "person" not in context and payload.get("customer_id"):
             try:
-                customer_query = self.supabase.table("people").select("*").eq("stripe_customer_id", payload.get("customer_id"))
-                customer_query = customer_query.eq("business_id", business_id)
-                response = customer_query.limit(1).execute()
-                if response.data:
-                    context["person"] = response.data[0]
-                    context["customer"] = response.data[0]
-                    context["people"] = response.data[0]
-                    context["record"] = response.data[0]
-                    context["person_id"] = response.data[0].get("id")
-                    context.setdefault("user_id", response.data[0].get("user_id"))
-                    context.setdefault("business_id", response.data[0].get("business_id"))
+                # Encrypted People fields cannot be safely queried by plaintext.
+                # Scope first, decrypt on the server, then match in memory.
+                customer_rows = (
+                    self.supabase.table("people")
+                    .select("*")
+                    .eq("business_id", business_id)
+                    .limit(500)
+                    .execute()
+                    .data
+                    or []
+                )
+                person = next(
+                    (
+                        row for row in customer_rows
+                        if str(row.get("stripe_customer_id") or "")
+                        == str(payload.get("customer_id") or "")
+                    ),
+                    None,
+                )
+                if person:
+                    context["person"] = person
+                    context["customer"] = person
+                    context["people"] = person
+                    context["record"] = person
+                    context["person_id"] = person.get("id")
+                    context.setdefault("user_id", person.get("user_id"))
+                    context.setdefault("business_id", person.get("business_id"))
             except Exception as exc:
                 logging.warning('scenario_engine._build_flow_context.event_3748')
 

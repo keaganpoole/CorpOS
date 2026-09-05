@@ -43,6 +43,7 @@ import expandedX from '@/assets/t1-expanded-x.png';
 import TypingAnimation from '../components/TypingAnimation';
 import HeroConcept from '../components/HeroConcept';
 import CalendarShowcase, { RightFeatureList } from '../components/CalendarShowcase';
+import EncryptionShowcase from '../components/EncryptionShowcase';
 import WorkWeekComparison from '../components/WorkWeekComparison';
 import JitterDebugOverlay from '../components/JitterDebugOverlay';
 import LegalFooter from '../components/LegalFooter';
@@ -338,7 +339,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
                 <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent"> of the front desk</span>
               </h2>
               <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
-                Deploy the world's most advanced AI receptionists and transform your front desk into a 24/7 operation that answers and places calls, books appointments, processes payments, manages your CRM, and handles every customer through astonishingly natural conversations with a level of speed, consistency, and availability human receptionists simply cannot match.
+                Deploy advanced AI receptionists and transform your front desk into a 24/7 operation for routine calls, general questions, scheduling, payments, and CRM work—while your team remains available for requests that require authorized human handling.
               </div>
             </div>
           </div>
@@ -964,6 +965,10 @@ const HomePage = () => {
 
         <section className="content-section content-section--showcase dark-bg text-center">
           <CalendarShowcase variant="scenarios" />
+        </section>
+
+        <section className="content-section content-section--showcase dark-bg text-center">
+          <EncryptionShowcase />
         </section>
 
       </main>

@@ -597,7 +597,7 @@ const PasswordsPage = () => {
   const [selectedOAuthProviderForFiltering, setSelectedOAuthProviderForFiltering] = useState(null); // New state for filtering passwords by OAuth provider
   const [showToast, setShowToast] = useState({ isVisible: false, message: '' });
   const [selectedCardGradientColor, setSelectedCardGradientColor] = useState(null); // New state for toast gradient
-  const [userPlanData, setUserPlanData] = useState(null); // Stores plan details from the 'plans' table
+  const [userPlanData, setUserPlanData] = useState(null); // Stores catalog entitlement details when this legacy screen is enabled
   const [userTotalPasswordsCount, setUserTotalPasswordsCount] = useState(0); // Stores user's current total password count
 
   const showNotification = (message) => {

@@ -26,9 +26,18 @@ Envelope coverage in `backend/protected_data.py` and the file services:
 - `call_logs`: transcript text/JSON, call report, analysis results, conversation initiation data.
 - `flow_executions`: flow context, pause data, trigger event.
 - `integrations`: credentials, including access/refresh tokens.
+- `people`: identity/contact text, notes/instructions, tags/custom fields,
+  activity outcomes and customer/payment references.
 - Private document bytes in `caller-documents` and recording bytes in `call_recordings`.
 
-People demographics/notes/custom fields, appointment notes/custom fields, call-list summaries/search fields, document metadata, scenario definitions and other unmapped fields are **not application-envelope-encrypted**. They still depend on authorization, audit controls, TLS and platform encryption at rest. Existing historical plaintext rows/files have not all been migrated. Evaluate this explicitly in the risk assessment; it does not automatically justify encrypted search or a rewrite. Do not advertise “all PHI is application-encrypted.”
+People structural/operational metadata (IDs, tenant ownership, consent flags,
+timestamps and numeric counters), appointment notes/custom fields, call-list
+summaries/search fields, document metadata, scenario definitions and other
+unmapped fields are **not application-envelope-encrypted**. They still depend on
+authorization, audit controls, TLS and platform encryption at rest. Existing
+historical rows/files require the documented controlled backfill. Evaluate this
+explicitly in the risk assessment; it does not automatically justify encrypted
+search or a rewrite. Do not advertise “all PHI is application-encrypted.”
 
 Current retention cleans eligible transient workflow/call payloads; it does **not** provide comprehensive lifecycle deletion of canonical clinical records, documents, transcripts or recordings. No live retention policy was left enabled. Choose the necessary policy and a controlled procedure before promising deletion timelines.
 

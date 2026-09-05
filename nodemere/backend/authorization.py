@@ -32,7 +32,7 @@ BUSINESS_TABLES = frozenset({
 })
 OWNER_TABLES = frozenset({"payments", "invoices", "integrations", "checkpoints"})
 PERSONAL_TABLES = frozenset({"users", "account_data_requests"})
-CATALOG_TABLES = frozenset({"sonar_plans", "receptionist_catalog", "system_config"})
+CATALOG_TABLES = frozenset({"plans", "receptionist_catalog", "system_config"})
 REFERENCES = {
     "person_id": "people", "appointment_id": "appointments", "staff_id": "staff",
     "service_id": "services", "receptionist_id": "hired_receptionists",

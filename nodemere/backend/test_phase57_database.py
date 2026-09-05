@@ -99,6 +99,64 @@ class DatabaseEncryptionTests(unittest.TestCase):
         result=self.client.table('call_logs').select('transcript_text').eq('id',self.record).execute().data
         self.assertEqual(result,[{'transcript_text':CANARY}])
 
+    def test_people_sensitive_fields_encrypt_without_changing_bigint_id(self):
+        person_id=9901
+        result=self.client.table('people').insert({
+            'id':person_id,'business_id':1,'user_id':OWNER,
+            'first_name':'Synthetic','last_name':'Patient','phone':'+15555550123',
+            'email':'synthetic@example.test','notes':CANARY,
+            'custom_fields':{'protected_note':CANARY},
+        }).execute().data[0]
+        self.assertEqual(result['id'],person_id)
+        self.assertEqual(result['notes'],CANARY)
+        self.assertNotIn('encryption_record_id',result)
+        stored=self.db.table('people').select('*').eq('id',person_id).execute().data[0]
+        self.assertNotIn(CANARY,json.dumps(stored,default=str))
+        self.assertTrue(is_encrypted(stored['first_name']))
+        self.assertTrue(is_encrypted(stored['custom_fields']))
+        projected=self.client.table('people').select('id,first_name,custom_fields').eq('id',person_id).execute().data
+        self.assertEqual(projected,[{'id':person_id,'first_name':'Synthetic','custom_fields':{'protected_note':CANARY}}])
+
+    def test_people_plaintext_downgrade_and_binding_changes_are_rejected(self):
+        person_id=9902
+        self.client.table('people').insert({
+            'id':person_id,'business_id':1,'user_id':OWNER,'notes':CANARY,
+        }).execute()
+        with self.assertRaises(psycopg2.errors.InsufficientPrivilege):
+            self.db.table('people').update({'notes':'unsafe'}).eq('id',person_id).execute()
+        self.connection.rollback()
+        with self.connection.cursor() as cursor: cursor.execute('set role service_role')
+        self.client.table('people').insert({
+            'id':person_id,'business_id':1,'user_id':OWNER,'notes':CANARY,
+        }).execute()
+        with self.assertRaises(psycopg2.errors.InsufficientPrivilege):
+            self.db.table('people').update({'business_id':2}).eq('id',person_id).execute()
+
+    def test_people_ciphertext_cannot_be_copied_to_another_record(self):
+        first_id,second_id=9903,9904
+        self.client.table('people').insert({'id':first_id,'business_id':1,'user_id':OWNER,'notes':CANARY}).execute()
+        self.client.table('people').insert({'id':second_id,'business_id':1,'user_id':OWNER,'notes':'other'}).execute()
+        first=self.db.table('people').select('*').eq('id',first_id).execute().data[0]
+        self.db.table('people').update({'notes':first['notes']}).eq('id',second_id).execute()
+        with self.assertRaises(KeyUnavailable):
+            self.client.table('people').select('*').eq('id',second_id).execute()
+
+    def test_people_backfill_preview_and_verified_apply(self):
+        person_id=9905
+        with patch.dict(os.environ,{'NODEMERE_ENCRYPTION_MODE':'read-compatible'}):
+            self.client.table('people').insert({
+                'id':person_id,'business_id':1,'user_id':OWNER,
+                'first_name':'Legacy','notes':CANARY,
+            }).execute()
+        preview=backfill(self.db,1,'people')
+        self.assertGreater(preview['plaintext_fields'],0)
+        self.assertEqual(preview['rows_changed'],0)
+        result=backfill(self.db,1,'people',apply=True)
+        self.assertGreater(result['rows_changed'],0)
+        stored=self.db.table('people').select('*').eq('id',person_id).execute().data[0]
+        self.assertNotIn(CANARY,json.dumps(stored,default=str))
+        self.assertEqual(self.client.table('people').select('*').eq('id',person_id).execute().data[0]['notes'],CANARY)
+
     def test_update_preserves_untouched_ciphertext_and_increments_revision(self):
         self.create(); original=self.db.table('call_logs').select('*').eq('id',self.record).execute().data[0]
         result=self.client.table('call_logs').update({'transcript_text':'updated'}).eq('id',self.record).execute().data[0]

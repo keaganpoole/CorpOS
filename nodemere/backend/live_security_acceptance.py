@@ -116,7 +116,15 @@ class Acceptance:
     def seed(self,table,tenant,payload):
         if table!='invoices': payload.setdefault('business_id',self.businesses[tenant])
         if table not in {'staff','people_docs'}: payload.setdefault('user_id',self.users['owner'+tenant]['id'])
-        row=self.required(self.rest('POST',table,data=payload),'seed '+table)[0]
+        if table == 'people':
+            # The service REST endpoint intentionally cannot accept plaintext
+            # People fields after Phase 6 activation. Seed through the same
+            # protected server adapter used by the application.
+            rows=self.main.supabase_admin.raw.table('people').insert(payload).execute().data or []
+            if not rows: raise RuntimeError('seed people returned no row')
+            row=rows[0]
+        else:
+            row=self.required(self.rest('POST',table,data=payload),'seed '+table)[0]
         self.rows.setdefault(table,[]).append(row['id']);return row
 
     @staticmethod

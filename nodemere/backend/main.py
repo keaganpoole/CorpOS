@@ -127,7 +127,7 @@ from .models import (
     TierResponse, HelpdeskMessage, OAuthAccountCreate, OAuthAccountResponse,
     UserIntegrationUpdate, UserIntegrationResponse,
 )
-from .dependencies import get_current_user, get_current_rep
+from .dependencies import get_current_user, get_current_user_for_recovery, get_current_rep
 from .security import safe_oauth_return_to, script_safe_json, issue_internal_context, verify_internal_context
 from .authorization import (Tenant, current_tenant, current_identity, resolve_tenant,
                             validate_references, require_record, owner_id as business_owner_id)
@@ -178,19 +178,8 @@ from .workforce import router as workforce_router
 app.include_router(workforce_router)
 from .record_reads import router as record_read_router
 app.include_router(record_read_router)
-NODEMERE_LEGAL_ACCEPTANCE_KEY = "nodemere_legal_acceptance_v2026_08_11"
-NODEMERE_LEGAL_ACCEPTANCE_VERSION = "2026-08-11"
-RESTRICTED_LAUNCH_INDUSTRY_TERMS = {
-    "health", "medical", "dental", "hipaa", "pharmacy", "hospital", "clinic",
-    "legal", "law firm", "attorney", "financial", "bank", "lending", "credit",
-    "insurance", "education", "school", "government", "political", "campaign",
-    "debt collection", "collections",
-}
-
-
-def is_restricted_launch_industry(value: Optional[str]) -> bool:
-    normalized = str(value or "").strip().lower()
-    return bool(normalized) and any(term in normalized for term in RESTRICTED_LAUNCH_INDUSTRY_TERMS)
+NODEMERE_LEGAL_ACCEPTANCE_KEY = "nodemere_legal_acceptance_v2026_09_04"
+NODEMERE_LEGAL_ACCEPTANCE_VERSION = "2026-09-04"
 # scheduler = AsyncIOScheduler()
 PAYMENT_TEST_MODE = TEST_MODE
 
@@ -2736,6 +2725,13 @@ class LegalAcceptanceRequest(BaseModel):
     accepted_terms: bool
     certified_permitted_use: bool
 
+
+class AccountDeletionRequest(BaseModel):
+    business_name: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=1, max_length=120)
+    feedback: Optional[str] = Field(default=None, max_length=2000)
+    acknowledged: bool = False
+
 class CustomerCreateRequest(BaseModel):
     person_id: Optional[str] = None
     customer_name: Optional[str] = None
@@ -2933,6 +2929,8 @@ configured_origins = [
 origins = configured_origins or [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
     "https://nodemere.ai",
     "https://www.nodemere.ai",
     "https://nodemere.io",
@@ -4488,7 +4486,7 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
     try:
         plan_slug = str(plan_name or "free").strip().lower()
         plan_response = (
-            supabase_admin.table("sonar_plans")
+            supabase_admin.table("plans")
             .select("entitlements")
             .eq("slug", plan_slug)
             .limit(1)
@@ -4555,7 +4553,7 @@ def get_user_plan_context(user_id: str) -> dict:
     entitlements = dict(DEFAULT_PLAN_ENTITLEMENTS[plan_slug])
     try:
         plan_response = (
-            supabase_admin.table("sonar_plans")
+            supabase_admin.table("plans")
             .select("slug,entitlements")
             .eq("slug", plan_slug)
             .limit(1)
@@ -9012,11 +9010,6 @@ async def update_sonar_business_profile(payload: dict, current_user: dict = Depe
         "about_us", "policies", "faq", "business_hours", "business_timezone", "industry",
     }
     updates = {key: value for key, value in payload.items() if key in allowed_fields}
-    if "industry" in updates and is_restricted_launch_industry(updates.get("industry")):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This industry is not available for Nodemere's general-business launch. Contact support before using regulated or restricted activities.",
-        )
     if "business_hours" in updates and isinstance(updates["business_hours"], (dict, list)):
         updates["business_hours"] = json.dumps(updates["business_hours"])
     if "industry" in updates and isinstance(updates["industry"], (dict, list)):
@@ -9513,7 +9506,10 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
         count_user_rows("people", user_id, business_id=(business or {}).get("id")),
         "max_contacts",
     )
-    insert_payload = {**payload}
+    insert_payload = {
+        key: value for key, value in payload.items()
+        if key not in {"id", "user_id", "business_id", "created_at", "encryption_record_id", "security_revision"}
+    }
     insert_payload["user_id"] = user_id
     if business:
         insert_payload["business_id"] = business["id"]
@@ -9558,7 +9554,7 @@ async def update_sonar_person(person_id: str, payload: dict, current_user: dict 
         updates = {
             key: value
             for key, value in payload.items()
-            if key not in {"id", "user_id", "business_id", "created_at"}
+            if key not in {"id", "user_id", "business_id", "created_at", "encryption_record_id", "security_revision"}
         }
         updates = normalize_people_payload_custom_fields(
             updates,
@@ -10466,7 +10462,7 @@ async def deduct_rep_points(rep_id: UUID, points_data: dict, current_rep_id: str
 async def get_money_table_data(current_rep: str = Depends(get_current_rep)):
     try:
         # 1. Fetch all data
-        plans_response = supabase.table('plans').select('plan, plan_label').execute()
+        plans_response = supabase.table('plans').select('slug,name').execute()
         reps_response = supabase.table('reps').select('rep_id, first_name, last_name, points').execute()
         users_response = supabase.table('users').select('plan, associate').execute()
 
@@ -10484,7 +10480,7 @@ async def get_money_table_data(current_rep: str = Depends(get_current_rep)):
         # 3. Build the final response
         money_table_data = []
         for plan in plans_response.data:
-            plan_name = plan['plan']
+            plan_name = plan['slug']
             associated_rep_ids = plan_to_reps[plan_name]
             
             plan_reps = []
@@ -10502,7 +10498,7 @@ async def get_money_table_data(current_rep: str = Depends(get_current_rep)):
             
             money_table_data.append(MoneyTablePlan(
                 plan=plan_name,
-                plan_label=plan.get('plan_label', plan_name.capitalize()),
+                plan_label=plan.get('name', plan_name.capitalize()),
                 total_annual_payouts=total_monthly_commission * 12,
                 reps=plan_reps
             ))
@@ -10533,7 +10529,7 @@ async def get_sonar_pricing_plans():
     stripe_data = await get_plans()
     try:
         plan_rows = (
-            supabase_admin.table("sonar_plans")
+            supabase_admin.table("plans")
             .select("slug,name,stripe_product_name,sort_order,is_recommended,display,entitlements,features")
             .eq("is_public", True)
             .order("sort_order")
@@ -12303,6 +12299,12 @@ async def close_account(current_user: dict = Depends(get_current_user)):
     )
     profile = (profile_response.data or [None])[0]
     status_value = str((profile or {}).get("subscription_status") or "").lower()
+    usage_snapshot = None
+    try:
+        usage_snapshot = get_usage_snapshot(user_id)
+    except Exception:
+        logging.warning('main.request_account_deletion.usage_snapshot_failed.event_12389')
+    subscription_canceled = False
     if status_value in {"active", "trialing", "past_due", "unpaid", "failed"}:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -12328,6 +12330,212 @@ async def close_account(current_user: dict = Depends(get_current_user)):
     return {
         "closed": True,
         "message": "Your account is closed and your deletion request has been submitted.",
+    }
+
+
+@app.post("/users/me/account/delete", tags=["Users"])
+async def request_account_deletion(payload: AccountDeletionRequest, current_user: dict = Depends(get_current_user)):
+    """Submit the user-facing SaaS account deletion request.
+
+    Access is disabled immediately by marking the profile pending_deletion. A
+    separate retention/deletion worker can process the queued request without
+    making the browser responsible for deleting tenant data piecemeal.
+    """
+    from .authorization import authorize_account_closure
+
+    if not payload.acknowledged:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please acknowledge the account deletion terms")
+
+    allowed_reasons = {
+        "I no longer need Nodemere",
+        "It is too expensive",
+        "I could not get it set up",
+        "It is missing something I need",
+        "I am switching to another product",
+        "Other",
+    }
+    if payload.reason not in allowed_reasons:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Select a valid deletion reason")
+
+    user_id = str(current_user.id)
+    authorize_account_closure(
+        getattr(supabase_admin, 'raw', supabase_admin),
+        user_id,
+        getattr(current_user, 'nodemere_aal', 'aal1'),
+    )
+
+    profile_response = (
+        supabase_admin.table("users")
+        .select("subscription_status,account_status")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    profile = (profile_response.data or [None])[0]
+    status_value = str((profile or {}).get("subscription_status") or "").lower()
+    if status_value in {"active", "trialing", "past_due", "unpaid", "failed"}:
+        try:
+            await _cancel_subscription_for_user(CancelSubscriptionRequest(), user_id)
+        except HTTPException as exc:
+            logging.warning('main.request_account_deletion.billing_cancel_failed.event_12390')
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="We could not cancel your subscription, so your account was not scheduled for deletion. Please retry.",
+            ) from exc
+        except Exception as exc:
+            logging.warning('main.request_account_deletion.billing_cancel_failed.event_12391')
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="We could not cancel your subscription, so your account was not scheduled for deletion. Please retry.",
+            ) from exc
+        supabase_admin.table("users").update({
+            "plan": "free",
+            "subscription_status": "canceled",
+            "billing_period": None,
+        }).eq("id", user_id).execute()
+        subscription_canceled = True
+    if str((profile or {}).get("account_status") or "").lower() in {"pending_deletion", "closed"}:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A deletion request is already pending for this account")
+
+    business_response = (
+        supabase_admin.table("businesses")
+        .select("name")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    business = (business_response.data or [None])[0]
+    expected_name = re.sub(r"\s+", " ", str((business or {}).get("name") or "").strip()).casefold()
+    supplied_name = re.sub(r"\s+", " ", payload.business_name.strip()).casefold()
+    if not expected_name or supplied_name != expected_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Type your business name exactly to confirm deletion")
+
+    pending_request = (
+        supabase_admin.table("account_data_requests")
+        .select("id,request_type,status,created_at")
+        .eq("user_id", user_id)
+        .eq("request_type", "deletion")
+        .in_("status", ["requested", "processing"])
+        .limit(1)
+        .execute()
+    ).data or []
+    if pending_request:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A deletion request is already pending for this account")
+
+    now = datetime.now(timezone.utc).isoformat()
+    request_response = supabase_admin.table("account_data_requests").insert({
+        "user_id": user_id,
+        "request_type": "deletion",
+        "details": json.dumps({
+            "source": "Settings > Account",
+            "reason": payload.reason,
+            "feedback": payload.feedback.strip() if payload.feedback else None,
+            "business_name_confirmed": True,
+            "billing_action": "canceled_immediately" if subscription_canceled else "no_active_subscription",
+            "usage_snapshot": {
+                "used_seconds": usage_snapshot.get("used_seconds", 0) if usage_snapshot else 0,
+                "included_seconds": usage_snapshot.get("included_seconds", 0) if usage_snapshot else 0,
+                "overage_seconds": usage_snapshot.get("overage_seconds", 0) if usage_snapshot else 0,
+                "billable_overage_minutes": usage_snapshot.get("billable_overage_minutes", 0) if usage_snapshot else 0,
+                "estimated_overage_amount_cents": usage_snapshot.get("estimated_overage_amount_cents", 0) if usage_snapshot else 0,
+            },
+            "requested_at": now,
+        }),
+    }).execute()
+    if not request_response.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Deletion request could not be created")
+
+    update_response = supabase_admin.table("users").update({
+        "account_status": "pending_deletion",
+        "deletion_requested_at": now,
+    }).eq("id", user_id).execute()
+    if not update_response.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Account could not be scheduled for deletion")
+
+    return {
+        "requested": True,
+        "request_id": request_response.data[0].get("id"),
+        "access_ends_at": now,
+        "retention_period_days": 30,
+        "minutes_policy": "Used minutes and accrued overage remain attached to the canceled billing cycle. Unused included minutes do not carry over; a new plan starts a fresh allowance.",
+        "message": "Your subscription was canceled, your account has been scheduled for deletion, and your access has ended.",
+    }
+
+
+@app.post("/users/me/account/reactivate", tags=["Users"])
+async def reactivate_account(current_user: dict = Depends(get_current_user_for_recovery)):
+    """Withdraw a pending deletion during the account's recovery window."""
+    from .authorization import authorize_account_closure
+
+    user_id = str(current_user.id)
+    profile_response = (
+        supabase_admin.table("users")
+        .select("account_status,deletion_requested_at")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    profile = (profile_response.data or [None])[0] or {}
+    account_status = str(profile.get("account_status") or "").lower()
+    if account_status == "active":
+        return {"reactivated": False, "message": "Your account is already active."}
+    if account_status != "pending_deletion":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This account cannot be restored.")
+
+    requested_at = profile.get("deletion_requested_at")
+    if requested_at:
+        try:
+            recovery_deadline = datetime.fromisoformat(str(requested_at).replace("Z", "+00:00")) + timedelta(days=30)
+            if datetime.now(timezone.utc) >= recovery_deadline:
+                raise HTTPException(status_code=status.HTTP_410_GONE, detail="The account recovery window has expired.")
+        except HTTPException:
+            raise
+        except (TypeError, ValueError):
+            recovery_deadline = None
+    else:
+        recovery_deadline = None
+
+    authorize_account_closure(
+        getattr(supabase_admin, 'raw', supabase_admin),
+        user_id,
+        getattr(current_user, 'nodemere_aal', 'aal1'),
+    )
+
+    now = datetime.now(timezone.utc).isoformat()
+    pending_requests = (
+        supabase_admin.table("account_data_requests")
+        .select("id,details")
+        .eq("user_id", user_id)
+        .eq("request_type", "deletion")
+        .in_("status", ["requested", "processing"])
+        .execute()
+    ).data or []
+    for request_row in pending_requests:
+        raw_details = request_row.get("details")
+        try:
+            details = json.loads(raw_details) if isinstance(raw_details, str) else dict(raw_details or {})
+        except (TypeError, ValueError):
+            details = {"original_details": raw_details}
+        details.update({"withdrawn_at": now, "outcome": "withdrawn_during_recovery"})
+        supabase_admin.table("account_data_requests").update({
+            "status": "rejected",
+            "completed_at": now,
+            "details": json.dumps(details),
+        }).eq("id", request_row["id"]).execute()
+
+    update_response = supabase_admin.table("users").update({
+        "account_status": "active",
+        "deletion_requested_at": None,
+        "closed_at": None,
+    }).eq("id", user_id).execute()
+    if not update_response.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Account could not be restored")
+
+    return {
+        "reactivated": True,
+        "subscription_status": "canceled",
+        "recovery_deadline": recovery_deadline.isoformat() if recovery_deadline else None,
+        "message": "Your account has been restored. Choose a plan to restart your subscription.",
     }
 
 
@@ -12368,12 +12576,28 @@ async def accept_legal_terms(
             "ip_address": get_client_ip(request),
             "certified_permitted_use": True,
         }
-        response = (
-            supabase_admin.table("users")
-            .update({"terms_of_service": terms})
-            .eq("id", current_user_id)
-            .execute()
-        )
+        if profile_response.data:
+            response = (
+                supabase_admin.table("users")
+                .update({"terms_of_service": terms})
+                .eq("id", current_user_id)
+                .execute()
+            )
+        else:
+            # OAuth may return here before the ordinary profile read has created
+            # a row.  Create that row with the acceptance rather than treating a
+            # zero-row update as a successful legal record.
+            user_metadata = getattr(current_user, "user_metadata", {}) or {}
+            response = supabase_admin.table("users").upsert({
+                "id": current_user_id,
+                "email": current_user.email,
+                "full_name": user_metadata.get("full_name") or user_metadata.get("name"),
+                "phone": user_metadata.get("phone"),
+                "onboarded": False,
+                "terms_of_service": terms,
+            }).execute()
+        if not response.data:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to record legal acceptance.")
         return {"ok": True, "terms_of_service": response.data[0].get("terms_of_service") if response.data else terms}
     except HTTPException:
         raise
@@ -13079,12 +13303,6 @@ async def complete_onboarding(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Business name is required to start onboarding.",
-            )
-
-        if onboarding_data.industry and is_restricted_launch_industry(onboarding_data.industry):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This industry is not available for Nodemere's general-business launch. Contact support before using regulated or restricted activities.",
             )
 
         normalized_business_hours = normalize_onboarding_schedule(onboarding_data.business_hours or {})
@@ -14254,14 +14472,14 @@ async def create_password_for_user(password_data: PasswordCreate, current_user: 
     if not user_plan_name:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User does not have a subscription plan.")
 
-    plan_response = supabase.table("plans").select("*").eq("plan", user_plan_name).single().execute()
+    plan_response = supabase.table("plans").select("slug,entitlements").eq("slug", user_plan_name).single().execute()
     if not plan_response.data:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='The request could not be completed')
     
-    plan = plan_response.data
+    plan_entitlements = plan_response.data.get("entitlements") or {}
 
-    total_passwords_limit = plan.get("total_passwords_limit")
-    daily_passwords_limit = plan.get("daily_passwords_limit")
+    total_passwords_limit = plan_entitlements.get("total_passwords_limit")
+    daily_passwords_limit = plan_entitlements.get("daily_passwords_limit")
     
     total_passwords_count = user.get("total_passwords_count", 0) or 0
     daily_passwords_count = user.get("daily_passwords_count", 0) or 0

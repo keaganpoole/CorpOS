@@ -2,7 +2,7 @@
 -- Stripe remains the source of truth for prices, products, subscriptions, and checkout.
 -- This table is the source of truth for what each plan includes in the application.
 
-create table if not exists public.sonar_plans (
+create table if not exists public.plans (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
   name text not null unique,
@@ -15,22 +15,22 @@ create table if not exists public.sonar_plans (
   features jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint sonar_plans_display_object check (jsonb_typeof(display) = 'object'),
-  constraint sonar_plans_entitlements_object check (jsonb_typeof(entitlements) = 'object'),
-  constraint sonar_plans_features_array check (jsonb_typeof(features) = 'array')
+  constraint plans_display_object check (jsonb_typeof(display) = 'object'),
+  constraint plans_entitlements_object check (jsonb_typeof(entitlements) = 'object'),
+  constraint plans_features_array check (jsonb_typeof(features) = 'array')
 );
 
-create index if not exists sonar_plans_public_sort_idx
-  on public.sonar_plans (is_public, sort_order);
+create index if not exists plans_public_sort_idx
+  on public.plans (is_public, sort_order);
 
-alter table public.sonar_plans enable row level security;
+alter table public.plans enable row level security;
 
-drop policy if exists "Public can read public Sonar plans" on public.sonar_plans;
-create policy "Public can read public Sonar plans"
-  on public.sonar_plans for select
+drop policy if exists "Public can read public plans" on public.plans;
+create policy "Public can read public plans"
+  on public.plans for select
   using (is_public = true);
 
-insert into public.sonar_plans (
+insert into public.plans (
   slug,
   name,
   stripe_product_name,
@@ -98,7 +98,7 @@ on conflict (slug) do update set
   updated_at = now();
 
 -- Keep updated_at accurate when an entitlement is edited in Supabase.
-create or replace function public.set_sonar_plans_updated_at()
+create or replace function public.set_plans_updated_at()
 returns trigger as $$
 begin
   new.updated_at = now();
@@ -106,14 +106,14 @@ begin
 end;
 $$ language plpgsql;
 
-drop trigger if exists sonar_plans_set_updated_at on public.sonar_plans;
-create trigger sonar_plans_set_updated_at
-before update on public.sonar_plans
-for each row execute function public.set_sonar_plans_updated_at();
+drop trigger if exists plans_set_updated_at on public.plans;
+create trigger plans_set_updated_at
+before update on public.plans
+for each row execute function public.set_plans_updated_at();
 
 -- Backfill the allowance for businesses that already have a matching user plan.
 update public.businesses as b
 set current_cycle_included_seconds = coalesce((p.entitlements ->> 'included_call_minutes')::integer, 0) * 60
 from public.users as u
-join public.sonar_plans as p on p.slug = lower(coalesce(u.plan, 'free'))
+join public.plans as p on p.slug = lower(coalesce(u.plan, 'free'))
 where b.user_id = u.id;

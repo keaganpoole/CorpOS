@@ -71,3 +71,20 @@ test('both scenario builders select permitted invoice columns instead of raw pro
     assert.match(source,/from\(tableKey\)\.select\(columns\)/);
   }
 });
+
+test('People sensitive fields are loaded through the authorized decryption API',()=>{
+  const files=[
+    'src/sonar/hooks/useLeads.js',
+    'src/sonar/hooks/useAppointments.js',
+    'src/sonar/lib/customFields.js',
+    'src/sonar/pages/Scenarios/VariablesPane.jsx',
+    'src/sonar/pages/Scenarios/HomepageVariablesPane.jsx',
+    'src/sonar/pages/Scenarios/Scenarios.jsx',
+    'src/sonar/pages/Scenarios/HomepageScenariosDemo.jsx',
+  ];
+  for(const file of files) assert.doesNotMatch(read(file),/\.from\(['"]people['"]\)/,file);
+  const api=read('src/sonar/lib/api.js');
+  assert.match(api,/getPeople:.*\/api\/sonar\/people/);
+  assert.match(api,/getPerson:.*\/api\/sonar\/people\/\$\{encodeURIComponent\(id\)\}/);
+  assert.match(read('src/sonar/pages/LiveMonitoringPage.jsx'),/from\('people'\)\.select\('id,created_at'\)/);
+});

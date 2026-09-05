@@ -58,6 +58,13 @@ class Phase57(Acceptance):
         person=self.seed('people','A',{'first_name':'SYNTHETIC SECURITY','last_name':self.run,'notes':self.canary,'do_not_call':True,'do_not_text':True})
         other=self.seed('people','B',{'first_name':'SYNTHETIC FOREIGN','last_name':self.run,'do_not_call':True,'do_not_text':True})
         self.personA=person; self.personB=other
+        stored_person=self.raw('people',person['id'])
+        self.check(6,'People identity and notes are ciphertext in Supabase',
+                   self.canary not in json.dumps(stored_person) and str(stored_person.get('notes','')).startswith('ndmenc:v1:'))
+        self.check(6,'People ciphertext transparently decrypts on the server',
+                   self.protected.decode('people',stored_person).get('notes')==self.canary)
+        response=self.rest('PATCH','people',data={'notes':self.canary},params={'id':'eq.'+str(person['id'])})
+        self.check(6,'Service REST cannot downgrade People to plaintext',response.status_code==403)
         scenario=self.seed('scenarios','A',{'name':'[SECURITY TEST] '+self.run,'nodes_data':[],'edges_data':[],'is_active':False})
         req=self.seed('requests','A',{'request_type':'document_upload','person_id':person['id'],'token_hash':uuid4().hex+uuid4().hex,'status':'completed',
                                    'expires_at':datetime.now(timezone.utc).isoformat()})

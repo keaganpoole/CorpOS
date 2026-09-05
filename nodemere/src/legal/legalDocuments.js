@@ -1,8 +1,8 @@
-export const LEGAL_EFFECTIVE_DATE = 'August 30, 2026';
+export const LEGAL_EFFECTIVE_DATE = 'September 4, 2026';
 
-export const LEGAL_ACCEPTANCE_KEY = 'nodemere_legal_acceptance_v2026_08_30';
+export const LEGAL_ACCEPTANCE_KEY = 'nodemere_legal_acceptance_v2026_09_04';
 
-export const LEGAL_ACCEPTANCE_VERSION = '2026-08-30';
+export const LEGAL_ACCEPTANCE_VERSION = '2026-09-04';
 
 export const hasCurrentLegalAcceptance = (profile) => (
   profile?.terms_of_service?.[LEGAL_ACCEPTANCE_KEY]?.accepted === true
@@ -33,7 +33,7 @@ You receive a limited, non-exclusive, non-transferable, revocable right to use t
 
 Nodemere does **not** use identifiable Customer Data, call recordings, transcripts, uploaded documents, or voice data to train generalized AI models by default. We may use aggregated or de-identified information to operate, secure, analyze, and improve the Service, provided it is not reasonably linkable to an identified person or Customer.
 
-You represent that you have all rights, notices, permissions, and lawful bases needed to provide Customer Data to us and direct its processing. Do not submit protected, confidential, or sensitive information unless the Service is expressly approved in writing for that use.
+You represent that you have all rights, notices, permissions, and lawful bases needed to provide Customer Data to us and direct its processing. Standard Nodemere plans are approved for ordinary front-desk and business-administration workflows. They are not approved for automated handling of sensitive, confidential, regulated, protected, or account-specific information, or for workflows requiring identity verification, professional judgment, or access to protected records. Configure those requests to be handled by an authorized person. Broader use requires Nodemere's prior written approval and any required agreements or configuration.
 
 ## 3. AI, calls, recordings, and communications
 
@@ -69,7 +69,7 @@ You will pay applicable subscription and usage fees shown at purchase or in an o
 
 ## 6. Restricted uses
 
-You must comply with the [Acceptable Use Policy](/acceptable-use-policy). Without Nodemere's prior written approval and any required addendum, you may not use the Service for healthcare or PHI, financial services or credit decisions, legal services, education records, insurance decisions, government work, debt collection, political activity, emergency services, or other regulated or high-risk activities. You may not use the Service to deceive, impersonate, discriminate, harass, surveil unlawfully, infringe rights, send spam, evade consent requirements, or create a voice clone without the voice owner's documented authorization.
+You must comply with the [Acceptable Use Policy](/acceptable-use-policy). Without Nodemere's prior written approval and any required addendum, you may not use standard-plan automation for restricted workflows involving sensitive, confidential, regulated, protected, or account-specific information; identity-dependent requests; professional judgment; or access to protected records. This restriction is based on the data and workflow, not the Customer's industry. You may not use the Service to deceive, impersonate, discriminate, harass, surveil unlawfully, infringe rights, send spam, evade consent requirements, or create a voice clone without the voice owner's documented authorization.
 
 ## 7. Confidentiality
 
@@ -180,7 +180,7 @@ This Acceptable Use Policy is part of the [Terms of Service](/terms). It applies
 
 ## Allowed launch use
 
-Nodemere is currently approved for general U.S. business administration and customer-service use, such as answering inbound calls, scheduling, status updates, appointment reminders, customer-requested follow-up, CRM updates, and sending secure document links. Use must remain within the Customer's lawful business purpose and documented instructions.
+Nodemere standard plans are currently approved for ordinary U.S. business administration and customer-service use, such as answering inbound calls, general business questions, routine scheduling where permitted and where restricted information is not involved, status updates, appointment reminders, customer-requested follow-up, CRM updates, and sending secure document links. Use must remain within the Customer's lawful business purpose and documented instructions.
 
 ## You may not use Nodemere to
 
@@ -192,7 +192,7 @@ Nodemere is currently approved for general U.S. business administration and cust
 - submit another person's voice, likeness, recording, biometric information, or personal data without documented authority; or use a synthetic voice for deceptive impersonation;
 - process payment credentials through the Service other than Stripe-hosted payment components and approved flows; or use payment features without clear sale terms and customer authorization;
 - use the Service for emergency dispatch, 911, medical triage, suicide or crisis response, or any situation in which an error or delay could create a risk of death, bodily injury, or serious harm;
-- use the Service with protected health information, healthcare, dental, legal, financial, lending, credit, insurance, education, government, political, debt-collection, employment, biometric, or similarly regulated data or activities unless Nodemere has approved the use in writing and all required agreements and controls are in place;
+- use standard-plan automation to collect, disclose, retrieve, change, or decide based on sensitive, confidential, regulated, protected, or account-specific information, or to handle identity-dependent requests; route those requests to an authorized person unless Nodemere has separately approved the workflow in writing and all required agreements and controls are in place;
 - make or assist with decisions about employment, housing, insurance, credit, education, healthcare, legal rights, benefits, or other high-impact matters;
 - upload malware, exploit vulnerabilities, bypass access controls, probe systems, resell unauthorized access, or interfere with the Service; or
 - use the Service to harass, threaten, discriminate against, exploit, or unlawfully surveil any person.
@@ -232,7 +232,7 @@ Nodemere does not authorize telemarketing, marketing, political, fundraising, or
 
 ## Emergency and regulated use
 
-Do not use Nodemere for 911, emergency dispatch, medical triage, crisis response, or any decision where an AI error could cause serious harm. Regulated industries and use cases are not authorized at launch without Nodemere's prior written approval and the required agreements and controls.`
+Do not use Nodemere for 911, emergency dispatch, medical triage, crisis response, or any decision where an AI error could cause serious harm. Standard-plan automation is not authorized for restricted workflows involving sensitive, confidential, regulated, protected, or account-specific information, or identity-dependent requests, without Nodemere's prior written approval and the required agreements and controls.`
   },
   dpa: {
     title: 'Data Processing Addendum',
@@ -300,7 +300,7 @@ Nodemere uses service providers to operate the Service. The providers that proce
 
 Nodemere may add, replace, or remove subprocessors as the Service changes. We will maintain this notice and, where required by contract or law, provide advance notice of material changes. Questions or objections under the DPA: **support@nodemere.ai**.
 
-Nodemere does not authorize regulated use of the Service at launch. A provider appearing in this notice does not mean that provider has signed a business associate agreement, financial-services addendum, government agreement, or other industry-specific agreement required for a Customer's use case.`
+Nodemere standard plans do not authorize restricted automated workflows involving sensitive, confidential, regulated, protected, or account-specific information. A provider appearing in this notice does not mean that provider has signed a business associate agreement, financial-services addendum, government agreement, or other industry-specific agreement required for a separately approved use case.`
   },
   cookies: {
     title: 'Cookie Notice',
