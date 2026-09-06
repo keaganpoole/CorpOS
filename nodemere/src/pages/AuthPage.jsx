@@ -7,6 +7,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import googleIcon from '../assets/google.png'; // Import the local Google icon
 import { LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
+import { prepareVisitorIdentity, trackVisitorEvent } from '../lib/visitorTracking.js';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 const FRONTEND_PUBLIC_URL = import.meta.env.VITE_FRONTEND_PUBLIC_URL || window.location.origin;
@@ -77,6 +78,8 @@ const AuthPage = () => {
                 localStorage.removeItem('pendingPlan');
                 const { priceId, planSlug, cycle } = JSON.parse(pendingPlan);
                 try {
+                    trackVisitorEvent('checkout_started', { element_id: 'auth-pending-checkout', element_type: 'button' });
+                    await prepareVisitorIdentity();
                     const response = await axios.post(
                         `${API_BASE_URL}/create-checkout-session`,
                         { price_id: priceId, plan_slug: planSlug, billing_cycle: cycle },
@@ -113,8 +116,20 @@ const AuthPage = () => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
+    const trackAuthStart = (formId = isSignUp ? 'auth-signup' : 'auth-login') => {
+        trackVisitorEvent('form_started', { form_id: formId });
+        if (isSignUp) trackVisitorEvent('signup_started', { form_id: formId });
+    };
+    const handleAuthFocus = (event) => {
+        const fieldId = { email: 'email', password: 'password', confirmPassword: 'confirm-password' }[event.target.name];
+        if (!fieldId) return;
+        trackAuthStart();
+        trackVisitorEvent('field_focused', { form_id: isSignUp ? 'auth-signup' : 'auth-login', field_id: fieldId });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        trackAuthStart();
         setError('');
         setSuccessMessage('');
         setIsLoading(true);
@@ -138,12 +153,14 @@ const AuthPage = () => {
                     legal_version: LEGAL_ACCEPTANCE_VERSION,
                     certified_permitted_use: true,
                 });
+                trackVisitorEvent('form_completed', { form_id: 'auth-signup' });
                 setSuccessMessage('Please check your email inbox and spam folder for a confirmation link. ');
                 setFormData(prev => ({ ...prev, password: '', confirmPassword: '' })); // Keep email, clear passwords
                 setIsConfirmationSent(true);
                 setResendTimer(60); // Start the 60-second timer
             } else {
                 await login(formData.email, formData.password);
+                trackVisitorEvent('form_completed', { form_id: 'auth-login' });
                 // The useEffect below will handle redirection based on session and pendingPlan
             }
         } catch (apiError) {
@@ -172,6 +189,8 @@ const AuthPage = () => {
         setIsLoading(true);
         try {
             if (isSignUp) sessionStorage.setItem(OAUTH_LEGAL_ACCEPTANCE_STORAGE_KEY, LEGAL_ACCEPTANCE_VERSION);
+            trackAuthStart('auth-google');
+            await prepareVisitorIdentity();
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -247,7 +266,7 @@ const AuthPage = () => {
                     <h1 className="text-2xl font-bold text-white mb-10">{isSignUp ? 'Create an account' : 'Welcome back'}</h1>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} onFocusCapture={handleAuthFocus} className="space-y-5">
                     <div className={inputGroupClasses}>
                         <input id="email" type="email" name="email" placeholder=" " value={formData.email} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
                         <label htmlFor="email" className={labelClasses}>Email</label>

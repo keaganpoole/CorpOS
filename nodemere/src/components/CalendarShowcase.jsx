@@ -898,7 +898,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               </div>
               {isMonitoringVariant && (
                 <div className="mt-8 flex justify-center">
-                  <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta">
+                  <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta" data-visitor-event="cta_click" data-visitor-id={`${variant}-get-started`}>
                     Get Started
                     <ArrowRight size={16} strokeWidth={2.4} />
                   </Link>
@@ -906,7 +906,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
               )}
               {!isMonitoringVariant && !isCrmVariant && (
                 <div className="mt-12 flex justify-center">
-                  <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta">
+                  <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta" data-visitor-event="cta_click" data-visitor-id={`${variant}-booking-calls`}>
                     Start Booking Calls
                     <ArrowRight size={16} strokeWidth={2.4} />
                   </Link>

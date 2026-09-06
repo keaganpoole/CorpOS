@@ -100,6 +100,13 @@ class PrivacyTests(unittest.TestCase):
             OperationalLogFilter().filter(record)
             self.assertNotIn(CANARY,record.getMessage())
             self.assertIsNone(record.exc_text)
+    def test_uvicorn_access_log_keeps_formatter_shape_after_redaction(self):
+        record=logging.LogRecord('uvicorn.access',logging.INFO,'synthetic',1,
+            '%s - "%s %s HTTP/%s" %s',('127.0.0.1','GET','/api/private','1.1',200),None)
+        OperationalLogFilter().filter(record)
+        self.assertEqual(len(record.args),5)
+        self.assertNotIn('127.0.0.1',record.getMessage())
+        self.assertNotIn('/api/private',record.getMessage())
     def test_useful_operational_event_and_request_id_preserved(self):
         record=logging.LogRecord('root',logging.INFO,'synthetic',1,'main.example.event_1',(),None)
         OperationalLogFilter().filter(record)

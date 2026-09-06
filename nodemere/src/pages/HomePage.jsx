@@ -47,7 +47,6 @@ import EncryptionShowcase from '../components/EncryptionShowcase';
 import WorkWeekComparison from '../components/WorkWeekComparison';
 import JitterDebugOverlay from '../components/JitterDebugOverlay';
 import LegalFooter from '../components/LegalFooter';
-import { trackVisitor } from '../services/apiService';
 import useSectionScrollProgress from '../hooks/useSectionScrollProgress';
 
 const HERO_RECEPTIONIST_FEATURE_ITEMS = [
@@ -284,6 +283,8 @@ const StackedHeroShowcase = ({ sectionRef }) => {
 
   return (
     <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[280vh] bg-[#020202]"
+      data-visitor-section="hero"
+      data-visitor-section-index="0"
       data-jitter-debug-root={jitterDebugEnabled ? 'hero' : undefined}
       data-jitter-section-progress={jitterDebugEnabled ? sectionProgress : undefined}
       data-jitter-feature-progress={jitterDebugEnabled ? heroFeatureProgress : undefined}
@@ -564,6 +565,8 @@ const ComparisonShowcase = () => {
 
   return (
     <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[560vh]"
+      data-visitor-section="comparison"
+      data-visitor-section-index="4"
       data-jitter-debug-root={jitterDebugEnabled ? 'comparison' : undefined}
       data-jitter-section-progress={jitterDebugEnabled ? sectionProgress : undefined}
       data-jitter-feature-progress={jitterDebugEnabled ? comparisonProgress : undefined}
@@ -630,7 +633,6 @@ const HomePage = () => {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const hasTrackedVisitor = useRef(false);
   const jitterTest = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('jitterTest') : null;
 
   const phoneHelperCollageImages = [phonehelper1, phonehelper2];
@@ -679,18 +681,6 @@ const HomePage = () => {
       setShowSplash(false);
     }, 1000);
 
-    const recordVisitor = async () => {
-      if (hasTrackedVisitor.current) return;
-      hasTrackedVisitor.current = true;
-      try {
-        const userAgent = navigator.userAgent;
-        await trackVisitor(userAgent);
-      } catch (error) {
-        console.error("HomePage.jsx:event_770");
-      }
-    };
-
-    recordVisitor();
     return () => clearTimeout(timer);
   }, []);
 
@@ -799,13 +789,13 @@ const HomePage = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      <div className={`header${headerHasAppeared ? ' is-visible' : ''}`}>
+      <div className={`header${headerHasAppeared ? ' is-visible' : ''}`} data-visitor-click-section="header" data-visitor-click-section-index="-1">
         <nav className="nav-content">
           <img src={logoImage} alt="Nodemere" className="header-logo" />
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6 ml-auto">
-            <Link to="/pricing" className="text-sm font-semibold text-white hover:text-gray-300">Pricing</Link>
+            <Link to="/pricing" data-visitor-event="navigation_click" data-visitor-id="header-pricing" className="text-sm font-semibold text-white hover:text-gray-300">Pricing</Link>
             {session ? (
               <>
                 <button
@@ -818,8 +808,8 @@ const HomePage = () => {
               </>
             ) : (
               <>
-                <Link to="/auth" className="text-sm font-semibold text-white hover:text-gray-300">Login</Link>
-                <Link to="/auth" state={{ isSignUp: true }} className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
+                <Link to="/auth" data-visitor-event="navigation_click" data-visitor-id="header-login" className="text-sm font-semibold text-white hover:text-gray-300">Login</Link>
+                <Link to="/auth" state={{ isSignUp: true }} data-visitor-event="cta_click" data-visitor-id="header-signup" className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
               </>
             )}
           </div>
@@ -827,7 +817,7 @@ const HomePage = () => {
           {/* Mobile Navigation */}
           <div className="md:hidden flex items-center space-x-4 ml-auto">
             {!session && (
-              <Link to="/auth" state={{ isSignUp: true }} className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
+              <Link to="/auth" state={{ isSignUp: true }} data-visitor-event="cta_click" data-visitor-id="mobile-signup" className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
             )}
             <button onClick={toggleMenu} className="text-white hover:text-gray-300 focus:outline-none">
               {isMenuOpen ? <XIcon size={24} /> : <MenuIcon size={24} />}
@@ -848,11 +838,11 @@ const HomePage = () => {
                 {session && (
                   <Link to="/dashboard" className="text-base font-semibold text-white hover:text-gray-300" onClick={toggleMenu}>Dashboard</Link>
                 )}
-                <Link to="/pricing" className="text-base font-semibold text-white hover:text-gray-300" onClick={toggleMenu}>Pricing</Link>
+                <Link to="/pricing" data-visitor-event="navigation_click" data-visitor-id="mobile-pricing" className="text-base font-semibold text-white hover:text-gray-300" onClick={toggleMenu}>Pricing</Link>
                 {session ? (
                   <button onClick={async () => { await logout(); navigate('/'); toggleMenu(); }} className="text-base font-semibold text-white hover:text-gray-300">Logout</button>
                 ) : (
-                  <Link to="/auth" className="text-base font-semibold text-white hover:text-gray-300" onClick={toggleMenu}>Login</Link>
+                  <Link to="/auth" data-visitor-event="navigation_click" data-visitor-id="mobile-login" className="text-base font-semibold text-white hover:text-gray-300" onClick={toggleMenu}>Login</Link>
                 )}
               </div>
             </motion.div>
@@ -863,25 +853,25 @@ const HomePage = () => {
       <main>
         <StackedHeroShowcase sectionRef={heroRef} />
 
-        <section className="content-section content-section--showcase content-section--booking dark-bg text-center">
+        <section className="content-section content-section--showcase content-section--booking dark-bg text-center" data-visitor-section="calendar" data-visitor-section-index="1">
           <CalendarShowcase />
         </section>
 
-        <section className="content-section content-section--showcase dark-bg text-center">
+        <section className="content-section content-section--showcase dark-bg text-center" data-visitor-section="people-crm" data-visitor-section-index="2">
           <CalendarShowcase variant="people-crm" />
         </section>
 
-        <section className="content-section content-section--showcase dark-bg text-center">
+        <section className="content-section content-section--showcase dark-bg text-center" data-visitor-section="live-monitoring" data-visitor-section-index="3">
           <CalendarShowcase variant="live-monitoring" />
         </section>
 
         <ComparisonShowcase />
 
-        <section className="content-section content-section--showcase dark-bg text-center">
+        <section className="content-section content-section--showcase dark-bg text-center" data-visitor-section="scenarios" data-visitor-section-index="5">
           <CalendarShowcase variant="scenarios" />
         </section>
 
-        <section className="content-section content-section--showcase dark-bg text-center">
+        <section className="content-section content-section--showcase dark-bg text-center" data-visitor-section="security" data-visitor-section-index="6">
           <EncryptionShowcase />
         </section>
 

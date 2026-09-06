@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
@@ -17,12 +17,16 @@ import SplashScreen from './components/SplashScreen';
 import LegalDocumentPage from './components/LegalDocumentPage';
 import LegalAcceptanceGate from './components/LegalAcceptanceGate';
 import CookieNotice from './components/CookieNotice';
+import VisitorTracking from './components/VisitorTracking';
 import { WorkforceGate } from './components/WorkforceSecurity';
 import CustomerExperienceFeedback from './components/CustomerExperienceFeedback';
 
 // Sonar Dashboard
 import SonarDashboard from './sonar/SonarDashboard';
 import ProjectIntelligenceReport from './sonar/pages/ProjectIntelligenceReport';
+import { visitorIntelligenceApi } from './lib/visitorIntelligenceApi';
+
+const VisitorsPage = lazy(() => import('./pages/VisitorsPage'));
 
 function DashboardGate() {
   const { session, profile, isLoading, workforce } = useAuth();
@@ -60,12 +64,35 @@ function OnboardingGate() {
   return <LegalAcceptanceGate><Onboarding2Page /></LegalAcceptanceGate>;
 }
 
+function VisitorGate() {
+  const { session, profile, isLoading } = useAuth();
+  const [access, setAccess] = useState('checking');
+  const localVisitorAccess = import.meta.env.DEV && (!import.meta.env.VITE_API_URL || /localhost|127\.0\.0\.1/.test(String(import.meta.env.VITE_API_URL)));
+  useEffect(() => {
+    let cancelled = false;
+    if (!session) { setAccess('checking'); return () => { cancelled = true; }; }
+    if (localVisitorAccess) { setAccess('allowed'); return () => { cancelled = true; }; }
+    visitorIntelligenceApi.access()
+      .then((result) => { if (!cancelled) setAccess(result?.authorized === true ? 'allowed' : 'denied'); })
+      .catch((error) => { if (!cancelled) setAccess(error?.status === 403 ? 'denied' : 'unavailable'); });
+    return () => { cancelled = true; };
+  }, [localVisitorAccess, session?.access_token]);
+  if (isLoading) return <SplashScreen />;
+  if (!session) return <Navigate to="/auth" replace />;
+  if (profile?.account_status === 'pending_deletion') return <AccountRecoveryPage />;
+  if (access === 'denied') return <Navigate to="/dashboard" replace />;
+  if (access === 'unavailable') return <div className="flex min-h-screen items-center justify-center bg-[#020202] p-6 text-center text-sm text-zinc-500">This internal page is temporarily unavailable.</div>;
+  if (access !== 'allowed') return <SplashScreen />;
+  return <Suspense fallback={<SplashScreen />}><VisitorsPage /></Suspense>;
+}
+
 
 function AppContent() {
   const { isLoading, isAppLoading } = useAuth();
   const location = useLocation();
   const isVoiceCloneEntry = location.pathname.startsWith('/clone');
   const isPublicStats = location.pathname === '/stats';
+  const isVisitors = location.pathname.startsWith('/visitors');
 
   if ((isLoading || isAppLoading) && !isVoiceCloneEntry && !isPublicStats) {
     return <SplashScreen />;
@@ -105,12 +132,13 @@ function AppContent() {
         <Route path="/dashboard" element={<DashboardGate />} />
         <Route path="/dashboard/*" element={<DashboardGate />} />
         <Route path="/stats" element={<ProjectIntelligenceReport publicView />} />
+        <Route path="/visitors" element={<VisitorGate />} />
 
         {/* --- Fallback Route --- */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <CookieNotice />
-      <CustomerExperienceFeedback />
+      {!isVisitors && <CustomerExperienceFeedback />}
     </>
   );
 }
@@ -119,6 +147,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        <VisitorTracking />
         <AppContent />
       </AuthProvider>
     </Router>

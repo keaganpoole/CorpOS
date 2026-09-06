@@ -3,6 +3,7 @@
 import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { supabase, setWorkforceContext } from '../supabaseClient';
 import { needsMfa } from '../lib/workforceSecurity';
+import { resetVisitorIdentity, updateVisitorAuth } from '../lib/visitorTracking.js';
 
 const AuthContext = createContext(null);
 
@@ -19,7 +20,7 @@ export const AuthProvider = ({ children }) => {
         const active = data.session;
         if (!active) { setWorkforce(null); setWorkforceContext(null); return null; }
         try {
-            const response = await fetch(`${window.sonar?.apiUrl || import.meta.env.VITE_API_URL || ''}/api/workforce/session`, { headers: { Authorization: `Bearer ${active.access_token}` } });
+            const response = await fetch(`${import.meta.env.VITE_API_URL || window.sonar?.apiUrl || ''}/api/workforce/session`, { headers: { Authorization: `Bearer ${active.access_token}` } });
             if (!response.ok) throw new Error('Workforce access is unavailable. Check that the backend and security migrations are ready.');
             const body = await response.json();
             const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -72,15 +73,18 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         let isMounted = true;
+        let visitorAuthRevision = 0;
 
         supabase.auth.getSession().then(({ data }) => {
             if (!isMounted) return;
             const nextSession = data.session ?? null;
+            if (visitorAuthRevision === 0) updateVisitorAuth(nextSession);
             setSession(nextSession);
             setIsProfileLoaded(!nextSession?.user);
             setIsSessionLoading(false);
         }).catch(() => {
             if (isMounted) {
+                if (visitorAuthRevision === 0) updateVisitorAuth(null);
                 setSession(null);
                 setProfile(null);
                 setIsProfileLoaded(true);
@@ -90,6 +94,8 @@ export const AuthProvider = ({ children }) => {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             (_event, nextSession) => {
+                visitorAuthRevision += 1;
+                updateVisitorAuth(nextSession ?? null);
                 const nextUserId = nextSession?.user?.id ?? null;
                 const isSameUser = Boolean(nextUserId && nextUserId === currentUserIdRef.current);
 
@@ -178,6 +184,7 @@ export const AuthProvider = ({ children }) => {
             if (error) throw error;
         },
         logout: async () => {
+            resetVisitorIdentity();
             setWorkforce(null);
             setWorkforceContext(null);
             setProfile(null);

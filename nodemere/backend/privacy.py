@@ -67,7 +67,10 @@ class OperationalLogFilter(logging.Filter):
         record.correlation_id = correlation_id.get()
         if record.name == 'uvicorn.access':
             status = record.args[-1] if isinstance(record.args,tuple) and record.args else None
-            record.msg, record.args = 'HTTP response status=%s', (status if isinstance(status,int) else 0,)
+            # Uvicorn's AccessFormatter unpacks the standard five access-log
+            # arguments. Keep that shape while redacting client/path details.
+            record.msg = '%s - "%s %s HTTP/%s" %s'
+            record.args = ('-', 'GET', '[redacted]', '1.1', status if isinstance(status,int) else 0)
         elif record.name != 'root':
             # Provider libraries may include response/request bodies even at
             # warning level. Retain severity and logger identity only.

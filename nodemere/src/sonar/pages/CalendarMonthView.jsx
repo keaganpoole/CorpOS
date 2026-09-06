@@ -280,7 +280,6 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   const avatarGuideTimersRef = useRef([]);
 
   const markCalendarPeekSeen = useCallback(async () => {
-    setCalendarPeekSeen(true);
     try {
       window.localStorage.setItem('SONAR_calendar_sneak_peek_seen', 'true');
     } catch {}
@@ -512,8 +511,8 @@ export default function CalendarMonthView({ data = null, className = '', selecte
     : `${MONTHS[month]} 1`;
 
   return (
-    <div className={`relative flex h-full min-h-0 w-full items-start justify-center bg-transparent p-4 pt-3 md:p-5 md:pt-4 2xl:p-5 2xl:pt-4 ${className}`.trim()}>
-      <div ref={calendarGridRef} className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-[#0a0a0a] p-5 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] md:p-6 lg:p-7 2xl:p-10">
+    <div ref={calendarGridRef} className={`relative flex h-full min-h-0 w-full items-start justify-center bg-transparent p-4 pt-3 md:p-5 md:pt-4 2xl:p-5 2xl:pt-4 ${className}`.trim()}>
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-[#0a0a0a] p-5 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] md:p-6 lg:p-7 2xl:p-10">
         <div className="mb-4 flex items-center justify-between gap-2 border-b border-white/5 pb-4 text-left lg:mb-5 lg:pb-5 2xl:mb-6 2xl:pb-6">
           <span className="flex items-center space-x-2 font-bold tracking-tight text-white text-[1.5rem] md:text-[1.65rem] lg:text-[1.75rem] 2xl:text-[2rem]">
             <CalendarIcon className="text-zinc-300" size={22} />

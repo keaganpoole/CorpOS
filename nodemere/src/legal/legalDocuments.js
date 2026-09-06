@@ -1,8 +1,8 @@
-export const LEGAL_EFFECTIVE_DATE = 'September 4, 2026';
+export const LEGAL_EFFECTIVE_DATE = 'September 5, 2026';
 
-export const LEGAL_ACCEPTANCE_KEY = 'nodemere_legal_acceptance_v2026_09_04';
+export const LEGAL_ACCEPTANCE_KEY = 'nodemere_legal_acceptance_v2026_09_05';
 
-export const LEGAL_ACCEPTANCE_VERSION = '2026-09-04';
+export const LEGAL_ACCEPTANCE_VERSION = '2026-09-05';
 
 export const hasCurrentLegalAcceptance = (profile) => (
   profile?.terms_of_service?.[LEGAL_ACCEPTANCE_KEY]?.accepted === true
@@ -32,6 +32,8 @@ You receive a limited, non-exclusive, non-transferable, revocable right to use t
 **Customer Data** means information you or your callers, contacts, employees, and integrations submit to or make available through the Service, including contact details, call audio, transcripts, documents, messages, prompts, calendar data, and payment-related metadata. You retain your rights in Customer Data. You authorize Nodemere to process Customer Data solely to provide, secure, support, troubleshoot, and improve the Service as described in these Terms, the [Privacy Policy](/privacy-policy), and, where applicable, the [Data Processing Addendum](/data-processing-addendum).
 
 Nodemere does **not** use identifiable Customer Data, call recordings, transcripts, uploaded documents, or voice data to train generalized AI models by default. We may use aggregated or de-identified information to operate, secure, analyze, and improve the Service, provided it is not reasonably linkable to an identified person or Customer.
+
+With a public-site visitor's optional analytics consent, Nodemere may measure website sessions, page and homepage-section engagement, campaign attribution, device and browser characteristics, and signup or subscription conversion. Consenting visits use a persistent first-party visitor identifier and a limited fingerprint-derived identifier and may later be linked to a Nodemere account so the pre-account journey remains continuous. These practices and the available consent controls are described primarily in the [Privacy Policy](/privacy-policy) and [Cookie Notice](/cookie-notice).
 
 You represent that you have all rights, notices, permissions, and lawful bases needed to provide Customer Data to us and direct its processing. Standard Nodemere plans are approved for ordinary front-desk and business-administration workflows. They are not approved for automated handling of sensitive, confidential, regulated, protected, or account-specific information, or for workflows requiring identity verification, professional judgment, or access to protected records. Configure those requests to be handled by an authorized person. Broader use requires Nodemere's prior written approval and any required agreements or configuration.
 
@@ -123,13 +125,16 @@ Depending on how the Service is used, we process:
 - voice-cloning information, including submitted voice samples, consent records, generated voice configuration, and related technical data, where the feature is used;
 - payment-integration information, such as connected-account identifiers, customer and transaction identifiers, amounts, statuses, invoices, and refunds. Card numbers are processed by Stripe, not stored by Nodemere;
 - integration data from services you connect, such as calendars and email accounts, to the extent you authorize access; and
-- device, log, and website information, such as IP address, browser, timestamps, pages or features used, error information, and limited cookie preferences.
+- device, log, and website information, such as IP address processed by hosting and security infrastructure, browser, timestamps, pages or features used, error information, and cookie or storage preferences; and
+- when a public-site visitor accepts optional analytics, a persistent first-party visitor identifier; a per-tab session identifier; a deterministic, fingerprint-derived identifier; browser name and version; operating system and version; device category; screen and viewport dimensions; pixel ratio; time zone; language, locale, and touch support; referring-site origin; landing-page path; UTM campaign fields; page views; sessions; visible and focused engagement time; scroll milestones and depth; homepage-section reach, visible time, and progression; identified buttons or links and section-normalized click coordinates; signup and checkout starts; and verified account or paid-subscription conversion events.
 
 We collect information directly from you, from people who communicate with a Customer using the Service, automatically from the Service, and from integrations you authorize.
 
+The optional visitor identifier is pseudonymous before account linkage, but it is not necessarily anonymous: if a consenting visitor creates or signs into an account, Nodemere may associate the earlier consenting visits with that account. The visitor analytics system does not record typed form values, arbitrary keystrokes, passwords, authentication tokens, payment-card information, continuous pointer movement, DOM snapshots, audio, canvas, or WebGL fingerprints. It currently does not persist IP addresses, ASN or ISP data, or IP-derived location in visitor analytics records. Hosting and security providers may independently process request IP addresses as described in this Policy and their applicable notices.
+
 ## 2. How we use information
 
-We use personal information to provide and administer the Service; authenticate users; configure AI receptionists and workflows; process connected-account payment instructions; provide support; secure, debug, and prevent fraud or abuse; analyze service performance; comply with law; and enforce our agreements.
+We use personal information to provide and administer the Service; authenticate users; configure AI receptionists and workflows; process connected-account payment instructions; provide support; secure, debug, troubleshoot, and prevent fraud or abuse; understand public-site use; improve website structure and content; measure marketing attribution and effectiveness; understand signup and subscription conversion; analyze service performance; comply with law; and enforce our agreements.
 
 We do **not** use identifiable Customer Data, recordings, transcripts, uploaded documents, or voice data to train generalized AI models by default. We may use aggregated or de-identified information that is not reasonably linkable to an individual or Customer to improve reliability, security, and product performance.
 
@@ -145,7 +150,7 @@ Customers decide whether to enable calling, recording, transcription, and workfl
 
 ## 5. Retention
 
-We retain information for as long as reasonably necessary to provide the Service, meet legal, accounting, security, dispute-resolution, and enforcement needs, and then delete or de-identify it. Retention can differ by data type and feature. We honor valid deletion requests subject to legal obligations, fraud-prevention needs, backup cycles, and data we must keep to document consent, transactions, or disputes. For a current account-data request, email support@nodemere.ai.
+We retain information for as long as reasonably necessary to provide the Service, meet legal, accounting, security, dispute-resolution, and enforcement needs, and then delete or de-identify it. Retention can differ by data type and feature. For optional visitor analytics, raw events are scheduled for pruning after 90 days and inactive session rows after 365 days; limited aggregate totals, attribution, conversion, consent, revocation, and replay-prevention records may be retained longer for measurement, security, and consent integrity. We honor valid deletion requests subject to legal obligations, fraud-prevention needs, backup cycles, and data we must keep to document consent, transactions, or disputes. For a current account-data request, email support@nodemere.ai.
 
 ## 6. Security
 
@@ -159,7 +164,7 @@ California residents may have rights under the California Consumer Privacy Act, 
 
 ## 8. Cookies
 
-We use essential browser storage and limited functional cookies, including a source-preference cookie when you arrive through a designated campaign link. These support navigation and service configuration. We do not currently operate third-party advertising cookies on the public site. See the [Cookie Notice](/cookie-notice).
+We use essential browser storage and limited functional cookies, including a source-preference cookie when you arrive through a designated campaign link. These support navigation and service configuration. With your optional analytics consent, we also use a persistent first-party visitor ID, a per-tab session ID, and a limited fingerprint-derived identifier to recognize a consenting returning browser, understand public-site engagement and attribution, and associate consenting visits with account creation and subscriptions. The fingerprint-derived identifier is not itself a cookie. You can reject non-essential storage or later withdraw optional analytics consent through Cookie preferences. We do not currently operate third-party advertising cookies on the public site. See the [Cookie Notice](/cookie-notice).
 
 ## 9. Children and international use
 
@@ -309,15 +314,20 @@ Nodemere standard plans do not authorize restricted automated workflows involvin
 
 **Effective date: ${LEGAL_EFFECTIVE_DATE}**
 
-Nodemere uses limited browser storage and cookies to operate the website and remember basic preferences. This notice supplements the [Privacy Policy](/privacy-policy).
+Nodemere uses limited browser storage and cookies to operate the website and remember basic preferences. This notice supplements the [Privacy Policy](/privacy-policy). Our categories are **Necessary** and **Analytics / performance**.
 
 ## Cookies and storage we use
 
 - **Essential session and security storage.** Our authentication and application providers use browser storage or cookies needed to sign in, keep a session active, protect the Service, and remember basic interface settings.
 - **Source-preference cookie.** When a visitor arrives using a designated campaign source, Nodemere may store a first-party source cookie for up to 30 days to preserve the selected site or pricing experience.
 - **Local interface preferences.** The application may store non-sensitive interface settings locally in the browser, such as dashboard layout, display, or acknowledgment preferences.
+- **Optional analytics / performance storage.** If you choose **Accept All** or enable Analytics / performance under **Manage Preferences**, Nodemere stores a persistent first-party visitor ID in local storage and a per-tab session ID in session storage. This optional storage supports returning-visitor recognition, session continuity, public-page and homepage-section engagement, source and campaign attribution, and account or paid-subscription conversion measurement.
 
-We do not currently operate third-party advertising cookies or sell or share personal information for cross-context behavioral advertising. If we introduce non-essential analytics or advertising technologies, we will update this notice and provide choices required by applicable law.
+When optional analytics is enabled, a deterministic fingerprint-derived identifier is calculated from the first-party visitor ID and limited browser, operating-system, device-category, touch-support, and coarsened screen characteristics. This identifier is not a cookie. It supports consistency alongside the stored visitor ID, never causes a visitor merge by itself, and does not restore an identity after storage is cleared or blocked. Optional analytics also records public-page views and sessions, visible and focused engagement time, scroll milestones, homepage-section reach and progression, identified button or link interactions, section-normalized click coordinates, safe referring-site origins and UTM values, and conversion milestones. It does not record form values, arbitrary keystrokes, passwords, authentication tokens, payment-card data, continuous pointer trails, DOM snapshots, audio, canvas, or WebGL fingerprints.
+
+Analytics stays off until you make an affirmative choice. **Reject Non-Essential** leaves Necessary storage available and prevents the optional analytics module from loading. **Manage Preferences** lets you enable or disable Analytics / performance, and the persistent **Cookie preferences** control lets you change that choice later. Withdrawal stops collection immediately, clears browser-side visitor and session analytics storage, and sends a best-effort revocation for the previously issued identifier. Browser Global Privacy Control or Do Not Track signals keep optional analytics off. Preferences expire after 366 days or when the consent version changes, at which point Nodemere asks again.
+
+We do not currently operate third-party advertising cookies or sell or share personal information for cross-context behavioral advertising.
 
 You can control or delete cookies through your browser settings. Blocking essential cookies or storage may prevent the Service from working correctly. For questions, email support@nodemere.ai.`
   },

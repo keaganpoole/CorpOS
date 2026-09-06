@@ -157,6 +157,7 @@ from .contract_service import (
 )
 from .project_intelligence import get_project_intelligence, refresh_market_research
 from .business_intelligence import get_business_intelligence
+from .visitor_intelligence import build_visitor_intelligence_router, build_visitor_router, record_verified_billing_event
 from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_call_nest_event, record_nest_event
 
 try:
@@ -178,8 +179,10 @@ from .workforce import router as workforce_router
 app.include_router(workforce_router)
 from .record_reads import router as record_read_router
 app.include_router(record_read_router)
-NODEMERE_LEGAL_ACCEPTANCE_KEY = "nodemere_legal_acceptance_v2026_09_04"
-NODEMERE_LEGAL_ACCEPTANCE_VERSION = "2026-09-04"
+app.include_router(build_visitor_router(supabase_admin, get_current_user))
+app.include_router(build_visitor_intelligence_router(supabase_admin, get_current_user))
+NODEMERE_LEGAL_ACCEPTANCE_KEY = "nodemere_legal_acceptance_v2026_09_05"
+NODEMERE_LEGAL_ACCEPTANCE_VERSION = "2026-09-05"
 # scheduler = AsyncIOScheduler()
 PAYMENT_TEST_MODE = TEST_MODE
 
@@ -202,6 +205,9 @@ TENANT_SESSION_STATES: dict[str, dict] = {}
 ROUTE_HIT_EXCLUDE_PATHS = {
     "/api/events/live-pulse",
     "/api/logs",
+    "/api/public/visitor/collect",
+    "/api/public/visitor/identity",
+    "/api/public/visitor/revoke",
 }
 scenario_engine: Optional[ScenarioEngine] = None
 PENDING_FORWARDING_VERIFICATION_TASKS: dict[str, asyncio.Task] = {}
@@ -2965,9 +2971,20 @@ async def add_security_headers(request: Request, call_next):
 
 def is_public_api_route(request: Request) -> bool:
     path = request.url.path
+    # Tracking validates consent/capabilities itself; identity additionally
+    # verifies Supabase Auth before membership or onboarding exists.
+    if request.method == "POST" and path in {
+        "/api/public/visitor/collect", "/api/public/visitor/identity", "/api/public/visitor/revoke"
+    }:
+        return True
     # These bootstrap endpoints still require get_current_user themselves, but
     # must be reachable before membership/MFA enrollment has completed.
     if path in {"/api/workforce/session", "/api/workforce/invitations/pending"} or (path.startswith("/api/workforce/invitations/") and path.endswith("/accept")):
+        return True
+    # Visitor Intelligence performs its own explicit staff allowlist check.
+    # It must remain reachable before business membership/MFA middleware so
+    # the internal command center can authorize independently.
+    if path.startswith("/api/visitor-intelligence/"):
         return True
     if request.method == "OPTIONS":
         return True
@@ -11754,6 +11771,9 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     event_type = event["type"]
     connected_account_id = event.get("account")
     is_connected_account_event = bool(connected_account_id)
+    # Only the signature-verified platform event can establish paid conversion.
+    # This is independent of downstream legacy billing handling and best effort.
+    await asyncio.to_thread(record_verified_billing_event, supabase_admin, event)
     logging.info('main.stripe_webhook.event_11643')
 
     if event_type == 'checkout.session.completed':

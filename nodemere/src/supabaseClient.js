@@ -15,7 +15,7 @@ const client = createClient(supabaseUrl, supabaseAnonKey);
 async function readRecords(table, body) {
   const {data} = await client.auth.getSession();
   if (!data.session?.access_token) throw new Error('Authentication required');
-  const base = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
+  const base = import.meta.env.VITE_API_URL || window.sonar?.apiUrl || '';
   const response = await fetch(`${base}/api/sonar/${table}/read`, {method:'POST',
     headers:{Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
   if (!response.ok) throw new Error('Record access failed');

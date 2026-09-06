@@ -1,0 +1,20 @@
+.visitor-cookie-notice { position: fixed; right: 18px; bottom: 18px; z-index: 1200; width: min(430px, calc(100vw - 36px)); max-height: calc(100dvh - 36px); overflow-y: auto; padding: 18px; border: 1px solid rgba(255,255,255,.14); border-radius: 16px; background: rgba(15,15,16,.98); box-shadow: 0 18px 55px rgba(0,0,0,.45); color: #a1a1aa; font: 12px/1.6 Inter, ui-sans-serif, system-ui, sans-serif; }
+.visitor-cookie-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.visitor-cookie-heading h2 { margin: 0; font-size: 14px; font-weight: 600; color: #f4f4f5; }
+.visitor-cookie-notice p { margin: 0; }
+.visitor-cookie-notice a { color: #f4f4f5; text-decoration: underline; text-underline-offset: 3px; }
+.visitor-cookie-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.visitor-cookie-actions button { flex: 1 0 auto; min-height: 38px; border: 1px solid rgba(255,255,255,.17); border-radius: 999px; padding: 8px 12px; background: #f4f4f5; color: #09090b; font: inherit; font-weight: 600; cursor: pointer; }
+.visitor-cookie-actions .visitor-cookie-manage { background: transparent; color: #d4d4d8; }
+.visitor-cookie-actions button:disabled { opacity: .4; cursor: not-allowed; }
+.visitor-cookie-close { background: transparent; color: #a1a1aa; border: 0; width: 28px; height: 28px; font-size: 21px; cursor: pointer; }
+.visitor-cookie-categories { margin-top: 14px; border-top: 1px solid rgba(255,255,255,.08); }
+.visitor-cookie-categories label { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.08); cursor: pointer; }
+.visitor-cookie-categories strong, .visitor-cookie-categories small { display: block; }
+.visitor-cookie-categories strong { font-weight: 500; color: #e4e4e7; }
+.visitor-cookie-categories input { accent-color: #fff; width: 16px; height: 16px; flex: none; }
+.visitor-cookie-notice .visitor-cookie-signal { margin-top: 10px; color: #d4d4d8; }
+.visitor-preferences-reopen { position: fixed; bottom: 12px; left: 14px; z-index: 1100; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 10px; background: #101011; color: #a1a1aa; font: 11px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
+.visitor-cookie-notice button:focus-visible, .visitor-preferences-reopen:focus-visible { outline: 2px solid #d4d4d8; outline-offset: 3px; }
+.legal-footer .visitor-preferences-link { padding: 0; border: 0; background: transparent; color: #aaaab3; font: inherit; cursor: pointer; }
+.legal-footer .visitor-preferences-link:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
