@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
 import { APPOINTMENT_FIELDS, formatDate, formatTime, formatTimestampFull, titleCase } from '../lib/appointmentSchema';
+import { supabase } from '../lib/supabase';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const HOMEPAGE_TAG_COLORS = {
@@ -31,7 +32,25 @@ const STATUS_COLORS = {
 
 const getAppointmentActions = (status) => {
   const normalized = titleCase(status);
-  if (normalized === 'Completed') return [];
+  if (normalized === 'Completed') {
+    return [
+      {
+        label: 'Follow Up',
+        children: [
+          { label: 'Rebook', className: 'text-zinc-300' },
+          { label: 'Google Review', className: 'text-amber-300' },
+        ],
+      },
+      {
+        label: 'Customer Care',
+        children: [
+          { label: 'Check In', className: 'text-zinc-300' },
+          { label: 'Thank You', className: 'text-zinc-300' },
+          { label: 'Request Feedback', className: 'text-zinc-300' },
+        ],
+      },
+    ];
+  }
   if (normalized === 'Cancelled') return [{ label: 'Reschedule', className: 'text-zinc-300' }];
   if (normalized === 'Confirmed') {
     return [
@@ -52,9 +71,16 @@ const getCustomerFirstName = (appointment) => {
   return String(source).trim().split(/\s+/).filter(Boolean)[0] || 'customer';
 };
 
+const getCustomerName = (appointment) => appointment._personName || appointment.client_name || 'Customer';
+
 const getAppointmentActionPrompt = (action, customerFirstName) => {
   if (action === 'Confirm') return `Call ${customerFirstName} to confirm?`;
   if (action === 'Cancel') return `Call ${customerFirstName} to cancel?`;
+  if (action === 'Google Review') return `Call ${customerFirstName} to ask for a Google review?`;
+  if (action === 'Rebook') return `Call ${customerFirstName} to rebook?`;
+  if (action === 'Check In') return `Call ${customerFirstName} to check in?`;
+  if (action === 'Thank You') return `Send a thank-you message to ${customerFirstName}?`;
+  if (action === 'Request Feedback') return `Call ${customerFirstName} to request feedback?`;
   return `Call ${customerFirstName} to reschedule?`;
 };
 
@@ -236,10 +262,65 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
   const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
+  const [activeAppointmentActionGroup, setActiveAppointmentActionGroup] = useState(null);
   const [activeAppointmentPrompt, setActiveAppointmentPrompt] = useState(null);
+  const [calendarPeekSeen, setCalendarPeekSeen] = useState(() => {
+    try {
+      return window.localStorage.getItem('SONAR_calendar_sneak_peek_seen') === 'true' ? true : null;
+    } catch {
+      return null;
+    }
+  });
+  const [avatarGuide, setAvatarGuide] = useState(null);
   const [showDetailFieldPicker, setShowDetailFieldPicker] = useState(false);
   const [detailFieldIds, setDetailFieldIds] = useState(loadDetailFieldSelection);
   const detailFieldPickerRef = useRef(null);
+  const calendarGridRef = useRef(null);
+  const avatarGuideShownRef = useRef(false);
+  const avatarGuideTimersRef = useRef([]);
+
+  const markCalendarPeekSeen = useCallback(async () => {
+    setCalendarPeekSeen(true);
+    try {
+      window.localStorage.setItem('SONAR_calendar_sneak_peek_seen', 'true');
+    } catch {}
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: existingSettings, error: existingSettingsError } = await supabase
+        .from('account_settings')
+        .select('id,preferences,business_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      if (existingSettingsError && existingSettingsError.code !== 'PGRST116') throw existingSettingsError;
+
+      const nextPreferences = {
+        ...(existingSettings?.preferences || {}),
+        calendar: {
+          ...((existingSettings?.preferences || {}).calendar || {}),
+          sneak_peek_seen: true,
+        },
+      };
+
+      if (existingSettings?.id) {
+        const { error } = await supabase
+          .from('account_settings')
+          .update({ preferences: nextPreferences })
+          .eq('id', existingSettings.id)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('account_settings')
+          .insert({ user_id: user.id, business_id: existingSettings?.business_id || null, preferences: nextPreferences });
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('CalendarMonthView.jsx:event_120');
+    }
+  }, []);
 
   const servicesById = useMemo(
     () => new Map((services || []).map((service) => [String(service.id), service])),
@@ -280,6 +361,105 @@ export default function CalendarMonthView({ data = null, className = '', selecte
     const timer = window.setTimeout(() => setHasAnimatedDots(true), 120);
     return () => window.clearTimeout(timer);
   }, [hasAnimatedDots]);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser()
+      .then(({ data: { user } }) => {
+        if (!user) {
+          if (!cancelled) setCalendarPeekSeen((current) => (current === null ? false : current));
+          return null;
+        }
+        return supabase
+          .from('account_settings')
+          .select('preferences')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+      })
+      .then((response) => {
+        if (cancelled || !response) return;
+        const seen = response.data?.preferences?.calendar?.sneak_peek_seen === true;
+        if (seen) {
+          try { window.localStorage.setItem('SONAR_calendar_sneak_peek_seen', 'true'); } catch {}
+        }
+        setCalendarPeekSeen((current) => (current === true ? true : seen));
+      })
+      .catch(() => {
+        if (!cancelled) setCalendarPeekSeen((current) => (current === null ? false : current));
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (calendarPeekSeen !== false || !hasAnimatedDots || loading || selectedDateAppointments.length === 0 || avatarGuideShownRef.current) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const queueGuideTimer = (callback, delay) => {
+      const timer = window.setTimeout(callback, delay);
+      avatarGuideTimersRef.current.push(timer);
+      return timer;
+    };
+
+    const startGuide = () => {
+      if (cancelled || avatarGuideShownRef.current) return;
+      const root = calendarGridRef.current;
+      const avatarTarget = root?.querySelector('.demo-calendar-avatar-trigger[data-demo-actionable="true"]');
+      const avatarRect = avatarTarget?.getBoundingClientRect();
+      const rootRect = root?.getBoundingClientRect();
+      const appointmentId = avatarTarget?.dataset?.appointmentId;
+      if (!avatarTarget || !avatarRect || !rootRect || !appointmentId || avatarRect.width <= 0 || avatarRect.height <= 0) return;
+
+      const targetX = avatarRect.left - rootRect.left + (avatarRect.width / 2) - 2;
+      const targetY = avatarRect.top - rootRect.top + (avatarRect.height / 2) - 2;
+      const startX = Math.min(rootRect.width - 28, Math.max(targetX + 80, rootRect.width * 0.78));
+      const startY = Math.max(28, targetY - Math.min(220, rootRect.height * 0.36));
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+      avatarGuideShownRef.current = true;
+      markCalendarPeekSeen();
+      setAvatarGuide({
+        phase: reduceMotion ? 'clicked' : 'moving',
+        appointmentId,
+        startX: reduceMotion ? targetX : startX,
+        startY: reduceMotion ? targetY : startY,
+        targetX,
+        targetY,
+      });
+
+      queueGuideTimer(() => {
+        if (cancelled) return;
+        setAvatarGuide((current) => (current ? { ...current, phase: 'clicked' } : current));
+        setActiveAppointmentActionsId(appointmentId);
+        setActiveAppointmentActionGroup(null);
+        setActiveAppointmentPrompt(null);
+      }, reduceMotion ? 80 : 1180);
+
+      queueGuideTimer(() => {
+        if (cancelled) return;
+        setActiveAppointmentActionsId(null);
+        setAvatarGuide((current) => (current ? { ...current, phase: 'leaving' } : current));
+      }, reduceMotion ? 1680 : 2860);
+
+      queueGuideTimer(() => {
+        if (!cancelled) setAvatarGuide(null);
+      }, reduceMotion ? 1900 : 3120);
+    };
+
+    queueGuideTimer(startGuide, 1900);
+    return () => {
+      cancelled = true;
+      avatarGuideTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      avatarGuideTimersRef.current = [];
+    };
+  }, [calendarPeekSeen, hasAnimatedDots, loading, markCalendarPeekSeen, selectedDateAppointments.length]);
+
+  useEffect(() => () => {
+    avatarGuideTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    avatarGuideTimersRef.current = [];
+  }, []);
 
   useEffect(() => {
     if (!showDetailFieldPicker) return undefined;
@@ -333,7 +513,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
 
   return (
     <div className={`relative flex h-full min-h-0 w-full items-start justify-center bg-transparent p-4 pt-3 md:p-5 md:pt-4 2xl:p-5 2xl:pt-4 ${className}`.trim()}>
-      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-[#0a0a0a] p-5 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] md:p-6 lg:p-7 2xl:p-10">
+      <div ref={calendarGridRef} className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-[#0a0a0a] p-5 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] md:p-6 lg:p-7 2xl:p-10">
         <div className="mb-4 flex items-center justify-between gap-2 border-b border-white/5 pb-4 text-left lg:mb-5 lg:pb-5 2xl:mb-6 2xl:pb-6">
           <span className="flex items-center space-x-2 font-bold tracking-tight text-white text-[1.5rem] md:text-[1.65rem] lg:text-[1.75rem] 2xl:text-[2rem]">
             <CalendarIcon className="text-zinc-300" size={22} />
@@ -473,12 +653,20 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                 const activePromptAction = activeAppointmentPrompt?.appointmentId === appointment.id
                   ? activeAppointmentPrompt.action
                   : null;
+                const activeActionGroup = activeAppointmentActionGroup?.appointmentId === appointment.id
+                  ? activeAppointmentActionGroup.group
+                  : null;
                 const showAppointmentActions = activeAppointmentActionsId === appointment.id;
                 const toggleAppointmentActions = () => {
                   if (!hasAppointmentActions) return;
                   setActiveAppointmentActionsId((current) => {
                     const next = current === appointment.id ? null : appointment.id;
-                    if (next !== appointment.id) setActiveAppointmentPrompt(null);
+                    if (next !== appointment.id) {
+                      setActiveAppointmentActionGroup(null);
+                      setActiveAppointmentPrompt(null);
+                    } else {
+                      setActiveAppointmentActionGroup(null);
+                    }
                     return next;
                   });
                 };
@@ -512,11 +700,6 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                       <button
                         type="button"
                         onClick={() => {
-                          if (activeAppointmentActionsId === appointment.id) {
-                            setActiveAppointmentActionsId(null);
-                            setActiveAppointmentPrompt(null);
-                            return;
-                          }
                           setExpandedAppointmentId((current) => (current === appointment.id ? null : appointment.id));
                         }}
                         className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-visible text-left"
@@ -583,12 +766,16 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                                     transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
                                     className="flex items-center gap-2.5"
                                   >
-                                    {appointmentActions.map((action) => (
+                                    {(activeActionGroup?.children || appointmentActions).map((action) => (
                                       <span
                                         key={action.label}
                                         onClick={(actionEvent) => {
                                           actionEvent.preventDefault();
                                           actionEvent.stopPropagation();
+                                          if (action.children) {
+                                            setActiveAppointmentActionGroup({ appointmentId: appointment.id, group: action });
+                                            return;
+                                          }
                                           setActiveAppointmentPrompt({
                                             appointmentId: appointment.id,
                                             action: action.label,
@@ -630,7 +817,9 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                                 toggleAppointmentActions();
                               }
                             }}
-                            className={`demo-calendar-avatar-trigger flex h-5 w-5 items-center justify-center rounded-full ${hasAppointmentActions ? 'cursor-pointer' : ''}`}
+                            data-demo-actionable={hasAppointmentActions ? 'true' : undefined}
+                            data-appointment-id={hasAppointmentActions ? appointment.id : undefined}
+                            className={`demo-calendar-avatar-trigger flex h-5 w-5 items-center justify-center rounded-full ${hasAppointmentActions ? 'cursor-pointer' : ''} ${avatarGuide?.appointmentId === appointment.id && avatarGuide.phase === 'clicked' ? 'demo-calendar-avatar-trigger--guided-click' : ''}`}
                           >
                             <span className="demo-calendar-avatar-trigger__image flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[8px] font-bold text-zinc-300">
                               {avatarSrc ? (
@@ -645,6 +834,10 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                             </span>
                           </span>
                           <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
+                          <span className="text-[10px] font-medium italic text-zinc-500">with</span>
+                          <span className="truncate text-[10px] font-medium text-zinc-400">{getCustomerName(appointment)}</span>
+                          <span className="text-[10px] font-medium italic text-zinc-500">via</span>
+                          <span className="truncate text-[10px] font-medium text-zinc-400">{appointment._receptionistName || 'Receptionist'}</span>
                         </motion.div>
                         <div className="flex shrink-0 items-center space-x-1.5">
                         {!showAppointmentActions && (
@@ -701,7 +894,178 @@ export default function CalendarMonthView({ data = null, className = '', selecte
           )}
         </div>
       </div>
+      <AnimatePresence>
+        {avatarGuide && (
+          <motion.div
+            key={avatarGuide.appointmentId}
+            aria-hidden="true"
+            initial={{
+              x: avatarGuide.startX,
+              y: avatarGuide.startY,
+              opacity: 0,
+              scale: 0.94,
+            }}
+            animate={{
+              x: avatarGuide.targetX,
+              y: avatarGuide.targetY,
+              opacity: avatarGuide.phase === 'leaving' ? 0 : 1,
+              scale: avatarGuide.phase === 'leaving' ? 0.96 : 1,
+            }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={avatarGuide.phase === 'moving'
+              ? {
+                  x: { duration: 1.18, ease: [0.22, 1, 0.36, 1] },
+                  y: { duration: 1.18, ease: [0.22, 1, 0.36, 1] },
+                  opacity: { duration: 0.2, ease: 'easeOut' },
+                  scale: { duration: 0.26, ease: 'easeOut' },
+                }
+              : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className={`demo-calendar-guided-cursor ${avatarGuide.phase === 'clicked' ? 'is-clicked' : ''}`}
+          >
+            <span className="demo-calendar-guided-cursor__ripple" />
+            <svg className="demo-calendar-guided-cursor__icon" viewBox="0 0 24 28" fill="none">
+              <path d="M2.1 1.7 20.3 16c.72.57.32 1.73-.6 1.73h-7.18l-3.66 7.4c-.42.84-1.66.68-1.85-.24L2.1 1.7Z" fill="#f4f4f5" stroke="#18181b" strokeWidth="1.35" strokeLinejoin="round" />
+            </svg>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <style>{`
+        @keyframes demoCalendarCursorPress {
+          0%, 100% {
+            transform: scale(1) translateZ(0);
+          }
+          38% {
+            transform: scale(0.84) translateZ(0);
+          }
+          72% {
+            transform: scale(1.03) translateZ(0);
+          }
+        }
+
+        @keyframes demoCalendarCursorRipple {
+          0% {
+            opacity: 0;
+            transform: scale(0.3);
+          }
+          20% {
+            opacity: 0.42;
+          }
+          100% {
+            opacity: 0;
+            transform: scale(1.45);
+          }
+        }
+
+        @keyframes demoCalendarGuidedAvatarPress {
+          0%, 100% {
+            transform: scale(1) translateZ(0);
+          }
+          34% {
+            transform: scale(0.94) translateZ(0);
+          }
+          68% {
+            transform: scale(1.025) translateZ(0);
+          }
+        }
+
+        @keyframes demoCalendarGuidedAvatarRing {
+          0% {
+            opacity: 0;
+            transform: scale(0.9) translateZ(0);
+          }
+          18% {
+            opacity: 0.48;
+            transform: scale(1.08) translateZ(0);
+          }
+          54% {
+            opacity: 0.18;
+            transform: scale(1.2) translateZ(0);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(1.34) translateZ(0);
+          }
+        }
+
+        @keyframes demoCalendarGuidedAvatarBreath {
+          0%, 100% {
+            opacity: 0.18;
+            transform: scale(1) translateZ(0);
+          }
+          50% {
+            opacity: 0.34;
+            transform: scale(1.06) translateZ(0);
+          }
+        }
+
+        .demo-calendar-avatar-trigger--guided-click::before,
+        .demo-calendar-avatar-trigger--guided-click::after {
+          content: "";
+          position: absolute;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          border-radius: 999px;
+          pointer-events: none;
+          transform-origin: center;
+        }
+
+        .demo-calendar-avatar-trigger--guided-click::before {
+          inset: -4px;
+          animation: demoCalendarGuidedAvatarRing 1.35s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        }
+
+        .demo-calendar-avatar-trigger--guided-click::after {
+          inset: -2px;
+          border-color: rgba(255, 255, 255, 0.22);
+          animation: demoCalendarGuidedAvatarBreath 1.35s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        }
+
+        .demo-calendar-avatar-trigger--guided-click .demo-calendar-avatar-trigger__image {
+          animation: demoCalendarGuidedAvatarPress 380ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+        }
+
+        .demo-calendar-guided-cursor {
+          position: absolute;
+          top: 0;
+          left: 0;
+          z-index: 50;
+          width: 24px;
+          height: 28px;
+          pointer-events: none;
+          transform-origin: 2px 2px;
+          will-change: transform, opacity;
+        }
+
+        .demo-calendar-guided-cursor__icon {
+          position: relative;
+          z-index: 2;
+          display: block;
+          width: 24px;
+          height: 28px;
+          filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.46));
+          transform-origin: 2px 2px;
+        }
+
+        .demo-calendar-guided-cursor__ripple {
+          position: absolute;
+          top: -8px;
+          left: -8px;
+          z-index: 1;
+          width: 20px;
+          height: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.36);
+          border-radius: 999px;
+          opacity: 0;
+          transform-origin: center;
+        }
+
+        .demo-calendar-guided-cursor.is-clicked .demo-calendar-guided-cursor__icon {
+          animation: demoCalendarCursorPress 360ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+        }
+
+        .demo-calendar-guided-cursor.is-clicked .demo-calendar-guided-cursor__ripple {
+          animation: demoCalendarCursorRipple 620ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+        }
+
         @keyframes demoCallStatusGradient {
           0% {
             background-position: 0% 50%;

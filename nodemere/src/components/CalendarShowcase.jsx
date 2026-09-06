@@ -43,7 +43,25 @@ const DEMO_APPOINTMENT_STATUS_COLORS = {
 };
 
 const getDemoAppointmentActions = (status) => {
-  if (status === 'Completed') return [];
+  if (status === 'Completed') {
+    return [
+      {
+        label: 'Follow Up',
+        children: [
+          { label: 'Rebook', className: 'text-zinc-300' },
+          { label: 'Google Review', className: 'text-amber-300' },
+        ],
+      },
+      {
+        label: 'Customer Care',
+        children: [
+          { label: 'Check In', className: 'text-zinc-300' },
+          { label: 'Thank You', className: 'text-zinc-300' },
+          { label: 'Request Feedback', className: 'text-zinc-300' },
+        ],
+      },
+    ];
+  }
   if (status === 'Cancelled') return [{ label: 'Reschedule', className: 'text-zinc-300' }];
   if (status === 'Confirmed') {
     return [
@@ -120,11 +138,42 @@ const DEMO_CUSTOMER_FIRST_NAMES = [
   'Ruby',
   'Claire',
   'Mia',
+  'Liam',
+  'Noah',
+  'Ethan',
+  'Mateo',
+  'James',
+  'Daniel',
+  'Michael',
+  'Alex',
+];
+const DEMO_CUSTOMER_MALE_FIRST_NAMES = ['Liam', 'Noah', 'Ethan', 'Mateo', 'James', 'Daniel', 'Michael', 'Alex'];
+const DEMO_MENS_APPOINTMENT_TITLES = new Set(["Men's Haircut", 'Skin Fade', 'Beard Trim']);
+const DEMO_CUSTOMER_LAST_NAMES = [
+  'Nguyen',
+  'Patel',
+  'Rivera',
+  'Kim',
+  'Johnson',
+  'Williams',
+  'Garcia',
+  'Thompson',
+  'Lee',
+  'Martinez',
+  'Brown',
+  'Davis',
 ];
 
 const getDemoActionPrompt = (action, customerFirstName) => {
   if (action === 'Confirm') return `Call ${customerFirstName} to confirm?`;
   if (action === 'Cancel') return `Call ${customerFirstName} to cancel?`;
+  if (action === 'Google Review') return `Call ${customerFirstName} to ask for a Google review?`;
+  if (action === 'Rebook') return `Call ${customerFirstName} to rebook?`;
+  if (action === 'Request Feedback') return `Call ${customerFirstName} to request feedback?`;
+  if (action === 'Receipt') return `Send a receipt to ${customerFirstName}?`;
+  if (action === 'Aftercare Instructions') return `Send aftercare instructions to ${customerFirstName}?`;
+  if (action === 'Check In') return `Call ${customerFirstName} to check in?`;
+  if (action === 'Thank You') return `Send a thank-you message to ${customerFirstName}?`;
   return `Call ${customerFirstName} to reschedule?`;
 };
 
@@ -1227,6 +1276,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
   const [selectedDay, setSelectedDay] = useState(currentDay);
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
   const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
+  const [activeAppointmentActionGroup, setActiveAppointmentActionGroup] = useState(null);
   const [closingAppointmentActionsId, setClosingAppointmentActionsId] = useState(null);
   const [activeAppointmentPrompt, setActiveAppointmentPrompt] = useState(null);
   const [avatarGuide, setAvatarGuide] = useState(null);
@@ -1322,7 +1372,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
     () => ({
       1: [
         { title: 'Color Consultation', category: 'Color', time: '9:00 AM', tagColor: getTagColor('Color') },
-        { title: 'Haircut Appointment', category: 'Haircut', time: '1:30 PM', tagColor: getTagColor('Haircut') },
+        { title: "Men's Haircut", category: 'Haircut', time: '1:30 PM', tagColor: getTagColor('Haircut') },
       ],
       2: [
         { title: 'Styling Appointment', category: 'Styling', time: '11:00 AM', tagColor: getTagColor('Styling') },
@@ -1351,7 +1401,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
         { title: 'Bridal Trial', category: 'Bridal', time: '2:30 PM', tagColor: getTagColor('Bridal') },
       ],
       8: [
-        { title: 'Haircut Appointment', category: 'Haircut', time: '9:15 AM', tagColor: getTagColor('Haircut') },
+        { title: 'Skin Fade', category: 'Haircut', time: '9:15 AM', tagColor: getTagColor('Haircut') },
         { title: 'Color Refresh', category: 'Color', time: '11:15 AM', tagColor: getTagColor('Color') },
         { title: 'Trim Appointment', category: 'Haircut', time: '4:45 PM', tagColor: getTagColor('Haircut') },
       ],
@@ -1370,7 +1420,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
         { title: 'Trim Appointment', category: 'Haircut', time: '1:15 PM', tagColor: getTagColor('Haircut') },
       ],
       12: [
-        { title: 'Haircut Appointment', category: 'Haircut', time: '10:00 AM', tagColor: getTagColor('Haircut') },
+        { title: 'Beard Trim', category: 'Haircut', time: '10:00 AM', tagColor: getTagColor('Haircut') },
         { title: 'Styling Appointment', category: 'Styling', time: '4:00 PM', tagColor: getTagColor('Styling') },
       ],
       13: [
@@ -1550,7 +1600,11 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
         (events || []).map((event, index) => {
           const seedDay = Number(day);
           const poolIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}`) % pool.length;
-          const customerIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer`) % DEMO_CUSTOMER_FIRST_NAMES.length;
+          const customerNames = DEMO_MENS_APPOINTMENT_TITLES.has(event.title)
+            ? DEMO_CUSTOMER_MALE_FIRST_NAMES
+            : DEMO_CUSTOMER_FIRST_NAMES.slice(0, 12);
+          const customerIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer`) % customerNames.length;
+          const customerLastNameIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer-last`) % DEMO_CUSTOMER_LAST_NAMES.length;
           const receptionist = Number(day) === currentDay
             ? (defaultReceptionistAssignments[index] || pool[poolIndex])
             : pool[poolIndex];
@@ -1562,7 +1616,8 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
             status,
             statusColor: DEMO_APPOINTMENT_STATUS_COLORS[status] || DEMO_APPOINTMENT_STATUS_COLORS.Booked,
             notes: getAppointmentNote(event, seedDay, index),
-            customerFirstName: DEMO_CUSTOMER_FIRST_NAMES[customerIndex],
+            customerFirstName: customerNames[customerIndex],
+            customerLastName: DEMO_CUSTOMER_LAST_NAMES[customerLastNameIndex],
             receptionistName: receptionist?.first_name || receptionist?.full_name || 'Receptionist',
             receptionistAvatar: receptionist?.avatar || '',
             receptionistBannerUrl: receptionist?.banner_url || getReceptionistBannerUrl(receptionist?.banner_id) || receptionist?.avatar || '',
@@ -1732,15 +1787,20 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                 const activePromptAction = activeAppointmentPrompt?.appointmentId === event.id
                   ? activeAppointmentPrompt.action
                   : null;
+                const activeActionGroup = activeAppointmentActionGroup?.appointmentId === event.id
+                  ? activeAppointmentActionGroup.group
+                  : null;
                 const showAppointmentActions = activeAppointmentActionsId === event.id;
                 const showActionLane = showAppointmentActions || Boolean(activePromptAction);
                 const toggleAppointmentActions = () => {
                   if (!hasAppointmentActions) return;
                   if (activeAppointmentActionsId === event.id) {
                     closeAppointmentActions(event.id);
+                    setActiveAppointmentActionGroup(null);
                     setActiveAppointmentPrompt(null);
                     return;
                   }
+                  setActiveAppointmentActionGroup(null);
                   openAppointmentActions(event.id);
                 };
 
@@ -1829,13 +1889,17 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                                   exit="exit"
                                   className="flex items-center gap-2.5"
                                 >
-                                  {appointmentActions.map((action) => (
+                                  {(activeActionGroup?.children || appointmentActions).map((action) => (
                                     <motion.span
                                       key={action.label}
                                       variants={DEMO_ACTION_ITEM_VARIANTS}
                                       onClick={(actionEvent) => {
                                         actionEvent.preventDefault();
                                         actionEvent.stopPropagation();
+                                        if (action.children) {
+                                          setActiveAppointmentActionGroup({ appointmentId: event.id, group: action });
+                                          return;
+                                        }
                                         setActiveAppointmentPrompt({
                                           appointmentId: event.id,
                                           action: action.label,
@@ -1890,6 +1954,8 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                           </span>
                         </span>
                         <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
+                        {!isMobile && !isCompact && <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium italic text-zinc-500`}>with</span>}
+                        <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium text-zinc-400`}>{event.customerFirstName} {event.customerLastName}</span>
                         {!isMobile && !isCompact && <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium italic text-zinc-500`}>via</span>}
                         <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} ${isCompact ? 'hidden' : 'text-[10px]'} font-medium text-zinc-400`}>
                           {event.receptionistName}
