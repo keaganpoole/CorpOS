@@ -514,8 +514,7 @@ const TABLE_DEFS = [
     ],
     fetch: async () => {
       try {
-        const { data } = await supabase.from('payments').select('*').order('created_at', { ascending: false }).limit(20);
-        return data || [];
+        return (await api.getPayments(20)) || [];
       } catch { return []; }
     },
   },
@@ -541,8 +540,7 @@ const TABLE_DEFS = [
     ],
     fetch: async () => {
       try {
-        const { data } = await supabase.from('invoices').select('id,amount_due,amount_paid,currency,status,stripe_customer_id,due_date,created_at').order('created_at', { ascending: false }).limit(20);
-        return data || [];
+        return (await api.getInvoices(20)) || [];
       } catch { return []; }
     },
   },
@@ -564,8 +562,7 @@ const TABLE_DEFS = [
     ],
     fetch: async () => {
       try {
-        const { data } = await supabase.from('appointments').select('*').limit(20);
-        return data || [];
+        return (await api.getAppointments(20)) || [];
       } catch { return []; }
     },
   },
@@ -667,8 +664,8 @@ const TABLE_DEFS = [
     ],
     fetch: async () => {
       try {
-        const { data } = await supabase.from('businesses').select('*').limit(20);
-        return data || [];
+        const data = await api.getBusinessProfile();
+        return data ? [data] : [];
       } catch { return []; }
     },
   },
@@ -697,13 +694,7 @@ const TABLE_DEFS = [
     ],
     fetch: async () => {
       try {
-        const businessId = await getCurrentBusinessId();
-        const { data } = await supabase
-          .from('staff')
-          .select('*')
-          .eq('business_id', businessId)
-          .limit(20);
-        return data || [];
+        return (await api.getStaff(false)) || [];
       } catch { return []; }
     },
   },

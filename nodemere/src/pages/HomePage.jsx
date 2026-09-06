@@ -50,38 +50,11 @@ import LegalFooter from '../components/LegalFooter';
 import { trackVisitor } from '../services/apiService';
 import useSectionScrollProgress from '../hooks/useSectionScrollProgress';
 
-const NUMBER_ICON_MASKS = {
-  transfer: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.5 5.5a.75.75 0 0 1 1.06 0l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.75.75 0 1 1-1.06-1.06L16.47 10.5H8.5a.75.75 0 0 1 0-1.5h7.97l-1.97-1.97a.75.75 0 0 1 0-1.06Zm-5 8a.75.75 0 0 1 1.06 0A.75.75 0 0 1 10 14.56l-1.97 1.97H16a.75.75 0 0 1 0 1.5H8.03L10 19.97a.75.75 0 1 1-1.06 1.06L5.69 17.78a.75.75 0 0 1 0-1.06l3.81-3.81Z"/></svg>')}`,
-  plus: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2.25a9.75 9.75 0 1 0 0 19.5 9.75 9.75 0 0 0 0-19.5Zm0 4.25a.75.75 0 0 1 .75.75v3.25H16a.75.75 0 0 1 0 1.5h-3.25V15a.75.75 0 0 1-1.5 0v-3.25H8a.75.75 0 0 1 0-1.5h3.25V7.25A.75.75 0 0 1 12 6.5Z"/></svg>')}`,
-};
-
-const NumberGradientIcon = ({ icon = 'transfer', colors = ['var(--brandGradientStart)', 'var(--brandGradientEnd)'] }) => {
-  const iconMask = NUMBER_ICON_MASKS[icon] || NUMBER_ICON_MASKS.transfer;
-
-  return (
-    <span
-      aria-hidden="true"
-      className="number-gradient-icon"
-      style={{
-        backgroundImage: `linear-gradient(135deg, ${colors.join(', ')})`,
-        WebkitMaskImage: `url("${iconMask}")`,
-        maskImage: `url("${iconMask}")`,
-        WebkitMaskRepeat: 'no-repeat',
-        maskRepeat: 'no-repeat',
-        WebkitMaskPosition: 'center',
-        maskPosition: 'center',
-        WebkitMaskSize: 'contain',
-        maskSize: 'contain',
-      }}
-    />
-  );
-};
-
 const HERO_RECEPTIONIST_FEATURE_ITEMS = [
   {
     icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
     title: '24/7 Call Handling',
-    copy: 'Answer inbound calls instantly, day or night, so customers reach your business instead of voicemail.',
+    copy: 'Be there for every caller, day or night. Keep your existing business number or claim a dedicated line through Nodemere, and let your AI receptionist answer instantly instead of sending customers to voicemail.',
   },
   {
     icon: <MessagesSquare className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
@@ -379,61 +352,6 @@ const StackedHeroShowcase = ({ sectionRef }) => {
         </div>
       </div>
     </div>
-  );
-};
-
-const NumberOptionsShowcase = () => {
-  const sectionRef = useRef(null);
-  const isInView = useInView(sectionRef, { once: true, amount: 0.45 });
-
-  return (
-    <div ref={sectionRef} className="relative w-full bg-[#020202]">
-      <div className="relative z-10 mx-auto flex w-full max-w-[1300px] justify-center px-6 py-24 md:px-10 lg:px-12 lg:py-28">
-        <div className="grid w-full max-w-[980px] grid-cols-1 gap-16 justify-items-center lg:grid-cols-[1fr_auto_1fr] lg:gap-12 lg:items-stretch">
-          <div className="w-full max-w-[24rem] text-left">
-              <div className="homepage-number-pill">
-                <NumberGradientIcon icon="transfer" colors={['var(--brandGradientStart)', 'var(--brandGradientEnd)']} />
-                <span>Forward existing line</span>
-              </div>
-              <h2 className="homepage-number-title">
-                Keep Your Number
-              </h2>
-              <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
-                Keep your existing business number and route it into Nodemere. Your customers keep calling the same line, while Nodemere answers on the other end and handles the conversation for you.
-              </div>
-            </div>
-
-          <motion.div
-            aria-hidden="true"
-            className="pointer-events-none hidden w-px self-stretch lg:block"
-            initial={{ opacity: 0, scaleY: 0.2, y: 12 }}
-            animate={isInView ? { opacity: 1, scaleY: 1, y: 0 } : { opacity: 0, scaleY: 0.2, y: 12 }}
-            transition={{ duration: 1.05, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              transformOrigin: 'center',
-              height: 'calc(100% - 2rem)',
-              marginTop: '1rem',
-              marginBottom: '1rem',
-              background: 'linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.22), rgba(255,255,255,0.22), rgba(255,255,255,0))',
-              boxShadow: '0 0 18px rgba(255,255,255,0.08)',
-            }}
-          />
-
-          <div className="w-full max-w-[24rem] text-left">
-              <div className="homepage-number-pill">
-                <NumberGradientIcon icon="plus" colors={['var(--brandGradientStart)', 'var(--brandGradientEnd)']} />
-                <span>Claim a new line</span>
-              </div>
-              <h2 className="homepage-number-title">
-                Choose New Number
-              </h2>
-              <div className="calendar-showcase-description mt-6 max-w-[24rem] text-[0.95rem] font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:text-[0.95rem]">
-                If you want a clean setup, claim a new number directly in Nodemere. It becomes your dedicated business line for calls handled by the receptionist from day one.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
   );
 };
 
@@ -951,10 +869,6 @@ const HomePage = () => {
 
         <section className="content-section content-section--showcase dark-bg text-center">
           <CalendarShowcase variant="people-crm" />
-        </section>
-
-        <section className="content-section content-section--showcase dark-bg text-center">
-          <NumberOptionsShowcase />
         </section>
 
         <section className="content-section content-section--showcase dark-bg text-center">

@@ -38,6 +38,7 @@ import './Scenarios.css';
 import AetherEdgeLogic from './AetherEdgeLogic';
 import VariablesPane, { getFieldDisplayLabel, getTableFields, getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields, TABLE_COLORS, TABLE_LABELS } from './HomepageVariablesPane';
 import { supabase } from '../../lib/supabase';
+import { api } from '../../lib/api';
 import { fetchCustomFields, getCurrentBusinessId, isCustomFieldKey } from '../../lib/customFields';
 import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/fieldContexts';
 import { getSmartActions, getSmartActionByKey } from './smartActions';
@@ -880,23 +881,7 @@ export default function ScenariosPage({
     }
 
     try {
-      const { data, error } = await applyScenarioOwnershipFilter(
-        supabase
-          .from('scenarios')
-          .select('*')
-      )
-        .order('updated_at', { ascending: false });
-
-      if (error) {
-        if (error.code === 'PGRST205') {
-          console.log('[Scenarios] Table not found. Run SQL in Supabase to create scenarios table.');
-          setScenarios([]);
-          return [];
-        }
-        throw error;
-      }
-
-      const rows = data || [];
+      const rows = (await api.getScenarios()) || [];
       setScenarios(rows);
       console.debug("HomepageScenariosDemo.jsx:event_901");
       return rows;
@@ -904,7 +889,7 @@ export default function ScenariosPage({
       console.error("HomepageScenariosDemo.jsx:event_904");
       return [];
     }
-  }, [applyScenarioOwnershipFilter, demoMode, userId]);
+  }, [demoMode, userId]);
 
   const loadBuilderTimezone = useCallback(async () => {
     if (demoMode) {
@@ -2882,32 +2867,12 @@ export default function ScenariosPage({
     };
     
     let result;
-    
-    if (currentScenario) {
-      // Update existing scenario
-      const { data, error } = await applyScenarioOwnershipFilter(
-        supabase
-        .from('scenarios')
-        .update(scenarioData)
-        .eq('id', currentScenario.id)
-        .select()
-      )
-        .single();
-      
-      result = { data, error };
-    } else {
-      // Insert new scenario
-      const { data, error } = await supabase
-        .from('scenarios')
-        .insert(scenarioData)
-        .select();
-      
-      result = { data: data?.[0], error };
-    }
-    
-    const { data, error } = result;
-    
-    if (error) {
+    try {
+      const data = currentScenario
+        ? await api.updateScenario(currentScenario.id, scenarioData)
+        : await api.createScenario(scenarioData);
+      result = { data, error: null };
+    } catch (error) {
       console.error("HomepageScenariosDemo.jsx:event_2911");
       setShowSaveModal(false);
       return;
@@ -4738,13 +4703,9 @@ export default function ScenariosPage({
     const scenario = window.selectedScenarioForDelete;
     if (!scenario) return;
 
-    let deleteQuery = supabase.from('scenarios').delete().eq('id', scenario.id);
-    if (userId) {
-      deleteQuery = deleteQuery.or(`user_id.eq.${userId},created_by.eq.${userId}`);
-    }
-    const { error } = await deleteQuery;
-    
-    if (error) {
+    try {
+      await api.deleteScenario(scenario.id);
+    } catch (error) {
       console.error("HomepageScenariosDemo.jsx:event_4757");
       setDeleteConfirmModal(false);
       return;
@@ -4768,14 +4729,9 @@ export default function ScenariosPage({
   const handleToggleScenarioStatus = async (scenario) => {
     const newStatus = scenario.status === 'active' ? 'disabled' : 'active';
     
-    const { error } = await applyScenarioOwnershipFilter(
-      supabase
-        .from('scenarios')
-        .update({ status: newStatus })
-        .eq('id', scenario.id)
-    );
-    
-    if (error) {
+    try {
+      await api.updateScenario(scenario.id, { status: newStatus });
+    } catch (error) {
       console.error("HomepageScenariosDemo.jsx:event_4788");
       return;
     }

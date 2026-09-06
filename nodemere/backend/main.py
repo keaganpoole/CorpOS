@@ -3589,10 +3589,35 @@ def resolve_scenario_user_id_from_stripe_event(event: dict, metadata: Optional[d
         else resolve_connected_account_user_id(event.get("account"))
     ) or None
 
+def resolve_scenario_event_business_id(payload: dict):
+    """Bind persisted events to trusted tenant state or an owner relationship.
+
+    The event payload remains encrypted content, never the authorization source.
+    """
+    tenant = current_tenant.get()
+    user_id = payload.get("user_id") if isinstance(payload, dict) else None
+    claimed_business = payload.get("business_id") if isinstance(payload, dict) else None
+    if tenant:
+        if claimed_business is not None and str(claimed_business) != str(tenant.business_id):
+            raise HTTPException(403, "Conflicting business context")
+        if user_id is not None and str(user_id) not in {str(tenant.actor_id), str(tenant.owner_id)}:
+            raise HTTPException(403, "Conflicting owner context")
+        return tenant.business_id
+    if not user_id:
+        return None
+    raw = getattr(getattr(supabase_admin, "raw", supabase_admin), "database", getattr(supabase_admin, "raw", supabase_admin))
+    query = raw.table("businesses").select("id").eq("user_id", str(user_id))
+    if claimed_business is not None:
+        query = query.eq("id", claimed_business)
+    rows = query.limit(2).execute().data or []
+    return rows[0]["id"] if len(rows) == 1 else None
+
 def emit_payment_trigger(trigger_key: str, payload: dict):
+    business_id = resolve_scenario_event_business_id(payload)
     trigger_payload = {
         "trigger_key": trigger_key,
         "payload": payload,
+        "business_id": business_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     logging.info('main.emit_payment_trigger.event_3636')
@@ -3614,9 +3639,12 @@ def emit_scenario_trigger(trigger_key: str, payload: Optional[dict] = None, crea
     else:
         event_created_at = event_created_at.astimezone(timezone.utc)
 
+    event_payload = payload or {}
+    business_id = resolve_scenario_event_business_id(event_payload)
     trigger_payload = {
         "trigger_key": normalized_trigger_key,
-        "payload": payload or {},
+        "payload": event_payload,
+        "business_id": business_id,
         "created_at": event_created_at.isoformat(),
     }
     logging.info('main.emit_scenario_trigger.event_3660')
@@ -3630,7 +3658,7 @@ def emit_scenario_trigger(trigger_key: str, payload: Optional[dict] = None, crea
     except Exception as exc:
         logging.warning('main.emit_scenario_trigger.event_3572')
 
-    schedule_backend_scenario_execution(normalized_trigger_key, payload or {})
+    schedule_backend_scenario_execution(normalized_trigger_key, event_payload)
     return {"ok": True, "event": saved_event, "persisted": persisted}
 
 
@@ -7483,7 +7511,7 @@ async def legacy_server_tool(
         role_value = str(first_present(payload, "role") or "").strip()
         if role_value:
             query = query.ilike("role", f"%{role_value}%")
-        raw_rows = query.order("full_name").limit(200).execute().data or []
+        raw_rows = query.limit(200).execute().data or []
 
         search_terms = tokenize_search_terms(
             first_present(payload, "query", "search", "specialty", "service", "service_name"),
@@ -8338,18 +8366,18 @@ async def persist_elevenlabs_event(payload):
                 or []
             )
         if not existing and call_log.get("business_id") and call_log.get("from_number"):
-            existing = (
+            candidates = (
                 supabase.table("call_logs")
-                .select("id,audio_storage_path,duration_seconds,business_id")
+                .select("id,audio_storage_path,duration_seconds,business_id,from_number")
                 .eq("business_id", str(call_log["business_id"]))
-                .eq("from_number", call_log["from_number"])
                 .eq("status", "in-progress")
                 .order("started_at", desc=True)
-                .limit(1)
+                .limit(20)
                 .execute()
                 .data
                 or []
             )
+            existing = [row for row in candidates if row.get("from_number") == call_log["from_number"]][:1]
         if existing:
             if existing[0].get("audio_storage_path") and not call_log.get("audio_storage_path"):
                 call_log["audio_storage_path"] = existing[0]["audio_storage_path"]
@@ -9002,8 +9030,6 @@ async def get_sonar_business_profile(current_user: dict = Depends(get_current_us
 @app.put("/api/sonar/business/profile", tags=["Sonar Business"])
 async def update_sonar_business_profile(payload: dict, current_user: dict = Depends(get_current_user)):
     business = load_business_by_user_id(business_owner_id(current_user))
-    if not business:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
     allowed_fields = {
         "name", "phone", "email", "avatar", "address", "city", "state", "zip", "website",
@@ -9014,6 +9040,15 @@ async def update_sonar_business_profile(payload: dict, current_user: dict = Depe
         updates["business_hours"] = json.dumps(updates["business_hours"])
     if "industry" in updates and isinstance(updates["industry"], (dict, list)):
         updates["industry"] = updates["industry"]
+
+    if not business:
+        created = supabase.table("businesses").insert({
+            "user_id": business_owner_id(current_user),
+            "name": str(updates.get("name") or ""),
+        }).execute().data or []
+        business = created[0] if created else None
+    if not business:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create business record")
 
     response = supabase.table("businesses").update(updates).eq("id", business["id"]).execute()
     updated = response.data[0] if response.data else {**business, **updates}
@@ -9637,8 +9672,38 @@ async def list_sonar_staff(active_only: bool = True, current_user: dict = Depend
     query = supabase.table("staff").select("*").eq("business_id", business["id"])
     if active_only:
         query = query.eq("is_active", True)
-    response = query.order("full_name").limit(200).execute()
-    return response.data or []
+    response = query.limit(200).execute()
+    return sorted(response.data or [], key=lambda row: str(row.get("full_name") or "").lower())
+
+STAFF_PROFILE_FIELDS = {
+    "full_name", "first_name", "last_name", "role", "email", "phone",
+    "avatar", "is_active", "working_hours", "knowledge", "acknowledgements",
+}
+
+@app.post("/api/sonar/staff", tags=["Sonar Staff"])
+async def create_sonar_staff(payload: dict, current_user: dict = Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    values = {key: value for key, value in payload.items() if key in STAFF_PROFILE_FIELDS}
+    values["business_id"] = business["id"]
+    response = supabase.table("staff").insert(values).execute()
+    return response.data[0] if response.data else values
+
+@app.put("/api/sonar/staff/{staff_id}", tags=["Sonar Staff"])
+async def update_sonar_staff(staff_id: UUID, payload: dict, current_user: dict = Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    values = {key: value for key, value in payload.items() if key in STAFF_PROFILE_FIELDS}
+    response = supabase.table("staff").update(values).eq("id", str(staff_id)).eq("business_id", business["id"]).execute()
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+    return response.data[0]
+
+@app.delete("/api/sonar/staff/{staff_id}", tags=["Sonar Staff"])
+async def delete_sonar_staff(staff_id: UUID, current_user: dict = Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    response = supabase.table("staff").delete().eq("id", str(staff_id)).eq("business_id", business["id"]).execute()
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+    return {"ok": True}
 
 @app.post("/api/sonar/services", tags=["Sonar Services"])
 async def create_sonar_service(payload: dict, current_user: dict = Depends(get_current_user)):
@@ -9656,6 +9721,27 @@ async def list_sonar_appointments(limit: int = 100, current_user: dict = Depends
     query = supabase.table("appointments").select("id,date,time,duration,status,source,notes,person_id,service_id,staff_id,business_id,receptionist_id,created_at,updated_at")
     query = query.eq("business_id", business["id"])
     response = query.order("date").order("time").limit(max(1, min(limit, 500))).execute()
+    return response.data or []
+
+@app.get("/api/sonar/payments", tags=["Sonar Payments"])
+async def list_sonar_payments(limit: int = 100, current_user: dict = Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    response = (
+        supabase.table("payments").select("*")
+        .eq("business_id", business["id"])
+        .order("created_at", desc=True)
+        .limit(max(1, min(limit, 200))).execute()
+    )
+    return response.data or []
+
+@app.get("/api/sonar/invoices", tags=["Sonar Invoices"])
+async def list_sonar_invoices(limit: int = 100, current_user: dict = Depends(get_current_user)):
+    response = (
+        supabase.table("invoices").select("*")
+        .eq("user_id", business_owner_id(current_user))
+        .order("created_at", desc=True)
+        .limit(max(1, min(limit, 200))).execute()
+    )
     return response.data or []
 
 
@@ -10085,31 +10171,22 @@ async def list_call_logs(
     safe_offset = max(0, offset)
     query = (
         supabase.table("call_logs")
-        .select("id,business_id,user_id,caller_name,caller_phone,from_number,started_at,event_timestamp,created_at,duration_seconds,status,outcome,summary,call_successful,direction,receptionist_name,agent_name,hired_receptionist_id,is_favorited,has_audio")
+        .select("id,business_id,user_id,caller_name,caller_phone,from_number,started_at,event_timestamp,created_at,duration_seconds,status,outcome,summary,notes,call_successful,direction,receptionist_name,agent_name,hired_receptionist_id,is_favorited,has_audio")
         .eq("user_id", business_owner_id(current_user))
         .order("created_at", desc=True)
-        .range(safe_offset, safe_offset + safe_limit - 1)
     )
     search_query = (q or "").strip()
     if search_query:
-        escaped_query = search_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_").replace(",", "\\,")
-        pattern = f"%{escaped_query}%"
-        query = query.or_(
-            ",".join([
-                f"caller_name.ilike.{pattern}",
-                f"caller_phone.ilike.{pattern}",
-                f"from_number.ilike.{pattern}",
-                f"summary.ilike.{pattern}",
-                f"notes.ilike.{pattern}",
-                f"outcome.ilike.{pattern}",
-                f"status.ilike.{pattern}",
-                f"call_successful.ilike.{pattern}",
-                f"agent_name.ilike.{pattern}",
-                f"receptionist_name.ilike.{pattern}",
-            ])
-        )
-    response = query.execute()
-    rows = response.data or []
+        # Randomized AES-GCM ciphertext cannot support SQL ILIKE. Decrypt a
+        # bounded tenant-only set server-side, then search and paginate it.
+        candidates = query.limit(2000).execute().data or []
+        needle = search_query.casefold()
+        search_fields = ("caller_name", "caller_phone", "from_number", "summary", "notes",
+                         "outcome", "status", "call_successful", "agent_name", "receptionist_name")
+        rows = [row for row in candidates if any(needle in str(row.get(field) or "").casefold() for field in search_fields)]
+        rows = rows[safe_offset:safe_offset + safe_limit]
+    else:
+        rows = query.range(safe_offset, safe_offset + safe_limit - 1).execute().data or []
     for row in rows:
         enrich_call_log_with_person(
             row,
@@ -10131,6 +10208,7 @@ async def list_call_logs(
                     row["receptionist_avatar"] = receptionist_response.data[0].get("avatar")
             except Exception as exc:
                 logging.warning('main.list_call_logs.event_9975')
+        row.pop("notes", None)
     return rows
 
 
@@ -13360,7 +13438,24 @@ async def complete_onboarding(
                 .execute()
             )
         else:
-            business_response = supabase.table('businesses').insert(business_payload).execute()
+            # The generated bigint ID selects the business DEK, so create the
+            # structural row before writing its encrypted profile fields.
+            created_response = supabase.table('businesses').insert({
+                "user_id": current_user_id,
+                "name": business_payload.get("name") or "",
+                "business_timezone": business_payload.get("business_timezone"),
+                "business_hours": business_payload.get("business_hours"),
+                "industry": business_payload.get("industry"),
+            }).execute()
+            created_business = (created_response.data or [None])[0]
+            if not created_business:
+                raise HTTPException(status_code=500, detail="Could not create business record")
+            business_response = (
+                supabase.table('businesses')
+                .update(business_payload)
+                .eq('id', created_business['id'])
+                .execute()
+            )
 
         business = business_response.data[0] if business_response.data else None
         business_id = business.get("id") if business else (existing_business or {}).get("id")

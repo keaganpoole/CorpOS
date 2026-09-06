@@ -2085,14 +2085,12 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
       if (!resolvedBusinessId) return;
 
-      const [businessResponse, staffResponse] = await Promise.all([
-        supabase.from('businesses').select('business_hours').eq('id', resolvedBusinessId).maybeSingle(),
-        supabase.from('staff').select('*').eq('business_id', resolvedBusinessId).order('created_at', { ascending: false }),
+      const [businessProfile, staffRows] = await Promise.all([
+        api.getBusinessProfile(),
+        api.getStaff(false),
       ]);
-      if (businessResponse.error) throw businessResponse.error;
-      if (staffResponse.error) throw staffResponse.error;
-      setBusinessHours(businessResponse.data?.business_hours || null);
-      setStaffMembers(staffResponse.data || []);
+      setBusinessHours(businessProfile?.business_hours || null);
+      setStaffMembers(staffRows || []);
     } catch (err) {
       console.error("SettingsPage.jsx:event_2096");
       setError(err.message || 'Failed to load staff');
@@ -2225,12 +2223,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       const payload = normalizeStaffPayload({ ...form, full_name: fullName }, resolvedBusinessId);
 
       if (!editingStaffId) {
-        const { data, error: insertError } = await supabase
-          .from('staff')
-          .insert(payload)
-          .select('*')
-          .single();
-        if (insertError) throw insertError;
+        const data = await api.createStaff(payload);
         setStaffMembers((prev) => [data, ...prev]);
         api.claimNestMilestone('first_staff_member_added', {
           source_id: data?.id,
@@ -2239,14 +2232,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
           console.warn("SettingsPage.jsx:event_2239");
         });
       } else {
-        const { data, error: updateError } = await supabase
-          .from('staff')
-          .update(payload)
-          .eq('id', editingStaffId)
-          .eq('business_id', resolvedBusinessId)
-          .select('*')
-          .single();
-        if (updateError) throw updateError;
+        const data = await api.updateStaff(editingStaffId, payload);
         setStaffMembers((prev) => prev.map((member) => (member.id === data.id ? data : member)));
       }
       closeModal();
@@ -2267,10 +2253,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         resolvedBusinessId = business?.id || null;
       }
 
-      let query = supabase.from('staff').delete().eq('id', staff.id);
-      if (resolvedBusinessId) query = query.eq('business_id', resolvedBusinessId);
-      const { error: deleteError } = await query;
-      if (deleteError) throw deleteError;
+      await api.deleteStaff(staff.id);
 
       setStaffMembers((prev) => prev.filter((member) => member.id !== staff.id));
       setSelectedStaff((prev) => (prev?.id === staff.id ? null : prev));
@@ -2290,13 +2273,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         resolvedBusinessId = business?.id || null;
       }
 
-      let query = supabase
-        .from('staff')
-        .update({ is_active: nextIsActive })
-        .eq('id', staff.id);
-      if (resolvedBusinessId) query = query.eq('business_id', resolvedBusinessId);
-      const { data, error: toggleError } = await query.select('*').single();
-      if (toggleError) throw toggleError;
+      const data = await api.updateStaff(staff.id, { is_active: nextIsActive });
 
       setStaffMembers((prev) => prev.map((member) => (member.id === data.id ? data : member)));
       setSelectedStaff((prev) => (prev?.id === data.id ? data : prev));
@@ -2325,13 +2302,8 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       acknowledgements: { ...(prev.acknowledgements || {}), [warningKey]: true },
     }));
     if (editingStaffId) {
-      supabase
-        .from('staff')
-        .update({ acknowledgements: nextAcknowledgements })
-        .eq('id', editingStaffId)
-        .then(({ error: acknowledgementError }) => {
-          if (acknowledgementError) console.warn("SettingsPage.jsx:event_2333");
-        });
+      api.updateStaff(editingStaffId, { acknowledgements: nextAcknowledgements })
+        .catch(() => console.warn("SettingsPage.jsx:event_2333"));
     }
   };
 
@@ -3293,47 +3265,27 @@ const SettingsPage = () => {
     }
 
     if (normalizedBusinessId !== null) {
-      const { data, error } = await supabase
-        .from('businesses')
-        .update(businessPayload)
-        .eq('id', normalizedBusinessId)
-        .eq('user_id', userId)
-        .select('id')
-        .single();
-      if (error) throw error;
+      const data = await api.updateBusinessProfile(businessPayload);
       syncBusinessId(data?.id ?? normalizedBusinessId);
       return data || { id: normalizedBusinessId };
     }
 
-    const { data: existingBusiness, error: existingBusinessError } = await supabase
-      .from('businesses')
-      .select('id')
-      .eq('user_id', userId)
-      .limit(1)
-      .maybeSingle();
-    if (existingBusinessError && existingBusinessError.code !== 'PGRST116') throw existingBusinessError;
+    let existingBusiness = null;
+    try {
+      existingBusiness = await api.getBusinessProfile();
+    } catch (error) {
+      if (!createIfMissing) return null;
+    }
 
     if (existingBusiness?.id) {
-      const { data, error } = await supabase
-        .from('businesses')
-        .update(businessPayload)
-        .eq('id', existingBusiness.id)
-        .eq('user_id', userId)
-        .select('id')
-        .single();
-      if (error) throw error;
+      const data = await api.updateBusinessProfile(businessPayload);
       syncBusinessId(data?.id ?? existingBusiness.id);
       return data || existingBusiness;
     }
 
     if (!createIfMissing) return null;
 
-    const { data, error } = await supabase
-      .from('businesses')
-      .insert(businessPayload)
-      .select('id')
-      .single();
-    if (error) throw error;
+    const data = await api.updateBusinessProfile(businessPayload);
     syncBusinessId(data?.id ?? null);
     return data || null;
   };
@@ -3346,15 +3298,10 @@ const SettingsPage = () => {
       const userId = authData?.user?.id;
       if (!userId) throw new Error('User not found');
 
-      // Load business info from businesses table
-      const { data: bizData, error: bizErr } = await supabase
-        .from('businesses')
-        .select('id, name, industry, phone, email, avatar, address, city, state, zip, business_hours, about_us, policies, faq')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle();
-
-      if (bizErr && bizErr.code !== 'PGRST116') throw bizErr;
+      // Sensitive business profile fields are server-decrypted after tenant authorization.
+      let bizData = null;
+      try { bizData = await api.getBusinessProfile(); }
+      catch (error) { bizData = null; }
 
       // Load app config from account_settings
       const { data: settingsData, error: settingsErr } = await supabase

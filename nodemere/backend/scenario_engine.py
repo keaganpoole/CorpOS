@@ -3265,6 +3265,11 @@ class ScenarioEngine:
                 "batch_size": 10,
             }).execute()
             jobs = response.data or []
+            # RPC results bypass ProtectedClient.table(), so decrypt protected
+            # job payloads explicitly before the scheduler consumes them.
+            protected = getattr(self.supabase, "raw", None)
+            if protected and hasattr(protected, "decode"):
+                jobs = [protected.decode("jobs", job) for job in jobs]
         except Exception as exc:
             logging.warning('scenario_engine.run_due_scheduled_jobs.event_3269')
             return {"ok": False, "claimed": 0, "error": 'Operation failed'}

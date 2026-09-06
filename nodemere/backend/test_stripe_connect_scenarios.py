@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.env_loader import load_project_env
+from backend.protected_data import ProtectedClient
 
 
 load_project_env()
@@ -50,7 +51,7 @@ WEBHOOK_SECRET = required_env("STRIPE_WEBHOOK_SECRET")
 SUPABASE_URL = required_env("SUPABASE_URL")
 SUPABASE_KEY = required_env("SUPABASE_SERVICE_ROLE_KEY")
 stripe.api_key = STRIPE_KEY
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = ProtectedClient(create_client(SUPABASE_URL, SUPABASE_KEY))
 STRIPE_OPTIONS = {"stripe_account": CONNECTED_ACCOUNT}
 
 
@@ -196,7 +197,12 @@ def create_scenario(name: str, trigger: str, action: str | None = None, config: 
 
 
 def deactivate_existing_matrix_scenarios():
-    rows = supabase.table("scenarios").select("id,is_active,status").like("name", f"{MATRIX_PREFIX}%").execute().data or []
+    rows = [
+        row for row in (
+            supabase.table("scenarios").select("id,name,is_active,status").execute().data or []
+        )
+        if str(row.get("name") or "").startswith(MATRIX_PREFIX)
+    ]
     for row in rows:
         supabase.table("scenarios").update({"is_active": False}).eq("id", row["id"]).execute()
 
@@ -442,7 +448,12 @@ def trigger_subscription_created():
 def main():
     results = []
     scenario_ids = []
-    existing = supabase.table("scenarios").select("id,is_active,status").like("name", f"{MATRIX_PREFIX}%").execute().data or []
+    existing = [
+        row for row in (
+            supabase.table("scenarios").select("id,name,is_active,status").execute().data or []
+        )
+        if str(row.get("name") or "").startswith(MATRIX_PREFIX)
+    ]
     deactivate_existing_matrix_scenarios()
     try:
         action_cases = [

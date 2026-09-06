@@ -50,8 +50,14 @@ async def data_protection(user=Depends(get_current_user)):
     from .envelope import writes_enabled
     # Never expose wrapper bytes, key IDs, active KEK secrets, or a decrypt API.
     return {'encrypt_new':writes_enabled(), 'tenant_id':tenant.business_id,
-            'coverage':['call transcripts/reports','workflow payloads','integration credentials','new private documents/recordings'],
-            'historical_backfill_requires_operator':True}
+            'coverage':[
+                'people and business contact/profile data',
+                'appointments, calls, scenarios, and workflow payloads',
+                'staff, requests, documents, contracts, and voice records',
+                'payment/invoice sensitive fields and integration credentials',
+                'private document, recording, signature, and voice-sample files',
+            ],
+            'historical_backfill_requires_operator':False}
 
 
 @router.get('/audit-events')

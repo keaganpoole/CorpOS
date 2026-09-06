@@ -10,13 +10,15 @@ import os
 from uuid import uuid4
 from .envelope import Envelope, canonical, b64, KeyUnavailable, is_encrypted
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from .protected_data import ProtectedClient, FIELDS
+from .protected_data import ProtectedClient, FIELDS, OWNER_LINKED_TABLES
 
 
 def backfill(db, business_id, table, *, apply=False, after=None):
     if table not in FIELDS: raise ValueError('Unsupported protected table')
     query = db.table(table).select('*').order('id').limit(100)
-    if table == 'integrations':
+    if table == 'businesses':
+        query = query.eq('id', business_id)
+    elif table in OWNER_LINKED_TABLES:
         rows = db.table('businesses').select('user_id').eq('id',business_id).limit(1).execute().data
         if not rows: raise ValueError('Business unavailable')
         query = query.eq('user_id', rows[0]['user_id'])
@@ -27,15 +29,19 @@ def backfill(db, business_id, table, *, apply=False, after=None):
     plaintext_count, changed = 0, 0
     for row in rows:
         values = {f: row[f] for f in FIELDS[table] if row.get(f) is not None}
-        plaintext_count += sum(not is_encrypted(value) for value in values.values())
+        plaintext_values = {f: value for f, value in values.items() if not is_encrypted(value)}
+        plaintext_count += len(plaintext_values)
         # Verify every old envelope before rewriting: corruption/lost keys stop
         # the batch, never replace an unreadable field with empty plaintext.
         decoded = protected.decode(table, row)
-        if not apply or not values: continue
-        encoded = protected.encode(table, {f: decoded[f] for f in values}, row)
+        if not apply or not plaintext_values: continue
+        # Existing ciphertext is verified above but never needlessly rewritten.
+        # This makes repeat runs idempotent and limits each rollout to fields
+        # that genuinely still need migration.
+        encoded = protected.encode(table, {f: decoded[f] for f in plaintext_values}, row)
         # Verify the candidate bytes before committing.
         verified = protected.decode(table, {**row, **encoded})
-        if any(verified[f] != decoded[f] for f in values): raise KeyUnavailable()
+        if any(verified[f] != decoded[f] for f in plaintext_values): raise KeyUnavailable()
         result = db.table(table).update(encoded).eq('id',row['id']).eq('security_revision',row['security_revision']).execute().data
         if not result: raise ValueError('Concurrent change; rerun the same batch')
         changed += 1

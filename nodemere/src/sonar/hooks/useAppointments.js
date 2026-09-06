@@ -147,12 +147,11 @@ export function useAppointments() {
       if (authError) throw authError;
       const userId = authData?.user?.id || null;
 
-      const [{ data: appointmentRows, error: appointmentsError }, peopleRows, { data: serviceRows, error: servicesError }] = await Promise.all([
-        supabase.from('appointments').select('id,date,time,duration,status,source,notes,person_id,service_id,staff_id,business_id,receptionist_id,created_at,updated_at').eq('business_id', businessId).order(sortBy, { ascending: sortDir === 'asc', nullsFirst: false }),
+      const [appointmentRows, peopleRows, { data: serviceRows, error: servicesError }] = await Promise.all([
+        api.getAppointments(500),
         api.getPeople(500),
         supabase.from('services').select('id,name,category,is_active').eq('business_id', businessId).order('category', { ascending: true }).order('sort_order', { ascending: true }),
       ]);
-      if (appointmentsError) throw appointmentsError;
       if (servicesError) throw servicesError;
 
       let receptionistRows = [];
@@ -238,32 +237,13 @@ export function useAppointments() {
       .channel('appointments-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, async (payload) => {
         if (businessIdRef.current && payload.new?.business_id && payload.new.business_id !== businessIdRef.current) return;
-        if (payload.eventType !== 'DELETE') {
-          const {data,error} = await supabase.from('appointments').select('*').eq('id',payload.new.id).maybeSingle();
-          if (error || !data || abortRef.current) return;
-          payload={...payload,new:data};
-        }
-        if (payload.eventType === 'INSERT') {
-          setAppointments((prev) => {
-            const withoutExisting = prev.filter((row) => row.id !== payload.new.id);
-            const placement = pendingInsertPlacementRef.current.get(payload.new.id);
-            if (placement === 'end') {
-              pendingInsertPlacementRef.current.delete(payload.new.id);
-              return [...withoutExisting, payload.new];
-            }
-            return [payload.new, ...withoutExisting];
-          });
-          markJustAdded(payload.new.id);
-        } else if (payload.eventType === 'UPDATE') {
-          setAppointments((prev) => prev.map((row) => (row.id === payload.new.id ? payload.new : row)));
-        } else if (payload.eventType === 'DELETE') {
-          setAppointments((prev) => prev.filter((row) => row.id !== payload.old.id));
-        }
+        await fetchAppointments();
+        if (payload.eventType === 'INSERT' && payload.new?.id) markJustAdded(payload.new.id);
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [markJustAdded]);
+  }, [fetchAppointments, markJustAdded]);
 
   const createAppointment = async (appointmentData, options = {}) => {
     const { userId, businessId } = await getCreateContext();

@@ -28,7 +28,7 @@ BUSINESS_TABLES = frozenset({
     "people", "appointments", "staff", "services", "call_logs", "hired_receptionists",
     "scenarios", "flow_executions", "people_docs", "people_schema", "appointments_schema",
     "requests", "contracts", "custom_voices", "jobs", "purchased_numbers", "account_settings",
-    "nest", "bugs", "reviews", "billing_overage_events",
+    "nest", "bugs", "reviews", "billing_overage_events", "scenario_events",
 })
 OWNER_TABLES = frozenset({"payments", "invoices", "integrations", "checkpoints"})
 PERSONAL_TABLES = frozenset({"users", "account_data_requests"})
@@ -211,7 +211,7 @@ class ScopedClient:
 
 class ScopedTable:
     def __init__(self, db, name, tenant):
-        if name not in BUSINESS_TABLES | OWNER_TABLES | PERSONAL_TABLES | CATALOG_TABLES | {"businesses", "scenario_events"}:
+        if name not in BUSINESS_TABLES | OWNER_TABLES | PERSONAL_TABLES | CATALOG_TABLES | {"businesses"}:
             forbidden("Unregistered resource")
         self.db, self.name, self.tenant = db, name, tenant
 
@@ -227,8 +227,6 @@ class ScopedTable:
             if name == "users":
                 return query.in_("id", list({t.actor_id, t.owner_id}))
             return query.eq("user_id", t.actor_id)
-        if name == "scenario_events":
-            return query.eq("payload->>business_id", str(t.business_id))
         if name in CATALOG_TABLES:
             return query
         forbidden("Unregistered resource")

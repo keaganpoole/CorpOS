@@ -1979,12 +1979,7 @@ const SonarDashboard = () => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('scenarios')
-        .select('*')
-        .or(`user_id.eq.${userId},created_by.eq.${userId}`);
-
-      if (error) throw error;
+      const data = await api.getScenarios();
 
       const map = {};
       if (Array.isArray(data)) {
@@ -2059,15 +2054,7 @@ const SonarDashboard = () => {
     }
 
     try {
-      const { data: business, error: businessError } = await supabase
-        .from('businesses')
-        .select('id,name,phone,email,address,city,state,zip,business_hours,forwarding_config,people_field_config')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (businessError) throw businessError;
+      const business = await api.getBusinessProfile();
 
       let staffRows = [];
       let purchasedNumberRows = [];
@@ -2075,10 +2062,7 @@ const SonarDashboard = () => {
 
       if (business?.id) {
         const [staffResponse, purchasedNumbersResponse, customFieldsResponse] = await Promise.all([
-          supabase
-            .from('staff')
-            .select('id,full_name,first_name,last_name,is_active,working_hours')
-            .eq('business_id', business.id),
+          api.getStaff(false),
           supabase
             .from('purchased_numbers')
             .select('phone_number,status,is_active,kind')
@@ -2090,11 +2074,7 @@ const SonarDashboard = () => {
             .eq('is_active', true),
         ]);
 
-        if (staffResponse.error) {
-          console.error("SonarDashboard.jsx:event_2094");
-        } else {
-          staffRows = staffResponse.data || [];
-        }
+        staffRows = staffResponse || [];
 
         if (purchasedNumbersResponse.error) {
           console.error("SonarDashboard.jsx:event_2100");

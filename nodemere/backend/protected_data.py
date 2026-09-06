@@ -10,10 +10,54 @@ from fastapi import HTTPException
 from .envelope import Envelope, is_encrypted, writes_enabled, KeyUnavailable
 
 FIELDS = {
-    'call_logs': {'transcript_jsonb': True, 'transcript_text': False, 'call_report': True,
-                 'analysis_results': True, 'conversation_initiation_data': True},
+    'businesses': {
+        'phone': False, 'email': False, 'address': False, 'city': False,
+        'state': False, 'zip': False, 'about_us': False, 'policies': False,
+        'faq': False,
+    },
+    'appointments': {'notes': False, 'custom_fields': True},
+    'call_logs': {
+        'caller_phone': False, 'caller_name': False, 'from_number': False,
+        'to_number': False, 'notes': False, 'summary': False,
+        'transcript_jsonb': True, 'transcript_text': False, 'call_report': True,
+        'analysis_results': True, 'conversation_initiation_data': True,
+        'conversation_metadata': True, 'telephony_metadata': True,
+        'failure_reason': False,
+    },
     'flow_executions': {'flow_context': True, 'pause_data': True, 'trigger_event': True},
     'integrations': {'credentials': True},
+    'requests': {'phone': False, 'metadata': True},
+    'people_docs': {'file_name': False, 'metadata': True},
+    'contracts': {
+        'signer_name': False, 'signer_email': False, 'voice_display_name': False,
+        'agreement_body': False, 'consent': True, 'metadata': True,
+        'signer_ip': False, 'signer_user_agent': False,
+    },
+    'custom_voices': {
+        'voice_name': False, 'speaker_name': False, 'speaker_email': False,
+        'sample_storage_paths': True, 'provider_response': True, 'metadata': True,
+    },
+    'scenarios': {
+        'name': False, 'description': False, 'nodes_data': True,
+        'edges_data': True, 'assigned_to': False, 'notes': False,
+        'schedule_config': True,
+    },
+    'jobs': {'schedule_config': True, 'payload': True, 'last_error': False},
+    'scenario_events': {'payload': True},
+    'payments': {
+        'description': False, 'receipt_url': False, 'error_message': False,
+        'metadata': True,
+    },
+    'invoices': {
+        'hosted_invoice_url': False, 'invoice_pdf': False, 'description': False,
+        'metadata': True, 'raw_stripe_invoice': True,
+    },
+    'staff': {
+        'full_name': False, 'first_name': False, 'last_name': False,
+        'email': False, 'phone': False, 'knowledge': False,
+        'working_hours': True, 'acknowledgements': True,
+    },
+    'bugs': {'description': False, 'page': False, 'user_agent': False},
     # Keep relational/operational columns usable while encrypting the fields
     # that can contain identity, contact, financial, or free-form PHI.
     'people': {
@@ -32,7 +76,14 @@ FIELDS = {
 
 # People retains its established bigint primary key. A separate immutable UUID
 # binds ciphertext to the row without changing any existing foreign keys.
-RECORD_ID_FIELDS = {'people': 'encryption_record_id'}
+RECORD_ID_FIELDS = {
+    'people': 'encryption_record_id',
+    'businesses': 'encryption_record_id',
+}
+
+# These legacy tables are scoped through the immutable business owner rather
+# than a business_id column. The lookup must resolve to exactly one business.
+OWNER_LINKED_TABLES = {'integrations', 'invoices'}
 
 
 class ProtectedClient:
@@ -45,7 +96,10 @@ class ProtectedClient:
     from_ = table
 
     def business(self, table, row):
-        if table != 'integrations':
+        if table == 'businesses':
+            if row.get('id') is None: raise KeyUnavailable()
+            return row['id']
+        if table not in OWNER_LINKED_TABLES:
             if row.get('business_id') is None: raise KeyUnavailable()
             return row['business_id']
         rows = self.database.table('businesses').select('id').eq('user_id', row.get('user_id')).limit(2).execute().data
@@ -113,9 +167,11 @@ class ProtectedQuery:
         # from explicit projections afterward. Do not decrypt unrequested fields.
         requested = {c.strip() for c in columns.split(',')}
         if columns != '*' and requested & FIELDS[self.name].keys():
+            routing = ['id'] if self.name == 'businesses' else (
+                ['user_id'] if self.name in OWNER_LINKED_TABLES else ['business_id']
+            )
             columns = ','.join(dict.fromkeys([
-                *columns.split(','), 'id',
-                'user_id' if self.name == 'integrations' else 'business_id',
+                *columns.split(','), 'id', *routing,
                 RECORD_ID_FIELDS.get(self.name, 'id'),
             ]))
         result = self.filters(self.client.database.table(self.name).select(columns, **self.options)).execute()

@@ -19,6 +19,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
 
 const COLORS = {
   source: '#00f2ff',
@@ -1069,6 +1070,7 @@ export function useLiveSankeyState() {
     version: 0,
   });
   const scenarioCacheRef = useRef(new Map());
+  const scenarioListRequestRef = useRef(null);
   const sessionsRef = useRef(new Map());
   const seenCheckpointIdsRef = useRef(new Set());
   const flowInstancesRef = useRef([]);
@@ -1082,15 +1084,16 @@ export function useLiveSankeyState() {
     const resolveScenario = async (scenarioId) => {
       if (!scenarioId) return null;
       if (scenarioCacheRef.current.has(scenarioId)) return scenarioCacheRef.current.get(scenarioId);
-      const { data, error } = await supabase
-        .from('scenarios')
-        .select('*')
-        .eq('id', scenarioId)
-        .limit(1)
-        .maybeSingle();
-      if (error) console.warn("LiveMonitoringPage.jsx:event_1091");
-      scenarioCacheRef.current.set(scenarioId, data || null);
-      return data || null;
+      if (!scenarioListRequestRef.current) {
+        scenarioListRequestRef.current = api.getScenarios();
+      }
+      const scenarios = await scenarioListRequestRef.current;
+      for (const scenario of Array.isArray(scenarios) ? scenarios : []) {
+        if (scenario?.id) scenarioCacheRef.current.set(String(scenario.id), scenario);
+      }
+      const resolved = scenarioCacheRef.current.get(String(scenarioId)) || null;
+      scenarioCacheRef.current.set(String(scenarioId), resolved);
+      return resolved;
     };
 
     const publishState = () => {

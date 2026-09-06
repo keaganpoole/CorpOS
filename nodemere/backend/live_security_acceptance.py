@@ -116,15 +116,12 @@ class Acceptance:
     def seed(self,table,tenant,payload):
         if table!='invoices': payload.setdefault('business_id',self.businesses[tenant])
         if table not in {'staff','people_docs'}: payload.setdefault('user_id',self.users['owner'+tenant]['id'])
-        if table == 'people':
-            # The service REST endpoint intentionally cannot accept plaintext
-            # People fields after Phase 6 activation. Seed through the same
-            # protected server adapter used by the application.
-            rows=self.main.supabase_admin.raw.table('people').insert(payload).execute().data or []
-            if not rows: raise RuntimeError('seed people returned no row')
-            row=rows[0]
-        else:
-            row=self.required(self.rest('POST',table,data=payload),'seed '+table)[0]
+        # Seed through the same protected service adapter used by the
+        # application. The live database correctly rejects service-role
+        # plaintext for every registered protected table.
+        rows=self.main.supabase_admin.raw.table(table).insert(payload).execute().data or []
+        if not rows: raise RuntimeError('seed '+table+' returned no row')
+        row=rows[0]
         self.rows.setdefault(table,[]).append(row['id']);return row
 
     @staticmethod
@@ -297,7 +294,16 @@ class Acceptance:
         out=io.BytesIO()
         with wave.open(out,'wb') as wav:wav.setnchannels(1);wav.setsampwidth(2);wav.setframerate(8000);wav.writeframes(b'\x00\x00'*800)
         path=self.run+'/synthetic.wav';bucket='call_recordings'
-        self.main.supabase_admin.storage.from_(bucket).upload(path,out.getvalue(),{'content-type':'audio/wav'})
+        from .envelope import seal_file
+        path=f'business/{self.businesses["A"]}/{path}.ndmenc'
+        protected_audio=seal_file(
+            self.main.supabase_admin.raw,
+            out.getvalue(),
+            business_id=self.businesses['A'],
+            bucket=bucket,
+            path=path,
+        )
+        self.main.supabase_admin.storage.from_(bucket).upload(path,protected_audio,{'content-type':'application/octet-stream'})
         self.objects.append((bucket,path))
         call=self.seed('call_logs','A',{'conversation_id':self.run,'audio_storage_path':path,'has_audio':True,'raw_payload':{},'transcript_text':canary,'summary':'Synthetic call'})
         for who,expected in [('ownerA',200),('manager',200),('staff',403),('ownerB',404)]:
@@ -305,7 +311,7 @@ class Acceptance:
             self.check(4,who+' recording authorization',r.status_code==expected,r.status_code)
             if who=='ownerA' and r.status_code==200:
                 url=r.json().get('url') or r.json().get('audio_url')
-                signed=requests.get(url,timeout=20) if url else None
+                signed=(self.api('GET',url,'ownerA') if url and url.startswith('/') else requests.get(url,timeout=20)) if url else None
                 self.check(4,'Authorized recording bytes can be played',signed is not None and signed.ok and signed.content==out.getvalue())
         r=self.api('POST','/api/sonar/call-logs/search','ownerA',{})
         self.check(4,'Call list omits transcript and recording capability',r.status_code==200 and canary not in r.text and 'audio_storage_path' not in r.text and 'token=' not in r.text,r.status_code)
@@ -357,7 +363,12 @@ class Acceptance:
                         payload=msg.get('payload',{})
                         self.output({'realtime_system':who,'status':payload.get('status'),'extension':payload.get('extension')})
                         ready=payload.get('status')=='ok' and payload.get('extension')=='postgres_changes'
-            await asyncio.to_thread(self.required,self.rest('PATCH','people',data={'first_name':'SYNTHETIC REALTIME '+self.run},params={'id':'eq.'+str(self.personA['id'])}),'realtime fixture mutation')
+            changed=await asyncio.to_thread(
+                lambda: self.main.supabase_admin.raw.table('people').update(
+                    {'first_name':'SYNTHETIC REALTIME '+self.run}
+                ).eq('id',str(self.personA['id'])).execute().data or []
+            )
+            if not changed: raise RuntimeError('realtime fixture mutation returned no row')
             async def collect(ws):
                 records=[];end=time.monotonic()+10
                 while time.monotonic()<end:
@@ -407,7 +418,7 @@ class Acceptance:
                 r=self.rest('DELETE',table,params={'id':'in.('+','.join(map(str,ids))+')'})
                 if not r.ok:self.output({'cleanup_pending_table':table,'http':r.status_code})
         for bid in self.businesses.values():
-            self.rest('DELETE','scenario_events',params={'payload->>business_id':'eq.'+str(bid)})
+            self.rest('DELETE','scenario_events',params={'business_id':'eq.'+str(bid)})
             for table in ['nest','checkpoints','jobs','scenario_events','account_settings']:
                 # Some event tables lack business_id; only delete where a direct
                 # tenant column exists, leaving exact-root SQL cleanup if needed.

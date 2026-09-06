@@ -430,8 +430,18 @@ def sign_contract(supabase, *, token: str, signer_name: str, signer_email: str, 
         user_agent=user_agent,
     )
 
-    supabase.storage.from_(CONTRACT_BUCKET).upload(signature_path, signature_bytes, {"content-type": "image/png", "upsert": "false"})
-    supabase.storage.from_(CONTRACT_BUCKET).upload(pdf_path, pdf_bytes, {"content-type": "application/pdf", "upsert": "false"})
+    from .envelope import encryption_required, seal_file
+    business_id = contract.get("business_id")
+    raw_db = getattr(supabase, "raw", supabase)
+    if encryption_required(raw_db, business_id):
+        signature_path += ".ndmenc"
+        pdf_path += ".ndmenc"
+    stored_signature = seal_file(raw_db, signature_bytes, business_id=business_id, bucket=CONTRACT_BUCKET, path=signature_path)
+    stored_pdf = seal_file(raw_db, pdf_bytes, business_id=business_id, bucket=CONTRACT_BUCKET, path=pdf_path)
+    stored_type = "application/octet-stream" if signature_path.endswith(".ndmenc") else "image/png"
+    supabase.storage.from_(CONTRACT_BUCKET).upload(signature_path, stored_signature, {"content-type": stored_type, "upsert": "false"})
+    stored_type = "application/octet-stream" if pdf_path.endswith(".ndmenc") else "application/pdf"
+    supabase.storage.from_(CONTRACT_BUCKET).upload(pdf_path, stored_pdf, {"content-type": stored_type, "upsert": "false"})
 
     update = {
         "status": "signed",
@@ -458,11 +468,16 @@ def sign_contract(supabase, *, token: str, signer_name: str, signer_email: str, 
     return {**public_contract_payload(saved), "clone_url": f"/clone/{token}"}
 
 
-def upload_sample_to_storage(supabase, *, contract_id: str, filename: str, content_type: str, content: bytes) -> dict:
+def upload_sample_to_storage(supabase, *, contract_id: str, business_id, filename: str, content_type: str, content: bytes) -> dict:
     safe_name = safe_filename(filename, "sample.webm")
     storage_path = f"contracts/{contract_id}/samples/{uuid4().hex}-{safe_name}"
     normalized_type = (content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream").lower()
-    supabase.storage.from_(CONTRACT_BUCKET).upload(storage_path, content, {"content-type": normalized_type, "upsert": "false"})
+    from .envelope import encryption_required, seal_file
+    raw_db = getattr(supabase, "raw", supabase)
+    if encryption_required(raw_db, business_id): storage_path += ".ndmenc"
+    stored = seal_file(raw_db, content, business_id=business_id, bucket=CONTRACT_BUCKET, path=storage_path)
+    stored_type = "application/octet-stream" if storage_path.endswith(".ndmenc") else normalized_type
+    supabase.storage.from_(CONTRACT_BUCKET).upload(storage_path, stored, {"content-type": stored_type, "upsert": "false"})
     return {
         "file_name": safe_name,
         "storage_bucket": CONTRACT_BUCKET,
@@ -529,7 +544,7 @@ def clone_voice(supabase, *, token: str, api_key: str, voice_name: str, uploaded
         from .upload_validation import validate_audio
         try: validate_audio(content,content_type)
         except ValueError: return {"success":False,"status":"unsupported","message":"The file is not a supported audio container."}
-        saved_samples.append(upload_sample_to_storage(supabase, contract_id=contract_id, filename=filename, content_type=content_type, content=content))
+        saved_samples.append(upload_sample_to_storage(supabase, contract_id=contract_id, business_id=contract.get("business_id"), filename=filename, content_type=content_type, content=content))
         samples_for_api.append({"file_name": filename, "content_type": content_type, "content": content})
 
     clean_voice_name = (voice_name or contract.get("voice_display_name") or contract.get("signer_name") or "Nodemere Custom Voice").strip()
