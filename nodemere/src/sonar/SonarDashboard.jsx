@@ -81,6 +81,31 @@ import { useAuth } from '../contexts/AuthContext';
 import logoImage from '../assets/logo.png';
 
 const DASHBOARD_ROUTE_STORAGE_KEY = 'sonar-dashboard-route';
+
+const teamPanelVariants = {
+  hidden: {
+    opacity: 0,
+    y: 7,
+    transition: { duration: 0.14, ease: [0.4, 0, 1, 1] },
+    transitionEnd: { visibility: 'hidden' },
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    visibility: 'visible',
+    transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const teamGridVariants = {
+  hidden: { transition: { staggerChildren: 0.02, staggerDirection: -1 } },
+  visible: { transition: { staggerChildren: 0.035 } },
+};
+
+const teamCardVariants = {
+  hidden: { opacity: 0, y: 10, scale: 0.992 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] } },
+};
 const DEFAULT_DASHBOARD_ROUTE = 'receptionists';
 const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'stats', 'settings'];
 const POPUP_DISMISS_PERSISTS_SHOWN = false;
@@ -1746,6 +1771,7 @@ const SonarDashboard = () => {
   const [terminateAgentHasAppointments, setTerminateAgentHasAppointments] = useState(false);
   const [archivedAgents, setArchivedAgents] = useState([]);
   const [archivedAgentsLoading, setArchivedAgentsLoading] = useState(false);
+  const [teamStaffLoading, setTeamStaffLoading] = useState(true);
   const [dismissedPopupIds, setDismissedPopupIds] = useState([]);
   const [manualPopupId, setManualPopupId] = useState(null);
   const [backendTasklistState, setBackendTasklistState] = useState(null);
@@ -1754,6 +1780,7 @@ const SonarDashboard = () => {
   const [showPlanChangePopup, setShowPlanChangePopup] = useState(false);
   const [nestStageExpanded, setNestStageExpanded] = useState(false);
   const tasklistPersistRef = useRef('');
+  const archivedAgentsLoadedRef = useRef(false);
   const userId = authSession?.user?.id || profile?.id || null;
 
   useEffect(() => {
@@ -2015,10 +2042,12 @@ const SonarDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (currentRoute === 'receptionists' && teamView === 'archived') {
-      loadArchivedAgents();
-    }
-  }, [currentRoute, teamView, loadArchivedAgents]);
+    if (currentRoute !== 'receptionists' || archivedAgentsLoadedRef.current) return;
+    archivedAgentsLoadedRef.current = true;
+    loadArchivedAgents().catch(() => {
+      archivedAgentsLoadedRef.current = false;
+    });
+  }, [currentRoute, loadArchivedAgents]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2177,6 +2206,7 @@ const SonarDashboard = () => {
     }
     return { ...a, _scenario: null, scenario_name: null, scenario_id: null };
   });
+  const teamInitialLoading = agentsLoading || archivedAgentsLoading || teamStaffLoading;
   const popupContext = {
     currentRoute,
     teamView,
@@ -2271,8 +2301,21 @@ const SonarDashboard = () => {
               </div>
             </div>
 
-            <div key={teamView} className="custom-scrollbar min-h-0 flex-1 overflow-auto px-12 pb-8 pt-5">
-              {teamView === 'receptionists' ? (
+            <div className="relative min-h-0 flex-1">
+              {teamInitialLoading ? (
+                <div className="absolute inset-0 z-10 flex items-center justify-center pb-20">
+                  <CubePreloader />
+                </div>
+              ) : null}
+              <motion.div
+                className="custom-scrollbar absolute inset-0 overflow-auto px-12 pb-8 pt-5"
+                initial="hidden"
+                animate={teamView === 'receptionists' && !teamInitialLoading ? 'visible' : 'hidden'}
+                variants={teamPanelVariants}
+                style={{ pointerEvents: teamView === 'receptionists' && !teamInitialLoading ? 'auto' : 'none' }}
+                aria-hidden={teamView !== 'receptionists' || teamInitialLoading}
+              >
+                {
                 agentsLoading ? (
                   <div className="flex min-h-full items-center justify-center pb-20">
                     <CubePreloader />
@@ -2286,36 +2329,46 @@ const SonarDashboard = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6">
+                  <motion.div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6" variants={teamGridVariants}>
                     {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
                       const reactionsMap = {};
                       for (const r of (reactions || [])) reactionsMap[r.agent_name] = r;
                       return (
-                        <AgentNode
-                          key={agent.id}
-                          agent={agent}
-                          isActive={false}
-                          reactions={reactionsMap[agent.name] || {}}
-                          pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
-                          onOpenMarketplace={setMarketplaceAgent}
-                          onOpenScenarios={setReceptionistsAgent}
-                          onUpdateDirection={(agent, nextDirection) => updateAgentDirection(agent.id, nextDirection)}
-                          onTerminate={(agent) => setTerminateAgent(agent)}
-                          slim
-                        />
+                        <motion.div key={agent.id} variants={teamCardVariants}>
+                          <AgentNode
+                            agent={agent}
+                            isActive={false}
+                            reactions={reactionsMap[agent.name] || {}}
+                            pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
+                            onOpenMarketplace={setMarketplaceAgent}
+                            onOpenScenarios={setReceptionistsAgent}
+                            onUpdateDirection={(agent, nextDirection) => updateAgentDirection(agent.id, nextDirection)}
+                            onTerminate={(agent) => setTerminateAgent(agent)}
+                            slim
+                          />
+                        </motion.div>
                       );
                     })}
-                  </div>
-                )
-              ) : teamView === 'archived' ? (
+                  </motion.div>
+                )}
+              </motion.div>
+              <motion.div
+                className="custom-scrollbar absolute inset-0 overflow-auto px-12 pb-8 pt-5"
+                initial="hidden"
+                animate={teamView === 'archived' && !teamInitialLoading ? 'visible' : 'hidden'}
+                variants={teamPanelVariants}
+                style={{ pointerEvents: teamView === 'archived' && !teamInitialLoading ? 'auto' : 'none' }}
+                aria-hidden={teamView !== 'archived' || teamInitialLoading}
+              >
+                {
                 archivedAgentsLoading ? (
                   <div className="flex min-h-full items-center justify-center pb-20">
                     <CubePreloader />
                   </div>
                 ) : archivedAgents.length > 0 ? (
-                  <div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6">
+                  <motion.div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6" variants={teamGridVariants}>
                     {archivedAgents.map((agent) => (
-                      <div key={agent.id} className="box-border w-[340px] overflow-hidden rounded-[28px] border border-white/[0.04] bg-[#0A0A0A] opacity-80 transition hover:opacity-100">
+                      <motion.div key={agent.id} variants={teamCardVariants} className="box-border w-[340px] overflow-hidden rounded-[28px] border border-white/[0.04] bg-[#0A0A0A] opacity-80 transition hover:opacity-100">
                         <div className="relative h-[220px] overflow-hidden rounded-t-[28px]">
                           <img
                             src={agent.avatar || `${AVATAR_BASE}/${(agent.name || 'receptionist').toLowerCase()}.jpg`}
@@ -2346,9 +2399,9 @@ const SonarDashboard = () => {
                             Restore Receptionist
                           </button>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
-                  </div>
+                  </motion.div>
                 ) : (
                   <div className="flex min-h-full items-center justify-center pb-20 text-center">
                     <div>
@@ -2356,12 +2409,23 @@ const SonarDashboard = () => {
                       <p className="mt-2 text-[12px] text-zinc-600">Archived receptionists will appear here.</p>
                     </div>
                   </div>
-                )
-              ) : (
+                )}
+              </motion.div>
+              <motion.div
+                className="custom-scrollbar absolute inset-0 overflow-auto px-12 pb-8 pt-5"
+                initial="hidden"
+                animate={teamView === 'staff' && !teamInitialLoading ? 'visible' : 'hidden'}
+                variants={teamPanelVariants}
+                style={{ pointerEvents: teamView === 'staff' && !teamInitialLoading ? 'auto' : 'none' }}
+                aria-hidden={teamView !== 'staff' || teamInitialLoading}
+              >
                 <StaffManager
                   businessId={staffBusinessId}
                   ensureBusinessRecord={ensureStaffBusiness}
                   onBusinessLinked={setStaffBusinessId}
+                  onLoadingChange={setTeamStaffLoading}
+                  animateCards
+                  isVisible={teamView === 'staff' && !teamInitialLoading}
                   hideIntro
                   hideToolbar
                   cardGridClassName="grid grid-cols-[repeat(auto-fill,380px)] items-start justify-start gap-8"
@@ -2371,7 +2435,7 @@ const SonarDashboard = () => {
                     </div>
                   )}
                 />
-              )}
+              </motion.div>
             </div>
             <AnimatePresence>
               {showHireModal && (

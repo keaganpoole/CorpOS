@@ -1529,6 +1529,16 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
   );
 };
 
+const teamStaffGridVariants = {
+  hidden: { transition: { staggerChildren: 0.02, staggerDirection: -1 } },
+  visible: { transition: { staggerChildren: 0.035 } },
+};
+
+const teamStaffCardVariants = {
+  hidden: { opacity: 0, y: 10, scale: 0.992 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] } },
+};
+
 // ─── Service Form (outside ServicesManager to preserve state) ─────────────
 const StaffDetailsModal = ({ staff, onClose, onEdit }) => {
   if (!staff) return null;
@@ -2046,7 +2056,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
   );
 };
 
-export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, defaultHours, hideIntro = false, hideToolbar = false, cardGridClassName = '', compactCards = false, loaderClassName = '', loadingFallback = null }) => {
+export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, onLoadingChange = null, animateCards = false, isVisible = true, defaultHours, hideIntro = false, hideToolbar = false, cardGridClassName = '', compactCards = false, loaderClassName = '', loadingFallback = null }) => {
   const [staffMembers, setStaffMembers] = useState([]);
   const [businessHours, setBusinessHours] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2061,6 +2071,10 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const [avatarUploadName, setAvatarUploadName] = useState('');
   const [showKnowledgeTips, setShowKnowledgeTips] = useState(false);
   const [deleteStaffTarget, setDeleteStaffTarget] = useState(null);
+
+  useEffect(() => {
+    onLoadingChange?.(loading);
+  }, [loading, onLoadingChange]);
 
   useEffect(() => {
     loadStaff();
@@ -2419,19 +2433,25 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
             <p className="text-[13px] leading-none text-zinc-500 -translate-y-1.5">Add a staff member your receptionist can book with.</p>
           </div>
         ) : (
-          <div className={cardGridClassName || 'grid grid-cols-1 gap-4 xl:grid-cols-2'}>
+          <motion.div
+            className={cardGridClassName || 'grid grid-cols-1 gap-4 xl:grid-cols-2'}
+            initial={animateCards ? 'hidden' : false}
+            animate={animateCards ? (isVisible ? 'visible' : 'hidden') : undefined}
+            variants={animateCards ? teamStaffGridVariants : undefined}
+          >
             {staffMembers.map((staff) => (
-              <StaffCard
-                key={staff.id}
-                staff={staff}
-                onSelect={setSelectedStaff}
-                onEdit={openEditModal}
-                onDelete={requestDeleteStaff}
-                onToggleActive={toggleStaffActive}
-                compact={compactCards}
-              />
+              <motion.div key={staff.id} variants={animateCards ? teamStaffCardVariants : undefined}>
+                <StaffCard
+                  staff={staff}
+                  onSelect={setSelectedStaff}
+                  onEdit={openEditModal}
+                  onDelete={requestDeleteStaff}
+                  onToggleActive={toggleStaffActive}
+                  compact={compactCards}
+                />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
 
