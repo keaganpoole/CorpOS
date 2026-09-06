@@ -1765,7 +1765,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                       className={`relative z-10 flex shrink-0 items-center justify-center rounded-full p-1 transition-transform duration-200 focus:outline-none ${hasAppointmentActions ? 'hover:scale-110' : 'cursor-default'}`}
                     >
                       <span
-                        className={`${isMobile ? 'h-1.5 w-1.5' : isCompact ? 'h-2 w-2' : 'h-2.5 w-2.5'} rounded-full ${activePromptAction ? 'demo-call-status-dot' : 'shadow-[0_0_4px_currentColor]'}`}
+                        className={`${isMobile ? 'h-[3px] w-[3px]' : isCompact ? 'h-1 w-1' : 'h-1.5 w-1.5'} rounded-full ${activePromptAction ? 'demo-call-status-dot' : 'shadow-[0_0_4px_currentColor]'}`}
                         style={activePromptAction
                           ? undefined
                           : { color: event.statusColor, backgroundColor: event.statusColor }}
@@ -1774,9 +1774,6 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                     <button
                       type="button"
                       onClick={() => {
-                        if (showAppointmentActions || activePromptAction) {
-                          return;
-                        }
                         setExpandedAppointmentId((current) => (current === event.id ? null : event.id));
                       }}
                       className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-visible text-left"
