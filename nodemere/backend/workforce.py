@@ -1,4 +1,5 @@
 """Workforce membership only. No patient accounts or custom MFA implementation."""
+import asyncio
 from datetime import datetime, timezone
 from uuid import UUID
 from typing import Literal
@@ -7,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from .config import (supabase_admin, frontend_base_url, system_gmail_sender_email,
     system_gmail_refresh_token, google_client_id, google_client_secret)
-from .dependencies import get_current_user
-from .authorization import resolve_tenant
+from .dependencies import get_current_user, get_current_user_for_workforce_session
+from .authorization import resolve_tenant, resolve_session_tenant
 from .permissions import require_permission
 from .email_delivery_service import send_secure_link_email, SystemGmailConfiguration, EmailDeliveryError
 
@@ -115,13 +116,18 @@ class MfaPolicyInput(BaseModel):
 
 
 @router.get('/session')
-async def session(user=Depends(get_current_user)):
-    tenant=context(user, allow_missing=True)
-    policy=False
-    if tenant:
-        rows=database().table('businesses').select('workforce_mfa_required').eq('id',tenant.business_id).limit(1).execute().data or []
-        policy=bool(rows and rows[0].get('workforce_mfa_required'))
-    return {"tenant":asdict(tenant) if tenant else None,"policy_requires_mfa":policy}
+async def session(user=Depends(get_current_user_for_workforce_session)):
+    try:
+        tenant=await asyncio.to_thread(
+            resolve_session_tenant, database(), str(user.id),
+            aal=getattr(user,"nodemere_aal","aal1"), allow_missing=True,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(503, "Workforce membership service is unavailable")
+    return {"tenant":asdict(tenant) if tenant else None,
+            "policy_requires_mfa":bool(tenant and tenant.mfa_required)}
 
 
 @router.get('/invitations/pending')

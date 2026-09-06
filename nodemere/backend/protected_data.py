@@ -106,9 +106,9 @@ class ProtectedClient:
         if len(rows or []) != 1: raise KeyUnavailable()
         return rows[0]['id']
 
-    def decode(self, table, row):
+    def decode(self, table, row, engine=None):
         row = dict(row)
-        engine = Envelope(self.database)
+        engine = engine or Envelope(self.database)
         record_id = row.get(RECORD_ID_FIELDS.get(table, 'id'))
         for field in FIELDS[table]:
             if is_encrypted(row.get(field)):
@@ -175,8 +175,9 @@ class ProtectedQuery:
                 RECORD_ID_FIELDS.get(self.name, 'id'),
             ]))
         result = self.filters(self.client.database.table(self.name).select(columns, **self.options)).execute()
+        engine = Envelope(self.client.database)
         def decode(row):
-            decoded = self.client.decode(self.name, row)
+            decoded = self.client.decode(self.name, row, engine=engine)
             return decoded if self.columns == '*' else {k: v for k, v in decoded.items() if k in requested}
         if isinstance(result.data, list): result.data = [decode(row) for row in result.data]
         elif isinstance(result.data, dict): result.data = decode(result.data)
@@ -190,7 +191,9 @@ class ProtectedQuery:
         if not sensitive_write or not writes_enabled():
             query = getattr(db.table(self.name), self.operation)(self.values, **self.options) if self.values is not None else db.table(self.name).delete(**self.options)
             result = self.filters(query).execute()
-            if isinstance(result.data, list): result.data = [self.client.decode(self.name, row) for row in result.data]
+            if isinstance(result.data, list):
+                engine = Envelope(self.client.database)
+                result.data = [self.client.decode(self.name, row, engine=engine) for row in result.data]
             return result
         if self.operation == 'insert':
             values = [self.client.encode(self.name, row) for row in self.values] if isinstance(self.values, list) else self.client.encode(self.name, self.values)
@@ -224,5 +227,6 @@ class ProtectedQuery:
                     updated = db.table(self.name).insert(encoded).execute()
                 rows.extend(updated.data or [])
             result = SimpleNamespace(data=rows, count=None)
-        result.data = [self.client.decode(self.name, row) for row in (result.data or [])]
+        engine = Envelope(self.client.database)
+        result.data = [self.client.decode(self.name, row, engine=engine) for row in (result.data or [])]
         return result

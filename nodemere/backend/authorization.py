@@ -73,6 +73,28 @@ def resolve_tenant(db, actor_id, *, aal="aal1", allow_missing=False):
                   role=member["role"], aal=aal, mfa_required=bool(rows[0].get("workforce_mfa_required")))
 
 
+def resolve_session_tenant(db, actor_id, *, aal="aal1", allow_missing=False):
+    """Resolve dashboard bootstrap authorization in one server-only RPC."""
+    rows = db.rpc("nodemere_workforce_session", {"target_actor": str(actor_id)}).execute().data or []
+    if len(rows) != 1:
+        raise HTTPException(503, "Workforce authorization is unavailable")
+    row = rows[0]
+    blocked = {"closed", "pending_deletion", "disabled"}
+    if row.get("actor_exists") and row.get("actor_status") in blocked:
+        forbidden("Account unavailable")
+    count = int(row.get("active_membership_count") or 0)
+    if count == 0 and allow_missing:
+        return None
+    if count != 1:
+        forbidden("An unambiguous business membership is required")
+    if (not row.get("business_id") or not row.get("owner_id") or not row.get("owner_exists")
+            or row.get("owner_status") in blocked or row.get("membership_role") not in {"OWNER", "MANAGER", "STAFF"}):
+        forbidden("Business unavailable")
+    return Tenant(str(actor_id), row["business_id"], str(row["owner_id"]),
+                  role=row["membership_role"], aal=aal,
+                  mfa_required=bool(row.get("workforce_mfa_required") or row.get("mfa_enrolled")))
+
+
 @contextmanager
 def tenant_scope(tenant):
     existing = current_tenant.get()

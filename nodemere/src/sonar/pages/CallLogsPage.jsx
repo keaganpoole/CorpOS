@@ -635,12 +635,10 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
   const [timeNow, setTimeNow] = useState(() => new Date());
   const [deleteTargetIds, setDeleteTargetIds] = useState([]);
   const [deleting, setDeleting] = useState(false);
+  const [callDetailsById, setCallDetailsById] = useState({});
+  const [initialDetailIds, setInitialDetailIds] = useState(null);
   const listScrollRef = useRef(null);
   const searchReadyRef = useRef(false);
-
-  useEffect(() => {
-    onToolbarMetaChange?.({ count: calls.length, loading });
-  }, [calls.length, loading, onToolbarMetaChange]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setTimeNow(new Date()), 30000);
@@ -653,6 +651,8 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
       return undefined;
     }
     const timeout = window.setTimeout(() => {
+      setCallDetailsById({});
+      setInitialDetailIds(null);
       loadCallLogs({ force: true, searchQuery });
     }, 280);
     return () => window.clearTimeout(timeout);
@@ -763,21 +763,96 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
   }, [calls, searchQuery]);
 
   const selectedBaseCall = filteredCalls.find((call) => call.id === selectedId) || filteredCalls[0] || null;
-  const [callDetails, setCallDetails] = useState(null);
+  const selectedCallId = selectedBaseCall?.id || null;
+  const hasCachedCallDetails = !selectedCallId
+    || Object.prototype.hasOwnProperty.call(callDetailsById, selectedCallId);
+  const callDetails = selectedCallId ? callDetailsById[selectedCallId] : null;
+  const initialDetailsLoading = initialDetailIds === null
+    || initialDetailIds.some((callId) => !Object.prototype.hasOwnProperty.call(callDetailsById, callId));
+  const conversationLoading = loading || initialDetailsLoading;
+  const transcriptLoading = !conversationLoading && Boolean(selectedCallId) && !hasCachedCallDetails;
+
   useEffect(() => {
-    setCallDetails(null);
-    if (!selectedBaseCall?.id || !session?.access_token) return undefined;
+    if (!loading && initialDetailIds === null) {
+      setInitialDetailIds(calls.map((call) => call.id).filter(Boolean));
+    }
+  }, [calls, initialDetailIds, loading]);
+
+  useEffect(() => {
+    if (!session?.access_token || !Array.isArray(initialDetailIds) || initialDetailIds.length === 0) return undefined;
+    const missingIds = initialDetailIds.filter(
+      (callId) => !Object.prototype.hasOwnProperty.call(callDetailsById, callId)
+    );
+    if (missingIds.length === 0) return undefined;
+
+    let cancelled = false;
+    const controllers = missingIds.map(() => new AbortController());
+    Promise.all(missingIds.map(async (callId, index) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs/${encodeURIComponent(callId)}/details`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          signal: controllers[index].signal,
+        });
+        if (!response.ok) throw new Error('Could not load call details');
+        return [callId, await response.json()];
+      } catch (error) {
+        if (error.name === 'AbortError') return null;
+        return [callId, null];
+      }
+    })).then((entries) => {
+      if (cancelled) return;
+      setCallDetailsById((current) => ({
+        ...current,
+        ...Object.fromEntries(entries.filter(Boolean)),
+      }));
+    });
+
+    return () => {
+      cancelled = true;
+      controllers.forEach((controller) => controller.abort());
+    };
+  }, [callDetailsById, initialDetailIds, session?.access_token]);
+
+  useEffect(() => {
+    if (
+      !selectedCallId
+      || !session?.access_token
+      || hasCachedCallDetails
+      || conversationLoading
+      || initialDetailIds.includes(selectedCallId)
+    ) return undefined;
     const controller = new AbortController();
-    fetch(`${API_BASE_URL}/api/sonar/call-logs/${encodeURIComponent(selectedBaseCall.id)}/details`, {
+    fetch(`${API_BASE_URL}/api/sonar/call-logs/${encodeURIComponent(selectedCallId)}/details`, {
       headers:{ Authorization:`Bearer ${session.access_token}` }, signal:controller.signal,
     }).then(async response => { if (!response.ok) throw new Error('Could not load call details'); return response.json(); })
-      .then(setCallDetails).catch(error => { if (error.name !== 'AbortError') setError(error.message); });
+      .then((details) => {
+        setCallDetailsById((current) => ({ ...current, [selectedCallId]: details }));
+        setHasPresentedConversation(true);
+      })
+      .catch((error) => {
+        if (error.name === 'AbortError') return;
+        setCallDetailsById((current) => ({ ...current, [selectedCallId]: null }));
+        setError(error.message);
+      });
     return () => controller.abort();
-  }, [selectedBaseCall?.id, session?.access_token]);
+  }, [conversationLoading, hasCachedCallDetails, initialDetailIds, selectedCallId, session?.access_token, setError]);
+
   const selectedCall = selectedBaseCall && callDetails?.id === selectedBaseCall.id
     ? {...selectedBaseCall, transcript:normalizeTranscript(callDetails.transcript_jsonb,callDetails.transcript_text), raw:{...selectedBaseCall.raw,...callDetails}}
     : selectedBaseCall;
   const selectedDeleteCount = selectedForDelete.length;
+
+  useEffect(() => {
+    onToolbarMetaChange?.({ count: calls.length, loading: conversationLoading });
+  }, [calls.length, conversationLoading, onToolbarMetaChange]);
+
+  if (conversationLoading) {
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center bg-[#020202] text-zinc-100">
+        <CallLogsLoader />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#020202] text-zinc-100">
@@ -818,6 +893,8 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                   type="button"
                   onClick={() => {
                     setSelectedForDelete([]);
+                    setCallDetailsById({});
+                    setInitialDetailIds(null);
                     loadCallLogs({ force: true, searchQuery });
                   }}
                   className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-zinc-500 transition-colors hover:border-white/[0.10] hover:bg-white/[0.035] hover:text-white active:scale-95"
@@ -844,15 +921,12 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
           </div>
 
           <div ref={listScrollRef} onScroll={handleListScroll} className="custom-scrollbar min-h-[320px] flex-1 overflow-y-auto px-3 pb-2 pt-2">
-            {loading && (
-              <CallLogsLoader />
-            )}
-            {!loading && error && (
+            {error && (
               <div className="p-6 text-center">
                 <p className="text-[13px] font-semibold text-rose-300">{error}</p>
               </div>
             )}
-            {!loading && !error && filteredCalls.map((call) => (
+            {!error && filteredCalls.map((call) => (
               <div key={call.id} className="border-b border-white/[0.04] last:border-b-0">
                 <CallCard
                   call={call}
@@ -872,12 +946,12 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                 />
               </div>
             ))}
-            {!loading && !error && loadingMore && (
+            {!error && loadingMore && (
               <div className="py-5 text-center">
                 <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-700 animate-pulse">Loading more calls</span>
               </div>
             )}
-            {!loading && !error && filteredCalls.length === 0 && (
+            {!error && filteredCalls.length === 0 && (
               <div className="p-6 text-center">
                 <p className="text-[13px] font-semibold text-zinc-300">No calls found</p>
                 <p className="mt-2 text-[12px] text-zinc-600">{calls.length ? 'Adjust the filters or search another caller.' : 'Call details will appear here.'}</p>
@@ -887,7 +961,9 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
         </aside>
 
         <section className="relative flex min-h-0 flex-col after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/[0.05]">
-          {selectedCall ? (
+          {transcriptLoading ? (
+            <CallLogsLoader />
+          ) : selectedCall ? (
             <>
           <div className="shrink-0 px-5 pb-5 pt-8 sm:px-6 sm:pb-6 sm:pt-8">
             <div className="flex flex-col gap-5">

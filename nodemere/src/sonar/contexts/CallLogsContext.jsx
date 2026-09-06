@@ -96,9 +96,6 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
     };
 
     loadCallLogs({ initial: true });
-    const pollingTimer = window.setInterval(() => {
-      if (!cancelled) loadCallLogs({ force: true });
-    }, 5000);
     const channel = supabase
       .channel(`call-logs-dashboard-cache-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs', filter: `business_id=eq.${workforce?.tenant?.business_id}` }, scheduleRefresh)
@@ -113,7 +110,6 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
     return () => {
       cancelled = true;
       if (refreshTimer) window.clearTimeout(refreshTimer);
-      window.clearInterval(pollingTimer);
       supabase.removeChannel(channel);
     };
   }, [session?.access_token, workforce?.tenant?.business_id, workforce?.tenant?.role]);

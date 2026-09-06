@@ -68,7 +68,12 @@ def _format_timestamp(value: Any) -> str | None:
     parsed = _parse_datetime(value)
     if not parsed:
         return None
-    return parsed.astimezone().strftime("%b %-d, %Y · %-I:%M %p")
+    local = parsed.astimezone()
+    # The `-` flag used to suppress zero padding is not supported by Windows'
+    # strftime implementation. Build those two components explicitly so the
+    # report renders identically on local Windows and Unix deployments.
+    hour = local.strftime("%I").lstrip("0") or "0"
+    return f"{local.strftime('%b')} {local.day}, {local.year} · {hour}:{local.strftime('%M %p')}"
 
 
 def _format_duration(seconds: float | int | None) -> str | None:

@@ -1,8 +1,10 @@
 # backend/config.py
 
 import os
+import httpx
 import stripe
 from supabase import create_client, Client
+from supabase.lib.client_options import SyncClientOptions
 from .authorization import ScopedClient
 from .protected_data import ProtectedClient
 
@@ -126,9 +128,27 @@ try:
             "A Supabase API key is required. Set SUPABASE_SERVICE_ROLE_KEY, "
             "SUPABASE_PUBLISHABLE_KEY, SUPABASE_ANON_KEY, or SUPABASE_KEY."
         )
-    supabase = ScopedClient(ProtectedClient(create_client(url, key)))
-    supabase_admin = ScopedClient(ProtectedClient(create_client(url, service_role_key or key)))
-    supabase_auth: Client = create_client(url, public_key or key)
+    def _new_server_supabase_client(api_key: str) -> Client:
+        # httpx's HTTP/2 transport is intermittently unreliable on Windows when
+        # several dashboard requests share a Supabase client. Keep the same
+        # pooled client behavior over HTTP/1.1, which is fully supported by
+        # Supabase/PostgREST and avoids spurious WinError 10035 responses.
+        transport = httpx.Client(
+            http2=False,
+            timeout=httpx.Timeout(120.0, connect=10.0),
+        )
+        return create_client(
+            url,
+            api_key,
+            options=SyncClientOptions(httpx_client=transport),
+        )
+
+
+    supabase = ScopedClient(ProtectedClient(_new_server_supabase_client(key)))
+    supabase_admin = ScopedClient(
+        ProtectedClient(_new_server_supabase_client(service_role_key or key))
+    )
+    supabase_auth: Client = _new_server_supabase_client(public_key or key)
 except Exception as e:
     print("ERROR: Supabase client creation failed; check server configuration.")
     raise
@@ -136,4 +156,4 @@ except Exception as e:
 
 def new_auth_client():
     """Password/signup methods mutate sessions; never run them on shared clients."""
-    return create_client(url, public_key or key)
+    return _new_server_supabase_client(public_key or key)

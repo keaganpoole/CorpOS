@@ -1,11 +1,12 @@
 # backend/dependencies.py
+import asyncio
 from types import SimpleNamespace
 import logging
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel # type: ignore
-from supabase_auth.errors import AuthApiError
+from supabase_auth.errors import AuthApiError, AuthInvalidJwtError
 from .config import ALGORITHM, SECRET_KEY, supabase_admin, supabase_auth
 from .authorization import current_identity
 
@@ -92,6 +93,41 @@ async def get_current_user(token = Depends(http_bearer)):
 
 async def get_current_user_for_recovery(token = Depends(http_bearer)):
     return await _get_current_user(token, allow_pending_deletion=True)
+
+
+async def get_current_user_for_workforce_session(token = Depends(http_bearer)):
+    # ES256 access tokens are verified locally against Supabase's cached JWKS.
+    # The server-only session RPC then performs account, membership, owner,
+    # role, MFA-enrollment, and MFA-policy checks in one database round trip.
+    try:
+        verified = await asyncio.to_thread(supabase_auth.auth.get_claims, token.credentials)
+        # Current supabase-auth releases expose ClaimsResponse as a TypedDict.
+        # Retain the attribute fallback for older response-model releases.
+        claims = (
+            verified.get("claims")
+            if isinstance(verified, dict)
+            else getattr(verified, "claims", None)
+        )
+        if not isinstance(claims, dict):
+            raise AuthInvalidJwtError("Missing verified claims")
+        user = _build_authenticated_user(claims)
+        user.nodemere_aal = "aal2" if claims.get("aal") == "aal2" else "aal1"
+        user.nodemere_mfa_enrolled = False
+        return user
+    except AuthInvalidJwtError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid or expired authentication token.") from None
+    except AuthApiError as exc:
+        if exc.status in {400, 401, 403, 422}:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Invalid or expired authentication token.") from None
+        logging.warning("dependencies.claims.event_1")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Authentication is temporarily unavailable. Please try again.") from None
+    except Exception:
+        logging.warning("dependencies.claims.event_1")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Authentication is temporarily unavailable. Please try again.") from None
 
 async def get_current_rep(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(

@@ -19,14 +19,16 @@ OWNER = '11111111-1111-4111-8111-111111111111'
 
 
 class MemoryKeys:
-    def __init__(self): self.rows = []; self.filters = []
+    def __init__(self): self.rows = []; self.filters = []; self.reads = 0
     def table(self, name):
         if name != 'business_data_keys': raise AssertionError(name)
         self.filters = []; return self
     def select(self, *a): return self
     def eq(self,k,v): self.filters.append((k,v)); return self
     def limit(self,*a): return self
-    def execute(self): return SimpleNamespace(data=deepcopy([r for r in self.rows if all(str(r.get(k))==str(v) for k,v in self.filters)]))
+    def execute(self):
+        self.reads += 1
+        return SimpleNamespace(data=deepcopy([r for r in self.rows if all(str(r.get(k))==str(v) for k,v in self.filters)]))
     def rpc(self, name, data):
         if name=='nodemere_provision_data_key':
             row = dict(data['candidate'],active=True); self.rows.append(row); return SimpleNamespace(execute=lambda:SimpleNamespace(data=deepcopy(row)))
@@ -55,6 +57,14 @@ class EnvelopeTests(unittest.TestCase):
         self.assertNotEqual(a['nonce'],b['nonce']); self.assertEqual(a['key_id'],b['key_id'])
         c=self.engine.seal(b'a',**dict(self.context,business_id=2)); self.assertNotEqual(a['key_id'],c['key_id'])
         self.assertNotEqual(self.engine.unwrap(self.db.rows[0]),self.engine.unwrap(self.db.rows[1]))
+
+    def test_reuses_unwrapped_key_within_one_read_scope(self):
+        sealed = self.engine.seal(CANARY.encode(), **self.context)
+        reader = Envelope(self.db, self.ring, 'old')
+        reads_before = self.db.reads
+        self.assertEqual(reader.open(sealed, **self.context), CANARY.encode())
+        self.assertEqual(reader.open(sealed, **self.context), CANARY.encode())
+        self.assertEqual(self.db.reads - reads_before, 1)
 
     def test_every_aad_dimension_bound(self):
         sealed=self.engine.seal(CANARY.encode(),**self.context)

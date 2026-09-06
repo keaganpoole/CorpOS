@@ -53,7 +53,7 @@ class AuthFailureClassificationTests(unittest.IsolatedAsyncioTestCase):
     async def test_http_boundary_preserves_503_and_never_authorizes(self):
         from fastapi.testclient import TestClient
         from .test_phase1_security import main
-        with patch.object(dependencies.supabase_auth.auth, "get_user", side_effect=httpx.ReadTimeout("SECRET_CANARY")):
+        with patch.object(dependencies.supabase_auth.auth, "get_claims", side_effect=httpx.ReadTimeout("SECRET_CANARY")):
             with self.assertLogs(level="WARNING"):
                 response = TestClient(main.app).get(
                     "/api/workforce/session", headers={"Authorization": "Bearer SECRET_CANARY"})

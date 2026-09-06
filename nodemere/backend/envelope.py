@@ -68,6 +68,10 @@ class Envelope:
         # Explicit ring injection is for isolated tests/recovery drills only.
         self.ring, self.active = ring, active
         self._current = {}
+        # Request-scoped cache only. A protected result set commonly contains
+        # many fields sealed by the same DEK; repeatedly fetching/unwrapping it
+        # makes one page load issue dozens of identical Supabase requests.
+        self._unwrapped = {}
 
     def keys(self):
         return (self.ring, self.active) if self.ring is not None else keyring()
@@ -114,12 +118,17 @@ class Envelope:
     def open(self, envelope, *, business_id, resource, record_id, field):
         try:
             if set(envelope) != {'v', 'key_id', 'nonce', 'ciphertext'} or envelope['v'] != 1: raise ValueError()
-            rows = self.db.table('business_data_keys').select('*').eq('id', envelope['key_id']).eq('business_id', business_id).limit(1).execute().data
-            if not rows: raise ValueError()
+            cache_key = (str(business_id), str(envelope['key_id']))
+            dek = self._unwrapped.get(cache_key)
+            if dek is None:
+                rows = self.db.table('business_data_keys').select('*').eq('id', envelope['key_id']).eq('business_id', business_id).limit(1).execute().data
+                if not rows: raise ValueError()
+                dek = self.unwrap(rows[0])
+                self._unwrapped[cache_key] = dek
             nonce = unb64(envelope['nonce'])
             if len(nonce) != 12: raise ValueError()
             aad = canonical(['nodemere', 'data', 1, str(business_id), resource, str(record_id), field, envelope['key_id']])
-            return AESGCM(self.unwrap(rows[0])).decrypt(nonce, unb64(envelope['ciphertext']), aad)
+            return AESGCM(dek).decrypt(nonce, unb64(envelope['ciphertext']), aad)
         except Exception:
             raise KeyUnavailable() from None
 

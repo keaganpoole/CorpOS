@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../../../supabaseClient';
 import {
   User, Calendar, Phone, ChevronDown, ChevronRight, ChevronUp, X, Zap, Sparkles, CreditCard, Search, Layers
 } from 'lucide-react';
@@ -25,11 +25,6 @@ try {
     if (action) SMART_ACTION_MAP[k] = action.name;
   });
 } catch (e) { /* ignore */ }
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-);
 
 const TABLE_REF_ALIASES = {
   people: 'person',

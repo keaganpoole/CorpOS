@@ -127,9 +127,10 @@ from .models import (
     TierResponse, HelpdeskMessage, OAuthAccountCreate, OAuthAccountResponse,
     UserIntegrationUpdate, UserIntegrationResponse,
 )
-from .dependencies import get_current_user, get_current_user_for_recovery, get_current_rep
+from .dependencies import (get_current_user, get_current_user_for_recovery,
+                           get_current_user_for_workforce_session, get_current_rep)
 from .security import safe_oauth_return_to, script_safe_json, issue_internal_context, verify_internal_context
-from .authorization import (Tenant, current_tenant, current_identity, resolve_tenant,
+from .authorization import (Tenant, current_tenant, current_identity, resolve_tenant, resolve_session_tenant,
                             validate_references, require_record, owner_id as business_owner_id)
 from .config import new_auth_client
 from .permissions import require_permission, route_permission
@@ -3056,10 +3057,17 @@ async def require_authenticated_api_request(request: Request, call_next):
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Authentication required."})
     tenant = None
     try:
-        user = await get_current_user(SimpleNamespace(credentials=access_token))
+        user = await get_current_user_for_workforce_session(SimpleNamespace(credentials=access_token))
         request.state.authenticated_user_id = str(user.id)
         raw_db=getattr(supabase_admin, "raw", supabase_admin)
-        tenant = resolve_tenant(raw_db, str(user.id), aal=getattr(user,"nodemere_aal","aal1"),allow_missing=onboarding)
+        # Supabase's synchronous API must not block the event loop while the
+        # dashboard starts several authorized requests. Server clients use a
+        # thread-safe HTTP/1.1 pool (see config.py), so these lookups can run in
+        # parallel without the Windows HTTP/2 socket failures seen previously.
+        tenant = await asyncio.to_thread(
+            resolve_session_tenant, raw_db, str(user.id),
+            aal=getattr(user,"nodemere_aal","aal1"), allow_missing=onboarding,
+        )
         if onboarding and tenant is None:
             if raw_db.table('businesses').select('id').eq('user_id',str(user.id)).limit(1).execute().data:
                 raise HTTPException(403,'Active business membership required')

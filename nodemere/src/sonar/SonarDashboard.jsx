@@ -580,16 +580,17 @@ const displayAgentDirection = (value) => {
   return 'All';
 };
 
-function CallLogsToolbarTitle({ active, action = null }) {
+function CallLogsToolbarTitle({ active, action = null, loading: loadingOverride = null }) {
   const { calls, loading, hasMore } = useCallLogs();
   if (!active) return null;
+  const isLoading = loadingOverride ?? loading;
 
   return (
     <div className="nest-toolbar-title absolute left-[76px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-3">
       <span className="text-[13px] font-semibold tracking-[-0.02em] text-white">Call Logs</span>
       <span className="nest-toolbar-meta hidden h-4 w-px bg-white/[0.12] md:block" aria-hidden="true" />
       <span className="nest-toolbar-meta hidden text-[12px] font-medium text-zinc-500 md:inline">
-        {loading ? 'Loading calls' : `${calls.length}${hasMore ? '+' : ''} recent calls`}
+        {isLoading ? 'Loading calls' : `${calls.length}${hasMore ? '+' : ''} recent calls`}
       </span>
       {action}
     </div>
@@ -1722,6 +1723,7 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
 const SonarDashboard = () => {
   const { session: authSession, profile, refreshProfile, workforce } = useAuth();
   const [currentRoute, setCurrentRoute] = useState(getInitialDashboardRoute);
+  const [mountedRoutes, setMountedRoutes] = useState([currentRoute]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [marketplaceAgent, setMarketplaceAgent] = useState(null);
   const [pendingModel, setPendingModel] = useState(null);
@@ -1970,6 +1972,9 @@ const SonarDashboard = () => {
 
   useEffect(() => {
     window.localStorage.setItem(DASHBOARD_ROUTE_STORAGE_KEY, currentRoute);
+    setMountedRoutes((routes) => (
+      routes.includes(currentRoute) ? routes : [...routes, currentRoute]
+    ));
   }, [currentRoute]);
 
   const loadAgentScenarios = async () => {
@@ -2226,11 +2231,11 @@ const SonarDashboard = () => {
     { id: 'call-logs', icon: <Phone size={18} />, label: 'Call Logs' },
   ].filter(item => workforce?.tenant?.role !== 'STAFF' || ['calendar','pipeline'].includes(item.id));
 
-  const renderView = () => {
-    if (workforce?.tenant?.role === 'STAFF' && !['calendar','pipeline','settings'].includes(currentRoute)) {
+  const renderView = (route = currentRoute) => {
+    if (workforce?.tenant?.role === 'STAFF' && !['calendar','pipeline','settings'].includes(route)) {
       return <div className="p-8 text-zinc-300">Use Calendar or People for front-desk work. Other sections require a Manager or Owner.</div>;
     }
-    switch (currentRoute) {
+    switch (route) {
       case 'receptionists':
         return (
           <div className={`receptionists-page-scope h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
@@ -2491,7 +2496,7 @@ const SonarDashboard = () => {
       case 'stats':
         return <BusinessIntelligenceReport />;
       default:
-        return <PlaceholderView title={currentRoute} body="Coming soon" />;
+        return <PlaceholderView title={route} body="Coming soon" />;
     }
   };
 
@@ -2526,7 +2531,7 @@ const SonarDashboard = () => {
         <div className="absolute left-[38px] z-10 -translate-x-1/2">
           <img src={logoImage} alt="Nodemere" className="h-8 w-auto select-none" />
         </div>
-        <CallLogsToolbarTitle active={currentRoute === 'call-logs'} />
+        <CallLogsToolbarTitle active={currentRoute === 'call-logs'} loading={callLogsToolbarMeta.loading} />
         <PeopleToolbarTitle
           active={currentRoute === 'pipeline'}
           count={peopleToolbarMeta.count}
@@ -2659,13 +2664,32 @@ const SonarDashboard = () => {
 
         <main className="flex-1 flex flex-col min-w-0 bg-[#020202] relative">
           <div className="flex-1 overflow-hidden">
-            <AnimatePresence mode="wait">
-              <motion.div key={currentRoute} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }} className="h-full">
-                <ErrorBoundary>
-                  {renderView()}
-                </ErrorBoundary>
-              </motion.div>
-            </AnimatePresence>
+            <div className="relative h-full">
+              {(mountedRoutes.includes(currentRoute)
+                ? mountedRoutes
+                : [...mountedRoutes, currentRoute]
+              ).map((route) => {
+                const isActive = route === currentRoute;
+                return (
+                  <motion.div
+                    key={`${userId || 'anonymous'}:${route}`}
+                    initial={false}
+                    animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 10 }}
+                    transition={{ duration: 0.3 }}
+                    aria-hidden={!isActive}
+                    className={`absolute inset-0 h-full ${isActive ? 'z-10' : 'z-0'}`}
+                    style={{
+                      visibility: isActive ? 'visible' : 'hidden',
+                      pointerEvents: isActive ? 'auto' : 'none',
+                    }}
+                  >
+                    <ErrorBoundary>
+                      {renderView(route)}
+                    </ErrorBoundary>
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
         </main>
       </div>
