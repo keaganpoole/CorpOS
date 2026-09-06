@@ -20,10 +20,12 @@ export const AuthProvider = ({ children }) => {
         const active = data.session;
         if (!active) { setWorkforce(null); setWorkforceContext(null); return null; }
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL || window.sonar?.apiUrl || ''}/api/workforce/session`, { headers: { Authorization: `Bearer ${active.access_token}` } });
+            const [response, assurance] = await Promise.all([
+                fetch(`${import.meta.env.VITE_API_URL || window.sonar?.apiUrl || ''}/api/workforce/session`, { headers: { Authorization: `Bearer ${active.access_token}` } }),
+                supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+            ]);
             if (!response.ok) throw new Error('Workforce access is unavailable. Check that the backend and security migrations are ready.');
             const body = await response.json();
-            const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
             if (assurance.error) throw new Error('Could not verify authentication assurance. Please sign in again.');
             const value = { tenant: body.tenant, policy_requires_mfa: body.policy_requires_mfa, needsMfa: needsMfa(assurance.data, body.tenant) };
             if (currentUserIdRef.current !== active.user.id) return null;

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { enrollTotp, verifyTotp, removeTotp } from '../lib/workforceSecurity';
+import SplashScreen from './SplashScreen';
+
+const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
 
 const base = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
 export async function workforceRequest(path, method = 'GET', body) {
@@ -14,7 +17,7 @@ export async function workforceRequest(path, method = 'GET', body) {
   return value;
 }
 
-export function MfaPanel({ onVerified }) {
+export function MfaPanel({ onVerified, gate = false }) {
   const [factors, setFactors] = useState([]);
   const [unfinished, setUnfinished] = useState([]);
   const [selected, setSelected] = useState('');
@@ -31,29 +34,39 @@ export function MfaPanel({ onVerified }) {
   }
   useEffect(() => { load().catch(e => setError(e.message)); return () => { /* secrets only live in component memory */ }; }, []);
   async function run(action) { setBusy(true); setError(''); try { await action(); } catch (e) { setError(e.message); } finally { setBusy(false); } }
-  return <section className="space-y-3 rounded-xl border border-white/10 p-5 text-white">
-    <h2 className="text-lg font-semibold">Authenticator security</h2>
-    <p className="text-sm text-white/60">Use an authenticator app. Google sign-in does not replace this verification.</p>
+  return <section className={gate
+    ? 'relative w-full overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#09090b]/95 px-6 py-8 text-center text-white shadow-[0_32px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:px-10 sm:py-10'
+    : 'space-y-3 rounded-xl border border-white/10 p-5 text-white'}>
+    {gate && <>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-16 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+      <img src={NODEMERE_LOGO_SRC} alt="Nodemere" className="mx-auto mb-7 h-14 w-auto object-contain" />
+    </>}
+    <div className={gate ? 'mb-7 space-y-2' : 'space-y-1'}>
+      <h2 className={gate ? 'text-2xl font-semibold tracking-[-0.04em] sm:text-[28px]' : 'text-lg font-semibold'}>{gate ? 'Confirm it’s you.' : 'Authenticator security'}</h2>
+      <p className={gate ? 'mx-auto max-w-sm text-sm leading-6 text-white/50' : 'text-sm text-white/60'}>{gate ? 'Enter the six-digit code from your authenticator app.' : 'Add an authenticator for stronger account security.'}</p>
+    </div>
+    <div className={gate ? 'space-y-4' : 'space-y-3'}>
     {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-    {!setup && unfinished.map(f => <button key={f.id} disabled={busy} className="block text-sm" onClick={() => run(async () => { const result=await supabase.auth.mfa.unenroll({factorId:f.id}); if(result.error) throw new Error('Could not clear unfinished setup'); await load(); })}>Clear unfinished authenticator setup</button>)}
-    {setup && <div className="space-y-2">
-      <img className="h-48 w-48 bg-white p-2" alt="Scan this private authenticator setup QR code" src={setup.totp.qr_code.startsWith('data:') ? setup.totp.qr_code : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(setup.totp.qr_code)}`} />
+    {!setup && unfinished.map(f => <button key={f.id} disabled={busy} className={gate ? 'mx-auto block text-xs text-white/45 transition hover:text-white/75' : 'block text-sm'} onClick={() => run(async () => { const result=await supabase.auth.mfa.unenroll({factorId:f.id}); if(result.error) throw new Error('Could not clear unfinished setup'); await load(); })}>Clear unfinished setup</button>)}
+    {setup && <div className="space-y-3">
+      <img className="mx-auto h-48 w-48 rounded-2xl bg-white p-3" alt="Scan this private authenticator setup QR code" src={setup.totp.qr_code.startsWith('data:') ? setup.totp.qr_code : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(setup.totp.qr_code)}`} />
       <p className="text-sm">Manual setup key: <code className="break-all select-all">{setup.totp.secret}</code></p>
-      <p className="text-xs text-white/60">Keep this key private. It is cleared after verification or leaving this screen.</p>
+      <p className="text-xs text-white/45">Keep this key private.</p>
     </div>}
-    {!setup && factors.length > 0 && <label className="block text-sm">Authenticator
-      <select aria-label="Authenticator" className="ml-3 rounded bg-neutral-900 p-2" value={selected} onChange={e => setSelected(e.target.value)}>{factors.map(f => <option key={f.id} value={f.id}>{f.friendly_name || 'Authenticator'}</option>)}</select>
+    {!setup && factors.length > 1 && <label className={gate ? 'block text-xs text-white/45' : 'block text-sm'}>Authenticator
+      <select aria-label="Authenticator" className={gate ? 'ml-3 rounded-lg border border-white/10 bg-black/40 p-2 text-white' : 'ml-3 rounded bg-neutral-900 p-2'} value={selected} onChange={e => setSelected(e.target.value)}>{factors.map(f => <option key={f.id} value={f.id}>{f.friendly_name || 'Authenticator'}</option>)}</select>
     </label>}
     {(setup || selected) && <form onSubmit={e => { e.preventDefault(); run(async () => {
       await verifyTotp(supabase.auth, setup?.id || selected, code); setCode(''); setSetup(null); await load(); await onVerified?.();
-    }); }} className="flex flex-wrap gap-2">
-      <input aria-label="Authenticator code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} className="rounded bg-neutral-900 p-2" value={code} onChange={e => setCode(e.target.value.replace(/\D/g,''))} />
-      <button disabled={busy} className="rounded border border-white/20 px-4 py-2">Verify code</button>
+    }); }} className={gate ? 'mx-auto flex max-w-sm flex-col gap-3' : 'flex flex-wrap gap-2'}>
+      <input aria-label="Authenticator code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="000000" className={gate ? 'h-14 rounded-xl border border-white/10 bg-white/[0.045] px-4 text-center font-mono text-xl tracking-[0.42em] text-white outline-none transition placeholder:text-white/15 focus:border-white/25 focus:bg-white/[0.065]' : 'rounded bg-neutral-900 p-2'} value={code} onChange={e => setCode(e.target.value.replace(/\D/g,''))} />
+      <button disabled={busy} className={gate ? 'h-12 rounded-xl bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50' : 'rounded border border-white/20 px-4 py-2'}>{busy ? 'Checking…' : gate ? 'Continue' : 'Verify code'}</button>
     </form>}
-    <button disabled={busy || Boolean(setup)} className="rounded border border-white/20 px-4 py-2" onClick={() => run(async () => setSetup(await enrollTotp(supabase.auth)))}>{factors.length ? 'Add replacement authenticator' : 'Set up authenticator'}</button>
+    <button disabled={busy || Boolean(setup)} className={gate ? 'text-xs font-medium text-white/45 transition hover:text-white/75 disabled:opacity-40' : 'rounded border border-white/20 px-4 py-2'} onClick={() => run(async () => setSetup(await enrollTotp(supabase.auth)))}>{factors.length ? 'Use a different authenticator' : 'Set up authenticator'}</button>
     {setup && <button disabled={busy} className="ml-3 text-sm" onClick={() => run(async () => { const { error: e } = await supabase.auth.mfa.unenroll({ factorId: setup.id }); if (e) throw new Error('Could not cancel setup'); setSetup(null); })}>Cancel setup</button>}
-    {!setup && selected && <button disabled={busy} className="ml-3 text-sm" onClick={() => run(async () => { await removeTotp(supabase.auth, selected); await load(); await onVerified?.(); })}>Remove selected authenticator</button>}
-    <p className="text-xs text-white/60">Lost access? Use another enrolled authenticator. If none is available, contact Nodemere support for a verified Supabase recovery review. Password reset alone does not bypass MFA.</p>
+    {!setup && selected && !gate && <button disabled={busy} className="ml-3 text-sm" onClick={() => run(async () => { await removeTotp(supabase.auth, selected); await load(); await onVerified?.(); })}>Remove authenticator</button>}
+    <p className={gate ? 'pt-2 text-xs text-white/35' : 'text-xs text-white/60'}>{gate ? 'Need help? Contact Nodemere support.' : 'Lost access? Use another authenticator or contact Nodemere support.'}</p>
+    </div>
   </section>;
 }
 
@@ -113,9 +126,14 @@ export function WorkforceGate({ children }) {
   const [pendingChecked, setPendingChecked] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => { if (workforce && !workforce.tenant && !workforce.error) { setPendingChecked(false); workforceRequest('/invitations/pending').then(setPending).catch(e => setError(e.message)).finally(() => setPendingChecked(true)); } }, [workforce]);
-  if (!workforce || workforce.loading) return <div className="p-8 text-white">Checking workforce access…</div>;
+  if (!workforce || workforce.loading) return <SplashScreen />;
   if (workforce.error) return <div className="p-8 text-white"><p role="alert">{workforce.error}</p><button onClick={refreshWorkforce}>Retry</button><button className="ml-4" onClick={logout}>Sign out</button></div>;
-  if (workforce.needsMfa) return <div className="mx-auto max-w-xl space-y-4 p-8"><MfaPanel onVerified={refreshWorkforce} /><button className="text-white" onClick={logout}>Sign out</button></div>;
+  if (workforce.needsMfa) return <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#050506] px-5 py-10">
+    <div className="relative w-full max-w-md">
+      <MfaPanel gate onVerified={refreshWorkforce} />
+      <button className="mx-auto mt-5 block text-xs font-medium text-white/35 transition hover:text-white/70" onClick={logout}>Sign out</button>
+    </div>
+  </main>;
   if (!workforce.tenant && !pendingChecked) return <div className="p-8 text-white">Checking invitations…</div>;
   if (!workforce.tenant && pending.length) return <div className="mx-auto max-w-xl p-8 text-white"><h1>Business invitations</h1>{error && <p role="alert">{error}</p>}{pending.map(i => <div key={i.id} className="py-3">Join as {i.role}<button className="ml-4" onClick={async () => { try { await workforceRequest(`/invitations/${i.id}/accept`,'POST',{}); await refreshWorkforce(); } catch (e) { setError(e.message); } }}>Accept invitation</button></div>)}</div>;
   return children;

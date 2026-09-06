@@ -63,7 +63,10 @@ def resolve_tenant(db, actor_id, *, aal="aal1", allow_missing=False):
     if len(memberships) != 1:
         forbidden("An unambiguous business membership is required")
     member = memberships[0]
-    rows = db.table("businesses").select("*").eq("id", member["business_id"]).limit(1).execute().data or []
+    # Session authorization needs only immutable ownership and the MFA policy.
+    # Do not decrypt the full business profile during login: availability of
+    # unrelated protected profile fields must never prevent authentication.
+    rows = db.table("businesses").select("id,user_id,workforce_mfa_required").eq("id", member["business_id"]).limit(1).execute().data or []
     if not rows or member["role"] not in {"OWNER", "MANAGER", "STAFF"} or not account_active(db, rows[0]['user_id']):
         forbidden("Business unavailable")
     return Tenant(str(actor_id), rows[0]["id"], str(rows[0]["user_id"]),
