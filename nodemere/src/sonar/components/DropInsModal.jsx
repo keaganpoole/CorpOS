@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowDown, ArrowUp, Plus, X, Search, Sparkles, Phone, CalendarDays, Bell, Heart, MessageCircle, Repeat2, Receipt, Check, Pencil, Trash2, Layers, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowDown, ArrowUp, Plus, X, Search, Sparkles, Phone, PhoneCall, CalendarDays, Bell, Heart, MessageCircle, Repeat2, Receipt, Check, Pencil, Trash2, Loader2, Lightbulb } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { api } from '../lib/api';
 import { STATUS_OPTIONS } from '../lib/appointmentSchema';
 import DropInAppointmentPreview from './DropInAppointmentPreview';
+import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import './dropIns.css';
 
 const ICONS = { google: FcGoogle, calendar: CalendarDays, bell: Bell, heart: Heart, message: MessageCircle, repeat: Repeat2, receipt: Receipt, sparkles: Sparkles, phone: Phone };
@@ -33,6 +34,7 @@ export default function DropInsModal({ model, onClose }) {
   const [success, setSuccess] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [pendingNavigation, setPendingNavigation] = useState(null);
+  const [tipsOpen, setTipsOpen] = useState(false);
   const modal = useRef(null);
   const reduced = useReducedMotion();
   const dirty = draft && JSON.stringify(draft) !== JSON.stringify(baseline);
@@ -109,7 +111,7 @@ export default function DropInsModal({ model, onClose }) {
   return createPortal(<div className="drop-ins-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) navigate(onClose); }}>
     <motion.section ref={modal} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="drop-ins-title" className="drop-ins-modal" onKeyDown={handleKeys} initial={{ opacity: 0, y: reduced ? 0 : 20, scale: reduced ? 1 : .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .24 }}>
       <header className="drop-ins-header">
-        <div className="drop-ins-heading"><span className="drop-ins-heading-icon"><Layers size={22} /></span><div><p className="drop-ins-eyebrow">YOUR CALENDAR, WITH A LITTLE MORE POSSIBILITY</p><h2 id="drop-ins-title">Drop-ins<span className="drop-ins-title-dot">.</span></h2></div></div>
+        <div className="drop-ins-heading"><span className="drop-ins-heading-icon"><PhoneCall size={22} /></span><div><p className="drop-ins-eyebrow">YOUR CALENDAR, WITH A LITTLE MORE POSSIBILITY</p><div className="drop-ins-title-row"><h2 id="drop-ins-title">Drop-ins<span className="drop-ins-title-dot">.</span></h2><button type="button" className="drop-ins-tips-button" onClick={() => setTipsOpen(true)} aria-label="Drop-ins tips" title="Drop-ins tips"><Lightbulb size={16} /></button></div></div></div>
         <button type="button" className="drop-ins-icon-button" aria-label="Close drop-ins" onClick={() => navigate(onClose)}><X size={20} /></button>
       </header>
       <div className="drop-ins-statuses" role="tablist" aria-label="Appointment status">
@@ -127,7 +129,7 @@ export default function DropInsModal({ model, onClose }) {
             <motion.div key={view} initial={{ opacity: 0, x: reduced ? 0 : 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -10 }} transition={{ duration: .18 }}>
               {view === 'manage' && <>
                 <div className="drop-ins-section-heading"><div><p className="drop-ins-eyebrow">{status.toUpperCase()} APPOINTMENTS</p><h3>Your drop-ins</h3><p>{statusCopy[status]}</p></div>{model.canManage && <button type="button" className="drop-ins-primary" onClick={() => { setView('gallery'); setCategory('All'); }} disabled={model.loading}><Plus size={16} />Add drop-in</button>}</div>
-                {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !statusItems.length ? <div className="drop-ins-empty"><span className="drop-ins-empty-icon"><Layers size={32} /></span><h4>What should happen next?</h4><p>{model.canManage ? 'Start with a ready-made idea or write your own. Your first drop-in is just a few words away.' : 'Your owner or manager can create drop-ins for this status.'}</p>{model.canManage && <button type="button" className="drop-ins-primary" onClick={() => setView('gallery')}><Sparkles size={16} />Explore templates</button>}</div> : <>
+                {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !statusItems.length ? <div className="drop-ins-empty"><span className="drop-ins-empty-icon"><PhoneCall size={32} /></span><h4>What should happen next?</h4><p>{model.canManage ? 'Start with a ready-made idea or write your own. Your first drop-in is just a few words away.' : 'Your owner or manager can create drop-ins for this status.'}</p>{model.canManage && <button type="button" className="drop-ins-primary" onClick={() => setView('gallery')}><Sparkles size={16} />Explore templates</button>}</div> : <>
                   <div className="drop-ins-list-toolbar"><span>{activeItems.length} active · {statusItems.length} total</span><label>Sort <select aria-label="Sort drop-ins" value={sort} onChange={e => setSort(e.target.value)}><option value="manual">Manual</option><option value="used">Most Used</option><option value="alpha">Alphabetical</option><option value="newest">Newest</option></select></label></div>
                   {sort !== 'manual' && <p className="drop-ins-sort-note">Calendar buttons always follow your manual order.</p>}
                   <div className="drop-ins-list">{sortedItems.map(item => <div key={item.id} className={`drop-ins-list-row ${item.is_active ? '' : 'is-inactive'}`}>
@@ -164,5 +166,25 @@ export default function DropInsModal({ model, onClose }) {
         </main>
       </div>
     </motion.section>
+    <AnimatePresence>{tipsOpen ? <DropInsTipsModal onClose={() => setTipsOpen(false)} /> : null}</AnimatePresence>
   </div>, document.body);
+}
+
+function DropInsTipsModal({ onClose }) {
+  const points = [
+    ['Start with the moment.', 'Choose when the conversation belongs in the calendar: before an appointment, after it, or when someone misses it.'],
+    ['Name the outcome.', 'Give the button a short name and a clear purpose so your receptionist knows exactly why to call.'],
+    ['Write the handoff.', 'Describe the objective in plain language. Appointment details are added automatically when the call starts.'],
+  ];
+  return <motion.div className="drop-ins-tips-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
+    <motion.div className="drop-ins-tips-modal" initial={{ opacity: 0, y: 16, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: .98 }} transition={{ duration: .18 }} onMouseDown={event => event.stopPropagation()}>
+      <ModalSpectrumLine variant="tips" />
+      <div className="drop-ins-tips-glow" aria-hidden="true" />
+      <div className="drop-ins-tips-content">
+        <div className="drop-ins-tips-top"><div><div className="drop-ins-tips-kicker"><Lightbulb size={15} />Tips</div><h3>Make every drop-in count.</h3><p>Drop-ins give your receptionist a focused reason to call while keeping the appointment record familiar.</p></div><button type="button" className="drop-ins-tips-close" onClick={onClose} aria-label="Close drop-ins tips"><X size={17} /></button></div>
+        <div className="drop-ins-tips-points">{points.map(([title, body], index) => <div className="drop-ins-tips-point" key={title}><span style={{ opacity: 1 - index * .14 }} /><div><strong>{title}</strong><p>{body}</p></div></div>)}</div>
+        <p className="drop-ins-tips-footer">A great drop-in is specific enough to guide the call and simple enough to understand at a glance.</p>
+      </div>
+    </motion.div>
+  </motion.div>;
 }

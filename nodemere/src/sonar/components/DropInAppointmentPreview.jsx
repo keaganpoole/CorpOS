@@ -74,7 +74,7 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
                     <DropInStrip items={items} highlightedId={highlight} onSelect={selectAction}
                       emptyLabel={<button type="button" className="drop-in-preview-add" aria-label="Add a drop-in to the preview" title="Add drop-in" disabled={!canManage}
                         onPointerDown={event => { event.preventDefault(); event.stopPropagation(); onAdd?.(); }}
-                        onClick={event => { if (event.detail === 0) onAdd?.(); }} />} />
+                        onClick={event => { if (event.detail === 0) onAdd?.(); }}>Add drop-in</button>} />
                   </motion.div>}
                 </AnimatePresence>}
               />

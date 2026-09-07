@@ -29,7 +29,7 @@
 .drop-in-preview .drop-in-chip { position:relative; z-index:31; pointer-events:auto; min-height:26px; padding:5px 6px; margin:-5px -6px; }
 .drop-in-preview .drop-in-chip.is-highlighted { color:#fafafa; text-shadow:0 0 10px #ffffff18; }
 .drop-in-preview .drop-in-chip:empty { display:block; width:55px; height:18px; border:1px dashed #ffffff30; border-radius:5px; background:#ffffff04; }
-.drop-in-preview-add { display:block; position:relative; z-index:31; width:55px; height:18px; border:1px dashed #ffffff30; border-radius:5px; background:#ffffff04; cursor:pointer; pointer-events:auto; }
+.drop-in-preview-add { display:block; position:relative; z-index:31; width:auto; min-width:82px; height:22px; padding:0 8px; border:1px dashed #ffffff30; border-radius:5px; background:#ffffff04; color:#a1a1aa; font-size:8px; line-height:20px; cursor:pointer; pointer-events:auto; }
 .drop-in-preview-add:hover:not(:disabled) { border-color:#ffffff55; background:#ffffff08; }
 .drop-in-preview-add:disabled { cursor:default; opacity:.45; }
 @media(max-width:760px) {
