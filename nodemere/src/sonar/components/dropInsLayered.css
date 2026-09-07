@@ -159,7 +159,12 @@
   .drop-ins-modal .drop-in-preview { flex-basis: 180px; }
   .drop-ins-modal .drop-ins-header { padding-top: 16px; }
 }
-.drop-ins-modal .drop-in-chip-wrap { position: relative; isolation: isolate; display: inline-flex; align-items: center; flex: 0 0 auto; min-width: 0; max-width: none; padding: 3px 10px 0 0; overflow: visible; cursor: pointer; }
+/* Keep the button layer on the same 20px centerline as the preview avatar. */
+.drop-ins-modal .drop-in-preview-record .drop-in-strip,
+.drop-ins-modal .drop-in-preview-record .drop-in-strip-page { height: 20px; }
+.drop-ins-modal .drop-in-preview-record .drop-in-chip { min-height: 20px; margin-block: 0; padding-block: 0; line-height: 20px; }
+.drop-ins-modal .drop-in-preview-record .drop-in-arrow { height: 20px; }
+.drop-ins-modal .drop-in-chip-wrap { position: relative; isolation: isolate; display: inline-flex; align-items: center; flex: 0 0 auto; min-width: 0; max-width: none; padding: 0 10px 0 0; overflow: visible; cursor: pointer; }
 .drop-ins-modal .drop-in-chip-wrap .drop-in-chip { min-width: 0; max-width: none; overflow: visible; text-overflow: clip; }
 .drop-ins-modal .drop-in-chip-delete { position: absolute; top: -1px; right: 0; z-index: 32; display: grid; place-items: center; width: 10px; height: 10px; padding: 0; border: 1px solid #09090b; border-radius: 999px; background: #2b2b2f; color: #a1a1aa; opacity: 0; pointer-events: auto; transform: rotate(0deg); transform-origin: center; transition: opacity .16s, transform .3s cubic-bezier(.22,.8,.26,1), background .16s, color .16s; }
 .drop-ins-modal .drop-in-chip-delete svg { pointer-events: none; }

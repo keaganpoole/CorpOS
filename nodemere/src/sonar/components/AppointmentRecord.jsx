@@ -19,7 +19,7 @@ export default function AppointmentRecord({
       onClick={onDetails} className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-visible text-left">
       <AnimatePresence initial={false}>
         {actionsOpen && <motion.div initial={{ opacity: 0, x: -18, scale: .94 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -14, scale: .96 }}
-          transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="absolute left-7 z-20 flex w-[calc(100%-7rem)] items-center gap-2.5">
+          transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="appointment-record-actions absolute left-7 z-20 flex w-[calc(100%-7rem)] items-center gap-2.5">
           {actions}
         </motion.div>}
       </AnimatePresence>
