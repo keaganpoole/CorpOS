@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 export default function AppointmentRecord({
   actionsOpen, actions, actionable = true, onToggleActions, onDetails, detailsLabel,
   avatar, avatarProps = {}, details, category, time, color, prompting = false,
-  className = '', style,
+  className = '', style, overlay,
 }) {
   const toggle = event => { event.preventDefault(); event.stopPropagation(); onToggleActions?.(); };
   return <motion.div initial={false} animate={{ opacity: 1, y: 0 }}
@@ -38,5 +38,6 @@ export default function AppointmentRecord({
         <span className="font-mono text-[10px] text-zinc-400">{time}</span>
       </div>
     </div>
+    {overlay}
   </motion.div>;
 }
