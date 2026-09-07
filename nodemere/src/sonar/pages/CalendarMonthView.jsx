@@ -658,6 +658,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                 const activePromptAction = activeAppointmentPrompt?.appointmentId === appointment.id
                   ? activeAppointmentPrompt.action
                   : null;
+                const promptPurpose = (activePromptAction?.purpose || activePromptAction?.name || '').toLowerCase();
                 const showAppointmentActions = activeAppointmentActionsId === appointment.id;
                 const toggleAppointmentActions = () => {
                   if (!hasAppointmentActions) return;
@@ -693,8 +694,8 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                       actions={<AnimatePresence mode="wait" initial={false}>
                         {activePromptAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
                           <div className="drop-in-confirm" onClick={e => e.stopPropagation()}>
-                            <span title={`${appointment._receptionistName || 'Receptionist'} will call ${getCustomerFirstName(appointment)} to ${activePromptAction.purpose || activePromptAction.name}?`}>
-                              Call customer to {activePromptAction.purpose || activePromptAction.name}?
+                            <span title={`${appointment._receptionistName || 'Receptionist'} will call ${getCustomerFirstName(appointment)} to ${promptPurpose}?`}>
+                              Call customer to {promptPurpose}?
                             </span>
                             <button type="button" disabled={callingAppointment !== null} onClick={() => runDropIn(appointment, activeAppointmentPrompt)}>
                               {callingAppointment === appointment.id ? 'Starting…' : 'Call'}
