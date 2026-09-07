@@ -162,6 +162,8 @@ export function useAppointments() {
           full_name: agent.full_name || agent.name || '',
           first_name: agent.first_name || agent.name || '',
           status: agent.status || null,
+          is_active: agent.is_active !== false,
+          direction: agent.direction || 'all',
           avatar: agent.avatar || null,
           banner_id: agent.banner_id ?? null,
           catalog_id: agent.catalog_id ?? null,
@@ -174,7 +176,7 @@ export function useAppointments() {
         if (businessId && userId) {
           const combinedResponse = await supabase
             .from('hired_receptionists')
-            .select('id,full_name,first_name,status,avatar,catalog_id,user_id,business_id')
+            .select('id,full_name,first_name,status,is_active,direction,avatar,banner_id,catalog_id,user_id,business_id')
             .or(`business_id.eq.${businessId},user_id.eq.${userId}`)
             .order('full_name', { ascending: true });
           if (combinedResponse.error) throw combinedResponse.error;
@@ -182,7 +184,7 @@ export function useAppointments() {
         } else if (businessId) {
           const businessResponse = await supabase
             .from('hired_receptionists')
-            .select('id,full_name,first_name,status,avatar,catalog_id,user_id,business_id')
+            .select('id,full_name,first_name,status,is_active,direction,avatar,banner_id,catalog_id,user_id,business_id')
             .eq('business_id', businessId)
             .order('full_name', { ascending: true });
           if (businessResponse.error) throw businessResponse.error;
@@ -190,7 +192,7 @@ export function useAppointments() {
         } else if (userId) {
           const userResponse = await supabase
             .from('hired_receptionists')
-            .select('id,full_name,first_name,status,avatar,catalog_id,user_id,business_id')
+            .select('id,full_name,first_name,status,is_active,direction,avatar,banner_id,catalog_id,user_id,business_id')
             .eq('user_id', userId)
             .order('full_name', { ascending: true });
           if (userResponse.error) throw userResponse.error;

@@ -12,6 +12,11 @@ import {
 import { useAppointments } from '../hooks/useAppointments';
 import { APPOINTMENT_FIELDS, formatDate, formatTime, formatTimestampFull, titleCase } from '../lib/appointmentSchema';
 import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
+import { useDropIns } from '../hooks/useDropIns';
+import DropInsModal from '../components/DropInsModal';
+import DropInStrip from '../components/DropInStrip';
+import AppointmentRecord from '../components/AppointmentRecord';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const HOMEPAGE_TAG_COLORS = {
@@ -29,42 +34,14 @@ const STATUS_COLORS = {
   Missed: '#fb7185',
   Cancelled: '#f43f5e',
 };
-
-const getAppointmentActions = (status) => {
-  const normalized = titleCase(status);
-  if (normalized === 'Completed') {
-    return [
-      {
-        label: 'Follow Up',
-        children: [
-          { label: 'Rebook', className: 'text-zinc-300' },
-          { label: 'Google Review', className: 'text-amber-300' },
-        ],
-      },
-      {
-        label: 'Customer Care',
-        children: [
-          { label: 'Check In', className: 'text-zinc-300' },
-          { label: 'Thank You', className: 'text-zinc-300' },
-          { label: 'Request Feedback', className: 'text-zinc-300' },
-        ],
-      },
-    ];
-  }
-  if (normalized === 'Cancelled') return [{ label: 'Reschedule', className: 'text-zinc-300' }];
-  if (normalized === 'Confirmed') {
-    return [
-      { label: 'Reschedule', className: 'text-zinc-300' },
-      { label: 'Cancel', className: 'text-rose-300' },
-    ];
-  }
-
-  return [
-    { label: 'Confirm', className: 'text-emerald-300' },
-    { label: 'Reschedule', className: 'text-zinc-300' },
-    { label: 'Cancel', className: 'text-rose-300' },
-  ];
+const MAGGIE_PREVIEW_RECEPTIONIST = {
+  name: 'Maggie',
+  avatar: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie.png',
+  banner: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/maggie_001.png',
 };
+const receptionistBanner = (bannerId) => (
+  bannerId ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${bannerId}.png` : ''
+);
 
 const getCustomerFirstName = (appointment) => {
   const source = appointment._personName || appointment.client_name || 'customer';
@@ -72,17 +49,6 @@ const getCustomerFirstName = (appointment) => {
 };
 
 const getCustomerName = (appointment) => appointment._personName || appointment.client_name || 'Customer';
-
-const getAppointmentActionPrompt = (action, customerFirstName) => {
-  if (action === 'Confirm') return `Call ${customerFirstName} to confirm?`;
-  if (action === 'Cancel') return `Call ${customerFirstName} to cancel?`;
-  if (action === 'Google Review') return `Call ${customerFirstName} to ask for a Google review?`;
-  if (action === 'Rebook') return `Call ${customerFirstName} to rebook?`;
-  if (action === 'Check In') return `Call ${customerFirstName} to check in?`;
-  if (action === 'Thank You') return `Send a thank-you message to ${customerFirstName}?`;
-  if (action === 'Request Feedback') return `Call ${customerFirstName} to request feedback?`;
-  return `Call ${customerFirstName} to reschedule?`;
-};
 
 const appointmentFieldClass =
   'w-full rounded-2xl border border-neutral-800 bg-neutral-900 px-5 py-4 text-base text-neutral-100 placeholder:text-neutral-600 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus:border-neutral-700 transition-all [color-scheme:dark]';
@@ -262,7 +228,11 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
   const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
-  const [activeAppointmentActionGroup, setActiveAppointmentActionGroup] = useState(null);
+  const dropIns = useDropIns();
+  const [dropInsOpen, setDropInsOpen] = useState(false);
+  const [callingAppointment, setCallingAppointment] = useState(null);
+  const callLock = useRef(false);
+  const [callFeedback, setCallFeedback] = useState({});
   const [activeAppointmentPrompt, setActiveAppointmentPrompt] = useState(null);
   const [calendarPeekSeen, setCalendarPeekSeen] = useState(() => {
     try {
@@ -327,6 +297,21 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   );
   const receptionistCatalogById = lookups?.receptionistCatalogById || new Map();
   const receptionistsById = lookups?.receptionistsById || new Map();
+  const previewReceptionist = useMemo(() => {
+    const eligible = Array.from(receptionistsById.values()).find((row) => (
+      row?.is_active !== false
+      && String(row.status || '').trim().toLowerCase() !== 'archived'
+      && ['outbound', 'all'].includes(String(row.direction || 'all').trim().toLowerCase())
+    ));
+    if (!eligible) return MAGGIE_PREVIEW_RECEPTIONIST;
+    const catalog = eligible.catalog_id ? receptionistCatalogById.get(String(eligible.catalog_id)) : null;
+    const banner = receptionistBanner(catalog?.banner_id || eligible.banner_id);
+    return {
+      name: eligible.full_name || eligible.first_name || 'Receptionist',
+      avatar: eligible.avatar || catalog?.avatar || banner || MAGGIE_PREVIEW_RECEPTIONIST.avatar,
+      banner: banner || eligible.avatar || catalog?.avatar || MAGGIE_PREVIEW_RECEPTIONIST.banner,
+    };
+  }, [receptionistsById, receptionistCatalogById]);
   const detailFields = useMemo(() => APPOINTMENT_FIELDS.filter((field) => field.table), []);
   const detailFieldsByKey = useMemo(
     () => new Map(detailFields.map((field) => [field.key, field])),
@@ -432,7 +417,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
         if (cancelled) return;
         setAvatarGuide((current) => (current ? { ...current, phase: 'clicked' } : current));
         setActiveAppointmentActionsId(appointmentId);
-        setActiveAppointmentActionGroup(null);
+
         setActiveAppointmentPrompt(null);
       }, reduceMotion ? 80 : 1180);
 
@@ -477,6 +462,25 @@ export default function CalendarMonthView({ data = null, className = '', selecte
     setSelectedDate(getCurrentMonthInitialDate(appointmentsByDate, fallbackDate));
   }, [appointmentsByDate, currentMonth, currentYear, selectedDate]);
 
+  const runDropIn = async (appointment, selection) => {
+    if (callLock.current) return;
+    callLock.current = true;
+    setCallingAppointment(appointment.id);
+    try {
+      const result = await api.runDropIn(appointment.id, selection.action.id, selection.requestId);
+      const uncertain = ['dispatching', 'dispatch-unknown'].includes(result.status);
+      const failed = result.status === 'failed';
+      setCallFeedback(current => ({ ...current, [appointment.id]: {
+        error: failed || uncertain,
+        message: failed ? result.failure_reason || 'The call could not be started.' : uncertain ? 'Call confirmation is pending. Please do not start another call.' : `${appointment._receptionistName || 'Your receptionist'} is handling this drop-in. Check Calls for progress.`,
+      } }));
+      setActiveAppointmentPrompt(null);
+    } catch (error) {
+      setCallFeedback(current => ({ ...current, [appointment.id]: { error: true, message: error.message + (error.status ? '' : ' Confirmation may still be pending. Retry this confirmation to check the same request.') } }));
+      // Retain the request ID after a network error; retrying cannot dial twice.
+    } finally { callLock.current = false; setCallingAppointment(null); }
+  };
+
   const goToPrevMonth = () => {
     if (currentMonth === 0) {
       setCurrentMonth(11);
@@ -520,6 +524,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
           </span>
 
           <div className="relative flex items-center gap-1.5" ref={detailFieldPickerRef}>
+            <button type="button" onClick={() => setDropInsOpen(true)} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-[11px] font-semibold text-zinc-300 transition hover:bg-white/[0.08] hover:text-white">Drop-ins</button>
             <button
               type="button"
               onClick={() => setShowDetailFieldPicker((current) => !current)}
@@ -647,214 +652,61 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                     value: formatDetailValue(field, appointment, { servicesById, receptionistsById }),
                   }))
                   .filter((item) => hasFieldValue(item.value));
-                const appointmentActions = getAppointmentActions(appointment.status);
+                const appointmentActions = dropIns.items.filter(x => x.is_active && x.available_on_status === String(appointment.status).toLowerCase()).sort((a,b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
                 const hasAppointmentActions = appointmentActions.length > 0;
                 const activePromptAction = activeAppointmentPrompt?.appointmentId === appointment.id
                   ? activeAppointmentPrompt.action
-                  : null;
-                const activeActionGroup = activeAppointmentActionGroup?.appointmentId === appointment.id
-                  ? activeAppointmentActionGroup.group
                   : null;
                 const showAppointmentActions = activeAppointmentActionsId === appointment.id;
                 const toggleAppointmentActions = () => {
                   if (!hasAppointmentActions) return;
                   setActiveAppointmentActionsId((current) => {
                     const next = current === appointment.id ? null : appointment.id;
-                    if (next !== appointment.id) {
-                      setActiveAppointmentActionGroup(null);
-                      setActiveAppointmentPrompt(null);
-                    } else {
-                      setActiveAppointmentActionGroup(null);
-                    }
+                    setActiveAppointmentPrompt(null);
                     return next;
                   });
                 };
                 return (
                   <div key={appointment.id} className="space-y-1">
-                    <motion.div
-                      initial={false}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`agenda-item real-calendar-appointment-record flex w-full items-center justify-between gap-3 rounded-lg border bg-[#070707]/92 p-3 text-left ${activePromptAction ? 'demo-call-agenda-item' : 'border-white/[0.08]'}`}
-                      style={{
-                        animationDelay: `${index * 90}ms`,
-                        '--demo-receptionist-banner': `url(${receptionistBannerUrl || avatarSrc})`,
+                    <AppointmentRecord
+                      actionsOpen={showAppointmentActions} actionable={hasAppointmentActions}
+                      onToggleActions={toggleAppointmentActions} prompting={!!activePromptAction}
+                      onDetails={() => setExpandedAppointmentId(current => current === appointment.id ? null : appointment.id)}
+                      detailsLabel={`Appointment details for ${getCustomerName(appointment)}`}
+                      color={tagColor} category={category} time={formatTime(appointment.time)}
+                      style={{ animationDelay: `${index * 90}ms`, '--demo-receptionist-banner': `url(${receptionistBannerUrl || avatarSrc})` }}
+                      avatar={avatarSrc ? <img src={avatarSrc} alt="" className="h-full w-full object-cover" /> : avatarLabel}
+                      avatarProps={{
+                        'data-demo-actionable': hasAppointmentActions ? 'true' : undefined,
+                        'data-appointment-id': hasAppointmentActions ? appointment.id : undefined,
+                        className: avatarGuide?.appointmentId === appointment.id && avatarGuide.phase === 'clicked' ? 'demo-calendar-avatar-trigger--guided-click' : '',
                       }}
-                    >
-                      <button
-                        type="button"
-                        aria-label={`${activeAppointmentActionsId === appointment.id ? 'Hide' : 'Show'} appointment actions`}
-                        onClick={(clickEvent) => {
-                          clickEvent.stopPropagation();
-                          toggleAppointmentActions();
-                        }}
-                        className={`relative z-10 flex shrink-0 items-center justify-center rounded-full p-1 transition-transform duration-200 focus:outline-none ${hasAppointmentActions ? 'hover:scale-110' : 'cursor-default'}`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${activePromptAction ? 'demo-call-status-dot' : 'shadow-[0_0_4px_currentColor]'}`}
-                          style={activePromptAction
-                            ? undefined
-                            : { color: tagColor, backgroundColor: tagColor }}
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setExpandedAppointmentId((current) => (current === appointment.id ? null : appointment.id));
-                        }}
-                        className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-visible text-left"
-                      >
-                        <AnimatePresence initial={false}>
-                          {showAppointmentActions && (
-                            <motion.div
-                              initial={{ opacity: 0, x: -18, scale: 0.94 }}
-                              animate={{ opacity: 1, x: 0, scale: 1 }}
-                              exit={{ opacity: 0, x: -14, scale: 0.96 }}
-                              transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
-                              className="absolute left-0 z-20 flex max-w-[calc(100%-4.5rem)] items-center gap-2.5"
-                            >
-                              <AnimatePresence mode="wait" initial={false}>
-                                {activePromptAction ? (
-                                  <motion.div
-                                    key="action-prompt"
-                                    initial={{ opacity: 0, x: -14, scale: 0.96 }}
-                                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                                    exit={{ opacity: 0, x: -12, scale: 0.97 }}
-                                    transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
-                                    className="flex min-w-0 items-center gap-2"
-                                  >
-                                    <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[7px] font-bold text-zinc-300">
-                                      {avatarSrc ? (
-                                        <img
-                                          src={avatarSrc}
-                                          alt=""
-                                          className="h-full w-full object-cover"
-                                        />
-                                      ) : (
-                                        avatarLabel
-                                      )}
-                                    </span>
-                                    <span className="truncate text-[9px] font-bold tracking-[-0.02em] text-zinc-200 drop-shadow-[0_0_10px_rgba(255,255,255,0.08)]">
-                                      {getAppointmentActionPrompt(activePromptAction, getCustomerFirstName(appointment))}
-                                    </span>
-                                    <span
-                                      onClick={(actionEvent) => {
-                                        actionEvent.preventDefault();
-                                        actionEvent.stopPropagation();
-                                      }}
-                                      className="shrink-0 cursor-pointer text-[9px] font-bold tracking-[-0.02em] text-emerald-300 drop-shadow-[0_0_10px_rgba(110,231,183,0.14)]"
-                                    >
-                                      Call
-                                    </span>
-                                    <span
-                                      onClick={(actionEvent) => {
-                                        actionEvent.preventDefault();
-                                        actionEvent.stopPropagation();
-                                        setActiveAppointmentPrompt(null);
-                                      }}
-                                      className="shrink-0 cursor-pointer text-[9px] font-bold tracking-[-0.02em] text-zinc-500 drop-shadow-[0_0_10px_rgba(113,113,122,0.14)]"
-                                    >
-                                      Cancel
-                                    </span>
-                                  </motion.div>
-                                ) : (
-                                  <motion.div
-                                    key="action-list"
-                                    initial={{ opacity: 0, x: -14, scale: 0.96 }}
-                                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                                    exit={{ opacity: 0, x: -12, scale: 0.97 }}
-                                    transition={{ type: 'spring', stiffness: 440, damping: 28, mass: 0.7 }}
-                                    className="flex items-center gap-2.5"
-                                  >
-                                    {(activeActionGroup?.children || appointmentActions).map((action) => (
-                                      <span
-                                        key={action.label}
-                                        onClick={(actionEvent) => {
-                                          actionEvent.preventDefault();
-                                          actionEvent.stopPropagation();
-                                          if (action.children) {
-                                            setActiveAppointmentActionGroup({ appointmentId: appointment.id, group: action });
-                                            return;
-                                          }
-                                          setActiveAppointmentPrompt({
-                                            appointmentId: appointment.id,
-                                            action: action.label,
-                                          });
-                                        }}
-                                        className={`cursor-pointer text-[9px] font-bold tracking-[-0.02em] drop-shadow-[0_0_10px_rgba(255,255,255,0.08)] ${action.className}`}
-                                      >
-                                        {action.label}
-                                      </span>
-                                    ))}
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                        <motion.div
-                          animate={{
-                            opacity: showAppointmentActions ? 0 : 1,
-                            x: showAppointmentActions ? 28 : 0,
-                          }}
-                          transition={{ duration: 0.2, ease: 'easeOut' }}
-                          className="flex min-w-0 flex-1 items-center space-x-2"
-                        >
-                          <span
-                            role={hasAppointmentActions ? 'button' : undefined}
-                            tabIndex={hasAppointmentActions ? 0 : undefined}
-                            aria-label={`${activeAppointmentActionsId === appointment.id ? 'Hide' : 'Show'} appointment actions`}
-                            onClick={(avatarEvent) => {
-                              avatarEvent.preventDefault();
-                              avatarEvent.stopPropagation();
-                              toggleAppointmentActions();
-                            }}
-                            onKeyDown={(avatarEvent) => {
-                              if (!hasAppointmentActions) return;
-                              if (avatarEvent.key === 'Enter' || avatarEvent.key === ' ') {
-                                avatarEvent.preventDefault();
-                                avatarEvent.stopPropagation();
-                                toggleAppointmentActions();
-                              }
-                            }}
-                            data-demo-actionable={hasAppointmentActions ? 'true' : undefined}
-                            data-appointment-id={hasAppointmentActions ? appointment.id : undefined}
-                            className={`demo-calendar-avatar-trigger flex h-5 w-5 items-center justify-center rounded-full ${hasAppointmentActions ? 'cursor-pointer' : ''} ${avatarGuide?.appointmentId === appointment.id && avatarGuide.phase === 'clicked' ? 'demo-calendar-avatar-trigger--guided-click' : ''}`}
-                          >
-                            <span className="demo-calendar-avatar-trigger__image flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[8px] font-bold text-zinc-300">
-                              {avatarSrc ? (
-                                <img
-                                  src={avatarSrc}
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                avatarLabel
-                              )}
+                      details={<>
+                        <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
+                        <span className="text-[10px] font-medium italic text-zinc-500">with</span>
+                        <span className="truncate text-[10px] font-medium text-zinc-400">{getCustomerName(appointment)}</span>
+                        <span className="text-[10px] font-medium italic text-zinc-500">via</span>
+                        <span className="truncate text-[10px] font-medium text-zinc-400">{appointment._receptionistName || 'Receptionist'}</span>
+                      </>}
+                      actions={<AnimatePresence mode="wait" initial={false}>
+                        {activePromptAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
+                          <div className="drop-in-confirm" onClick={e => e.stopPropagation()}>
+                            <span title={`${appointment._receptionistName || 'Receptionist'} will call ${getCustomerFirstName(appointment)} to ${activePromptAction.purpose || activePromptAction.name}?`}>
+                              Call customer to {activePromptAction.purpose || activePromptAction.name}?
                             </span>
-                          </span>
-                          <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
-                          <span className="text-[10px] font-medium italic text-zinc-500">with</span>
-                          <span className="truncate text-[10px] font-medium text-zinc-400">{getCustomerName(appointment)}</span>
-                          <span className="text-[10px] font-medium italic text-zinc-500">via</span>
-                          <span className="truncate text-[10px] font-medium text-zinc-400">{appointment._receptionistName || 'Receptionist'}</span>
-                        </motion.div>
-                        <div className="flex shrink-0 items-center space-x-1.5">
-                        {!showAppointmentActions && (
-                          <span
-                            className="rounded border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
-                            style={{
-                              color: tagColor,
-                              borderColor: `${tagColor}33`,
-                              backgroundColor: `${tagColor}14`,
-                            }}
-                          >
-                            {category}
-                          </span>
-                        )}
-                        <span className="font-mono text-[10px] text-zinc-400">{formatTime(appointment.time)}</span>
-                      </div>
-                      </button>
-                    </motion.div>
+                            <button type="button" disabled={callingAppointment !== null} onClick={() => runDropIn(appointment, activeAppointmentPrompt)}>
+                              {callingAppointment === appointment.id ? 'Starting…' : 'Call'}
+                            </button>
+                            <button type="button" disabled={callingAppointment === appointment.id} onClick={() => setActiveAppointmentPrompt(null)}>Cancel</button>
+                          </div>
+                        </motion.div> : <motion.div key="action-list" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
+                          <DropInStrip items={appointmentActions} onSelect={action => {
+                            setActiveAppointmentPrompt({ appointmentId: appointment.id, action, requestId: crypto.randomUUID() });
+                          }} />
+                        </motion.div>}
+                      </AnimatePresence>}
+                    />
+                    {callFeedback[appointment.id] && <div role="status" className={`drop-in-call-feedback ${callFeedback[appointment.id].error ? 'is-error' : ''}`}>{callFeedback[appointment.id].message}</div>}
                     <AnimatePresence initial={false}>
                       {isExpanded && (
                         <motion.div
@@ -928,6 +780,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
           </motion.div>
         )}
       </AnimatePresence>
+      {dropInsOpen && <DropInsModal model={{ ...dropIns, previewReceptionist }} onClose={() => setDropInsOpen(false)} />}
       <style>{`
         @keyframes demoCalendarCursorPress {
           0%, 100% {

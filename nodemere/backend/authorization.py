@@ -28,7 +28,7 @@ BUSINESS_TABLES = frozenset({
     "people", "appointments", "staff", "services", "call_logs", "hired_receptionists",
     "scenarios", "flow_executions", "people_docs", "people_schema", "appointments_schema",
     "requests", "contracts", "custom_voices", "jobs", "purchased_numbers", "account_settings",
-    "nest", "bugs", "reviews", "billing_overage_events", "scenario_events",
+    "nest", "bugs", "reviews", "billing_overage_events", "scenario_events", "drop_ins",
 })
 OWNER_TABLES = frozenset({"payments", "invoices", "integrations", "checkpoints"})
 PERSONAL_TABLES = frozenset({"users", "account_data_requests"})
@@ -40,7 +40,7 @@ REFERENCES = {
     "payment_id": "payments", "invoice_id": "invoices", "integration_id": "integrations",
     "document_id": "people_docs", "request_id": "requests", "contract_id": "contracts",
     "execution_id": "flow_executions", "flow_execution_id": "flow_executions",
-    "call_log_id": "call_logs", "assigned_staff": "staff",
+    "call_log_id": "call_logs", "assigned_staff": "staff", "drop_in_id": "drop_ins",
 }
 OWNERSHIP = frozenset({"user_id", "business_id", "created_by", "owner_id"})
 

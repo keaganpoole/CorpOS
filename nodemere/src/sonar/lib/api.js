@@ -64,7 +64,20 @@ async function fetchJSON(endpoint) {
   }
 }
 
+async function strictGetJSON(endpoint) {
+  const res = await fetch(`${API_BASE}${endpoint}`, { headers: await buildAuthHeaders() });
+  if (!res.ok) throw await parseApiError(res);
+  return res.json();
+}
+
 export const api = {
+  getDropIns: () => strictGetJSON('/api/sonar/drop-ins'),
+  getDropInTemplates: () => strictGetJSON('/api/sonar/drop-ins/templates'),
+  createDropIn: (draft) => postJSON('/api/sonar/drop-ins', draft),
+  updateDropIn: (id, draft) => putJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}`, draft),
+  deleteDropIn: (id) => deleteJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}`),
+  reorderDropIns: (order) => putJSON('/api/sonar/drop-ins/order', order),
+  runDropIn: (appointmentId, id, requestId) => postJSON(`/api/sonar/appointments/${encodeURIComponent(appointmentId)}/drop-ins/${encodeURIComponent(id)}/run`, { request_id: requestId }),
   getAgents: (options = {}) => fetchJSON(`/api/agents${options.includeArchived ? '?include_archived=true' : ''}`),
   getSystemSummary: () => fetchJSON('/api/system/summary'),
   getLivePulse: (limit = 30) => fetchJSON(`/api/events/live-pulse?limit=${limit}`),

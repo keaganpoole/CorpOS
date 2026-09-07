@@ -33,6 +33,8 @@ def require_permission(tenant, permission):
 
 def route_permission(path, method):
     read = method in {"GET", "HEAD"}
+    if path.startswith('/api/sonar/drop-ins'):
+        return 'operations.read' if read else 'operations.manage'
     if path in {'/api/sonar/people/read','/api/sonar/appointments/read'} and method == 'POST':
         return 'operations.read'
     if path.startswith('/api/workforce/'):

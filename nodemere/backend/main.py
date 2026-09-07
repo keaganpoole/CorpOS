@@ -8145,26 +8145,6 @@ async def legacy_server_tool(
         emit_appointment_change_triggers(existing, updated, business_id=business.get("id") if business else None)
         return {"ok": True, "appointment": updated}
 
-    if normalized_tool == "cancel-appointment":
-        appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
-        if not appointment_id:
-            return {"ok": True, "appointment": {"action": "cancel_appointment", "skipped": True, "reason": "appointment_id is required"}}
-        existing_query = supabase.table("appointments").select("*").eq("id", appointment_id)
-        if business and business.get("id") is not None:
-            existing_query = existing_query.eq("business_id", business.get("id"))
-        existing_response = existing_query.limit(1).execute()
-        existing = existing_response.data[0] if existing_response.data else None
-        if not existing:
-            return {"ok": True, "appointment": {"id": appointment_id, "action": "cancel_appointment", "skipped": True, "reason": "Appointment not found"}}
-        response = supabase.table("appointments").update({
-            "status": "cancelled",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", appointment_id).execute()
-        cancelled = response.data[0] if response.data else {**existing, "status": "cancelled", "updated_at": datetime.now(timezone.utc).isoformat()}
-        cancelled = {"action": "cancel_appointment", "table": "appointments", **cancelled}
-        emit_appointment_change_triggers(existing, cancelled, business_id=business.get("id") if business else None)
-        return {"ok": True, "appointment": cancelled}
-
     if normalized_tool == "log-call-outcome":
         duration_seconds = first_present(payload, "duration_seconds", "duration")
         call_log = {
@@ -8301,6 +8281,17 @@ async def elevenlabs_post_call_webhook(
 async def persist_elevenlabs_event(payload):
     webhook_type,event_timestamp,event_data=get_elevenlabs_event_data(payload)
     conversation_id=first_present(event_data,"conversation_id","conversation_initiation_client_data.dynamic_variables.system__conversation_id")
+    # Provider callbacks can arrive before the outbound HTTP response. Resolve
+    # the pre-created drop-in log using the signed, tenant-validated context.
+    drop_in_log = None
+    drop_dynamic = extract_dynamic_variables(event_data)
+    if drop_dynamic.get('drop_in_id') and drop_dynamic.get('call_log_id'):
+        candidates = supabase.table('call_logs').select('*').eq('id', str(drop_dynamic['call_log_id'])).limit(1).execute().data or []
+        if not candidates or str(candidates[0].get('drop_in_id')) != str(drop_dynamic['drop_in_id']):
+            raise HTTPException(403, 'Invalid drop-in call binding')
+        drop_in_log = candidates[0]
+        if drop_in_log.get('conversation_id') and str(drop_in_log['conversation_id']) != str(conversation_id):
+            raise HTTPException(403, 'Conflicting drop-in conversation')
     if webhook_type == "post_call_audio":
         audio_storage_path = upload_call_recording(
             str(conversation_id) if conversation_id else "",
@@ -8320,8 +8311,8 @@ async def persist_elevenlabs_event(payload):
         }
         updates = {key: value for key, value in updates.items() if value is not None}
         try:
-            existing = []
-            if conversation_id:
+            existing = [drop_in_log] if drop_in_log else []
+            if not existing and conversation_id:
                 existing = (
                     supabase.table("call_logs")
                     .select("id")
@@ -8369,8 +8360,8 @@ async def persist_elevenlabs_event(payload):
     )
 
     try:
-        existing = []
-        if call_log.get("conversation_id"):
+        existing = [drop_in_log] if drop_in_log else []
+        if not existing and call_log.get("conversation_id"):
             existing = (
                 supabase.table("call_logs")
                 .select("id,audio_storage_path,duration_seconds,business_id")
@@ -8404,6 +8395,13 @@ async def persist_elevenlabs_event(payload):
             )
             existing = [row for row in candidates if row.get("from_number") == call_log["from_number"]][:1]
         if existing:
+            saved_drop = drop_in_log
+            if not saved_drop:
+                saved_rows = supabase.table('call_logs').select('*').eq('id', existing[0]['id']).limit(1).execute().data or []
+                saved_drop = saved_rows[0] if saved_rows and saved_rows[0].get('drop_in_id') else None
+            if saved_drop:
+                for field in ('drop_in_id', 'appointment_id', 'person_id', 'hired_receptionist_id', 'receptionist_name', 'conversation_initiation_data', 'source'):
+                    call_log[field] = saved_drop.get(field)
             if existing[0].get("audio_storage_path") and not call_log.get("audio_storage_path"):
                 call_log["audio_storage_path"] = existing[0]["audio_storage_path"]
             response = supabase.table("call_logs").update(call_log).eq("id", existing[0]["id"]).execute()
@@ -11700,6 +11698,10 @@ scenario_engine = ScenarioEngine(
     plan_access_checker=enforce_call_minutes,
     scenario_access_checker=require_scenario_feature_access,
 )
+
+from .drop_ins import build_router as build_drop_ins_router
+app.include_router(build_drop_ins_router(supabase, get_current_user, load_business_by_user_id,
+                                        scenario_engine.action_executor))
 
 @app.post("/api/sonar/update-payment", tags=["Sonar Payments"])
 async def update_payment(request: PaymentUpdateRequest, current_user: dict = Depends(get_current_user)):
