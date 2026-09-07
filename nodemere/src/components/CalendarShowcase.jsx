@@ -19,6 +19,7 @@ import {
 import { Link } from 'react-router-dom';
 import HomepageScenariosDemo from '../sonar/pages/Scenarios/HomepageScenariosDemo';
 import HomepagePeopleCrmDemo, { DEMO_CUSTOM_FIELDS } from '../sonar/pages/HomepagePeopleCrmDemo';
+import CallLayerBorderOverlay from '../sonar/components/CallLayerBorderOverlay';
 import useSectionScrollProgress from '../hooks/useSectionScrollProgress';
 
 const supabase = createClient(
@@ -1971,6 +1972,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                         <span className={`${isMobile ? 'text-[8px]' : isCompact ? 'text-[9px]' : 'text-[10px]'} font-mono text-zinc-400`}>{event.time}</span>
                       </div>
                     </button>
+                    {activePromptAction && <CallLayerBorderOverlay />}
                   </motion.div>
                   <AnimatePresence initial={false}>
                     {expandedAppointmentId === event.id && (

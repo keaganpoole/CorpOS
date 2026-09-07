@@ -17,6 +17,7 @@ import { useDropIns } from '../hooks/useDropIns';
 import DropInsModal from '../components/DropInsModal';
 import DropInStrip from '../components/DropInStrip';
 import AppointmentRecord from '../components/AppointmentRecord';
+import CallLayerBorderOverlay from '../components/CallLayerBorderOverlay';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const HOMEPAGE_TAG_COLORS = {
@@ -681,6 +682,7 @@ export default function CalendarMonthView({ data = null, className = '', selecte
                         'data-appointment-id': hasAppointmentActions ? appointment.id : undefined,
                         className: avatarGuide?.appointmentId === appointment.id && avatarGuide.phase === 'clicked' ? 'demo-calendar-avatar-trigger--guided-click' : '',
                       }}
+                      overlay={activePromptAction ? <CallLayerBorderOverlay /> : null}
                       details={<>
                         <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
                         <span className="text-[10px] font-medium italic text-zinc-500">with</span>

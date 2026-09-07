@@ -58,14 +58,15 @@
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -14px 42px rgba(0, 0, 0, .18);
 }
-.drop-ins-modal .drop-ins-statuses { padding: 0 30px; gap: 24px; border-color: #b6bedb14; scrollbar-width: thin; scrollbar-color: #44475f transparent; }
+.drop-ins-modal .drop-ins-statuses { position: relative; padding: 0 30px; gap: 24px; border-color: #b6bedb14; scrollbar-width: thin; scrollbar-color: #44475f transparent; }
 .drop-ins-modal .drop-ins-statuses > button { color: #969cb3; padding: 15px 0; }
 .drop-ins-modal .drop-ins-statuses > button.is-current { color: #fff; }
-.drop-ins-modal .drop-ins-statuses > button.is-current:after { background: #f4f4f5; }
+.drop-ins-modal .drop-ins-statuses > button.is-current:after { display: none; }
+.drop-ins-modal .drop-ins-status-indicator { position: absolute; left: 0; bottom: 0; height: 2px; border-radius: 3px; pointer-events: none; background: linear-gradient(90deg, #d4d4d8, #fff, #a1a1aa); transition: left .52s cubic-bezier(.22, 1, .36, 1), width .42s cubic-bezier(.22, 1, .36, 1); }
 .drop-ins-modal .drop-ins-statuses .drop-ins-status-dot { box-shadow: 0 0 7px currentColor; }
 .drop-ins-modal .drop-ins-tab-count { color: #a6acc2; }
-.drop-ins-modal .drop-ins-workspace { flex: 1; padding: 22px 30px 26px; scrollbar-color: #44475f transparent; }
-.drop-ins-modal .drop-ins-section-heading { margin-bottom: 20px; }
+.drop-ins-modal .drop-ins-workspace { flex: 1; padding: 16px 30px 6px; scrollbar-color: #44475f transparent; }
+.drop-ins-modal .drop-ins-section-heading { margin-bottom: 14px; }
 .drop-ins-modal .drop-ins-section-heading h3 { font-size: 22px; margin: 0 0 7px; }
 .drop-ins-modal .drop-ins-section-heading p:not(.drop-ins-eyebrow) { color: #a1a6bb; }
 .drop-ins-modal .drop-ins-heading-actions { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
@@ -81,9 +82,10 @@
 .drop-ins-modal .drop-ins-gallery-title h3 { margin: 0; color: #f4f4f5; font-size: 17px; font-weight: 550; letter-spacing: -.025em; }
 .drop-ins-modal .drop-ins-gallery-search { width: 240px; padding: 10px 12px; background: #ffffff03; border-color: #b6bedb1c; color: #a1a6bb; }
 .drop-ins-modal .drop-ins-gallery-search input::placeholder { color: #959bb3; }
-.drop-ins-modal .drop-ins-categories { gap: 8px; margin: 13px 0; }
-.drop-ins-modal .drop-ins-categories button { padding: 7px 13px; color: #a6acc2; border-color: #b6bedb12; }
-.drop-ins-modal .drop-ins-categories button.is-current { color: #09090b; background: #f4f4f5; border-color: #f4f4f5; }
+.drop-ins-modal .drop-ins-categories { gap: 18px; margin: 13px 0; }
+.drop-ins-modal .drop-ins-categories button { padding: 7px 0; color: #8d93aa; border-color: transparent; background: transparent; transition: color .22s ease; }
+.drop-ins-modal .drop-ins-categories button:hover { color: #d4d4d8; }
+.drop-ins-modal .drop-ins-categories button.is-current { color: #f4f4f5; background: transparent; border-color: transparent; }
 .drop-ins-modal .drop-ins-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .drop-ins-modal .drop-ins-template { padding: 16px; min-height: 170px; background: #111111e6; border-color: #b6bedb1c; border-radius: 15px; }
 .drop-ins-modal .drop-ins-template:hover { background: #ffffff08; border-color: #ffffff45; box-shadow: 0 0 22px #ffffff05; }
@@ -109,15 +111,15 @@
 .drop-ins-modal .drop-ins-delete-confirm { color: #d4d4d8; }
 
 
-.drop-ins-modal .drop-ins-editor { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.4fr); gap: 20px 28px; }
-.drop-ins-modal .drop-ins-editor-identity { display: flex; flex-direction: column; gap: 18px; }
+.drop-ins-modal .drop-ins-editor { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.4fr); row-gap: 14px; column-gap: 28px; }
+.drop-ins-modal .drop-ins-editor-identity { display: flex; flex-direction: column; gap: 14px; }
 .drop-ins-modal .drop-ins-field { display: flex; flex-direction: column; min-width: 0; }
 .drop-ins-modal .drop-ins-field > label { color: #e4e4e7; font-size: 12px; font-weight: 550; margin-bottom: 9px; }
 .drop-ins-modal .drop-ins-field > label span { display: block; font-size: 11px; line-height: 1.6; font-weight: 400; color: #a1a6bb; margin-top: 5px; }
 .drop-ins-modal .drop-ins-editor input, .drop-ins-modal .drop-ins-editor textarea { margin: 0; background: #0f0f10f2; border-color: #b6bedb26; padding: 11px 14px; }
 .drop-ins-modal .drop-ins-editor input::placeholder, .drop-ins-modal .drop-ins-editor textarea::placeholder { color: #8c93ad; }
-.drop-ins-modal .drop-ins-editor textarea { flex: 1; min-height: 150px; }
-.drop-ins-modal .drop-ins-editor-footer { grid-column: 1 / -1; padding-top: 16px; border-top: 1px solid #b6bedb14; }
+.drop-ins-modal .drop-ins-editor textarea { flex: 0 0 140px; height: 140px; min-height: 0; }
+.drop-ins-modal .drop-ins-editor-footer { grid-column: 1 / -1; padding-top: 8px; border-top: 1px solid #b6bedb14; }
 
 @media (max-width: 900px) {
   .drop-ins-modal .drop-ins-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -139,8 +141,12 @@
   .drop-ins-modal .drop-ins-heading-actions { width: 100%; justify-content: flex-end; }
   .drop-ins-modal .drop-ins-gallery-search { order: 3; width: 100%; }
   .drop-ins-modal .drop-ins-editor { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-  .drop-ins-modal .drop-ins-editor textarea { min-height: 180px; }
+  .drop-ins-modal .drop-ins-editor-identity { gap: 18px; }
+  .drop-ins-modal .drop-ins-editor textarea { flex: 0 0 auto; height: auto; min-height: 180px; }
   .drop-ins-modal .drop-ins-list-text p { max-width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drop-ins-modal .drop-ins-status-indicator { transition: none; }
 }
 @media (max-width: 420px) {
   .drop-ins-modal .drop-ins-list { grid-template-columns: minmax(0, 1fr); }

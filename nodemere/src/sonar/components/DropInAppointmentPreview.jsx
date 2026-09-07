@@ -1,7 +1,8 @@
-import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useMotionValue, useSpring, useReducedMotion } from 'framer-motion';
 import { UserRound } from 'lucide-react';
 import AppointmentRecord from './AppointmentRecord';
+import CallLayerBorderOverlay from './CallLayerBorderOverlay';
 import DropInStrip from './DropInStrip';
 import './dropInPreview.css';
 
@@ -12,26 +13,7 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
   const [scale, setScale] = useState(1);
   const [open, setOpen] = useState(true);
   const [selectedAction, setSelectedAction] = useState(null);
-  const borderOverlay = useRef(null);
-  const borderId = useId().replace(/:/g, '');
-  const [borderGeometry, setBorderGeometry] = useState(null);
   const hasBorderOverlay = !!selectedAction && !!draft?.is_active;
-  useLayoutEffect(() => {
-    const svg = borderOverlay.current;
-    if (!svg) return;
-    const card = svg.parentElement;
-    const measure = () => {
-      const css = getComputedStyle(card);
-      // Absolute inset:0 covers the padding box, inside the existing CSS border.
-      // Keep SVG units equal to CSS pixels; never scale an assumed viewBox.
-      const radius = Math.max(0, parseFloat(css.borderTopLeftRadius) - parseFloat(css.borderTopWidth));
-      setBorderGeometry({ width: card.clientWidth, height: card.clientHeight, radius });
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(card);
-    return () => observer.disconnect();
-  }, [hasBorderOverlay]);
   const reduced = useReducedMotion();
   const pointerX = useMotionValue(0), pointerY = useMotionValue(0);
   const rotateX = useSpring(pointerX, { stiffness: 100, damping: 24 });
@@ -93,37 +75,7 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
                 prompting={!!selectedAction} style={{ '--demo-receptionist-banner': receptionistBanner ? `url("${receptionistBanner}")` : 'none' }}
                 avatar={receptionist?.avatar ? <img src={receptionist.avatar} alt="" className="h-full w-full object-cover" /> : <UserRound size={12} strokeWidth={1.6} />}
                 className="drop-in-preview-record"
-                overlay={hasBorderOverlay ? <svg ref={borderOverlay} aria-hidden="true" className="drop-in-call-comet" style={{ position: 'absolute', inset: 0, zIndex: 30, width: '100%', height: '100%', overflow: 'hidden', pointerEvents: 'none', borderRadius: borderGeometry?.radius }} xmlns="http://www.w3.org/2000/svg">
-                  {borderGeometry && <>
-                  <defs>
-                    <linearGradient id="drop-in-call-comet-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="var(--brandGradientStart)" stopOpacity="0" />
-                      <stop offset="55%" stopColor="var(--brandGradientEnd)" stopOpacity=".32" />
-                      <stop offset="88%" stopColor="#d8b4fe" stopOpacity=".85" />
-                      <stop offset="100%" stopColor="#fff" stopOpacity="1" />
-                    </linearGradient>
-                    <linearGradient id="drop-in-call-god-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#fff" stopOpacity="0" />
-                      <stop offset="50%" stopColor="#fff" stopOpacity=".72" />
-                      <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-                    </linearGradient>
-                    <clipPath id={`${borderId}-pill-clip`} clipPathUnits="userSpaceOnUse"><rect width="100%" height="100%" rx={borderGeometry.radius} ry={borderGeometry.radius} /></clipPath>
-                    <mask id={`${borderId}-border-band`} maskUnits="userSpaceOnUse" x="0" y="0" width={borderGeometry.width} height={borderGeometry.height} style={{ maskType: 'alpha' }}>
-                      <rect x=".75" y=".75" width={borderGeometry.width - 1.5} height={borderGeometry.height - 1.5} rx={Math.max(0, borderGeometry.radius - .75)} fill="none" stroke="white" strokeWidth="1.5" />
-                    </mask>
-                    <filter id="drop-in-call-god-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.4" /></filter>
-                    <filter id="drop-in-call-lens-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation=".55" /></filter>
-                  </defs>
-                  <g clipPath={`url(#${borderId}-pill-clip)`}>
-                    <g mask={`url(#${borderId}-border-band)`}>
-                    <rect className="drop-in-call-comet-stroke" x=".75" y=".75" width={borderGeometry.width - 1.5} height={borderGeometry.height - 1.5} rx={Math.max(0, borderGeometry.radius - .75)} pathLength="100" fill="none" stroke="url(#drop-in-call-comet-gradient)" strokeWidth="1.5" strokeDasharray="22 78" strokeDashoffset="100" />
-                    <rect className="drop-in-call-god-sweep" x=".75" y=".75" width={borderGeometry.width - 1.5} height={borderGeometry.height - 1.5} rx={Math.max(0, borderGeometry.radius - .75)} pathLength="100" fill="none" stroke="url(#drop-in-call-god-gradient)" strokeWidth="1.5" strokeDasharray="24 76" strokeDashoffset="100" filter="url(#drop-in-call-god-blur)" />
-                    <rect className="drop-in-call-lens-flare" x=".75" y=".75" width={borderGeometry.width - 1.5} height={borderGeometry.height - 1.5} rx={Math.max(0, borderGeometry.radius - .75)} pathLength="100" fill="none" stroke="url(#drop-in-call-god-gradient)" strokeWidth="1.5" strokeDasharray="9 91" strokeDashoffset="100" filter="url(#drop-in-call-lens-blur)" />
-                    {[18, 37, 58, 76, 91].map((left, index) => <circle key={left} className="drop-in-call-particle" cx={`${left}%`} cy=".75" r=".5" style={{ animationDelay: `${-120 + (index * 70)}ms` }} />)}
-                    </g>
-                  </g>
-                  </>}
-                </svg> : null}
+                overlay={hasBorderOverlay ? <CallLayerBorderOverlay key={`${selectedAction.id}-${selectedAction.name}-${selectedAction.purpose}`} /> : null}
                 details={<><span className="drop-in-preview-placeholder is-title" /><span className="drop-in-preview-placeholder is-person" /></>}
                 category={<span className="drop-in-preview-placeholder is-category" aria-label="Service placeholder" />}
                 time={<span className="drop-in-preview-placeholder is-time" aria-label="Appointment time placeholder" />}
