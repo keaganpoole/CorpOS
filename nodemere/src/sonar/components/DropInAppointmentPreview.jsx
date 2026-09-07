@@ -7,7 +7,7 @@ import './dropInPreview.css';
 
 const COLORS = { pending: '#fbbf24', confirmed: '#34d399', completed: '#22c55e', missed: '#fb7185', cancelled: '#f43f5e' };
 
-export default function DropInAppointmentPreview({ items, status, draft, showCallLayer = false, receptionist, onAdd, canManage }) {
+export default function DropInAppointmentPreview({ items, status, draft, showCallLayer = false, receptionist, onAdd, onDelete, canManage }) {
   const stage = useRef(null);
   const [scale, setScale] = useState(1);
   const [open, setOpen] = useState(true);
@@ -36,6 +36,19 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
   useEffect(() => { if (reduced) { pointerX.set(0); pointerY.set(0); } }, [reduced, pointerX, pointerY]);
   const move = event => {
     if (reduced || event.pointerType === 'touch') return;
+    const recordRect = event.currentTarget.querySelector('.drop-in-preview-record')?.getBoundingClientRect();
+    const overRecord = recordRect
+      && event.clientX >= recordRect.left - 12 && event.clientX <= recordRect.right + 12
+      && event.clientY >= recordRect.top - 12 && event.clientY <= recordRect.bottom + 12;
+    if (overRecord) {
+      const currentX = rotateX.get();
+      const currentY = rotateY.get();
+      pointerX.set(currentX);
+      pointerY.set(currentY);
+      if (typeof rotateX.jump === 'function') rotateX.jump(currentX); else rotateX.set(currentX);
+      if (typeof rotateY.jump === 'function') rotateY.jump(currentY); else rotateY.set(currentY);
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     pointerX.set(-(event.clientY - rect.top - rect.height / 2) / rect.height * 8);
     pointerY.set((event.clientX - rect.left - rect.width / 2) / rect.width * 10);
@@ -71,7 +84,7 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
                       <button type="button" onClick={closeSelection}>Cancel</button>
                     </div>
                   </motion.div> : <motion.div key="action-list" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
-                    <DropInStrip items={items} highlightedId={highlight} onSelect={selectAction}
+                    <DropInStrip items={items} highlightedId={highlight} onSelect={selectAction} onDelete={onDelete}
                       emptyLabel={<button type="button" className="drop-in-preview-add" aria-label="Add a drop-in to the preview" title="Add drop-in" disabled={!canManage}
                         onPointerDown={event => { event.preventDefault(); event.stopPropagation(); onAdd?.(); }}
                         onClick={event => { if (event.detail === 0) onAdd?.(); }}>Add drop-in</button>} />

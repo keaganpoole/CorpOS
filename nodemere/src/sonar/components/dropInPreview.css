@@ -10,8 +10,8 @@
 .drop-in-preview-stage { position:relative; flex:1; min-height:340px; display:grid; grid-template-columns:minmax(0,1fr); place-items:center; perspective:1200px; }
 .drop-in-preview-light { position:absolute; width:85%; height:50%; top:15%; border-radius:50%; background:radial-gradient(ellipse,#ffffff08,transparent 65%); filter:blur(25px); pointer-events:none; }
 .drop-in-preview-floor { position:absolute; top:calc(50% + 75px); left:12%; width:76%; height:100px; border-radius:50%; transform:rotate(-3deg) scaleY(.55); background:radial-gradient(ellipse,#000c 5%,#0008 35%,transparent 70%); filter:blur(14px); pointer-events:none; }
-.drop-in-preview-scale { width:420px; transform-origin:center; transform-style:preserve-3d; }
-.drop-in-preview-tilt { transform-style:preserve-3d; }
+.drop-in-preview-scale { width:420px; transform-origin:center; transform-style:flat; }
+.drop-in-preview-tilt { transform-style:flat; }
 .drop-in-preview-object { position:relative; transform:rotateX(12deg) rotateY(-9deg) rotateZ(-4deg); transform-style:preserve-3d; }
 .drop-in-preview-edge { position:absolute; inset:0; border-radius:9px; border:1px solid #ffffff16; background:linear-gradient(110deg,#2a2a2a,#111 20%,#242424 65%,#0b0b0b); box-shadow:0 1px 0 #0008; pointer-events:none; }
 .drop-in-preview-face { position:relative; z-index:20; transform:translateZ(14px); transform-style:flat; isolation:isolate; border-radius:9px; pointer-events:auto; }

@@ -1,10 +1,10 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import './dropIns.css';
 
 // The exact same measured, paginated controls power the Calendar and live guide.
-export default function DropInStrip({ items, onSelect, highlightedId, emptyLabel = 'No active drop-ins', getTitle = item => item.name }) {
+export default function DropInStrip({ items, onSelect, onDelete, highlightedId, emptyLabel = 'No active drop-ins', getTitle = item => item.name }) {
   const root = useRef(null);
   const measure = useRef(null);
   const [pages, setPages] = useState([[]]);
@@ -50,11 +50,14 @@ export default function DropInStrip({ items, onSelect, highlightedId, emptyLabel
     <div className="drop-in-strip-window">
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={page} className="drop-in-strip-page" initial={{ opacity: 0, x: reduced ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -12 }} transition={{ duration: .15 }}>
-          {(pages[page] || []).map(saved => items.find(item => item.id === saved.id)).filter(Boolean).map(x => <button type="button" key={x.id} title={getTitle(x)} aria-label={x.name || 'Name your drop-in'} className={`drop-in-chip ${highlightedId === x.id ? 'is-highlighted' : ''}`} onPointerDown={event => activate(event, x)} onClick={event => {
+          {(pages[page] || []).map(saved => items.find(item => item.id === saved.id)).filter(Boolean).map(x => <span className="drop-in-chip-wrap" key={x.id}>
+            <button type="button" title={getTitle(x)} aria-label={x.name || 'Name your drop-in'} className={`drop-in-chip ${highlightedId === x.id ? 'is-highlighted' : ''}`} onPointerDown={event => activate(event, x)} onClick={event => {
             // Pointer presses have already selected the action. Keep the native
             // click path for keyboard users.
             if (event.detail === 0) activate(event, x);
-          }}>{x.name}</button>)}
+          }}>{x.name}</button>
+            {onDelete && <button type="button" className="drop-in-chip-delete" aria-label={`Delete ${x.name}`} title={`Delete ${x.name}`} onPointerDown={event => { event.preventDefault(); event.stopPropagation(); }} onClick={event => { event.preventDefault(); event.stopPropagation(); onDelete(x); }}><X size={7} strokeWidth={2.2} /></button>}
+          </span>)}
           {!items.length && <span className="drop-in-empty-label">{emptyLabel}</span>}
         </motion.div>
       </AnimatePresence>
