@@ -15,16 +15,23 @@
 .drop-in-preview-object { position:relative; transform:rotateX(12deg) rotateY(-9deg) rotateZ(-4deg); transform-style:preserve-3d; }
 .drop-in-preview-edge { position:absolute; inset:0; border-radius:9px; border:1px solid #ffffff16; background:linear-gradient(110deg,#2a2a2a,#111 20%,#242424 65%,#0b0b0b); box-shadow:0 1px 0 #0008; pointer-events:none; }
 .drop-in-preview-face { position:relative; z-index:20; transform:translateZ(14px); transform-style:flat; isolation:isolate; border-radius:9px; pointer-events:auto; }
-.drop-in-preview-record { position:relative; z-index:2; min-height:52px; background:linear-gradient(115deg,#121212 0%,#070707 38%,#070707 75%,#101010)!important; border-color:#ffffff14!important; box-shadow:inset 0 1px 0 #ffffff0a; }
+.drop-in-preview-record { position:relative; z-index:2; min-height:52px; background-color:#070707!important; background-image:linear-gradient(115deg,#121212 0%,#070707 38%,#070707 75%,#101010)!important; border-color:#ffffff14!important; box-shadow:inset 0 1px 0 #ffffff0a; }
 .drop-in-preview-record .demo-calendar-avatar-trigger__image { background:#18181b; color:#d4d4d8; border-color:#ffffff1a; box-shadow:inset 0 1px 2px #ffffff0a; }
+/* These were inherited from HomePage.css in the modal. Keep the preview
+   self-contained without changing the original values or animation timing. */
+.drop-in-preview-record .demo-calendar-avatar-trigger{position:relative;isolation:isolate;overflow:visible;flex-shrink:0;transform-origin:center;will-change:transform}
+.drop-in-preview-record .demo-calendar-avatar-trigger__image{position:relative;z-index:2;transform-origin:center;will-change:transform}
+.drop-in-preview-record .demo-call-status-dot{background:linear-gradient(135deg,var(--brandGradientStart) 0%,#ff5fc4 24%,var(--brandGradientEnd) 52%,#a855f7 74%,var(--brandGradientStart) 100%);background-size:420% 420%;box-shadow:0 0 7px color-mix(in srgb,var(--brandGradientStart) 48%,transparent),0 0 12px color-mix(in srgb,var(--brandGradientEnd) 38%,transparent);animation:demoCallStatusGradient 1.85s ease-in-out infinite}
+@keyframes demoCallStatusGradient{0%{background-position:0% 50%;filter:brightness(1.02)}50%{background-position:100% 50%;filter:brightness(1.18)}100%{background-position:0% 50%;filter:brightness(1.02)}}
 .drop-in-preview-record .appointment-record-actions { inset-block:0; }
-.drop-in-preview-record.demo-call-agenda-item { overflow:hidden; border-color:transparent!important; background:linear-gradient(rgba(7,7,7,.92),rgba(7,7,7,.92)) padding-box,linear-gradient(135deg,var(--brandGradientStart),var(--brandGradientEnd),#a855f7,var(--brandGradientStart)) border-box!important; background-size:320% 320%!important; box-shadow:0 0 0 1px color-mix(in srgb,var(--brandGradientStart) 16%,transparent),0 0 14px color-mix(in srgb,var(--brandGradientEnd) 14%,transparent); }
+.drop-in-preview-record.demo-call-agenda-item { overflow:hidden; border-color:transparent!important; background-image:linear-gradient(rgba(7,7,7,.92),rgba(7,7,7,.92)),linear-gradient(135deg,var(--brandGradientStart),var(--brandGradientEnd),#a855f7,var(--brandGradientStart))!important; background-origin:padding-box,border-box!important; background-clip:padding-box,border-box!important; background-size:320% 320%; background-position:0% 50%; box-shadow:0 0 0 1px color-mix(in srgb,var(--brandGradientStart) 16%,transparent),0 0 14px color-mix(in srgb,var(--brandGradientEnd) 14%,transparent); animation:drop-in-call-flowing-border 4.8s ease-in-out infinite; }
 .drop-in-preview-sheen { position:absolute; inset:0; border-radius:9px; background:linear-gradient(115deg,#ffffff0a,transparent 35%,transparent 70%,#ffffff04); pointer-events:none; }
 .drop-in-call-comet { position:absolute; inset:0; z-index:30; display:block; width:100%; height:100%; overflow:hidden; pointer-events:none; }
 .drop-in-call-comet-stroke { animation:drop-in-call-comet-stroke 1s cubic-bezier(.22,1,.36,1) forwards, drop-in-call-comet-stroke-fade 1s cubic-bezier(.22,1,.36,1) forwards; }
 .drop-in-call-god-sweep { opacity:0; animation:drop-in-call-god-sweep 8s cubic-bezier(.16,1,.3,1) infinite; }
 .drop-in-call-lens-flare { opacity:0; animation:drop-in-call-lens-flare-sweep 8s cubic-bezier(.16,1,.3,1) infinite; }
 .drop-in-call-particle { fill:#fff; opacity:0; filter:drop-shadow(0 0 3px rgba(255,255,255,.75)); transform-box:fill-box; transform-origin:center; animation:drop-in-call-particle-shimmer 8s ease-in-out infinite; }
+@keyframes drop-in-call-flowing-border { 0% { background-position:0% 50%; filter:brightness(1.02); } 50% { background-position:100% 50%; filter:brightness(1.18); } 100% { background-position:0% 50%; filter:brightness(1.02); } }
 @keyframes drop-in-call-comet-stroke { from { stroke-dashoffset:100; } to { stroke-dashoffset:0; } }
 @keyframes drop-in-call-comet-stroke-fade { 0% { opacity:0; } 10% { opacity:1; } 86% { opacity:1; } 100% { opacity:0; } }
 @keyframes drop-in-call-god-sweep { 0%,76% { stroke-dashoffset:100; opacity:0; } 82% { opacity:.16; } 88% { stroke-dashoffset:0; opacity:.3; } 94%,100% { stroke-dashoffset:-100; opacity:0; } }
@@ -43,6 +50,26 @@
 .drop-in-preview-add { display:block; position:relative; z-index:31; width:auto; min-width:82px; height:22px; padding:0 8px; border:1px dashed #ffffff30; border-radius:5px; background:#ffffff04; color:#a1a1aa; font-size:8px; line-height:20px; cursor:pointer; pointer-events:auto; }
 .drop-in-preview-add:hover:not(:disabled) { border-color:#ffffff55; background:#ffffff08; }
 .drop-in-preview-add:disabled { cursor:default; opacity:.45; }
+/* The modal's exact appointment skin travels with the shared preview, not its
+   surrounding modal panels. Existing modal selectors retain the same values. */
+.drop-in-preview .drop-in-preview-record .drop-in-strip,.drop-in-preview .drop-in-preview-record .drop-in-strip-page{height:20px}
+.drop-in-preview .drop-in-preview-record .drop-in-chip{min-height:20px;margin-block:0;padding-block:0;line-height:20px}
+.drop-in-preview .drop-in-preview-record .drop-in-arrow{height:20px}
+.drop-in-preview-record .drop-in-chip-wrap{position:relative;isolation:isolate;display:inline-flex;align-items:center;flex:0 0 auto;min-width:0;max-width:none;padding:0 10px 0 0;overflow:visible;cursor:pointer}
+.drop-in-preview-record .drop-in-chip-wrap .drop-in-chip{min-width:0;max-width:none;overflow:visible;text-overflow:clip}
+.drop-in-preview-record .drop-in-chip-delete{position:absolute;top:-1px;right:0;z-index:32;display:grid;place-items:center;width:10px;height:10px;padding:0;border:1px solid #09090b;border-radius:999px;background:#2b2b2f;color:#a1a1aa;opacity:0;pointer-events:auto;transform:rotate(0deg);transform-origin:center;transition:opacity .16s,transform .3s cubic-bezier(.22,.8,.26,1),background .16s,color .16s}
+.drop-in-preview-record .drop-in-chip-delete svg{pointer-events:none}
+.drop-in-preview-record .drop-in-chip-wrap:hover .drop-in-chip-delete,.drop-in-preview-record .drop-in-chip-delete:focus-visible{opacity:1;transform:rotate(180deg)}
+.drop-in-preview-record .drop-in-chip-delete:hover{background:#ef4444;color:#fff}
+.drop-in-hierarchy-window{position:relative;flex:1;min-width:0;height:20px;overflow:hidden}
+.drop-in-hierarchy-row{position:absolute;inset:0;display:flex;align-items:center;gap:8px;height:20px}
+.drop-in-hierarchy-back{display:flex;align-items:center;gap:3px;min-width:0;max-width:43%;flex-shrink:0;height:20px;border:0;border-right:1px solid #ffffff17;background:transparent;padding:0 7px 0 0;color:#a0a0aa;font-size:9px;line-height:20px}
+.drop-in-hierarchy-back>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.drop-in-hierarchy-back>svg{flex-shrink:0}
+.drop-in-preview .drop-in-hierarchy-window .drop-in-chip{display:inline-flex;align-items:center;gap:3px;margin-inline:0;padding-inline:0}
+.drop-in-hierarchy-window .drop-in-chip>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.drop-in-hierarchy-window .drop-in-chip>svg{flex-shrink:0}
+.drop-in-hierarchy-window .drop-in-strip-window{flex:1;overflow:hidden}
+.drop-in-hierarchy-window .drop-in-chip-wrap{max-width:100%;flex-shrink:1}
+.drop-in-hierarchy-window .drop-in-chip-wrap .drop-in-chip{max-width:100%;min-width:0;overflow:hidden}
 @media(max-width:760px) {
   .drop-in-preview { position:sticky; top:0; z-index:2; flex:none; height:250px; border-right:0; border-bottom:1px solid #ffffff0b; }
   .drop-in-preview-label { padding:20px; font-size:9px; }

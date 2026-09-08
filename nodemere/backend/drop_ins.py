@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from postgrest.exceptions import APIError
 from .authorization import current_tenant
+from .audit import StampedQuery
 from .permissions import require_permission
 from .drop_in_templates import STATUSES, for_industry
 
@@ -15,11 +16,61 @@ class DropInDraft(BaseModel):
     prompt: str = Field(min_length=1, max_length=6000)
     available_on_status: str
     is_active: bool = True
+    parent_id: UUID | None = None
 
 
 class DropInOrder(BaseModel):
     available_on_status: str
     ids: list[UUID]
+
+
+class DropInMove(BaseModel):
+    parent_id: UUID | None = None
+    before_id: UUID | None = None
+
+
+class BuilderNode(DropInDraft):
+    id: UUID
+    sort_order: int = Field(default=0, ge=0, le=2147483647)
+    canvas_x: float = Field(default=0, ge=-1000000, le=1000000, allow_inf_nan=False)
+    canvas_y: float = Field(default=0, ge=-1000000, le=1000000, allow_inf_nan=False)
+
+
+class BuilderRevision(BaseModel):
+    id: UUID
+    updated_at: datetime
+
+
+class DropInBuilder(BaseModel):
+    items: list[BuilderNode]
+    baseline: list[BuilderRevision]
+
+
+def clean_builder(builder):
+    values = []
+    for node in builder.items:
+        value = clean_draft(node)
+        value['id'] = str(value['id'])
+        values.append(value)
+    by_id = {value['id']: value for value in values}
+    if len(by_id) != len(values) or len({row.id for row in builder.baseline}) != len(builder.baseline):
+        raise HTTPException(422, 'Duplicate drop-in identifiers.')
+    # Iterative ancestor validation supports arbitrary depth and rejects cycles
+    # before encryption or any database writes.
+    complete = set()
+    for value in values:
+        current, seen = value, set()
+        while current and current['id'] not in complete:
+            if current['id'] in seen:
+                raise HTTPException(422, 'A drop-in cannot contain itself.')
+            seen.add(current['id'])
+            parent_id = current.get('parent_id')
+            parent = by_id.get(parent_id) if parent_id else None
+            if parent_id and (not parent or parent['available_on_status'] != current['available_on_status']):
+                raise HTTPException(422, 'Parents and children must belong to the same appointment status.')
+            current = parent
+        complete.update(seen)
+    return values
 
 
 class DropInRun(BaseModel):
@@ -36,6 +87,8 @@ def clean_draft(draft):
         raise HTTPException(422, 'Give your drop-in a name, purpose and instructions.')
     if values['available_on_status'] not in STATUSES:
         raise HTTPException(422, 'Choose an existing appointment status.')
+    if values.get('parent_id'):
+        values['parent_id'] = str(values['parent_id'])
     return values
 
 
@@ -68,6 +121,18 @@ def build_router(db, get_user, load_business, executor):
             raise HTTPException(404, 'This record is no longer available.')
         return found[0]
 
+    def validate_parent(drop_in_id, status, parent_id):
+        seen = {str(drop_in_id)} if drop_in_id else set()
+        current = str(parent_id) if parent_id else None
+        while current:
+            if current in seen:
+                raise HTTPException(422, 'A drop-in cannot contain itself.')
+            seen.add(current)
+            parent = get('drop_ins', current, active=True)
+            if parent['available_on_status'] != status:
+                raise HTTPException(422, 'Parent and child drop-ins must use the same appointment status.')
+            current = str(parent.get('parent_id')) if parent.get('parent_id') else None
+
     @router.get('/api/sonar/drop-ins')
     def list_drop_ins(user=Depends(get_user)):
         auth = tenant()
@@ -96,6 +161,7 @@ def build_router(db, get_user, load_business, executor):
     def create(draft: DropInDraft, user=Depends(get_user)):
         auth = tenant('operations.manage')
         values = clean_draft(draft)
+        validate_parent(None, values['available_on_status'], values.get('parent_id'))
         last = rows(db.table('drop_ins').select('sort_order').eq('available_on_status', values['available_on_status'])
                     .is_('deleted_at', 'null').order('sort_order', desc=True).limit(1))
         values.update(business_id=auth.business_id, sort_order=(last[0]['sort_order'] + 1 if last else 0))
@@ -117,6 +183,29 @@ def build_router(db, get_user, load_business, executor):
             raise
         return {'ok': True}
 
+    @router.put('/api/sonar/drop-ins/builder')
+    def save_builder(builder: DropInBuilder, user=Depends(get_user)):
+        auth = tenant('operations.manage')
+        values = clean_builder(builder)
+        # This is an explicitly tenant-authorized RPC. Prompts pass through the
+        # same envelope encryption as individual saves; never send plaintext to SQL.
+        protected = db.raw
+        encoded = [protected.encode('drop_ins', {**value, 'business_id': auth.business_id}) for value in values]
+        try:
+            # RPCs bypass the table wrapper; retain its per-request audit identity.
+            result = StampedQuery(protected.rpc('save_drop_in_builder', {
+                'target_business': auth.business_id,
+                'nodes': encoded,
+                'baseline': [{'id': str(row.id), 'updated_at': row.updated_at.isoformat()} for row in builder.baseline],
+            })).execute().data or []
+        except APIError as error:
+            if error.code in {'40001', '23505'}:
+                raise HTTPException(409, 'The drop-ins changed. Reload the saved version before saving.') from None
+            if error.code in {'22023', '23503', '23514'}:
+                raise HTTPException(422, 'Invalid drop-in hierarchy. Check your parent and child connections.') from None
+            raise
+        return {'items': [protected.decode('drop_ins', row) for row in result], 'can_manage': True}
+
     @router.put('/api/sonar/drop-ins/{drop_in_id}')
     def update(drop_in_id: UUID, draft: DropInDraft, user=Depends(get_user)):
         tenant('operations.manage')
@@ -124,15 +213,34 @@ def build_router(db, get_user, load_business, executor):
         values = clean_draft(draft)
         if values['available_on_status'] != previous['available_on_status']:
             raise HTTPException(422, 'Create a separate drop-in for another status.')
+        validate_parent(drop_in_id, values['available_on_status'], values.get('parent_id'))
         result = rows(db.table('drop_ins').update(values).eq('id', str(drop_in_id)).is_('deleted_at', 'null'))
         if not result:
             raise HTTPException(409, 'This drop-in changed. Reload before saving.')
         return result[0]
 
+    @router.put('/api/sonar/drop-ins/{drop_in_id}/move')
+    def move(drop_in_id: UUID, move: DropInMove, user=Depends(get_user)):
+        auth = tenant('operations.manage')
+        item = get('drop_ins', drop_in_id, active=True)
+        validate_parent(drop_in_id, item['available_on_status'], move.parent_id)
+        if move.before_id:
+            before = get('drop_ins', move.before_id, active=True)
+            if before['available_on_status'] != item['available_on_status'] or str(before.get('parent_id') or '') != str(move.parent_id or ''):
+                raise HTTPException(422, 'Choose a position within the selected parent.')
+        db.raw.rpc('move_drop_in', {
+            'target_business': auth.business_id,
+            'target_drop_in': str(drop_in_id),
+            'target_parent': str(move.parent_id) if move.parent_id else None,
+            'target_before': str(move.before_id) if move.before_id else None,
+        }).execute()
+        return {'ok': True}
+
     @router.delete('/api/sonar/drop-ins/{drop_in_id}')
     def delete(drop_in_id: UUID, user=Depends(get_user)):
         tenant('operations.manage')
-        get('drop_ins', drop_in_id, active=True)
+        item = get('drop_ins', drop_in_id, active=True)
+        rows(db.table('drop_ins').update({'parent_id': item.get('parent_id')}).eq('parent_id', str(drop_in_id)).is_('deleted_at', 'null'))
         rows(db.table('drop_ins').update({'deleted_at': datetime.now(timezone.utc).isoformat(), 'is_active': False})
              .eq('id', str(drop_in_id)))
         return {'ok': True}
@@ -170,7 +278,7 @@ def build_router(db, get_user, load_business, executor):
         context = {'business': business, 'business_id': auth.business_id, 'user_id': auth.owner_id,
                    'person': person, 'customer': person, 'receptionist': receptionist,
                    'appointment': appointment, 'service': service, '_scenario': {},
-                   '_drop_in': {'id': str(drop_in_id), 'name': drop_in['name'], 'call_log_id': log_id}}
+                   '_drop_in': {'id': str(drop_in_id), 'name': drop_in['name'], 'purpose': drop_in['purpose'], 'call_log_id': log_id}}
         snapshot = {'drop_in': {'id': str(drop_in_id), 'name': drop_in['name'], 'purpose': drop_in['purpose'], 'prompt': drop_in['prompt'],
                                 'triggered_by': auth.actor_id}}
         try:

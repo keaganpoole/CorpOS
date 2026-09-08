@@ -67,6 +67,7 @@ import SettingsPage from './pages/SettingsPage';
 import { StaffManager } from './pages/SettingsPage';
 import ReportProblemModal from './components/ReportProblemModal';
 import CalendarPage from './pages/CalendarPage';
+import DropInsPage from './pages/DropInsPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
 import BusinessIntelligenceReport from './pages/BusinessIntelligenceReport';
 import CubePreloader from './components/CubePreloader';
@@ -107,7 +108,7 @@ const teamCardVariants = {
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] } },
 };
 const DEFAULT_DASHBOARD_ROUTE = 'receptionists';
-const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'stats', 'settings'];
+const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'drop-ins', 'call-logs', 'pipeline', 'stats', 'settings'];
 const POPUP_DISMISS_PERSISTS_SHOWN = false;
 
 const formatPlanName = (plan) => {
@@ -2255,6 +2256,7 @@ const SonarDashboard = () => {
   const navItems = [
     { id: 'receptionists', icon: <IdCardLanyard size={18} />, label: 'Team' },
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
+    { id: 'drop-ins', icon: <Layers size={18} />, label: 'Drop-Ins' },
     { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
     { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios', beta: true },
     { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Reports' },
@@ -2553,6 +2555,8 @@ const SonarDashboard = () => {
         return <SettingsPage />;
       case 'calendar':
         return <CalendarPage onToolbarMetaChange={setCalendarToolbarMeta} />;
+      case 'drop-ins':
+        return <DropInsPage receptionists={agents} storageKey={`drop-ins-camera:${staffBusinessId || businessUsage?.business_id || profile?.business_id || profile?.id || 'local'}`} />;
       case 'call-logs':
         return <CallLogsPage onToolbarMetaChange={setCallLogsToolbarMeta} />;
       case 'pipeline':
@@ -2621,6 +2625,11 @@ const SonarDashboard = () => {
           title="Scenarios"
           beta
           description="Automate workflows with conditional logic"
+        />
+        <StaticToolbarTitle
+          active={currentRoute === 'drop-ins'}
+          title="Drop-Ins"
+          description="Build appointment conversations"
         />
         <StaticToolbarTitle
           active={currentRoute === 'settings'}

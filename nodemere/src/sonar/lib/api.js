@@ -73,10 +73,12 @@ async function strictGetJSON(endpoint) {
 export const api = {
   getDropIns: () => strictGetJSON('/api/sonar/drop-ins'),
   getDropInTemplates: () => strictGetJSON('/api/sonar/drop-ins/templates'),
+  saveDropInBuilder: (builder) => putJSON('/api/sonar/drop-ins/builder', builder),
   createDropIn: (draft) => postJSON('/api/sonar/drop-ins', draft),
   updateDropIn: (id, draft) => putJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}`, draft),
   deleteDropIn: (id) => deleteJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}`),
   reorderDropIns: (order) => putJSON('/api/sonar/drop-ins/order', order),
+  moveDropIn: (id, move) => putJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}/move`, move),
   runDropIn: (appointmentId, id, requestId) => postJSON(`/api/sonar/appointments/${encodeURIComponent(appointmentId)}/drop-ins/${encodeURIComponent(id)}/run`, { request_id: requestId }),
   getAgents: (options = {}) => fetchJSON(`/api/agents${options.includeArchived ? '?include_archived=true' : ''}`),
   getSystemSummary: () => fetchJSON('/api/system/summary'),
