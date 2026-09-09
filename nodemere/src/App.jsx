@@ -27,6 +27,7 @@ import ProjectIntelligenceReport from './sonar/pages/ProjectIntelligenceReport';
 import { visitorIntelligenceApi } from './lib/visitorIntelligenceApi';
 
 const VisitorsPage = lazy(() => import('./pages/VisitorsPage'));
+const ConceptsPage = lazy(() => import('./pages/concepts/ConceptsPage'));
 
 function DashboardGate() {
   const { session, profile, isLoading, workforce } = useAuth();
@@ -93,6 +94,11 @@ function AppContent() {
   const isVoiceCloneEntry = location.pathname.startsWith('/clone');
   const isPublicStats = location.pathname === '/stats';
   const isVisitors = location.pathname.startsWith('/visitors');
+  const isConcepts = location.pathname === '/concepts';
+
+  if (isConcepts) {
+    return <Suspense fallback={<div style={{ minHeight: '100vh', background: '#0b0d0e' }} />}><ConceptsPage /></Suspense>;
+  }
 
   if ((isLoading || isAppLoading) && !isVoiceCloneEntry && !isPublicStats) {
     return <SplashScreen />;
