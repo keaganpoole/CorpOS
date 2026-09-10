@@ -14,3 +14,43 @@
 @media(max-height:720px) and (min-width:761px){.di-preview-showcase{flex-basis:170px}.di-page-header{padding-top:17px;padding-bottom:14px}.di-panel-heading{height:69px}.di-preview-caption{bottom:11px}}
 @media(prefers-reduced-motion:reduce){.di-studio *{scroll-behavior:auto!important;transition:none!important}.di-studio .animate-spin{animation:none}}
 @media(max-width:900px){.di-history{display:flex}.di-history .di-icon-button{width:25px;height:30px}.di-statuses{min-width:0}}
+
+/* Current dashboard treatment: quiet surface, centered status rail, compact tiles. */
+.di-studio { background: #020202; }
+.di-status-bar { justify-content: center; min-height: 60px; margin: 0; padding: 0; border-top: 1px solid #ffffff0b; border-bottom: 1px solid #ffffff16; background: #050505; }
+.di-status-bar .di-statuses { gap: 4px; padding: 4px; border: 1px solid #ffffff18; border-radius: 999px; background: #111114; box-shadow: inset 0 1px 0 #ffffff08, 0 8px 24px #0005; }
+.di-status-bar .di-statuses > button { height: 34px; padding: 0 15px; border: 1px solid transparent; border-radius: 999px; color: #9a9aa3; font-size: 11px !important; }
+.di-status-bar .di-statuses > button:hover { color: #fff; background: #ffffff08; }
+.di-status-bar .di-statuses > button.is-current { color: #fff7fd; border-color: #ee36bcaa; background: linear-gradient(135deg,#e826b166,#974cef66); box-shadow: inset 0 0 16px #f03bbe1a, 0 0 18px #de36dd38; }
+.di-status-bar { margin-left: -324px; width: calc(100% + 324px); }
+.di-status-bar { position: relative; z-index: 6; }
+.di-studio.has-panel > .di-panel { padding-top: 150px; }
+.di-workspace { overflow: visible; }
+.di-panel-tabs { display: flex; align-items: center; gap: 4px; }
+.di-panel-tabs button { padding: 5px 8px; border: 0; border-bottom: 1px solid transparent; color: #85858e; background: transparent; font-size: 11px; }
+.di-panel-tabs button.is-current { color: #f0eef2; border-bottom-color: #d45bc4; }
+.di-panel-tabs button:hover:not(:disabled) { color: #fff; }
+.di-template-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.di-template { min-height: 142px; padding: 11px 9px 10px; border-radius: 10px; background: linear-gradient(135deg,#151516,#101011); }
+.di-template strong { font-size: 10px; }
+.di-template p { font-size: 9px; line-height: 1.5; }
+@media (min-width: 1400px) { .di-template { min-height: 142px; padding: 11px 9px 10px; } .di-template strong { font-size: 10px; } .di-template p { font-size: 9px; } }
+@media (min-width: 1400px) { .di-status-bar { margin-left: -360px; width: calc(100% + 360px); } }
+@media (max-width: 760px) { .di-status-bar { margin-left: 0; width: 100%; justify-content: flex-start; padding-inline: 12px; overflow: hidden; } .di-status-bar .di-statuses { max-width: 100%; overflow-x: auto; justify-content: flex-start; } .di-studio.has-panel > .di-panel { padding-top: 0; } }
+
+/* The status rail is the page's first visual element; all builder content follows it. */
+.di-studio { display: flex; flex-direction: column; background: #020202; }
+.di-status-top { position: relative; z-index: 8; display: flex; flex: 0 0 60px; align-items: center; justify-content: center; width: 100%; border-bottom: 1px solid #ffffff16; background: #050505; }
+.di-status-top .di-statuses { gap: 4px; padding: 4px; border: 1px solid #ffffff18; border-radius: 999px; background: #111114; box-shadow: inset 0 1px 0 #ffffff08, 0 8px 24px #0005; }
+.di-status-top .di-statuses > button { height: 34px; padding: 0 15px; border: 1px solid transparent; border-radius: 999px; color: #9a9aa3; font-size: 11px !important; }
+.di-status-top .di-statuses > button:hover { color: #fff; background: #ffffff08; }
+.di-status-top .di-statuses > button.is-current { color: #fff7fd; border-color: #ee36bcaa; background: linear-gradient(135deg,#e826b166,#974cef66); box-shadow: inset 0 0 16px #f03bbe1a, 0 0 18px #de36dd38; }
+.di-main-row { display: flex; flex: 1; min-height: 0; min-width: 0; }
+.di-main-row > .di-panel { padding-top: 0; }
+.di-main-row .di-workspace { overflow: visible; }
+.di-page-header { min-height: 56px; padding: 0 32px; }
+.di-page-header .di-title { display: none; }
+.di-page-header .di-save-group { margin-left: auto; }
+.di-main-row .di-status-bar { display: none; }
+@media (min-width: 1400px) { .di-status-top .di-statuses > button { min-width: 82px; } }
+@media (max-width: 760px) { .di-status-top { justify-content: flex-start; padding-inline: 12px; overflow: hidden; } .di-status-top .di-statuses { max-width: 100%; overflow-x: auto; justify-content: flex-start; } .di-page-header { min-height: 48px; padding-inline: 18px; } }

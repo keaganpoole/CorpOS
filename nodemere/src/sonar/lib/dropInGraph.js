@@ -106,7 +106,7 @@ export function validateGraph(items) {
 }
 
 export function builderPayload(items, baseline) {
-  const fields = ['id', 'name', 'purpose', 'prompt', 'is_active', 'available_on_status', 'parent_id', 'sort_order', 'canvas_x', 'canvas_y'];
+  const fields = ['id', 'name', 'button_label', 'purpose', 'prompt', 'is_active', 'available_on_status', 'parent_id', 'sort_order', 'canvas_x', 'canvas_y'];
   return {
     items: items.map(item => Object.fromEntries(fields.map(key => [key, item[key] ?? (key === 'parent_id' ? null : 0)]))),
     baseline: baseline.map(item => ({ id: item.id, updated_at: item.updated_at })),

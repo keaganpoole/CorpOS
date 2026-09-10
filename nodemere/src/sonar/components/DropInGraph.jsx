@@ -32,7 +32,12 @@ const DropInGraph = forwardRef(function DropInGraph({ items, selectedId, onSelec
     const zoom = clampZoom(Math.min(1, (rect.width - 112) / width, (rect.height - 120) / height));
     onViewport({ x: (rect.width - width * zoom) / 2 - left * zoom, y: Math.max(48, (rect.height - height * zoom) / 2 - 20) - top * zoom, zoom });
   };
-  useLayoutEffect(() => { if (!viewport) fit(true); }, [viewport, items.length]);
+  useLayoutEffect(() => {
+    if (viewport) return;
+    const rect = surface.current?.getBoundingClientRect();
+    const root = latest.current.visible.find(node => !node.parent_id) || latest.current.visible[0];
+    if (rect) onViewport({ x: rect.width / 2 - ((root?.canvas_x || 0) + W / 2), y: Math.max(48, rect.height / 2 - ((root?.canvas_y || 0) + H / 2)), zoom: 1 });
+  }, [viewport, items.length]);
   useEffect(() => {
     const node = surface.current;
     const wheel = event => {

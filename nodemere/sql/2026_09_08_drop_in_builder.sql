@@ -2,6 +2,9 @@
 begin;
 alter table public.drop_ins add column if not exists canvas_x double precision;
 alter table public.drop_ins add column if not exists canvas_y double precision;
+alter table public.drop_ins add column if not exists button_label text;
+update public.drop_ins set button_label = name where button_label is null;
+alter table public.drop_ins alter column button_label set default '';
 
 -- Serialize both the page's atomic saves and the retained modal's individual
 -- writes. A deferred guard checks final state rather than intermediate moves.
@@ -68,11 +71,11 @@ begin
   end if;
   -- All new nodes exist before assigning any foreign keys, regardless of input
   -- order. Encryption is enforced by the original drop_ins_guard trigger.
-  for entry in select * from jsonb_to_recordset(nodes) as n(id uuid,name text,purpose text,prompt text,is_active boolean,available_on_status text,parent_id uuid,sort_order integer,canvas_x double precision,canvas_y double precision) loop
+  for entry in select * from jsonb_to_recordset(nodes) as n(id uuid,name text,button_label text,purpose text,prompt text,is_active boolean,available_on_status text,parent_id uuid,sort_order integer,canvas_x double precision,canvas_y double precision) loop
     if entry.canvas_x not between -1000000 and 1000000 or entry.canvas_y not between -1000000 and 1000000 then raise exception 'Invalid canvas position' using errcode='22023'; end if;
-    insert into public.drop_ins(id,business_id,name,purpose,prompt,is_active,available_on_status,sort_order,canvas_x,canvas_y)
-      values(entry.id,target_business,entry.name,entry.purpose,entry.prompt,entry.is_active,entry.available_on_status,entry.sort_order,entry.canvas_x,entry.canvas_y)
-      on conflict(id) do update set name=excluded.name,purpose=excluded.purpose,prompt=excluded.prompt,is_active=excluded.is_active,sort_order=excluded.sort_order,canvas_x=excluded.canvas_x,canvas_y=excluded.canvas_y
+    insert into public.drop_ins(id,business_id,name,button_label,purpose,prompt,is_active,available_on_status,sort_order,canvas_x,canvas_y)
+      values(entry.id,target_business,entry.name,coalesce(nullif(entry.button_label,''),entry.name),entry.purpose,entry.prompt,entry.is_active,entry.available_on_status,entry.sort_order,entry.canvas_x,entry.canvas_y)
+      on conflict(id) do update set name=excluded.name,button_label=excluded.button_label,purpose=excluded.purpose,prompt=excluded.prompt,is_active=excluded.is_active,sort_order=excluded.sort_order,canvas_x=excluded.canvas_x,canvas_y=excluded.canvas_y
       where drop_ins.business_id=target_business and drop_ins.available_on_status=excluded.available_on_status;
     if not found then raise exception 'Cannot change drop-in status' using errcode='22023'; end if;
   end loop;

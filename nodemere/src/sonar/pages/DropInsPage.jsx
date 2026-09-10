@@ -18,8 +18,8 @@ export default function DropInsPage({ transport = api, receptionists = [], stora
   const [items, setItems] = useState([]), [baseline, setBaseline] = useState([]);
   const [templates, setTemplates] = useState([]), [templatesLoading, setTemplatesLoading] = useState(true), [templateError, setTemplateError] = useState('');
   const [loading, setLoading] = useState(true), [canManage, setCanManage] = useState(false), [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('completed'), [selectedId, setSelectedId] = useState(null);
-  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 760), [search, setSearch] = useState(''), [closedCategories, setClosedCategories] = useState(new Set());
+  const [status, setStatus] = useState('pending'), [selectedId, setSelectedId] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 760), [panelView, setPanelView] = useState('templates'), [search, setSearch] = useState(''), [closedCategories, setClosedCategories] = useState(new Set());
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [confirm, setConfirm] = useState(null);
   const [history, setHistory] = useState({ past: [], future: [] });
   const [dragging, setDragging] = useState(false), [previewCall, setPreviewCall] = useState(false);
@@ -38,7 +38,7 @@ export default function DropInsPage({ transport = api, receptionists = [], stora
   }, [receptionists]);
   const load = useCallback(async () => {
     setLoading(true); setError('');
-    try { const result = await transport.getDropIns(); setBaseline(result.items); setItems(normalize(result.items)); setCanManage(result.can_manage); setHistory({ past: [], future: [] }); }
+    try { const result = await transport.getDropIns(); setBaseline(result.items); setItems(normalize(result.items)); setCanManage(result.can_manage); setSelectedId(null); setPanelView('templates'); setHistory({ past: [], future: [] }); }
     catch (e) { setError(e.message || 'Could not load drop-ins.'); }
     finally { setLoading(false); }
   }, [transport]);
@@ -79,12 +79,12 @@ export default function DropInsPage({ transport = api, receptionists = [], stora
     setHistory(h => { if (!h.past.length) return h; setItems(h.past.at(-1)); return { past: h.past.slice(0, -1), future: [current.current, ...h.future] }; });
   };
   const redo = () => setHistory(h => { if (!h.future.length) return h; setItems(h.future[0]); return { past: [...h.past, current.current], future: h.future.slice(1) }; });
-  const select = id => { finishTyping(); setSelectedId(id); if (id) setPanelOpen(true); };
+  const select = id => { finishTyping(); setSelectedId(id); if (id) { setPanelOpen(true); setPanelView('details'); } else setPanelView('templates'); };
   const icon = value => { const template = templates.find(t => t.name === value.name); const Icon = ICONS[value.icon || template?.icon] || MessageSquare; return <Icon size={18} strokeWidth={1.45} />; };
   const add = (template, parentId = null, preferred) => {
     if (!canManage || busy) return;
     const point = freePosition(statusItems, parentId, parentId ? undefined : preferred);
-    const node = { id: crypto.randomUUID(), name: template?.name || 'New drop-in', purpose: template?.purpose || 'follow up', prompt: template?.prompt || 'Follow up with the customer about their appointment. Use the appointment context and verified business information.', is_active: true, available_on_status: status, parent_id: parentId, sort_order: Math.max(-1, ...statusItems.filter(x => (x.parent_id || null) === parentId).map(x => x.sort_order || 0)) + 1, canvas_x: point.x, canvas_y: point.y };
+    const node = { id: crypto.randomUUID(), name: template?.name || 'New drop-in', button_label: template?.button_label || template?.name || 'New drop-in', purpose: template?.purpose || 'follow up', prompt: template?.prompt || 'Follow up with the customer about their appointment. Use the appointment context and verified business information.', is_active: true, available_on_status: status, parent_id: parentId, sort_order: Math.max(-1, ...statusItems.filter(x => (x.parent_id || null) === parentId).map(x => x.sort_order || 0)) + 1, canvas_x: point.x, canvas_y: point.y };
     commit([...current.current, node]); setSelectedId(node.id); setPanelOpen(true);
     setNotice(parentId ? `Added beneath ${statusItems.find(x => x.id === parentId)?.name}.` : 'Parent drop-in added.');
     // Reveal the new root even when the user has panned elsewhere.
@@ -123,14 +123,17 @@ export default function DropInsPage({ transport = api, receptionists = [], stora
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (dirty && !busy && canManage) save(); }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.target.closest('input, textarea') && !busy && canManage) { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
   }}>
-    <aside className="di-panel" ref={panel} aria-label={selected ? 'Edit drop-in' : 'Drop-in templates'} inert={!panelOpen ? '' : undefined}>
-      <div className="di-panel-heading">{selected ? <button type="button" className="di-back" onClick={() => select(null)}><ArrowLeft size={16} /> Templates</button> : <h2>Templates</h2>}<button type="button" className="di-icon-button" title="Collapse panel" aria-label="Collapse panel" onClick={() => setPanelOpen(false)}><PanelLeftClose size={17} /></button></div>
+    <div className="di-status-top" aria-label="Appointment status"><div className="di-statuses">{STATUSES.map(value => <button type="button" key={value} aria-pressed={status === value} className={status === value ? 'is-current' : ''} onClick={() => { finishTyping(); setStatus(value); setSelectedId(null); }}><i style={{ background: COLORS[value] }} />{value}<small>{items.filter(x => x.available_on_status === value).length}</small></button>)}</div></div>
+    <div className="di-main-row">
+    <aside className="di-panel" ref={panel} aria-label={selected && panelView === 'details' ? 'Edit drop-in' : 'Drop-in templates'} inert={!panelOpen ? '' : undefined}>
+      <div className="di-panel-heading"><div className="di-panel-tabs"><button type="button" className={panelView === 'templates' ? 'is-current' : ''} onClick={() => { setPanelView('templates'); setSelectedId(null); }}>Templates</button><button type="button" className={panelView === 'details' ? 'is-current' : ''} disabled={!selected} onClick={() => setPanelView('details')}>Details</button></div><button type="button" className="di-icon-button" title="Collapse panel" aria-label="Collapse panel" onClick={() => setPanelOpen(false)}><PanelLeftClose size={17} /></button></div>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={selected ? 'editor' : 'templates'} className="di-panel-content" initial={{ opacity: 0, x: reduced ? 0 : selected ? 8 : -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : selected ? 8 : -8 }} transition={{ duration: reduced ? .01 : .18 }}>
-          {selected ? <div className="di-editor">
+          {selected && panelView === 'details' ? <div className="di-editor">
             <div className="di-editor-title"><span className="di-node-icon">{icon(selected)}</span><div><h2>{selected.name || 'New drop-in'}</h2><p>{childCount ? `${childCount} ${childCount === 1 ? 'child' : 'children'} · opens a branch` : 'Action · opens a call'}</p></div></div>
             {ancestors.length > 0 && <div className="di-editor-path" title={ancestors.map(x => x.name).join(' / ')}>{ancestors.length > 1 && <span>… /</span>}<span>{ancestors.at(-1)?.name}</span><ChevronRight size={12} /><span>{selected.name}</span></div>}
             <label className="di-field">Name <input aria-label="Name" autoComplete="off" value={selected.name} maxLength={64} disabled={!canManage || busy} onChange={e => edit('name', e.target.value)} onBlur={finishTyping} /><small>{selected.name.length}/64</small></label>
+            <label className="di-field">Button label <span className="di-field-hint">The text customers see in the appointment.</span><input aria-label="Button label" value={selected.button_label ?? selected.name} maxLength={64} disabled={!canManage || busy} onChange={e => edit('button_label', e.target.value)} onBlur={finishTyping} /><small>{(selected.button_label ?? selected.name).length}/64</small></label>
             <label className="di-field">Purpose <span className="di-field-hint">What should your receptionist call to do?</span><input aria-label="Purpose" value={selected.purpose} maxLength={30} disabled={!canManage || busy} onChange={e => edit('purpose', e.target.value)} onBlur={finishTyping} /><small>{selected.purpose.length}/30</small></label>
             <label className="di-field">Instructions <textarea aria-label="Instructions" value={selected.prompt} maxLength={6000} disabled={!canManage || busy} onChange={e => edit('prompt', e.target.value)} onBlur={finishTyping} /><small>{selected.prompt.length.toLocaleString()}/6,000</small></label>
             <div className="di-active-row"><div><span>Active</span><p>{childCount ? 'Applies to this entire branch.' : 'Available in the appointment.'}</p></div><button type="button" role="switch" aria-checked={selected.is_active} aria-label="Drop-in active" disabled={!canManage || busy} onClick={() => commit(items.map(x => x.id === selected.id ? { ...x, is_active: !x.is_active } : x))}><span /></button></div>
@@ -162,5 +165,6 @@ export default function DropInsPage({ transport = api, receptionists = [], stora
       <AnimatePresence>{notice && <motion.div className="di-toast" role="status" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}><Check size={14} />{notice}</motion.div>}</AnimatePresence>
       {confirm && <div className="di-confirm-backdrop"><div className="di-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="di-confirm-title" aria-describedby="di-confirm-description" onKeyDown={event => { if (event.key === 'Tab') { const buttons = [...event.currentTarget.querySelectorAll('button')]; if (event.shiftKey && document.activeElement === buttons[0]) { event.preventDefault(); buttons.at(-1).focus(); } else if (!event.shiftKey && document.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0].focus(); } } }}><h2 id="di-confirm-title">{confirm === 'delete' ? `Delete ${selected?.name}?` : 'Discard your unsaved changes?'}</h2><p id="di-confirm-description">{confirm === 'delete' ? 'Children will move up one level. You can undo this before saving.' : 'This reloads the latest saved builder. Your current edits will be discarded.'}</p><div><button type="button" autoFocus onClick={() => setConfirm(null)}>Cancel</button><button type="button" className="di-confirm-danger" onClick={() => { if (confirm === 'delete') { commit(removeNode(items, selected.id)); select(null); setNotice('Drop-in removed. Undo is available.'); } else load(); setConfirm(null); }}>{confirm === 'delete' ? 'Delete drop-in' : 'Discard & reload'}</button></div></div></div>}
     </main>
+    </div>
   </section>;
 }

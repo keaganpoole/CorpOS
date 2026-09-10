@@ -12,6 +12,7 @@ from .drop_in_templates import STATUSES, for_industry
 
 class DropInDraft(BaseModel):
     name: str = Field(min_length=1, max_length=64)
+    button_label: str | None = Field(default=None, max_length=64)
     purpose: str = Field(min_length=1, max_length=30)
     prompt: str = Field(min_length=1, max_length=6000)
     available_on_status: str
@@ -80,6 +81,7 @@ class DropInRun(BaseModel):
 def clean_draft(draft):
     values = draft.model_dump()
     values['name'] = values['name'].strip()
+    values['button_label'] = (values.get('button_label') or values['name']).strip()
     values['purpose'] = values['purpose'].strip()
     values['prompt'] = values['prompt'].strip()
     values['available_on_status'] = values['available_on_status'].strip().lower()

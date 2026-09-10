@@ -19,7 +19,7 @@ export default function DropInHierarchyStrip({ items, parent, direction, pathKey
         {parent && <button className="drop-in-hierarchy-back" type="button" title={`Back from ${parent.name}`} aria-label={`Back from ${parent.name}`} onClick={event => { event.stopPropagation(); onBack(); }}><ChevronUp size={10} /><span>{parent.name}</span></button>}
         <DropInStrip items={items} highlightedId={highlightedId} onSelect={onSelect} onDelete={onDelete} emptyLabel={emptyLabel} itemSpacing={10} measureKey={[...childIds].join('|')}
           getTitle={item => childIds.has(item.id) ? `Open ${item.name} children` : item.name}
-          getLabel={item => <><span>{item.name}</span>{childIds.has(item.id) && <ChevronDown size={10} />}</>} />
+          getLabel={item => <><span>{item.button_label || item.name}</span>{childIds.has(item.id) && <ChevronDown size={10} />}</>} />
       </motion.div>
     </AnimatePresence>
   </div>;
