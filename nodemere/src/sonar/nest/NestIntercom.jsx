@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, ChevronDown, Mic, MicOff, PhoneOff, X } from 'lucide-react';
+import { AudioLines, Check, Mic, MicOff, PhoneOff, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useNest } from './NestRuntime';
 
@@ -22,6 +22,12 @@ const createLine = (message) => {
 };
 
 const fallbackInitial = (name) => String(name || 'R').trim().slice(0, 1).toUpperCase();
+const receptionistImage = (receptionist) => receptionist?.avatar || receptionist?.banner_url || '';
+const PRESENCE_SHAPES = [
+  'M50 5 C63 4 75 13 79 25 C84 39 96 47 91 61 C87 73 74 77 67 89 C59 101 44 95 35 88 C24 79 10 77 9 63 C8 49 21 42 23 29 C25 15 36 6 50 5 Z',
+  'M50 8 C65 8 73 18 82 28 C91 39 91 52 83 61 C75 70 77 84 65 91 C53 98 42 91 32 87 C20 82 11 73 13 60 C15 48 25 42 24 30 C23 18 36 7 50 8 Z',
+  'M50 5 C64 7 83 11 82 25 C81 39 93 44 89 58 C86 72 68 73 65 87 C62 99 48 98 37 91 C25 83 10 79 10 64 C10 50 25 45 25 32 C25 18 37 3 50 5 Z',
+];
 
 function PrivacyNotice({ open, busy, onCancel, onAccept }) {
   if (typeof document === 'undefined') return null;
@@ -85,7 +91,7 @@ function NestIntercomInner({ open, onClose }) {
     const data = await api.getIntercomBootstrap();
     setBootstrap(data);
     const remembered = data?.settings?.last_receptionist_eligible ? data.settings.last_receptionist_id : '';
-    setSelectedId(remembered || '');
+    setSelectedId(remembered || data?.receptionists?.[0]?.id || '');
   }, []);
 
   useEffect(() => {
@@ -242,13 +248,13 @@ function NestIntercomInner({ open, onClose }) {
     return () => window.clearTimeout(timer);
   }, [bootstrap?.limits?.turn_seconds?.agent, conversation.sendUserActivity, open, phase]);
 
-  const beginSession = async ({ force = false } = {}) => {
-    if (!selectedId || (loading && !force)) return;
+  const beginSession = async ({ force = false, receptionistId = selectedId } = {}) => {
+    if (!receptionistId || (loading && !force)) return;
     setLoading(true);
     setError('');
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
-      const session = await api.createIntercomSession({ receptionist_id: selectedId });
+      const session = await api.createIntercomSession({ receptionist_id: receptionistId });
       const startedAt = new Date().toISOString();
       sessionRef.current = { ...session, started_at: startedAt };
       transcriptRef.current = [];
@@ -273,16 +279,22 @@ function NestIntercomInner({ open, onClose }) {
     }
   };
 
-  const requestStart = () => {
-    if (!selectedId) {
+  const selectReceptionist = (receptionistId) => {
+    setSelectedId(receptionistId);
+    setError('');
+  };
+
+  const requestStart = (receptionistId = selectedId) => {
+    if (!receptionistId) {
       setError('Choose a receptionist first.');
       return;
     }
+    setError('');
     if (!bootstrap?.settings?.privacy_accepted) {
       setPrivacyOpen(true);
       return;
     }
-    beginSession();
+    beginSession({ receptionistId });
   };
 
   const acceptPrivacy = async () => {
@@ -308,6 +320,20 @@ function NestIntercomInner({ open, onClose }) {
 
   const unavailable = bootstrap && (!bootstrap.agent_configured || !(bootstrap.receptionists || []).length);
   const hasTranscript = Boolean(line?.text);
+  const receptionists = bootstrap?.receptionists || [];
+  const pickerCount = receptionists.length > 4 ? 'many' : receptionists.length;
+  const sessionStatus = muted
+    ? 'Muted'
+    : phase === 'speaking'
+      ? 'Speaking'
+      : phase === 'connecting'
+        ? 'Connecting'
+        : 'Listening';
+  const sessionFallback = phase === 'connecting'
+    ? 'Opening the intercom'
+    : phase === 'speaking'
+      ? 'Speaking with you'
+      : 'I\u2019m here. What do you need?';
 
   return (
     <>
@@ -327,44 +353,104 @@ function NestIntercomInner({ open, onClose }) {
             {queueLength > 0 && <span className="intercom-queue" title={`${queueLength} NEST events waiting`}>{queueLength}</span>}
 
             <div className="intercom-main">
-              <div className="intercom-avatar" aria-hidden="true">
-                <span className="intercom-avatar-ring" />
-                {selectedReceptionist?.avatar
-                  ? <img src={selectedReceptionist.avatar} alt="" />
-                  : <span className="intercom-avatar-fallback">{fallbackInitial(selectedReceptionist?.name)}</span>}
-              </div>
-
-              {phase === 'selecting' ? (
-                <div className="intercom-picker">
-                  <label>
-                    <select value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setError(''); }} aria-label="Choose a receptionist">
-                      <option value="">Choose a receptionist</option>
-                      {(bootstrap?.receptionists || []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
-                    <ChevronDown size={12} />
-                  </label>
-                  <button type="button" className="intercom-start" onClick={requestStart} disabled={loading || unavailable || !selectedId} aria-label="Start voice conversation">
+              {phase === 'selecting' && selectedReceptionist && (
+                <div className="intercom-action no-drag">
+                  <span className="intercom-action-label">
+                    <span>Talk with</span>
+                    <strong>{selectedReceptionist.name.split(' ')[0]}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    className="intercom-talk-button"
+                    onClick={() => requestStart(selectedId)}
+                    disabled={loading || unavailable}
+                    aria-label={`Talk with ${selectedReceptionist.name}`}
+                    title={`Talk with ${selectedReceptionist.name}`}
+                  >
                     <Mic size={14} />
                   </button>
                 </div>
-              ) : (
-                <div className="intercom-transcript" aria-live="polite" aria-atomic="true">
-                  <AnimatePresence mode="wait" initial={false}>
-                    {line?.text && (
-                      <motion.p
-                        key={`${line.id}:${line.text}`}
-                        className={`is-${line.role}`}
-                        initial={{ opacity: 0, y: 8, rotateX: -10 }}
-                        animate={{ opacity: 1, y: 0, rotateX: 0 }}
-                        exit={{ opacity: 0, y: -7, rotateX: 8 }}
-                        transition={{ duration: line.draft ? 0.12 : 0.24, ease: [0.16, 1, 0.3, 1] }}
+              )}
+              {phase === 'selecting' ? (
+                <motion.div className={`intercom-picker is-${phase} count-${pickerCount}`} layout>
+                  {receptionists.map((item) => {
+                    const isSelected = String(item.id) === String(selectedId);
+                    return (
+                      <motion.button
+                        type="button"
+                        key={item.id}
+                        layout
+                        className={`intercom-receptionist ${isSelected ? 'is-selected' : ''}`}
+                        onClick={() => selectReceptionist(String(item.id))}
+                        disabled={loading || unavailable}
+                        aria-label={`Select ${item.name}`}
+                        aria-pressed={isSelected}
+                        title={item.name}
                       >
-                        {line.text}
+                        {item.banner_url && (
+                          <span
+                            className="intercom-receptionist-banner"
+                            style={{ backgroundImage: `url(${item.banner_url})` }}
+                            aria-hidden="true"
+                          />
+                        )}
+                        <span className="intercom-receptionist-shade" aria-hidden="true" />
+                        <span className="intercom-receptionist-name">{item.name.split(' ')[0]}</span>
+                      </motion.button>
+                    );
+                  })}
+                </motion.div>
+              ) : selectedReceptionist && (
+                <motion.div
+                  className={`intercom-session-stage is-${phase}`}
+                  initial={{ opacity: 0, scale: 0.94, x: 10 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  transition={{ duration: 0.52, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <div className="intercom-session-presence" aria-hidden="true">
+                    <motion.svg className="intercom-presence-contour" viewBox="0 0 100 100" aria-hidden="true">
+                      <motion.path
+                        className="intercom-presence-contour-glow"
+                        d={PRESENCE_SHAPES[0]}
+                        animate={{ d: [...PRESENCE_SHAPES, PRESENCE_SHAPES[0]] }}
+                        transition={{ duration: phase === 'speaking' ? 2.1 : 5.2, repeat: Infinity, ease: [0.45, 0.02, 0.34, 1] }}
+                      />
+                      <motion.path
+                        className="intercom-presence-contour-line"
+                        d={PRESENCE_SHAPES[0]}
+                        animate={{ d: [...PRESENCE_SHAPES, PRESENCE_SHAPES[0]] }}
+                        transition={{ duration: phase === 'speaking' ? 2.1 : 5.2, repeat: Infinity, ease: [0.45, 0.02, 0.34, 1] }}
+                      />
+                    </motion.svg>
+                    <span className="intercom-session-portrait">
+                      {receptionistImage(selectedReceptionist)
+                        ? <img src={receptionistImage(selectedReceptionist)} alt="" />
+                        : <span className="intercom-receptionist-fallback">{fallbackInitial(selectedReceptionist.name)}</span>}
+                    </span>
+                  </div>
+
+                  <div className="intercom-session-status">
+                    <AudioLines size={17} strokeWidth={1.7} aria-hidden="true" />
+                    <span>{sessionStatus}</span>
+                  </div>
+
+                  <span className="intercom-session-divider" aria-hidden="true" />
+
+                  <div className="intercom-transcript" aria-live="polite" aria-atomic="true">
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.p
+                        key={line?.text ? `${line.id}:${line.text}` : sessionFallback}
+                        className={line?.role ? `is-${line.role}` : ''}
+                        initial={{ opacity: 0, y: 7, filter: 'blur(4px)' }}
+                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                        exit={{ opacity: 0, y: -6, filter: 'blur(3px)' }}
+                        transition={{ duration: line?.draft ? 0.16 : 0.34, ease: [0.16, 1, 0.3, 1] }}
+                      >
+                        {line?.text || sessionFallback}
                       </motion.p>
-                    )}
-                  </AnimatePresence>
-                  {!line?.text && <span>{phase === 'connecting' ? 'Connecting' : 'Listening'}</span>}
-                </div>
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
               )}
             </div>
 

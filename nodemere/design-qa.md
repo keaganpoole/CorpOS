@@ -1,60 +1,51 @@
-# Drop-Ins Builder Design QA
+# Nest Intercom Session Design QA
 
-- Source visual truth: `C:\Users\Keagan\Downloads\exec-6571f13c-72e8-43f5-a0b8-6cb396a0e20f.png`, mirrored for comparison at `.audit\drop-ins-studio\selected-reference.png`.
-- Implementation: `http://127.0.0.1:5173/.audit/drop-ins-page/index.html?seed`.
-- Comparison artifact: `http://127.0.0.1:5173/.audit/drop-ins-studio/selected-reference-comparison.html`.
-- Viewport: source 1488 × 1058 px. Implementation inspected at 1980 × 1132 CSS px / DPR 1, then alongside the source in the comparison board at equal column width.
-- Normalization: the comparison board scales each complete image region to a single column. This is used for composition, palette, and hierarchy; the full-size selected-node capture was used for rail and field-detail inspection.
-- State: Completed status, Request feedback parent selected, Details tab open. The reference's Details state and the implementation's selected parent state are comparable; source content is illustrative while implementation preserves live fixture data and the required Templates / Details / Preview tab model.
+- Source visual truth path: `C:\Users\Keagan\.codex\generated_images\01a0960e-9463-7e72-b547-d44a9727ddaf\call_W7nU3POtVVGaQPu6Y0hmRX0u.png`
+- Source pixels: 2079 x 756. The source depicts a 1920 x 200 conceptual strip; implementation is normalized to the product's real 1669 x 55 Nest surface.
+- Implementation: `src/sonar/nest/NestIntercom.jsx` and `src/sonar/nest/nest.css`.
+- Implementation screenshot path: connected-browser inline capture of `http://localhost:5173/dashboard`; the browser API does not expose a persistent local screenshot path.
+- Browser viewport: 1834 x 1210 CSS px, device scale factor 1.
+- State: authenticated dashboard, intercom listening state with Maggie selected and no live microphone session.
 
 ## Full-view comparison evidence
 
-The selected reference and implementation were opened together in the local comparison board. The updated implementation matches the reference direction through: a tall editorial header with title and subtitle; near-black background; purple/magenta atmospheric preview glow; a wide appointment record across the upper canvas; compact dark rectangular hierarchy nodes; fine dotted canvas; magenta selected state and connector accents; a right configuration rail with low-contrast field surfaces; and a bright magenta-violet save action.
+The source mockup and the browser-rendered implementation were both opened and visually compared at their native aspect ratios. The implementation preserves the selected design's horizontal order and hierarchy: an enlarged atmospheric receptionist banner anchored on the left, portrait focal point with layered morphing contours, compact activity mark and status, vertical divider, live caption, and quiet controls on the far right. The source's blue-black cast was intentionally replaced with Nodemere's neutral charcoal surface and restrained pink-purple session accent.
 
-## Focused region comparison evidence
+## Focused-region comparison evidence
 
-- Canvas and preview: the full-size browser capture shows the existing appointment preview retained as a large top-canvas object with a violet atmospheric field, while panning/zooming remains owned by the underlying graph.
-- Node builder: the current drag/select/collapse/add controls remain attached to their live React nodes, now rendered as compact rectangular rows. Updated graph geometry uses the matching 240 × 84 node footprint so connector endpoints, hit targets, layout, and drag placement remain aligned.
-- Rail: selected-parent screenshot confirms the 430 px right rail, tab row, fields, hierarchy controls, destructive action, and Done action remain operational and visually match the reference's quieter right-panel hierarchy.
-- Header: status switching remains present as a product constraint, but the title/subtitle and magenta-violet save treatment now align with the reference.
+- Real Nest surface: left 82, right 1751, width 1669, height 55.
+- Session stage: left 749.23, right 1083.75, width 334.52, height 55. Its midpoint is 916.49, matching the Nest midpoint of 916.5.
+- Controls: left 1685, right 1743, height 27; all controls remain inside the Nest bounds.
+- The live portrait is 38 x 38 inside a 50 x 50 animated presence field with layered SVG contour motion, preserving visible breathing room within the 55px Nest.
+- Focused comparison was required because the component is only 55px tall in the production dashboard.
+
+## Fidelity surfaces
+
+- Fonts and typography: the session inherits the same system UI stack as the Nest notifications. Status is 10px/520 and transcript is 12px/460 with 1.35 line height, zero letter spacing, single-line truncation, and a restrained text shadow.
+- Spacing and layout rhythm: the content-sized grid keeps the visible cluster centered rather than centering an empty flexible column. The 15px gaps and 26px divider maintain the mockup's pacing without vertical stacking.
+- Colors and visual tokens: the core background is neutral black/charcoal. Pink-purple appears only in the live halo and activity icon; there is no blue background.
+- Image quality and asset fidelity: the real Maggie banner URL is used for the enlarged low-opacity background and the 1696 x 2320 avatar asset is used in the focal portrait. Both loaded at full source resolution.
+- Copy and content: the state reads `Listening` with `I'm here. What do you need?` until a real transcript line arrives. Live transcript text retains the existing animated replacement behavior.
+
+## Interaction and regression checks
+
+- Listening motion uses multiple blurred and crisp contour paths with animated shape interpolation; speaking accelerates and brightens the contours while reduced-motion preferences collapse animations.
+- Existing mute, end, privacy, error, idle warning, queue, close, picker, Nest history, and notification/reel selectors remain intact.
+- Browser console errors: none during the active-state render.
+- `npm run build`: passed. Existing unrelated warnings remain for a late CSS `@import`, stale Browserslist data, and large bundle chunks.
+
+## Comparison history
+
+1. Initial render: the stage occupied the correct 55px height, but its flexible transcript track made the visible elements read left-heavy and the banner footprint was too narrow.
+2. Fix: changed the session grid to content-sized tracks and widened the active banner crop while retaining low opacity.
+3. Final render: the visible stage is centered to within 0.01px of the Nest midpoint, the background has the intended breadth, and all content and controls remain inside the Nest.
 
 ## Findings
 
 No actionable P0, P1, or P2 findings remain.
 
-- Fonts and typography: title/subtitle scale and softer hierarchy follow the source; compact node/rail text remains legible and safely truncates.
-- Spacing and layout rhythm: the header, preview zone, graph rows, 430 px rail, and centered canvas toolbar are balanced. The visual comparison differs in viewport width, which is expected and normalized in the comparison board.
-- Colors and visual tokens: near-black neutral surfaces, violet/magenta selection, purple preview atmosphere, muted fields, and the save gradient map directly to the selected visual.
-- Image quality and asset fidelity: the original appointment-preview component and real receptionist avatar are retained; no screenshot was rasterized into the interface.
-- Copy and content: the reference subtitle is reflected; live fixture node and rail content is intentionally retained so the core builder flow remains testable.
-
-## Comparison history
-
-1. Earlier canvas work: the preview evolved from a rail card to a compact rail treatment, then a fixed canvas object. Those iterations retained core graph behavior but did not make the preview feel native to the builder.
-2. Selected-reference redesign: P2 — the prior cyan circle-node style and wide Studio Rail visibly diverged from the user-selected screenshot. Updated the tokens, header hierarchy, preview aura/placement, rail width, field treatment, and node geometry; changed node constants and connector geometry together so the functional graph stayed coherent.
-3. Post-fix evidence: full-size selected-node browser capture and the source/implementation comparison board show the reference composition, visual hierarchy, node style, and selected rail state. No P0/P1/P2 differences remain given the explicit constraint to preserve status switching, templates, and core graph behavior.
-
-## Primary interactions tested
-
-- Selected a parent node and inspected the Details rail.
-- Retained appointment-level addition, child addition, node selection, branch collapse, and node drag geometry.
-- Retained Templates / Details / Preview tabs for parents and the conditional child tab model.
-- Ran `node --test src/sonar/lib/dropInGraph.test.js`: 10 passing.
-- Ran `npm run build`: passing (pre-existing CSS import-order and bundle-size warnings only).
-- Opened a fresh browser tab and checked console errors: zero.
-
-## Implementation checklist
-
-- [x] Screenshot-inspired near-black, magenta, and violet theme
-- [x] Editorial title/subtitle header and magenta-violet save action
-- [x] Wide, integrated upper-canvas appointment preview
-- [x] Compact rectangular visual nodes with preserved graph behavior
-- [x] Graph layout and connector geometry aligned to the new node footprint
-- [x] Compact screenshot-inspired configuration rail
-- [x] Existing template flow, parent/child controls, canvas panning, zoom, and arrange behavior preserved
-
 ## Follow-up polish
 
-The centered status selector remains because it is a required existing workflow control absent from the reference. If desired, it can be repositioned into a quieter secondary row without removing its behavior.
+- P3: tune the banner focal position per receptionist only if future banner assets place faces unusually far from center.
 
 final result: passed

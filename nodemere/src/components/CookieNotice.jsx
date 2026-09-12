@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { OPEN_PREFERENCES, openVisitorPreferences, readConsent, saveConsent, subscribeConsent } from '../lib/visitorConsent.js';
+import { PUBLIC_PAGES } from '../lib/visitorPolicy.js';
 import './CookieNotice.css';
 
 export default function CookieNotice() {
+  const location = useLocation();
   const [consent, setConsent] = useState(readConsent);
   const [managing, setManaging] = useState(false);
   const [opened, setOpened] = useState(false);
@@ -31,6 +33,7 @@ export default function CookieNotice() {
     setDismissed(true); setError(''); close();
   };
   if ((consent.decided || dismissed) && !opened) {
+    if (!PUBLIC_PAGES.has(location.pathname)) return null;
     return <button type="button" className="visitor-preferences-reopen" onClick={openVisitorPreferences}>Cookie preferences</button>;
   }
   return (
