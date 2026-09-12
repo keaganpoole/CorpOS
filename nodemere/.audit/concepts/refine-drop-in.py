@@ -1,0 +1,12 @@
+from pathlib import Path
+p=Path('src/pages/concepts/ConceptsPage.jsx')
+s=p.read_text(encoding='utf-8')
+s=s.replace('onClick={()=>enter(node)}><span>{pad(i+1)}.{pad(j+1)}</span>','onClick={()=>{setPath([...path,node.id]);setActive(child.id);select(child.id);setHovered(null);}}><span>{pad(i+1)}.{pad(j+1)}</span>')
+s=s.replace('else setSelected(group.children.map(n=>n.id));','else {select(group.id);setSelected(group.children.map(n=>n.id));}')
+s=s.replace('appendChild, countDescendants, findNode, makeTree, pad','countDescendants, findNode, pad')
+p.write_text(s,encoding='utf-8')
+p=Path('src/pages/concepts/AdditionalConcepts.jsx');s=p.read_text(encoding='utf-8').replace('useMemo, useRef, useState','useEffect, useMemo, useRef, useState').replace('findNode, makeTree, pad','findNode, pad').replace('useDropInConcept,useCanvasSelection','useCanvasSelection')
+s=s.replace("const [focus,setFocus]=useState(groups[0]?.id);","const [focus,setFocus]=useCanvasSelection(groups[0]?.id);")
+s=s.replace('const selected=children[position];','const selected=children[Math.min(position,Math.max(0,children.length-1))];\n  useEffect(()=>{select(selected?.id||null);},[selected?.id]);')
+p.write_text(s,encoding='utf-8')
+p=Path('src/pages/concepts/DropInEcho.jsx');s=p.read_text(encoding='utf-8').replace('React,{useState}','React,{useEffect,useState}').replace('const available=children.filter','useEffect(()=>{select(parent.id);},[parent.id]);\n  const available=children.filter');p.write_text(s,encoding='utf-8')

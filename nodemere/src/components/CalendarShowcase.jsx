@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../supabaseClient';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Activity,
@@ -21,11 +21,6 @@ import HomepageScenariosDemo from '../sonar/pages/Scenarios/HomepageScenariosDem
 import HomepagePeopleCrmDemo, { DEMO_CUSTOM_FIELDS } from '../sonar/pages/HomepagePeopleCrmDemo';
 import CallLayerBorderOverlay from '../sonar/components/CallLayerBorderOverlay';
 import useSectionScrollProgress from '../hooks/useSectionScrollProgress';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-);
 
 const HERO_COLORS = ['#818cf8', '#2dd4bf', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#34d399'];
 const TAG_COLORS = {

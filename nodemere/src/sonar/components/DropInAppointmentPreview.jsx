@@ -96,8 +96,7 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
     if (children.length || (studioNavigation && action.has_children)) { setReelDirection(1); setPath(value => [...value, action.id]); return; }
     setSelectedAction(action);
   };
-  return <aside className="drop-in-preview" aria-label="Live appointment preview">
-    <div className="drop-in-preview-label"><span>Live preview</span><span className="drop-in-preview-status"><i style={{ background: COLORS[status] }} />{status}</span></div>
+  return <aside className="drop-in-preview" aria-label="Appointment preview">
     <div ref={stage} className="drop-in-preview-stage" onPointerMove={move} onPointerLeave={() => { pointerX.set(0); pointerY.set(0); }}>
       <div className="drop-in-preview-light" aria-hidden="true" />
       <div className="drop-in-preview-floor" aria-hidden="true" />

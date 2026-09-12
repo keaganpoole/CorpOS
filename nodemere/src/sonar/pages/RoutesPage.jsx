@@ -14,7 +14,6 @@ const ENDPOINTS = [
   { group: 'Server Tools', path: '/api/tools/check-availability', method: 'POST', desc: 'Check appointment slots using business and staff hours', icon: '📅', wsEvent: 'slots' },
   { group: 'Server Tools', path: '/api/tools/create-appointment', method: 'POST', desc: 'Book appointment', icon: '✅', wsEvent: 'book' },
   { group: 'Server Tools', path: '/api/tools/update-appointment', method: 'POST', desc: 'Reschedule appointment', icon: '🔄', wsEvent: 'reschedule' },
-  { group: 'Server Tools', path: '/api/tools/cancel-appointment', method: 'POST', desc: 'Cancel appointment', icon: '❌', wsEvent: 'cancel' },
   { group: 'Server Tools', path: '/api/tools/lookup-customer', method: 'POST', desc: 'Search customer records', icon: '👤', wsEvent: 'search' },
   { group: 'Server Tools', path: '/api/tools/get-services', method: 'GET', desc: 'List active services', icon: '📋', wsEvent: 'services' },
   { group: 'Server Tools', path: '/api/tools/get-business-info', method: 'POST', desc: 'Knowledge base lookup', icon: '📖', wsEvent: 'info' },

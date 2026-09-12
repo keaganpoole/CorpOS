@@ -117,7 +117,7 @@ function AppContent() {
       />
       <Routes>
         {/* --- Public Routes --- */}
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<><VisitorTracking /><HomePage /></>} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/onboarding" element={<OnboardingGate />} />
@@ -153,7 +153,6 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <VisitorTracking />
         <AppContent />
       </AuthProvider>
     </Router>

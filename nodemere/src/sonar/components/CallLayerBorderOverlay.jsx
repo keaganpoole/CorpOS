@@ -43,6 +43,7 @@ export default function CallLayerBorderOverlay() {
         <stop offset="55%" stopColor="var(--brandGradientEnd)" stopOpacity=".32" />
         <stop offset="88%" stopColor="#d8b4fe" stopOpacity=".85" />
         <stop offset="100%" stopColor="#fff" stopOpacity="1" />
+        <animateTransform attributeName="gradientTransform" type="rotate" from="0 .5 .5" to="360 .5 .5" dur="4.8s" repeatCount="indefinite" />
       </linearGradient>
       <linearGradient id={`${borderId}-god-gradient`} x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stopColor="#fff" stopOpacity="0" />

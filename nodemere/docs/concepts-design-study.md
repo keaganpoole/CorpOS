@@ -2,7 +2,7 @@
 
 ## Brief
 
-Six independently interactive explorations, a quiet thumbnail rail, one visible experiment. No backend or product dashboard. The working material is neutral: Collection → Alpha / Beta / Gamma / Delta → numbered elements. Each study keeps its own state while switching concepts.
+Fifteen independently interactive explorations, a quiet thumbnail rail, one visible experiment. No backend or product dashboard. The working material is neutral: Collection → Alpha / Beta / Gamma / Delta → numbered elements. Each study keeps its own state while switching concepts.
 
 ## Research translated into decisions
 
@@ -82,10 +82,15 @@ All five additions were rendered and interacted with in the connected in-app bro
 - Echo: reduced oversized specimens and brought the local editor into the initial desktop viewport. Verified a child override of 80 survives a parent change to 65, then Follow parent restores inheritance.
 - Tessera: reduced the map footprint and selected fill, made handles visibly actionable, and corrected pointer offset during dragging. Verified boundary reshaping, descent into Alpha, and nested region creation.
 
-The eleven-item thumbnail rail scrolls independently on desktop and horizontally on narrow screens. Study state survives switching concepts. The original Unfold was rechecked after the shell changes. Prototype edits are session-local and reset on reload; no backend or production data is involved.
+The fifteen-item thumbnail rail scrolls independently on desktop and horizontally on narrow screens. Study state survives switching concepts. The original Unfold was rechecked after the shell changes. Prototype edits are session-local and reset on reload; no backend or production data is involved.
 
 ## Drop In adaptation
-All eleven studies now operate on one local Drop In draft, grouped by pending, confirmed, completed, missed, and cancelled appointment status. Actions retain name, purpose, prompt, enabled state, ordering, and parent identity across concept switches. The editor supports validated parent changes; the appointment preview follows the same enabled-ancestor rules as the production graph. Echo now explores branch availability instead of invented prompt inheritance. No backend writes or calls occur. Drafts persist in browser local storage.
+All fifteen studies now operate on one local Drop In draft, grouped by pending, confirmed, completed, missed, and cancelled appointment status. Actions retain name, purpose, prompt, enabled state, ordering, and parent identity across concept switches. The editor supports validated parent changes; the appointment preview follows the same enabled-ancestor rules as the production graph. Echo now explores branch availability instead of invented prompt inheritance. No backend writes or calls occur. Drafts persist in browser local storage.
 
-Validation: production build, four domain-model tests (status preservation, subtree movement/cycle prevention, disabled branch preview, grouping/removal retaining instructions), rendered desktop review of all eleven layouts, mobile editor and preview, cross-concept reassignment, undo, and saved-purpose preview. Refinements include longer-name layouts, containment spacing, a compact rotational title, aligned status/selection bars, and responsive action details.
+Validation: production build, four domain-model tests (status preservation, subtree movement/cycle prevention, disabled branch preview, grouping/removal retaining instructions), rendered desktop review of all fifteen layouts, mobile editor and preview, cross-concept reassignment, undo, and saved-purpose preview. The extension adds Cadence (playable time lanes), Bracket (enterable syntax scopes), Weft (cross-lane splicing), and Contour (thresholded depth reveal). Refinements include longer-name layouts, containment spacing, a compact rotational title, aligned status/selection bars, responsive action details, and the new concepts’ motion-specific reveals.
 
+## Current canonical set
+
+The current page keeps **Unfold** as the reference direction and replaces the other studies with fourteen distinct illuminated-spine compositions: **Rail, Ribbon, Pulse, Ladder, Junction, Wave, Mirror, Chamber, Crown, Current, Splice, Switchback, Stack,** and **Halo**. The earlier extension names above describe superseded experiments and are retained only as historical notes.
+
+Each canonical study is wired to the same Drop In model and shared inspector. Their differences are structural: docking, continuous tracing, signal playback, stepped descent, branching, phase propagation, mirrored context, progressive chambers, suspended branches, directional focus, seam insertion, back-and-forth traversal, lifted layers, and adjustable boundary radius.

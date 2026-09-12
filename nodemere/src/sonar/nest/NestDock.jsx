@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Beaker, Eye, EyeOff, History, X } from 'lucide-react';
+import { Beaker, Eye, EyeOff, History, MessageCircle, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import NestStage from './NestStage';
 import NestAnimationStudio from './NestAnimationStudio';
+import NestIntercom from './NestIntercom';
+import IntercomHistoryPanel from './IntercomHistoryPanel';
 import { useNest } from './NestRuntime';
 import './nest.css';
 
@@ -68,6 +70,8 @@ const HistoryPanel = () => {
 };
 
 export default function NestDock({ onStageChange }) {
+  const [intercomOpen, setIntercomOpen] = useState(false);
+  const [conversationsOpen, setConversationsOpen] = useState(false);
   const {
     displayEvent,
     displayConcept,
@@ -78,10 +82,21 @@ export default function NestDock({ onStageChange }) {
     privacyMode,
     introStarted,
     markIntroStarted,
+    setVoiceActive,
   } = useNest();
   // Idle Nest stays quiet and centered. Any real event turns the usable toolbar
   // row into the Nest canvas; the selected concept decides how much of it to use.
-  const expanded = Boolean(displayEvent);
+  const expanded = Boolean(displayEvent || intercomOpen);
+
+  const openIntercom = () => {
+    setVoiceActive(true);
+    setIntercomOpen(true);
+  };
+
+  const closeIntercom = () => {
+    setIntercomOpen(false);
+    setVoiceActive(false);
+  };
 
   useEffect(() => {
     onStageChange?.(expanded);
@@ -90,27 +105,36 @@ export default function NestDock({ onStageChange }) {
 
   return (
     <>
-      <div className={`nest-dock ${expanded ? 'is-expanded' : ''}`}>
+      <div className={`nest-dock ${expanded ? 'is-expanded' : ''} ${intercomOpen ? 'is-intercom' : ''}`}>
         <NestStage
           event={displayEvent}
           concept={displayConcept}
           privacyMode={privacyMode}
           introStarted={introStarted}
           onIntroStart={markIntroStarted}
+          onIdleClick={!displayEvent && !intercomOpen ? openIntercom : undefined}
+          intercomOpening={intercomOpen}
         />
-        <div className="nest-dock-tools no-drag">
-          {queueLength > 0 && <span className="nest-queue-count" title={`${queueLength} queued Nest events`}>{queueLength}</span>}
-          <button type="button" onClick={() => setHistoryOpen(true)} aria-label="Open Nest activity history" title="Nest history (Ctrl+Shift+H)">
-            <History size={13} />
-          </button>
-          {import.meta.env.DEV && (
-            <button type="button" onMouseDown={() => setStudioOpen(true)} onClick={() => setStudioOpen(true)} aria-label="Open Nest Animation Studio" title="Nest Animation Studio (Ctrl+Shift+N)">
-              <Beaker size={13} />
+        <NestIntercom open={intercomOpen} onClose={closeIntercom} />
+        {!intercomOpen && (
+          <div className="nest-dock-tools no-drag">
+            {queueLength > 0 && <span className="nest-queue-count" title={`${queueLength} queued Nest events`}>{queueLength}</span>}
+            <button type="button" onClick={() => setConversationsOpen(true)} aria-label="Open voice conversations" title="Voice conversations">
+              <MessageCircle size={13} />
             </button>
-          )}
-        </div>
+            <button type="button" onClick={() => setHistoryOpen(true)} aria-label="Open Nest activity history" title="Nest history (Ctrl+Shift+H)">
+              <History size={13} />
+            </button>
+            {import.meta.env.DEV && (
+              <button type="button" onMouseDown={() => setStudioOpen(true)} onClick={() => setStudioOpen(true)} aria-label="Open Nest Animation Studio" title="Nest Animation Studio (Ctrl+Shift+N)">
+                <Beaker size={13} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <HistoryPanel />
+      <IntercomHistoryPanel open={conversationsOpen} onClose={() => setConversationsOpen(false)} />
       <NestAnimationStudio open={studioOpen} onClose={() => setStudioOpen(false)} />
     </>
   );

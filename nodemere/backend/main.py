@@ -94,6 +94,7 @@ from .config import (
     elevenlabs_api_key,
     elevenlabs_agent_id_inbound,
     elevenlabs_agent_id_outbound,
+    elevenlabs_agent_id_intercom,
     internal_tool_secret,
     twilio_phone_number,
     twilio_account_sid,
@@ -3020,11 +3021,13 @@ async def require_internal_tool_authorization(request: Request):
     if not hmac.compare_digest(supplied.encode("utf-8"), internal_tool_secret.encode("utf-8")):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal tool authorization.")
     token = request.headers.get("x-nodemere-context")
+    request.state.internal_claims = None
     scoped_path = request.scope.get("path", "")
     if (scoped_path.startswith(("/api/tools/", "/api/call/")) or scoped_path == "/api/scenarios/resume") and not token:
         raise HTTPException(400, "A signed internal-tool business context is required")
     if token:
         claims = verify_internal_context(internal_tool_secret, token)
+        request.state.internal_claims = claims
         business = load_business_by_id(claims.get("business_id"))
         if not business or str(business["user_id"]) != claims["sub"]:
             raise HTTPException(403, "Tool business unavailable")
@@ -4580,10 +4583,10 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
 # the server-owned entitlement table. The browser may display these values,
 # but it is never trusted to enforce them.
 DEFAULT_PLAN_ENTITLEMENTS = {
-    "free": {"included_call_minutes": 20, "max_receptionists": 1, "max_scenarios": 3, "max_contacts": 100, "inbound_calling": True, "outbound_calling": False, "overage_enabled": False, "payment_processing": False},
-    "essentials": {"included_call_minutes": 300, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True, "overage_cap_cents": 2500, "payment_processing": False},
-    "pro": {"included_call_minutes": 1500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 10000, "payment_processing": True},
-    "ultra": {"included_call_minutes": 3000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 25000, "payment_processing": True},
+    "free": {"included_call_minutes": 20, "max_receptionists": 1, "max_scenarios": 3, "max_contacts": 100, "inbound_calling": True, "outbound_calling": False, "overage_enabled": False, "payment_processing": False, "intercom_daily_turns": 10},
+    "essentials": {"included_call_minutes": 300, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True, "overage_cap_cents": 2500, "payment_processing": False, "intercom_daily_turns": 40},
+    "pro": {"included_call_minutes": 1500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 10000, "payment_processing": True, "intercom_daily_turns": 200},
+    "ultra": {"included_call_minutes": 3000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 25000, "payment_processing": True, "intercom_daily_turns": 500},
 }
 SUBSCRIPTION_ACCESS_STATUSES = {"active"}
 
@@ -6314,8 +6317,8 @@ async def check_verification_status_tool(request: Request):
     )
 
 
-async def request_document_upload_tool(request: Request):
-    payload = await parse_request_payload(request)
+async def request_document_upload_tool(request: Request, payload: Optional[dict] = None):
+    payload = payload if isinstance(payload, dict) else await parse_request_payload(request)
     context = build_verification_request_context(payload)
     if context.get("business_id") is None or context.get("person_id") is None:
         raise HTTPException(
@@ -6402,6 +6405,10 @@ async def create_voice_contract(payload: ContractCreateRequest, current_user: di
 @app.post("/api/tools/request-contract", tags=["Server Tools"])
 async def create_voice_contract_tool(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
     payload = await parse_request_payload(request)
+    tool_name = "create-contract-link"
+    confirmation_result = gate_intercom_write(request, tool_name, payload)
+    if confirmation_result:
+        return confirmation_result
     context = build_verification_request_context(payload)
     metadata = first_present(payload, "metadata") or {}
     if not isinstance(metadata, dict):
@@ -6409,7 +6416,7 @@ async def create_voice_contract_tool(request: Request, _internal: None = Depends
     business = context.get("business") or {}
     if business.get("name") and not metadata.get("business_name"):
         metadata["business_name"] = business.get("name")
-    return create_contract(
+    result = create_contract(
         supabase_admin,
         base_url=verification_base_url,
         signer_name=first_present(payload, "signer_name", "name", "full_name") or "",
@@ -6420,6 +6427,8 @@ async def create_voice_contract_tool(request: Request, _internal: None = Depends
         user_id=context.get("user_id"),
         metadata=metadata,
     )
+    record_intercom_write_action(request, tool_name, result)
+    return result
 
 
 @app.get("/api/contracts/{token}", tags=["Voice Contracts"])
@@ -6603,7 +6612,14 @@ async def complete_verification_page(token: str):
 @app.post("/api/tools/document_request", tags=["Server Tools"])
 @app.post("/api/tools/document-request", tags=["Server Tools"])
 async def request_document_upload_route(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
-    return await request_document_upload_tool(request)
+    payload = await parse_request_payload(request)
+    tool_name = "request-docs"
+    confirmation_result = gate_intercom_write(request, tool_name, payload)
+    if confirmation_result:
+        return confirmation_result
+    result = await request_document_upload_tool(request, payload)
+    record_intercom_write_action(request, tool_name, result)
+    return result
 
 
 @app.post("/api/tools/get_docs", tags=["Server Tools"])
@@ -7402,6 +7418,135 @@ async def set_agent_data(request: Request, _internal: None = Depends(require_int
     claim_call_milestones(supabase, saved)
     return {"ok": True, "call_log": saved}
 
+INTERCOM_WRITE_TOOLS = {
+    "create-contract-link",
+    "request-contract",
+    "create-person",
+    "create-record",
+    "update-person",
+    "update-record",
+    "update-customer",
+    "create-appointment",
+    "update-appointment",
+    "request-docs",
+    "document-request",
+    "document-upload-request",
+}
+
+
+def intercom_store():
+    return getattr(supabase_admin, "raw", supabase_admin)
+
+
+def intercom_write_fingerprint(tool_name: str, payload: dict) -> str:
+    ignored = {
+        "confirmation",
+        "confirmed",
+        "confirmation_token",
+        "secret__nodemere_context",
+        "system__conversation_id",
+    }
+    clean = {key: value for key, value in payload.items() if key not in ignored}
+    serialized = json.dumps({"tool": tool_name, "payload": clean}, sort_keys=True, default=str, separators=(",", ":"))
+    return hmac.new(internal_tool_secret.encode("utf-8"), serialized.encode("utf-8"), "sha256").hexdigest()
+
+
+def first_query_row(query) -> Optional[dict]:
+    rows = query.limit(1).execute().data or []
+    return rows[0] if rows else None
+
+
+def gate_intercom_write(request: Request, tool_name: str, payload: dict) -> Optional[dict]:
+    claims = getattr(request.state, "internal_claims", None) or {}
+    if claims.get("channel") != "intercom" or tool_name not in INTERCOM_WRITE_TOOLS:
+        return None
+    intercom_id = uuid_or_none(claims.get("intercom_id"))
+    intercom_user_id = str(claims.get("intercom_user_id") or "")
+    tenant = current_tenant.get()
+    row = first_query_row(
+        intercom_store().table("intercom")
+        .select("id,metadata,tool_calls")
+        .eq("id", intercom_id)
+        .eq("business_id", tenant.business_id)
+        .eq("user_id", intercom_user_id or tenant.owner_id)
+    ) if intercom_id and tenant else None
+    if not row:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Voice write context is unavailable")
+    fingerprint = intercom_write_fingerprint(tool_name, payload)
+    metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    pending = metadata.get("pending_write") if isinstance(metadata.get("pending_write"), dict) else {}
+    confirmed_at = parse_optional_datetime(pending.get("confirmed_at"))
+    confirmation_fresh = bool(confirmed_at and (datetime.now(timezone.utc) - confirmed_at).total_seconds() <= 120)
+    if pending.get("tool") == tool_name and pending.get("fingerprint") == fingerprint and confirmation_fresh:
+        metadata.pop("pending_write", None)
+        intercom_store().table("intercom").update({"metadata": metadata, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", row["id"]).eq("business_id", tenant.business_id).eq("user_id", intercom_user_id or tenant.owner_id).execute()
+        return None
+
+    requested_at = datetime.now(timezone.utc).isoformat()
+    metadata["pending_write"] = {
+        "tool": tool_name,
+        "fingerprint": fingerprint,
+        "requested_at": requested_at,
+        "confirmed_at": None,
+    }
+    tool_calls = row.get("tool_calls") if isinstance(row.get("tool_calls"), list) else []
+    tool_calls = [*tool_calls, {"tool": tool_name, "status": "confirmation_required", "at": requested_at}][-100:]
+    intercom_store().table("intercom").update({
+        "metadata": metadata,
+        "tool_calls": tool_calls,
+        "updated_at": requested_at,
+    }).eq("id", row["id"]).eq("business_id", tenant.business_id).eq("user_id", intercom_user_id or tenant.owner_id).execute()
+    return {
+        "ok": False,
+        "confirmation_required": True,
+        "message": "Ask the user for a clear yes, then repeat this exact tool call only after they confirm.",
+    }
+
+
+def record_intercom_write_action(request: Request, tool_name: str, result: dict) -> None:
+    claims = getattr(request.state, "internal_claims", None) or {}
+    if claims.get("channel") != "intercom":
+        return
+    intercom_id = uuid_or_none(claims.get("intercom_id"))
+    intercom_user_id = str(claims.get("intercom_user_id") or "")
+    tenant = current_tenant.get()
+    if not intercom_id or not tenant:
+        return
+    row = first_query_row(
+        intercom_store().table("intercom")
+        .select("id,write_actions")
+        .eq("id", intercom_id)
+        .eq("business_id", tenant.business_id)
+        .eq("user_id", intercom_user_id or tenant.owner_id)
+    )
+    if not row:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    actions = row.get("write_actions") if isinstance(row.get("write_actions"), list) else []
+    actions = [*actions, {"tool": tool_name, "status": "completed", "at": now, "result": event_metadata(result)}][-100:]
+    intercom_store().table("intercom").update({"write_actions": actions, "updated_at": now}).eq("id", row["id"]).eq("business_id", tenant.business_id).eq("user_id", intercom_user_id or tenant.owner_id).execute()
+    label = {
+        "create-appointment": "Appointment created by voice assistant",
+        "update-appointment": "Appointment updated by voice assistant",
+        "create-person": "Customer created by voice assistant",
+        "create-record": "Customer created by voice assistant",
+        "update-person": "Customer updated by voice assistant",
+        "update-record": "Customer updated by voice assistant",
+        "update-customer": "Customer updated by voice assistant",
+    }.get(tool_name, "Business updated by voice assistant")
+    record_nest_event(
+        supabase_admin,
+        business_id=tenant.business_id,
+        user_id=tenant.owner_id,
+        category="appointments" if "appointment" in tool_name else "people" if tool_name in {"create-person", "create-record", "update-person", "update-record", "update-customer"} else "workflows",
+        event_type=f"intercom_{tool_name.replace('-', '_')}",
+        title=label,
+        payload={"intercom_id": str(intercom_id), "tool": tool_name},
+        source_id=f"{intercom_id}:{len(actions)}",
+        idempotency_key=f"intercom:{intercom_id}:{len(actions)}",
+    )
+
+
 @app.api_route("/api/tools/{tool_name}", methods=["GET", "POST"], tags=["Server Tools"])
 async def legacy_server_tool(
     tool_name: str,
@@ -7417,6 +7562,10 @@ async def legacy_server_tool(
     normalized_tool = (tool_name or "").strip().lower().replace("_", "-")
     if not business or business.get("id") is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Business context is required for internal tools.")
+
+    confirmation_result = gate_intercom_write(request, normalized_tool, payload)
+    if confirmation_result:
+        return confirmation_result
 
     if normalized_tool in {"check-verification-status", "check-authentication", "verify-authentication", "auth-verify"}:
         context = build_verification_request_context({**payload, "business": business, "user_id": user_id})
@@ -7435,12 +7584,14 @@ async def legacy_server_tool(
         context_payload = {**payload, "business": business, "user_id": user_id}
         context = build_verification_request_context(context_payload)
         request_result = create_document_request(supabase_admin, base_url=verification_base_url, **context)
-        return deliver_existing_secure_link_by_email(
+        result = deliver_existing_secure_link_by_email(
             request_result=request_result,
             context=context,
             payload=context_payload,
             kind="document_upload",
         )
+        record_intercom_write_action(request, normalized_tool, result)
+        return result
 
     if normalized_tool in {"get-docs", "document-verify", "document-upload-verify"}:
         context = build_verification_request_context({**payload, "business": business, "user_id": user_id})
@@ -7699,13 +7850,15 @@ async def legacy_server_tool(
             "person": created,
             "record": created,
         })
-        return {
+        result = {
             "ok": True,
             "person": created,
             "record": created,
             "person_id": created.get("id"),
             "record_id": created.get("id"),
         }
+        record_intercom_write_action(request, normalized_tool, result)
+        return result
 
     if normalized_tool in {"update-person", "update-record", "update-customer"}:
         if not business:
@@ -7812,7 +7965,7 @@ async def legacy_server_tool(
             "person": updated,
             "record": updated,
         })
-        return {
+        result = {
             "ok": True,
             "person": updated,
             "record": updated,
@@ -7821,6 +7974,8 @@ async def legacy_server_tool(
             "record_id": updated.get("id") or person_id,
             "updated": True,
         }
+        record_intercom_write_action(request, normalized_tool, result)
+        return result
 
     if normalized_tool == "check-availability":
         if not business:
@@ -8074,7 +8229,9 @@ async def legacy_server_tool(
             },
         )
         emit_appointment_change_triggers(None, created, business_id=business.get("id") if business else None, include_updated=False)
-        return {"ok": True, "appointment": created}
+        result = {"ok": True, "appointment": created}
+        record_intercom_write_action(request, normalized_tool, result)
+        return result
 
     if normalized_tool == "update-appointment":
         appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
@@ -8143,7 +8300,9 @@ async def legacy_server_tool(
         updated = response.data[0] if response.data else {**existing, **updates}
         updated = {"action": "update_appointment", "table": "appointments", **updated}
         emit_appointment_change_triggers(existing, updated, business_id=business.get("id") if business else None)
-        return {"ok": True, "appointment": updated}
+        result = {"ok": True, "appointment": updated}
+        record_intercom_write_action(request, normalized_tool, result)
+        return result
 
     if normalized_tool == "log-call-outcome":
         duration_seconds = first_present(payload, "duration_seconds", "duration")
@@ -8283,8 +8442,10 @@ async def persist_elevenlabs_event(payload):
     conversation_id=first_present(event_data,"conversation_id","conversation_initiation_client_data.dynamic_variables.system__conversation_id")
     # Provider callbacks can arrive before the outbound HTTP response. Resolve
     # the pre-created drop-in log using the signed, tenant-validated context.
-    drop_in_log = None
     drop_dynamic = extract_dynamic_variables(event_data)
+    if str(drop_dynamic.get("intercom_session") or "").strip().lower() in {"true", "1", "yes"}:
+        return persist_intercom_provider_event(payload)
+    drop_in_log = None
     if drop_dynamic.get('drop_in_id') and drop_dynamic.get('call_log_id'):
         candidates = supabase.table('call_logs').select('*').eq('id', str(drop_dynamic['call_log_id'])).limit(1).execute().data or []
         if not candidates or str(candidates[0].get('drop_in_id')) != str(drop_dynamic['drop_in_id']):
@@ -8693,6 +8854,578 @@ async def claim_sonar_nest_milestone(payload: dict, current_user: dict = Depends
         payload=(payload or {}).get("payload") if isinstance((payload or {}).get("payload"), dict) else {},
     )
     return {"claimed": claimed}
+
+
+INTERCOM_TURN_LIMITS = {"free": 10, "essentials": 40, "pro": 200, "ultra": 500}
+INTERCOM_TURN_SECONDS = {
+    "free": {"user": 30, "agent": 30},
+    "essentials": {"user": 45, "agent": 45},
+    "pro": {"user": 60, "agent": 60},
+    "ultra": {"user": 90, "agent": 90},
+}
+
+
+def receptionist_banner_url(banner_id: Optional[str]) -> Optional[str]:
+    value = str(banner_id or "").strip()
+    if not value:
+        return None
+    return f"https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/{value}.png"
+
+
+def intercom_plan_limits(user_id: str) -> dict:
+    context = get_user_plan_context(user_id)
+    plan = context.get("plan") or "free"
+    try:
+        daily_turns = int(context.get("entitlements", {}).get("intercom_daily_turns") or INTERCOM_TURN_LIMITS.get(plan, 10))
+    except (TypeError, ValueError):
+        daily_turns = INTERCOM_TURN_LIMITS.get(plan, 10)
+    return {
+        "plan": plan,
+        "daily_turns": max(1, daily_turns),
+        "turn_seconds": INTERCOM_TURN_SECONDS.get(plan, INTERCOM_TURN_SECONDS["free"]),
+        "idle_warning_seconds": 45,
+        "idle_disconnect_seconds": 75,
+    }
+
+
+def intercom_actor_id(current_user: dict) -> str:
+    tenant = current_tenant.get()
+    if tenant and tenant.actor_id:
+        return str(tenant.actor_id)
+    if isinstance(current_user, dict):
+        return str(current_user.get("id") or current_user.get("sub") or business_owner_id(current_user))
+    return str(getattr(current_user, "id", None) or business_owner_id(current_user))
+
+
+def is_intercom_receptionist_eligible(row: dict) -> bool:
+    status_value = str(row.get("status") or "").strip().lower()
+    direction = normalize_receptionist_direction(row.get("direction"))
+    return (
+        row.get("is_active") is not False
+        and status_value not in {"offline", "disabled", "inactive", "archived"}
+        and bool(str(row.get("elevenlabs_voice_id") or "").strip())
+        and direction in {"inbound", "outbound", "all"}
+    )
+
+
+def list_intercom_receptionists(*, user_id: str, business_id: int) -> list[dict]:
+    rows = (
+        intercom_store().table("hired_receptionists")
+        .select("id,full_name,first_name,avatar,catalog_id,elevenlabs_voice_id,direction,is_active,status,hired_at,business_id,user_id")
+        .eq("business_id", business_id)
+        .eq("user_id", user_id)
+        .order("hired_at", desc=True)
+        .execute()
+        .data
+        or []
+    )
+    eligible = [row for row in rows if is_intercom_receptionist_eligible(row)]
+    catalog_ids = [str(row.get("catalog_id")) for row in eligible if row.get("catalog_id")]
+    catalog_by_id = {}
+    if catalog_ids:
+        catalog_rows = (
+            intercom_store().table("receptionist_catalog")
+            .select("id,avatar,banner_id")
+            .in_("id", catalog_ids)
+            .execute()
+            .data
+            or []
+        )
+        catalog_by_id = {str(row.get("id")): row for row in catalog_rows}
+    result = []
+    for row in eligible:
+        catalog = catalog_by_id.get(str(row.get("catalog_id"))) or {}
+        banner = receptionist_banner_url(catalog.get("banner_id"))
+        avatar = row.get("avatar") or catalog.get("avatar") or banner
+        result.append({
+            "id": row.get("id"),
+            "name": row.get("full_name") or row.get("first_name") or "Receptionist",
+            "avatar": avatar,
+            "banner_url": banner or avatar,
+            "voice_id": row.get("elevenlabs_voice_id"),
+            "direction": normalize_receptionist_direction(row.get("direction")),
+        })
+    return result
+
+
+def get_intercom_settings(*, user_id: str, business_id: int) -> dict:
+    row = first_query_row(
+        intercom_store().table("account_settings")
+        .select("preferences")
+        .eq("user_id", user_id)
+        .eq("business_id", business_id)
+    )
+    preferences = row.get("preferences") if isinstance(row, dict) and isinstance(row.get("preferences"), dict) else {}
+    intercom = preferences.get("intercom") if isinstance(preferences.get("intercom"), dict) else {}
+    if not intercom and isinstance(preferences.get("nest_voice"), dict):
+        intercom = preferences.get("nest_voice")
+    return {
+        "privacy_accepted": intercom.get("privacy_accepted") is True,
+        "last_receptionist_id": str(intercom.get("last_receptionist_id") or "").strip() or None,
+    }
+
+
+def update_intercom_settings(*, user_id: str, business_id: int, patch: dict) -> dict:
+    existing = first_query_row(
+        intercom_store().table("account_settings")
+        .select("id,preferences")
+        .eq("user_id", user_id)
+        .eq("business_id", business_id)
+    ) or {}
+    preferences = existing.get("preferences") if isinstance(existing.get("preferences"), dict) else {}
+    intercom = preferences.get("intercom") if isinstance(preferences.get("intercom"), dict) else {}
+    preferences["intercom"] = {**intercom, **patch, "updated_at": datetime.now(timezone.utc).isoformat()}
+    settings_row = {"user_id": user_id, "business_id": business_id, "preferences": preferences}
+    if existing.get("id"):
+        intercom_store().table("account_settings").update(settings_row).eq("id", existing["id"]).eq("business_id", business_id).eq("user_id", user_id).execute()
+    else:
+        intercom_store().table("account_settings").insert(settings_row).execute()
+    return get_intercom_settings(user_id=user_id, business_id=business_id)
+
+
+def get_or_create_intercom_usage(*, user_id: str, business_id: int, plan: str, limit_turns: int) -> dict:
+    today = date.today().isoformat()
+    row = first_query_row(
+        intercom_store().table("intercom_usage_daily")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("business_id", business_id)
+        .eq("usage_date", today)
+    )
+    if row:
+        if row.get("limit_turns") != limit_turns or row.get("plan_slug") != plan:
+            updates = {"plan_slug": plan, "limit_turns": limit_turns, "updated_at": datetime.now(timezone.utc).isoformat()}
+            row = (intercom_store().table("intercom_usage_daily").update(updates).eq("id", row["id"]).eq("business_id", business_id).eq("user_id", user_id).execute().data or [row])[0]
+        return row
+    try:
+        return (intercom_store().table("intercom_usage_daily").insert({
+            "user_id": user_id,
+            "business_id": business_id,
+            "usage_date": today,
+            "plan_slug": plan,
+            "turns_used": 0,
+            "limit_turns": limit_turns,
+        }).execute().data or [{}])[0]
+    except Exception:
+        # Another tab may have created today's row after the initial read.
+        existing = first_query_row(
+            intercom_store().table("intercom_usage_daily")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("business_id", business_id)
+            .eq("usage_date", today)
+        )
+        if existing:
+            return existing
+        raise
+
+
+def claim_intercom_usage_turn(*, user_id: str, business_id: int, plan: str, limit_turns: int) -> dict:
+    try:
+        result = (
+            intercom_store()
+            .rpc("nodemere_claim_intercom_turn", {
+                "target_business_id": business_id,
+                "target_user_id": user_id,
+                "target_plan_slug": plan,
+                "target_limit_turns": limit_turns,
+            })
+            .execute()
+            .data
+        )
+    except Exception as exc:
+        if "intercom_limit_reached" in str(exc).lower():
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Daily voice limit reached.",
+            ) from exc
+        raise
+    if isinstance(result, list):
+        result = result[0] if result else {}
+    return result if isinstance(result, dict) else {}
+
+
+def serialize_intercom_conversation(row: dict, include_transcript: bool = False) -> dict:
+    transcript = row.get("transcript") if isinstance(row.get("transcript"), list) else []
+    payload = {
+        "id": row.get("id"),
+        "title": row.get("title") or row.get("receptionist_name") or "Conversation",
+        "summary": row.get("summary") or "",
+        "receptionist_name": row.get("receptionist_name"),
+        "receptionist_avatar": row.get("receptionist_avatar"),
+        "receptionist_banner_url": row.get("receptionist_banner_url"),
+        "started_at": row.get("started_at"),
+        "ended_at": row.get("ended_at"),
+        "created_at": row.get("created_at"),
+    }
+    if include_transcript:
+        payload["transcript"] = transcript
+    return payload
+
+
+def normalize_intercom_transcript(value) -> list[dict]:
+    if not isinstance(value, list):
+        return []
+    transcript = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or item.get("message") or item.get("content") or "").strip()
+        if not text:
+            continue
+        raw_role = str(item.get("role") or item.get("source") or "agent").lower()
+        role = "user" if raw_role == "user" else "agent"
+        transcript.append({
+            "id": str(item.get("id") or item.get("event_id") or f"{role}:{index}"),
+            "role": role,
+            "text": text,
+            "at": item.get("at") or item.get("timestamp"),
+        })
+    return transcript
+
+
+def intercom_search_text(*, title: Optional[str], summary: Optional[str], receptionist_name: Optional[str], transcript: list[dict]) -> str:
+    transcript_text = " ".join(
+        str(item.get("text") or "").strip()
+        for item in transcript
+        if isinstance(item, dict) and item.get("text")
+    )
+    return " ".join(
+        str(value or "").strip()
+        for value in (title, summary, receptionist_name, transcript_text)
+        if str(value or "").strip()
+    )
+
+
+def persist_intercom_provider_event(payload: dict) -> dict:
+    webhook_type, event_timestamp, data = get_elevenlabs_event_data(payload)
+    tenant = current_tenant.get()
+    dynamic = extract_dynamic_variables(data)
+    intercom_id = uuid_or_none(dynamic.get("intercom_id"))
+    conversation_id = first_present(
+        data,
+        "conversation_id",
+        "conversation_initiation_client_data.dynamic_variables.system__conversation_id",
+    )
+    intercom_user_id = str(dynamic.get("intercom_user_id") or tenant.owner_id)
+    query = intercom_store().table("intercom").select("*").eq("business_id", tenant.business_id).eq("user_id", intercom_user_id)
+    if intercom_id:
+        query = query.eq("id", intercom_id)
+    elif conversation_id:
+        query = query.eq("elevenlabs_conversation_id", str(conversation_id))
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Voice conversation binding is required")
+    existing = first_query_row(query)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voice conversation not found")
+    if webhook_type == "post_call_audio":
+        return {"ok": True, "type": webhook_type, "intercom_id": existing.get("id")}
+
+    provider_transcript = normalize_intercom_transcript(data.get("transcript"))
+    transcript = provider_transcript or normalize_intercom_transcript(existing.get("transcript"))
+    analysis = data.get("analysis") if isinstance(data.get("analysis"), dict) else {}
+    summary = analysis.get("transcript_summary") or data.get("summary") or existing.get("summary")
+    title = analysis.get("call_summary_title") or data.get("call_summary_title") or existing.get("title")
+    tool_calls = []
+    for item in data.get("transcript") or []:
+        if isinstance(item, dict) and isinstance(item.get("tool_calls"), list):
+            tool_calls.extend(item.get("tool_calls"))
+    metadata = existing.get("metadata") if isinstance(existing.get("metadata"), dict) else {}
+    metadata.update({
+        "provider_status": data.get("status"),
+        "provider_event_timestamp": event_timestamp,
+        "provider_metadata": event_metadata(data.get("metadata")),
+    })
+    updates = {
+        "elevenlabs_conversation_id": str(conversation_id) if conversation_id else existing.get("elevenlabs_conversation_id"),
+        "title": title,
+        "summary": summary,
+        "transcript": transcript,
+        "search_text": intercom_search_text(
+            title=title,
+            summary=summary,
+            receptionist_name=existing.get("receptionist_name"),
+            transcript=transcript,
+        ),
+        "tool_calls": tool_calls or existing.get("tool_calls") or [],
+        "metadata": metadata,
+        "status": "complete" if str(data.get("status") or "").lower() in {"done", "complete", "completed"} else existing.get("status") or "active",
+        "ended_at": parse_optional_datetime(first_present(data, "ended_at", "metadata.end_time_unix_secs")).isoformat() if parse_optional_datetime(first_present(data, "ended_at", "metadata.end_time_unix_secs")) else existing.get("ended_at"),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    saved = (intercom_store().table("intercom").update(updates).eq("id", existing["id"]).eq("business_id", tenant.business_id).eq("user_id", intercom_user_id).execute().data or [{**existing, **updates}])[0]
+    return {"ok": True, "type": webhook_type, "intercom_id": saved.get("id")}
+
+
+@app.get("/api/sonar/nest/intercom/bootstrap", tags=["Sonar Nest"])
+async def get_intercom_bootstrap(current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    user_id = intercom_actor_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        return {"receptionists": [], "settings": {}, "usage": {"used": 0, "limit": 0}}
+    limits = intercom_plan_limits(owner_id)
+    usage = get_or_create_intercom_usage(user_id=user_id, business_id=business["id"], plan=limits["plan"], limit_turns=limits["daily_turns"])
+    settings = get_intercom_settings(user_id=user_id, business_id=business["id"])
+    receptionists = list_intercom_receptionists(user_id=owner_id, business_id=business["id"])
+    selected_id = settings.get("last_receptionist_id")
+    selected_eligible = any(str(item.get("id")) == str(selected_id) for item in receptionists)
+    return {
+        "agent_configured": bool(elevenlabs_api_key and elevenlabs_agent_id_intercom and internal_tool_secret),
+        "receptionists": receptionists,
+        "settings": {**settings, "last_receptionist_eligible": selected_eligible},
+        "usage": {"used": int(usage.get("turns_used") or 0), "limit": int(usage.get("limit_turns") or limits["daily_turns"]), "plan": limits["plan"]},
+        "limits": limits,
+    }
+
+
+@app.post("/api/sonar/nest/intercom/settings", tags=["Sonar Nest"])
+async def update_intercom_preferences(payload: dict, current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    user_id = intercom_actor_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    patch = {}
+    if "privacy_accepted" in payload:
+        patch["privacy_accepted"] = payload.get("privacy_accepted") is True
+        if patch["privacy_accepted"]:
+            patch["privacy_accepted_at"] = datetime.now(timezone.utc).isoformat()
+    if payload.get("last_receptionist_id"):
+        receptionists = list_intercom_receptionists(user_id=owner_id, business_id=business["id"])
+        requested = str(payload.get("last_receptionist_id"))
+        if not any(str(item.get("id")) == requested for item in receptionists):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Receptionist is not eligible for voice conversations.")
+        patch["last_receptionist_id"] = requested
+    settings = update_intercom_settings(user_id=user_id, business_id=business["id"], patch=patch)
+    return {"settings": settings}
+
+
+@app.post("/api/sonar/nest/intercom/session", tags=["Sonar Nest"])
+async def create_intercom_session(payload: dict, current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    user_id = intercom_actor_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    if not elevenlabs_api_key or not elevenlabs_agent_id_intercom or not internal_tool_secret:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Voice conversations are not configured.")
+    limits = intercom_plan_limits(owner_id)
+    usage = get_or_create_intercom_usage(user_id=user_id, business_id=business["id"], plan=limits["plan"], limit_turns=limits["daily_turns"])
+    if int(usage.get("turns_used") or 0) >= int(usage.get("limit_turns") or limits["daily_turns"]):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Daily voice limit reached.")
+    receptionists = list_intercom_receptionists(user_id=owner_id, business_id=business["id"])
+    receptionist_id = str(payload.get("receptionist_id") or "").strip()
+    receptionist = next((item for item in receptionists if str(item.get("id")) == receptionist_id), None)
+    if not receptionist:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose an eligible receptionist before starting a voice conversation.")
+    intercom_row = (intercom_store().table("intercom").insert({
+        "business_id": business["id"],
+        "user_id": user_id,
+        "hired_receptionist_id": int_or_none(receptionist_id),
+        "elevenlabs_agent_id": elevenlabs_agent_id_intercom,
+        "receptionist_name": receptionist.get("name"),
+        "receptionist_avatar": receptionist.get("avatar"),
+        "receptionist_banner_url": receptionist.get("banner_url"),
+        "status": "connecting",
+        "metadata": {"source": "nest", "channel": "intercom"},
+    }).execute().data or [{}])[0]
+    intercom_id = str(intercom_row.get("id") or "")
+    capability = issue_internal_context(
+        internal_tool_secret,
+        business,
+        claims={"channel": "intercom", "intercom_id": intercom_id, "intercom_user_id": user_id},
+    )
+    response = requests.get(
+        "https://api.elevenlabs.io/v1/convai/conversation/get-signed-url",
+        headers={"xi-api-key": elevenlabs_api_key},
+        params={"agent_id": elevenlabs_agent_id_intercom},
+        timeout=15,
+    )
+    if not response.ok:
+        if intercom_id:
+            intercom_store().table("intercom").update({"status": "failed", "ended_at": datetime.now(timezone.utc).isoformat()}).eq("id", intercom_id).eq("business_id", business["id"]).eq("user_id", user_id).execute()
+        logging.warning("main.intercom_signed_url.event_1")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to start the voice conversation.")
+    body = response.json() or {}
+    update_intercom_settings(user_id=user_id, business_id=business["id"], patch={"last_receptionist_id": receptionist_id})
+    return {
+        "signed_url": body.get("signed_url"),
+        "intercom_id": intercom_id,
+        "agent_id": elevenlabs_agent_id_intercom,
+        "user_id": user_id,
+        "receptionist": receptionist,
+        "usage": {"used": int(usage.get("turns_used") or 0), "limit": int(usage.get("limit_turns") or limits["daily_turns"])},
+        "limits": limits,
+        "dynamic_variables": {
+            "business_id": str(business.get("id")),
+            "user_id": owner_id,
+            "intercom_user_id": user_id,
+            "business_name": business.get("name") or "",
+            "receptionist_id": receptionist_id,
+            "hired_receptionist_id": receptionist_id,
+            "receptionist_name": receptionist.get("name") or "",
+            "elevenlabs_voice_id": receptionist.get("voice_id") or "",
+            "intercom_session": "true",
+            "intercom_id": intercom_id,
+            "requires_write_confirmation": "true",
+            "secret__nodemere_context": capability,
+        },
+    }
+
+
+@app.post("/api/sonar/nest/intercom/turn", tags=["Sonar Nest"])
+async def record_intercom_turn(payload: dict, current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    user_id = intercom_actor_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    intercom_id = uuid_or_none(payload.get("intercom_id") or payload.get("conversation_id"))
+    row = (first_query_row(intercom_store().table("intercom").select("*").eq("id", intercom_id).eq("business_id", business["id"]).eq("user_id", user_id)) if intercom_id else None)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voice conversation not found")
+    role = "user" if str(payload.get("role") or "user").lower() == "user" else "agent"
+    text = str(payload.get("text") or "").strip()
+    turn_id = str(payload.get("turn_id") or payload.get("event_id") or uuid4())
+    transcript = row.get("transcript") if isinstance(row.get("transcript"), list) else []
+    duplicate = any(str(item.get("id")) == turn_id for item in transcript if isinstance(item, dict))
+    limits = intercom_plan_limits(owner_id)
+    usage = get_or_create_intercom_usage(user_id=user_id, business_id=business["id"], plan=limits["plan"], limit_turns=limits["daily_turns"])
+    updated_usage = usage
+    if role == "user" and text and not duplicate:
+        updated_usage = claim_intercom_usage_turn(
+            user_id=user_id,
+            business_id=business["id"],
+            plan=limits["plan"],
+            limit_turns=limits["daily_turns"],
+        )
+    if text and not duplicate:
+        transcript.append({"id": turn_id, "role": role, "text": text, "at": payload.get("at") or datetime.now(timezone.utc).isoformat()})
+    metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    pending_write = metadata.get("pending_write") if isinstance(metadata.get("pending_write"), dict) else None
+    normalized_confirmation = re.sub(r"[^a-z ]+", "", text.lower()).strip()
+    if role == "user" and pending_write and normalized_confirmation in {"yes", "yes please", "yes do it", "do it", "go ahead", "confirm", "confirmed", "please do"}:
+        pending_write["confirmed_at"] = datetime.now(timezone.utc).isoformat()
+        metadata["pending_write"] = pending_write
+    conversation_updates = {
+        "transcript": transcript,
+        "search_text": intercom_search_text(
+            title=row.get("title"),
+            summary=row.get("summary"),
+            receptionist_name=row.get("receptionist_name"),
+            transcript=transcript,
+        ),
+        "metadata": metadata,
+        "status": "active",
+        "turn_count": sum(1 for item in transcript if isinstance(item, dict) and item.get("role") == "user"),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if payload.get("elevenlabs_conversation_id"):
+        conversation_updates["elevenlabs_conversation_id"] = str(payload.get("elevenlabs_conversation_id"))
+    intercom_store().table("intercom").update(conversation_updates).eq("id", intercom_id).eq("business_id", business["id"]).eq("user_id", user_id).execute()
+    return {"usage": {"used": int(updated_usage.get("turns_used") or 0), "limit": int(updated_usage.get("limit_turns") or limits["daily_turns"])}}
+
+
+@app.get("/api/sonar/nest/intercom/conversations", tags=["Sonar Nest"])
+async def list_intercom_conversations(q: Optional[str] = None, limit: int = 40, current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    user_id = intercom_actor_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        return {"conversations": []}
+    query = (
+        intercom_store().table("intercom")
+        .select("*")
+        .eq("business_id", business["id"])
+        .eq("user_id", user_id)
+        .is_("deleted_at", "null")
+        .order("created_at", desc=True)
+    )
+    needle = str(q or "").strip()[:120]
+    if needle:
+        query = query.ilike("search_text", f"%{needle}%")
+    rows = query.limit(max(1, min(limit, 100))).execute().data or []
+    return {"conversations": [serialize_intercom_conversation(row) for row in rows]}
+
+
+@app.post("/api/sonar/nest/intercom/conversations", tags=["Sonar Nest"])
+async def save_intercom_conversation(payload: dict, current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    user_id = intercom_actor_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    transcript = normalize_intercom_transcript(payload.get("transcript"))
+    receptionist = payload.get("receptionist") if isinstance(payload.get("receptionist"), dict) else {}
+    first_user_line = next((item.get("text") for item in transcript if item.get("role") == "user" and item.get("text")), None)
+    intercom_id = uuid_or_none(payload.get("intercom_id") or payload.get("id"))
+    existing = (first_query_row(intercom_store().table("intercom").select("*").eq("id", intercom_id).eq("business_id", business["id"]).eq("user_id", user_id)) if intercom_id else None)
+    elevenlabs_conversation_id = payload.get("elevenlabs_conversation_id")
+    title = str(payload.get("title") or first_user_line or "Conversation").strip()[:120]
+    existing_metadata = existing.get("metadata") if isinstance((existing or {}).get("metadata"), dict) else {}
+    payload_metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    values = {
+        "hired_receptionist_id": int_or_none(receptionist.get("id") or payload.get("receptionist_id")),
+        "elevenlabs_agent_id": payload.get("agent_id") or elevenlabs_agent_id_intercom,
+        "elevenlabs_conversation_id": elevenlabs_conversation_id,
+        "receptionist_name": receptionist.get("name") or payload.get("receptionist_name"),
+        "receptionist_avatar": receptionist.get("avatar"),
+        "receptionist_banner_url": receptionist.get("banner_url"),
+        "title": title,
+        "summary": payload.get("summary") or (existing or {}).get("summary"),
+        "transcript": transcript,
+        "usage": payload.get("usage") if isinstance(payload.get("usage"), dict) else {},
+        "tool_calls": payload.get("tool_calls") if isinstance(payload.get("tool_calls"), list) else (existing or {}).get("tool_calls") or [],
+        "write_actions": payload.get("write_actions") if isinstance(payload.get("write_actions"), list) else (existing or {}).get("write_actions") or [],
+        "metadata": {**existing_metadata, **payload_metadata},
+        "started_at": payload.get("started_at") or (existing or {}).get("started_at") or datetime.now(timezone.utc).isoformat(),
+        "ended_at": payload.get("ended_at") or datetime.now(timezone.utc).isoformat(),
+        "status": "complete",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    values["search_text"] = intercom_search_text(
+        title=values.get("title"),
+        summary=values.get("summary"),
+        receptionist_name=values.get("receptionist_name"),
+        transcript=transcript,
+    )
+    if existing:
+        row = (intercom_store().table("intercom").update(values).eq("id", existing["id"]).eq("business_id", business["id"]).eq("user_id", user_id).execute().data or [{**existing, **values}])[0]
+    else:
+        row = (intercom_store().table("intercom").insert({"business_id": business["id"], "user_id": user_id, **values}).execute().data or [{}])[0]
+    return {"conversation": serialize_intercom_conversation(row, include_transcript=True)}
+
+
+@app.get("/api/sonar/nest/intercom/conversations/{conversation_id}", tags=["Sonar Nest"])
+async def get_intercom_conversation(conversation_id: str, current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    user_id = intercom_actor_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    row = first_query_row(
+        intercom_store().table("intercom")
+        .select("*")
+        .eq("id", conversation_id)
+        .eq("business_id", business["id"])
+        .eq("user_id", user_id)
+        .is_("deleted_at", "null")
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    return {"conversation": serialize_intercom_conversation(row, include_transcript=True)}
+
+
+@app.delete("/api/sonar/nest/intercom/conversations/{conversation_id}", tags=["Sonar Nest"])
+async def delete_intercom_conversation(conversation_id: str, current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    user_id = intercom_actor_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+    intercom_store().table("intercom").delete().eq("id", conversation_id).eq("business_id", business["id"]).eq("user_id", user_id).execute()
+    return {"ok": True}
 
 
 @app.get("/api/public/project-intelligence", tags=["Public Project Intelligence"])

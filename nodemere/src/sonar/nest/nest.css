@@ -37,6 +37,17 @@
 .nest-idle-intro.is-collapsed .nest-intro-word { transform: scaleX(1.02); font-weight: 590; }
 .nest-idle-intro.is-collapsed .nest-intro-anchor { font-size: 18px; font-weight: 620; transform: scaleX(1.04); }
 .nest-idle-word { font-size: 18px; font-weight: 570; letter-spacing: -.045em; color: rgba(255,255,255,.58); text-transform: uppercase; user-select: none; }
+.nest-idle-word,
+.nest-idle-intro { border: 0; background: transparent; font-family: inherit; cursor: pointer; }
+.nest-idle-word,
+.nest-idle-intro { pointer-events: auto; }
+.nest-intercom-trigger { gap: 0; }
+.nest-intercom-trigger > span { display: inline-block; transition: transform 180ms cubic-bezier(.16,1,.3,1), color 180ms ease; }
+.nest-intercom-trigger:hover > span:nth-child(1) { transform: translateX(-2px); }
+.nest-intercom-trigger:hover > span:nth-child(2) { transform: translateX(-.7px); }
+.nest-intercom-trigger:hover > span:nth-child(3) { transform: translateX(.7px); }
+.nest-intercom-trigger:hover > span:nth-child(4) { transform: translateX(2px); }
+.nest-intercom-trigger:hover { color: rgba(255,255,255,.82); }
 
 .nest-content {
   --nest-footprint: 34%;
@@ -220,6 +231,91 @@
 .nest-dock-tools button:hover { color: rgba(255,255,255,.72); background: rgba(255,255,255,.05); }
 .nest-queue-count { display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.5); font-size: 8px; font-weight: 700; }
 
+/* Intercom occupies the existing NEST strip; it never creates a second dock. */
+.intercom-surface { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; overflow: hidden; isolation: isolate; color: white; }
+.intercom-banner { position: absolute; inset: -18px; z-index: -3; background-position: center 38%; background-size: cover; opacity: .24; filter: saturate(.74) contrast(1.04); transform: scale(1.03); transition: opacity 420ms ease, filter 420ms ease, transform 600ms cubic-bezier(.16,1,.3,1); }
+.intercom-surface.has-transcript .intercom-banner { opacity: .055; filter: saturate(.35) contrast(.9); transform: scale(1.07); }
+.intercom-scrim { position: absolute; inset: 0; z-index: -2; background: linear-gradient(90deg, rgba(2,2,2,.9), rgba(2,2,2,.56) 48%, rgba(2,2,2,.9)); }
+.intercom-surface.has-transcript .intercom-scrim { background: rgba(2,2,2,.86); }
+.intercom-main { position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 11px; width: min(560px, calc(100% - 150px)); min-width: 0; height: 100%; transition: justify-content 360ms cubic-bezier(.16,1,.3,1); }
+.intercom-surface.has-transcript .intercom-main { justify-content: flex-start; }
+.intercom-avatar { position: relative; display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; background: #0b0b0d; box-shadow: 0 6px 24px rgba(0,0,0,.42); transition: transform 360ms cubic-bezier(.16,1,.3,1); }
+.intercom-avatar img, .intercom-avatar-fallback { width: 31px; height: 31px; border-radius: 50%; object-fit: cover; }
+.intercom-avatar-fallback { display: grid; place-items: center; color: rgba(255,255,255,.72); background: rgba(255,255,255,.065); font-size: 11px; font-weight: 700; }
+.intercom-avatar-ring { position: absolute; inset: -2px; border-radius: 50%; background: conic-gradient(from 10deg, rgba(255,255,255,.05) 0 58%, rgba(247,99,196,.92) 70%, rgba(181,116,255,.95) 79%, rgba(111,211,255,.9) 88%, rgba(255,255,255,.05) 100%); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0); mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0); opacity: .54; }
+.phase-connecting .intercom-avatar-ring,
+.phase-speaking .intercom-avatar-ring { opacity: 1; animation: intercom-ring-orbit 1.15s linear infinite; filter: drop-shadow(0 0 5px rgba(224,96,224,.52)); }
+.phase-listening .intercom-avatar-ring { animation: intercom-ring-breathe 1.9s ease-in-out infinite; }
+.intercom-picker { display: flex; align-items: center; min-width: 0; gap: 6px; }
+.intercom-picker label { position: relative; display: flex; align-items: center; min-width: 0; }
+.intercom-picker select { width: min(210px, 32vw); height: 30px; padding: 0 28px 0 10px; border: 1px solid rgba(255,255,255,.09); border-radius: 8px; appearance: none; color: rgba(255,255,255,.8); background: rgba(4,4,5,.64); font: 560 10px/1 inherit; outline: none; }
+.intercom-picker select:focus { border-color: rgba(226,127,224,.38); box-shadow: 0 0 0 3px rgba(208,82,202,.07); }
+.intercom-picker label > svg { position: absolute; right: 9px; color: rgba(255,255,255,.34); pointer-events: none; }
+.intercom-picker button,
+.intercom-controls button,
+.intercom-close { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.08); border-radius: 50%; color: rgba(255,255,255,.64); background: rgba(8,8,9,.72); transition: color 160ms ease, background 160ms ease, border-color 160ms ease, transform 160ms ease; }
+.intercom-picker button:hover:not(:disabled),
+.intercom-controls button:hover,
+.intercom-close:hover { color: white; border-color: rgba(255,255,255,.17); background: rgba(255,255,255,.09); transform: scale(1.04); }
+.intercom-picker button:disabled { opacity: .28; cursor: not-allowed; }
+.intercom-start { color: rgba(250,182,232,.9) !important; }
+.intercom-transcript { min-width: 0; flex: 1; overflow: hidden; perspective: 500px; }
+.intercom-transcript p { margin: 0; overflow: hidden; color: rgba(255,255,255,.91); font-size: 12px; line-height: 1.25; font-weight: 500; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; transform-origin: 50% 100%; }
+.intercom-transcript p.is-user { color: rgba(255,255,255,.48); font-weight: 450; }
+.intercom-transcript > span { color: rgba(255,255,255,.32); font-size: 10px; }
+.intercom-controls { position: absolute; right: 8px; top: 50%; z-index: 5; display: flex; gap: 4px; transform: translateY(-50%); }
+.intercom-controls button { width: 27px; height: 27px; }
+.intercom-controls button.is-end { color: rgba(255,137,155,.76); }
+.intercom-close { position: absolute; right: 8px; top: 50%; z-index: 5; width: 27px; height: 27px; transform: translateY(-50%); }
+.intercom-close:hover { transform: translateY(-50%) scale(1.04); }
+.intercom-queue { position: absolute; left: 9px; top: 50%; z-index: 5; display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; color: rgba(255,255,255,.5); background: rgba(255,255,255,.08); font-size: 8px; font-weight: 700; transform: translateY(-50%); }
+.intercom-error, .intercom-idle-warning { position: absolute; left: 50%; bottom: 2px; z-index: 6; max-width: calc(100% - 180px); overflow: hidden; color: rgba(255,170,186,.72); font-size: 8px; line-height: 1; text-overflow: ellipsis; white-space: nowrap; transform: translateX(-50%); }
+.intercom-idle-warning { color: rgba(255,255,255,.4); }
+
+.intercom-privacy-overlay { align-items: center; padding-top: 24px; }
+.intercom-privacy-panel { position: relative; width: min(390px, calc(100vw - 32px)); overflow: hidden; padding: 28px; border: 1px solid rgba(255,255,255,.09); border-radius: 20px; background: rgba(8,8,9,.98); box-shadow: 0 30px 90px rgba(0,0,0,.64), inset 0 1px rgba(255,255,255,.04); text-align: center; }
+.intercom-spectrum { position: absolute; left: -20%; right: -20%; top: 0; height: 1px; background: linear-gradient(90deg, transparent 5%, #f05fb9, #b776ef, #70c9f3, #f05fb9, transparent 95%); background-size: 50% 100%; animation: intercom-spectrum-shift 4.2s linear infinite; opacity: .86; }
+.intercom-privacy-mark { display: grid; place-items: center; width: 38px; height: 38px; margin: 0 auto 16px; border: 1px solid rgba(255,255,255,.08); border-radius: 50%; color: rgba(255,255,255,.72); background: rgba(255,255,255,.035); }
+.intercom-privacy-panel h2 { margin: 0; color: rgba(255,255,255,.94); font-size: 18px; font-weight: 610; letter-spacing: 0; }
+.intercom-privacy-panel p { margin: 10px auto 22px; max-width: 300px; color: rgba(255,255,255,.4); font-size: 11px; line-height: 1.65; }
+.intercom-privacy-actions { display: flex; justify-content: center; gap: 7px; }
+.intercom-privacy-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: rgba(255,255,255,.52); background: transparent; font-size: 10px; font-weight: 650; }
+.intercom-privacy-actions button.is-primary { color: rgba(255,255,255,.9); border-color: rgba(221,126,221,.23); background: rgba(190,76,185,.13); }
+
+.intercom-history-panel { display: grid; grid-template-rows: auto auto minmax(0,1fr); }
+.intercom-history-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.intercom-history-title > button { display: grid; place-items: center; width: 29px; height: 29px; flex: 0 0 auto; border: 0; border-radius: 8px; color: rgba(255,255,255,.44); background: rgba(255,255,255,.035); }
+.nest-panel-actions button.is-confirming { color: #fda4af; background: rgba(244,63,94,.1); }
+.intercom-history-search { display: flex; align-items: center; gap: 9px; margin: 10px 12px 4px; padding: 0 11px; height: 35px; border: 1px solid rgba(255,255,255,.065); border-radius: 8px; color: rgba(255,255,255,.26); background: rgba(255,255,255,.018); }
+.intercom-history-search:focus-within { border-color: rgba(255,255,255,.13); color: rgba(255,255,255,.48); }
+.intercom-history-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: rgba(255,255,255,.78); background: transparent; font: 450 11px/1 inherit; }
+.intercom-history-search input::placeholder { color: rgba(255,255,255,.23); }
+.intercom-history-body { min-height: 0; max-height: 550px; overflow: auto; padding: 8px; }
+.intercom-history-list { display: grid; gap: 2px; }
+.intercom-history-list > button { display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: center; gap: 11px; min-height: 59px; padding: 8px 10px; border: 0; border-radius: 8px; color: inherit; background: transparent; text-align: left; }
+.intercom-history-list > button:hover { background: rgba(255,255,255,.03); }
+.intercom-history-list img, .intercom-history-fallback { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.intercom-history-fallback { display: grid; place-items: center; color: rgba(255,255,255,.42); background: rgba(255,255,255,.05); }
+.intercom-history-copy { min-width: 0; display: grid; gap: 4px; }
+.intercom-history-copy strong, .intercom-history-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.intercom-history-copy strong { color: rgba(255,255,255,.76); font-size: 11px; font-weight: 590; }
+.intercom-history-copy > span { color: rgba(255,255,255,.31); font-size: 9px; }
+.intercom-history-list time, .intercom-history-meta time { color: rgba(255,255,255,.22); font-size: 8px; white-space: nowrap; }
+.intercom-history-detail { padding: 8px 12px 18px; }
+.intercom-history-meta { display: flex; align-items: center; gap: 10px; padding: 6px 2px 14px; }
+.intercom-history-meta img, .intercom-history-meta > span { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+.intercom-history-meta > span { display: grid; place-items: center; color: rgba(255,255,255,.4); background: rgba(255,255,255,.05); }
+.intercom-history-meta > div { display: grid; gap: 3px; }
+.intercom-history-meta strong { color: rgba(255,255,255,.72); font-size: 11px; font-weight: 580; }
+.intercom-history-summary { margin: 0 0 18px; padding: 12px 13px; border-left: 1px solid rgba(220,116,215,.34); color: rgba(255,255,255,.45); background: rgba(255,255,255,.016); font-size: 10px; line-height: 1.65; }
+.intercom-history-transcript { display: grid; gap: 8px; }
+.intercom-history-transcript p { width: fit-content; max-width: 82%; margin: 0; padding: 8px 10px; border-radius: 8px; color: rgba(255,255,255,.72); background: rgba(255,255,255,.045); font-size: 10px; line-height: 1.55; }
+.intercom-history-transcript p.is-user { justify-self: end; color: rgba(255,255,255,.48); background: rgba(255,255,255,.022); }
+
+@keyframes intercom-ring-orbit { to { transform: rotate(360deg); } }
+@keyframes intercom-ring-breathe { 0%,100% { opacity: .42; transform: scale(.98); } 50% { opacity: .9; transform: scale(1.05); } }
+@keyframes intercom-spectrum-shift { to { background-position: 100% 0; } }
+
 .nest-overlay, .nest-studio-overlay { position: fixed; inset: 0; z-index: 1800; display: flex; align-items: flex-start; justify-content: center; padding: 72px 24px 24px; background: rgba(0,0,0,.68); backdrop-filter: blur(12px); }
 .nest-history-panel { width: min(520px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 96px)); overflow: hidden; border: 1px solid rgba(255,255,255,.09); border-radius: 22px; background: rgba(8,8,9,.97); box-shadow: 0 30px 90px rgba(0,0,0,.62), inset 0 1px rgba(255,255,255,.03); }
 .nest-panel-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 22px 18px; border-bottom: 1px solid rgba(255,255,255,.06); }
@@ -311,6 +407,7 @@
 }
 @media (max-width: 767px) {
   .nest-dock, .nest-dock.is-expanded { left: 70px; right: 60px; }
+  .nest-dock.is-intercom { left: 8px; right: 8px; }
   .nest-idle-intro { font-size: 11px; }
   .nest-content { --nest-footprint: calc(100% - 18px) !important; max-width: calc(100% - 18px); gap: 7px; }
   .nest-content-icon { width: 18px; height: 18px; }
@@ -318,6 +415,17 @@
   .nest-content-eyebrow, .nest-content-secondary, .nest-content-metric, .nest-live-indicator { display: none; }
   .nest-content-primary { max-width: 150px; font-size: 11px !important; }
   .nest-dock-tools { right: 38px; }
+  .intercom-main { width: calc(100% - 78px); gap: 7px; }
+  .intercom-avatar { flex-basis: 32px; width: 32px; height: 32px; }
+  .intercom-avatar img, .intercom-avatar-fallback { width: 27px; height: 27px; }
+  .intercom-picker select { width: min(128px, 34vw); padding-left: 8px; }
+  .intercom-transcript p { font-size: 10px; }
+  .intercom-controls { right: 3px; gap: 1px; }
+  .intercom-controls button, .intercom-close { width: 25px; height: 25px; }
+  .intercom-close { right: 3px; }
+  .intercom-error, .intercom-idle-warning { max-width: calc(100% - 110px); }
+  .intercom-history-list > button { grid-template-columns: 32px minmax(0,1fr); }
+  .intercom-history-list time { display: none; }
   .nest-studio { height: calc(100vh - 76px); }
   .nest-studio-overlay { padding: 64px 12px 12px; }
   .nest-category-list { padding: 12px; }
@@ -326,6 +434,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .nest-stage *, .nest-stage *::before, .nest-stage *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .intercom-surface *, .intercom-surface *::before, .intercom-surface *::after,
+  .intercom-spectrum { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 @keyframes nest-live-pulse { 0%,100%{opacity:.38;transform:scale(.82)} 50%{opacity:1;transform:scale(1.08)} }
 @keyframes nest-call-breathe { 0%,100%{transform:translateY(0) rotate(0)} 50%{transform:translateY(-.5px) rotate(-1.4deg)} }

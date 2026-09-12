@@ -1948,6 +1948,8 @@ class ScenarioActionExecutor:
                 scenario_context.update({
                     'call_log_id': context['_drop_in']['call_log_id'],
                     'drop_in_id': context['_drop_in']['id'],
+                    'drop_in_name': context['_drop_in'].get('name') or '',
+                    'drop_in_purpose': context['_drop_in'].get('purpose') or '',
                     'appointment_id': str(appointment.get('id') or ''),
                     'person_id': str(customer_record.get('id') or ''),
                     'appointment_context': json.dumps({

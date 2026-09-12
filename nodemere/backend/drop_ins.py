@@ -17,7 +17,6 @@ class DropInDraft(BaseModel):
     prompt: str = Field(min_length=1, max_length=6000)
     available_on_status: str
     is_active: bool = True
-    parent_id: UUID | None = None
 
 
 class DropInOrder(BaseModel):
@@ -89,8 +88,6 @@ def clean_draft(draft):
         raise HTTPException(422, 'Give your drop-in a name, purpose and instructions.')
     if values['available_on_status'] not in STATUSES:
         raise HTTPException(422, 'Choose an existing appointment status.')
-    if values.get('parent_id'):
-        values['parent_id'] = str(values['parent_id'])
     return values
 
 
@@ -123,18 +120,6 @@ def build_router(db, get_user, load_business, executor):
             raise HTTPException(404, 'This record is no longer available.')
         return found[0]
 
-    def validate_parent(drop_in_id, status, parent_id):
-        seen = {str(drop_in_id)} if drop_in_id else set()
-        current = str(parent_id) if parent_id else None
-        while current:
-            if current in seen:
-                raise HTTPException(422, 'A drop-in cannot contain itself.')
-            seen.add(current)
-            parent = get('drop_ins', current, active=True)
-            if parent['available_on_status'] != status:
-                raise HTTPException(422, 'Parent and child drop-ins must use the same appointment status.')
-            current = str(parent.get('parent_id')) if parent.get('parent_id') else None
-
     @router.get('/api/sonar/drop-ins')
     def list_drop_ins(user=Depends(get_user)):
         auth = tenant()
@@ -163,7 +148,6 @@ def build_router(db, get_user, load_business, executor):
     def create(draft: DropInDraft, user=Depends(get_user)):
         auth = tenant('operations.manage')
         values = clean_draft(draft)
-        validate_parent(None, values['available_on_status'], values.get('parent_id'))
         last = rows(db.table('drop_ins').select('sort_order').eq('available_on_status', values['available_on_status'])
                     .is_('deleted_at', 'null').order('sort_order', desc=True).limit(1))
         values.update(business_id=auth.business_id, sort_order=(last[0]['sort_order'] + 1 if last else 0))
@@ -215,7 +199,6 @@ def build_router(db, get_user, load_business, executor):
         values = clean_draft(draft)
         if values['available_on_status'] != previous['available_on_status']:
             raise HTTPException(422, 'Create a separate drop-in for another status.')
-        validate_parent(drop_in_id, values['available_on_status'], values.get('parent_id'))
         result = rows(db.table('drop_ins').update(values).eq('id', str(drop_in_id)).is_('deleted_at', 'null'))
         if not result:
             raise HTTPException(409, 'This drop-in changed. Reload before saving.')
@@ -223,26 +206,14 @@ def build_router(db, get_user, load_business, executor):
 
     @router.put('/api/sonar/drop-ins/{drop_in_id}/move')
     def move(drop_in_id: UUID, move: DropInMove, user=Depends(get_user)):
-        auth = tenant('operations.manage')
-        item = get('drop_ins', drop_in_id, active=True)
-        validate_parent(drop_in_id, item['available_on_status'], move.parent_id)
-        if move.before_id:
-            before = get('drop_ins', move.before_id, active=True)
-            if before['available_on_status'] != item['available_on_status'] or str(before.get('parent_id') or '') != str(move.parent_id or ''):
-                raise HTTPException(422, 'Choose a position within the selected parent.')
-        db.raw.rpc('move_drop_in', {
-            'target_business': auth.business_id,
-            'target_drop_in': str(drop_in_id),
-            'target_parent': str(move.parent_id) if move.parent_id else None,
-            'target_before': str(move.before_id) if move.before_id else None,
-        }).execute()
-        return {'ok': True}
+        tenant('operations.manage')
+        get('drop_ins', drop_in_id, active=True)
+        raise HTTPException(410, 'Nested drop-ins are no longer supported.')
 
     @router.delete('/api/sonar/drop-ins/{drop_in_id}')
     def delete(drop_in_id: UUID, user=Depends(get_user)):
         tenant('operations.manage')
-        item = get('drop_ins', drop_in_id, active=True)
-        rows(db.table('drop_ins').update({'parent_id': item.get('parent_id')}).eq('parent_id', str(drop_in_id)).is_('deleted_at', 'null'))
+        get('drop_ins', drop_in_id, active=True)
         rows(db.table('drop_ins').update({'deleted_at': datetime.now(timezone.utc).isoformat(), 'is_active': False})
              .eq('id', str(drop_in_id)))
         return {'ok': True}

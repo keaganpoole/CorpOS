@@ -244,7 +244,7 @@ const ReelPart = ({ event, content, Icon, compact, part }) => (
   </div>
 );
 
-export default function NestStage({ event, concept, privacyMode = false, compact = false, className = '', introStarted = false, onIntroStart }) {
+export default function NestStage({ event, concept, privacyMode = false, compact = false, className = '', introStarted = false, onIntroStart, onIdleClick, intercomOpening = false }) {
   const reducedMotion = useReducedMotion();
   const [now, setNow] = useState(Date.now());
   const [rolled, setRolled] = useState(false);
@@ -335,11 +335,14 @@ export default function NestStage({ event, concept, privacyMode = false, compact
       <AnimatePresence mode="wait" initial={false}>
         {!event ? (
           showIntro ? (
-            <motion.div
+            <motion.button
+              type="button"
               key="nest-typographic-intro"
               className={`nest-idle-intro${introTight ? ' is-collapsed' : ''}`}
+              onClick={onIdleClick}
+              aria-label="Talk to a receptionist"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              animate={{ opacity: intercomOpening ? 0 : 1, scale: intercomOpening ? 0.97 : 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: reducedMotion ? 0.01 : .48 }}
             >
@@ -355,18 +358,33 @@ export default function NestStage({ event, concept, privacyMode = false, compact
               </motion.span>
               <IntroWord word={INTRO_WORDS[2]} active={introCollapsed} reducedMotion={reducedMotion} />
               <IntroWord word={INTRO_WORDS[3]} active={introCollapsed} reducedMotion={reducedMotion} />
-            </motion.div>
+            </motion.button>
           ) : (
-            <motion.div
+            <motion.button
+              type="button"
               key="nest-idle"
-              className="nest-idle-word"
+              className={`nest-idle-word nest-intercom-trigger${intercomOpening ? ' is-opening' : ''}`}
+              onClick={onIdleClick}
+              aria-label="Talk to a receptionist"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              animate={{ opacity: intercomOpening ? 0 : 1 }}
               exit={{ opacity: 0, transition: { duration: reducedMotion ? 0.01 : 0.38 } }}
               transition={{ duration: reducedMotion ? 0.01 : .48 }}
             >
-              NEST
-            </motion.div>
+              {[...'NEST'].map((character, index) => (
+                <motion.span
+                  key={character}
+                  animate={intercomOpening ? {
+                    x: (index - 1.5) * 14,
+                    opacity: 0,
+                    filter: 'blur(3px)',
+                  } : { x: 0, opacity: 1, filter: 'blur(0px)' }}
+                  transition={{ duration: reducedMotion ? 0.01 : 0.2, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {character}
+                </motion.span>
+              ))}
+            </motion.button>
           )
         ) : (
           <motion.div key={`nest-reel:${event.id}`} className="nest-reel-viewport" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0.01 : 0.48 }}>

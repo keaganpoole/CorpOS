@@ -83,6 +83,10 @@ elevenlabs_webhook_secret = os.environ.get("ELEVENLABS_WEBHOOK_SECRET")
 elevenlabs_api_key = os.environ.get("ELEVENLABS_API_KEY")
 elevenlabs_agent_id_inbound = os.environ.get("ELEVENLABS_AGENT_ID_INBOUND")
 elevenlabs_agent_id_outbound = os.environ.get("ELEVENLABS_AGENT_ID_OUTBOUND")
+elevenlabs_agent_id_intercom = (
+    os.environ.get("ELEVENLABS_AGENT_ID_INTERCOM")
+    or os.environ.get("ELEVENLABS_AGENT_ID_NEST")
+)
 internal_tool_secret = os.environ.get("NODEMERE_INTERNAL_TOOL_SECRET")
 
 # --- Google / Gmail Integration Configuration ---

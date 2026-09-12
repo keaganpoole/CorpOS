@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Drop-Ins Studio Rail · design comparison</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #030709; color: #d9e9ef; font: 12px Inter, system-ui, sans-serif; }
+      main { display: grid; grid-template-columns: 1fr 1fr; width: 100%; height: 100%; gap: 1px; background: #2b3d46; }
+      section { min-width: 0; display: grid; grid-template-rows: 30px 1fr; background: #050b0e; }
+      header { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid #263842; color: #93a8b3; }
+      header strong { color: #e3f3f8; font-weight: 600; }
+      img, iframe { display: block; border: 0; background: #050b0e; }
+      img { width: 100%; height: 100%; object-fit: contain; object-position: center; }
+      iframe { width: 200%; height: 200%; transform: scale(.5); transform-origin: 0 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <header><strong>Selected visual</strong><span>1488 × 1058</span></header>
+        <img src="./pinned-studio-rail-reference.png" alt="Selected pinned Studio Rail mockup" />
+      </section>
+      <section>
+        <header><strong>Rendered implementation</strong><span>isolated frontend fixture</span></header>
+        <iframe title="Rendered Drop-Ins builder" src="../drop-ins-page/index.html?seed&width=1488&height=1058"></iframe>
+      </section>
+    </main>
+  </body>
+</html>

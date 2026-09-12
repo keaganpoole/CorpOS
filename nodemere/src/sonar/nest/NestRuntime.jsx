@@ -270,6 +270,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   const [introStarted, setIntroStarted] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(() => localStorage.getItem('nodemere:nest:privacy') === 'true');
   const [selectedConcepts, setSelectedConcepts] = useState(() => ({
     ...DEFAULT_NEST_CONCEPTS,
@@ -398,6 +399,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   }, []);
 
   useEffect(() => {
+    if (voiceActive) return undefined;
     if (!activeEvent) {
       if (queue.length) {
         const [next, ...rest] = queue;
@@ -411,7 +413,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
-  }, [activeEvent, queue]);
+  }, [activeEvent, queue, voiceActive]);
 
   useEffect(() => {
     persistHistory([]);
@@ -591,7 +593,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     setIntroStarted(true);
   }, []);
 
-  const displayEvent = previewEvent || activeEvent || liveCall;
+  const displayEvent = voiceActive ? null : (previewEvent || activeEvent || liveCall);
   const selectedPreference = displayEvent ? selectedConcepts[displayEvent.category] : null;
   const hasSavedPreference = selectedPreference !== null && typeof selectedPreference === 'object';
   const selectedConceptId = hasSavedPreference ? selectedPreference.conceptId : selectedPreference;
@@ -612,13 +614,15 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     setHistoryOpen,
     studioOpen,
     setStudioOpen,
+    voiceActive,
+    setVoiceActive,
     privacyMode,
     togglePrivacy,
     selectedConcepts,
     selectConcept,
     previewConcept,
     previewNotification,
-  }), [activeEvent, displayEvent, displayConcept, history, historyOpen, introStarted, liveCall, markIntroStarted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy]);
+  }), [activeEvent, displayEvent, displayConcept, history, historyOpen, introStarted, liveCall, markIntroStarted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy, voiceActive]);
 
   return <NestContext.Provider value={value}>{children}</NestContext.Provider>;
 };

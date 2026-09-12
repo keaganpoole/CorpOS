@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowDown, ArrowUp, Plus, X, Search, Sparkles, Phone, PhoneCall, CalendarDays, Bell, Heart, MessageCircle, Repeat2, Receipt, Check, Pencil, Trash2, Loader2, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Plus, X, Search, Sparkles, Phone, PhoneCall, CalendarDays, Bell, Heart, MessageCircle, Repeat2, Receipt, Check, Pencil, Trash2, Loader2, Lightbulb } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { api } from '../lib/api';
 import { STATUS_OPTIONS } from '../lib/appointmentSchema';
@@ -16,7 +16,8 @@ const statusCopy = {
   pending: 'Before the appointment is confirmed.', confirmed: 'Help customers get ready for their visit.',
   completed: 'Keep the conversation going after a visit.', missed: 'A thoughtful way to reconnect.', cancelled: 'Leave the door open for another visit.',
 };
-const blank = status => ({ name: '', purpose: '', prompt: '', is_active: true, available_on_status: status });
+const STATUS_COLORS = { pending: '#fbbf24', confirmed: '#34d399', completed: '#22c55e', missed: '#fb7185', cancelled: '#f43f5e' };
+const blank = (status) => ({ name: '', purpose: '', prompt: '', is_active: true, available_on_status: status });
 const manual = (a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id);
 
 export default function DropInsModal({ model, onClose }) {
@@ -39,6 +40,8 @@ export default function DropInsModal({ model, onClose }) {
   const [pendingNavigation, setPendingNavigation] = useState(null);
   const [tipsOpen, setTipsOpen] = useState(false);
   const modal = useRef(null);
+  const statusTabs = useRef(null);
+  const [statusIndicator, setStatusIndicator] = useState({ left: 0, width: 0 });
   const reduced = useReducedMotion();
   const dirty = draft && JSON.stringify(draft) !== JSON.stringify(baseline);
   const statusItems = model.items.filter(x => x.available_on_status === status).sort(manual);
@@ -50,7 +53,8 @@ export default function DropInsModal({ model, onClose }) {
     }
     return saved.sort(manual);
   }, [model.items, status, draft, view]);
-  const sortedItems = [...statusItems].sort(sort === 'alpha' ? (a, b) => a.name.localeCompare(b.name) : sort === 'newest' ? (a, b) => b.created_at.localeCompare(a.created_at) : sort === 'used' ? (a, b) => (b.usage_count || 0) - (a.usage_count || 0) || manual(a, b) : manual);
+  const itemSort = sort === 'alpha' ? (a, b) => a.name.localeCompare(b.name) : sort === 'newest' ? (a, b) => b.created_at.localeCompare(a.created_at) : sort === 'used' ? (a, b) => (b.usage_count || 0) - (a.usage_count || 0) || manual(a, b) : manual;
+  const sortedItems = [...statusItems].sort(itemSort);
   const applicableTemplates = templates.filter(t => t.statuses.includes(status));
   const categories = ['All', ...new Set(applicableTemplates.map(t => t.category))];
   const visibleTemplates = applicableTemplates.filter(t => (category === 'All' || t.category === category) && `${t.name} ${t.description} ${t.category}`.toLowerCase().includes(search.toLowerCase()));
@@ -61,7 +65,7 @@ export default function DropInsModal({ model, onClose }) {
     else action();
   };
   const leaveEditor = next => { setDraft(null); setBaseline(null); setPreviewCallLayer(false); setView(next); setError(''); };
-  const chooseTemplate = t => {
+  const chooseTemplate = (t) => {
     const next = { ...blank(status), name: t?.name || '', purpose: t?.purpose || t?.name || '', prompt: t?.prompt || '' };
     setDraft(next); setBaseline(next); setPreviewCallLayer(false); setView('editor'); setError('');
   };
@@ -104,13 +108,20 @@ export default function DropInsModal({ model, onClose }) {
     finally { setBusy(false); }
   };
   const save = () => perform(async () => { await model.save(draft); leaveEditor('manage'); }, draft.id ? 'Drop-in updated' : 'Drop-in added to your calendar');
-  const move = (id, direction) => {
-    const ids = statusItems.map(x => x.id); const at = ids.indexOf(id); const to = at + direction;
-    if (to < 0 || to >= ids.length) return;
-    [ids[at], ids[to]] = [ids[to], ids[at]];
-    perform(() => model.reorder(status, ids), 'Calendar order updated');
-  };
   const hasConfiguredDropIns = nextStatus => model.items.some(item => item.available_on_status === nextStatus);
+  useLayoutEffect(() => {
+    const updateIndicator = () => {
+      const active = statusTabs.current?.querySelector('[aria-selected="true"]');
+      if (!active) return;
+      const next = { left: active.offsetLeft, width: active.offsetWidth };
+      setStatusIndicator(previous => previous.left === next.left && previous.width === next.width ? previous : next);
+    };
+    updateIndicator();
+    const observer = statusTabs.current ? new ResizeObserver(updateIndicator) : null;
+    if (observer) observer.observe(statusTabs.current);
+    window.addEventListener('resize', updateIndicator);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', updateIndicator); };
+  }, [status]);
   const deleteDropIn = () => {
     if (!previewDeleteTarget) return;
     perform(async () => { await model.remove(previewDeleteTarget.id); setPreviewDeleteTarget(null); }, 'Drop-in removed');
@@ -120,7 +131,7 @@ export default function DropInsModal({ model, onClose }) {
     <motion.section ref={modal} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="drop-ins-title" className="drop-ins-modal" onKeyDown={handleKeys} initial={{ opacity: 0, y: reduced ? 0 : 20, scale: reduced ? 1 : .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .24 }}>
       <header className="drop-ins-header">
         <div className="drop-ins-heading"><span className="drop-ins-heading-icon"><PhoneCall size={22} /></span><div><p className="drop-ins-eyebrow">YOUR CALENDAR, WITH A LITTLE MORE POSSIBILITY</p><div className="drop-ins-title-row"><h2 id="drop-ins-title">Drop-ins<span className="drop-ins-title-dot">.</span></h2><button type="button" className="drop-ins-tips-button" onClick={() => setTipsOpen(true)} aria-label="Drop-ins tips" title="Drop-ins tips"><Lightbulb size={16} /></button></div></div></div>
-        <button type="button" className="drop-ins-icon-button" aria-label="Close drop-ins" onClick={() => navigate(onClose)}><X size={20} /></button>
+        <div className="drop-ins-header-actions"><span className="drop-ins-header-status"><i style={{ background: STATUS_COLORS[status] }} />{status}</span><button type="button" className="drop-ins-icon-button" aria-label="Close drop-ins" onClick={() => navigate(onClose)}><X size={20} /></button></div>
       </header>
       <div className="drop-ins-body">
         <DropInAppointmentPreview items={previewItems} status={status} draft={view === 'editor' ? draft : null} showCallLayer={previewCallLayer} receptionist={model.previewReceptionist}
@@ -128,8 +139,9 @@ export default function DropInsModal({ model, onClose }) {
           onDelete={model.canManage && !busy ? item => setPreviewDeleteTarget(item) : undefined}
           onAdd={() => navigate(() => { leaveEditor('gallery'); setCategory('All'); })} />
         <div className="drop-ins-controls">
-          <div className="drop-ins-statuses" role="tablist" aria-label="Appointment status">
+          <div ref={statusTabs} className="drop-ins-statuses" role="tablist" aria-label="Appointment status">
             {STATUS_OPTIONS.map(option => { const key = option.value.toLowerCase(); return <button type="button" role="tab" aria-selected={status === key} key={key} onClick={() => navigate(() => { setStatus(key); leaveEditor(hasConfiguredDropIns(key) ? 'manage' : 'gallery'); setCategory('All'); setSearch(''); })} className={status === key ? 'is-current' : ''}><span className={`drop-ins-status-dot status-${key}`} />{option.value}<span className="drop-ins-tab-count">{model.items.filter(x => x.available_on_status === key && x.is_active).length}</span></button>; })}
+            <span aria-hidden="true" className="drop-ins-status-indicator" style={{ left: statusIndicator.left, width: statusIndicator.width }} />
           </div>
           <main className="drop-ins-workspace">
           <div aria-live="polite">{success && <div className="drop-ins-success"><Check size={15} />{success}</div>}</div>
@@ -142,10 +154,10 @@ export default function DropInsModal({ model, onClose }) {
                 {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !statusItems.length ? <div className="drop-ins-no-results">No drop-ins for {status} appointments.</div> : <>
                   <div className="drop-ins-list-toolbar"><span>{activeItems.length} active · {statusItems.length} total</span><label>Sort <select aria-label="Sort drop-ins" value={sort} onChange={e => setSort(e.target.value)}><option value="manual">Manual</option><option value="used">Most Used</option><option value="alpha">Alphabetical</option><option value="newest">Newest</option></select></label></div>
                   {sort !== 'manual' && <p className="drop-ins-sort-note">Calendar buttons always follow your manual order.</p>}
+                  <div className="drop-ins-builder-note"><span>Use the controls on each row to edit, enable, or remove calendar drop-ins.</span></div>
                   <div className="drop-ins-list">{sortedItems.map(item => <div key={item.id} className={`drop-ins-list-row ${item.is_active ? '' : 'is-inactive'}`}>
                     <span className="drop-ins-order-number">{statusItems.indexOf(item) + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p><span>{item.is_active ? 'Active' : 'Inactive'}{item.usage_count > 0 ? ` · ${item.usage_count} calls started` : ''}</span></div>
                     {model.canManage && <div className="drop-ins-row-actions">
-                      {sort === 'manual' && <div className="drop-ins-order-controls"><button type="button" aria-label={`Move ${item.name} earlier`} disabled={busy || statusItems[0].id === item.id} onClick={() => move(item.id, -1)}><ArrowUp size={13} /></button><button type="button" aria-label={`Move ${item.name} later`} disabled={busy || statusItems.at(-1).id === item.id} onClick={() => move(item.id, 1)}><ArrowDown size={13} /></button></div>}
                       <button type="button" role="switch" aria-checked={item.is_active} aria-label={`Enable ${item.name}`} className="drop-ins-switch" disabled={busy} onClick={() => perform(() => model.save({ ...item, is_active: !item.is_active }))}><span /></button>
                       <button type="button" className="drop-ins-icon-button" aria-label={`Edit ${item.name}`} disabled={busy} onClick={() => edit(item)}><Pencil size={15} /></button>
                       <button type="button" className="drop-ins-icon-button" aria-label={`Delete ${item.name}`} disabled={busy} onClick={() => setConfirmDelete(item.id)}><Trash2 size={15} /></button>
@@ -156,7 +168,7 @@ export default function DropInsModal({ model, onClose }) {
               </>}
               {view === 'gallery' && <>
                 <div className="drop-ins-gallery-heading">
-                  <div className="drop-ins-gallery-title"><button type="button" className="drop-ins-icon-button" aria-label="Back to your drop-ins" onClick={() => leaveEditor(hasConfiguredDropIns(status) ? 'manage' : 'gallery')}><ArrowLeft size={18} /></button><h3>Templates</h3></div>
+                  <div className="drop-ins-gallery-title">{hasConfiguredDropIns(status) && <button type="button" className="drop-ins-icon-button" aria-label="Back to your drop-ins" onClick={() => leaveEditor('manage')}><ArrowLeft size={18} /></button>}<h3>Templates</h3></div>
                   <div className="drop-ins-gallery-search"><Search size={16} /><input aria-label="Search drop-in templates" placeholder="Search templates…" value={search} onChange={e => setSearch(e.target.value)} /></div>
                   <button type="button" className="drop-ins-primary" onClick={() => chooseTemplate(null)}><Plus size={15} />Create blank</button>
                 </div>

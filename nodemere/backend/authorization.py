@@ -28,7 +28,7 @@ BUSINESS_TABLES = frozenset({
     "people", "appointments", "staff", "services", "call_logs", "hired_receptionists",
     "scenarios", "flow_executions", "people_docs", "people_schema", "appointments_schema",
     "requests", "contracts", "custom_voices", "jobs", "purchased_numbers", "account_settings",
-    "nest", "bugs", "reviews", "billing_overage_events", "scenario_events", "drop_ins",
+    "nest", "intercom", "intercom_usage_daily", "bugs", "reviews", "billing_overage_events", "scenario_events", "drop_ins",
 })
 OWNER_TABLES = frozenset({"payments", "invoices", "integrations", "checkpoints"})
 PERSONAL_TABLES = frozenset({"users", "account_data_requests"})

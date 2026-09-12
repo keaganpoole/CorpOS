@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
-import { prepareVisitorIdentity, trackVisitorEvent } from '../lib/visitorTracking.js';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Lightbulb, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -270,8 +269,6 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
 
         setCheckoutLoading(true);
         try {
-            trackVisitorEvent('checkout_started', { element_id: 'pricing-checkout', element_type: 'button' });
-            await prepareVisitorIdentity();
             const response = await axios.post(
                 apiUrl('/create-checkout-session'),
                 { price_id: priceId, plan_slug: planSlug, billing_cycle: cycle },

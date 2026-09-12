@@ -25,6 +25,7 @@ export function MfaPanel({ onVerified, gate = false }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const submittedCodeRef = React.useRef('');
   async function load() {
     const result = await supabase.auth.mfa.listFactors();
     if (result.error) throw new Error('Could not load authenticators.');
@@ -34,6 +35,30 @@ export function MfaPanel({ onVerified, gate = false }) {
   }
   useEffect(() => { load().catch(e => setError(e.message)); return () => { /* secrets only live in component memory */ }; }, []);
   async function run(action) { setBusy(true); setError(''); try { await action(); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  async function verifyCode() {
+    const factorId = setup?.id || selected;
+    if (!factorId || code.length !== 6 || busy || submittedCodeRef.current === code) return;
+    const submittedCode = code;
+    submittedCodeRef.current = submittedCode;
+    setBusy(true);
+    setError('');
+    try {
+      await verifyTotp(supabase.auth, factorId, submittedCode);
+      setCode('');
+      setSetup(null);
+      await load();
+      await onVerified?.();
+    } catch (verificationError) {
+      submittedCodeRef.current = '';
+      setCode('');
+      setError(verificationError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    if (gate && code.length === 6) void verifyCode();
+  }, [code, gate]);
   return <section className={gate
     ? 'relative w-full overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#09090b]/95 px-6 py-8 text-center text-white shadow-[0_32px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:px-10 sm:py-10'
     : 'space-y-3 rounded-xl border border-white/10 p-5 text-white'}>
@@ -56,11 +81,10 @@ export function MfaPanel({ onVerified, gate = false }) {
     {!setup && factors.length > 1 && <label className={gate ? 'block text-xs text-white/45' : 'block text-sm'}>Authenticator
       <select aria-label="Authenticator" className={gate ? 'ml-3 rounded-lg border border-white/10 bg-black/40 p-2 text-white' : 'ml-3 rounded bg-neutral-900 p-2'} value={selected} onChange={e => setSelected(e.target.value)}>{factors.map(f => <option key={f.id} value={f.id}>{f.friendly_name || 'Authenticator'}</option>)}</select>
     </label>}
-    {(setup || selected) && <form onSubmit={e => { e.preventDefault(); run(async () => {
-      await verifyTotp(supabase.auth, setup?.id || selected, code); setCode(''); setSetup(null); await load(); await onVerified?.();
-    }); }} className={gate ? 'mx-auto flex max-w-sm flex-col gap-3' : 'flex flex-wrap gap-2'}>
-      <input aria-label="Authenticator code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="000000" className={gate ? 'h-14 rounded-xl border border-white/10 bg-white/[0.045] px-4 text-center font-mono text-xl tracking-[0.42em] text-white outline-none transition placeholder:text-white/15 focus:border-white/25 focus:bg-white/[0.065]' : 'rounded bg-neutral-900 p-2'} value={code} onChange={e => setCode(e.target.value.replace(/\D/g,''))} />
-      <button disabled={busy} className={gate ? 'h-12 rounded-xl bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50' : 'rounded border border-white/20 px-4 py-2'}>{busy ? 'Checking…' : gate ? 'Continue' : 'Verify code'}</button>
+    {(setup || selected) && <form onSubmit={e => { e.preventDefault(); void verifyCode(); }} className={gate ? 'mx-auto flex max-w-sm flex-col gap-3' : 'flex flex-wrap gap-2'}>
+      <input aria-label="Authenticator code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="000000" disabled={busy} className={gate ? 'h-14 rounded-xl border border-white/10 bg-white/[0.045] px-4 text-center font-mono text-xl tracking-[0.42em] text-white outline-none transition placeholder:text-white/15 focus:border-white/25 focus:bg-white/[0.065] disabled:cursor-wait disabled:opacity-70' : 'rounded bg-neutral-900 p-2'} value={code} onChange={e => { submittedCodeRef.current = ''; setCode(e.target.value.replace(/\D/g,'')); }} />
+      {!gate && <button disabled={busy} className="rounded border border-white/20 px-4 py-2">{busy ? 'Checking…' : 'Verify code'}</button>}
+      {gate && busy && <p aria-live="polite" className="text-xs font-medium text-white/45">Checking…</p>}
     </form>}
     <button disabled={busy || Boolean(setup)} className={gate ? 'text-xs font-medium text-white/45 transition hover:text-white/75 disabled:opacity-40' : 'rounded border border-white/20 px-4 py-2'} onClick={() => run(async () => setSetup(await enrollTotp(supabase.auth)))}>{factors.length ? 'Use a different authenticator' : 'Set up authenticator'}</button>
     {setup && <button disabled={busy} className="ml-3 text-sm" onClick={() => run(async () => { const { error: e } = await supabase.auth.mfa.unenroll({ factorId: setup.id }); if (e) throw new Error('Could not cancel setup'); setSetup(null); })}>Cancel setup</button>}

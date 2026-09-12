@@ -6,16 +6,11 @@ import { countDescendants, findNode, pad, spring } from './model';
 import './concepts.css';
 import { DropInConceptProvider, useDropInConcept, useCanvasSelection } from './DropInConceptContext';
 import { DropInStatusBar, DropInTools } from './DropInConceptTools';
-import { additionalConcepts, AdditionalPreview } from './AdditionalConcepts';
+import { spineConcepts, SpinePreview, renderSpineConcept } from './SpineConcepts';
 
 const concepts = [
   { name: 'Unfold', thesis: 'Open a parent action. Build the next choices.', mechanism: 'Lateral disclosure', instruction: 'Open a Drop In to build its next choices.', component: Unfold },
-  { name: 'Within', thesis: 'Enter a Drop In to explore its children.', mechanism: 'Recursive containment', instruction: 'Enter a group. Keep your place in the whole.', component: Within },
-  { name: 'Continuum', thesis: 'One whole. As many choices as you need.', mechanism: 'Proportional division', instruction: 'Select a span. Drag a seam to rebalance it.', component: Continuum },
-  { name: 'Passage', thesis: 'Read, reveal, and edit each action branch.', mechanism: 'Typographic focus', instruction: 'Move through the index. Open a line to go deeper.', component: Passage },
-  { name: 'Strata', thesis: 'Separate appointment, parent, and child actions.', mechanism: 'Spatial separation', instruction: 'Pull the layers apart. Trace a path through depth.', component: Strata },
-  { name: 'Gather', thesis: 'Move next choices between parent Drop Ins.', mechanism: 'Direct reassignment', instruction: 'Select elements, then a destination. Or drag one across.', component: Gather },
-  ...additionalConcepts,
+  ...spineConcepts.map((concept) => ({ ...concept, component: (props) => renderSpineConcept(concept, props) })),
 ];
 
 export function useStructure() { return useDropInConcept(); }
@@ -38,7 +33,7 @@ export function Path({ nodes, onSelect }) {
 }
 
 function Preview({ index }) {
-  if (index > 5) return <AdditionalPreview index={index} />;
+  if (index > 0) return <SpinePreview index={index} />;
   return <svg className="cl-thumbnail" viewBox="0 0 160 63" fill="none" aria-hidden="true">
     {index === 0 && <>{[0, 1, 2, 3, 4].map((n) => <path key={n} d={`M${24 + n * 22} 12 L${42 + n * 22} 7 V51 L${24 + n * 22} 56Z`} fill={n === 1 ? '#3b4646' : '#191d1f'} stroke={n === 1 ? '#8cb9ad' : '#485052'} />)}<path d="M52 23H64M52 31H64M52 39H64" stroke="#bdcec8" /></>}
     {index === 1 && <><circle cx="80" cy="32" r="28" stroke="#64746e" /><circle cx="69" cy="32" r="15" fill="#293530" stroke="#8cb9ad" /><circle cx="99" cy="32" r="11" stroke="#59645f" /><circle cx="66" cy="27" r="4" stroke="#b6d0c4" /><circle cx="73" cy="36" r="5" stroke="#b6d0c4" /></>}
@@ -63,7 +58,7 @@ function ConceptsLab() {
       <div className="cl-brand"><span className="cl-brand-mark"><i /><i /><i /></span><span>Drop Ins<span className="cl-brand-sub">BUILDER CONCEPTS</span></span></div>
       <div className="cl-studies-label">{concepts.length} EXPERIMENTS <span>01—{pad(concepts.length)}</span></div>
       <nav className="cl-study-list" aria-label="Concepts">{concepts.map((concept, index) => <button key={concept.name} className={`cl-study ${selected === index ? 'active' : ''}`} aria-pressed={selected === index} onClick={() => setSelected(index)}><Preview index={index}/><span className="cl-study-name"><span className="cl-mono">{pad(index+1)}</span>{concept.name}{selected === index && <motion.i layoutId="active-dot" />}</span></button>)}</nav>
-      <div className="cl-sidebar-foot">One Drop In draft.<br/><span>Eleven ways to build it.</span></div>
+      <div className="cl-sidebar-foot">One Drop In draft.<br/><span>Fifteen ways to build it.</span></div>
     </aside>
     <main ref={main} className="cl-main">
       <header className="cl-heading"><div><span className="cl-eyebrow">{pad(selected+1)} / {item.mechanism}</span><h1>{item.name}<span>{item.thesis}</span></h1></div><span className="cl-lab-label">DROP-IN BUILDER</span></header>

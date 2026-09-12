@@ -73,6 +73,17 @@ class Database:
     def table(self, name): return Query(self, name)
     def rpc(self, name, params):
         if name == 'drop_in_usage': return SimpleNamespace(execute=lambda: SimpleNamespace(data=[]))
+        if name == 'move_drop_in':
+            def move():
+                item = next(r for r in self.data['drop_ins'] if r['id'] == params['target_drop_in'] and r['business_id'] == params['target_business'])
+                item['parent_id'] = params['target_parent']
+                siblings = sorted((r for r in self.data['drop_ins'] if r['business_id'] == params['target_business'] and r.get('parent_id') == params['target_parent'] and r['id'] != item['id'] and not r.get('deleted_at')), key=lambda r: (r.get('sort_order', 0), r['id']))
+                before = params['target_before']
+                at = next((index for index, row in enumerate(siblings) if row['id'] == before), len(siblings))
+                siblings.insert(at, item)
+                for index, row in enumerate(siblings): row['sort_order'] = index
+                return SimpleNamespace(data=None)
+            return SimpleNamespace(execute=move)
         def reorder():
             rows = [r for r in self.data['drop_ins'] if r['business_id'] == params['target_business'] and r['available_on_status'] == params['target_status'] and not r.get('deleted_at')]
             if sorted(r['id'] for r in rows) != sorted(params['ordered_ids']): raise ValueError('stale order')
@@ -120,6 +131,21 @@ class DropInTests(unittest.TestCase):
             self.assertEqual(self.client.post('/api/sonar/drop-ins', json={'name':'Test','purpose':'Test','prompt':prompt,'available_on_status':status}).status_code, 422)
         self.assertEqual(self.client.post('/api/sonar/drop-ins', json={'name':'Test','purpose':' ','prompt':'Call','available_on_status':'completed'}).status_code, 422)
         self.assertEqual(self.client.post('/api/sonar/drop-ins', json={'name':'Test','purpose':'x' * 31,'prompt':'Call','available_on_status':'completed'}).status_code, 422)
+    def test_parent_id_is_ignored_after_hierarchy_removal(self):
+        parent = self.db.data['drop_ins'][0]
+        child = self.client.post('/api/sonar/drop-ins', json={'name':'Location','purpose':'ask about location','prompt':'Ask about the location.','available_on_status':'completed','parent_id':parent['id']})
+        self.assertEqual(child.status_code, 200, child.text)
+        self.assertNotIn('parent_id', child.json())
+        changed = self.client.put('/api/sonar/drop-ins/' + child.json()['id'], json={**child.json(), 'parent_id':parent['id'], 'name':'Location Updated'})
+        self.assertEqual(changed.status_code, 200, changed.text)
+        self.assertNotIn('parent_id', changed.json())
+    def test_nested_move_is_gone_and_delete_soft_deletes(self):
+        child = self.client.post('/api/sonar/drop-ins', json={'name':'Price','purpose':'ask about price','prompt':'Ask about price.','available_on_status':'completed'}).json()
+        moved = self.client.put('/api/sonar/drop-ins/' + child['id'] + '/move', json={'parent_id':DROP,'before_id':None})
+        self.assertEqual(moved.status_code, 410, moved.text)
+        self.assertEqual(self.client.delete('/api/sonar/drop-ins/' + DROP).status_code, 200)
+        self.assertIsNotNone(next(r for r in self.db.data['drop_ins'] if r['id'] == DROP)['deleted_at'])
+        self.assertIsNone(next(r for r in self.db.data['drop_ins'] if r['id'] == child['id']).get('deleted_at'))
     def test_same_request_is_not_dispatched_twice(self):
         key = str(uuid4())
         first = self.run_call(key); second = self.run_call(key)
@@ -189,7 +215,7 @@ class ProviderDispatchTests(unittest.TestCase):
                         'person': self.db.data['people'][0], 'customer': self.db.data['people'][0],
                         'receptionist': self.db.data['hired_receptionists'][0],
                         'appointment': self.db.data['appointments'][0], '_scenario': {},
-                        '_drop_in': {'id': DROP, 'name': 'Thank You', 'call_log_id': self.log_id}}
+                        '_drop_in': {'id': DROP, 'name': 'Thank You', 'purpose': 'thank them', 'call_log_id': self.log_id}}
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
         self.stack.enter_context(patch.dict(os.environ, {'ELEVENLABS_API_KEY': 'synthetic', 'ELEVENLABS_AGENT_ID_OUTBOUND': 'outbound-test'}))
@@ -206,6 +232,9 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertEqual(payload['conversation_config_override']['tts']['voice_id'], 'assigned-voice')
         self.assertEqual(payload['dynamic_variables']['receptionist_id'], '9')
         self.assertEqual(payload['dynamic_variables']['call_log_id'], self.log_id)
+        self.assertEqual(payload['dynamic_variables']['drop_in_id'], DROP)
+        self.assertEqual(payload['dynamic_variables']['drop_in_name'], 'Thank You')
+        self.assertEqual(payload['dynamic_variables']['drop_in_purpose'], 'thank them')
         self.assertIn(APPT, payload['dynamic_variables']['mission'])
         self.assertIn('secret__nodemere_context', payload['dynamic_variables'])
         self.assertEqual(len(self.db.data['call_logs']), 1)

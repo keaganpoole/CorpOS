@@ -16,10 +16,22 @@ def _context_key(secret):
     return hmac.new(secret.encode(), b"nodemere/internal-tenant-context/v1", hashlib.sha256).hexdigest()
 
 
-def issue_internal_context(secret, business, *, lifetime=5400):
-    return jwt.encode({"aud": "nodemere-internal-context", "iss": "nodemere",
-        "sub": str(business["user_id"]), "business_id": str(business["id"]),
-        "iat": int(time.time()), "exp": int(time.time()) + lifetime}, _context_key(secret), algorithm="HS256")
+def issue_internal_context(secret, business, *, lifetime=5400, claims=None):
+    trusted_claims = {
+        key: value
+        for key, value in (claims or {}).items()
+        if key not in {"aud", "iss", "sub", "business_id", "iat", "exp"}
+    }
+    payload = {
+        "aud": "nodemere-internal-context",
+        "iss": "nodemere",
+        "sub": str(business["user_id"]),
+        "business_id": str(business["id"]),
+        "iat": int(time.time()),
+        "exp": int(time.time()) + lifetime,
+        **trusted_claims,
+    }
+    return jwt.encode(payload, _context_key(secret), algorithm="HS256")
 
 
 def verify_internal_context(secret, token, *, allow_expired=False):
