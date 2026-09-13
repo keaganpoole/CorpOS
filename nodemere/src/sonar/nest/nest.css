@@ -244,35 +244,42 @@
 .intercom-action { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; gap: 14px; min-width: 118px; }
 .intercom-action-label { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; color: rgba(255,255,255,.46); font-size: 12px; font-weight: 450; letter-spacing: -.02em; }
 .intercom-action-label strong { color: rgba(255,255,255,.86); font-size: 13px; font-weight: 560; }
+.intercom-calling { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 0; color: rgba(255,255,255,.72); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.intercom-calling-photo { display: grid; place-items: center; width: 29px; height: 29px; overflow: hidden; flex: 0 0 auto; border: 0; border-radius: 50%; background: rgba(255,255,255,.06); box-shadow: 0 5px 14px rgba(0,0,0,.3); }
+.intercom-calling-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
+.intercom-calling::after { width: 13px; height: 13px; border: 1px solid rgba(255,255,255,.18); border-top-color: rgba(239,139,229,.9); border-radius: 50%; content: ''; animation: intercom-calling-spin .9s linear infinite; }
+.intercom-mic-permission { display: inline-flex; align-items: center; justify-content: center; gap: 12px; color: rgba(255,255,255,.64); font-size: 10px; font-weight: 500; white-space: nowrap; }
+.intercom-mic-permission button { display: inline-flex; align-items: center; gap: 6px; height: 27px; padding: 0 10px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; color: rgba(255,255,255,.86); background: rgba(255,255,255,.07); font-size: 9px; font-weight: 600; }
+.intercom-mic-permission button:hover:not(:disabled), .intercom-mic-permission button:focus-visible { border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.1); outline: none; }
 .intercom-talk-button { display: grid; place-items: center; width: 31px; height: 31px; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.16); border-radius: 50%; color: rgba(255,255,255,.82); background: rgba(255,255,255,.07); box-shadow: inset 0 1px rgba(255,255,255,.08), 0 5px 14px rgba(0,0,0,.26); transition: color 160ms ease, background 160ms ease, border-color 160ms ease, transform 160ms ease; }
 .intercom-talk-button:hover:not(:disabled), .intercom-talk-button:focus-visible { color: white; border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.13); transform: translateY(-1px); outline: none; }
 .intercom-talk-button:disabled { opacity: .35; cursor: not-allowed; }
 .intercom-picker { display: flex; align-items: center; justify-content: center; flex: 0 1 auto; min-width: 0; max-width: 100%; height: 50px; gap: 5px; overflow-x: auto; overflow-y: hidden; padding: 0 8px; scrollbar-width: none; transition: width 420ms cubic-bezier(.16,1,.3,1), flex-basis 420ms cubic-bezier(.16,1,.3,1), gap 420ms cubic-bezier(.16,1,.3,1), padding 420ms cubic-bezier(.16,1,.3,1); }
 .intercom-picker::-webkit-scrollbar { display: none; }
-.intercom-picker.is-selecting { width: min(660px, 100%); height: 50px; gap: 3px; padding: 2px; overflow: hidden; border: 1px solid rgba(255,255,255,.085); border-radius: 12px; background: rgba(5,5,7,.54); box-shadow: inset 0 1px rgba(255,255,255,.035), 0 8px 26px rgba(0,0,0,.2); }
-.intercom-picker.is-selecting.count-1 { width: min(280px, 72%); }
-.intercom-picker.is-selecting.count-2 { width: min(500px, 88%); }
+.intercom-picker.is-selecting { width: min(660px, 100%); height: 50px; gap: 3px; padding: 2px; overflow: hidden; border: 0; border-radius: 12px; background: rgba(5,5,7,.54); box-shadow: inset 0 1px rgba(255,255,255,.035), 0 8px 26px rgba(0,0,0,.2); }
+.intercom-picker.is-selecting.count-1 { width: min(200px, 55%); }
+.intercom-picker.is-selecting.count-2 { width: min(355px, 66%); }
 .intercom-picker.is-selecting.count-3,
-.intercom-picker.is-selecting.count-4 { width: min(660px, 100%); }
-.intercom-picker.is-selecting.count-many { width: min(660px, 100%); justify-content: flex-start; overflow-x: auto; }
+.intercom-picker.is-selecting.count-4 { width: min(475px, 100%); }
+.intercom-picker.is-selecting.count-many { width: min(485px, 100%); justify-content: flex-start; overflow-x: auto; }
 .intercom-picker.is-selecting.count-many .intercom-receptionist { flex: 0 0 154px; }
 .intercom-picker:not(.is-selecting) { flex: 0 0 48px; gap: 0; overflow: visible; padding: 0; }
 .intercom-receptionist { position: relative; display: grid; place-items: center; flex: 0 0 31px; width: 31px; height: 38px; padding: 2px; border: 0; border-radius: 7px; color: white; background: transparent; opacity: .42; filter: saturate(.48) brightness(.7); transform: scale(.92); transition: width 420ms cubic-bezier(.16,1,.3,1), flex-basis 420ms cubic-bezier(.16,1,.3,1), margin 420ms cubic-bezier(.16,1,.3,1), opacity 360ms ease, filter 360ms ease, transform 420ms cubic-bezier(.16,1,.3,1); }
-.intercom-picker.is-selecting .intercom-receptionist { flex: 1 1 0; width: auto; height: 44px; min-width: 0; padding: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.035); border-radius: 9px; opacity: .58; filter: saturate(.62) brightness(.74); transform: none; background: rgba(8,8,10,.74); }
+.intercom-picker.is-selecting .intercom-receptionist { flex: 1 1 0; width: auto; height: 44px; min-width: 0; padding: 0; overflow: hidden; border: 0; border-radius: 9px; opacity: .58; filter: saturate(.62) brightness(.74); transform: none; background: transparent; }
 .intercom-picker.is-selecting .intercom-receptionist + .intercom-receptionist { margin-left: 0; }
 .intercom-receptionist:hover:not(:disabled), .intercom-receptionist:focus-visible { opacity: .86; filter: saturate(.85) brightness(.96); transform: translateY(-1px) scale(.96); outline: none; }
 .intercom-picker.is-selecting .intercom-receptionist:hover:not(:disabled),
 .intercom-picker.is-selecting .intercom-receptionist:focus-visible { opacity: .92; filter: saturate(.9) brightness(.94); transform: none; border-color: rgba(255,255,255,.12); }
 .intercom-receptionist.is-selected { flex-basis: 42px; width: 42px; height: 42px; opacity: 1; filter: none; transform: scale(1); z-index: 3; }
-.intercom-picker.is-selecting .intercom-receptionist.is-selected { flex: 1 1 0; width: auto; height: 44px; opacity: 1; filter: none; transform: none; border-color: rgba(249,141,235,.68); box-shadow: inset 0 0 18px rgba(226,90,219,.09), 0 0 0 1px rgba(187,103,255,.16), 0 0 13px rgba(240,91,213,.34), 0 0 24px rgba(153,86,255,.16); }
-.intercom-picker.is-selecting .intercom-receptionist.is-selected { border-color: rgba(255,255,255,.22); box-shadow: inset 0 0 18px rgba(255,255,255,.06); }
+.intercom-picker.is-selecting .intercom-receptionist.is-selected { flex: 1 1 0; width: auto; height: 44px; opacity: 1; filter: none; transform: none; border-color: transparent; background: transparent; box-shadow: none; }
+.intercom-picker.is-selecting .intercom-receptionist.is-selected::after { position: absolute; inset: -4px; z-index: 2; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,.04) 24%, rgba(255,255,255,.012) 52%, transparent 76%); content: ''; filter: blur(6px); opacity: .62; pointer-events: none; }
 .intercom-picker.is-selecting .intercom-active-effects { display: none; }
-.intercom-receptionist-name { position: relative; z-index: 3; color: rgba(255,255,255,.78); font-size: 11px; font-weight: 520; letter-spacing: .015em; text-shadow: 0 1px 10px rgba(0,0,0,.72); }
-.intercom-picker.is-selecting .intercom-receptionist.is-selected .intercom-receptionist-name { color: rgba(255,255,255,.94); }
+.intercom-receptionist-name { position: absolute; right: 12%; z-index: 3; color: rgba(190,195,202,.72); font-size: 11px; font-weight: 450; line-height: 1; letter-spacing: .08em; text-align: left; text-shadow: 0 1px 8px rgba(0,0,0,.42); transition: color 300ms ease, text-shadow 300ms ease; }
+.intercom-picker.is-selecting .intercom-receptionist.is-selected .intercom-receptionist-name { color: rgba(202,207,214,.8); text-shadow: 0 1px 10px rgba(0,0,0,.48); }
 .intercom-picker:not(.is-selecting) .intercom-receptionist:not(.is-selected) { flex-basis: 0; width: 0; margin: 0 -3px; padding: 0; opacity: 0; filter: blur(7px) brightness(.35); transform: scale(.62); pointer-events: none; }
 .intercom-picker:not(.is-selecting) .intercom-receptionist.is-selected { cursor: default; }
-.intercom-receptionist-banner { position: absolute; inset: 0; z-index: 0; background-position: center 34%; background-repeat: no-repeat; background-size: cover; opacity: 0; transform: scale(1.03); transition: opacity 360ms ease, filter 360ms ease, transform 520ms cubic-bezier(.16,1,.3,1); }
-.intercom-receptionist-shade { position: absolute; inset: 0; z-index: 1; opacity: 0; background: linear-gradient(90deg, rgba(4,4,6,.5), rgba(4,4,6,.16) 50%, rgba(4,4,6,.5)); transition: opacity 360ms ease; }
+.intercom-receptionist-banner { position: absolute; inset: 0 auto 0 0; z-index: 0; width: 58%; background-position: 50% 34%; background-repeat: no-repeat; background-size: cover; opacity: 0; transform: scale(1.03); transition: opacity 360ms ease, filter 360ms ease, transform 520ms cubic-bezier(.16,1,.3,1); }
+.intercom-receptionist-shade { position: absolute; inset: 0 auto 0 0; z-index: 1; width: 58%; opacity: 0; background: linear-gradient(90deg, rgba(4,4,6,.04), rgba(4,4,6,.12) 58%, rgba(4,4,6,.22)); transition: opacity 360ms ease; }
 .intercom-picker.is-selecting .intercom-receptionist-banner { opacity: .64; }
 .intercom-picker.is-selecting .intercom-receptionist-shade { opacity: 1; }
 .intercom-picker.is-selecting .intercom-receptionist:not(.is-selected) .intercom-receptionist-banner { filter: grayscale(.18) saturate(.64) brightness(.72); }
@@ -298,26 +305,24 @@
 .intercom-particle-field i:nth-child(5) { left: 42%; top: -2px; animation-delay: -2.1s; }
 .intercom-particle-field i:nth-child(6) { right: -2px; top: 58%; animation-delay: -1.2s; }
 .intercom-particle-field i:nth-child(7) { left: -2px; top: 56%; animation-delay: -3s; }
-.intercom-session-stage { display: grid; grid-template-columns: 50px auto 1px fit-content(360px); align-items: center; gap: 15px; width: fit-content; max-width: 100%; min-width: 0; height: 100%; padding: 0 4px; }
-.intercom-session-presence { position: relative; display: grid; place-items: center; width: 50px; height: 50px; flex: 0 0 auto; isolation: isolate; }
-.intercom-session-portrait { position: relative; z-index: 3; display: grid; place-items: center; width: 38px; height: 38px; overflow: hidden; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: rgba(8,8,10,.94); box-shadow: inset 0 1px rgba(255,255,255,.12), 0 7px 18px rgba(0,0,0,.42); }
-.intercom-session-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
-.intercom-presence-contour { position: absolute; inset: -5px; z-index: 2; width: 60px; height: 60px; overflow: visible; pointer-events: none; }
-.intercom-presence-contour path { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.intercom-presence-contour-glow { stroke: rgba(225,113,224,.82); stroke-width: 3.2; opacity: .34; filter: blur(5px); mix-blend-mode: screen; }
-.intercom-presence-contour-line { stroke: rgba(255,255,255,.82); stroke-width: 1.35; opacity: .9; filter: drop-shadow(0 0 4px rgba(236,105,218,.74)) drop-shadow(0 0 8px rgba(165,100,250,.42)); }
-.intercom-session-stage.is-connecting .intercom-presence-contour-glow { opacity: .62; }
-.intercom-session-stage.is-speaking .intercom-presence-contour-glow { stroke: rgba(246,111,214,.94); opacity: .5; }
-.intercom-session-stage.is-speaking .intercom-presence-contour-line { stroke: rgba(255,255,255,.96); filter: drop-shadow(0 0 5px rgba(244,95,210,.9)) drop-shadow(0 0 10px rgba(165,100,250,.52)); }
+.intercom-session-stage { display: grid; grid-template-columns: 112px 1px minmax(0, 1fr); align-items: center; gap: 15px; width: min(560px, calc(100% - 16px)); max-width: 100%; min-width: 0; height: 100%; padding: 0 4px; }
+.intercom-session-presence { position: relative; display: grid; place-items: center; width: 96px; height: 44px; isolation: isolate; }
+.intercom-voice-line { display: block; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.intercom-voice-line path { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; mix-blend-mode: screen; }
+.intercom-voice-line .intercom-voice-line-glow { opacity: .35; filter: blur(3px); }
+.intercom-session-monitor { position: relative; display: flex; align-items: center; width: 112px; height: 100%; overflow: visible; }
+.intercom-session-monitor-line { width: 100%; height: 44px; opacity: 1; transition: opacity 360ms ease; }
+.intercom-session-monitor.is-hint-visible .intercom-session-monitor-line { opacity: 0; }
+.intercom-session-silence-hint { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255,255,255,.58); font-size: 10px; font-weight: 500; opacity: 0; transform: translateY(4px); transition: opacity 360ms ease, transform 360ms cubic-bezier(.16,1,.3,1); }
+.intercom-session-monitor.is-hint-visible .intercom-session-silence-hint { opacity: 1; transform: translateY(0); }
 .intercom-session-status { display: inline-flex; align-items: center; gap: 7px; min-width: 78px; color: rgba(255,255,255,.64); font-size: 10px; line-height: 1; font-weight: 520; letter-spacing: 0; white-space: nowrap; }
 .intercom-session-status svg { color: rgba(227,145,224,.9); filter: drop-shadow(0 0 5px rgba(212,103,218,.32)); transform-origin: center; animation: intercom-status-breathe 2.8s ease-in-out infinite; }
-.intercom-session-stage.is-speaking .intercom-session-status svg { color: rgba(247,126,214,.96); animation-duration: .9s; }
 .intercom-session-divider { width: 1px; height: 26px; background: rgba(255,255,255,.16); box-shadow: 1px 0 rgba(0,0,0,.3); }
 .intercom-controls button,
 .intercom-close { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.08); border-radius: 50%; color: rgba(255,255,255,.64); background: rgba(8,8,9,.72); transition: color 160ms ease, background 160ms ease, border-color 160ms ease, transform 160ms ease; }
 .intercom-controls button:hover,
 .intercom-close:hover { color: white; border-color: rgba(255,255,255,.17); background: rgba(255,255,255,.09); transform: scale(1.04); }
-.intercom-transcript { display: flex; align-items: center; align-self: center; height: 100%; min-width: 100px; max-width: 360px; overflow: hidden; perspective: 500px; }
+.intercom-transcript { display: flex; align-items: center; align-self: center; width: 100%; height: 100%; min-width: 0; max-width: none; overflow: hidden; perspective: 500px; }
 .intercom-transcript p { position: relative; top: 4.7px; display: flex; align-items: center; height: 100%; margin: 0; overflow: hidden; color: rgba(255,255,255,.9); font-size: 12px; line-height: 1; font-weight: 460; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 12px rgba(0,0,0,.42); transform-origin: 50% 100%; }
 .intercom-transcript p.is-user { color: rgba(255,255,255,.58); font-weight: 430; }
 .intercom-controls { position: absolute; right: 8px; top: 50%; z-index: 5; display: flex; gap: 4px; transform: translateY(-50%); }
@@ -375,6 +380,7 @@
 @keyframes intercom-presence-flow { 0% { border-radius: 46% 54% 58% 42% / 54% 43% 57% 46%; transform: rotate(-5deg) scale(.96); opacity: .7; } 46% { border-radius: 59% 41% 45% 55% / 42% 58% 47% 53%; transform: rotate(5deg) scale(1.04); opacity: 1; } 100% { border-radius: 42% 58% 52% 48% / 58% 46% 54% 42%; transform: rotate(-2deg) scale(.99); opacity: .82; } }
 @keyframes intercom-presence-flow-reverse { 0% { border-radius: 57% 43% 46% 54% / 44% 56% 45% 55%; transform: rotate(5deg) scale(1.03); } 52% { border-radius: 43% 57% 56% 44% / 58% 42% 54% 46%; transform: rotate(-6deg) scale(.95); } 100% { border-radius: 52% 48% 42% 58% / 47% 55% 45% 53%; transform: rotate(3deg) scale(1); } }
 @keyframes intercom-status-breathe { 0%,100% { opacity: .62; transform: scaleY(.88); } 50% { opacity: 1; transform: scaleY(1.08); } }
+@keyframes intercom-calling-spin { to { transform: rotate(360deg); } }
 
 .nest-overlay, .nest-studio-overlay { position: fixed; inset: 0; z-index: 1800; display: flex; align-items: flex-start; justify-content: center; padding: 72px 24px 24px; background: rgba(0,0,0,.68); backdrop-filter: blur(12px); }
 .nest-history-panel { width: min(520px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 96px)); overflow: hidden; border: 1px solid rgba(255,255,255,.09); border-radius: 22px; background: rgba(8,8,9,.97); box-shadow: 0 30px 90px rgba(0,0,0,.62), inset 0 1px rgba(255,255,255,.03); }
@@ -478,17 +484,17 @@
   .intercom-main { width: calc(100% - 118px); gap: 10px; }
   .intercom-picker { max-width: 100%; gap: 3px; padding-inline: 3px; }
   .intercom-picker.is-selecting { padding: 2px; gap: 2px; }
-  .intercom-picker.is-selecting.count-1 { width: min(230px, 78%); }
-  .intercom-picker.is-selecting.count-2 { width: min(390px, 92%); }
+  .intercom-picker.is-selecting.count-1 { width: min(175px, 61%); }
+  .intercom-picker.is-selecting.count-2 { width: min(285px, 72%); }
   .intercom-receptionist { flex-basis: 28px; width: 28px; height: 35px; }
   .intercom-picker.is-selecting .intercom-receptionist,
   .intercom-picker.is-selecting .intercom-receptionist.is-selected { height: 43px; }
   .intercom-picker.is-selecting .intercom-receptionist-image { width: 29px; height: 34px; }
   .intercom-receptionist.is-selected { flex-basis: 39px; width: 39px; height: 39px; }
   .intercom-picker:not(.is-selecting) { flex-basis: 43px; }
-  .intercom-session-stage { grid-template-columns: 42px auto 1px fit-content(220px); gap: 8px; width: fit-content; max-width: 100%; padding: 0; }
-  .intercom-session-presence { width: 42px; height: 42px; }
-  .intercom-session-portrait { width: 32px; height: 32px; }
+  .intercom-session-stage { grid-template-columns: 82px 1px minmax(0, 1fr); gap: 8px; width: calc(100% - 6px); max-width: 100%; padding: 0; }
+  .intercom-session-monitor { width: 82px; }
+  .intercom-session-presence { width: 64px; height: 42px; }
   .intercom-session-status { min-width: 58px; gap: 5px; font-size: 9px; }
   .intercom-session-status svg { width: 14px; height: 14px; }
   .intercom-session-divider { height: 22px; }
@@ -506,10 +512,11 @@
   .nest-category-list-action { display: none; }
 }
 @media (max-width: 420px) {
-  .intercom-session-stage { grid-template-columns: 42px 18px 1px fit-content(150px); gap: 7px; }
+  .intercom-session-stage { grid-template-columns: 64px 1px minmax(0, 1fr); gap: 7px; }
+  .intercom-session-monitor { width: 64px; }
   .intercom-session-status { min-width: 0; }
   .intercom-session-status span { display: none; }
-  .intercom-transcript { min-width: 54px; max-width: 150px; }
+  .intercom-transcript { min-width: 0; max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .nest-stage *, .nest-stage *::before, .nest-stage *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

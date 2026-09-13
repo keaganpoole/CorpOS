@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AudioLines, Check, Mic, MicOff, PhoneOff, X } from 'lucide-react';
+import { Check, Mic, MicOff, PhoneOff, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useNest } from './NestRuntime';
+import IntercomVoiceLine from './IntercomVoiceLine';
+import useIntercomMicrophone from './useIntercomMicrophone';
 
 const PRIVACY_COPY = 'Voice conversations may be transcribed and saved so you can review them later.';
 const ACTIVE_PHASES = new Set(['connecting', 'listening', 'speaking']);
@@ -23,11 +25,6 @@ const createLine = (message) => {
 
 const fallbackInitial = (name) => String(name || 'R').trim().slice(0, 1).toUpperCase();
 const receptionistImage = (receptionist) => receptionist?.avatar || receptionist?.banner_url || '';
-const PRESENCE_SHAPES = [
-  'M50 5 C63 4 75 13 79 25 C84 39 96 47 91 61 C87 73 74 77 67 89 C59 101 44 95 35 88 C24 79 10 77 9 63 C8 49 21 42 23 29 C25 15 36 6 50 5 Z',
-  'M50 8 C65 8 73 18 82 28 C91 39 91 52 83 61 C75 70 77 84 65 91 C53 98 42 91 32 87 C20 82 11 73 13 60 C15 48 25 42 24 30 C23 18 36 7 50 8 Z',
-  'M50 5 C64 7 83 11 82 25 C81 39 93 44 89 58 C86 72 68 73 65 87 C62 99 48 98 37 91 C25 83 10 79 10 64 C10 50 25 45 25 32 C25 18 37 3 50 5 Z',
-];
 
 function PrivacyNotice({ open, busy, onCancel, onAccept }) {
   if (typeof document === 'undefined') return null;
@@ -65,6 +62,7 @@ function PrivacyNotice({ open, busy, onCancel, onAccept }) {
 }
 
 function NestIntercomInner({ open, onClose }) {
+  const { start: startMicrophone, stop: stopMicrophone, sample: sampleMicrophone, setMuted: setMicrophoneMuted } = useIntercomMicrophone();
   const { queueLength, setVoiceActive } = useNest();
   const [bootstrap, setBootstrap] = useState(null);
   const [selectedId, setSelectedId] = useState('');
@@ -73,6 +71,8 @@ function NestIntercomInner({ open, onClose }) {
   const [muted, setMuted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [micPermissionState, setMicPermissionState] = useState('unknown');
+  const [silenceHintVisible, setSilenceHintVisible] = useState(false);
   const [idleWarning, setIdleWarning] = useState(false);
   const [error, setError] = useState('');
   const sessionRef = useRef(null);
@@ -81,6 +81,39 @@ function NestIntercomInner({ open, onClose }) {
   const lastActivityRef = useRef(Date.now());
   const endingRef = useRef(false);
   const endTransportRef = useRef(() => {});
+  const userHasSpokenRef = useRef(false);
+  const silenceHintTimerRef = useRef(null);
+  const silenceHintHideTimerRef = useRef(null);
+
+  useEffect(() => { setMicrophoneMuted(muted); }, [muted, setMicrophoneMuted]);
+
+  const clearSilenceHintTimers = useCallback(() => {
+    if (silenceHintTimerRef.current) window.clearTimeout(silenceHintTimerRef.current);
+    if (silenceHintHideTimerRef.current) window.clearTimeout(silenceHintHideTimerRef.current);
+    silenceHintTimerRef.current = null;
+    silenceHintHideTimerRef.current = null;
+  }, []);
+
+  const startSilenceHintTimer = useCallback(() => {
+    clearSilenceHintTimers();
+    userHasSpokenRef.current = false;
+    setSilenceHintVisible(false);
+    silenceHintTimerRef.current = window.setTimeout(() => {
+      if (userHasSpokenRef.current) return;
+      setSilenceHintVisible(true);
+      silenceHintHideTimerRef.current = window.setTimeout(() => setSilenceHintVisible(false), 3200);
+    }, 5000);
+  }, [clearSilenceHintTimers]);
+
+  const readMicrophonePermission = useCallback(async () => {
+    if (!navigator.permissions?.query) return 'prompt';
+    try {
+      const result = await navigator.permissions.query({ name: 'microphone' });
+      return result.state;
+    } catch {
+      return 'prompt';
+    }
+  }, []);
 
   const selectedReceptionist = useMemo(
     () => (bootstrap?.receptionists || []).find((item) => String(item.id) === String(selectedId)) || null,
@@ -102,13 +135,18 @@ function NestIntercomInner({ open, onClose }) {
 
   useEffect(() => {
     setVoiceActive(open);
+    if (!open) {
+      stopMicrophone();
+      clearSilenceHintTimers();
+      setSilenceHintVisible(false);
+    }
     if (open) {
       setPhase('selecting');
       setError('');
       setLine(null);
     }
     return () => setVoiceActive(false);
-  }, [open, setVoiceActive]);
+  }, [clearSilenceHintTimers, open, setVoiceActive, stopMicrophone]);
 
   const persistLine = useCallback(async (nextLine) => {
     if (!nextLine || !sessionRef.current?.intercom_id) return;
@@ -141,6 +179,9 @@ function NestIntercomInner({ open, onClose }) {
 
   const finalizeSession = useCallback(async ({ close = true } = {}) => {
     if (endingRef.current) return;
+    stopMicrophone();
+    clearSilenceHintTimers();
+    setSilenceHintVisible(false);
     endingRef.current = true;
     const session = sessionRef.current;
     if (session?.intercom_id) {
@@ -168,7 +209,7 @@ function NestIntercomInner({ open, onClose }) {
     setPhase('selecting');
     endingRef.current = false;
     if (close) onClose?.();
-  }, [bootstrap?.usage, onClose]);
+  }, [bootstrap?.usage, clearSilenceHintTimers, onClose, stopMicrophone]);
 
   const conversation = useConversation({
     micMuted: muted,
@@ -182,6 +223,7 @@ function NestIntercomInner({ open, onClose }) {
         }).catch(() => {});
       }
       lastActivityRef.current = Date.now();
+      startSilenceHintTimer();
       setPhase('listening');
     },
     onDisconnect: () => {
@@ -190,7 +232,7 @@ function NestIntercomInner({ open, onClose }) {
     onError: (message) => {
       setError(String(message || 'Voice had trouble connecting.'));
       if (sessionRef.current) finalizeSession({ close: false });
-      else setPhase('selecting');
+      else { stopMicrophone(); setPhase('selecting'); }
     },
     onModeChange: ({ mode }) => {
       lastActivityRef.current = Date.now();
@@ -199,7 +241,14 @@ function NestIntercomInner({ open, onClose }) {
     },
     onMessage: (message) => {
       const nextLine = createLine(message);
-      if (nextLine) appendFinalLine(nextLine);
+      if (nextLine) {
+        if (nextLine.role === 'user') {
+          userHasSpokenRef.current = true;
+          clearSilenceHintTimers();
+          setSilenceHintVisible(false);
+        }
+        appendFinalLine(nextLine);
+      }
     },
     onAgentChatResponsePart: ({ type, text, response_id: responseId }) => {
       lastActivityRef.current = Date.now();
@@ -248,12 +297,20 @@ function NestIntercomInner({ open, onClose }) {
     return () => window.clearTimeout(timer);
   }, [bootstrap?.limits?.turn_seconds?.agent, conversation.sendUserActivity, open, phase]);
 
-  const beginSession = async ({ force = false, receptionistId = selectedId } = {}) => {
+  const beginSession = async ({ force = false, receptionistId = selectedId, requestPermission = false } = {}) => {
     if (!receptionistId || (loading && !force)) return;
     setLoading(true);
     setError('');
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const permission = await readMicrophonePermission();
+      setMicPermissionState(permission);
+      if (permission !== 'granted' && !requestPermission) {
+        setPhase('mic-permission');
+        return;
+      }
+      await startMicrophone();
+      setMicPermissionState('granted');
+      setPhase('calling');
       const session = await api.createIntercomSession({ receptionist_id: receptionistId });
       const startedAt = new Date().toISOString();
       sessionRef.current = { ...session, started_at: startedAt };
@@ -272,8 +329,15 @@ function NestIntercomInner({ open, onClose }) {
         },
       });
     } catch (err) {
-      setError(err.message || 'Voice could not start.');
-      setPhase('selecting');
+      stopMicrophone();
+      if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') {
+        setMicPermissionState('denied');
+        setError('Microphone access is required to talk.');
+        setPhase('mic-permission');
+      } else {
+        setError(err.message || 'Voice could not start.');
+        setPhase('selecting');
+      }
     } finally {
       setLoading(false);
     }
@@ -322,13 +386,6 @@ function NestIntercomInner({ open, onClose }) {
   const hasTranscript = Boolean(line?.text);
   const receptionists = bootstrap?.receptionists || [];
   const pickerCount = receptionists.length > 4 ? 'many' : receptionists.length;
-  const sessionStatus = muted
-    ? 'Muted'
-    : phase === 'speaking'
-      ? 'Speaking'
-      : phase === 'connecting'
-        ? 'Connecting'
-        : 'Listening';
   const sessionFallback = phase === 'connecting'
     ? 'Opening the intercom'
     : phase === 'speaking'
@@ -353,7 +410,24 @@ function NestIntercomInner({ open, onClose }) {
             {queueLength > 0 && <span className="intercom-queue" title={`${queueLength} NEST events waiting`}>{queueLength}</span>}
 
             <div className="intercom-main">
-              {phase === 'selecting' && selectedReceptionist && (
+              {phase === 'mic-permission' && selectedReceptionist ? (
+                <motion.div className="intercom-mic-permission no-drag" role="status" aria-live="polite" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <span>{micPermissionState === 'denied' ? 'Allow microphone access to talk' : 'Please allow microphone access'}</span>
+                  <button type="button" onClick={() => beginSession({ force: true, receptionistId: selectedId, requestPermission: true })} disabled={loading}>
+                    <Mic size={13} />
+                    Allow microphone
+                  </button>
+                </motion.div>
+              ) : phase === 'calling' && selectedReceptionist ? (
+                <motion.div className="intercom-calling no-drag" role="status" aria-live="polite" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}>
+                  <span className="intercom-calling-photo" aria-hidden="true">
+                    {receptionistImage(selectedReceptionist)
+                      ? <img src={receptionistImage(selectedReceptionist)} alt="" />
+                      : <span className="intercom-receptionist-fallback">{fallbackInitial(selectedReceptionist.name)}</span>}
+                  </span>
+                  <span>Calling {selectedReceptionist.name}...</span>
+                </motion.div>
+              ) : phase === 'selecting' && selectedReceptionist && (
                 <div className="intercom-action no-drag">
                   <span className="intercom-action-label">
                     <span>Talk with</span>
@@ -400,38 +474,21 @@ function NestIntercomInner({ open, onClose }) {
                     );
                   })}
                 </motion.div>
-              ) : selectedReceptionist && (
+              ) : ACTIVE_PHASES.has(phase) && selectedReceptionist && (
                 <motion.div
                   className={`intercom-session-stage is-${phase}`}
                   initial={{ opacity: 0, scale: 0.94, x: 10 }}
                   animate={{ opacity: 1, scale: 1, x: 0 }}
                   transition={{ duration: 0.52, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  <div className="intercom-session-presence" aria-hidden="true">
-                    <motion.svg className="intercom-presence-contour" viewBox="0 0 100 100" aria-hidden="true">
-                      <motion.path
-                        className="intercom-presence-contour-glow"
-                        d={PRESENCE_SHAPES[0]}
-                        animate={{ d: [...PRESENCE_SHAPES, PRESENCE_SHAPES[0]] }}
-                        transition={{ duration: phase === 'speaking' ? 2.1 : 5.2, repeat: Infinity, ease: [0.45, 0.02, 0.34, 1] }}
+                  <div className={`intercom-session-monitor ${silenceHintVisible ? 'is-hint-visible' : ''}`}>
+                    <div className="intercom-session-monitor-line">
+                      <IntercomVoiceLine
+                        sampleMicrophone={sampleMicrophone}
+                        enabled={open && conversation.status === 'connected' && !muted && !conversation.isMuted}
                       />
-                      <motion.path
-                        className="intercom-presence-contour-line"
-                        d={PRESENCE_SHAPES[0]}
-                        animate={{ d: [...PRESENCE_SHAPES, PRESENCE_SHAPES[0]] }}
-                        transition={{ duration: phase === 'speaking' ? 2.1 : 5.2, repeat: Infinity, ease: [0.45, 0.02, 0.34, 1] }}
-                      />
-                    </motion.svg>
-                    <span className="intercom-session-portrait">
-                      {receptionistImage(selectedReceptionist)
-                        ? <img src={receptionistImage(selectedReceptionist)} alt="" />
-                        : <span className="intercom-receptionist-fallback">{fallbackInitial(selectedReceptionist.name)}</span>}
-                    </span>
-                  </div>
-
-                  <div className="intercom-session-status">
-                    <AudioLines size={17} strokeWidth={1.7} aria-hidden="true" />
-                    <span>{sessionStatus}</span>
+                    </div>
+                    <span className="intercom-session-silence-hint">Listening...</span>
                   </div>
 
                   <span className="intercom-session-divider" aria-hidden="true" />
@@ -454,7 +511,7 @@ function NestIntercomInner({ open, onClose }) {
               )}
             </div>
 
-            {phase === 'selecting' ? (
+            {phase === 'selecting' || phase === 'calling' || phase === 'mic-permission' ? (
               <button type="button" className="intercom-close" onClick={onClose} aria-label="Close voice conversation"><X size={13} /></button>
             ) : (
               <div className="intercom-controls no-drag">
