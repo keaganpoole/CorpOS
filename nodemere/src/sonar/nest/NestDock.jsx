@@ -69,7 +69,7 @@ const HistoryPanel = () => {
   );
 };
 
-export default function NestDock({ onStageChange }) {
+export default function NestDock({ onStageChange, businessAvatar = '' }) {
   const [intercomOpen, setIntercomOpen] = useState(false);
   const [conversationsOpen, setConversationsOpen] = useState(false);
   const {
@@ -134,7 +134,7 @@ export default function NestDock({ onStageChange }) {
         )}
       </div>
       <HistoryPanel />
-      <IntercomHistoryPanel open={conversationsOpen} onClose={() => setConversationsOpen(false)} />
+      <IntercomHistoryPanel businessAvatar={businessAvatar} open={conversationsOpen} onClose={() => setConversationsOpen(false)} />
       <NestAnimationStudio open={studioOpen} onClose={() => setStudioOpen(false)} />
     </>
   );

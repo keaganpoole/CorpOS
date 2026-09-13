@@ -350,7 +350,7 @@
 .nest-panel-actions button.is-confirming { color: #fda4af; background: rgba(244,63,94,.1); }
 .intercom-history-search { display: flex; align-items: center; gap: 9px; margin: 10px 12px 4px; padding: 0 11px; height: 35px; border: 1px solid rgba(255,255,255,.065); border-radius: 8px; color: rgba(255,255,255,.26); background: rgba(255,255,255,.018); }
 .intercom-history-search:focus-within { border-color: rgba(255,255,255,.13); color: rgba(255,255,255,.48); }
-.intercom-history-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: rgba(255,255,255,.78); background: transparent; font: 450 11px/1 inherit; }
+.intercom-history-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: rgba(255,255,255,.78); background: transparent; font: 450 10px/1 inherit; }
 .intercom-history-search input::placeholder { color: rgba(255,255,255,.23); }
 .intercom-history-body { min-height: 0; max-height: 550px; overflow: auto; padding: 8px; }
 .intercom-history-list { display: grid; gap: 2px; }
@@ -360,19 +360,33 @@
 .intercom-history-fallback { display: grid; place-items: center; color: rgba(255,255,255,.42); background: rgba(255,255,255,.05); }
 .intercom-history-copy { min-width: 0; display: grid; gap: 4px; }
 .intercom-history-copy strong, .intercom-history-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.intercom-history-copy strong { color: rgba(255,255,255,.76); font-size: 11px; font-weight: 590; }
-.intercom-history-copy > span { color: rgba(255,255,255,.31); font-size: 9px; }
-.intercom-history-list time, .intercom-history-meta time { color: rgba(255,255,255,.22); font-size: 8px; white-space: nowrap; }
+.intercom-history-copy strong { color: rgba(255,255,255,.76); font-size: 12px; font-weight: 590; }
+.intercom-history-copy > span { color: rgba(255,255,255,.31); font-size: 10px; }
+.intercom-history-list time, .intercom-history-meta time { color: rgba(255,255,255,.22); font-size: 9px; white-space: nowrap; }
 .intercom-history-detail { padding: 8px 12px 18px; }
 .intercom-history-meta { display: flex; align-items: center; gap: 10px; padding: 6px 2px 14px; }
 .intercom-history-meta img, .intercom-history-meta > span { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
 .intercom-history-meta > span { display: grid; place-items: center; color: rgba(255,255,255,.4); background: rgba(255,255,255,.05); }
 .intercom-history-meta > div { display: grid; gap: 3px; }
 .intercom-history-meta strong { color: rgba(255,255,255,.72); font-size: 11px; font-weight: 580; }
-.intercom-history-summary { margin: 0 0 18px; padding: 12px 13px; border-left: 1px solid rgba(220,116,215,.34); color: rgba(255,255,255,.45); background: rgba(255,255,255,.016); font-size: 10px; line-height: 1.65; }
-.intercom-history-transcript { display: grid; gap: 8px; }
-.intercom-history-transcript p { width: fit-content; max-width: 82%; margin: 0; padding: 8px 10px; border-radius: 8px; color: rgba(255,255,255,.72); background: rgba(255,255,255,.045); font-size: 10px; line-height: 1.55; }
-.intercom-history-transcript p.is-user { justify-self: end; color: rgba(255,255,255,.48); background: rgba(255,255,255,.022); }
+.intercom-history-summary { margin: 0 0 18px; padding: 12px 13px; border-left: 1px solid rgba(255,255,255,.16); color: rgba(255,255,255,.45); background: rgba(255,255,255,.016); font-size: 11px; line-height: 1.65; }
+.intercom-history-transcript { display: grid; gap: 14px; }
+.intercom-history-timestamp { justify-self: center; margin: 2px 0 4px; color: rgba(255,255,255,.3); font-size: 9px; line-height: 1; white-space: nowrap; }
+.intercom-history-message { display: flex; align-items: center; gap: 10px; }
+.intercom-history-message.is-receptionist { justify-content: flex-end; }
+.intercom-history-message.is-caller { justify-content: flex-start; }
+.intercom-history-message-avatar { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); border-radius: 50%; color: rgba(255,255,255,.7); background: rgba(255,255,255,.08); font-size: 9px; font-weight: 700; object-fit: cover; }
+.intercom-history-message-content { display: flex; max-width: 74%; flex-direction: column; }
+.intercom-history-message.is-receptionist .intercom-history-message-content { align-items: flex-end; }
+.intercom-history-message.is-caller .intercom-history-message-content { align-items: flex-start; }
+.intercom-history-message-bubble { padding: 9px 12px; border-radius: 16px; color: white; font-size: 11px; line-height: 1.55; box-shadow: 0 12px 30px rgba(0,0,0,.18); }
+.intercom-history-message.is-receptionist .intercom-history-message-bubble { border-bottom-right-radius: 5px; background: #007aff; }
+.intercom-history-message.is-caller .intercom-history-message-bubble { border-bottom-left-radius: 5px; background: #2c2c2e; }
+.intercom-history-message-meta { display: flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 4px; color: rgba(255,255,255,.28); font-size: 9px; }
+.intercom-history-message-meta span:first-child { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.intercom-history-message-meta b { color: rgba(255,255,255,.12); font-weight: 400; }
+.intercom-history-message.is-receptionist .intercom-history-message-meta { justify-content: flex-end; text-align: right; }
+.intercom-history-message.is-caller .intercom-history-message-meta { justify-content: flex-start; text-align: left; }
 
 @keyframes intercom-wave { 0% { opacity: .58; transform: scale(.88); } 72%,100% { opacity: 0; transform: scale(1.32); } }
 @keyframes intercom-particle { 0%,100% { opacity: .18; transform: translate3d(0,2px,0) scale(.72); } 48% { opacity: .9; transform: translate3d(1px,-2px,0) scale(1.12); } }

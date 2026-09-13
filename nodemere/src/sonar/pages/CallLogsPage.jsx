@@ -156,8 +156,20 @@ function normalized(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function hideTags(value) {
+  return String(value || '')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function displayText(value, fallback = '') {
+  const cleaned = hideTags(value);
+  return cleaned || fallback;
+}
+
 function titleize(value, fallback = 'General') {
-  const raw = String(value || '').trim();
+  const raw = hideTags(value);
   if (!raw) return fallback;
   return raw
     .replace(/[_-]+/g, ' ')
@@ -212,7 +224,7 @@ function transcriptFromText(text) {
       const speakerValue = hasSpeaker ? speaker : 'caller';
       return {
         speaker: normalized(speakerValue).includes('agent') || normalized(speakerValue).includes('receptionist') ? 'receptionist' : 'customer',
-        text: hasSpeaker ? rest.join(':').trim() : line,
+        text: displayText(hasSpeaker ? rest.join(':').trim() : line),
         offset: '',
       };
     });
@@ -223,7 +235,7 @@ function normalizeTranscript(turns, fallbackText) {
   return turns
     .map((turn) => {
       const role = normalized(turn.role || turn.speaker);
-      const text = String(turn.message || turn.text || turn.content || '').trim();
+      const text = hideTags(turn.message || turn.text || turn.content || '');
       if (!text) return null;
       return {
         speaker: role === 'agent' || role === 'assistant' || role === 'receptionist' ? 'receptionist' : 'customer',
@@ -240,16 +252,16 @@ export function normalizeCall(row) {
   const avatarName = normalized(receptionistName);
   return {
     id: row.id,
-    name: row.caller_name || 'Unknown Caller',
-    phone: row.caller_phone || row.from_number || 'Unknown number',
-    summary: row.summary || row.notes || 'No summary captured yet.',
+    name: displayText(row.caller_name, 'Unknown Caller'),
+    phone: displayText(row.caller_phone || row.from_number, 'Unknown number'),
+    summary: displayText(row.summary || row.notes, 'No summary captured yet.'),
     purpose,
     status: titleize(row.status || row.call_successful || 'Unknown', 'Unknown'),
     sentiment: sentimentFromCall(row),
     direction: directionFromCall(row),
     duration: row.duration_seconds || 0,
     time: row.started_at || row.event_timestamp || row.created_at,
-    receptionist: receptionistName,
+    receptionist: displayText(receptionistName, 'Receptionist'),
     receptionistAvatar: row.receptionist_avatar || (avatarName && avatarName !== 'receptionist' ? `${AVATAR_BASE}/${avatarName}.jpg` : ''),
     isFavorited: Boolean(row.is_favorited),
     audioUrl: row.audio_url || '',

@@ -2642,7 +2642,7 @@ const SonarDashboard = () => {
           description="Source-aware project report"
         />
 
-        <NestDock onStageChange={setNestStageExpanded} />
+        <NestDock businessAvatar={businessUsage?.avatar || ''} onStageChange={setNestStageExpanded} />
         <div className="ml-auto flex items-center">
           <button
             type="button"

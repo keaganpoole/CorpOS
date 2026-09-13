@@ -15,7 +15,14 @@ const formatTime = (value) => {
   }).format(date);
 };
 
-export default function IntercomHistoryPanel({ open, onClose }) {
+const hideTags = (value) => String(value || '')
+  .replace(/\[[^\]]*\]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const displayText = (value, fallback = '') => hideTags(value) || fallback;
+
+export default function IntercomHistoryPanel({ open, onClose, businessAvatar = '' }) {
   const [query, setQuery] = useState('');
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -96,7 +103,7 @@ export default function IntercomHistoryPanel({ open, onClose }) {
                 )}
                 <div>
                   <span className="nest-panel-kicker">Nest</span>
-                  <h2 id="intercom-history-title">{selected ? selected.title : 'Conversations'}</h2>
+                  <h2 id="intercom-history-title">{selected ? displayText(selected.title, 'Conversation') : 'Conversations'}</h2>
                 </div>
               </div>
               <div className="nest-panel-actions">
@@ -125,19 +132,34 @@ export default function IntercomHistoryPanel({ open, onClose }) {
             <div className="intercom-history-body custom-scrollbar">
               {selected ? (
                 <div className="intercom-history-detail">
-                  <div className="intercom-history-meta">
-                    {selected.receptionist_avatar
-                      ? <img src={selected.receptionist_avatar} alt="" />
-                      : <span><MessageCircle size={14} /></span>}
-                    <div>
-                      <strong>{selected.receptionist_name || 'Receptionist'}</strong>
-                      <time>{formatTime(selected.started_at || selected.created_at)}</time>
-                    </div>
-                  </div>
-                  {selected.summary && <p className="intercom-history-summary">{selected.summary}</p>}
+                  {selected.summary && hideTags(selected.summary) && <p className="intercom-history-summary">{hideTags(selected.summary)}</p>}
                   <div className="intercom-history-transcript">
+                    <time className="intercom-history-timestamp">{formatTime(selected.started_at || selected.created_at)}</time>
                     {(selected.transcript || []).map((item, index) => (
-                      <p key={item.id || `${item.role}:${index}`} className={`is-${item.role === 'user' ? 'user' : 'agent'}`}>{item.text || item.message}</p>
+                      (() => {
+                        const isReceptionist = item.role !== 'user';
+                        const speakerName = isReceptionist
+                          ? displayText(selected.receptionist_name, 'Receptionist')
+                          : displayText(selected.caller_name, 'You');
+                        const initial = speakerName.trim().charAt(0).toUpperCase() || (isReceptionist ? 'R' : 'Y');
+                        return (
+                          <div key={item.id || `${item.role}:${index}`} className={`intercom-history-message ${isReceptionist ? 'is-receptionist' : 'is-caller'}`}>
+                            {!isReceptionist && (businessAvatar || selected.business_avatar)
+                              ? <img className="intercom-history-message-avatar" src={businessAvatar || selected.business_avatar} alt="" />
+                              : !isReceptionist && <span className="intercom-history-message-avatar">{initial}</span>}
+                            <div className="intercom-history-message-content">
+                              <div className="intercom-history-message-bubble">{hideTags(item.text || item.message)}</div>
+                              <div className="intercom-history-message-meta">
+                                <span>{speakerName}</span>
+                                {item.offset && <><b>•</b><span>{item.offset}</span></>}
+                              </div>
+                            </div>
+                            {isReceptionist && selected.receptionist_avatar
+                              ? <img className="intercom-history-message-avatar" src={selected.receptionist_avatar} alt="" />
+                              : isReceptionist && <span className="intercom-history-message-avatar">{initial}</span>}
+                          </div>
+                        );
+                      })()
                     ))}
                     {!(selected.transcript || []).length && <div className="nest-history-empty">No transcript was saved for this conversation.</div>}
                   </div>
@@ -150,8 +172,8 @@ export default function IntercomHistoryPanel({ open, onClose }) {
                         ? <img src={item.receptionist_avatar} alt="" />
                         : <span className="intercom-history-fallback"><MessageCircle size={13} /></span>}
                       <span className="intercom-history-copy">
-                        <strong>{item.title || item.receptionist_name || 'Conversation'}</strong>
-                        <span>{item.summary || 'Conversation saved'}</span>
+                        <strong>{displayText(item.title || item.receptionist_name, 'Conversation')}</strong>
+                        <span>{displayText(item.summary, 'Conversation saved')}</span>
                       </span>
                       <time>{formatTime(item.started_at || item.created_at)}</time>
                     </button>
