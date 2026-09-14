@@ -13,6 +13,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
 import VoiceClonePage from './pages/VoiceClonePage';
+import VoiceCatalogPage from './pages/VoiceCatalogPage';
 import SplashScreen from './components/SplashScreen';
 import LegalDocumentPage from './components/LegalDocumentPage';
 import LegalAcceptanceGate from './components/LegalAcceptanceGate';
@@ -87,6 +88,24 @@ function VisitorGate() {
   return <Suspense fallback={<SplashScreen />}><VisitorsPage /></Suspense>;
 }
 
+function VoiceCatalogGate() {
+  const { session, profile, isLoading, workforce } = useAuth();
+
+  if (isLoading) return <SplashScreen />;
+  if (!session) return <Navigate to="/auth" replace />;
+  if (profile?.account_status === 'pending_deletion') return <AccountRecoveryPage />;
+
+  return (
+    <LegalAcceptanceGate>
+      <WorkforceGate>
+        {!profile?.onboarded && !workforce?.tenant
+          ? <Navigate to="/onboarding" replace />
+          : <VoiceCatalogPage />}
+      </WorkforceGate>
+    </LegalAcceptanceGate>
+  );
+}
+
 
 function AppContent() {
   const { isLoading, isAppLoading } = useAuth();
@@ -133,6 +152,7 @@ function AppContent() {
         <Route path="/upload/:token" element={<DocumentUploadPage />} />
         <Route path="/clone/:token" element={<VoiceClonePage />} />
         <Route path="/clone" element={<VoiceClonePage />} />
+        <Route path="/voice-catalog" element={<VoiceCatalogGate />} />
 
         {/* --- Dashboard (Sonar) --- */}
         <Route path="/dashboard" element={<DashboardGate />} />

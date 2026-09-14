@@ -88,6 +88,8 @@ export const api = {
   getSession: () => fetchJSON('/api/session'),
   getPipeline: () => fetchJSON('/api/pipeline'),
   getReceptionistCatalog: () => fetchJSON('/api/sonar/receptionists/catalog'),
+  getVoiceCatalog: ({ includeUnavailable = false, recheck = false } = {}) => strictGetJSON(`/api/voice-catalog?include_unavailable=${includeUnavailable ? 'true' : 'false'}&recheck=${recheck ? 'true' : 'false'}`),
+  getVoiceCatalogVoice: (voiceId) => strictGetJSON(`/api/voice-catalog/${encodeURIComponent(voiceId)}`),
   getPeople: (limit = 500) => fetchJSON(`/api/sonar/people?limit=${limit}`),
   getPerson: (id) => fetchJSON(`/api/sonar/people/${encodeURIComponent(id)}`),
   getBusinessProfile: () => fetchJSON('/api/sonar/business/profile'),

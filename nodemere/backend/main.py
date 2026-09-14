@@ -10927,6 +10927,141 @@ async def list_receptionist_catalog(current_user: dict = Depends(get_current_use
         logging.warning('main.list_receptionist_catalog.event_9915')
     return [*catalog_rows, *clone_rows]
 
+
+def _voice_catalog_payload(raw: dict, *, availability: str = "available") -> dict:
+    labels = raw.get("labels") if isinstance(raw.get("labels"), dict) else {}
+    verification = raw.get("voice_verification") if isinstance(raw.get("voice_verification"), dict) else {}
+    sharing = raw.get("sharing") if isinstance(raw.get("sharing"), dict) else {}
+    verified_languages = raw.get("verified_languages") if isinstance(raw.get("verified_languages"), list) else []
+    return {
+        "voice_id": raw.get("voice_id"),
+        "name": raw.get("name"),
+        "description": raw.get("description"),
+        "preview_url": raw.get("preview_url"),
+        "category": raw.get("category"),
+        "labels": labels,
+        "verified_languages": verified_languages,
+        "verified": bool(raw.get("verified") is True or verification.get("is_verified") is True or verification.get("status") == "verified"),
+        "voice_verification": {
+            "status": verification.get("status"),
+            "is_verified": verification.get("is_verified"),
+        },
+        "available_for_tiers": raw.get("available_for_tiers") if isinstance(raw.get("available_for_tiers"), list) else [],
+        "is_legacy": bool(raw.get("is_legacy")),
+        "is_owner": bool(raw.get("is_owner")),
+        "created_at_unix": raw.get("created_at_unix"),
+        "permission_on_resource": raw.get("permission_on_resource"),
+        "safety_control": raw.get("safety_control"),
+        "sharing": {
+            "status": sharing.get("status"),
+            "cloned_by_count": sharing.get("cloned_by_count"),
+        },
+        "fine_tuning": raw.get("fine_tuning") if isinstance(raw.get("fine_tuning"), dict) else {},
+        "settings": raw.get("settings") if isinstance(raw.get("settings"), dict) else {},
+        "availability": availability,
+    }
+
+
+def _fetch_elevenlabs_voice(voice_id: str) -> tuple[str, Optional[dict]]:
+    headers = get_elevenlabs_headers()
+    if not headers:
+        return "error", None
+    try:
+        response = requests.get(
+            f"https://api.elevenlabs.io/v1/voices/{voice_id}",
+            headers=headers,
+            timeout=15,
+        )
+    except requests.RequestException:
+        return "error", None
+    if response.status_code == 404:
+        return "unavailable", None
+    if not response.ok:
+        return "error", None
+    try:
+        payload = response.json()
+    except (ValueError, requests.exceptions.JSONDecodeError):
+        return "error", None
+    return ("available", payload) if isinstance(payload, dict) else ("error", None)
+
+
+def _voice_catalog_id_is_safe(voice_id: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9_-]{1,128}", voice_id or ""))
+
+
+@app.get("/api/voice-catalog", tags=["Voice Catalog"])
+async def list_voice_catalog(
+    include_unavailable: bool = False,
+    recheck: bool = False,
+    current_user: dict = Depends(get_current_user),
+):
+    del current_user, recheck
+    headers = get_elevenlabs_headers()
+    if not headers:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Voice catalog is not configured.")
+    try:
+        response = await asyncio.to_thread(
+            requests.get,
+            "https://api.elevenlabs.io/v1/voices",
+            headers=headers,
+            params={"show_legacy": "true"},
+            timeout=20,
+        )
+    except requests.RequestException:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Voice catalog is temporarily unavailable.") from None
+    if not response.ok:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ElevenLabs could not return the voice catalog.")
+    try:
+        payload = response.json()
+    except (ValueError, requests.exceptions.JSONDecodeError):
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ElevenLabs returned an invalid voice catalog.") from None
+    raw_voices = payload.get("voices") if isinstance(payload, dict) else None
+    if not isinstance(raw_voices, list):
+        raw_voices = []
+
+    semaphore = asyncio.Semaphore(8)
+
+    async def validate(raw_voice: dict) -> dict:
+        voice_id = str(raw_voice.get("voice_id") or "").strip()
+        if not _voice_catalog_id_is_safe(voice_id):
+            return _voice_catalog_payload(raw_voice, availability="error")
+        async with semaphore:
+            availability, detail = await asyncio.to_thread(_fetch_elevenlabs_voice, voice_id)
+        # The list and detail endpoints do not always return the same fields.
+        # Keep list-level ownership/tier/lifecycle metadata when validation's
+        # detail payload is sparse, while allowing the detail response to win
+        # for the richer voice profile fields.
+        merged_voice = {**raw_voice, **(detail or {})}
+        return _voice_catalog_payload(merged_voice, availability=availability)
+
+    voices = await asyncio.gather(*(validate(raw_voice) for raw_voice in raw_voices if isinstance(raw_voice, dict)))
+    unavailable = [voice for voice in voices if voice["availability"] != "available"]
+    visible = voices if include_unavailable else [voice for voice in voices if voice["availability"] == "available"]
+    return {
+        "voices": visible,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "stats": {
+            "total": len(voices),
+            "available": len(voices) - len(unavailable),
+            "hidden": 0 if include_unavailable else len(unavailable),
+            "unavailable": sum(voice["availability"] == "unavailable" for voice in voices),
+            "errors": sum(voice["availability"] == "error" for voice in voices),
+        },
+    }
+
+
+@app.get("/api/voice-catalog/{voice_id}", tags=["Voice Catalog"])
+async def get_voice_catalog_voice(voice_id: str, current_user: dict = Depends(get_current_user)):
+    del current_user
+    if not _voice_catalog_id_is_safe(voice_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid voice ID.")
+    availability, payload = await asyncio.to_thread(_fetch_elevenlabs_voice, voice_id)
+    if availability == "unavailable":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voice is unavailable.")
+    if availability != "available" or not payload:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Voice availability could not be verified.")
+    return {"voice": _voice_catalog_payload(payload), "checked_at": datetime.now(timezone.utc).isoformat()}
+
 @app.get("/api/sonar/call-logs", tags=["Sonar Calls"])
 async def list_call_logs(
     limit: int = 50,
