@@ -7159,11 +7159,9 @@ async def twilio_inbound_webhook(request: Request):
         for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
         if value is not None
     }
-    register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
-        "agent": {"first_message": required_opening},
-    }
     register_payload["conversation_initiation_client_data"]["dynamic_variables"]["secret__nodemere_context"] = issue_internal_context(internal_tool_secret, business)
     if receptionist and receptionist.get("elevenlabs_voice_id"):
+        register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {}
         register_payload["conversation_initiation_client_data"]["conversation_config_override"]["tts"] = {
             "voice_id": receptionist.get("elevenlabs_voice_id"),
         }

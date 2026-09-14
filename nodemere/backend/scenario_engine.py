@@ -1989,13 +1989,12 @@ class ScenarioActionExecutor:
             conversation_initiation_client_data = {
                 "scenario_context": scenario_context,
                 "dynamic_variables": elevenlabs_dynamic_variables,
-                "conversation_config_override": {
-                    "agent": {"first_message": required_opening},
-                },
             }
             if scenario_context.get("elevenlabs_voice_id"):
-                conversation_initiation_client_data["conversation_config_override"]["tts"] = {
+                conversation_initiation_client_data["conversation_config_override"] = {
+                    "tts": {
                     "voice_id": scenario_context["elevenlabs_voice_id"],
+                    },
                 }
             logging.info('scenario_engine._call_customer.event_2009')
 

@@ -10,4 +10,4 @@ def load_project_env() -> None:
     # Load shared project env first, then allow backend-specific overrides.
     for env_path in (project_root / ".env", backend_dir / ".env"):
         if env_path.exists():
-            load_dotenv(env_path)
+            load_dotenv(env_path, override=env_path == backend_dir / ".env")
