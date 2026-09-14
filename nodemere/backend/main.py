@@ -9219,6 +9219,19 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
     receptionist = next((item for item in receptionists if str(item.get("id")) == receptionist_id), None)
     if not receptionist:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose an eligible receptionist before starting a voice conversation.")
+    voice_id = str(receptionist.get("voice_id") or "").strip()
+    try:
+        voice_response = requests.get(
+            f"https://api.elevenlabs.io/v1/voices/{voice_id}",
+            headers={"xi-api-key": elevenlabs_api_key},
+            timeout=10,
+        )
+    except requests.RequestException:
+        logging.warning("main.intercom_voice_validation.unavailable")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Voice availability could not be verified. Please try again.")
+    if not voice_response.ok:
+        logging.warning("main.intercom_voice_validation.invalid status=%s", voice_response.status_code)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This receptionist's voice is unavailable. Choose another receptionist or update the voice ID.")
     intercom_row = (intercom_store().table("intercom").insert({
         "business_id": business["id"],
         "user_id": user_id,
