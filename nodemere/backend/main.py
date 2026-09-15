@@ -9268,6 +9268,10 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
         knowledge_branch_id, knowledge_override = build_intercom_knowledge(
             intercom_store(), business, elevenlabs_api_key, elevenlabs_agent_id_intercom
         )
+    except (ValueError, APIError):
+        # Expected until the private-cache migration is applied, or when a
+        # complete safe override cannot be assembled.
+        logging.info("main.intercom_knowledge.fallback business_id=%s", business["id"])
     except Exception:
         # The existing informational webhooks remain available if sync fails.
         logging.exception("main.intercom_knowledge.unavailable business_id=%s", business["id"])
