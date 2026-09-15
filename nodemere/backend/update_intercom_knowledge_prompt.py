@@ -76,7 +76,11 @@ def main() -> None:
     old_docs = [row["id"] for row in config["agent"]["prompt"].get("knowledge_base") or []]
     old_tools = [row["name"] for row in config["agent"]["prompt"].get("tools") or []]
     config["agent"]["prompt"]["prompt"] = new_prompt
+    # The GET response expands tool_ids into tools; the PATCH API rejects both.
+    config["agent"]["prompt"].pop("tools", None)
     saved = requests.patch(base, headers={**headers, "Content-Type": "application/json"}, params={"branch_id": branch_id}, json={"conversation_config": config, "version_description": "Intercom answers ordinary business facts from per-call knowledge first"}, timeout=30)
+    if not saved.ok:
+        print(f"Agent update rejected ({saved.status_code}): {saved.text[:1200]}")
     saved.raise_for_status()
     checked = requests.get(base, headers=headers, params={"branch_id": branch_id}, timeout=15)
     checked.raise_for_status()
