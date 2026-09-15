@@ -10788,7 +10788,22 @@ def normalize_custom_voice_receptionist(row: dict) -> dict:
 
 @app.post("/api/sonar/receptionists/hire", tags=["Sonar Receptionists"])
 async def hire_receptionist(payload: dict, current_user: dict = Depends(get_current_user)):
-    catalog_id = payload.get("catalog_id") or payload.get("id")
+    logging.info(
+        "hire_receptionist payload keys=%s catalog_id=%r catalogId=%r receptionist_catalog_id=%r id=%r source=%r custom_voice_id=%r",
+        sorted(payload.keys()),
+        payload.get("catalog_id"),
+        payload.get("catalogId"),
+        payload.get("receptionist_catalog_id"),
+        payload.get("id"),
+        payload.get("source"),
+        payload.get("custom_voice_id"),
+    )
+    catalog_id = (
+        payload.get("catalog_id")
+        or payload.get("catalogId")
+        or payload.get("receptionist_catalog_id")
+        or payload.get("id")
+    )
     custom_voice_id = payload.get("custom_voice_id") or payload.get("voice_clone_id")
     source = str(payload.get("source") or "").strip().lower()
     is_voice_clone_hire = source in {"voice_clone", "custom_voice"} or bool(custom_voice_id)
@@ -10907,11 +10922,15 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
 async def list_receptionist_catalog(current_user: dict = Depends(get_current_user)):
     response = (
         supabase.table("receptionist_catalog")
-        .select("*, personality:personalities(mbti,personality)")
+        .select("id,full_name,description,stereotype,avatar,traits,voice,age,first_name,elevenlabs_voice_id,call_types,phone_number,is_active,compliments,complaints,showcase_in_hero,hero_avatar,banner_id,gender,personality_type,personality_id,personality:personalities(mbti,personality)")
         .order("full_name")
         .execute()
     )
-    catalog_rows = response.data or []
+    catalog_rows = [
+        {**row, "catalog_id": row.get("id")}
+        for row in (response.data or [])
+        if row.get("id") is not None
+    ]
     clone_rows = []
     try:
         custom_voice_response = (

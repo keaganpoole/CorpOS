@@ -158,8 +158,13 @@ export const api = {
   clearPendingRestart: (id) => deleteJSON(`/api/pending-restarts/${id}`),
   hireReceptionist: (receptionist) => {
     if (receptionist && typeof receptionist === 'object') {
+      const catalogId = receptionist.catalog_id
+        ?? receptionist.catalogId
+        ?? receptionist.receptionist_catalog_id
+        ?? receptionist.id;
       return postJSON('/api/sonar/receptionists/hire', {
-        catalog_id: receptionist.id,
+        catalog_id: catalogId,
+        id: catalogId,
         source: receptionist.source,
         custom_voice_id: receptionist.custom_voice_id,
       });

@@ -132,10 +132,8 @@ export default function MbtiPersonalityModal({ person, onClose }) {
               <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.18em] text-zinc-600"><Sparkles size={14} /><span>Personality profile</span></div>
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <h2 id="mbti-personality-title" className="text-[32px] font-semibold tracking-[-.05em] text-white">{type || 'MBTI'}</h2>
-                <span className="text-[15px] font-medium text-zinc-500">{profile.name}</span>
               </div>
-              <p className="mt-3 text-[10px] font-bold uppercase tracking-[.18em] text-zinc-600">How {firstName} may sound on the phone</p>
-              <p className="mt-2 max-w-[470px] text-[13px] leading-6 text-zinc-400">{profile.phone}</p>
+              <p className="mt-3 max-w-[470px] text-[13px] leading-6 text-zinc-400">{profile.phone}</p>
             </div>
             <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close personality profile"><X size={17} /></button>
           </div>

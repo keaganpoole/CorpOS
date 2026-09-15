@@ -41,7 +41,10 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
       const availableReceptionists = (catalogData || []).filter(
         (row) => !hiredIds.has(String(row.id)) && !hiredVoices.has(String(row.elevenlabs_voice_id || row.provider_voice_id || ''))
-      );
+      ).map((row) => ({
+        ...row,
+        catalog_id: row.catalog_id ?? row.id,
+      }));
 
       setReceptionists(availableReceptionists);
     } catch (err) {
@@ -106,10 +109,15 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
   const handleSelect = async (receptionist) => {
     if (hiringId) return;
-    setHiringId(receptionist.id);
+    const receptionistId = receptionist.catalog_id ?? receptionist.id;
+    setHiringId(receptionistId);
     setHireError('');
     try {
-      await onHire?.(receptionist);
+      await onHire?.({
+        ...receptionist,
+        id: receptionistId,
+        catalog_id: receptionistId,
+      });
       onClose?.();
     } catch (err) {
       console.error("HireReceptionistModal.jsx:event_113");
