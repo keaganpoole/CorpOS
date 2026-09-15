@@ -1225,6 +1225,25 @@ class ScenarioActionExecutor:
                 dynamic_vars[label_key] = value
         return dynamic_vars
 
+    def _get_receptionist_personality_type(self, context: dict) -> str:
+        receptionist = context.get("receptionist") or {}
+        value = receptionist.get("personality_type")
+        personality = receptionist.get("personality") if isinstance(receptionist.get("personality"), dict) else {}
+        value = value or personality.get("mbti")
+        if value:
+            return str(value).strip().upper()
+        catalog_id = receptionist.get("catalog_id")
+        if catalog_id is None:
+            return ""
+        try:
+            response = self.supabase.table("receptionist_catalog").select("personality_type,personality:personalities(mbti)").eq("id", str(catalog_id)).limit(1).execute()
+            row = (response.data or [{}])[0]
+            linked = row.get("personality") if isinstance(row.get("personality"), dict) else {}
+            return str(row.get("personality_type") or linked.get("mbti") or "").strip().upper()
+        except Exception:
+            logging.warning('scenario_engine._get_receptionist_personality_type.event_1229')
+            return ""
+
     def _find_elevenlabs_phone_number_id_for_business(self, context: dict) -> str:
         business = context.get("business") or {}
         elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
@@ -1933,6 +1952,7 @@ class ScenarioActionExecutor:
                 "company_name": (context.get("business") or {}).get("name") or "",
                 "autonomy_index": 1,
                 "receptionist_name": assistant_name,
+                "personality_type": self._get_receptionist_personality_type(context),
                 "receptionist_id": str((context.get("receptionist") or {}).get("id") or ""),
                 "elevenlabs_voice_id": (context.get("receptionist") or {}).get("elevenlabs_voice_id") or "",
                 "customer_name": (context.get("customer") or {}).get("first_name") or (context.get("person") or {}).get("first_name") or "",

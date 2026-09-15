@@ -4227,6 +4227,32 @@ def get_receptionist_display_name(receptionist: Optional[dict]) -> Optional[str]
     first_name = str(receptionist.get("first_name") or "").strip()
     return first_name or None
 
+def get_receptionist_personality_type(receptionist: Optional[dict]) -> Optional[str]:
+    if not receptionist:
+        return None
+    personality = receptionist.get("personality") if isinstance(receptionist.get("personality"), dict) else {}
+    value = receptionist.get("personality_type") or personality.get("mbti")
+    if value:
+        return str(value).strip().upper()
+    catalog_id = receptionist.get("catalog_id")
+    if catalog_id is None:
+        return None
+    try:
+        response = (
+            supabase.table("receptionist_catalog")
+            .select("personality_type,personality:personalities(mbti)")
+            .eq("id", str(catalog_id))
+            .limit(1)
+            .execute()
+        )
+        row = (response.data or [None])[0] or {}
+        linked = row.get("personality") if isinstance(row.get("personality"), dict) else {}
+        value = row.get("personality_type") or linked.get("mbti")
+        return str(value).strip().upper() if value else None
+    except Exception:
+        logging.warning('main.get_receptionist_personality_type.event_4238')
+        return None
+
 def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: Optional[str] = None):
     business_id_value = int_or_none(business_id)
     user_id_value = str(user_id).strip() if user_id else None
@@ -7123,6 +7149,7 @@ async def twilio_inbound_webhook(request: Request):
                 "business_name": business.get("name") if business else None,
                 "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
                 "receptionist_name": get_receptionist_display_name(receptionist),
+                "personality_type": get_receptionist_personality_type(receptionist),
                 "elevenlabs_voice_id": receptionist.get("elevenlabs_voice_id") if receptionist else None,
                 "twilio_to_number": to_number,
                 "twilio_call_sid": first_present(payload, "CallSid"),
@@ -7250,6 +7277,7 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
         "business_name": business.get("name") if business else None,
         "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
         "receptionist_name": get_receptionist_display_name(receptionist),
+        "personality_type": get_receptionist_personality_type(receptionist),
         "elevenlabs_voice_id": receptionist.get("elevenlabs_voice_id") if receptionist else None,
         "twilio_to_number": call_payload.get("to_number"),
         "twilio_call_sid": call_payload.get("call_id"),
@@ -8923,7 +8951,7 @@ def list_intercom_receptionists(*, user_id: str, business_id: int) -> list[dict]
     if catalog_ids:
         catalog_rows = (
             intercom_store().table("receptionist_catalog")
-            .select("id,avatar,banner_id")
+            .select("id,avatar,banner_id,personality_type,personality:personalities(mbti)")
             .in_("id", catalog_ids)
             .execute()
             .data
@@ -8933,6 +8961,8 @@ def list_intercom_receptionists(*, user_id: str, business_id: int) -> list[dict]
     result = []
     for row in eligible:
         catalog = catalog_by_id.get(str(row.get("catalog_id"))) or {}
+        linked_personality = catalog.get("personality") if isinstance(catalog.get("personality"), dict) else {}
+        personality_type = catalog.get("personality_type") or linked_personality.get("mbti")
         banner = receptionist_banner_url(catalog.get("banner_id"))
         avatar = row.get("avatar") or catalog.get("avatar") or banner
         result.append({
@@ -8941,6 +8971,7 @@ def list_intercom_receptionists(*, user_id: str, business_id: int) -> list[dict]
             "avatar": avatar,
             "banner_url": banner or avatar,
             "voice_id": row.get("elevenlabs_voice_id"),
+            "personality_type": str(personality_type).strip().upper() if personality_type else None,
             "direction": normalize_receptionist_direction(row.get("direction")),
         })
     return result
@@ -9276,6 +9307,7 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
             "receptionist_id": receptionist_id,
             "hired_receptionist_id": receptionist_id,
             "receptionist_name": receptionist.get("name") or "",
+            "personality_type": receptionist.get("personality_type") or "",
             "elevenlabs_voice_id": receptionist.get("voice_id") or "",
             "intercom_session": "true",
             "intercom_id": intercom_id,
