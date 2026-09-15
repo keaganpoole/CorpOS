@@ -159,7 +159,7 @@ from .contract_service import (
 )
 from .project_intelligence import get_project_intelligence, refresh_market_research
 from .business_intelligence import get_business_intelligence
-from .intercom_knowledge import build_intercom_knowledge
+from .intercom_knowledge import build_intercom_knowledge, safe_general_override, sync_general_documents
 from .visitor_intelligence import build_visitor_intelligence_router, build_visitor_router, record_verified_billing_event
 from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_call_nest_event, record_nest_event
 
@@ -1730,6 +1730,18 @@ async def startup_scenario_engine():
             scenario_engine.start_scheduler()
     except Exception as exc:
         logging.error('main.startup_scenario_engine.event_1727')
+
+
+@app.on_event("startup")
+async def startup_intercom_general_knowledge():
+    if not elevenlabs_api_key or not elevenlabs_agent_id_intercom:
+        return
+    try:
+        await asyncio.to_thread(sync_general_documents, elevenlabs_api_key, elevenlabs_agent_id_intercom)
+    except Exception:
+        # Keep the API available; the existing branch documents and webhook
+        # tools remain usable if ElevenLabs cannot be reached during startup.
+        logging.exception("main.intercom_general_knowledge.sync_unavailable")
 
 
 @app.on_event("shutdown")
@@ -9262,19 +9274,21 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
     if not voice_response.ok:
         logging.warning("main.intercom_voice_validation.invalid status=%s", voice_response.status_code)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This receptionist's voice is unavailable. Choose another receptionist or update the voice ID.")
-    knowledge_branch_id = None
-    knowledge_override = None
     try:
         knowledge_branch_id, knowledge_override = build_intercom_knowledge(
             intercom_store(), business, elevenlabs_api_key, elevenlabs_agent_id_intercom
         )
-    except (ValueError, APIError):
-        # Expected until the private-cache migration is applied, or when a
-        # complete safe override cannot be assembled.
-        logging.info("main.intercom_knowledge.fallback business_id=%s", business["id"])
     except Exception:
-        # The existing informational webhooks remain available if sync fails.
-        logging.exception("main.intercom_knowledge.unavailable business_id=%s", business["id"])
+        # Informational webhooks can still answer missing business facts, but
+        # the branch default may contain documents from other businesses.
+        logging.warning("main.intercom_knowledge.business_fallback business_id=%s", business["id"])
+        try:
+            knowledge_branch_id, knowledge_override = safe_general_override(
+                elevenlabs_api_key, elevenlabs_agent_id_intercom
+            )
+        except Exception:
+            logging.exception("main.intercom_knowledge.general_unavailable")
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Voice knowledge is unavailable. Please try again.")
     intercom_row = (intercom_store().table("intercom").insert({
         "business_id": business["id"],
         "user_id": user_id,
@@ -9295,7 +9309,7 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
     response = requests.get(
         "https://api.elevenlabs.io/v1/convai/conversation/get-signed-url",
         headers={"xi-api-key": elevenlabs_api_key},
-        params={"agent_id": elevenlabs_agent_id_intercom, **({"branch_id": knowledge_branch_id} if knowledge_branch_id else {})},
+        params={"agent_id": elevenlabs_agent_id_intercom, "branch_id": knowledge_branch_id},
         timeout=15,
     )
     if not response.ok:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from threading import Lock
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -10,11 +11,17 @@ import requests
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "NODEMERE_KNOWLEDGE_BASE" / "01_BUSINESS_INFORMATION"
+GENERAL_DIR = TEMPLATE_DIR.parent
+GENERAL_FOLDERS = ("04_CONVERSATION_REFERENCE", "05_ERROR_AND_RECOVERY", "06_PERSONALITY_EXPRESSION")
 DOCUMENT_TYPES = ("policies", "services", "staff", "about", "faq", "hours")
 SERVICE_FIELDS = "name,description,price_type,price_min,price_max,unit,category,is_active,sort_order"
 STAFF_FIELDS = "full_name,first_name,last_name,role,is_active,knowledge"
 SHARED_PREFIXES = ("Nodemere — 04_", "Nodemere — 05_", "Nodemere — 06_")
 ELEVENLABS_BASE = "https://api.elevenlabs.io/v1/convai"
+_general_cache_lock = Lock()
+_general_cache: tuple[str, str, list[dict]] | None = None
+_business_id_lock = Lock()
+_validated_business_ids: set[str] = set()
 
 
 def _text(value) -> str:
@@ -155,7 +162,7 @@ def _provider_json(response):
     return response.json()
 
 
-def active_shared_documents(api_key: str, agent_id: str, http=requests) -> tuple[str, list[dict]]:
+def live_branch_configuration(api_key: str, agent_id: str, http=requests) -> tuple[str, dict]:
     headers = {"xi-api-key": api_key}
     branches = _provider_json(http.get(f"{ELEVENLABS_BASE}/agents/{agent_id}/branches", headers=headers, timeout=10)).get("results") or []
     live = [row for row in branches if float(row.get("current_live_percentage") or 0) == 100]
@@ -163,15 +170,105 @@ def active_shared_documents(api_key: str, agent_id: str, http=requests) -> tuple
         raise ValueError("Intercom must have one fully live ElevenLabs branch for a complete KB override")
     branch_id = live[0]["id"]
     config = _provider_json(http.get(f"{ELEVENLABS_BASE}/agents/{agent_id}", headers=headers, params={"branch_id": branch_id}, timeout=10))
+    allowed = (((config.get("platform_settings") or {}).get("overrides") or {}).get("conversation_config_override") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base")
+    if allowed is not True:
+        raise ValueError("The live Intercom branch does not allow KB overrides")
+    return branch_id, config
+
+
+def active_shared_documents(api_key: str, agent_id: str, http=requests) -> tuple[str, list[dict]]:
+    branch_id, config = live_branch_configuration(api_key, agent_id, http=http)
     prompt = (config.get("conversation_config") or {}).get("agent", {}).get("prompt", {})
     attached = prompt.get("knowledge_base") or []
     shared = [dict(row) for row in attached if _text(row.get("name")).startswith(SHARED_PREFIXES) and row.get("id")]
     if not shared:
         raise ValueError("The live Intercom branch has no shared Nodemere documents")
-    allowed = (((config.get("platform_settings") or {}).get("overrides") or {}).get("conversation_config_override") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base")
-    if allowed is not True:
-        raise ValueError("The live Intercom branch does not allow KB overrides")
     return branch_id, shared
+
+
+def cached_general_documents(agent_id: str) -> tuple[str, list[dict]] | None:
+    with _general_cache_lock:
+        if _general_cache and _general_cache[0] == agent_id:
+            return _general_cache[1], [dict(row) for row in _general_cache[2]]
+    return None
+
+
+def sync_general_documents(api_key: str, agent_id: str, http=requests) -> tuple[str, list[dict]]:
+    """Make project Markdown authoritative for the general ElevenLabs documents.
+
+    Runs at backend startup, not per call. Existing file IDs are preserved;
+    only changed source files are uploaded. The resulting IDs are cached for
+    conversation overrides until the next backend restart/deployment.
+    """
+    global _general_cache
+    branch_id, config = live_branch_configuration(api_key, agent_id, http=http)
+    branch_documents = (config.get("conversation_config") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base") or []
+    attached = [dict(row) for row in branch_documents if _text(row.get("name")).startswith(SHARED_PREFIXES) and row.get("id")]
+    # A document already attached to this branch has been validated by
+    # ElevenLabs; reuse that evidence instead of making six separate GETs on
+    # the first call after every deployment.
+    with _business_id_lock:
+        _validated_business_ids.update(row["id"] for row in branch_documents if _text(row.get("name")).startswith("Nodemere business ") and row.get("id"))
+    by_name = {}
+    for row in attached:
+        if row["name"] in by_name:
+            raise ValueError(f"Duplicate general document attachment: {row['name']}")
+        by_name[row["name"]] = row
+    paths = [path for folder in GENERAL_FOLDERS for path in sorted((GENERAL_DIR / folder).glob("*.md"))]
+    if len(paths) != 15 or len({path.name for path in paths}) != 15:
+        raise ValueError(f"Expected 15 distinct general Markdown files, found {len(paths)}")
+    references = []
+    newly_created = []
+    updated_count = 0
+    headers = {"xi-api-key": api_key}
+    for path in paths:
+        name = f"Nodemere — {path.parent.name} — {path.name}"
+        existing = by_name.get(name)
+        if existing:
+            if existing.get("type") != "file":
+                raise ValueError(f"General document is not a file: {name}")
+            document_id = existing["id"]
+            source = _provider_json(http.get(
+                f"{ELEVENLABS_BASE}/knowledge-base/{document_id}/source-file-url",
+                headers=headers, timeout=15,
+            ))
+            remote = http.get(source["signed_url"], timeout=15)
+            remote.raise_for_status()
+            if remote.content != path.read_bytes():
+                with path.open("rb") as markdown:
+                    updated = _provider_json(http.patch(
+                        f"{ELEVENLABS_BASE}/knowledge-base/{document_id}/update-file",
+                        headers=headers, files={"file": (path.name, markdown, "text/markdown")}, timeout=30,
+                    ))
+                if updated.get("id") != document_id:
+                    raise ValueError(f"General document ID changed during sync: {name}")
+                updated_count += 1
+            reference = dict(existing)
+        else:
+            with path.open("rb") as markdown:
+                created = _provider_json(http.post(
+                    f"{ELEVENLABS_BASE}/knowledge-base/file", headers=headers,
+                    files={"file": (path.name, markdown, "text/markdown"), "name": (None, name)}, timeout=30,
+                ))
+            reference = {"type": "file", "name": name, "id": created["id"], "usage_mode": "prompt" if path.stat().st_size <= 10000 else "auto"}
+            newly_created.append(reference)
+        references.append(reference)
+    if newly_created:
+        attach_documents_to_branch(api_key, agent_id, branch_id, newly_created, http=http)
+    with _general_cache_lock:
+        _general_cache = (agent_id, branch_id, [dict(row) for row in references])
+    logging.info("intercom_knowledge.general_synced documents=%s created=%s updated=%s", len(references), len(newly_created), updated_count)
+    return branch_id, references
+
+
+def safe_general_override(api_key: str, agent_id: str, http=requests) -> tuple[str, list[dict]]:
+    """A safe fallback: only verified general documents, never the branch default."""
+    cached = cached_general_documents(agent_id)
+    branch_id, config = live_branch_configuration(api_key, agent_id, http=http)
+    attached_ids = {row.get("id") for row in (config.get("conversation_config") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base") or []}
+    if cached and cached[0] == branch_id and all(row["id"] in attached_ids for row in cached[1]):
+        return cached
+    return sync_general_documents(api_key, agent_id, http=http)
 
 
 def sync_business_documents(store, business: dict, api_key: str, http=requests) -> list[dict]:
@@ -194,6 +291,17 @@ def sync_business_documents(store, business: dict, api_key: str, http=requests) 
                 store.table("knowledge_base").update({"content": "", "version": int(old.get("version") or 0) + 1, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", old["id"]).eq("business_id", business_id).execute()
             continue
         name = f"Nodemere business {business_id} — {kind}.md"
+        if old_id:
+            with _business_id_lock:
+                already_valid = old_id in _validated_business_ids
+            if not already_valid:
+                check = http.get(f"{ELEVENLABS_BASE}/knowledge-base/{old_id}", headers=headers, timeout=10)
+                if check.status_code == 404:
+                    old_id = None
+                else:
+                    check.raise_for_status()
+                    with _business_id_lock:
+                        _validated_business_ids.add(old_id)
         if not old_id:
             created = _provider_json(http.post(f"{ELEVENLABS_BASE}/knowledge-base/text", headers=headers, json={"name": name, "text": content}, timeout=20))
             document_id = created["id"]
@@ -202,6 +310,8 @@ def sync_business_documents(store, business: dict, api_key: str, http=requests) 
             document_id = old_id
         else:
             document_id = old_id
+        with _business_id_lock:
+            _validated_business_ids.add(document_id)
         if not old or old.get("content") != content or not old_id:
             payload = {"business_id": business_id, "document_type": kind, "content": content, "version": int(old.get("version") or 0) + 1 if old else 1, "published": True, "elevenlabs_document_id": document_id, "last_synced_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}
             store.table("knowledge_base").upsert(payload, on_conflict="business_id,document_type").execute()
@@ -209,7 +319,7 @@ def sync_business_documents(store, business: dict, api_key: str, http=requests) 
     return references
 
 
-def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, documents: list[dict], http=requests) -> None:
+def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, documents: list[dict], http=requests) -> set[str]:
     """Ensure per-business documents are valid resources for this branch override.
 
     ElevenLabs rejects an override reference unless the document is attached to
@@ -217,7 +327,7 @@ def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, docu
     still controls which business documents are actually used for the call.
     """
     if not documents:
-        return
+        return set()
     headers = {"xi-api-key": api_key}
     current = _provider_json(http.get(
         f"{ELEVENLABS_BASE}/agents/{agent_id}", headers=headers,
@@ -235,8 +345,10 @@ def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, docu
             known.add(document["id"])
             changed = True
     if not changed:
-        return
+        return known
     prompt["knowledge_base"] = attached
+    # Agent GET expands tool_ids into tools; the update API rejects both.
+    prompt.pop("tools", None)
     agent["prompt"] = prompt
     conversation["agent"] = agent
     response = http.patch(
@@ -244,16 +356,28 @@ def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, docu
         params={"branch_id": branch_id}, json={"conversation_config": conversation}, timeout=20,
     )
     response.raise_for_status()
+    checked = _provider_json(http.get(
+        f"{ELEVENLABS_BASE}/agents/{agent_id}", headers=headers,
+        params={"branch_id": branch_id}, timeout=10,
+    ))
+    checked_ids = {row.get("id") for row in (checked.get("conversation_config") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base") or []}
+    if not {row["id"] for row in documents}.issubset(checked_ids):
+        raise ValueError("ElevenLabs branch did not retain the knowledge attachments")
+    return checked_ids
 
 
 def build_intercom_knowledge(store, business: dict, api_key: str, agent_id: str, http=requests) -> tuple[str, list[dict]]:
     # The migration must run before generated business text is written to the cache.
     if store.rpc("nodemere_intercom_knowledge_ready").execute().data is not True:
         raise ValueError("The private Intercom knowledge cache is not ready")
-    branch_id, shared = active_shared_documents(api_key, agent_id, http=http)
+    branch_id, shared = cached_general_documents(agent_id) or sync_general_documents(api_key, agent_id, http=http)
     business_documents = sync_business_documents(store, business, api_key, http=http)
     if not business_documents:
         raise ValueError("No business knowledge documents are available for this call")
-    attach_documents_to_branch(api_key, agent_id, branch_id, business_documents, http=http)
+    attached_ids = attach_documents_to_branch(api_key, agent_id, branch_id, business_documents, http=http)
+    # A deleted or detached general document would make the call's full
+    # override invalid. The fallback path rebuilds general knowledge first.
+    if not all(row["id"] in attached_ids for row in shared):
+        branch_id, shared = sync_general_documents(api_key, agent_id, http=http)
     logging.info("intercom_knowledge.ready business_id=%s shared=%s business=%s", business["id"], len(shared), len(business_documents))
     return branch_id, shared + business_documents
