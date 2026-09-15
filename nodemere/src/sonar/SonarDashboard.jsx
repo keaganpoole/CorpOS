@@ -2080,6 +2080,7 @@ const SonarDashboard = () => {
     wsStatus,
     agentsLoading,
     updateAgentDirection,
+    removeAgent,
     refresh,
   } = useSonarState();
   const loadTasklistState = useCallback(async () => {
@@ -2523,8 +2524,8 @@ const SonarDashboard = () => {
                             try {
                               const result = await api.deleteAgent(terminateAgent.id);
                               if (!result?.ok) throw new Error('Failed to remove receptionist');
+                              removeAgent(terminateAgent.id);
                               setTerminateAgent(null);
-                              await refresh();
                               await loadAgentScenarios();
                             } catch (err) {
                               console.error("SonarDashboard.jsx:event_2476");

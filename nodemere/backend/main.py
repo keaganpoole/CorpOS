@@ -9279,6 +9279,8 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
             "elevenlabs_voice_id": receptionist.get("voice_id") or "",
             "intercom_session": "true",
             "intercom_id": intercom_id,
+            "person_id": "",
+            "docs_request_id": "",
             "requires_write_confirmation": "true",
             "secret__nodemere_context": capability,
         },
@@ -10905,7 +10907,7 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
 async def list_receptionist_catalog(current_user: dict = Depends(get_current_user)):
     response = (
         supabase.table("receptionist_catalog")
-        .select("*")
+        .select("*, personality:personalities(mbti,personality)")
         .order("full_name")
         .execute()
     )

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import CubePreloader from '../components/CubePreloader';
+import MbtiPersonalityModal from '../components/MbtiPersonalityModal';
 
 const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalogIds = [], hiredVoiceIds = [] }) => {
   const [receptionists, setReceptionists] = useState([]);
@@ -16,6 +17,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
   const [playingVoice, setPlayingVoice] = useState(null);
   const [hiringId, setHiringId] = useState(null);
   const [hireError, setHireError] = useState('');
+  const [personalityPerson, setPersonalityPerson] = useState(null);
   const audioRef = useRef(null);
   const carouselTransitionMs = 620;
   const hiredCatalogKey = (hiredCatalogIds || [])
@@ -189,7 +191,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
                 return (
                   <div
-                    key={person.id}
+                    key={`${person.id ?? person.elevenlabs_voice_id ?? person.full_name ?? 'receptionist'}-${index}`}
                     className={`${baseClasses} ${stateClasses}`}
                     onClick={() => {
                       if (isNext) nextCard();
@@ -223,6 +225,20 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                                 <CalendarDays size={11} />
                                 <span>{person.age} years old</span>
                               </span>
+                            )}
+                            {(person.personality?.mbti || person.personality_type) && (
+                              <button
+                                type="button"
+                                title={person.personality?.personality || 'Personality type'}
+                                aria-label={`Learn about ${person.personality?.mbti || person.personality_type} personality type`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setPersonalityPerson(person);
+                                }}
+                                className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-300/10 px-2.5 py-1 text-[10px] font-bold tracking-[0.14em] text-violet-100/75 transition hover:border-violet-200/35 hover:bg-violet-300/15 hover:text-white"
+                              >
+                                {person.personality?.mbti || person.personality_type}
+                              </button>
                             )}
                           </div>
                         </div>
@@ -271,7 +287,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {person.traits && Array.isArray(person.traits) && person.traits.map((trait, i) => (
-                              <span key={i} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-white/60 font-medium">
+                              <span key={`${String(trait)}-${i}`} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-white/60 font-medium">
                                 {trait}
                               </span>
                             ))}
@@ -317,9 +333,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                   <ChevronLeft size={16} className="text-zinc-300" />
                 </button>
                 <div className="flex gap-2">
-                  {receptionists.map((_, i) => (
+                  {receptionists.map((person, i) => (
                     <button
-                      key={i}
+                      key={`${person.id ?? person.elevenlabs_voice_id ?? person.full_name ?? 'receptionist'}-dot-${i}`}
                       onClick={() => {
                         if (isAnimating) return;
                         setIsAnimating(true);
@@ -351,6 +367,12 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
           </>
         )}
       </motion.div>
+
+      <AnimatePresence>
+        {personalityPerson && (
+          <MbtiPersonalityModal person={personalityPerson} onClose={() => setPersonalityPerson(null)} />
+        )}
+      </AnimatePresence>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');

@@ -11,8 +11,8 @@ const LAYERS = [
 ];
 const FLAT_PATH = 'M 4 22 L 92 22';
 const MAX_AMPLITUDE = 15;
-const ACTIVE_RMS_THRESHOLD = 0.06;
-const FULL_AMPLITUDE_RMS = 0.32;
+const ACTIVE_RMS_THRESHOLD = 0.035;
+const FULL_AMPLITUDE_RMS = 0.18;
 
 function wavePath(amplitude, phase, layerIndex) {
   const layer = LAYERS[layerIndex];

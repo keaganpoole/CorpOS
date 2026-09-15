@@ -179,8 +179,23 @@ const [reactions, setReactions] = useState([]);
 
     const agentsSub = supabase
       .channel('agents-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hired_receptionists' }, () => {
-        // Refresh agents from API to get proper field mapping
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hired_receptionists' }, (payload) => {
+        const changed = payload.new || payload.record || {};
+        const changedId = String(changed.id || payload.old?.id || '');
+        const isRemoved = payload.eventType === 'DELETE'
+          || (payload.eventType === 'UPDATE' && (changed.is_active === false || ['archived', 'deleted', 'terminated'].includes(String(changed.status || '').toLowerCase())));
+
+        if (isRemoved && changedId) {
+          let hadAgent = false;
+          setAgents(prev => {
+            hadAgent = prev.some(agent => String(agent.id) === changedId);
+            return prev.filter(agent => String(agent.id) !== changedId);
+          });
+          if (hadAgent) setSummary(prev => ({ ...prev, activeAgents: Math.max(0, (prev.activeAgents || 0) - 1), totalAgents: Math.max(0, (prev.totalAgents || 0) - 1) }));
+          return;
+        }
+
+        // Refresh only for other changes that may affect field mapping.
         api.getAgents().then(d => { if (d) setAgents(d); });
       })
       .subscribe();
@@ -432,6 +447,11 @@ const [reactions, setReactions] = useState([]);
     return result;
   }, []);
 
+  const removeAgent = useCallback((agentId) => {
+    setAgents(prev => prev.filter(agent => String(agent.id) !== String(agentId)));
+    setSummary(prev => ({ ...prev, activeAgents: Math.max(0, (prev.activeAgents || 0) - 1), totalAgents: Math.max(0, (prev.totalAgents || 0) - 1) }));
+  }, []);
+
   return {
     tasks,
     agents,
@@ -451,6 +471,7 @@ const [reactions, setReactions] = useState([]);
     pingMax,
     updateAgentActive,
     updateAgentDirection,
+    removeAgent,
     refresh: loadInitialData,
   };
 }

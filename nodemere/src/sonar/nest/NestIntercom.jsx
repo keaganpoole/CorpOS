@@ -23,6 +23,11 @@ const createLine = (message) => {
   };
 };
 
+const hideTranscriptTags = (value) => String(value || '')
+  .replace(/\[[^\]]*\]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 const fallbackInitial = (name) => String(name || 'R').trim().slice(0, 1).toUpperCase();
 const receptionistImage = (receptionist) => receptionist?.avatar || receptionist?.banner_url || '';
 
@@ -503,7 +508,7 @@ function NestIntercomInner({ open, onClose }) {
                         exit={{ opacity: 0, y: -6, filter: 'blur(3px)' }}
                         transition={{ duration: line?.draft ? 0.16 : 0.34, ease: [0.16, 1, 0.3, 1] }}
                       >
-                        {line?.text || sessionFallback}
+                        {hideTranscriptTags(line?.text) || sessionFallback}
                       </motion.p>
                     </AnimatePresence>
                   </div>
