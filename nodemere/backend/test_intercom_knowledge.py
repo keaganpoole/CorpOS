@@ -73,11 +73,12 @@ class IntercomKnowledgeTests(unittest.TestCase):
         tenant_doc = [{"id": "business-42", "type": "text", "name": "Business 42 policies"}]
         with patch("backend.intercom_knowledge.active_shared_documents", return_value=("testing", shared)), patch(
             "backend.intercom_knowledge.sync_business_documents", return_value=tenant_doc
-        ) as sync:
+        ) as sync, patch("backend.intercom_knowledge.attach_documents_to_branch") as attach:
             branch, docs = build_intercom_knowledge(store, business, "key", "agent")
         self.assertEqual(branch, "testing")
         self.assertEqual([doc["id"] for doc in docs], ["shared", "business-42"])
         self.assertIs(sync.call_args.args[1], business)
+        attach.assert_called_once_with("key", "agent", "testing", tenant_doc, http=__import__("requests"))
 
 
 if __name__ == "__main__":

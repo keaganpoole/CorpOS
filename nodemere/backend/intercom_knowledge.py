@@ -209,6 +209,43 @@ def sync_business_documents(store, business: dict, api_key: str, http=requests) 
     return references
 
 
+def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, documents: list[dict], http=requests) -> None:
+    """Ensure per-business documents are valid resources for this branch override.
+
+    ElevenLabs rejects an override reference unless the document is attached to
+    the selected agent branch. Attachments are additive; the per-call override
+    still controls which business documents are actually used for the call.
+    """
+    if not documents:
+        return
+    headers = {"xi-api-key": api_key}
+    current = _provider_json(http.get(
+        f"{ELEVENLABS_BASE}/agents/{agent_id}", headers=headers,
+        params={"branch_id": branch_id}, timeout=10,
+    ))
+    conversation = dict(current.get("conversation_config") or {})
+    agent = dict(conversation.get("agent") or {})
+    prompt = dict(agent.get("prompt") or {})
+    attached = list(prompt.get("knowledge_base") or [])
+    known = {row.get("id") for row in attached if row.get("id")}
+    changed = False
+    for document in documents:
+        if document.get("id") and document["id"] not in known:
+            attached.append(document)
+            known.add(document["id"])
+            changed = True
+    if not changed:
+        return
+    prompt["knowledge_base"] = attached
+    agent["prompt"] = prompt
+    conversation["agent"] = agent
+    response = http.patch(
+        f"{ELEVENLABS_BASE}/agents/{agent_id}", headers={**headers, "Content-Type": "application/json"},
+        params={"branch_id": branch_id}, json={"conversation_config": conversation}, timeout=20,
+    )
+    response.raise_for_status()
+
+
 def build_intercom_knowledge(store, business: dict, api_key: str, agent_id: str, http=requests) -> tuple[str, list[dict]]:
     # The migration must run before generated business text is written to the cache.
     if store.rpc("nodemere_intercom_knowledge_ready").execute().data is not True:
@@ -217,5 +254,6 @@ def build_intercom_knowledge(store, business: dict, api_key: str, agent_id: str,
     business_documents = sync_business_documents(store, business, api_key, http=http)
     if not business_documents:
         raise ValueError("No business knowledge documents are available for this call")
+    attach_documents_to_branch(api_key, agent_id, branch_id, business_documents, http=http)
     logging.info("intercom_knowledge.ready business_id=%s shared=%s business=%s", business["id"], len(shared), len(business_documents))
     return branch_id, shared + business_documents
