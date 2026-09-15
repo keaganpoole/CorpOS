@@ -330,6 +330,9 @@ function NestIntercomInner({ open, onClose }) {
         userId: session.user_id,
         dynamicVariables: session.dynamic_variables,
         overrides: {
+          agent: session.knowledge_base_override?.length
+            ? { prompt: { knowledge_base: session.knowledge_base_override } }
+            : undefined,
           tts: session.receptionist?.voice_id ? { voiceId: session.receptionist.voice_id } : undefined,
         },
       });

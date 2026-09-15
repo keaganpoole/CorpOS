@@ -159,6 +159,7 @@ from .contract_service import (
 )
 from .project_intelligence import get_project_intelligence, refresh_market_research
 from .business_intelligence import get_business_intelligence
+from .intercom_knowledge import build_intercom_knowledge
 from .visitor_intelligence import build_visitor_intelligence_router, build_visitor_router, record_verified_billing_event
 from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_call_nest_event, record_nest_event
 
@@ -9261,6 +9262,15 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
     if not voice_response.ok:
         logging.warning("main.intercom_voice_validation.invalid status=%s", voice_response.status_code)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This receptionist's voice is unavailable. Choose another receptionist or update the voice ID.")
+    knowledge_branch_id = None
+    knowledge_override = None
+    try:
+        knowledge_branch_id, knowledge_override = build_intercom_knowledge(
+            intercom_store(), business, elevenlabs_api_key, elevenlabs_agent_id_intercom
+        )
+    except Exception:
+        # The existing informational webhooks remain available if sync fails.
+        logging.exception("main.intercom_knowledge.unavailable business_id=%s", business["id"])
     intercom_row = (intercom_store().table("intercom").insert({
         "business_id": business["id"],
         "user_id": user_id,
@@ -9281,7 +9291,7 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
     response = requests.get(
         "https://api.elevenlabs.io/v1/convai/conversation/get-signed-url",
         headers={"xi-api-key": elevenlabs_api_key},
-        params={"agent_id": elevenlabs_agent_id_intercom},
+        params={"agent_id": elevenlabs_agent_id_intercom, **({"branch_id": knowledge_branch_id} if knowledge_branch_id else {})},
         timeout=15,
     )
     if not response.ok:
@@ -9299,6 +9309,7 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
         "receptionist": receptionist,
         "usage": {"used": int(usage.get("turns_used") or 0), "limit": int(usage.get("limit_turns") or limits["daily_turns"])},
         "limits": limits,
+        "knowledge_base_override": knowledge_override,
         "dynamic_variables": {
             "business_id": str(business.get("id")),
             "user_id": owner_id,
