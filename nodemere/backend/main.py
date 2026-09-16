@@ -9279,16 +9279,8 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
             intercom_store(), business, elevenlabs_api_key, elevenlabs_agent_id_intercom
         )
     except Exception:
-        # Informational webhooks can still answer missing business facts, but
-        # the branch default may contain documents from other businesses.
-        logging.warning("main.intercom_knowledge.business_fallback business_id=%s", business["id"])
-        try:
-            knowledge_branch_id, knowledge_override = safe_general_override(
-                elevenlabs_api_key, elevenlabs_agent_id_intercom
-            )
-        except Exception:
-            logging.exception("main.intercom_knowledge.general_unavailable")
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Voice knowledge is unavailable. Please try again.")
+        logging.exception("main.intercom_knowledge.business_unavailable")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Business voice knowledge is unavailable. Please try again.")
     intercom_row = (intercom_store().table("intercom").insert({
         "business_id": business["id"],
         "user_id": user_id,

@@ -418,17 +418,15 @@ def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, docu
 
 
 def build_intercom_knowledge(store, business: dict, api_key: str, agent_id: str, http=requests) -> tuple[str, list[dict]]:
-    # The migration must run before generated business text is written to the cache.
+    # Intercom calls receive only the current business documents. General
+    # Nodemere conversation/recovery/personality files are intentionally not
+    # included in the per-call override.
     if store.rpc("nodemere_intercom_knowledge_ready").execute().data is not True:
         raise ValueError("The private Intercom knowledge cache is not ready")
-    branch_id, shared = cached_general_documents(agent_id) or sync_general_documents(api_key, agent_id, http=http)
+    branch_id, _config = live_branch_configuration(api_key, agent_id, http=http)
     business_documents = sync_business_documents(store, business, api_key, http=http)
     if not business_documents:
         raise ValueError("No business knowledge documents are available for this call")
-    attached_ids = attach_documents_to_branch(api_key, agent_id, branch_id, business_documents, http=http)
-    # A deleted or detached general document would make the call's full
-    # override invalid. The fallback path rebuilds general knowledge first.
-    if not all(row["id"] in attached_ids for row in shared):
-        branch_id, shared = sync_general_documents(api_key, agent_id, http=http)
-    logging.info("intercom_knowledge.ready business_id=%s shared=%s business=%s", business["id"], len(shared), len(business_documents))
-    return branch_id, shared + business_documents
+    attach_documents_to_branch(api_key, agent_id, branch_id, business_documents, http=http)
+    logging.info("intercom_knowledge.ready business_id=%s shared=0 business=%s", business["id"], len(business_documents))
+    return branch_id, business_documents
