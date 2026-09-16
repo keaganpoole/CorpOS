@@ -186,6 +186,39 @@ def active_shared_documents(api_key: str, agent_id: str, http=requests) -> tuple
     return branch_id, shared
 
 
+def ensure_general_prompt_mode(api_key: str, agent_id: str, branch_id: str, document_ids: set[str], config: dict, http=requests) -> None:
+    """Make the branch attachment settings match the per-call prompt override."""
+    conversation = dict(config.get("conversation_config") or {})
+    agent = dict(conversation.get("agent") or {})
+    prompt = dict(agent.get("prompt") or {})
+    attached = [dict(row) for row in (prompt.get("knowledge_base") or [])]
+    changed = False
+    for row in attached:
+        if row.get("id") in document_ids and row.get("usage_mode") != "prompt":
+            row["usage_mode"] = "prompt"
+            changed = True
+    if not changed:
+        return
+    prompt["knowledge_base"] = attached
+    prompt.pop("tools", None)
+    agent["prompt"] = prompt
+    conversation["agent"] = agent
+    headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
+    response = http.patch(
+        f"{ELEVENLABS_BASE}/agents/{agent_id}", headers=headers,
+        params={"branch_id": branch_id}, json={"conversation_config": conversation}, timeout=20,
+    )
+    response.raise_for_status()
+    checked = _provider_json(http.get(
+        f"{ELEVENLABS_BASE}/agents/{agent_id}", headers={"xi-api-key": api_key},
+        params={"branch_id": branch_id}, timeout=10,
+    ))
+    checked_rows = (checked.get("conversation_config") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base") or []
+    actual = {row.get("id"): row.get("usage_mode") for row in checked_rows}
+    if any(actual.get(document_id) != "prompt" for document_id in document_ids):
+        raise ValueError("ElevenLabs branch did not retain prompt mode for general documents")
+
+
 def cached_general_documents(agent_id: str) -> tuple[str, list[dict]] | None:
     with _general_cache_lock:
         if _general_cache and _general_cache[0] == agent_id:
@@ -244,17 +277,23 @@ def sync_general_documents(api_key: str, agent_id: str, http=requests) -> tuple[
                     raise ValueError(f"General document ID changed during sync: {name}")
                 updated_count += 1
             reference = dict(existing)
+            # General speech and behavior guidance must be available on every
+            # turn.  Existing documents may have been created as ``auto``;
+            # normalize the per-call reference so content updates also switch
+            # them to ElevenLabs' always-include-in-prompt mode.
+            reference["usage_mode"] = "prompt"
         else:
             with path.open("rb") as markdown:
                 created = _provider_json(http.post(
                     f"{ELEVENLABS_BASE}/knowledge-base/file", headers=headers,
                     files={"file": (path.name, markdown, "text/markdown"), "name": (None, name)}, timeout=30,
                 ))
-            reference = {"type": "file", "name": name, "id": created["id"], "usage_mode": "prompt" if path.stat().st_size <= 10000 else "auto"}
+            reference = {"type": "file", "name": name, "id": created["id"], "usage_mode": "prompt"}
             newly_created.append(reference)
         references.append(reference)
     if newly_created:
         attach_documents_to_branch(api_key, agent_id, branch_id, newly_created, http=http)
+    ensure_general_prompt_mode(api_key, agent_id, branch_id, {row["id"] for row in references}, config, http=http)
     with _general_cache_lock:
         _general_cache = (agent_id, branch_id, [dict(row) for row in references])
     logging.info("intercom_knowledge.general_synced documents=%s created=%s updated=%s", len(references), len(newly_created), updated_count)
@@ -315,7 +354,9 @@ def sync_business_documents(store, business: dict, api_key: str, http=requests) 
         if not old or old.get("content") != content or not old_id:
             payload = {"business_id": business_id, "document_type": kind, "content": content, "version": int(old.get("version") or 0) + 1 if old else 1, "published": True, "elevenlabs_document_id": document_id, "last_synced_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}
             store.table("knowledge_base").upsert(payload, on_conflict="business_id,document_type").execute()
-        references.append({"type": "text", "name": name, "id": document_id, "usage_mode": "prompt" if len(content) <= 10000 else "auto"})
+        # Business documents remain retrieval-backed.  General speech and
+        # behavior documents are the only always-in-prompt resources.
+        references.append({"type": "text", "name": name, "id": document_id, "usage_mode": "auto"})
     return references
 
 
@@ -338,7 +379,13 @@ def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, docu
     prompt = dict(agent.get("prompt") or {})
     attached = list(prompt.get("knowledge_base") or [])
     known = {row.get("id") for row in attached if row.get("id")}
+    requested_modes = {document.get("id"): document.get("usage_mode") for document in documents if document.get("id")}
     changed = False
+    for row in attached:
+        requested_mode = requested_modes.get(row.get("id"))
+        if requested_mode and row.get("usage_mode") != requested_mode:
+            row["usage_mode"] = requested_mode
+            changed = True
     for document in documents:
         if document.get("id") and document["id"] not in known:
             attached.append(document)
@@ -361,8 +408,12 @@ def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, docu
         params={"branch_id": branch_id}, timeout=10,
     ))
     checked_ids = {row.get("id") for row in (checked.get("conversation_config") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base") or []}
+    checked_rows = (checked.get("conversation_config") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base") or []
+    checked_modes = {row.get("id"): row.get("usage_mode") for row in checked_rows}
     if not {row["id"] for row in documents}.issubset(checked_ids):
         raise ValueError("ElevenLabs branch did not retain the knowledge attachments")
+    if any(checked_modes.get(row["id"]) != row.get("usage_mode") for row in documents):
+        raise ValueError("ElevenLabs branch did not retain the requested knowledge usage modes")
     return checked_ids
 
 

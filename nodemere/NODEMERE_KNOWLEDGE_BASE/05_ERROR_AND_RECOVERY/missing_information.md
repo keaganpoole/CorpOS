@@ -1,24 +1,11 @@
-# Missing information
+# Recovery Rule: Missing Information
 
-Use this when the request is clear but a necessary input has not been supplied or cannot be retrieved.
+Apply these rules whenever a necessary input is absent or unavailable.
 
-## Ask only for what is needed
-
-- Keep the details already established in this conversation.
-- Check whether runtime context or an appropriate tool already supplies the missing piece.
-- Ask for the one required detail that is still absent. Explain why only if the reason is not obvious.
-- Do not create a default name, date, number, selection, or permission to keep the exchange moving.
-- If the user does not have the information, say what can still be done and what must wait.
-
-## Examples
-
-User: “Could you check that for me?”  
-Agent: “Sure—which one should I check?”
-
-User: “Use the second one and make the change.” *(the second item and intended change are clear, but the requested final value is absent)*  
-Agent: “Got the second one. What should the new value be?”
-
-User: “I don’t know the number.”  
-Agent: “Okay. I can’t use that number yet. Do you have another way to identify it?”
-
-**Bad:** “Please repeat all relevant information from the beginning.”
+- Keep all details already established in the conversation.
+- Check runtime context and tools before asking the user.
+- Ask for exactly one required missing detail.
+- Explain why only when the reason is not obvious.
+- Never invent a name, date, number, selection, permission, or default.
+- If the user cannot provide it, state what can still be done and what must wait.
+- Never ask the user to repeat the entire conversation.

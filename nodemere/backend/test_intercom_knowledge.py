@@ -109,11 +109,14 @@ class IntercomKnowledgeTests(unittest.TestCase):
 
     def test_unchanged_general_files_are_not_uploaded_again(self):
         paths = [path for folder in GENERAL_FOLDERS for path in sorted((GENERAL_DIR / folder).glob("*.md"))]
-        attached = [{"id": f"existing-{index}", "name": f"Nodemere — {path.parent.name} — {path.name}", "type": "file", "usage_mode": "prompt"} for index, path in enumerate(paths)]
+        attached = [{"id": f"existing-{index}", "name": f"Nodemere — {path.parent.name} — {path.name}", "type": "file", "usage_mode": "auto"} for index, path in enumerate(paths)]
         http = Mock()
         def get(url, **kwargs):
             response = Mock()
             response.raise_for_status.return_value = None
+            if "/agents/" in url:
+                response.json.return_value = {"conversation_config": {"agent": {"prompt": {"knowledge_base": [dict(row, usage_mode="prompt") for row in attached]}}}}
+                return response
             if url.endswith("/source-file-url"):
                 response.json.return_value = {"signed_url": f"source://{url.split('/')[-2]}"}
             else:
@@ -126,7 +129,8 @@ class IntercomKnowledgeTests(unittest.TestCase):
         })), patch("backend.intercom_knowledge._general_cache", None):
             _, docs = sync_general_documents("key", "agent", http=http)
         self.assertEqual([row["id"] for row in docs], [row["id"] for row in attached])
-        http.patch.assert_not_called()
+        self.assertEqual({row["usage_mode"] for row in docs}, {"prompt"})
+        self.assertEqual(http.patch.call_count, 1)
         http.post.assert_not_called()
 
     def test_changed_general_file_updates_existing_id_once(self):
@@ -136,6 +140,9 @@ class IntercomKnowledgeTests(unittest.TestCase):
         def get(url, **kwargs):
             response = Mock()
             response.raise_for_status.return_value = None
+            if "/agents/" in url:
+                response.json.return_value = {"conversation_config": {"agent": {"prompt": {"knowledge_base": [dict(row, usage_mode="prompt") for row in attached]}}}}
+                return response
             if url.endswith("/source-file-url"):
                 response.json.return_value = {"signed_url": f"source://{url.split('/')[-2]}"}
             else:
@@ -149,8 +156,8 @@ class IntercomKnowledgeTests(unittest.TestCase):
         })), patch("backend.intercom_knowledge._general_cache", None):
             _, docs = sync_general_documents("key", "agent", http=http)
         self.assertEqual([row["id"] for row in docs], [row["id"] for row in attached])
-        self.assertEqual(http.patch.call_count, 1)
-        self.assertIn("existing-0/update-file", http.patch.call_args.args[0])
+        self.assertEqual(http.patch.call_count, 2)
+        self.assertIn("existing-0/update-file", http.patch.call_args_list[0].args[0])
         http.post.assert_not_called()
 
     def test_deleted_dynamic_id_is_recreated_and_saved(self):

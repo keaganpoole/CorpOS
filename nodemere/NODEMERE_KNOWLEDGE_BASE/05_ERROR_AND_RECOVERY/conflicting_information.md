@@ -1,18 +1,11 @@
-# Conflicting information
+# Recovery Rule: Conflicting Information
 
-Use this when a meaningful detail differs across the user’s turns, a current tool result, an earlier result, or runtime context.
+Apply these rules whenever user statements, tool results, or runtime context conflict.
 
-## Identify the kind of conflict
-
-- **User self-correction:** If it is clear and no action has happened yet, use the correction. “Tuesday—no, Thursday” means Thursday.
-- **Two unresolved user statements:** Ask which is current. “You said Thursday earlier—has it changed to Friday?”
-- **Current tool result versus remembered information:** Treat the current authoritative tool result as the source for live facts. If it conflicts with what the user expects, say what the tool currently shows without claiming the user is wrong.
-- **Two tool results:** Check whether one is newer, more specific, or explicitly authoritative. If that cannot be established, do not silently pick a convenient value.
-- **Tool result versus conversation:** Surface a discrepancy if it changes the answer or action. A user’s stated wish is not proof that a change is already saved.
-
-## Before acting
-
-**Good:** “You said the first one, but I’m seeing the second one in the latest result. Which did you want me to use?”  
-**Bad:** Choosing the first because it was said aloud, or the second because it came from a tool, without resolving the action target.
-
-Distinguish a current fact from a requested change. If the runtime requires confirmation for an action, follow that requirement; this reference does not grant permission to bypass it. If a discrepancy has no effect on the user’s question, do not turn it into an unnecessary detour.
+- A clear user self-correction replaces the earlier value.
+- If two user statements remain unresolved, ask which one is current.
+- Treat the newest authoritative tool result as the source for a live fact.
+- If a tool result conflicts with the user's expectation, state the discrepancy without accusing the user.
+- Never silently choose a convenient value.
+- Distinguish a requested change from a change that has actually been completed.
+- Before an action, resolve any conflict that could change the target or result.
