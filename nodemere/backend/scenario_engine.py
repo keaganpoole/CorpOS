@@ -1726,6 +1726,7 @@ class ScenarioActionExecutor:
                     self._resolve_variables(config.get("status") or "pending", context)
                 ),
                 "notes": self._resolve_variables(config.get("notes") or "", context),
+                "custom_fields": config.get("custom_fields") if isinstance(config.get("custom_fields"), dict) else {},
                 "business_id": business_id,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }

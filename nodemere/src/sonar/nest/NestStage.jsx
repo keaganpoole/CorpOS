@@ -179,6 +179,26 @@ const subjectForEvent = (event) => ({
   metric: '',
 });
 
+const liveCallReceptionist = (event) => {
+  if (event?.event_type !== 'call_active' || !event?.persistent) return null;
+  const payload = payloadForEvent(event);
+  const name = payload.receptionist_name || payload.agent_name || 'Receptionist';
+  return {
+    banner: payload.receptionist_banner_url || '',
+  };
+};
+
+const LiveCallReceptionistArtwork = ({ event }) => {
+  const receptionist = liveCallReceptionist(event);
+  if (!receptionist) return null;
+  return (
+    <div className="nest-live-call-receptionist" aria-hidden="true">
+      {receptionist.banner && <span className="nest-live-call-banner" style={{ backgroundImage: `url(${receptionist.banner})` }} />}
+      <span className="nest-live-call-banner-shade" />
+    </div>
+  );
+};
+
 const INTRO_WORDS = ['Nodemere', 'Events', 'Signal', 'Terminal'];
 
 const IntroWord = ({ word, active, reducedMotion }) => (
@@ -227,10 +247,12 @@ const ContentIcon = ({ Icon, mode, compact, partTwo = false, partOne = false }) 
 
 const ReelPart = ({ event, content, Icon, compact, part }) => (
   <div className={`nest-content nest-reel-content nest-layout-${part === 1 ? 'return' : 'pivot'} nest-density-spacious nest-footprint-${part === 1 ? 'full' : 'medium'} nest-placement-center`}>
-      <ContentIcon Icon={part === 1 ? iconForPartOne(event) : Icon} mode="transform" compact={compact} partOne={part === 1} partTwo={part === 2} />
+      {!(event?.event_type === 'call_active' && event?.direction === 'inbound') && (
+        <ContentIcon Icon={part === 1 ? iconForPartOne(event) : Icon} mode="transform" compact={compact} partOne={part === 1} partTwo={part === 2} />
+      )}
       <div className="nest-content-copy">
         <span className="nest-content-eyebrow">{content.eyebrow}</span>
-        <span className="nest-content-primary">{content.primary}</span>
+        <span className={`nest-content-primary${event?.event_type === 'call_active' && event?.direction === 'inbound' && part === 1 ? ' is-incoming-call' : ''}`}>{content.primary}</span>
         {content.secondary && content.secondary !== content.primary && (
           <span className="nest-content-secondary">{content.secondary}</span>
         )}
@@ -261,6 +283,7 @@ export default function NestStage({ event, concept, privacyMode = false, compact
   const reelTransition = rolled
     ? { duration: reducedMotion ? 0.01 : 0.72, ease: [0.22, 1, 0.36, 1] }
     : transition;
+  const isIncomingCall = event?.event_type === 'call_active' && event?.direction === 'inbound';
 
   useLayoutEffect(() => {
     setRolled(false);
@@ -278,7 +301,7 @@ export default function NestStage({ event, concept, privacyMode = false, compact
       window.clearTimeout(rollTimer);
       if (fadeTimer) window.clearTimeout(fadeTimer);
     };
-  }, [event?.id, concept?.id, reducedMotion]);
+  }, [concept?.id, event?.id, isIncomingCall, reducedMotion]);
 
   useEffect(() => {
     // The typographic intro belongs to the stage mount, not to the event
@@ -332,6 +355,7 @@ export default function NestStage({ event, concept, privacyMode = false, compact
       aria-atomic="true"
       data-priority={event?.priority || 'idle'}
     >
+      <LiveCallReceptionistArtwork event={event} />
       <AnimatePresence mode="wait" initial={false}>
         {!event ? (
           showIntro ? (

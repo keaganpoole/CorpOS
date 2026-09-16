@@ -3687,7 +3687,10 @@ def emit_scenario_trigger(trigger_key: str, payload: Optional[dict] = None, crea
     except Exception as exc:
         logging.warning('main.emit_scenario_trigger.event_3572')
 
-    schedule_backend_scenario_execution(normalized_trigger_key, event_payload)
+    try:
+        schedule_backend_scenario_execution(normalized_trigger_key, event_payload)
+    except Exception:
+        logging.warning('main.emit_scenario_trigger.event_3661')
     return {"ok": True, "event": saved_event, "persisted": persisted}
 
 
@@ -5174,6 +5177,24 @@ def safe_appointment_service_id(value, *, business_id):
         return None
 
 
+def safe_appointment_service_id_from_name(value, *, business_id):
+    name = str(value or "").strip()
+    if not name or business_id is None:
+        return None
+    try:
+        rows = supabase.table("services").select("id,name").eq("business_id", business_id).eq("is_active", True).limit(200).execute().data or []
+    except Exception:
+        return None
+    normalized_name = " ".join(name.lower().split())
+    matches = [
+        row for row in rows
+        if " ".join(str(row.get("name") or "").strip().lower().split()) == normalized_name
+    ]
+    if len(matches) == 1:
+        return matches[0].get("id")
+    return None
+
+
 def load_staff_record(value, *, business_id=None, require_active: bool = False):
     parsed = uuid_or_none(value)
     if not parsed:
@@ -5196,6 +5217,17 @@ def load_staff_record(value, *, business_id=None, require_active: bool = False):
 def safe_appointment_staff_id(value, *, business_id=None, require_active: bool = False):
     staff = load_staff_record(value, business_id=business_id, require_active=require_active)
     return staff.get("id") if staff else None
+
+
+def safe_appointment_receptionist_id(value, *, business_id=None):
+    parsed = int_or_none(value)
+    if parsed is None or business_id is None:
+        return None
+    try:
+        response = supabase.table("hired_receptionists").select("id").eq("id", parsed).eq("business_id", business_id).limit(1).execute()
+        return parsed if response.data else None
+    except Exception:
+        return None
 
 
 def appointment_time_to_minutes(value) -> Optional[int]:
@@ -7167,6 +7199,7 @@ async def twilio_inbound_webhook(request: Request):
                 "elevenlabs_voice_id": receptionist.get("elevenlabs_voice_id") if receptionist else None,
                 "twilio_to_number": to_number,
                 "twilio_call_sid": first_present(payload, "CallSid"),
+                "docs_request_id": "",
                 "required_opening_disclosure": required_opening,
                 "recording_enabled": True,
             }
@@ -7322,6 +7355,7 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
         "elevenlabs_voice_id": receptionist.get("elevenlabs_voice_id") if receptionist else None,
         "twilio_to_number": call_payload.get("to_number"),
         "twilio_call_sid": call_payload.get("call_id"),
+        "docs_request_id": "",
     }
     add_people_intake_dynamic_variables(dynamic_variables, business)
     matched_person = lookup_person_record(
@@ -8248,10 +8282,31 @@ async def legacy_server_tool(
         appointment_time = normalize_appointment_time_value(first_present(merged_payload, "time", "appointment_time"))
         appointment_duration = normalize_appointment_duration(first_present(merged_payload, "duration", "appointment_duration"))
         person_id = safe_appointment_person_id(first_present(merged_payload, "person_id"), business_id=(business or {}).get("id"))
+        if first_present(merged_payload, "person_id") is not None and person_id is None:
+            return {"ok": False, "appointment": None, "reason": "Customer not found"}
         requested_staff_id = first_present(merged_payload, "staff_id")
         staff_id = safe_appointment_staff_id(requested_staff_id, business_id=business.get("id"), require_active=False)
         if requested_staff_id is not None and staff_id is None:
             return {"ok": False, "appointment": None, "reason": "Staff member not found"}
+        requested_receptionist_id = first_present(merged_payload, "receptionist_id", "hired_receptionist_id")
+        receptionist_id = (
+            safe_appointment_receptionist_id(requested_receptionist_id, business_id=business.get("id"))
+            if requested_receptionist_id is not None
+            else (receptionist or {}).get("id")
+        )
+        if requested_receptionist_id is not None and receptionist_id is None:
+            return {"ok": False, "appointment": None, "reason": "Receptionist not found"}
+        service_id = safe_appointment_service_id(
+            first_present(merged_payload, "service_id"),
+            business_id=(business or {}).get("id"),
+        )
+        if service_id is None:
+            service_id = safe_appointment_service_id_from_name(
+                first_present(merged_payload, "service_name", "service", "service_id"),
+                business_id=(business or {}).get("id"),
+            )
+        if first_present(merged_payload, "service_id", "service_name", "service") is not None and service_id is None:
+            return {"ok": False, "appointment": None, "reason": "Service not found"}
         schedule_valid, schedule_reason, schedule_conflicts = validate_appointment_schedule(
             business,
             appointment_date,
@@ -8271,17 +8326,34 @@ async def legacy_server_tool(
             "time": appointment_time,
             "duration": appointment_duration,
             "status": normalize_appointment_status(first_present(merged_payload, "status")),
-            "receptionist_id": int_or_none(first_present(merged_payload, "receptionist_id", "hired_receptionist_id")) or (receptionist or {}).get("id"),
+            "receptionist_id": receptionist_id,
             "notes": first_present(merged_payload, "notes"),
+            # This protected JSON field has a database default, but supplying
+            # it here ensures ProtectedClient encrypts it before the trigger
+            # sees the inserted row.
+            "custom_fields": first_present(merged_payload, "custom_fields") if isinstance(first_present(merged_payload, "custom_fields"), dict) else {},
             "person_id": person_id,
-            "service_id": safe_appointment_service_id(first_present(merged_payload, "service_id"), business_id=(business or {}).get("id")),
+            "service_id": service_id,
             "staff_id": staff_id,
             "business_id": business.get("id") if business else None,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         if first_present(merged_payload, "source") is not None:
             appointment_row["source"] = first_present(merged_payload, "source")
-        response = supabase.table("appointments").insert(appointment_row).execute()
+        try:
+            response = supabase.table("appointments").insert(appointment_row).execute()
+        except Exception as exc:
+            logging.warning('main.legacy_server_tool.create_appointment.event_8286')
+            error_text = str(exc)
+            if "user_id" in error_text:
+                reason = "Appointment owner could not be set"
+            elif "appointments_status_check" in error_text or "status" in error_text:
+                reason = "Appointment status was rejected"
+            elif "foreign key" in error_text.lower():
+                reason = "One appointment reference was rejected"
+            else:
+                reason = "Appointment could not be created"
+            return {"ok": False, "appointment": None, "reason": reason}
         created = response.data[0] if response.data else appointment_row
         created = {"action": "create_appointment", "table": "appointments", **created}
         emit_scenario_trigger(
@@ -10630,6 +10702,7 @@ async def create_sonar_appointment(payload: dict, current_user: dict = Depends(g
         "status": normalize_appointment_status(first_present(payload, "status")),
         "receptionist_id": int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id")),
         "notes": first_present(payload, "notes"),
+        "custom_fields": first_present(payload, "custom_fields") if isinstance(first_present(payload, "custom_fields"), dict) else {},
         "person_id": person_id,
         "service_id": safe_appointment_service_id(first_present(payload, "service_id"), business_id=(business or {}).get("id")),
         "staff_id": staff_id,
@@ -11199,17 +11272,30 @@ async def list_call_logs(
             user_id=business_owner_id(current_user),
         )
         row["receptionist_avatar"] = None
+        row["receptionist_banner_url"] = None
         if row.get("hired_receptionist_id"):
             try:
                 receptionist_response = (
                     supabase.table("hired_receptionists")
-                    .select("avatar")
+                    .select("avatar,catalog_id")
                     .eq("id", str(row["hired_receptionist_id"]))
                     .limit(1)
                     .execute()
                 )
                 if receptionist_response.data:
-                    row["receptionist_avatar"] = receptionist_response.data[0].get("avatar")
+                    receptionist = receptionist_response.data[0]
+                    row["receptionist_avatar"] = receptionist.get("avatar")
+                    catalog_id = receptionist.get("catalog_id")
+                    if catalog_id:
+                        catalog_response = (
+                            supabase.table("receptionist_catalog")
+                            .select("banner_id")
+                            .eq("id", str(catalog_id))
+                            .limit(1)
+                            .execute()
+                        )
+                        if catalog_response.data:
+                            row["receptionist_banner_url"] = receptionist_banner_url(catalog_response.data[0].get("banner_id"))
             except Exception as exc:
                 logging.warning('main.list_call_logs.event_9975')
         row.pop("notes", None)

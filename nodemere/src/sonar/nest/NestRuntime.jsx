@@ -88,7 +88,7 @@ const previewNotificationFixture = (key, label, category) => {
     payload: { preview: true },
   };
   const overrides = {
-    call_active: { title: 'Call in progress', message: 'Jordan Lee', direction: 'inbound', payload: { caller_name: 'Jordan Lee', direction: 'inbound', status: 'in-progress' } },
+    call_active: { title: 'Incoming Call', message: 'Jordan Lee', direction: 'inbound', payload: { caller_name: 'Jordan Lee', direction: 'inbound', status: 'in-progress' } },
     call_completed: { title: 'Call completed', message: 'Jordan Lee · 4m 18s', direction: 'inbound', payload: { caller_name: 'Jordan Lee', direction: 'inbound', status: 'completed' } },
     call_missed: { title: 'Call missed', message: 'Morgan Smith · (207) 555-0148', direction: 'inbound', priority: 'major', payload: { caller_name: 'Morgan Smith', caller_phone: '(207) 555-0148', direction: 'inbound', status: 'missed' } },
     call_failed: { title: 'Call needs attention', message: 'Taylor Reed · Connection failed', direction: 'inbound', priority: 'critical', payload: { caller_name: 'Taylor Reed', direction: 'inbound', status: 'failed' } },
@@ -500,7 +500,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       category: 'calls',
       event_type: 'call_active',
       direction: direction.startsWith('out') ? 'outbound' : direction.startsWith('in') ? 'inbound' : 'unknown',
-      title: direction.startsWith('out') ? 'Outgoing call' : 'Call in progress',
+      title: direction.startsWith('out') ? 'Outgoing call' : 'Incoming Call',
       message: displayName(row) || activeCall.name || (direction.startsWith('out') ? 'Connecting' : 'Live now'),
       priority: 'routine',
       persistent: true,

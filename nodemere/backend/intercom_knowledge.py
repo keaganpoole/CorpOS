@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from threading import Lock
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,8 +13,8 @@ TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "NODEMERE_KNOWLEDGE_BASE" /
 RECEPTIONIST_STORIES_PATH = TEMPLATE_DIR.parent / "RECEPTIONIST_BACKSTORY" / "receptionist_stories.md"
 GENERAL_DIR = TEMPLATE_DIR.parent
 GENERAL_FOLDERS = ("04_CONVERSATION_REFERENCE", "05_ERROR_AND_RECOVERY", "06_PERSONALITY_EXPRESSION")
-SERVICE_FIELDS = "name,description,price_type,price_min,price_max,unit,category,is_active,sort_order"
-STAFF_FIELDS = "full_name,first_name,last_name,role,is_active,working_hours,knowledge"
+SERVICE_FIELDS = "id,name,description,price_type,price_min,price_max,unit,category,is_active,sort_order"
+STAFF_FIELDS = "id,full_name,first_name,last_name,role,is_active,working_hours,knowledge"
 SHARED_PREFIXES = ("Nodemere — 04_", "Nodemere — 05_", "Nodemere — 06_")
 ELEVENLABS_BASE = "https://api.elevenlabs.io/v1/convai"
 _general_cache_lock = Lock()
@@ -61,6 +60,8 @@ def _services(rows: list[dict]) -> str:
         if row.get("is_active") is not True or not _text(row.get("name")):
             continue
         lines = [f"## {_text(row['name'])}"]
+        if _text(row.get("id")):
+            lines.append(f"Service ID: {_text(row['id'])}")
         for label, value in (("Category", row.get("category")), ("Description", row.get("description")), ("Price", _price(row))):
             if _text(value):
                 lines.append(f"{label}: {_text(value)}")
@@ -77,6 +78,8 @@ def _staff(rows: list[dict]) -> str:
         if not name:
             continue
         lines = [f"## {name}"]
+        if _text(row.get("id")):
+            lines.append(f"Staff ID: {_text(row['id'])}")
         if _text(row.get("role")):
             lines.append(f"Role: {_text(row['role'])}")
         if _markdown(row.get("knowledge")):
@@ -207,7 +210,6 @@ def _existing_text_documents(business_id, api_key: str, http=requests) -> dict[s
 
 def live_branch_configuration(api_key: str, agent_id: str, http=requests) -> tuple[str, dict]:
     headers = {"xi-api-key": api_key}
-    logging.info("intercom_knowledge.branch_lookup_started.event_2101")
     branches = _provider_json(http.get(f"{ELEVENLABS_BASE}/agents/{agent_id}/branches", headers=headers, timeout=10)).get("results") or []
     live = [row for row in branches if float(row.get("current_live_percentage") or 0) == 100]
     if len(live) != 1:
@@ -217,7 +219,6 @@ def live_branch_configuration(api_key: str, agent_id: str, http=requests) -> tup
     allowed = (((config.get("platform_settings") or {}).get("overrides") or {}).get("conversation_config_override") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base")
     if allowed is not True:
         raise ValueError("The live Intercom branch does not allow KB overrides")
-    logging.info("intercom_knowledge.branch_ready.event_2102")
     return branch_id, config
 
 
@@ -341,7 +342,6 @@ def sync_general_documents(api_key: str, agent_id: str, http=requests) -> tuple[
     ensure_general_prompt_mode(api_key, agent_id, branch_id, {row["id"] for row in references}, config, http=http)
     with _general_cache_lock:
         _general_cache = (agent_id, branch_id, [dict(row) for row in references])
-    logging.info("intercom_knowledge.general_synced documents=%s created=%s updated=%s", len(references), len(newly_created), updated_count)
     return branch_id, references
 
 
@@ -356,22 +356,15 @@ def safe_general_override(api_key: str, agent_id: str, http=requests) -> tuple[s
 
 
 def sync_business_documents(store, business: dict, api_key: str, http=requests) -> list[dict]:
-    logging.info("intercom_knowledge.business_sync_started.event_2111")
     business_id = business["id"]
-    logging.info("intercom_knowledge.services_query_started.event_2113")
     services = (store.table("services").select(SERVICE_FIELDS).eq("business_id", business_id).limit(1000).execute().data or [])
-    logging.info("intercom_knowledge.services_query_ready.event_2114")
-    logging.info("intercom_knowledge.staff_query_started.event_2115")
     staff = (store.table("staff").select(STAFF_FIELDS).eq("business_id", business_id).limit(200).execute().data or [])
-    logging.info("intercom_knowledge.staff_query_ready.event_2116")
     content_by_type = render_documents(business, services, staff)
-    logging.info("intercom_knowledge.documents_rendered.event_2117")
     provider_documents = _existing_text_documents(business_id, api_key, http=http)
     cached_documents = _business_document_cache.setdefault(str(business_id), {})
     references = []
     headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
     for kind, content in content_by_type.items():
-        logging.info("intercom_knowledge.document_sync_started.event_2119")
         try:
             if not content:
                 continue
@@ -394,12 +387,7 @@ def sync_business_documents(store, business: dict, api_key: str, http=requests) 
             cached_documents[kind] = (document_id, content)
             references.append({"type": "text", "name": name, "id": document_id, "usage_mode": "auto"})
         except Exception:
-            # Keep provider details out of application logs, but leave a
-            # distinct marker showing that the failure happened in this
-            # document's sync rather than in business lookup or rendering.
-            logging.error("intercom_knowledge.document_sync_failed.event_2140")
             raise
-    logging.info("intercom_knowledge.business_sync_ready.event_2112")
     return references
 
 
@@ -457,7 +445,6 @@ def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, docu
         raise ValueError("ElevenLabs branch did not retain the knowledge attachments")
     if any(checked_modes.get(row["id"]) != row.get("usage_mode") for row in documents):
         raise ValueError("ElevenLabs branch did not retain the requested knowledge usage modes")
-    logging.info("intercom_knowledge.business_attach_ready.event_2122")
     return checked_ids
 
 
@@ -465,11 +452,9 @@ def build_intercom_knowledge(store, business: dict, api_key: str, agent_id: str,
     # Intercom calls receive only the current business documents. General
     # Nodemere conversation/recovery/personality files are intentionally not
     # included in the per-call override.
-    logging.info("intercom_knowledge.business_build_started.event_2131")
     branch_id, _config = live_branch_configuration(api_key, agent_id, http=http)
     business_documents = sync_business_documents(store, business, api_key, http=http)
     if not business_documents:
         raise ValueError("No business knowledge documents are available for this call")
     attach_documents_to_branch(api_key, agent_id, branch_id, business_documents, http=http)
-    logging.info("intercom_knowledge.ready business_id=%s shared=0 business=%s", business["id"], len(business_documents))
     return branch_id, business_documents

@@ -263,6 +263,7 @@ export function normalizeCall(row) {
     time: row.started_at || row.event_timestamp || row.created_at,
     receptionist: displayText(receptionistName, 'Receptionist'),
     receptionistAvatar: row.receptionist_avatar || (avatarName && avatarName !== 'receptionist' ? `${AVATAR_BASE}/${avatarName}.jpg` : ''),
+    receptionistBanner: row.receptionist_banner_url || '',
     isFavorited: Boolean(row.is_favorited),
     audioUrl: row.audio_url || '',
     hasAudio: Boolean(row.has_audio),

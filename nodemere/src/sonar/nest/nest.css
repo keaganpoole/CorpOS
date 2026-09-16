@@ -69,6 +69,7 @@
 }
 .nest-content-eyebrow { grid-area: eyebrow; color: rgba(var(--nest-accent),.62); font-size: 9px; line-height: 1; font-weight: 520; letter-spacing: -.01em; text-transform: none; }
 .nest-content-primary { grid-area: primary; overflow: hidden; text-overflow: ellipsis; color: rgba(255,255,255,.96); font-size: 17px; line-height: 1.08; font-weight: 590; letter-spacing: -.04em; }
+.nest-content-primary.is-incoming-call { font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; background-image: linear-gradient(115deg, #475569 0%, #818cf8 32%, #fbcfe8 48%, #bae6fd 56%, #64748b 78%, #475569 100%); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; will-change: background-position, filter; transform: translateZ(0); animation: nest-auroral-whisper 5.2s cubic-bezier(.4, 0, .2, 1) infinite; }
 .nest-content-secondary { grid-area: secondary; overflow: hidden; text-overflow: ellipsis; color: rgba(255,255,255,.46); font-size: 11px; line-height: 1.12; font-weight: 450; letter-spacing: -.015em; }
 .nest-content-metric { grid-area: metric; align-self: center; color: rgba(255,255,255,.68); font-size: 13px; line-height: 1; font-weight: 560; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
 
@@ -209,6 +210,7 @@
   42% { transform: translateY(-1px) rotate(-2deg); opacity: .9; }
   68% { transform: translateY(.5px) rotate(1deg); opacity: .84; }
 }
+@keyframes nest-auroral-whisper { 0% { background-position: 0% 50%; filter: drop-shadow(0 0 0 transparent); } 50% { background-position: 100% 50%; filter: drop-shadow(0 0 12px rgba(165,180,252,.28)); } 100% { background-position: 300% 50%; filter: drop-shadow(0 0 0 transparent); } }
 @keyframes nest-part-two-icon-breathe { 0%, 100% { transform: scale(1); opacity: .78; } 50% { transform: scale(1.07); opacity: .94; } }
 @keyframes nest-part-two-icon-tilt { 0%, 100% { transform: rotate(0deg) scale(1); } 38% { transform: rotate(-8deg) scale(1.04); } 64% { transform: rotate(4deg) scale(1.01); } }
 @keyframes nest-part-two-icon-pulse { 0%, 100% { transform: scale(1); opacity: .78; } 45% { transform: scale(1.14); opacity: 1; } 62% { transform: scale(.98); opacity: .84; } }
@@ -230,6 +232,9 @@
 .nest-dock-tools button { display: grid; place-items: center; width: 25px; height: 25px; border: 0; border-radius: 8px; color: rgba(255,255,255,.28); background: transparent; transition: color 160ms ease, background 160ms ease; }
 .nest-dock-tools button:hover { color: rgba(255,255,255,.72); background: rgba(255,255,255,.05); }
 .nest-queue-count { display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.5); font-size: 8px; font-weight: 700; }
+.nest-live-call-receptionist { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.nest-live-call-banner { position: absolute; inset: 0 auto 0 0; width: 58%; background-position: 50% 34%; background-repeat: no-repeat; background-size: cover; opacity: .3; filter: saturate(.62) brightness(.78); transform: scale(1.03); }
+.nest-live-call-banner-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(3,3,4,.26), rgba(7,6,8,.52) 40%, rgba(5,5,6,.88) 72%, rgba(2,2,3,.98)); }
 
 /* Intercom occupies the existing NEST strip; it never creates a second dock. */
 .intercom-surface { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; overflow: hidden; isolation: isolate; color: white; }

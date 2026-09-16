@@ -16,20 +16,22 @@ class IntercomKnowledgeTests(unittest.TestCase):
             }},
         }
         services = [
-            {"name": "Consultation", "is_active": True, "price_type": "starting_at", "price_min": 50, "unit": "session"},
+            {"id": "11111111-1111-4111-8111-111111111111", "name": "Consultation", "is_active": True, "price_type": "starting_at", "price_min": 50, "unit": "session"},
             {"name": "Old Service", "is_active": False, "price_type": "fixed", "price_min": 90},
         ]
         staff = [
-            {"full_name": "Sam", "is_active": True, "role": "Specialist", "knowledge": "Works with new clients",
+            {"id": "22222222-2222-4222-8222-222222222222", "full_name": "Sam", "is_active": True, "role": "Specialist", "knowledge": "Works with new clients",
              "working_hours": {"Monday": {"open": "09:00", "close": "17:00"}}},
             {"full_name": "Taylor", "is_active": False, "role": "Specialist"},
         ]
         docs = render_documents(business, services, staff)
         self.assertEqual(set(docs), {"policies", "services", "staff", "about", "faq", "hours", "receptionist_stories"})
+        self.assertIn("Service ID: 11111111-1111-4111-8111-111111111111", docs["services"])
         self.assertIn("From $50 per session", docs["services"])
         self.assertNotIn("Old Service", docs["services"])
         self.assertNotIn("duration", docs["services"].lower())
         self.assertIn("Sam", docs["staff"])
+        self.assertIn("Staff ID: 22222222-2222-4222-8222-222222222222", docs["staff"])
         self.assertIn("Monday: 09:00–17:00", docs["staff"])
         self.assertNotIn("Taylor", docs["staff"])
         self.assertIn("Monday: 09:00–17:00", docs["hours"])
