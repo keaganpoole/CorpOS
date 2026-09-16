@@ -159,7 +159,7 @@ from .contract_service import (
 )
 from .project_intelligence import get_project_intelligence, refresh_market_research
 from .business_intelligence import get_business_intelligence
-from .intercom_knowledge import build_intercom_knowledge, safe_general_override, sync_general_documents
+from .intercom_knowledge import build_intercom_knowledge
 from .visitor_intelligence import build_visitor_intelligence_router, build_visitor_router, record_verified_billing_event
 from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_call_nest_event, record_nest_event
 
@@ -1730,18 +1730,6 @@ async def startup_scenario_engine():
             scenario_engine.start_scheduler()
     except Exception as exc:
         logging.error('main.startup_scenario_engine.event_1727')
-
-
-@app.on_event("startup")
-async def startup_intercom_general_knowledge():
-    if not elevenlabs_api_key or not elevenlabs_agent_id_intercom:
-        return
-    try:
-        await asyncio.to_thread(sync_general_documents, elevenlabs_api_key, elevenlabs_agent_id_intercom)
-    except Exception:
-        # Keep the API available; the existing branch documents and webhook
-        # tools remain usable if ElevenLabs cannot be reached during startup.
-        logging.exception("main.intercom_general_knowledge.sync_unavailable")
 
 
 @app.on_event("shutdown")
@@ -5054,6 +5042,19 @@ def upsert_active_call_log(call_payload: dict, *, user_id: Optional[str], busine
         # The call itself must continue even if NEST's live indicator cannot be persisted.
         logging.warning('main.upsert_active_call_log.event_4889')
 
+
+def mark_call_log_failed(*, provider_call_sid: Optional[str], business_id: Optional[str], user_id: Optional[str], reason: str) -> None:
+    if not provider_call_sid:
+        return
+    try:
+        getattr(supabase_admin, "raw", supabase_admin).table("call_logs").update({
+            "status": "failed",
+            "failure_reason": reason,
+            "ended_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("provider_call_sid", str(provider_call_sid)).eq("business_id", business_id).execute()
+    except Exception:
+        logging.warning('main.mark_call_log_failed.event_4899')
+
 def normalize_intent_key(intent_key: str) -> str:
     normalized = (intent_key or "").strip().lower().replace(" ", "_").replace("-", "_")
     return INTENT_KEY_ALIASES.get(normalized, normalized)
@@ -7171,6 +7172,27 @@ async def twilio_inbound_webhook(request: Request):
             }
         },
     }
+    try:
+        # Inbound calls use the same business-only knowledge documents as
+        # Intercom. The deleted general Nodemere documents are never included.
+        _knowledge_branch_id, knowledge_override = build_intercom_knowledge(
+            intercom_store(), business, elevenlabs_api_key, elevenlabs_agent_id_inbound
+        )
+    except Exception:
+        logging.error('main.twilio_inbound_webhook.business_knowledge_unavailable.event_7183')
+        mark_call_log_failed(
+            provider_call_sid=event_payload.get("call_id"),
+            business_id=business.get("id"),
+            user_id=resolved_user_id,
+            reason="Business voice knowledge was unavailable.",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail='Business voice knowledge is unavailable.',
+        )
+    register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
+        "agent": {"prompt": {"knowledge_base": knowledge_override}},
+    }
     add_people_intake_dynamic_variables(
         register_payload["conversation_initiation_client_data"]["scenario_context"],
         business,
@@ -7201,7 +7223,7 @@ async def twilio_inbound_webhook(request: Request):
     }
     register_payload["conversation_initiation_client_data"]["dynamic_variables"]["secret__nodemere_context"] = issue_internal_context(internal_tool_secret, business)
     if receptionist and receptionist.get("elevenlabs_voice_id"):
-        register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {}
+        register_payload["conversation_initiation_client_data"].setdefault("conversation_config_override", {})
         register_payload["conversation_initiation_client_data"]["conversation_config_override"]["tts"] = {
             "voice_id": receptionist.get("elevenlabs_voice_id"),
         }
@@ -7219,6 +7241,12 @@ async def twilio_inbound_webhook(request: Request):
     )
     if not response.ok:
         logging.error('main.twilio_inbound_webhook.event_7065')
+        mark_call_log_failed(
+            provider_call_sid=event_payload.get("call_id"),
+            business_id=business.get("id"),
+            user_id=resolved_user_id,
+            reason="The inbound voice call could not be registered.",
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail='The request could not be completed',

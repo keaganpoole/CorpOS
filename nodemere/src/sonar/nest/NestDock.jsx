@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Beaker, Eye, EyeOff, History, MessageCircle, X } from 'lucide-react';
+import { Eye, EyeOff, History, MessageCircle, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import NestStage from './NestStage';
 import NestAnimationStudio from './NestAnimationStudio';
@@ -83,6 +83,7 @@ export default function NestDock({ onStageChange, businessAvatar = '' }) {
     introStarted,
     markIntroStarted,
     setVoiceActive,
+    hideCurrentNotification,
   } = useNest();
   // Idle Nest stays quiet and centered. Any real event turns the usable toolbar
   // row into the Nest canvas; the selected concept decides how much of it to use.
@@ -125,9 +126,9 @@ export default function NestDock({ onStageChange, businessAvatar = '' }) {
             <button type="button" onClick={() => setHistoryOpen(true)} aria-label="Open Nest activity history" title="Nest history (Ctrl+Shift+H)">
               <History size={13} />
             </button>
-            {import.meta.env.DEV && (
-              <button type="button" onMouseDown={() => setStudioOpen(true)} onClick={() => setStudioOpen(true)} aria-label="Open Nest Animation Studio" title="Nest Animation Studio (Ctrl+Shift+N)">
-                <Beaker size={13} />
+            {displayEvent && (
+              <button type="button" onMouseDown={hideCurrentNotification} onClick={hideCurrentNotification} aria-label="Hide current Nest notification" title="Hide current notification">
+                <EyeOff size={13} />
               </button>
             )}
           </div>

@@ -267,6 +267,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   const [activeEvent, setActiveEvent] = useState(null);
   const [previewEvent, setPreviewEvent] = useState(null);
   const [liveCall, setLiveCall] = useState(null);
+  const [hiddenLiveCallId, setHiddenLiveCallId] = useState(null);
   const [introStarted, setIntroStarted] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
@@ -489,6 +490,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       && nestPreferences.notifications?.call_active !== false;
     if (!activeCall || !callsEnabled) {
       setLiveCall(null);
+      setHiddenLiveCallId(null);
       return;
     }
     const row = callRow(activeCall);
@@ -505,6 +507,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       occurred_at: row.started_at || row.created_at || new Date().toISOString(),
       payload: row,
     });
+    setHiddenLiveCallId((hiddenId) => hiddenId && hiddenId !== String(activeCall.id) ? null : hiddenId);
   }, [calls, callsLoading, enqueue, nestPreferences]);
 
   useEffect(() => {
@@ -593,7 +596,19 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     setIntroStarted(true);
   }, []);
 
-  const displayEvent = voiceActive ? null : (previewEvent || activeEvent || liveCall);
+  const visibleLiveCall = liveCall && hiddenLiveCallId !== String(liveCall.payload?.id || '').trim() ? liveCall : null;
+  const displayEvent = voiceActive ? null : (previewEvent || activeEvent || visibleLiveCall);
+  const hideCurrentNotification = useCallback(() => {
+    if (displayEvent?.event_type === 'call_active' && displayEvent.payload?.id) {
+      setHiddenLiveCallId(String(displayEvent.payload.id));
+      return;
+    }
+    if (displayEvent?.preview) {
+      setPreviewEvent(null);
+      return;
+    }
+    if (displayEvent) setActiveEvent(null);
+  }, [displayEvent]);
   const selectedPreference = displayEvent ? selectedConcepts[displayEvent.category] : null;
   const hasSavedPreference = selectedPreference !== null && typeof selectedPreference === 'object';
   const selectedConceptId = hasSavedPreference ? selectedPreference.conceptId : selectedPreference;
@@ -622,7 +637,8 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     selectConcept,
     previewConcept,
     previewNotification,
-  }), [activeEvent, displayEvent, displayConcept, history, historyOpen, introStarted, liveCall, markIntroStarted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy, voiceActive]);
+    hideCurrentNotification,
+  }), [activeEvent, displayEvent, displayConcept, hideCurrentNotification, history, historyOpen, introStarted, liveCall, markIntroStarted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy, voiceActive]);
 
   return <NestContext.Provider value={value}>{children}</NestContext.Provider>;
 };

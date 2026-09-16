@@ -11,17 +11,18 @@ import requests
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "NODEMERE_KNOWLEDGE_BASE" / "01_BUSINESS_INFORMATION"
+RECEPTIONIST_STORIES_PATH = TEMPLATE_DIR.parent / "RECEPTIONIST_BACKSTORY" / "receptionist_stories.md"
 GENERAL_DIR = TEMPLATE_DIR.parent
 GENERAL_FOLDERS = ("04_CONVERSATION_REFERENCE", "05_ERROR_AND_RECOVERY", "06_PERSONALITY_EXPRESSION")
-DOCUMENT_TYPES = ("policies", "services", "staff", "about", "faq", "hours")
 SERVICE_FIELDS = "name,description,price_type,price_min,price_max,unit,category,is_active,sort_order"
-STAFF_FIELDS = "full_name,first_name,last_name,role,is_active,knowledge"
+STAFF_FIELDS = "full_name,first_name,last_name,role,is_active,working_hours,knowledge"
 SHARED_PREFIXES = ("Nodemere — 04_", "Nodemere — 05_", "Nodemere — 06_")
 ELEVENLABS_BASE = "https://api.elevenlabs.io/v1/convai"
 _general_cache_lock = Lock()
 _general_cache: tuple[str, str, list[dict]] | None = None
 _business_id_lock = Lock()
 _validated_business_ids: set[str] = set()
+_business_document_cache: dict[str, dict[str, tuple[str, str]]] = {}
 
 
 def _text(value) -> str:
@@ -80,6 +81,24 @@ def _staff(rows: list[dict]) -> str:
             lines.append(f"Role: {_text(row['role'])}")
         if _markdown(row.get("knowledge")):
             lines.append(f"Profile: {_markdown(row['knowledge'])}")
+        working_hours = row.get("working_hours")
+        if isinstance(working_hours, str):
+            import json
+            try:
+                working_hours = json.loads(working_hours)
+            except ValueError:
+                working_hours = None
+        if isinstance(working_hours, dict):
+            schedule = []
+            for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"):
+                entry = next((value for key, value in working_hours.items() if _text(key).lower()[:3] == day[:3].lower()), None)
+                if not isinstance(entry, dict) or entry.get("enabled") is False:
+                    schedule.append(f"{day}: Not working")
+                    continue
+                opening = entry.get("open", entry.get("start"))
+                closing = entry.get("close", entry.get("end"))
+                schedule.append(f"{day}: {_text(opening)}–{_text(closing)}" if opening is not None and closing is not None else f"{day}: Working hours not specified")
+            lines.append("Schedule:\n" + "\n".join(schedule))
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 
@@ -146,11 +165,15 @@ def render_documents(business: dict, services: list[dict], staff: list[dict]) ->
         "about": _about(business),
         "faq": _markdown(business.get("faq")),
         "hours": _hours(business),
+        "receptionist_stories": RECEPTIONIST_STORIES_PATH.read_text(encoding="utf-8").strip() if RECEPTIONIST_STORIES_PATH.exists() else "",
     }
     result = {}
     for kind, section in sections.items():
         if not section:
             result[kind] = ""
+            continue
+        if kind == "receptionist_stories":
+            result[kind] = section
             continue
         template = (TEMPLATE_DIR / f"{kind}.md").read_text(encoding="utf-8")
         result[kind] = template.replace("{{business_name}}", name).replace(f"{{{{{kind}}}}}", section).strip()
@@ -162,8 +185,29 @@ def _provider_json(response):
     return response.json()
 
 
+def _existing_text_documents(business_id, api_key: str, http=requests) -> dict[str, dict]:
+    """Find this business's existing provider documents without a DB cache."""
+    prefix = f"Nodemere business {business_id} —"
+    response = http.get(
+        f"{ELEVENLABS_BASE}/knowledge-base",
+        headers={"xi-api-key": api_key},
+        params={"search": prefix, "types": "text", "page_size": 100},
+        timeout=10,
+    )
+    documents = (_provider_json(response).get("documents") or [])
+    if not isinstance(documents, list):
+        documents = []
+    return {
+        str(row["name"]): row
+        for row in documents
+        if isinstance(row, dict) and row.get("name") and row.get("id")
+        and str(row["name"]).startswith(prefix)
+    }
+
+
 def live_branch_configuration(api_key: str, agent_id: str, http=requests) -> tuple[str, dict]:
     headers = {"xi-api-key": api_key}
+    logging.info("intercom_knowledge.branch_lookup_started.event_2101")
     branches = _provider_json(http.get(f"{ELEVENLABS_BASE}/agents/{agent_id}/branches", headers=headers, timeout=10)).get("results") or []
     live = [row for row in branches if float(row.get("current_live_percentage") or 0) == 100]
     if len(live) != 1:
@@ -173,6 +217,7 @@ def live_branch_configuration(api_key: str, agent_id: str, http=requests) -> tup
     allowed = (((config.get("platform_settings") or {}).get("overrides") or {}).get("conversation_config_override") or {}).get("agent", {}).get("prompt", {}).get("knowledge_base")
     if allowed is not True:
         raise ValueError("The live Intercom branch does not allow KB overrides")
+    logging.info("intercom_knowledge.branch_ready.event_2102")
     return branch_id, config
 
 
@@ -311,52 +356,50 @@ def safe_general_override(api_key: str, agent_id: str, http=requests) -> tuple[s
 
 
 def sync_business_documents(store, business: dict, api_key: str, http=requests) -> list[dict]:
+    logging.info("intercom_knowledge.business_sync_started.event_2111")
     business_id = business["id"]
+    logging.info("intercom_knowledge.services_query_started.event_2113")
     services = (store.table("services").select(SERVICE_FIELDS).eq("business_id", business_id).limit(1000).execute().data or [])
+    logging.info("intercom_knowledge.services_query_ready.event_2114")
+    logging.info("intercom_knowledge.staff_query_started.event_2115")
     staff = (store.table("staff").select(STAFF_FIELDS).eq("business_id", business_id).limit(200).execute().data or [])
+    logging.info("intercom_knowledge.staff_query_ready.event_2116")
     content_by_type = render_documents(business, services, staff)
-    rows = store.table("knowledge_base").select("*").eq("business_id", business_id).execute().data or []
-    existing = {row["document_type"]: row for row in rows if row.get("document_type") in DOCUMENT_TYPES}
+    logging.info("intercom_knowledge.documents_rendered.event_2117")
+    provider_documents = _existing_text_documents(business_id, api_key, http=http)
+    cached_documents = _business_document_cache.setdefault(str(business_id), {})
     references = []
     headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
     for kind, content in content_by_type.items():
-        old = existing.get(kind) or {}
-        if old.get("published") is False:
-            continue
-        old_id = old.get("elevenlabs_document_id")
-        if not content:
-            # An empty source must not expose an old document in this call.
-            if old and old.get("content"):
-                store.table("knowledge_base").update({"content": "", "version": int(old.get("version") or 0) + 1, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", old["id"]).eq("business_id", business_id).execute()
-            continue
-        name = f"Nodemere business {business_id} — {kind}.md"
-        if old_id:
-            with _business_id_lock:
-                already_valid = old_id in _validated_business_ids
-            if not already_valid:
-                check = http.get(f"{ELEVENLABS_BASE}/knowledge-base/{old_id}", headers=headers, timeout=10)
-                if check.status_code == 404:
-                    old_id = None
-                else:
-                    check.raise_for_status()
-                    with _business_id_lock:
-                        _validated_business_ids.add(old_id)
-        if not old_id:
-            created = _provider_json(http.post(f"{ELEVENLABS_BASE}/knowledge-base/text", headers=headers, json={"name": name, "text": content}, timeout=20))
-            document_id = created["id"]
-        elif old.get("content") != content:
-            _provider_json(http.patch(f"{ELEVENLABS_BASE}/knowledge-base/{old_id}", headers=headers, json={"name": name, "content": content}, timeout=20))
-            document_id = old_id
-        else:
-            document_id = old_id
-        with _business_id_lock:
-            _validated_business_ids.add(document_id)
-        if not old or old.get("content") != content or not old_id:
-            payload = {"business_id": business_id, "document_type": kind, "content": content, "version": int(old.get("version") or 0) + 1 if old else 1, "published": True, "elevenlabs_document_id": document_id, "last_synced_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}
-            store.table("knowledge_base").upsert(payload, on_conflict="business_id,document_type").execute()
-        # Business documents remain retrieval-backed.  General speech and
-        # behavior documents are the only always-in-prompt resources.
-        references.append({"type": "text", "name": name, "id": document_id, "usage_mode": "auto"})
+        logging.info("intercom_knowledge.document_sync_started.event_2119")
+        try:
+            if not content:
+                continue
+            name = f"Nodemere business {business_id} — {kind}.md"
+            existing_provider = provider_documents.get(name) or {}
+            document_id = existing_provider.get("id")
+            cached = cached_documents.get(kind)
+            if not document_id:
+                # Recheck while holding the process-wide sync lock so two
+                # simultaneous calls cannot both create the same document.
+                with _business_id_lock:
+                    existing_provider = _existing_text_documents(business_id, api_key, http=http).get(name) or {}
+                    if existing_provider.get("id"):
+                        document_id = existing_provider["id"]
+                    else:
+                        created = _provider_json(http.post(f"{ELEVENLABS_BASE}/knowledge-base/text", headers=headers, json={"name": name, "text": content}, timeout=20))
+                        document_id = created["id"]
+            elif not cached or cached != (document_id, content):
+                _provider_json(http.patch(f"{ELEVENLABS_BASE}/knowledge-base/{document_id}", headers=headers, json={"name": name, "content": content}, timeout=20))
+            cached_documents[kind] = (document_id, content)
+            references.append({"type": "text", "name": name, "id": document_id, "usage_mode": "auto"})
+        except Exception:
+            # Keep provider details out of application logs, but leave a
+            # distinct marker showing that the failure happened in this
+            # document's sync rather than in business lookup or rendering.
+            logging.error("intercom_knowledge.document_sync_failed.event_2140")
+            raise
+    logging.info("intercom_knowledge.business_sync_ready.event_2112")
     return references
 
 
@@ -414,6 +457,7 @@ def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, docu
         raise ValueError("ElevenLabs branch did not retain the knowledge attachments")
     if any(checked_modes.get(row["id"]) != row.get("usage_mode") for row in documents):
         raise ValueError("ElevenLabs branch did not retain the requested knowledge usage modes")
+    logging.info("intercom_knowledge.business_attach_ready.event_2122")
     return checked_ids
 
 
@@ -421,8 +465,7 @@ def build_intercom_knowledge(store, business: dict, api_key: str, agent_id: str,
     # Intercom calls receive only the current business documents. General
     # Nodemere conversation/recovery/personality files are intentionally not
     # included in the per-call override.
-    if store.rpc("nodemere_intercom_knowledge_ready").execute().data is not True:
-        raise ValueError("The private Intercom knowledge cache is not ready")
+    logging.info("intercom_knowledge.business_build_started.event_2131")
     branch_id, _config = live_branch_configuration(api_key, agent_id, http=http)
     business_documents = sync_business_documents(store, business, api_key, http=http)
     if not business_documents:
