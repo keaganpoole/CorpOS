@@ -159,7 +159,13 @@ from .contract_service import (
 )
 from .project_intelligence import get_project_intelligence, refresh_market_research
 from .business_intelligence import get_business_intelligence
-from .intercom_knowledge import build_intercom_knowledge
+from .intercom_knowledge import (
+    business_source_signature,
+    cached_business_knowledge,
+    load_branch_business_knowledge,
+    queue_all_business_knowledge_sync,
+    schedule_business_knowledge_sync,
+)
 from .visitor_intelligence import build_visitor_intelligence_router, build_visitor_router, record_verified_billing_event
 from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_call_nest_event, record_nest_event
 
@@ -214,6 +220,8 @@ ROUTE_HIT_EXCLUDE_PATHS = {
 }
 scenario_engine: Optional[ScenarioEngine] = None
 PENDING_FORWARDING_VERIFICATION_TASKS: dict[str, asyncio.Task] = {}
+BUSINESS_KNOWLEDGE_STARTUP_TASK: Optional[asyncio.Task] = None
+BUSINESS_KNOWLEDGE_WATCH_TASK: Optional[asyncio.Task] = None
 
 
 def next_live_event_id(prefix: Optional[str] = None) -> str:
@@ -1716,14 +1724,49 @@ def schedule_backend_scenario_execution(event_type: str, payload: Optional[dict]
 push_live_event("FastAPI backend active on port 8000.", actor="system", severity="info", event_type="system_startup")
 
 
+async def monitor_business_knowledge_sources():
+    """Refresh business documents after a source Markdown file changes."""
+    previous_signature = await asyncio.to_thread(business_source_signature)
+    while True:
+        await asyncio.sleep(10)
+        current_signature = await asyncio.to_thread(business_source_signature)
+        if current_signature == previous_signature:
+            continue
+        previous_signature = current_signature
+        try:
+            await asyncio.to_thread(
+                queue_all_business_knowledge_sync,
+                intercom_store(),
+                elevenlabs_api_key,
+                business_voice_agent_ids(),
+            )
+        except Exception:
+            logging.exception('main.business_knowledge_source_refresh.event_1743')
+
+
 @app.on_event("startup")
 async def startup_scenario_engine():
+    global BUSINESS_KNOWLEDGE_STARTUP_TASK
+    global BUSINESS_KNOWLEDGE_WATCH_TASK
     global scenario_engine
     from .audit import enforced
     from .envelope import writes_enabled, keyring
     enforced()  # Invalid production mode is a startup failure, not a silent bypass.
     if writes_enabled(): keyring()
     if os.getenv('NODEMERE_RECOVERY_MODE', '').lower() in {'1','true','yes','on'}: return
+    if elevenlabs_api_key and (elevenlabs_agent_id_inbound or elevenlabs_agent_id_intercom):
+        try:
+            BUSINESS_KNOWLEDGE_STARTUP_TASK = asyncio.create_task(
+                asyncio.to_thread(
+                    queue_all_business_knowledge_sync,
+                    intercom_store(),
+                    elevenlabs_api_key,
+                    [elevenlabs_agent_id_inbound, elevenlabs_agent_id_intercom],
+                )
+            )
+            BUSINESS_KNOWLEDGE_WATCH_TASK = asyncio.create_task(monitor_business_knowledge_sources())
+        except Exception:
+            logging.exception('main.startup_business_knowledge_sync.event_1742')
     try:
         if scenario_engine:
             await scenario_engine.start()
@@ -1735,6 +1778,14 @@ async def startup_scenario_engine():
 @app.on_event("shutdown")
 async def shutdown_scenario_engine():
     global scenario_engine
+    global BUSINESS_KNOWLEDGE_STARTUP_TASK
+    global BUSINESS_KNOWLEDGE_WATCH_TASK
+    if BUSINESS_KNOWLEDGE_STARTUP_TASK and not BUSINESS_KNOWLEDGE_STARTUP_TASK.done():
+        BUSINESS_KNOWLEDGE_STARTUP_TASK.cancel()
+    BUSINESS_KNOWLEDGE_STARTUP_TASK = None
+    if BUSINESS_KNOWLEDGE_WATCH_TASK and not BUSINESS_KNOWLEDGE_WATCH_TASK.done():
+        BUSINESS_KNOWLEDGE_WATCH_TASK.cancel()
+    BUSINESS_KNOWLEDGE_WATCH_TASK = None
     try:
         if scenario_engine:
             await scenario_engine.stop_scheduler()
@@ -5058,6 +5109,17 @@ def mark_call_log_failed(*, provider_call_sid: Optional[str], business_id: Optio
     except Exception:
         logging.warning('main.mark_call_log_failed.event_4899')
 
+
+def persist_inbound_call_log(event_payload: dict, call_tenant, *, user_id: Optional[str], business_id: Optional[str], receptionist: Optional[dict]) -> None:
+    from .authorization import tenant_scope
+    with tenant_scope(call_tenant):
+        upsert_active_call_log(
+            event_payload,
+            user_id=user_id,
+            business_id=business_id,
+            receptionist=receptionist,
+        )
+
 def normalize_intent_key(intent_key: str) -> str:
     normalized = (intent_key or "").strip().lower().replace(" ", "_").replace("-", "_")
     return INTENT_KEY_ALIASES.get(normalized, normalized)
@@ -7161,7 +7223,6 @@ async def twilio_inbound_webhook(request: Request):
         business.get("name") if business else None,
         get_receptionist_display_name(receptionist),
     )
-    maybe_auto_verify_business_forwarding(business, called_number=to_number)
 
     event_payload = {
         "trigger_key": "incoming_call",
@@ -7179,8 +7240,6 @@ async def twilio_inbound_webhook(request: Request):
         "receptionist_name": get_receptionist_display_name(receptionist),
     }
     emit_scenario_trigger("incoming_call", event_payload)
-    with tenant_scope(call_tenant):
-        upsert_active_call_log(event_payload,user_id=resolved_user_id,business_id=business['id'],receptionist=receptionist)
 
     register_payload = {
         "agent_id": elevenlabs_agent_id_inbound,
@@ -7205,27 +7264,23 @@ async def twilio_inbound_webhook(request: Request):
             }
         },
     }
-    try:
-        # Inbound calls use the same business-only knowledge documents as
-        # Intercom. The deleted general Nodemere documents are never included.
-        _knowledge_branch_id, knowledge_override = build_intercom_knowledge(
-            intercom_store(), business, elevenlabs_api_key, elevenlabs_agent_id_inbound
-        )
-    except Exception:
-        logging.error('main.twilio_inbound_webhook.business_knowledge_unavailable.event_7183')
-        mark_call_log_failed(
-            provider_call_sid=event_payload.get("call_id"),
-            business_id=business.get("id"),
-            user_id=resolved_user_id,
-            reason="Business voice knowledge was unavailable.",
-        )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail='Business voice knowledge is unavailable.',
-        )
-    register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
-        "agent": {"prompt": {"knowledge_base": knowledge_override}},
-    }
+    # Knowledge is synchronized in the background. Use the last successful
+    # snapshot immediately; a missing or stale snapshot must never block the
+    # Twilio-to-ElevenLabs handoff.
+    knowledge_snapshot = cached_business_knowledge(business.get("id"), elevenlabs_agent_id_inbound)
+    if knowledge_snapshot:
+        _knowledge_branch_id, knowledge_override = knowledge_snapshot
+        register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
+            "agent": {"prompt": {"knowledge_base": knowledge_override}},
+        }
+    else:
+        logging.warning('main.twilio_inbound_webhook.business_knowledge_snapshot_unavailable.event_7184')
+        # Do not fall back to the branch's full attachment list: it can contain
+        # documents belonging to other businesses. An empty override keeps the
+        # call isolated while the background refresh prepares this business.
+        register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
+            "agent": {"prompt": {"knowledge_base": []}},
+        }
     add_people_intake_dynamic_variables(
         register_payload["conversation_initiation_client_data"]["scenario_context"],
         business,
@@ -7274,6 +7329,13 @@ async def twilio_inbound_webhook(request: Request):
     )
     if not response.ok:
         logging.error('main.twilio_inbound_webhook.event_7065')
+        persist_inbound_call_log(
+            event_payload,
+            call_tenant,
+            user_id=resolved_user_id,
+            business_id=business["id"],
+            receptionist=receptionist,
+        )
         mark_call_log_failed(
             provider_call_sid=event_payload.get("call_id"),
             business_id=business.get("id"),
@@ -7285,6 +7347,17 @@ async def twilio_inbound_webhook(request: Request):
             detail='The request could not be completed',
         )
 
+    asyncio.create_task(
+        asyncio.to_thread(
+            persist_inbound_call_log,
+            event_payload,
+            call_tenant,
+            user_id=resolved_user_id,
+            business_id=business["id"],
+            receptionist=receptionist,
+        )
+    )
+    asyncio.create_task(asyncio.to_thread(maybe_auto_verify_business_forwarding, business, called_number=to_number))
     return Response(content=response.text, media_type="application/xml")
 
 @app.post("/api/call/route", tags=["Server Tools"])
@@ -7537,6 +7610,22 @@ INTERCOM_WRITE_TOOLS = {
 
 def intercom_store():
     return getattr(supabase_admin, "raw", supabase_admin)
+
+
+def business_voice_agent_ids() -> list[str]:
+    return [agent_id for agent_id in (elevenlabs_agent_id_inbound, elevenlabs_agent_id_intercom) if agent_id]
+
+
+def queue_business_knowledge_refresh(business: Optional[dict], *, reason: str) -> None:
+    if not business or business.get("id") is None:
+        return
+    schedule_business_knowledge_sync(
+        intercom_store(),
+        business,
+        elevenlabs_api_key,
+        business_voice_agent_ids(),
+        reason=reason,
+    )
 
 
 def intercom_write_fingerprint(tool_name: str, payload: dict) -> str:
@@ -9374,13 +9463,21 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
     if not voice_response.ok:
         logging.warning("main.intercom_voice_validation.invalid status=%s", voice_response.status_code)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This receptionist's voice is unavailable. Choose another receptionist or update the voice ID.")
-    try:
-        knowledge_branch_id, knowledge_override = build_intercom_knowledge(
-            intercom_store(), business, elevenlabs_api_key, elevenlabs_agent_id_intercom
-        )
-    except Exception:
-        logging.exception("main.intercom_knowledge.business_unavailable")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Business voice knowledge is unavailable. Please try again.")
+    knowledge_snapshot = cached_business_knowledge(business["id"], elevenlabs_agent_id_intercom)
+    if knowledge_snapshot:
+        knowledge_branch_id, knowledge_override = knowledge_snapshot
+    else:
+        try:
+            # This is read-only fallback behavior for a cold process. It does
+            # not upload, update, or attach documents during session startup.
+            knowledge_branch_id, knowledge_override = load_branch_business_knowledge(
+                elevenlabs_api_key,
+                elevenlabs_agent_id_intercom,
+                business["id"],
+            )
+        except Exception:
+            logging.exception("main.intercom_knowledge.branch_unavailable")
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Voice conversation branch is unavailable. Please try again.")
     intercom_row = (intercom_store().table("intercom").insert({
         "business_id": business["id"],
         "user_id": user_id,
@@ -9974,6 +10071,7 @@ async def update_sonar_business_profile(payload: dict, current_user: dict = Depe
 
     response = supabase.table("businesses").update(updates).eq("id", business["id"]).execute()
     updated = response.data[0] if response.data else {**business, **updates}
+    queue_business_knowledge_refresh(updated, reason="business profile updated")
     return serialize_business_profile_row(updated)
 
 @app.post("/api/sonar/business/avatar", tags=["Sonar Business"])
@@ -10608,7 +10706,9 @@ async def create_sonar_staff(payload: dict, current_user: dict = Depends(get_cur
     values = {key: value for key, value in payload.items() if key in STAFF_PROFILE_FIELDS}
     values["business_id"] = business["id"]
     response = supabase.table("staff").insert(values).execute()
-    return response.data[0] if response.data else values
+    created = response.data[0] if response.data else values
+    queue_business_knowledge_refresh(business, reason="staff created")
+    return created
 
 @app.put("/api/sonar/staff/{staff_id}", tags=["Sonar Staff"])
 async def update_sonar_staff(staff_id: UUID, payload: dict, current_user: dict = Depends(get_current_user)):
@@ -10617,6 +10717,7 @@ async def update_sonar_staff(staff_id: UUID, payload: dict, current_user: dict =
     response = supabase.table("staff").update(values).eq("id", str(staff_id)).eq("business_id", business["id"]).execute()
     if not response.data:
         raise HTTPException(status_code=404, detail="Staff member not found")
+    queue_business_knowledge_refresh(business, reason="staff updated")
     return response.data[0]
 
 @app.delete("/api/sonar/staff/{staff_id}", tags=["Sonar Staff"])
@@ -10625,15 +10726,54 @@ async def delete_sonar_staff(staff_id: UUID, current_user: dict = Depends(get_cu
     response = supabase.table("staff").delete().eq("id", str(staff_id)).eq("business_id", business["id"]).execute()
     if not response.data:
         raise HTTPException(status_code=404, detail="Staff member not found")
+    queue_business_knowledge_refresh(business, reason="staff deleted")
     return {"ok": True}
+
+SERVICE_PROFILE_FIELDS = {
+    "name", "description", "category", "unit", "price_type", "price_min", "price_max",
+    "is_active", "sort_order",
+}
 
 @app.post("/api/sonar/services", tags=["Sonar Services"])
 async def create_sonar_service(payload: dict, current_user: dict = Depends(get_current_user)):
     business = require_business_for_user(business_owner_id(current_user))
-    insert_payload = {key: value for key, value in payload.items() if key not in {"id", "user_id", "business_id"}}
+    insert_payload = {key: value for key, value in payload.items() if key in SERVICE_PROFILE_FIELDS}
     insert_payload["business_id"] = business["id"]
     response = supabase.table("services").insert(insert_payload).execute()
-    return response.data[0] if response.data else insert_payload
+    created = response.data[0] if response.data else insert_payload
+    queue_business_knowledge_refresh(business, reason="service created")
+    return created
+
+@app.put("/api/sonar/services/{service_id}", tags=["Sonar Services"])
+async def update_sonar_service(service_id: UUID, payload: dict, current_user: dict = Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    values = {key: value for key, value in payload.items() if key in SERVICE_PROFILE_FIELDS}
+    response = (
+        supabase.table("services")
+        .update(values)
+        .eq("id", str(service_id))
+        .eq("business_id", business["id"])
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Service not found")
+    queue_business_knowledge_refresh(business, reason="service updated")
+    return response.data[0]
+
+@app.delete("/api/sonar/services/{service_id}", tags=["Sonar Services"])
+async def delete_sonar_service(service_id: UUID, current_user: dict = Depends(get_current_user)):
+    business = require_business_for_user(business_owner_id(current_user))
+    response = (
+        supabase.table("services")
+        .delete()
+        .eq("id", str(service_id))
+        .eq("business_id", business["id"])
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Service not found")
+    queue_business_knowledge_refresh(business, reason="service deleted")
+    return {"ok": True}
 
 @app.get("/api/sonar/appointments", tags=["Sonar Appointments"])
 async def list_sonar_appointments(limit: int = 100, current_user: dict = Depends(get_current_user)):
@@ -14592,6 +14732,9 @@ async def complete_onboarding(
             if service_rows:
                 supabase.table("services").delete().eq("business_id", business_id).eq("user_id", current_user_id).execute()
                 supabase.table("services").insert(service_rows).execute()
+
+        if business:
+            queue_business_knowledge_refresh(business, reason="onboarding completed")
 
         return {
             "onboarded": onboarding_data.mark_onboarded,

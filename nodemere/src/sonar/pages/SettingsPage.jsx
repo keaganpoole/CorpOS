@@ -1821,13 +1821,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
         return;
       }
 
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('business_id', resolvedBusinessId)
-        .order('category', { ascending: true })
-        .order('sort_order', { ascending: true });
-      if (error) throw error;
+      const data = await api.getServices();
       setServices(data || []);
     } catch (err) {
       console.error("SettingsPage.jsx:event_1822");
@@ -1837,28 +1831,20 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
   };
 
   const addService = async (svc) => {
-    const id = crypto.randomUUID();
     try {
       const business = await ensureBusinessRecord({ createIfMissing: true });
       const resolvedBusinessId = business?.id || businessId || null;
       if (!resolvedBusinessId) throw new Error('Save business info before adding services.');
       onBusinessLinked?.(resolvedBusinessId);
 
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      const userId = authData?.user?.id;
-      if (!userId) throw new Error('User not found');
-
       const newSvc = {
         ...normalizeServicePayload(svc),
-        id,
-        user_id: userId,
         sort_order: services.length,
         business_id: resolvedBusinessId,
       };
-      const { error } = await supabase.from('services').insert(newSvc);
-      if (error) throw error;
-      setServices(prev => [...prev, { ...newSvc, id }]);
+      const created = await api.createService(newSvc);
+      if (!created) throw new Error('Could not create service.');
+      setServices(prev => [...prev, created]);
       setAddForm(null);
     } catch (err) {
       console.error("SettingsPage.jsx:event_1853");
@@ -1881,11 +1867,6 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
       const resolvedBusinessId = business?.id || businessId || null;
       if (!resolvedBusinessId) throw new Error('Save business info before importing services.');
       onBusinessLinked?.(resolvedBusinessId);
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      const userId = authData?.user?.id;
-      if (!userId) throw new Error('User not found');
-
       const rows = imported.map((service, index) => {
         const normalized = normalizeServicePayload(service);
         return {
@@ -1897,15 +1878,13 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
           price_min: normalized.price_min,
           price_max: normalized.price_max,
           is_active: normalized.is_active,
-          id: crypto.randomUUID(),
-          user_id: userId,
           business_id: resolvedBusinessId,
           sort_order: services.length + index,
         };
       });
-      const { error } = await supabase.from('services').insert(rows);
-      if (error) throw error;
-      setServices((current) => [...current, ...rows]);
+      const createdRows = await Promise.all(rows.map((row) => api.createService(row)));
+      if (createdRows.some((row) => !row)) throw new Error('Could not import all services.');
+      setServices((current) => [...current, ...createdRows]);
       setImportModalOpen(false);
       setImportText('');
     } catch (err) {
@@ -1925,11 +1904,9 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
       const existingService = services.find((service) => service.id === id);
       if (!existingService) throw new Error('Service not found.');
       const normalizedUpdates = normalizeServicePayload({ ...existingService, ...updates });
-      let query = supabase.from('services').update(normalizedUpdates).eq('id', id);
-      if (resolvedBusinessId) query = query.eq('business_id', resolvedBusinessId);
-      const { error } = await query;
-      if (error) throw error;
-      setServices(prev => prev.map(s => s.id === id ? { ...s, ...normalizedUpdates } : s));
+      const updated = await api.updateService(id, normalizedUpdates);
+      if (!updated) throw new Error('Could not update service.');
+      setServices(prev => prev.map(s => s.id === id ? updated : s));
     } catch (err) {
       console.error("SettingsPage.jsx:event_1923");
     }
@@ -1942,10 +1919,8 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
         const business = await ensureBusinessRecord({ createIfMissing: false });
         resolvedBusinessId = business?.id || null;
       }
-      let query = supabase.from('services').delete().eq('id', id);
-      if (resolvedBusinessId) query = query.eq('business_id', resolvedBusinessId);
-      const { error } = await query;
-      if (error) throw error;
+      const deleted = await api.deleteService(id);
+      if (!deleted) throw new Error('Could not delete service.');
       setServices(prev => prev.filter(s => s.id !== id));
        setAddForm(null);
     } catch (err) {

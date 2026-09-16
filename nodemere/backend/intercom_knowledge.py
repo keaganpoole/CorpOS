@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +24,29 @@ _general_cache: tuple[str, str, list[dict]] | None = None
 _business_id_lock = Lock()
 _validated_business_ids: set[str] = set()
 _business_document_cache: dict[str, dict[str, tuple[str, str]]] = {}
+_business_reference_cache: dict[tuple[str, str], tuple[str, list[dict]]] = {}
+_business_sync_state_lock = Lock()
+_business_sync_generation: dict[str, int] = {}
+_business_sync_running: set[str] = set()
+_business_sync_businesses: dict[str, dict] = {}
+_business_sync_agents: dict[str, tuple[str, ...]] = {}
+_business_sync_reasons: dict[str, str] = {}
+_business_sync_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="nodemere-kb")
+
+
+def business_source_signature() -> tuple[tuple[str, int, int], ...]:
+    """Return a cheap signature for the business-information source files."""
+    paths = sorted(TEMPLATE_DIR.glob("*.md"))
+    if RECEPTIONIST_STORIES_PATH.exists():
+        paths.append(RECEPTIONIST_STORIES_PATH)
+    signature = []
+    for path in paths:
+        try:
+            metadata = path.stat()
+        except FileNotFoundError:
+            continue
+        signature.append((str(path), metadata.st_mtime_ns, metadata.st_size))
+    return tuple(signature)
 
 
 def _text(value) -> str:
@@ -391,6 +416,35 @@ def sync_business_documents(store, business: dict, api_key: str, http=requests) 
     return references
 
 
+def _remember_business_knowledge(business_id, agent_id: str, branch_id: str, documents: list[dict]) -> None:
+    with _business_sync_state_lock:
+        _business_reference_cache[(str(business_id), str(agent_id))] = (
+            str(branch_id),
+            [dict(document) for document in documents],
+        )
+
+
+def cached_business_knowledge(business_id, agent_id: str) -> tuple[str, list[dict]] | None:
+    """Return the last successful branch/document snapshot without network I/O."""
+    with _business_sync_state_lock:
+        snapshot = _business_reference_cache.get((str(business_id), str(agent_id)))
+        if not snapshot:
+            return None
+        branch_id, documents = snapshot
+        return branch_id, [dict(document) for document in documents]
+
+
+def load_branch_business_knowledge(api_key: str, agent_id: str, business_id, http=requests) -> tuple[str, list[dict]]:
+    """Read already-attached business documents without creating or updating them."""
+    branch_id, config = live_branch_configuration(api_key, agent_id, http=http)
+    prefix = f"Nodemere business {business_id} —"
+    attached = (((config.get("conversation_config") or {}).get("agent") or {}).get("prompt") or {}).get("knowledge_base") or []
+    documents = [dict(row) for row in attached if isinstance(row, dict) and _text(row.get("name")).startswith(prefix) and row.get("id")]
+    if documents:
+        _remember_business_knowledge(business_id, agent_id, branch_id, documents)
+    return branch_id, documents
+
+
 def attach_documents_to_branch(api_key: str, agent_id: str, branch_id: str, documents: list[dict], http=requests) -> set[str]:
     """Ensure per-business documents are valid resources for this branch override.
 
@@ -457,4 +511,120 @@ def build_intercom_knowledge(store, business: dict, api_key: str, agent_id: str,
     if not business_documents:
         raise ValueError("No business knowledge documents are available for this call")
     attach_documents_to_branch(api_key, agent_id, branch_id, business_documents, http=http)
+    _remember_business_knowledge(business["id"], agent_id, branch_id, business_documents)
     return branch_id, business_documents
+
+
+def _run_business_knowledge_sync(store, business: dict, api_key: str, agent_ids: tuple[str, ...], reason: str, generation: int) -> None:
+    business_id = str(business.get("id"))
+    failures = []
+    try:
+        for agent_id in agent_ids:
+            if not agent_id:
+                continue
+            try:
+                build_intercom_knowledge(store, business, api_key, agent_id)
+            except Exception:
+                failures.append(agent_id)
+                logging.exception(
+                    "intercom_knowledge.background_sync_agent_failed business_id=%s agent_id=%s generation=%s reason=%s",
+                    business_id,
+                    agent_id,
+                    generation,
+                    reason,
+                )
+        if failures:
+            logging.warning(
+                "intercom_knowledge.background_sync_partial business_id=%s failed_agents=%s generation=%s reason=%s",
+                business_id,
+                len(failures),
+                generation,
+                reason,
+            )
+        else:
+            logging.info(
+                "intercom_knowledge.background_sync_ready business_id=%s generation=%s reason=%s",
+                business_id,
+                generation,
+                reason,
+            )
+    except Exception:
+        # A failed refresh must not invalidate the last successful snapshot or
+        # prevent a call from using it.
+        logging.exception(
+            "intercom_knowledge.background_sync_failed business_id=%s generation=%s reason=%s",
+            business_id,
+            generation,
+            reason,
+        )
+    finally:
+        with _business_sync_state_lock:
+            _business_sync_running.discard(business_id)
+            latest_generation = _business_sync_generation.get(business_id, generation)
+            if latest_generation > generation:
+                latest_business = dict(_business_sync_businesses.get(business_id) or business)
+                latest_agents = _business_sync_agents.get(business_id, agent_ids)
+                latest_reason = _business_sync_reasons.get(business_id, "queued change")
+                _business_sync_running.add(business_id)
+                _business_sync_executor.submit(
+                    _run_business_knowledge_sync,
+                    store,
+                    latest_business,
+                    api_key,
+                    latest_agents,
+                    latest_reason,
+                    latest_generation,
+                )
+
+
+def schedule_business_knowledge_sync(
+    store,
+    business: dict,
+    api_key: str,
+    agent_ids: list[str] | tuple[str, ...],
+    *,
+    reason: str = "business information changed",
+) -> bool:
+    """Queue a deduplicated, non-blocking refresh for a business.
+
+    Calls can request another refresh while one is running. That request is
+    recorded as a new generation and runs immediately after the current job,
+    preventing a change made during a refresh from being lost.
+    """
+    if not business or business.get("id") is None or not api_key:
+        return False
+    normalized_agents = tuple(dict.fromkeys(str(agent_id).strip() for agent_id in agent_ids if str(agent_id or "").strip()))
+    if not normalized_agents:
+        return False
+    business_id = str(business["id"])
+    with _business_sync_state_lock:
+        generation = _business_sync_generation.get(business_id, 0) + 1
+        _business_sync_generation[business_id] = generation
+        _business_sync_businesses[business_id] = dict(business)
+        _business_sync_agents[business_id] = normalized_agents
+        _business_sync_reasons[business_id] = reason
+        if business_id in _business_sync_running:
+            return True
+        _business_sync_running.add(business_id)
+    _business_sync_executor.submit(
+        _run_business_knowledge_sync,
+        store,
+        dict(business),
+        api_key,
+        normalized_agents,
+        reason,
+        generation,
+    )
+    return True
+
+
+def queue_all_business_knowledge_sync(store, api_key: str, agent_ids: list[str] | tuple[str, ...]) -> int:
+    """Queue a startup refresh for every business without blocking startup."""
+    if not api_key:
+        return 0
+    rows = store.table("businesses").select("*").limit(5000).execute().data or []
+    queued = 0
+    for business in rows:
+        if schedule_business_knowledge_sync(store, business, api_key, agent_ids, reason="backend startup"):
+            queued += 1
+    return queued
