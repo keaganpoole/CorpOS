@@ -25,7 +25,3 @@ Agent: *(stops)* “I’ll check.”
 Agent: “The reason is—”  
 User: “Actually, skip that.”  
 Agent: “—because there are three different possibilities…”
-
-## Source basis
-
-Platform-level interruption and silence settings: [ElevenLabs conversation flow](https://elevenlabs.io/docs/eleven-agents/customization/conversation-flow), [ElevenLabs prompting guide](https://elevenlabs.io/docs/eleven-agents/best-practices/prompting-guide). Barge-in and silence design: [NVIDIA Voice Agent Best Practices](https://github.com/NVIDIA/voice-agent-examples/blob/main/docs/BEST_PRACTICES.md). The distinction between runtime interruption and LLM response behavior is reinforced by [Hugging Face speech-to-speech architecture](https://github.com/huggingface/speech-to-speech).

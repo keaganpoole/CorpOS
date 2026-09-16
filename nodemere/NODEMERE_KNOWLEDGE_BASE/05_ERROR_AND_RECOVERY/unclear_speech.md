@@ -17,7 +17,3 @@ Use this when the audio itself is cut off, garbled, faint, or incomplete. Recove
 **Bad:** Repeating an unlikely transcript as if it were clear speech, or replying to a guessed sentence.
 
 If the user repeats the detail, use the new answer and move on. If repeated audio is still unclear, ask for a slower repetition or spelling only for the essential detail. Do not make the user start the conversation again.
-
-## Source basis
-
-Voice input is an imperfect transcription and critical decisions should use stable input: [LiveKit modality-aware instructions](https://docs.livekit.io/agents/multimodality/instructions/), [NVIDIA Voice Agent Best Practices](https://github.com/NVIDIA/voice-agent-examples/blob/main/docs/BEST_PRACTICES.md). The speech pipeline’s separate recognition stage explains why this recovery is needed: [Hugging Face speech-to-speech architecture](https://github.com/huggingface/speech-to-speech), [Deepgram voice prompting](https://developers.deepgram.com/docs/prompting-voice-agents).

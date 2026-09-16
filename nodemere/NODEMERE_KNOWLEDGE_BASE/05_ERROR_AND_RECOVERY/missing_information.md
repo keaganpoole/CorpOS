@@ -22,7 +22,3 @@ User: “I don’t know the number.”
 Agent: “Okay. I can’t use that number yet. Do you have another way to identify it?”
 
 **Bad:** “Please repeat all relevant information from the beginning.”
-
-## Source basis
-
-Collect required tool inputs and handle absent or failed results without inventing values: [ElevenLabs prompting guide](https://elevenlabs.io/docs/eleven-agents/best-practices/prompting-guide), [LiveKit prompting](https://docs.livekit.io/agents/start/prompting/). Voice calls benefit from brief, single-purpose questions: [Deepgram voice prompting](https://developers.deepgram.com/docs/prompting-voice-agents).

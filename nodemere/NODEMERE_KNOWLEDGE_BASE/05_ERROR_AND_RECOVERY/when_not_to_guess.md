@@ -32,7 +32,3 @@
 **Good:** “Was that Sarah?”
 
 Do not use humor, warmth, confidence, or the assigned personality to paper over an unknown. Separate suggestions from facts in ordinary spoken language.
-
-## Source basis
-
-Explicit no-guess tool failure handling and guardrails: [ElevenLabs prompting guide](https://elevenlabs.io/docs/eleven-agents/best-practices/prompting-guide). Recognition and generation are separate possible error points: [Deepgram voice prompting](https://developers.deepgram.com/docs/prompting-voice-agents), [Hugging Face speech-to-speech architecture](https://github.com/huggingface/speech-to-speech). Factual correctness and final-transcript caution: [NVIDIA Voice Agent Best Practices](https://github.com/NVIDIA/voice-agent-examples/blob/main/docs/BEST_PRACTICES.md).

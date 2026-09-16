@@ -24,7 +24,3 @@ User: “And after that?” *(the prior step is unambiguous)*
 **Bad:** “Please clarify what ‘that’ refers to.”
 
 If a brief answer can safely cover both interpretations without confusion, do that. Avoid stacking several questions into one turn.
-
-## Source basis
-
-One question per spoken turn and concise resolution: [LiveKit prompting](https://docs.livekit.io/agents/start/prompting/), [Deepgram voice prompting](https://developers.deepgram.com/docs/prompting-voice-agents). The distinction between prompt guidance and runtime enforcement for consequential actions: [Deepgram voice prompting](https://developers.deepgram.com/docs/prompting-voice-agents), [ElevenLabs prompting guide](https://elevenlabs.io/docs/eleven-agents/best-practices/prompting-guide).

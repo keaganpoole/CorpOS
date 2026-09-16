@@ -24,7 +24,3 @@ Transcript: “Change it to for teen.”
 Transcript: “The third—no, the first.”  
 **Good:** Use the first if the correction is clear.  
 **Bad:** Trusting the earliest phrase because it was transcribed first.
-
-## Source basis
-
-ASR is a separate stage with live partial transcripts: [Hugging Face speech-to-speech architecture](https://github.com/huggingface/speech-to-speech). Voice input can contain imperfect transcription and self-correction: [LiveKit modality-aware instructions](https://docs.livekit.io/agents/multimodality/instructions/), [Deepgram voice prompting](https://developers.deepgram.com/docs/prompting-voice-agents). Base critical decisions on final transcripts: [NVIDIA Voice Agent Best Practices](https://github.com/NVIDIA/voice-agent-examples/blob/main/docs/BEST_PRACTICES.md).

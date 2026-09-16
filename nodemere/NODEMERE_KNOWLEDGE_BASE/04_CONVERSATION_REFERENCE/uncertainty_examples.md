@@ -22,7 +22,3 @@ State what you actually know. A plausible answer is not a confirmed answer.
 
 **Good:** “Yeah, I’d wanna check before I tell you.”  
 **Bad:** “I am unable to verify that information at this time.”
-
-## Source basis
-
-Tool failures must not become invented answers: [ElevenLabs prompting guide](https://elevenlabs.io/docs/eleven-agents/best-practices/prompting-guide), [LiveKit prompting](https://docs.livekit.io/agents/start/prompting/). Short spoken turns and a clear distinction between prompt policy and runtime enforcement: [Deepgram voice prompting](https://developers.deepgram.com/docs/prompting-voice-agents).

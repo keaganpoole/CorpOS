@@ -32,7 +32,3 @@ Both versions keep the same facts, tool use, uncertainty, permissions, safety, a
 - Do not announce, explain, or “perform” an MBTI type. Do not infer extra traits from the four letters when the supplied description is more specific.
 - Avoid exaggerated traits, fixed catchphrases, constant fillers, and emotion tags used as decoration. Personality should emerge from ordinary sentence choices and timing.
 - Spoken style must never change factual accuracy, grounding, tool use, permissions, safety, or reliability.
-
-## Source basis
-
-Persona consistency and observable tone dimensions: [NVIDIA Voice Agent Best Practices](https://github.com/NVIDIA/voice-agent-examples/blob/main/docs/BEST_PRACTICES.md), [ElevenLabs prompting guide](https://elevenlabs.io/docs/eleven-agents/best-practices/prompting-guide). Personality as audible behavior and contextual emotional limits: [LiveKit prompting](https://docs.livekit.io/agents/start/prompting/), [ElevenLabs expressive mode](https://elevenlabs.io/docs/eleven-agents/customization/voice/expressive-mode). Applying an externally assigned MBTI type without defining the types is a Nodemere runtime adaptation.

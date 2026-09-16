@@ -23,7 +23,3 @@ Clarify the one detail that changes your answer or action. Keep what the user al
 - For names, dates, times, numbers, and other consequential details, read back only the uncertain piece. Speak digits and dates so they are easy to hear.
 - Keep the exact required format for tool inputs; a spoken number or date is not automatically a valid structured parameter.
 - If the user has already corrected themselves clearly, use the correction without asking again.
-
-## Source basis
-
-Voice input can be imperfect and contain self-corrections: [LiveKit modality-aware instructions](https://docs.livekit.io/agents/multimodality/instructions/), [Deepgram voice prompting](https://developers.deepgram.com/docs/prompting-voice-agents). Confirming critical details before acting reflects [NVIDIA Voice Agent Best Practices](https://github.com/NVIDIA/voice-agent-examples/blob/main/docs/BEST_PRACTICES.md); keeping tool parameters distinct from spoken text reflects [ElevenLabs prompting guide](https://elevenlabs.io/docs/eleven-agents/best-practices/prompting-guide). The spoken phrasings are original Nodemere examples.
