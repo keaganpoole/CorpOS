@@ -8,6 +8,7 @@ import {
   Copy, Download, Layers, Plus, Trash2, Tag, DollarSign,
   ArrowRight, X, MessageSquareText, Users, Maximize2, Wand2,
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil, Play, LogOut,
+  ThumbsUp, ThumbsDown,
   Loader2, CreditCard, ExternalLink,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -496,6 +497,7 @@ const staffInputClass = 'h-12 w-full rounded-2xl border border-white/[0.08] bg-w
 
 const createStaffFormState = (staff, baseHours = null) => ({
   id: staff?.id || null,
+  staff_type: staff?.staff_type === 'authorized_representative' ? 'transfer_contact' : (staff?.staff_type || 'team_member'),
   full_name: maskStaffName(staff?.full_name || ''),
   first_name: maskStaffName(staff?.first_name || ''),
   last_name: maskStaffName(staff?.last_name || ''),
@@ -515,6 +517,7 @@ const normalizeStaffPayload = (form, businessId) => {
 
   return {
     business_id: businessId,
+    staff_type: ['team_member', 'transfer_contact', 'both'].includes(form.staff_type) ? form.staff_type : 'team_member',
     full_name: derivedFullName,
     first_name: String(form.first_name || '').trim() || null,
     last_name: String(form.last_name || '').trim() || null,
@@ -1394,6 +1397,7 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
   const bodyClass = compact ? 'h-[315px] min-h-[315px] max-h-[315px] p-4 space-y-2.5' : 'h-[270px] min-h-[270px] max-h-[270px] p-6 space-y-3.5';
   const nameClass = compact ? 'text-xl' : 'text-2xl';
   const showAvatar = Boolean(staff.avatar) && !avatarFailed;
+  const staffTypeLabel = staff.staff_type === 'both' ? 'Both' : staff.staff_type === 'transfer_contact' || staff.staff_type === 'authorized_representative' ? 'Manager' : 'Team Member';
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -1477,6 +1481,11 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
               />
             </div>
           </div>
+        </div>
+
+        <div className="border-t border-white/[0.04] px-0.5 pt-3">
+          <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Staff Type</p>
+          <p className="text-[11px] font-bold leading-none tracking-tight text-zinc-300">{staffTypeLabel}</p>
         </div>
 
         <div className={`grid grid-cols-2 gap-x-5 gap-y-3 border-t border-white/[0.04] ${compact ? 'pt-2.5' : 'pt-3.5'}`}>
@@ -1716,8 +1725,8 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
 };
 
 const SettingsServiceInfoModal = ({ title, intro, points, footer, onClose, dense = false, maxWidthClass = 'max-w-[620px]' }) => (
-  <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
-    <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className={`relative w-full ${maxWidthClass} overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]`} onMouseDown={(event) => event.stopPropagation()}>
+  <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose} onClick={(event) => event.stopPropagation()}>
+    <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className={`relative w-full ${maxWidthClass} overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]`} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
       <ModalSpectrumLine variant="tips" />
       <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
       <div className="p-7 sm:p-8">
@@ -1730,7 +1739,7 @@ const SettingsServiceInfoModal = ({ title, intro, points, footer, onClose, dense
           <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label={`Close ${title}`}><X size={16} /></button>
         </div>
         {points?.length ? <div className={`mt-7 text-sm text-zinc-400 ${dense ? 'space-y-1 leading-5' : 'space-y-4 leading-6'}`}>
-          {points.map((point, index) => <div key={point.title} className="flex gap-3"><span className={`${dense ? 'mt-2 h-1 w-1' : 'mt-2 h-1.5 w-1.5'} shrink-0 rounded-full bg-white`} style={{ opacity: Math.max(0.35, 1 - (index * 0.14)) }} /><p><span className="font-semibold text-white">{point.title}</span> {point.body}</p></div>)}
+          {points.map((point, index) => <div key={point.title} className="flex gap-3"><span className={`${dense ? 'mt-2 h-1 w-1' : 'mt-2 h-1.5 w-1.5'} shrink-0 rounded-full bg-white`} style={{ opacity: Math.max(0.35, 1 - (index * 0.14)) }} /><div className="min-w-0"><p><span className="font-semibold text-white">{point.title}</span> {point.body}</p>{point.details?.length ? <div className="mt-3 flex flex-wrap gap-2">{point.details.map((detail) => { const isPositive = detail.toLowerCase().includes('appointment') ? point.title !== 'Manager.' : point.title !== 'Team Member.'; const DetailIcon = isPositive ? ThumbsUp : ThumbsDown; return <span key={detail} className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[11px] font-medium leading-none text-zinc-500"><DetailIcon className="h-3 w-3 text-zinc-600" aria-hidden="true" />{detail}</span>; })}</div> : null}</div></div>)}
         </div> : null}
         {footer ? <div className="relative mt-7 border-t border-white/[0.06] pt-5"><p className="max-w-[520px] text-[13px] leading-6 text-zinc-500">{footer}</p></div> : null}
       </div>
@@ -2044,6 +2053,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const [staffSlide, setStaffSlide] = useState(0);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadName, setAvatarUploadName] = useState('');
+  const [showStaffTypeTips, setShowStaffTypeTips] = useState(false);
   const [showKnowledgeTips, setShowKnowledgeTips] = useState(false);
   const [deleteStaffTarget, setDeleteStaffTarget] = useState(null);
 
@@ -2093,6 +2103,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     setForm({ ...createStaffFormState(null, defaultHours), acknowledgements: readStaffAcknowledgements('new') });
     setStaffSlide(0);
     setAvatarUploadName('');
+    setShowStaffTypeTips(false);
     setShowKnowledgeTips(false);
     setError('');
     setIsModalOpen(true);
@@ -2107,6 +2118,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     });
     setStaffSlide(0);
     setAvatarUploadName('');
+    setShowStaffTypeTips(false);
     setShowKnowledgeTips(false);
     setError('');
     setIsModalOpen(true);
@@ -2119,6 +2131,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     setForm(createStaffFormState(null, defaultHours));
     setStaffSlide(0);
     setAvatarUploadName('');
+    setShowStaffTypeTips(false);
     setShowKnowledgeTips(false);
     setError('');
   };
@@ -2129,7 +2142,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   };
 
   const validateStaffSlide = () => {
-    if (staffSlide !== 0) return true;
+    if (staffSlide !== 1) return true;
     const fullName = String(form.full_name || '').trim()
       || [form.first_name, form.last_name].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
     if (!fullName) {
@@ -2146,7 +2159,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const goNextStaffSlide = () => {
     setError('');
     if (!validateStaffSlide()) return;
-    setStaffSlide((prev) => Math.min(prev + 1, 3));
+    setStaffSlide((prev) => Math.min(prev + 1, staffSteps.length - 1));
   };
 
   const goBackStaffSlide = () => {
@@ -2276,9 +2289,10 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   };
 
   const staffSteps = [
+    { label: 'Type', title: 'What type of staff member is this?', description: 'Choose how Nodemere should use this staff member.' },
     { label: 'Profile', title: 'Basic Info', description: 'Add basic info for this staff member.' },
     { label: 'Schedule', title: 'Schedule', description: 'Set the exact days and hours this staff member can accept appointments.' },
-    { label: 'Knowledge', title: 'Knowledge', description: 'Help your receptionist learn more about this staff member. This allows it to recommend the right person, explain their strengths clearly, and make better booking decisions during calls.' },
+    ...(['team_member', 'both'].includes(form.staff_type) ? [{ label: 'Knowledge', title: 'Knowledge', description: 'Help your receptionist learn more about this staff member. This allows it to recommend the right person, explain their strengths clearly, and make better booking decisions during calls.' }] : []),
     { label: 'Photo', title: 'Upload Image', description: 'Upload a profile image that helps keep this staff member easy to recognize across the Team page.' },
   ];
 
@@ -2298,6 +2312,11 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
   const renderStaffSlide = () => {
     if (staffSlide === 0) {
+      return <div className="grid min-h-[390px] gap-4 md:grid-cols-3">
+        {[['team_member', 'Team Member', 'Contributes to the company’s day-to-day work and goals.', 'T'], ['transfer_contact', 'Manager', 'Receives escalated calls from the receptionist.', 'M'], ['both', 'Both', 'Supports the team’s everyday work while also staying available for escalated calls from the receptionist.', 'B']].map(([value, title, description, mark]) => <button key={value} type="button" onClick={() => setForm((prev) => ({ ...prev, staff_type: value }))} className={`group flex min-h-[220px] flex-col rounded-[24px] border p-5 text-left transition duration-300 sm:p-6 ${form.staff_type === value ? 'border-white/30 bg-white/[0.09] shadow-[0_18px_60px_rgba(255,255,255,0.04)]' : 'border-white/[0.08] bg-white/[0.035] hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.055]'}`}><span className={`flex h-12 w-12 items-center justify-center rounded-2xl border text-lg transition ${form.staff_type === value ? 'border-white/20 bg-white text-black' : 'border-white/[0.08] bg-black/20 text-zinc-600 group-hover:text-zinc-300'}`}>{mark}</span><span className="mt-[84px] block min-h-[104px]"><span className="block text-base font-semibold tracking-[-0.03em] text-white sm:text-lg">{title}</span><span className="mt-2 block max-w-[220px] text-[13px] leading-5 text-zinc-500">{description}</span></span><span className={`mt-auto text-[10px] font-bold uppercase tracking-[0.16em] ${form.staff_type === value ? 'text-white/70' : 'text-zinc-700'}`}>{form.staff_type === value ? 'Selected' : 'Choose type'}</span></button>)}
+      </div>;
+    }
+    if (staffSlide === 1) {
       return (
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block space-y-2 md:col-span-2">
@@ -2317,7 +2336,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
             <input type="text" value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: maskStaffRole(e.target.value) }))} placeholder="Senior Stylist" className={staffInputClass} />
           </label>
           <label className="block space-y-2">
-            <span className="text-[13px] font-normal text-zinc-400">Phone</span>
+            <span className="text-[13px] font-normal text-zinc-400">{['transfer_contact', 'both'].includes(form.staff_type) ? 'Transfer Phone Number' : 'Phone'}</span>
             <input type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: maskStaffPhone(e.target.value) }))} placeholder="(555) 000-0000" className={staffInputClass} />
           </label>
           <label className="block space-y-2 md:col-span-2">
@@ -2328,7 +2347,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       );
     }
 
-    if (staffSlide === 1) {
+    if (staffSlide === 2) {
       return (
         <StaffScheduleBuilder
           value={form.working_hours}
@@ -2340,7 +2359,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       );
     }
 
-    if (staffSlide === 2) {
+    if (staffSlide === 3 && ['team_member', 'both'].includes(form.staff_type)) {
       return (
         <textarea value={form.knowledge} onChange={(e) => setForm((prev) => ({ ...prev, knowledge: e.target.value }))} className="custom-scrollbar h-[410px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 pr-5 text-sm leading-6 text-white outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0" />
       );
@@ -2508,7 +2527,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               onClick={(e) => e.stopPropagation()}
-              className={`relative max-h-[calc(100vh-24px)] w-full ${staffSlide === 1 ? 'max-w-[1080px]' : 'max-w-[700px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}
+              className={`relative max-h-[calc(100vh-24px)] w-full ${staffSlide === 2 ? 'max-w-[1080px]' : 'max-w-[700px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}
             >
               <div className="relative p-6 sm:p-8">
                 <div className="mb-6 flex items-start justify-between gap-5">
@@ -2523,7 +2542,18 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                       <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
                         {staffSteps[staffSlide].title}
                       </h2>
-                      {staffSlide === 2 && (
+                      {staffSlide === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowStaffTypeTips(true)}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
+                          aria-label="Staff type tips"
+                          title="Staff type tips"
+                        >
+                          <Lightbulb className="h-4 w-4" />
+                        </button>
+                      )}
+                      {staffSlide === 3 && ['team_member', 'both'].includes(form.staff_type) && (
                         <button type="button" onClick={() => setShowKnowledgeTips(true)} className="h-6 rounded-full border border-white/[0.08] px-2.5 text-[10px] font-semibold tracking-normal text-zinc-500 transition hover:border-white/20 hover:text-zinc-300">
                           Tips
                         </button>
@@ -2580,6 +2610,21 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                 </div>
               </div>
             </motion.section>
+            <AnimatePresence>
+              {showStaffTypeTips ? (
+                <SettingsServiceInfoModal
+                  maxWidthClass="max-w-[530px]"
+                  title="Choose how this staff member is used"
+                  intro="Select the option that best matches how this person will support your business."
+                  points={[
+                    { title: 'Team Member.', body: 'For someone who contributes to the company’s day-to-day work and goals.', details: ['Takes appointments', 'Handles escalated calls'] },
+                    { title: 'Manager.', body: 'For someone who receives escalated calls from the receptionist.', details: ['Takes appointments', 'Handles escalated calls'] },
+                    { title: 'Both.', body: 'For someone who supports daily operations and receives escalated calls.', details: ['Takes appointments', 'Handles escalated calls'] },
+                  ]}
+                  onClose={() => setShowStaffTypeTips(false)}
+                />
+              ) : null}
+            </AnimatePresence>
             <AnimatePresence>
               {showKnowledgeTips && (
                 <motion.div
