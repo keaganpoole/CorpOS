@@ -75,6 +75,7 @@ export default function NestDock({ onStageChange, businessAvatar = '' }) {
   const {
     displayEvent,
     displayConcept,
+    liveCallActions,
     queueLength,
     setHistoryOpen,
     setStudioOpen,
@@ -110,6 +111,7 @@ export default function NestDock({ onStageChange, businessAvatar = '' }) {
         <NestStage
           event={displayEvent}
           concept={displayConcept}
+          liveCallActions={liveCallActions}
           privacyMode={privacyMode}
           introStarted={introStarted}
           onIntroStart={markIntroStarted}

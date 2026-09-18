@@ -4565,11 +4565,63 @@ def serialize_business_profile_row(row: dict):
 TOOL_BUSINESS_FIELDS = ('id', 'name', 'phone', 'email', 'address', 'city', 'state',
     'zip', 'website', 'about_us', 'policies', 'faq', 'business_hours', 'business_timezone', 'industry')
 TOOL_STAFF_FIELDS = ('id', 'full_name', 'first_name', 'last_name', 'role',
-    'is_active', 'working_hours', 'knowledge')
+    'is_active', 'working_hours', 'escalations', 'escalation_hours', 'knowledge')
 
 
 def staff_tool_view(row):
     return {key: row[key] for key in TOOL_STAFF_FIELDS if key in row} if row else None
+
+
+def schedule_has_enabled_days(schedule) -> bool:
+    if isinstance(schedule, str):
+        try:
+            schedule = json.loads(schedule)
+        except ValueError:
+            return False
+    if not isinstance(schedule, dict):
+        return False
+    return any(isinstance(entry, dict) and entry.get("enabled") is not False for entry in schedule.values())
+
+
+def get_escalation_staff_for_business(business_id) -> Optional[dict]:
+    if business_id is None:
+        return None
+    try:
+        rows = (
+            supabase.table("staff")
+            .select("id,full_name,first_name,last_name,phone,is_active,escalations,escalation_hours")
+            .eq("business_id", business_id)
+            .eq("is_active", True)
+            .limit(200)
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        logging.warning("main.get_escalation_staff_for_business.event_1")
+        return None
+    for row in rows:
+        if row.get("escalations") is False:
+            continue
+        if schedule_has_enabled_days(row.get("escalation_hours")) and normalize_phone_number(row.get("phone")):
+            return row
+    return None
+
+
+def add_escalation_dynamic_variables(dynamic_variables: dict, business: Optional[dict]):
+    escalation_staff = get_escalation_staff_for_business((business or {}).get("id"))
+    if not escalation_staff:
+        dynamic_variables["escalations_phone_number"] = ""
+        dynamic_variables["escalations_staff_id"] = ""
+        dynamic_variables["escalations_staff_name"] = ""
+        return dynamic_variables
+    dynamic_variables["escalations_phone_number"] = normalize_phone_number(escalation_staff.get("phone")) or ""
+    dynamic_variables["escalations_staff_id"] = str(escalation_staff.get("id") or "")
+    dynamic_variables["escalations_staff_name"] = (
+        str(escalation_staff.get("full_name") or "").strip()
+        or " ".join(filter(None, [str(escalation_staff.get("first_name") or "").strip(), str(escalation_staff.get("last_name") or "").strip()]))
+    )
+    return dynamic_variables
 
 def parse_usage_seconds(value) -> int:
     try:
@@ -7266,7 +7318,7 @@ async def twilio_inbound_webhook(request: Request):
     }
     # Knowledge is synchronized in the background. Use the last successful
     # snapshot immediately; a missing or stale snapshot must never block the
-    # Twilio-to-ElevenLabs handoff.
+    # Twilio-to-ElevenLabs transfer.
     knowledge_snapshot = cached_business_knowledge(business.get("id"), elevenlabs_agent_id_inbound)
     if knowledge_snapshot:
         _knowledge_branch_id, knowledge_override = knowledge_snapshot
@@ -7282,6 +7334,10 @@ async def twilio_inbound_webhook(request: Request):
             "agent": {"prompt": {"knowledge_base": []}},
         }
     add_people_intake_dynamic_variables(
+        register_payload["conversation_initiation_client_data"]["scenario_context"],
+        business,
+    )
+    add_escalation_dynamic_variables(
         register_payload["conversation_initiation_client_data"]["scenario_context"],
         business,
     )
@@ -7431,6 +7487,7 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
         "docs_request_id": "",
     }
     add_people_intake_dynamic_variables(dynamic_variables, business)
+    add_escalation_dynamic_variables(dynamic_variables, business)
     matched_person = lookup_person_record(
         phone_number=call_payload.get("from_number"),
         business_id=str(business.get("id")) if business and business.get("id") is not None else None,
@@ -8563,11 +8620,22 @@ async def legacy_server_tool(
         return {"ok": True, "call_log": saved}
 
     if normalized_tool == "transfer-call":
+        target_number = (
+            first_present(payload, "target_number", "phone_number", "transfer_to")
+            or first_present(payload, "escalations_phone_number")
+            or normalize_phone_number((get_escalation_staff_for_business(business.get("id") if business else None) or {}).get("phone"))
+        )
+        if not normalize_phone_number(target_number):
+            return {
+                "ok": False,
+                "status": "missing_target_number",
+                "reason": "No escalation phone number is configured for this business.",
+            }
         transfer_payload = {
             "business_id": business.get("id") if business else None,
             "user_id": user_id,
             "receptionist_id": (receptionist or {}).get("id"),
-            "target_number": first_present(payload, "target_number", "phone_number", "transfer_to"),
+            "target_number": normalize_phone_number(target_number) or target_number,
             "reason": first_present(payload, "reason"),
             "requested_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -9533,6 +9601,7 @@ async def create_intercom_session(payload: dict, current_user: dict = Depends(ge
             "docs_request_id": "",
             "requires_write_confirmation": "true",
             "secret__nodemere_context": capability,
+            **add_escalation_dynamic_variables({}, business),
         },
     }
 
@@ -10696,7 +10765,7 @@ async def list_sonar_staff(active_only: bool = True, current_user: dict = Depend
     return sorted(response.data or [], key=lambda row: str(row.get("full_name") or "").lower())
 
 STAFF_PROFILE_FIELDS = {
-    "full_name", "first_name", "last_name", "role", "email", "phone",
+    "staff_type", "escalations", "escalation_hours", "full_name", "first_name", "last_name", "role", "email", "phone",
     "avatar", "is_active", "working_hours", "knowledge", "acknowledgements",
 }
 
@@ -11388,7 +11457,7 @@ async def list_call_logs(
     safe_offset = max(0, offset)
     query = (
         supabase.table("call_logs")
-        .select("id,business_id,user_id,caller_name,caller_phone,from_number,started_at,event_timestamp,created_at,duration_seconds,status,outcome,summary,notes,call_successful,direction,receptionist_name,agent_name,hired_receptionist_id,is_favorited,has_audio")
+        .select("id,business_id,user_id,caller_name,caller_phone,from_number,started_at,ended_at,event_timestamp,created_at,duration_seconds,status,outcome,summary,notes,call_successful,failure_reason,direction,receptionist_name,agent_name,hired_receptionist_id,is_favorited,has_audio")
         .eq("user_id", business_owner_id(current_user))
         .order("created_at", desc=True)
     )

@@ -29,6 +29,7 @@ import { visitorIntelligenceApi } from './lib/visitorIntelligenceApi';
 
 const VisitorsPage = lazy(() => import('./pages/VisitorsPage'));
 const ConceptsPage = lazy(() => import('./pages/concepts/ConceptsPage'));
+const DesignsPage = lazy(() => import('./pages/designs/DesignsPage'));
 
 function DashboardGate() {
   const { session, profile, isLoading, workforce } = useAuth();
@@ -114,9 +115,14 @@ function AppContent() {
   const isPublicStats = location.pathname === '/stats';
   const isVisitors = location.pathname.startsWith('/visitors');
   const isConcepts = location.pathname === '/concepts';
+  const isDesigns = location.pathname === '/designs';
 
   if (isConcepts) {
     return <Suspense fallback={<div style={{ minHeight: '100vh', background: '#0b0d0e' }} />}><ConceptsPage /></Suspense>;
+  }
+
+  if (isDesigns) {
+    return <Suspense fallback={<div style={{ minHeight: '100vh', background: '#08090b' }} />}><DesignsPage /></Suspense>;
   }
 
   if ((isLoading || isAppLoading) && !isVoiceCloneEntry && !isPublicStats) {

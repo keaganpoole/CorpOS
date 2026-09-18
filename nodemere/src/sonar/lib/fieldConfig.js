@@ -65,7 +65,7 @@ export const DEFAULT_FIELD_CONFIG = {
   last_email_status: { name: 'Last Email Status', icon: 'mail' },
   callback_needed: { name: 'Callback Needed', icon: 'repeat' },
   callback_due_at: { name: 'Callback Due At', icon: 'clock' },
-  handoff_required: { name: 'Handoff Required', icon: 'navigation' },
+  handoff_required: { name: 'Escalation Required', icon: 'navigation' },
   assigned_staff: { name: 'Assigned Staff', icon: 'users' },
   call_route: {
     name: 'Call Route',
@@ -258,7 +258,7 @@ export const CONDITIONAL_FIELDS = [
   { key: 'last_sms_status', label: 'Last SMS Status', type: 'select', options: SMS_STATUS_OPTIONS.map((opt) => opt.value) },
   { key: 'last_email_status', label: 'Last Email Status', type: 'select', options: EMAIL_STATUS_OPTIONS.map((opt) => opt.value) },
   { key: 'callback_needed', label: 'Callback Needed', type: 'select', options: ['True', 'False'] },
-  { key: 'handoff_required', label: 'Handoff Required', type: 'select', options: ['True', 'False'] },
+  { key: 'handoff_required', label: 'Escalation Required', type: 'select', options: ['True', 'False'] },
   { key: 'payment_status', label: 'Payment Status', type: 'select', options: PAYMENT_STATUS_OPTIONS.map((opt) => opt.value) },
   { key: 'call_route', label: 'Call Route', type: 'select', options: CALL_ROUTE_OPTIONS.map((opt) => opt.value) },
   { key: 'assigned_staff', label: 'Assigned Staff', type: 'text' },

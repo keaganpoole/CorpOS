@@ -307,7 +307,7 @@ const TASKLIST_DEFINITIONS = [
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
         instructionTitle: 'Add A Staff Member',
         instruction:
-          'Open Receptionists, switch to Staff, and add a real team member your receptionist can book with or route callers to. Include the basic contact details so the staff record is useful during scheduling and handoff.',
+          'Open Receptionists, switch to Staff, and add a real team member your receptionist can book with or route callers to. Include the basic contact details so the staff record is useful during scheduling and escalations.',
       },
       {
         id: 'staff_availability',

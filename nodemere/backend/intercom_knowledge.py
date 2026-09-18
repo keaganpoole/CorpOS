@@ -16,7 +16,7 @@ RECEPTIONIST_STORIES_PATH = TEMPLATE_DIR.parent / "RECEPTIONIST_BACKSTORY" / "re
 GENERAL_DIR = TEMPLATE_DIR.parent
 GENERAL_FOLDERS = ("04_CONVERSATION_REFERENCE", "05_ERROR_AND_RECOVERY", "06_PERSONALITY_EXPRESSION")
 SERVICE_FIELDS = "id,name,description,price_type,price_min,price_max,unit,category,is_active,sort_order"
-STAFF_FIELDS = "id,full_name,first_name,last_name,role,is_active,working_hours,knowledge"
+STAFF_FIELDS = "id,full_name,first_name,last_name,role,is_active,working_hours,knowledge,staff_type,phone,escalations,escalation_hours"
 SHARED_PREFIXES = ("Nodemere — 04_", "Nodemere — 05_", "Nodemere — 06_")
 ELEVENLABS_BASE = "https://api.elevenlabs.io/v1/convai"
 _general_cache_lock = Lock()
@@ -94,10 +94,46 @@ def _services(rows: list[dict]) -> str:
     return "\n\n".join(blocks)
 
 
+def _coerce_schedule(value):
+    if isinstance(value, str):
+        import json
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return None
+    return value if isinstance(value, dict) else None
+
+
+def _schedule_lines(value, *, closed_label: str) -> list[str]:
+    schedule = _coerce_schedule(value)
+    if not isinstance(schedule, dict):
+        return []
+    lines = []
+    for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"):
+        entry = next((item for key, item in schedule.items() if _text(key).lower()[:3] == day[:3].lower()), None)
+        if not isinstance(entry, dict) or entry.get("enabled") is False:
+            lines.append(f"{day}: {closed_label}")
+            continue
+        opening = entry.get("open", entry.get("start"))
+        closing = entry.get("close", entry.get("end"))
+        lines.append(f"{day}: {_text(opening)}–{_text(closing)}" if opening is not None and closing is not None else f"{day}: Hours not specified")
+    return lines
+
+
+def _has_enabled_schedule(value) -> bool:
+    schedule = _coerce_schedule(value)
+    if not isinstance(schedule, dict):
+        return False
+    return any(isinstance(entry, dict) and entry.get("enabled") is not False for entry in schedule.values())
+
+
 def _staff(rows: list[dict]) -> str:
     blocks = []
     for row in sorted(rows, key=lambda item: _text(item.get("full_name") or item.get("first_name"))):
         if row.get("is_active") is not True:
+            continue
+        escalation_enabled = row.get("escalations") is not False and _has_enabled_schedule(row.get("escalation_hours"))
+        if _text(row.get("staff_type")).lower() == "transfer_contact" and not escalation_enabled:
             continue
         name = _text(row.get("full_name")) or " ".join(filter(None, [_text(row.get("first_name")), _text(row.get("last_name"))]))
         if not name:
@@ -109,24 +145,15 @@ def _staff(rows: list[dict]) -> str:
             lines.append(f"Role: {_text(row['role'])}")
         if _markdown(row.get("knowledge")):
             lines.append(f"Profile: {_markdown(row['knowledge'])}")
-        working_hours = row.get("working_hours")
-        if isinstance(working_hours, str):
-            import json
-            try:
-                working_hours = json.loads(working_hours)
-            except ValueError:
-                working_hours = None
-        if isinstance(working_hours, dict):
-            schedule = []
-            for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"):
-                entry = next((value for key, value in working_hours.items() if _text(key).lower()[:3] == day[:3].lower()), None)
-                if not isinstance(entry, dict) or entry.get("enabled") is False:
-                    schedule.append(f"{day}: Not working")
-                    continue
-                opening = entry.get("open", entry.get("start"))
-                closing = entry.get("close", entry.get("end"))
-                schedule.append(f"{day}: {_text(opening)}–{_text(closing)}" if opening is not None and closing is not None else f"{day}: Working hours not specified")
-            lines.append("Schedule:\n" + "\n".join(schedule))
+        working_schedule = _schedule_lines(row.get("working_hours"), closed_label="Not working")
+        if working_schedule:
+            lines.append("Appointment schedule:\n" + "\n".join(working_schedule))
+        if escalation_enabled:
+            lines.append("Escalations: Enabled")
+            lines.append("Escalation transfer number: use the dynamic variable {{escalations_phone_number}}.")
+            escalation_schedule = _schedule_lines(row.get("escalation_hours"), closed_label="Not available for escalations")
+            if escalation_schedule:
+                lines.append("Escalation schedule:\n" + "\n".join(escalation_schedule))
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 

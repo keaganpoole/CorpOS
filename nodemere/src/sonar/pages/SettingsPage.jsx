@@ -49,6 +49,19 @@ const COLORBLIND_SCHEDULE_LAYER_TYPES = [
   { id: 'outbound', label: 'Outbound Calls', color: '#d55e00', gradient: 'from-[#d55e00] to-[#e69f00]', glow: '0 0 16px rgba(213, 94, 0, 0.36)' },
 ];
 const getScheduleLayerTypes = (colorblindMode = false) => colorblindMode ? COLORBLIND_SCHEDULE_LAYER_TYPES : SCHEDULE_LAYER_TYPES;
+const STAFF_SCHEDULE_LAYER_TYPES = [
+  { id: 'staff', label: 'Staff Availability', color: '#06b6d4', gradient: 'from-cyan-500 to-blue-600', glow: '0 0 16px rgba(6, 182, 212, 0.4)' },
+  { id: 'escalations', label: 'Escalations', color: '#14b8a6', gradient: 'from-teal-400 to-emerald-500', glow: '0 0 16px rgba(20, 184, 166, 0.4)' },
+  { id: 'neither', label: 'Neither', color: '#71717a', gradient: 'from-zinc-700 to-zinc-500', glow: 'none' },
+];
+const COLORBLIND_STAFF_SCHEDULE_LAYER_TYPES = [
+  { id: 'staff', label: 'Staff Availability', color: '#0072b2', gradient: 'from-[#0072b2] to-[#56b4e9]', glow: '0 0 16px rgba(0, 114, 178, 0.36)' },
+  { id: 'escalations', label: 'Escalations', color: '#009e73', gradient: 'from-[#009e73] to-[#66c2a5]', glow: '0 0 16px rgba(0, 158, 115, 0.36)' },
+  { id: 'neither', label: 'Neither', color: '#8b8b8b', gradient: 'from-zinc-600 to-zinc-400', glow: 'none' },
+];
+const getStaffScheduleLayerTypes = (colorblindMode = false) => (
+  colorblindMode ? COLORBLIND_STAFF_SCHEDULE_LAYER_TYPES : STAFF_SCHEDULE_LAYER_TYPES
+);
 const OUTBOUND_LATE_HOURS_TERMS_KEY = 'outbound_late_hours_acknowledgment_v1';
 const OUTBOUND_LATE_HOURS_START = 20;
 const OUTBOUND_LATE_HOURS_END = 8;
@@ -358,11 +371,21 @@ const createDefaultHours = (baseHours = null) => (
   }, {})
 );
 
+const disableScheduleHours = (baseHours = null) => {
+  const normalized = createDefaultHours(baseHours);
+  return Object.fromEntries(DAYS.map((day) => [day, { ...normalized[day], enabled: false }]));
+};
+
+const hasEnabledScheduleHours = (hours) => (
+  DAYS.some((day) => createDefaultHours(hours)[day]?.enabled)
+);
+
 const timeToDecimalHour = (value, fallback = 9) => {
   const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return fallback;
-  const hours = Math.max(0, Math.min(23, Number(match[1])));
   const minutes = Math.max(0, Math.min(59, Number(match[2])));
+  const rawHours = Number(match[1]);
+  const hours = rawHours === 24 && minutes === 0 ? 24 : Math.max(0, Math.min(23, rawHours));
   return hours + (minutes / 60);
 };
 
@@ -495,21 +518,30 @@ const maskStaffPhone = (value) => {
 
 const staffInputClass = 'h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0';
 
-const createStaffFormState = (staff, baseHours = null) => ({
-  id: staff?.id || null,
-  staff_type: staff?.staff_type === 'authorized_representative' ? 'transfer_contact' : (staff?.staff_type || 'team_member'),
-  full_name: maskStaffName(staff?.full_name || ''),
-  first_name: maskStaffName(staff?.first_name || ''),
-  last_name: maskStaffName(staff?.last_name || ''),
-  role: maskStaffRole(staff?.role || ''),
-  email: maskStaffEmail(staff?.email || ''),
-  phone: maskStaffPhone(staff?.phone || ''),
-  avatar: staff?.avatar || '',
-  is_active: staff?.is_active !== false,
-  knowledge: staff ? (staff.knowledge || '') : DEFAULT_STAFF_KNOWLEDGE,
-  working_hours: createDefaultHours(staff?.working_hours || baseHours),
-  acknowledgements: staff?.acknowledgements && typeof staff.acknowledgements === 'object' ? staff.acknowledgements : {},
-});
+const createStaffFormState = (staff, baseHours = null) => {
+  const rawEscalationHours = staff?.escalation_hours || baseHours;
+  const escalationHours = staff && staff.escalations === false
+    ? disableScheduleHours(rawEscalationHours)
+    : createDefaultHours(rawEscalationHours);
+
+  return {
+    id: staff?.id || null,
+    staff_type: staff?.staff_type === 'authorized_representative' ? 'transfer_contact' : (staff?.staff_type || 'team_member'),
+    escalations: hasEnabledScheduleHours(escalationHours),
+    full_name: maskStaffName(staff?.full_name || ''),
+    first_name: maskStaffName(staff?.first_name || ''),
+    last_name: maskStaffName(staff?.last_name || ''),
+    role: maskStaffRole(staff?.role || ''),
+    email: maskStaffEmail(staff?.email || ''),
+    phone: maskStaffPhone(staff?.phone || ''),
+    avatar: staff?.avatar || '',
+    is_active: staff?.is_active !== false,
+    escalation_hours: escalationHours,
+    knowledge: staff ? (staff.knowledge || '') : DEFAULT_STAFF_KNOWLEDGE,
+    working_hours: createDefaultHours(staff?.working_hours || baseHours),
+    acknowledgements: staff?.acknowledgements && typeof staff.acknowledgements === 'object' ? staff.acknowledgements : {},
+  };
+};
 
 const normalizeStaffPayload = (form, businessId) => {
   const derivedFullName = String(form.full_name || '').trim()
@@ -518,6 +550,7 @@ const normalizeStaffPayload = (form, businessId) => {
   return {
     business_id: businessId,
     staff_type: ['team_member', 'transfer_contact', 'both'].includes(form.staff_type) ? form.staff_type : 'team_member',
+    escalations: hasEnabledScheduleHours(form.escalation_hours),
     full_name: derivedFullName,
     first_name: String(form.first_name || '').trim() || null,
     last_name: String(form.last_name || '').trim() || null,
@@ -526,6 +559,7 @@ const normalizeStaffPayload = (form, businessId) => {
     phone: String(form.phone || '').trim() || null,
     avatar: String(form.avatar || '').trim() || null,
     is_active: form.is_active !== false,
+    escalation_hours: createDefaultHours(form.escalation_hours),
     working_hours: createDefaultHours(form.working_hours),
     knowledge: String(form.knowledge || '').trim() || null,
     acknowledgements: form.acknowledgements && typeof form.acknowledgements === 'object' ? form.acknowledgements : {},
@@ -1083,27 +1117,31 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
   );
 };
 
-const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements = {}, onAcknowledge }) => {
+const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements = {}, onAcknowledge, escalationsValue, onEscalationsChange, escalationLocked = false, onEscalationBlocked, colorblindMode = false, onColorblindModeChange }) => {
   const dragPreviewRef = useRef(null);
+  const dragMovedRef = useRef(false);
   const [snapMinutes, setSnapMinutes] = useState(15);
   const [drag, setDrag] = useState(null);
   const [hoveredBar, setHoveredBar] = useState(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
   const [notice, setNotice] = useState('');
   const [outsideHoursNotice, setOutsideHoursNotice] = useState(false);
   const outsideHoursAcknowledgedRef = useRef(Boolean(acknowledgements?.outside_business_hours));
   const schedule = createDefaultHours(value);
+  const escalationsSchedule = createDefaultHours(escalationsValue || value);
   const businessSchedule = businessHours ? cleanStructuredBusinessHours(businessHours) : null;
   const timelineHours = 24;
-  const scheduleLayer = {
-    id: 'staff',
-    label: 'Staff Availability',
-    color: 'var(--brandGradientStart)',
-    gradient: 'from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)]',
-    glow: '0 0 16px color-mix(in srgb, var(--brandGradientStart) 38%, transparent)',
-  };
+  const staffLayerTypes = getStaffScheduleLayerTypes(colorblindMode);
+  const scheduleLayer = staffLayerTypes.find((layer) => layer.id === 'staff') || staffLayerTypes[0];
+  const escalationsLayer = staffLayerTypes.find((layer) => layer.id === 'escalations') || staffLayerTypes[1];
 
   const weeklyHours = DAYS.reduce((total, day) => {
     const dayValue = schedule[day];
+    return total + (dayValue?.enabled ? Math.max(0, timeToDecimalHour(dayValue.close, 17) - timeToDecimalHour(dayValue.open, 9)) : 0);
+  }, 0);
+  const weeklyEscalationsHours = DAYS.reduce((total, day) => {
+    const dayValue = escalationsSchedule[day];
     return total + (dayValue?.enabled ? Math.max(0, timeToDecimalHour(dayValue.close, 17) - timeToDecimalHour(dayValue.open, 9)) : 0);
   }, 0);
 
@@ -1165,14 +1203,65 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
     updateDay(day, { ...schedule[day], enabled: !schedule[day].enabled });
   };
 
-  const handlePointerDown = (event, day, handle) => {
-    const dayValue = schedule[day];
+  const toggleDayTracks = (day) => {
+    const escalationsDay = escalationsSchedule[day];
+    const isEnabled = Boolean(schedule[day]?.enabled || (escalationsValue && escalationsDay?.enabled));
+    updateDay(day, { ...schedule[day], enabled: !isEnabled });
+    if (escalationsValue) {
+      if (escalationLocked && !escalationsDay.enabled && !isEnabled) {
+        onEscalationBlocked?.();
+        return;
+      }
+      onEscalationsChange?.({ ...escalationsSchedule, [day]: { ...escalationsDay, enabled: !isEnabled } });
+    }
+  };
+
+  const toggleAllStaff = () => {
+    updateSchedule((current) => {
+      const isCurrentlyEnabled = DAYS.some((day) => current[day]?.enabled);
+      return Object.fromEntries(DAYS.map((day) => [
+        day,
+        { ...current[day], enabled: !isCurrentlyEnabled },
+      ]));
+    });
+  };
+
+  const toggleEscalations = () => {
+    const nextEnabled = DAYS.some((day) => escalationsSchedule[day]?.enabled);
+    if (escalationLocked && !nextEnabled) {
+      onEscalationBlocked?.();
+      return;
+    }
+    onEscalationsChange?.(Object.fromEntries(DAYS.map((day) => [day, { ...escalationsSchedule[day], enabled: !nextEnabled }])));
+  };
+
+  const toggleEscalationsDay = (day) => {
+    const escalationsDay = escalationsSchedule[day];
+    if (escalationLocked && !escalationsDay.enabled) {
+      onEscalationBlocked?.();
+      return;
+    }
+    onEscalationsChange?.({ ...escalationsSchedule, [day]: { ...escalationsDay, enabled: !escalationsDay.enabled } });
+  };
+
+  const handlePointerDown = (event, day, handle, track = 'staff') => {
+    if (track === 'escalations' && escalationLocked) {
+      const dayValue = escalationsSchedule[day];
+      if (!dayValue?.enabled) {
+        event.preventDefault();
+        onEscalationBlocked?.();
+      }
+      return;
+    }
+    const sourceSchedule = track === 'escalations' ? escalationsSchedule : schedule;
+    const dayValue = sourceSchedule[day];
     if (!dayValue?.enabled) return;
     event.preventDefault();
+    dragMovedRef.current = false;
     const start = timeToDecimalHour(dayValue.open, 9);
     const end = timeToDecimalHour(dayValue.close, 17);
-    dragPreviewRef.current = { day, handle, dayValue };
-    setDrag({ day, handle, startX: event.clientX, startValue: handle === 'left' ? start : handle === 'right' ? end : start });
+    dragPreviewRef.current = { day, handle, dayValue, track };
+    setDrag({ day, handle, track, startX: event.clientX, startValue: handle === 'left' ? start : handle === 'right' ? end : start });
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
 
@@ -1183,8 +1272,10 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
       if (!track) return;
       const width = track.getBoundingClientRect().width;
       const delta = ((event.clientX - drag.startX) / width) * timelineHours;
+      if (Math.abs(event.clientX - drag.startX) > 3) dragMovedRef.current = true;
       const snap = snapMinutes / 60;
-      const dayValue = schedule[drag.day];
+      const sourceSchedule = drag.track === 'escalations' ? escalationsSchedule : schedule;
+      const dayValue = sourceSchedule[drag.day];
       const currentStart = timeToDecimalHour(dayValue.open, 9);
       const currentEnd = timeToDecimalHour(dayValue.close, 17);
       const duration = Math.max(snap, currentEnd - currentStart);
@@ -1203,18 +1294,32 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
         start = end - duration;
       }
       const nextDay = { ...dayValue, open: decimalHourToTime(start), close: decimalHourToTime(end) };
-      dragPreviewRef.current = { day: drag.day, dayValue: nextDay };
-      updateDay(drag.day, nextDay);
+      dragPreviewRef.current = { day: drag.day, dayValue: nextDay, track: drag.track };
+      if (drag.track === 'escalations') onEscalationsChange?.({ ...escalationsSchedule, [drag.day]: nextDay });
+      else updateDay(drag.day, nextDay);
     };
     const stop = () => {
       const preview = dragPreviewRef.current;
-      const nextSchedule = preview?.day && preview.dayValue ? { ...schedule, [preview.day]: preview.dayValue } : null;
+      if (!dragMovedRef.current && drag.handle === 'center' && preview?.day) {
+        if (preview.track === 'escalations') {
+          const escalationsDay = escalationsSchedule[preview.day];
+          onEscalationsChange?.({ ...escalationsSchedule, [preview.day]: { ...escalationsDay, enabled: !escalationsDay.enabled } });
+        } else {
+          updateDay(preview.day, { ...schedule[preview.day], enabled: !schedule[preview.day].enabled });
+        }
+        dragPreviewRef.current = null;
+        dragMovedRef.current = false;
+        setDrag(null);
+        return;
+      }
+      const nextSchedule = preview?.track !== 'escalations' && preview?.day && preview.dayValue ? { ...schedule, [preview.day]: preview.dayValue } : null;
       const isOutsideBusinessHours = nextSchedule ? hasOutsideBusinessHours(nextSchedule) : false;
       if (!isOutsideBusinessHours) outsideHoursAcknowledgedRef.current = false;
       if (isOutsideBusinessHours && !outsideHoursAcknowledgedRef.current) {
         setOutsideHoursNotice(true);
       }
       dragPreviewRef.current = null;
+      dragMovedRef.current = false;
       setDrag(null);
     };
     window.addEventListener('pointermove', handleMove);
@@ -1223,7 +1328,7 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', stop);
     };
-  }, [drag, schedule, snapMinutes]);
+  }, [drag, schedule, escalationsSchedule, snapMinutes, onEscalationsChange]);
 
   const copyDay = (sourceDay) => {
     const source = schedule[sourceDay];
@@ -1231,18 +1336,110 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
     setNotice(`${sourceDay} copied to all days`);
   };
 
+  const toggleTrack = (track, day) => {
+    if (track === 'escalations') toggleEscalationsDay(day);
+    else toggleDay(day);
+  };
+
+  const exportSchedule = () => {
+    const blob = new Blob([JSON.stringify({
+      schema_version: 1,
+      staff_availability: schedule,
+      escalation_hours: escalationsSchedule,
+    }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'nodemere-staff-schedule.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openImportModal = () => {
+    setImportText('');
+    setNotice('');
+    setImportModalOpen(true);
+  };
+
+  const importSchedule = () => {
+    try {
+      const parsed = JSON.parse(importText);
+      const nextStaffHours = parsed.staff_availability || parsed.working_hours || parsed.staffAvailability || parsed;
+      const nextEscalationsHours = parsed.escalation_hours || parsed.escalationHours || parsed.escalations_hours || nextStaffHours;
+      if (!DAYS.every((day) => nextStaffHours?.[day])) throw new Error('This file does not contain a complete staff schedule.');
+      if (escalationLocked && hasEnabledScheduleHours(nextEscalationsHours)) {
+        onEscalationBlocked?.();
+        setNotice('Escalations are already assigned to another staff member.');
+        return;
+      }
+      onChange(createDefaultHours(nextStaffHours));
+      onEscalationsChange?.(createDefaultHours(nextEscalationsHours));
+      setImportModalOpen(false);
+      setImportText('');
+      setNotice('Schedule imported');
+    } catch (error) {
+      setNotice(error.message || 'Could not import that schedule.');
+    }
+  };
+
   return (
     <div className="space-y-2.5">
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-4">
           <span className="flex items-center gap-1.5 font-medium text-zinc-500"><CalendarClock className="h-3.5 w-3.5" /> Schedule:</span>
-          <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-300"><span className="h-2.5 w-2.5 rounded-full bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)]" />{scheduleLayer.label}</span>
+          <button type="button" onClick={toggleAllStaff} className={`flex items-center gap-1.5 text-[11px] font-medium transition hover:text-white ${DAYS.some((day) => schedule[day]?.enabled) ? 'text-zinc-300' : 'text-zinc-700'}`}><span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${scheduleLayer.gradient} ${DAYS.some((day) => schedule[day]?.enabled) ? '' : 'opacity-30'}`} />Staff Availability</button>
+          {escalationsValue ? <button type="button" onClick={toggleEscalations} className={`flex items-center gap-1.5 text-[11px] font-medium transition hover:text-white ${DAYS.some((day) => escalationsSchedule[day]?.enabled) ? 'text-zinc-300' : 'text-zinc-700'} ${escalationLocked && !DAYS.some((day) => escalationsSchedule[day]?.enabled) ? 'cursor-not-allowed' : ''}`}><span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${escalationsLayer.gradient} ${DAYS.some((day) => escalationsSchedule[day]?.enabled) ? '' : 'opacity-30'}`} />Escalations</button> : null}
           <div className="flex items-center gap-2 text-[11px] text-zinc-500">
             <span>Snap</span>
             <SnapDropdown value={snapMinutes} onChange={setSnapMinutes} />
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => onColorblindModeChange?.(!colorblindMode)} className={`relative flex h-8 w-8 items-center justify-center rounded-lg border transition ${colorblindMode ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-200' : 'border-white/[0.07] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:text-white'}`} aria-label="Colorblind-friendly colors" title="Colorblind-friendly colors">
+            <Eye className="h-4 w-4" />
+            <span className="pointer-events-none absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[conic-gradient(from_90deg,#0072b2,#009e73,#8b8b8b,#56b4e9,#0072b2)] ring-1 ring-black/30" />
+          </button>
+          <button type="button" onClick={openImportModal} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.025] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:border-white/[0.14] hover:text-white"><FileText className="h-3.5 w-3.5" /> Import</button>
+          <button type="button" onClick={exportSchedule} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.025] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:border-white/[0.14] hover:text-white"><Download className="h-3.5 w-3.5" /> Export</button>
+        </div>
       </div>
+      <AnimatePresence>
+        {importModalOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="w-full max-w-xl rounded-2xl border border-white/[0.08] bg-[#080808] p-5 shadow-2xl"
+              initial={{ y: 18, scale: 0.98, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 18, scale: 0.98, opacity: 0 }}
+            >
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Import staff schedule</h3>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">Paste an exported staff schedule below.</p>
+                </div>
+                <button type="button" onClick={() => setImportModalOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/10 hover:text-white" aria-label="Close import schedule">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <textarea
+                value={importText}
+                onChange={(event) => setImportText(event.target.value)}
+                className="h-64 w-full resize-none rounded-xl border border-white/[0.08] bg-black/50 p-3 font-mono text-xs text-zinc-100 outline-none transition placeholder:text-zinc-700 focus:border-white/[0.18]"
+                placeholder=""
+              />
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button type="button" onClick={() => setImportModalOpen(false)} className="h-9 rounded-lg border border-white/[0.07] px-3 text-xs font-semibold text-zinc-400 transition hover:border-white/[0.14] hover:text-white">Cancel</button>
+                <button type="button" onClick={importSchedule} className="h-9 rounded-lg bg-white px-3 text-xs font-semibold text-black transition hover:bg-zinc-200">Import schedule</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <div className="space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
         <div className="flex pl-24 pr-12 text-[11px] font-mono text-zinc-600">
@@ -1252,40 +1449,72 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
         <div className="space-y-1.5">
           {DAYS.map((day) => {
             const dayValue = schedule[day];
-            const start = timeToDecimalHour(dayValue.open, 9);
-            const end = timeToDecimalHour(dayValue.close, 17);
-            const left = Math.max(0, Math.min(100, (start / timelineHours) * 100));
-            const width = Math.max(0, Math.min(100 - left, ((end - start) / timelineHours) * 100));
-            const barKey = `staff-${day}`;
-            const isActiveBar = drag?.day === day;
-            const isHovered = hoveredBar === barKey;
+            const dayRowEnabled = dayValue.enabled || Boolean(escalationsValue && escalationsSchedule[day]?.enabled);
             return (
-              <div key={day} className={`group relative flex items-center rounded-xl border px-3 py-2 transition-all duration-200 ${dayValue.enabled ? 'border-white/[0.06] bg-white/[0.018] hover:bg-white/[0.035]' : 'border-transparent bg-black/20 opacity-50 hover:opacity-75'}`}>
+              <div key={day} className={`group relative flex items-center rounded-xl border px-3 py-2 transition-all duration-200 ${dayRowEnabled ? 'border-white/[0.06] bg-white/[0.018] hover:bg-white/[0.035]' : 'border-transparent bg-black/20 opacity-50 hover:opacity-75'}`}>
                 <div className="flex w-20 shrink-0 items-center gap-2.5">
-                  <button type="button" onClick={() => toggleDay(day)} className={`flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle staff availability for ${day}`}><span className={`block h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${dayValue.enabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
+                  <button type="button" onClick={() => toggleDayTracks(day)} className={`flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ${dayRowEnabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle all schedules for ${day}`}><span className={`block h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayRowEnabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${dayRowEnabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
                 </div>
                 <div data-staff-schedule-track={day} className="relative mx-2 flex h-10 min-w-0 flex-1 items-center">
                   <div className="pointer-events-none absolute inset-0 flex justify-between opacity-10">{Array.from({ length: timelineHours + 1 }).map((_, index) => <span key={index} className="h-full w-px bg-white/40" />)}</div>
-                  <button type="button" onClick={() => dayValue.enabled && updateDay(day, { ...dayValue, enabled: true })} aria-label={`${dayValue.enabled ? 'Adjust' : 'Enable'} ${day} staff availability`} className="absolute inset-x-0 h-2.5 rounded-full border border-white/[0.03] bg-white/[0.02]" />
-                  {dayValue.enabled ? (
-                    <div className={`group/bar absolute h-2.5 rounded-full bg-gradient-to-r ${scheduleLayer.gradient} ${isActiveBar ? 'z-20 scale-y-125 ring-2 ring-white/50' : 'z-10'} ${isHovered ? 'brightness-125 shadow-lg' : ''}`} style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || isHovered ? scheduleLayer.glow : 'none' }} onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)} onPointerDown={(event) => handlePointerDown(event, day, 'center')}>
-                      <button type="button" aria-label={`Move ${day} availability start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, 'left'); }} className="absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
-                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30"><span className="h-0.5 w-4 rounded-full bg-white/60" /></div>
-                      <button type="button" aria-label={`Move ${day} availability end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, 'right'); }} className="absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
-                    </div>
-                  ) : null}
-                  {dayValue.enabled && (isHovered || isActiveBar) ? <div className="pointer-events-none absolute -top-7 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.08] bg-[#111] px-2 py-0.5 font-mono text-[11px] text-zinc-100 shadow-2xl" style={{ left: `${Math.min(92, Math.max(8, left + (width / 2)))}%` }}><span className="font-semibold text-white">{formatScheduleTime(start)}</span><span className="px-1 text-zinc-500">-</span><span className="font-semibold text-white">{formatScheduleTime(end)}</span><span className="ml-1.5 rounded bg-white/10 px-1 text-[10px] text-zinc-400">{formatScheduleDuration(end - start)}</span></div> : null}
+                  <div className="relative flex w-full flex-col gap-1.5 py-1">
+                    {[
+                      { id: 'staff', track: 'staff', label: 'Staff Availability', dayValue, layer: scheduleLayer, toggle: () => toggleDay(day) },
+                      ...(escalationsValue ? [{ id: 'escalations', track: 'escalations', label: 'Escalations', dayValue: escalationsSchedule[day], layer: escalationsLayer, toggle: () => toggleEscalationsDay(day) }] : []),
+                    ].map((trackConfig) => {
+                      const trackDay = trackConfig.dayValue;
+                      const trackStart = timeToDecimalHour(trackDay.open, 9);
+                      const trackEnd = timeToDecimalHour(trackDay.close, 17);
+                      const trackLeft = Math.max(0, Math.min(100, (trackStart / timelineHours) * 100));
+                      const trackWidth = Math.max(0, Math.min(100 - trackLeft, ((trackEnd - trackStart) / timelineHours) * 100));
+                      const trackKey = `${trackConfig.id}-${day}`;
+                      const trackActive = drag?.day === day && drag?.track === trackConfig.track;
+                      const trackHovered = hoveredBar === trackKey;
+                      const trackDimmed = drag && !trackActive;
+                      return (
+                        <div key={trackConfig.id} className="group/bar relative h-2.5 w-full" onMouseEnter={() => setHoveredBar(trackKey)} onMouseLeave={() => setHoveredBar(null)}>
+                          <button type="button" onClick={trackConfig.toggle} aria-pressed={trackDay.enabled} aria-label={`${trackDay.enabled ? 'Disable' : 'Enable'} ${trackConfig.label} on ${day}`} title={`${trackDay.enabled ? 'Disable' : 'Enable'} ${trackConfig.label}`} className={`absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full border text-left transition ${trackDay.enabled ? 'border-white/[0.05] bg-white/[0.05]' : 'border-white/[0.03] bg-white/[0.02] opacity-60 hover:opacity-100'}`} />
+                          <div
+                            className={`absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${trackConfig.layer.gradient} transition-all duration-75 ${trackDay.enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer grayscale'} ${trackActive ? 'z-20 scale-y-110 ring-2 ring-white/50' : 'z-10'} ${trackDimmed ? 'opacity-30' : trackDay.enabled ? 'opacity-100' : 'opacity-25'} ${trackHovered && trackDay.enabled ? 'brightness-125 shadow-lg' : ''}`}
+                            style={{ left: `${trackLeft}%`, width: `${trackWidth}%`, boxShadow: trackActive || (trackHovered && trackDay.enabled) ? trackConfig.layer.glow : 'none' }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (!trackDay.enabled) toggleTrack(trackConfig.track, day);
+                            }}
+                            onPointerDown={(event) => handlePointerDown(event, day, 'center', trackConfig.track)}
+                          >
+                            <button type="button" aria-label={`Move ${day} ${trackConfig.label} start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, 'left', trackConfig.track); }} className="absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30"><span className="h-0.5 w-4 rounded-full bg-white/60" /></div>
+                            <button type="button" aria-label={`Move ${day} ${trackConfig.label} end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, 'right', trackConfig.track); }} className="absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
+                          </div>
+                          {trackDay.enabled && (trackHovered || trackActive) ? (
+                            <div className="pointer-events-none absolute -top-7 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.08] bg-[#111] px-2 py-0.5 font-mono text-[11px] text-zinc-100 shadow-2xl" style={{ left: `${Math.min(92, Math.max(8, trackLeft + (trackWidth / 2)))}%` }}>
+                              <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: trackConfig.layer.color }} />
+                              <span className="font-semibold text-white">{formatScheduleTime(trackStart)}</span>
+                              <span className="px-1 text-zinc-500">-</span>
+                              <span className="font-semibold text-white">{formatScheduleTime(trackEnd)}</span>
+                              {trackConfig.track === 'staff' ? <span className="ml-1.5 rounded bg-white/10 px-1 text-[10px] text-zinc-400">{formatScheduleDuration(trackEnd - trackStart)}</span> : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="flex w-10 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100">
-                  <button type="button" onClick={() => copyDay(day)} className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/10 hover:text-white" aria-label={`Copy ${day} schedule to all days`}><Copy className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => { copyDay(day); const source = escalationsSchedule[day]; onEscalationsChange?.(Object.fromEntries(DAYS.map((copyDayName) => [copyDayName, { ...escalationsSchedule[copyDayName], ...source }]))); }} className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/10 hover:text-white" aria-label={`Copy ${day} schedule to all days`}><Copy className="h-3.5 w-3.5" /></button>
                 </div>
               </div>
             );
           })}
         </div>
-        <div className="flex min-h-[48px] items-center rounded-2xl border border-white/[0.06] bg-white/[0.018] px-4 text-[11px] text-zinc-500">
-          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)]" />Weekly availability: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyHours)}</strong></span>
+        <div className="flex min-h-[48px] items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.018] px-4 text-[11px] text-zinc-500">
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="font-semibold text-zinc-400">Weekly Coverage: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyHours)}</strong></span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: scheduleLayer.color }} />Staff Availability: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyHours)}</strong></span>
+            {escalationsValue ? <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: escalationsLayer.color }} />Escalations: <strong className="ml-1 text-white">{formatWeeklyHours(weeklyEscalationsHours)}</strong></span> : null}
+          </div>
         </div>
       </div>
       {notice ? <div className="px-1 text-right text-[10px] text-emerald-300">{notice}</div> : null}
@@ -1464,28 +1693,34 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
 
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
           <h3 className={`${nameClass} truncate font-bold leading-none tracking-tight text-white`}>{staff.full_name}</h3>
-          <p className="mt-1 inline-flex max-w-full items-center truncate rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
+          <p className="mt-1 truncate text-left text-[10px] font-bold tracking-wide text-white/50">
             {staff.role || 'Staff Member'}
           </p>
         </div>
       </div>
 
       <div className={bodyClass}>
-        <div className="px-0.5 py-1">
+        <div className="border-b border-white/[0.04] px-0.5 pb-3">
           <div className="min-w-0">
             <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Staff Member</p>
             <div className="mt-1" onClick={(e) => e.stopPropagation()}>
               <StaffAvailabilitySelector
-              value={staff.is_active}
-              onChange={(nextValue) => onToggleActive?.(staff, nextValue)}
+                value={staff.is_active}
+                onChange={(nextValue) => onToggleActive?.(staff, nextValue)}
               />
             </div>
           </div>
         </div>
 
-        <div className="border-t border-white/[0.04] px-0.5 pt-3">
-          <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Staff Type</p>
-          <p className="text-[11px] font-bold leading-none tracking-tight text-zinc-300">{staffTypeLabel}</p>
+        <div className="grid grid-cols-2 gap-5 border-b border-white/[0.04] px-0.5 pb-3">
+          <div className="min-w-0">
+            <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Staff Type</p>
+            <p className="text-[11px] font-bold leading-none tracking-tight text-zinc-300">{staffTypeLabel}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Escalations</p>
+            <p className="text-[11px] font-bold leading-none tracking-tight text-zinc-300">{hasEnabledScheduleHours(staff.escalation_hours) ? 'Active' : 'Inactive'}</p>
+          </div>
         </div>
 
         <div className={`grid grid-cols-2 gap-x-5 gap-y-3 border-t border-white/[0.04] ${compact ? 'pt-2.5' : 'pt-3.5'}`}>
@@ -1739,7 +1974,7 @@ const SettingsServiceInfoModal = ({ title, intro, points, footer, onClose, dense
           <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label={`Close ${title}`}><X size={16} /></button>
         </div>
         {points?.length ? <div className={`mt-7 text-sm text-zinc-400 ${dense ? 'space-y-1 leading-5' : 'space-y-4 leading-6'}`}>
-          {points.map((point, index) => <div key={point.title} className="flex gap-3"><span className={`${dense ? 'mt-2 h-1 w-1' : 'mt-2 h-1.5 w-1.5'} shrink-0 rounded-full bg-white`} style={{ opacity: Math.max(0.35, 1 - (index * 0.14)) }} /><div className="min-w-0"><p><span className="font-semibold text-white">{point.title}</span> {point.body}</p>{point.details?.length ? <div className="mt-3 flex flex-wrap gap-2">{point.details.map((detail) => { const isPositive = detail.toLowerCase().includes('appointment') ? point.title !== 'Manager.' : point.title !== 'Team Member.'; const DetailIcon = isPositive ? ThumbsUp : ThumbsDown; return <span key={detail} className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[11px] font-medium leading-none text-zinc-500"><DetailIcon className="h-3 w-3 text-zinc-600" aria-hidden="true" />{detail}</span>; })}</div> : null}</div></div>)}
+          {points.map((point, index) => <div key={point.title} className="flex gap-3"><span className={`${dense ? 'mt-2 h-1 w-1' : 'mt-2 h-1.5 w-1.5'} shrink-0 rounded-full ${point.color ? '' : 'bg-white'}`} style={{ backgroundColor: point.color || undefined, opacity: point.color ? 1 : Math.max(0.35, 1 - (index * 0.14)) }} /><div className="min-w-0"><p><span className="font-semibold text-white">{point.title}</span> {point.body}</p>{point.details?.length ? <div className="mt-3 flex flex-wrap gap-2">{point.details.map((detail) => { const isPositive = detail.toLowerCase().includes('appointment') ? point.title !== 'Manager.' : point.title !== 'Team Member.'; const DetailIcon = isPositive ? ThumbsUp : ThumbsDown; return <span key={detail} className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[11px] font-medium leading-none text-zinc-500"><DetailIcon className="h-3 w-3 text-zinc-600" aria-hidden="true" />{detail}</span>; })}</div> : null}</div></div>)}
         </div> : null}
         {footer ? <div className="relative mt-7 border-t border-white/[0.06] pt-5"><p className="max-w-[520px] text-[13px] leading-6 text-zinc-500">{footer}</p></div> : null}
       </div>
@@ -2054,6 +2289,9 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadName, setAvatarUploadName] = useState('');
   const [showStaffTypeTips, setShowStaffTypeTips] = useState(false);
+  const [showStaffScheduleTips, setShowStaffScheduleTips] = useState(false);
+  const [showEscalationLimitWarning, setShowEscalationLimitWarning] = useState(false);
+  const [staffScheduleColorblindMode, setStaffScheduleColorblindMode] = useState(false);
   const [showKnowledgeTips, setShowKnowledgeTips] = useState(false);
   const [deleteStaffTarget, setDeleteStaffTarget] = useState(null);
 
@@ -2098,12 +2336,28 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     }
   };
 
+  const escalationOwner = staffMembers.find((member) => (
+    member.id !== editingStaffId
+    && member.is_active !== false
+    && hasEnabledScheduleHours(member.escalation_hours)
+  ));
+  const escalationLockedByAnotherStaff = Boolean(escalationOwner);
+
   const openCreateModal = () => {
     setEditingStaffId(null);
-    setForm({ ...createStaffFormState(null, defaultHours), acknowledgements: readStaffAcknowledgements('new') });
+    const nextForm = createStaffFormState(null, defaultHours);
+    setForm({
+      ...nextForm,
+      escalation_hours: staffMembers.some((member) => member.is_active !== false && hasEnabledScheduleHours(member.escalation_hours))
+        ? disableScheduleHours(nextForm.escalation_hours)
+        : nextForm.escalation_hours,
+      acknowledgements: readStaffAcknowledgements('new'),
+    });
     setStaffSlide(0);
     setAvatarUploadName('');
     setShowStaffTypeTips(false);
+    setShowStaffScheduleTips(false);
+    setShowEscalationLimitWarning(false);
     setShowKnowledgeTips(false);
     setError('');
     setIsModalOpen(true);
@@ -2119,6 +2373,8 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     setStaffSlide(0);
     setAvatarUploadName('');
     setShowStaffTypeTips(false);
+    setShowStaffScheduleTips(false);
+    setShowEscalationLimitWarning(false);
     setShowKnowledgeTips(false);
     setError('');
     setIsModalOpen(true);
@@ -2132,6 +2388,8 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
     setStaffSlide(0);
     setAvatarUploadName('');
     setShowStaffTypeTips(false);
+    setShowStaffScheduleTips(false);
+    setShowEscalationLimitWarning(false);
     setShowKnowledgeTips(false);
     setError('');
   };
@@ -2142,7 +2400,15 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   };
 
   const validateStaffSlide = () => {
-    if (staffSlide !== 1) return true;
+    if (staffSlide === 1) {
+      if (escalationLockedByAnotherStaff && hasEnabledScheduleHours(form.escalation_hours)) {
+        setShowEscalationLimitWarning(true);
+        setError('Disable escalations before continuing. Only one staff member can receive escalation calls.');
+        return false;
+      }
+      return true;
+    }
+    if (staffSlide !== 0) return true;
     const fullName = String(form.full_name || '').trim()
       || [form.first_name, form.last_name].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
     if (!fullName) {
@@ -2165,6 +2431,11 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   const goBackStaffSlide = () => {
     setError('');
     setStaffSlide((prev) => Math.max(prev - 1, 0));
+  };
+
+  const showEscalationBlockedWarning = () => {
+    setShowEscalationLimitWarning(true);
+    setError('');
   };
 
   const uploadStaffAvatar = async (file) => {
@@ -2268,6 +2539,9 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   };
 
   const toggleStaffActive = async (staff, nextIsActive) => {
+    const previousValue = staff.is_active !== false;
+    setStaffMembers((prev) => prev.map((member) => (member.id === staff.id ? { ...member, is_active: nextIsActive } : member)));
+    setSelectedStaff((prev) => (prev?.id === staff.id ? { ...prev, is_active: nextIsActive } : prev));
     try {
       let resolvedBusinessId = businessId;
       if (!resolvedBusinessId) {
@@ -2283,16 +2557,17 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
         setForm((prev) => ({ ...prev, is_active: data.is_active }));
       }
     } catch (err) {
+      setStaffMembers((prev) => prev.map((member) => (member.id === staff.id ? { ...member, is_active: previousValue } : member)));
+      setSelectedStaff((prev) => (prev?.id === staff.id ? { ...prev, is_active: previousValue } : prev));
       console.error("SettingsPage.jsx:event_2307");
       setError(err.message || 'Failed to update staff status');
     }
   };
 
   const staffSteps = [
-    { label: 'Type', title: 'What type of staff member is this?', description: 'Choose how Nodemere should use this staff member.' },
     { label: 'Profile', title: 'Basic Info', description: 'Add basic info for this staff member.' },
     { label: 'Schedule', title: 'Schedule', description: 'Set the exact days and hours this staff member can accept appointments.' },
-    ...(['team_member', 'both'].includes(form.staff_type) ? [{ label: 'Knowledge', title: 'Knowledge', description: 'Help your receptionist learn more about this staff member. This allows it to recommend the right person, explain their strengths clearly, and make better booking decisions during calls.' }] : []),
+    { label: 'Knowledge', title: 'Knowledge', description: 'Help your receptionist learn more about this staff member. This allows it to recommend the right person, explain their strengths clearly, and make better booking decisions during calls.' },
     { label: 'Photo', title: 'Upload Image', description: 'Upload a profile image that helps keep this staff member easy to recognize across the Team page.' },
   ];
 
@@ -2311,18 +2586,14 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
   };
 
   const renderStaffSlide = () => {
-    if (staffSlide === 0) {
+    if (false && staffSlide === 0) {
       return <div className="grid min-h-[390px] gap-4 md:grid-cols-3">
         {[['team_member', 'Team Member', 'Contributes to the company’s day-to-day work and goals.', 'T'], ['transfer_contact', 'Manager', 'Receives escalated calls from the receptionist.', 'M'], ['both', 'Both', 'Supports the team’s everyday work while also staying available for escalated calls from the receptionist.', 'B']].map(([value, title, description, mark]) => <button key={value} type="button" onClick={() => setForm((prev) => ({ ...prev, staff_type: value }))} className={`group flex min-h-[220px] flex-col rounded-[24px] border p-5 text-left transition duration-300 sm:p-6 ${form.staff_type === value ? 'border-white/30 bg-white/[0.09] shadow-[0_18px_60px_rgba(255,255,255,0.04)]' : 'border-white/[0.08] bg-white/[0.035] hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.055]'}`}><span className={`flex h-12 w-12 items-center justify-center rounded-2xl border text-lg transition ${form.staff_type === value ? 'border-white/20 bg-white text-black' : 'border-white/[0.08] bg-black/20 text-zinc-600 group-hover:text-zinc-300'}`}>{mark}</span><span className="mt-[84px] block min-h-[104px]"><span className="block text-base font-semibold tracking-[-0.03em] text-white sm:text-lg">{title}</span><span className="mt-2 block max-w-[220px] text-[13px] leading-5 text-zinc-500">{description}</span></span><span className={`mt-auto text-[10px] font-bold uppercase tracking-[0.16em] ${form.staff_type === value ? 'text-white/70' : 'text-zinc-700'}`}>{form.staff_type === value ? 'Selected' : 'Choose type'}</span></button>)}
       </div>;
     }
-    if (staffSlide === 1) {
+    if (staffSlide === 0) {
       return (
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="block space-y-2 md:col-span-2">
-            <span className="text-[13px] font-normal text-zinc-400">Full Name</span>
-            <input type="text" value={form.full_name} onChange={(e) => setForm((prev) => ({ ...prev, full_name: maskStaffName(e.target.value) }))} placeholder="e.g. Olivia Hart" className={staffInputClass} />
-          </label>
           <label className="block space-y-2">
             <span className="text-[13px] font-normal text-zinc-400">First Name</span>
             <input type="text" value={form.first_name} onChange={(e) => setForm((prev) => ({ ...prev, first_name: maskStaffName(e.target.value) }))} placeholder="Olivia" className={staffInputClass} />
@@ -2347,19 +2618,25 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
       );
     }
 
-    if (staffSlide === 2) {
+    if (staffSlide === 1) {
       return (
         <StaffScheduleBuilder
           value={form.working_hours}
+          escalationsValue={form.escalation_hours}
           businessHours={businessHours}
           acknowledgements={form.acknowledgements}
           onAcknowledge={acknowledgeStaffWarning}
           onChange={(nextHours) => setForm((prev) => ({ ...prev, working_hours: nextHours }))}
+          onEscalationsChange={(nextHours) => setForm((prev) => ({ ...prev, escalation_hours: nextHours }))}
+          escalationLocked={escalationLockedByAnotherStaff}
+          onEscalationBlocked={showEscalationBlockedWarning}
+          colorblindMode={staffScheduleColorblindMode}
+          onColorblindModeChange={setStaffScheduleColorblindMode}
         />
       );
     }
 
-    if (staffSlide === 3 && ['team_member', 'both'].includes(form.staff_type)) {
+    if (staffSlide === 2) {
       return (
         <textarea value={form.knowledge} onChange={(e) => setForm((prev) => ({ ...prev, knowledge: e.target.value }))} className="custom-scrollbar h-[410px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 pr-5 text-sm leading-6 text-white outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0" />
       );
@@ -2527,7 +2804,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               onClick={(e) => e.stopPropagation()}
-              className={`relative max-h-[calc(100vh-24px)] w-full ${staffSlide === 2 ? 'max-w-[1080px]' : 'max-w-[700px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}
+              className={`relative max-h-[calc(100vh-24px)] w-full ${staffSlide === 1 ? 'max-w-[1080px]' : 'max-w-[700px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}
             >
               <div className="relative p-6 sm:p-8">
                 <div className="mb-6 flex items-start justify-between gap-5">
@@ -2542,7 +2819,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                       <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
                         {staffSteps[staffSlide].title}
                       </h2>
-                      {staffSlide === 0 && (
+                      {false && staffSlide === 0 && (
                         <button
                           type="button"
                           onClick={() => setShowStaffTypeTips(true)}
@@ -2553,7 +2830,18 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                           <Lightbulb className="h-4 w-4" />
                         </button>
                       )}
-                      {staffSlide === 3 && ['team_member', 'both'].includes(form.staff_type) && (
+                      {staffSlide === 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowStaffScheduleTips(true)}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center text-zinc-600 transition hover:text-zinc-300"
+                          aria-label="Schedule help"
+                          title="Schedule help"
+                        >
+                          <Lightbulb className="h-4 w-4" />
+                        </button>
+                      )}
+                      {staffSlide === 2 && (
                         <button type="button" onClick={() => setShowKnowledgeTips(true)} className="h-6 rounded-full border border-white/[0.08] px-2.5 text-[10px] font-semibold tracking-normal text-zinc-500 transition hover:border-white/20 hover:text-zinc-300">
                           Tips
                         </button>
@@ -2575,23 +2863,23 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -18 }}
                     transition={{ duration: 0.18 }}
-                    className="min-h-[420px]"
+                    className={staffSlide === 0 ? 'min-h-[300px]' : 'min-h-[420px]'}
                   >
                     {renderStaffSlide()}
                   </motion.div>
                 </AnimatePresence>
 
-                <div className="mt-5 space-y-3">
+                <div className="mt-5 flex flex-col items-center gap-3">
                   {staffSlide === staffSteps.length - 1 ? (
-                    <button type="button" onClick={saveStaff} disabled={saving || avatarUploading} className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">
+                    <button type="button" onClick={saveStaff} disabled={saving || avatarUploading} className="h-12 min-w-[360px] rounded-full bg-white px-12 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">
                       {saving ? 'Saving...' : editingStaffId ? 'Update staff' : 'Add staff'}
                     </button>
                   ) : (
-                    <button type="button" onClick={goNextStaffSlide} disabled={saving || avatarUploading} className="h-12 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">
+                    <button type="button" onClick={goNextStaffSlide} disabled={saving || avatarUploading} className="h-12 min-w-[360px] rounded-full bg-white px-12 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">
                       Continue
                     </button>
                   )}
-                  <button type="button" onClick={staffSlide === 0 ? closeModal : goBackStaffSlide} disabled={saving || avatarUploading} className="h-11 w-full rounded-full text-sm font-normal text-zinc-500 transition hover:text-white disabled:opacity-40">
+                  <button type="button" onClick={staffSlide === 0 ? closeModal : goBackStaffSlide} disabled={saving || avatarUploading} className="h-11 rounded-full px-6 text-sm font-normal text-zinc-500 transition hover:text-white disabled:opacity-40">
                     {staffSlide === 0 ? 'Close' : 'Back'}
                   </button>
                   {editingStaffId && staffSlide === staffSteps.length - 1 && (
@@ -2623,6 +2911,70 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                   ]}
                   onClose={() => setShowStaffTypeTips(false)}
                 />
+              ) : null}
+            </AnimatePresence>
+            <AnimatePresence>
+              {showStaffScheduleTips ? (
+                <SettingsServiceInfoModal
+                  dense
+                  maxWidthClass="max-w-[660px]"
+                  title="Staff schedule help"
+                  intro="Set this staff member's appointment availability and escalation hours. These can differ from the business-wide schedule."
+                  points={[
+                    { title: 'Staff Availability.', body: 'Use this track to set when this staff member is available for appointments. Your receptionist will only offer times within these hours.', color: getStaffScheduleLayerTypes(staffScheduleColorblindMode).find((layer) => layer.id === 'staff')?.color },
+                    { title: 'Escalations.', body: 'Sets when you’re available to take over calls that need human assistance or can’t be handled by the AI.', color: getStaffScheduleLayerTypes(staffScheduleColorblindMode).find((layer) => layer.id === 'escalations')?.color },
+                    { title: 'Neither.', body: 'When both tracks are dim, the receptionist won’t book appointments with this staff member or transfer customer calls to them.', color: getStaffScheduleLayerTypes(staffScheduleColorblindMode).find((layer) => layer.id === 'neither')?.color },
+                  ]}
+                  footer="Click a track to enable or disable it for one day. Drag a colored bar to move it, or drag either end to adjust its start and end time."
+                  onClose={() => setShowStaffScheduleTips(false)}
+                />
+              ) : null}
+            </AnimatePresence>
+            <AnimatePresence>
+              {showEscalationLimitWarning ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-[12] flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setShowEscalationLimitWarning(false);
+                  }}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 12, scale: 0.98 }}
+                    transition={{ duration: 0.18 }}
+                    onClick={(event) => event.stopPropagation()}
+                    className="relative w-full max-w-[460px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] text-left shadow-[0_28px_90px_rgba(0,0,0,0.62)]"
+                  >
+                    <ModalSpectrumLine variant="warning" />
+                    <div className="p-7 sm:p-8">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="mb-3 flex items-center gap-1.5">
+                            <AlertTriangle className="h-4 w-4 shrink-0 -translate-y-[5px] text-zinc-600" aria-hidden="true" />
+                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Escalations locked</p>
+                          </div>
+                          <h3 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">One escalation contact at a time.</h3>
+                          <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">
+                            {escalationOwner?.full_name || 'Another staff member'} already has escalation hours configured. Disable escalations for that staff member before assigning this track here.
+                          </p>
+                        </div>
+                        <button type="button" onClick={() => setShowEscalationLimitWarning(false)} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close escalation warning">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="mt-6 flex justify-end">
+                        <button type="button" onClick={() => setShowEscalationLimitWarning(false)} className="rounded-full bg-white px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] text-black transition hover:bg-zinc-200">
+                          Got it
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
               ) : null}
             </AnimatePresence>
             <AnimatePresence>

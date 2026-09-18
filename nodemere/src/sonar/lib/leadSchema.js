@@ -228,7 +228,7 @@ export const LEAD_FIELDS = [
   // Routing
   { key: 'callback_needed', label: 'Callback Needed', type: 'boolean', required: false, table: false, section: 'routing', editable: true },
   { key: 'callback_due_at', label: 'Callback Due At', type: 'timestamp', required: false, table: false, tableWidth: '150px', section: 'routing', editable: true },
-  { key: 'handoff_required', label: 'Handoff Required', type: 'boolean', required: false, table: false, section: 'routing', editable: true },
+  { key: 'handoff_required', label: 'Escalation Required', type: 'boolean', required: false, table: false, section: 'routing', editable: true },
   { key: 'assigned_staff', label: 'Assigned Staff', type: 'text', required: false, table: false, tableWidth: '160px', section: 'routing', editable: true },
   {
     key: 'call_route',

@@ -209,7 +209,7 @@ function DropInsTipsModal({ onClose }) {
   const points = [
     ['Start with the moment.', 'Choose when the conversation belongs in the calendar: before an appointment, after it, or when someone misses it.'],
     ['Name the outcome.', 'Give the button a short name and a clear purpose so your receptionist knows exactly why to call.'],
-    ['Write the handoff.', 'Describe the objective in plain language. Appointment details are added automatically when the call starts.'],
+    ['Write the escalation.', 'Describe the objective in plain language. Appointment details are added automatically when the call starts.'],
   ];
   return <motion.div className="drop-ins-tips-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
     <motion.div className="drop-ins-tips-modal" initial={{ opacity: 0, y: 16, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: .98 }} transition={{ duration: .18 }} onMouseDown={event => event.stopPropagation()}>

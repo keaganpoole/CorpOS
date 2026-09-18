@@ -14,6 +14,7 @@ const NestContext = createContext(null);
 const MAX_HISTORY = 50;
 const ACTIVE_CALL_STATUSES = new Set(['initiated', 'queued', 'ringing', 'in-progress', 'in_progress', 'ongoing', 'answered', 'connected']);
 const TERMINAL_CALL_STATUSES = new Set(['completed', 'failed', 'missed', 'busy', 'no-answer', 'no_answer', 'canceled', 'cancelled']);
+const MAX_ORPHANED_CALL_AGE_MS = 10 * 60 * 1000;
 const PAYMENT_SUCCESS = new Set(['paid', 'succeeded', 'successful', 'complete', 'completed']);
 const PAYMENT_FAILED = new Set(['failed', 'declined', 'canceled', 'cancelled']);
 const PRIORITY = { routine: 1, major: 2, critical: 3 };
@@ -37,10 +38,16 @@ const sanitizeHistoryEvent = (event) => {
 
 const normalizeStatus = (row = {}) => {
   const raw = String(row.status || row.call_status || row.call_successful || '').trim().toLowerCase();
+  // A provider may leave the original in-progress status in place while
+  // still supplying definitive terminal metadata. Never keep such a call in
+  // the live indicator after an end or failure has been recorded.
+  if (row.failure_reason || row.error || row.error_message) return 'failed';
+  if (row.ended_at) {
+    if (['failed', 'busy', 'no-answer', 'no_answer', 'canceled', 'cancelled'].includes(raw)) return raw;
+    return 'completed';
+  }
   if (['true', 'yes', 'success', 'successful', 'done', 'complete'].includes(raw)) return 'completed';
   if (['false', 'no'].includes(raw)) return 'failed';
-  if (!raw && (row.failure_reason || row.error || row.error_message)) return 'failed';
-  if (!raw && row.ended_at) return 'completed';
   return raw;
 };
 const eventStamp = (row = {}) => row.updated_at || row.ended_at || row.started_at || row.event_timestamp || row.created_at || new Date().toISOString();
@@ -234,6 +241,18 @@ const normalizeRealtimePayload = (table, payload, history = []) => {
 
 const callRow = (call) => call?.raw || call || {};
 
+const isLiveCallRecord = (call) => {
+  const row = callRow(call);
+  if (!ACTIVE_CALL_STATUSES.has(normalizeStatus(row))) return false;
+  if (row.ended_at || row.failure_reason) return false;
+  const startedAt = Date.parse(row.started_at || row.created_at || row.event_timestamp || '');
+  // If the provider never sends its terminal callback, do not leave an
+  // orphaned live banner visible forever. Normal calls remain eligible well
+  // beyond the expected receptionist call duration.
+  const age = Date.now() - startedAt;
+  return Number.isFinite(startedAt) && age >= 0 && age < MAX_ORPHANED_CALL_AGE_MS;
+};
+
 const callLifecycleEvent = (call, status) => {
   const row = callRow(call);
   const direction = String(row.direction || call?.direction || 'incoming').toLowerCase();
@@ -251,7 +270,7 @@ const callLifecycleEvent = (call, status) => {
     event_type: failed ? 'call_failed' : missed ? 'call_missed' : 'call_completed',
     direction: direction.startsWith('out') ? 'outbound' : direction.startsWith('in') ? 'inbound' : 'unknown',
     source: 'call_logs', source_id: row.id || null, milestone_keys: milestoneKeys,
-    title: failed ? 'Call needs attention' : missed ? 'Call missed' : 'Call completed',
+    title: failed ? 'Call needs attention' : missed ? 'Call missed' : 'Call ended',
     message: name,
     priority: failed ? 'critical' : missed ? 'major' : 'routine',
     occurred_at: eventStamp(row),
@@ -267,6 +286,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   const [activeEvent, setActiveEvent] = useState(null);
   const [previewEvent, setPreviewEvent] = useState(null);
   const [liveCall, setLiveCall] = useState(null);
+  const [liveCallActions, setLiveCallActions] = useState([]);
   const [hiddenLiveCallId, setHiddenLiveCallId] = useState(null);
   const [introStarted, setIntroStarted] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -280,6 +300,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   const [nestPreferences, setNestPreferences] = useState(DEFAULT_NEST_PREFERENCES);
   const historyRef = useRef([]);
   const activeRef = useRef(null);
+  const liveCallRef = useRef(null);
   const seenRef = useRef(new Set());
   const callsBaselineRef = useRef(null);
   const tasklistBaselineRef = useRef(null);
@@ -290,6 +311,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
 
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { activeRef.current = activeEvent; }, [activeEvent]);
+  useEffect(() => { liveCallRef.current = liveCall; }, [liveCall]);
 
   useEffect(() => {
     if (!session?.user?.id) return undefined;
@@ -442,6 +464,17 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     const handle = (table) => (payload) => {
       const normalized = normalizeRealtimePayload(table, payload, historyRef.current);
       if (!normalized) return;
+      const activeCall = liveCallRef.current;
+      if (activeCall && ['appointments', 'people', 'payments'].includes(table)) {
+        const actionLabels = {
+          appointment_booked: 'Appointment created', appointment_rescheduled: 'Appointment updated',
+          appointment_cancelled: 'Appointment cancelled', appointment_updated: 'Appointment updated',
+          person_added: 'Customer added', payment_received: 'Payment received',
+        };
+        const label = actionLabels[normalized.event_type];
+        if (label) setLiveCallActions((current) => current.some((action) => action.id === normalized.id)
+          ? current : [...current, { id: normalized.id, type: normalized.event_type, label }].slice(-4));
+      }
       const milestoneKeys = normalized.milestone_keys || (normalized.milestone_key ? [normalized.milestone_key] : []);
       const alreadyClaimed = milestoneKeys.length > 0 && normalized.source_id
         && historyRef.current.some((event) => (
@@ -484,13 +517,18 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       callsBaselineRef.current = current;
     }
 
-    const activeCall = (calls || []).find((call) => ACTIVE_CALL_STATUSES.has(normalizeStatus(callRow(call))));
+    const activeCall = (calls || []).find(isLiveCallRecord);
     const callsEnabled = nestPreferences.enabled !== false
       && nestPreferences.categories?.calls !== false
       && nestPreferences.notifications?.call_active !== false;
     if (!activeCall || !callsEnabled) {
       setLiveCall(null);
+      setLiveCallActions([]);
       setHiddenLiveCallId(null);
+      // A live event must never survive after the call-log source says there
+      // is no active call. This also clears legacy/stale call_active events
+      // that may already be occupying the Nest display queue.
+      setActiveEvent((current) => current?.event_type === 'call_active' ? null : current);
       return;
     }
     const row = callRow(activeCall);
@@ -509,6 +547,10 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     });
     setHiddenLiveCallId((hiddenId) => hiddenId && hiddenId !== String(activeCall.id) ? null : hiddenId);
   }, [calls, callsLoading, enqueue, nestPreferences]);
+
+  useEffect(() => {
+    if (!liveCall?.id) setLiveCallActions([]);
+  }, [liveCall?.id]);
 
   useEffect(() => {
     if (!tasklistState || typeof tasklistState !== 'object') return;
@@ -621,6 +663,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     displayEvent,
     displayConcept,
     liveCall,
+    liveCallActions,
     introStarted,
     markIntroStarted,
     queueLength: queue.length,
@@ -638,7 +681,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     previewConcept,
     previewNotification,
     hideCurrentNotification,
-  }), [activeEvent, displayEvent, displayConcept, hideCurrentNotification, history, historyOpen, introStarted, liveCall, markIntroStarted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy, voiceActive]);
+  }), [activeEvent, displayEvent, displayConcept, hideCurrentNotification, history, historyOpen, introStarted, liveCall, liveCallActions, markIntroStarted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy, voiceActive]);
 
   return <NestContext.Provider value={value}>{children}</NestContext.Provider>;
 };

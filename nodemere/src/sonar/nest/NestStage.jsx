@@ -61,6 +61,24 @@ const splitDetail = (value = '') => {
   return { first: parts[0] || '', second: parts.slice(1).join(' · ') };
 };
 
+const summaryReveals = (value = '') => {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+  const sentences = normalized.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((part) => part.trim()).filter(Boolean) || [normalized];
+  const reveals = [];
+  sentences.forEach((sentence) => {
+    let remaining = sentence;
+    while (remaining.length > 100) {
+      let cut = remaining.lastIndexOf(' ', 100);
+      if (cut < 45) cut = 100;
+      reveals.push(remaining.slice(0, cut).trim());
+      remaining = remaining.slice(cut).trim();
+    }
+    if (remaining) reveals.push(remaining);
+  });
+  return reveals.slice(0, 8);
+};
+
 const payloadForEvent = (event) => event?.payload && typeof event.payload === 'object' ? event.payload : {};
 const eventPerson = (event) => {
   const payload = payloadForEvent(event);
@@ -180,7 +198,7 @@ const subjectForEvent = (event) => ({
 });
 
 const liveCallReceptionist = (event) => {
-  if (event?.event_type !== 'call_active' || !event?.persistent) return null;
+  if (!['call_active', 'call_completed'].includes(event?.event_type)) return null;
   const payload = payloadForEvent(event);
   const name = payload.receptionist_name || payload.agent_name || 'Receptionist';
   return {
@@ -195,6 +213,21 @@ const LiveCallReceptionistArtwork = ({ event }) => {
     <div className="nest-live-call-receptionist" aria-hidden="true">
       {receptionist.banner && <span className="nest-live-call-banner" style={{ backgroundImage: `url(${receptionist.banner})` }} />}
       <span className="nest-live-call-banner-shade" />
+    </div>
+  );
+};
+
+const liveActionIcon = (type) => type === 'appointment_booked' || type === 'appointment_updated' || type === 'appointment_cancelled'
+  ? CalendarCheck : type === 'person_added' ? UserPlus : Check;
+
+const LiveCallActionIndicators = ({ actions = [] }) => {
+  if (!actions.length) return null;
+  return (
+    <div className="nest-live-call-actions" aria-label="Actions completed during this call">
+      {actions.map((action) => {
+        const ActionIcon = liveActionIcon(action.type);
+        return <span key={action.id} className="nest-live-call-action" title={action.label} aria-label={action.label}><ActionIcon size={12} strokeWidth={1.7} /></span>;
+      })}
     </div>
   );
 };
@@ -246,7 +279,7 @@ const ContentIcon = ({ Icon, mode, compact, partTwo = false, partOne = false }) 
 };
 
 const ReelPart = ({ event, content, Icon, compact, part }) => (
-  <div className={`nest-content nest-reel-content nest-layout-${part === 1 ? 'return' : 'pivot'} nest-density-spacious nest-footprint-${part === 1 ? 'full' : 'medium'} nest-placement-center`}>
+  <div className={`nest-content nest-reel-content nest-layout-${part === 1 ? 'return' : 'pivot'} nest-density-spacious nest-footprint-${part === 1 ? 'full' : 'medium'} nest-placement-center${event?.event_type === 'call_completed' && part === 2 && event?.payload?.summary ? ' nest-call-summary' : ''}`}>
       {!(event?.event_type === 'call_active' && event?.direction === 'inbound') && (
         <ContentIcon Icon={part === 1 ? iconForPartOne(event) : Icon} mode="transform" compact={compact} partOne={part === 1} partTwo={part === 2} />
       )}
@@ -266,13 +299,14 @@ const ReelPart = ({ event, content, Icon, compact, part }) => (
   </div>
 );
 
-export default function NestStage({ event, concept, privacyMode = false, compact = false, className = '', introStarted = false, onIntroStart, onIdleClick, intercomOpening = false }) {
+export default function NestStage({ event, concept, privacyMode = false, compact = false, className = '', introStarted = false, onIntroStart, onIdleClick, intercomOpening = false, liveCallActions = [] }) {
   const reducedMotion = useReducedMotion();
   const [now, setNow] = useState(Date.now());
   const [rolled, setRolled] = useState(false);
   const [detailFaded, setDetailFaded] = useState(false);
   const [introCollapsed, setIntroCollapsed] = useState(false);
   const [introTight, setIntroTight] = useState(false);
+  const [summaryIndex, setSummaryIndex] = useState(0);
   // This is deliberately initialized once. The runtime tracks that an intro has
   // started for this page, so a stage remount caused by a notification cannot
   // restart the full terminal text.
@@ -284,10 +318,12 @@ export default function NestStage({ event, concept, privacyMode = false, compact
     ? { duration: reducedMotion ? 0.01 : 0.72, ease: [0.22, 1, 0.36, 1] }
     : transition;
   const isIncomingCall = event?.event_type === 'call_active' && event?.direction === 'inbound';
+  const summary = event?.event_type === 'call_completed' ? summaryReveals(event?.payload?.summary) : [];
 
   useLayoutEffect(() => {
     setRolled(false);
     setDetailFaded(false);
+    setSummaryIndex(0);
     if (!event) return undefined;
     // The track starts one viewport below the mask.  It settles Part 1, holds,
     // then advances exactly one viewport so Part 2 replaces it on that same strip.
@@ -302,6 +338,12 @@ export default function NestStage({ event, concept, privacyMode = false, compact
       if (fadeTimer) window.clearTimeout(fadeTimer);
     };
   }, [concept?.id, event?.id, isIncomingCall, reducedMotion]);
+
+  useEffect(() => {
+    if (summary.length <= 1) return undefined;
+    const timer = window.setInterval(() => setSummaryIndex((current) => (current + 1) % summary.length), reducedMotion ? 1200 : 4200);
+    return () => window.clearInterval(timer);
+  }, [event?.id, reducedMotion, summary.length]);
 
   useEffect(() => {
     // The typographic intro belongs to the stage mount, not to the event
@@ -346,7 +388,14 @@ export default function NestStage({ event, concept, privacyMode = false, compact
   }, [event?.persistent, event?.id]);
 
   const subject = useMemo(() => event ? subjectForEvent(event) : null, [event]);
-  const detail = useMemo(() => event ? contentForEvent(event, now, privacyMode) : null, [event, now, privacyMode]);
+  const detail = useMemo(() => {
+    if (!event) return null;
+    const content = contentForEvent(event, now, privacyMode);
+    if (event.event_type === 'call_completed' && summary.length) {
+      return { ...content, eyebrow: 'Call ended', primary: summary[summaryIndex], secondary: '', metric: '' };
+    }
+    return content;
+  }, [event, now, privacyMode, summary, summaryIndex]);
 
   return (
     <div
@@ -356,6 +405,7 @@ export default function NestStage({ event, concept, privacyMode = false, compact
       data-priority={event?.priority || 'idle'}
     >
       <LiveCallReceptionistArtwork event={event} />
+      {event?.persistent && <LiveCallActionIndicators actions={liveCallActions} />}
       <AnimatePresence mode="wait" initial={false}>
         {!event ? (
           showIntro ? (

@@ -86,6 +86,7 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
 
     let cancelled = false;
     let refreshTimer = null;
+    let pollingTimer = null;
     const userId = session.user?.id || 'current-user';
 
     const scheduleRefresh = () => {
@@ -96,6 +97,15 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
     };
 
     loadCallLogs({ initial: true });
+    // Realtime is the fast path, but browser tabs can lose a subscription
+    // while a call is active. Keep the live-call indicator eventually
+    // consistent with the provider even when no realtime event arrives.
+    const pollCallLogs = () => {
+      if (cancelled) return;
+      loadCallLogs({ force: true });
+      pollingTimer = window.setTimeout(pollCallLogs, 5000);
+    };
+    pollingTimer = window.setTimeout(pollCallLogs, 5000);
     const channel = supabase
       .channel(`call-logs-dashboard-cache-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs', filter: `business_id=eq.${workforce?.tenant?.business_id}` }, scheduleRefresh)
@@ -110,6 +120,7 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
     return () => {
       cancelled = true;
       if (refreshTimer) window.clearTimeout(refreshTimer);
+      if (pollingTimer) window.clearTimeout(pollingTimer);
       supabase.removeChannel(channel);
     };
   }, [session?.access_token, workforce?.tenant?.business_id, workforce?.tenant?.role]);
