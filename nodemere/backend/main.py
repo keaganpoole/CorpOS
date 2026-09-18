@@ -840,6 +840,18 @@ def get_twilio_caller_id_status_callback_url() -> Optional[str]:
     return f"{base_url}/twilio/outgoing-caller-id/status"
 
 
+def warm_escalations_enabled() -> bool:
+    """Keep the Twilio-controlled transfer path explicitly reversible."""
+    return os.environ.get("TWILIO_WARM_ESCALATIONS_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def twiml_response(body: str) -> Response:
+    return Response(
+        content=f'<?xml version="1.0" encoding="UTF-8"?><Response>{body}</Response>',
+        media_type="application/xml",
+    )
+
+
 def build_inbound_ai_disclosure(business_name: Optional[str], receptionist_name: Optional[str]) -> str:
     business_label = str(business_name or "the business").strip() or "the business"
     assistant_label = str(receptionist_name or "Nodemere assistant").strip() or "Nodemere assistant"
@@ -4623,6 +4635,105 @@ def add_escalation_dynamic_variables(dynamic_variables: dict, business: Optional
     )
     return dynamic_variables
 
+
+def is_staff_escalation_window_open(staff: Optional[dict], business: Optional[dict], at: Optional[datetime] = None) -> tuple[bool, str | None]:
+    """Check the selected staff member's escalation schedule in the business timezone."""
+    schedule = (staff or {}).get("escalation_hours")
+    if isinstance(schedule, str):
+        try:
+            schedule = json.loads(schedule)
+        except ValueError:
+            schedule = None
+    if not isinstance(schedule, dict):
+        return False, "The escalation schedule is unavailable."
+
+    local_now = (at or datetime.now(timezone.utc)).astimezone(get_business_timezone(business))
+    weekday = local_now.strftime("%A")
+    day_value = next(
+        (
+            value for key, value in schedule.items()
+            if normalize_working_hours_key(key) == normalize_working_hours_key(weekday)
+            and isinstance(value, dict)
+        ),
+        None,
+    )
+    if not day_value or day_value.get("enabled") is False:
+        return False, "The escalation recipient is not available right now."
+
+    start_minutes = appointment_time_to_minutes(day_value.get("open"))
+    end_minutes = appointment_time_to_minutes(day_value.get("close"))
+    if start_minutes is None or end_minutes is None or start_minutes >= end_minutes:
+        return False, "The escalation schedule is invalid."
+    current_minutes = local_now.hour * 60 + local_now.minute
+    if current_minutes < start_minutes or current_minutes >= end_minutes:
+        return False, "The escalation recipient is outside their scheduled hours."
+    return True, None
+
+
+def escalation_transfer_webhook_url(transfer_id: str, action: str) -> Optional[str]:
+    base_url = get_public_backend_base_url()
+    if not base_url:
+        return None
+    return f"{base_url}/twilio/escalations/{transfer_id}/{action}"
+
+
+def get_escalation_transfer(transfer_id: str) -> Optional[dict]:
+    """Find the durable transfer state attached to the live call log."""
+    try:
+        rows = (
+            supabase_admin.table("call_logs")
+            .select("id,business_id,provider_call_sid,from_number,to_number,raw_payload")
+            .contains("raw_payload", {"escalation_transfer": {"id": transfer_id}})
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        logging.warning("main.get_escalation_transfer.event_1")
+        return None
+    if not rows:
+        return None
+    row = rows[0]
+    raw_payload = row.get("raw_payload") if isinstance(row.get("raw_payload"), dict) else {}
+    transfer = raw_payload.get("escalation_transfer")
+    return {"call_log": row, "transfer": transfer} if isinstance(transfer, dict) else None
+
+
+def save_escalation_transfer(transfer_id: str, updates: dict) -> Optional[dict]:
+    current = get_escalation_transfer(transfer_id)
+    if not current:
+        return None
+    row = current["call_log"]
+    raw_payload = dict(row.get("raw_payload") or {})
+    transfer = {**current["transfer"], **updates, "updated_at": datetime.now(timezone.utc).isoformat()}
+    raw_payload["escalation_transfer"] = transfer
+    try:
+        supabase_admin.table("call_logs").update({"raw_payload": raw_payload}).eq("id", row["id"]).execute()
+    except Exception:
+        logging.warning("main.save_escalation_transfer.event_1")
+        return None
+    return {"call_log": {**row, "raw_payload": raw_payload}, "transfer": transfer}
+
+
+def redirect_twilio_call_to_escalation(call_sid: str, transfer_id: str) -> bool:
+    auth = get_twilio_auth_tuple()
+    transfer_url = escalation_transfer_webhook_url(transfer_id, "dial")
+    if not auth or not twilio_account_sid or not transfer_url:
+        return False
+    try:
+        response = requests.post(
+            f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/Calls/{call_sid}.json",
+            data={"Url": transfer_url, "Method": "POST"},
+            auth=auth,
+            timeout=30,
+        )
+        response.raise_for_status()
+        return True
+    except requests.RequestException:
+        logging.warning("main.redirect_twilio_call_to_escalation.event_1")
+        return False
+
 def parse_usage_seconds(value) -> int:
     try:
         return max(0, int(float(value or 0)))
@@ -5356,6 +5467,8 @@ def appointment_time_to_minutes(value) -> Optional[int]:
         minute = int(parts[1])
     except (TypeError, ValueError):
         return None
+    if hour == 24 and minute == 0:
+        return 24 * 60
     if hour < 0 or hour > 23 or minute < 0 or minute > 59:
         return None
     return (hour * 60) + minute
@@ -7225,7 +7338,9 @@ async def reload_scenarios(current_user: dict = Depends(get_current_user)):
 async def twilio_inbound_webhook(request: Request):
     await verify_twilio_webhook_request(request, twilio_voice_webhook_url)
     payload = await parse_request_payload(request)
-    from_number = normalize_phone_number(first_present(payload, "From", "from", "from_number", "Caller", "caller"))
+    raw_from_number = first_present(payload, "From", "from", "from_number", "Caller", "caller")
+    from_number = normalize_phone_number(raw_from_number)
+    caller_identity = from_number or str(raw_from_number or "anonymous").strip() or "anonymous"
     to_number = normalize_phone_number(first_present(payload, "To", "to", "to_number", "Called", "called"))
 
     if not elevenlabs_api_key or not elevenlabs_agent_id_inbound:
@@ -7233,11 +7348,11 @@ async def twilio_inbound_webhook(request: Request):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="ElevenLabs inbound calling is not configured.",
         )
-    if not from_number or not to_number:
+    if not to_number:
         logging.error('main.twilio_inbound_webhook.event_6926')
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Twilio inbound webhook requires From and To numbers.",
+            detail="Twilio inbound webhook requires a To number.",
         )
 
     context = resolve_business_context({
@@ -7295,13 +7410,13 @@ async def twilio_inbound_webhook(request: Request):
 
     register_payload = {
         "agent_id": elevenlabs_agent_id_inbound,
-        "from_number": from_number,
+        "from_number": caller_identity,
         "to_number": to_number,
         "direction": "inbound",
         "conversation_initiation_client_data": {
             "scenario_context": {
                 "autonomy_index": 1,
-                "caller_number": from_number,
+                "caller_number": caller_identity,
                 "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
                 "business_name": business.get("name") if business else None,
                 "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
@@ -7341,11 +7456,13 @@ async def twilio_inbound_webhook(request: Request):
         register_payload["conversation_initiation_client_data"]["scenario_context"],
         business,
     )
-    matched_person = lookup_person_record(
-        phone_number=from_number,
-        business_id=str(business.get("id")) if business and business.get("id") is not None else None,
-        user_id=context.get("user_id") or (business or {}).get("user_id"),
-    )
+    matched_person = None
+    if from_number:
+        matched_person = lookup_person_record(
+            phone_number=from_number,
+            business_id=str(business.get("id")) if business and business.get("id") is not None else None,
+            user_id=context.get("user_id") or (business or {}).get("user_id"),
+        )
     if matched_person:
         scenario_context = register_payload["conversation_initiation_client_data"]["scenario_context"]
         scenario_context["person_id"] = str(matched_person.get("id")) if matched_person.get("id") is not None else None
@@ -7415,6 +7532,119 @@ async def twilio_inbound_webhook(request: Request):
     )
     asyncio.create_task(asyncio.to_thread(maybe_auto_verify_business_forwarding, business, called_number=to_number))
     return Response(content=response.text, media_type="application/xml")
+
+
+@app.post("/twilio/escalations/{transfer_id}/dial", tags=["Twilio"])
+async def twilio_escalation_dial(transfer_id: str, request: Request):
+    expected_url = escalation_transfer_webhook_url(transfer_id, "dial")
+    await verify_twilio_webhook_request(request, expected_url)
+    transfer_state = get_escalation_transfer(transfer_id)
+    if not transfer_state:
+        return twiml_response("<Say>We are unable to complete that transfer.</Say><Hangup/>")
+
+    transfer = transfer_state["transfer"]
+    target_number = normalize_phone_number(transfer.get("target_number"))
+    whisper_url = escalation_transfer_webhook_url(transfer_id, "staff-whisper")
+    complete_url = escalation_transfer_webhook_url(transfer_id, "dial-complete")
+    status_url = escalation_transfer_webhook_url(transfer_id, "dial-status")
+    if not target_number or not whisper_url or not complete_url or not status_url:
+        save_escalation_transfer(transfer_id, {"status": "failed", "failure_reason": "Escalation transfer configuration is incomplete."})
+        return twiml_response("<Say>We are unable to complete that transfer right now.</Say><Hangup/>")
+
+    save_escalation_transfer(transfer_id, {"status": "dialing", "dial_started_at": datetime.now(timezone.utc).isoformat()})
+    caller_id = normalize_phone_number(transfer_state["call_log"].get("to_number"))
+    caller_id_attribute = f' callerId="{escape_html(caller_id, quote=True)}"' if caller_id else ""
+    return twiml_response(
+        f'<Dial action="{escape_html(complete_url, quote=True)}" method="POST" answerOnBridge="true" timeout="25"{caller_id_attribute}>'
+        f'<Number url="{escape_html(whisper_url, quote=True)}" method="POST" '
+        f'statusCallback="{escape_html(status_url, quote=True)}" statusCallbackMethod="POST" '
+        f'statusCallbackEvent="initiated ringing answered completed">{escape_html(target_number)}</Number>'
+        "</Dial>"
+    )
+
+
+@app.post("/twilio/escalations/{transfer_id}/staff-whisper", tags=["Twilio"])
+async def twilio_escalation_staff_whisper(transfer_id: str, request: Request):
+    expected_url = escalation_transfer_webhook_url(transfer_id, "staff-whisper")
+    await verify_twilio_webhook_request(request, expected_url)
+    payload = await parse_request_payload(request)
+    transfer_state = get_escalation_transfer(transfer_id)
+    if not transfer_state:
+        return twiml_response("<Hangup/>")
+
+    transfer = transfer_state["transfer"]
+    staff_name = str(transfer.get("staff_name") or "team member").strip()
+    caller_name = str(transfer.get("caller_name") or "the caller").strip()
+    reason = str(transfer.get("reason") or "No additional details were captured.").strip()
+    reason = re.sub(r"\s+", " ", reason)[:500]
+    save_escalation_transfer(
+        transfer_id,
+        {
+            "status": "awaiting_staff_acceptance",
+            "staff_call_sid": first_present(payload, "CallSid"),
+            "staff_answered_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    response_url = escalation_transfer_webhook_url(transfer_id, "staff-response")
+    if not response_url:
+        return twiml_response("<Hangup/>")
+    prompt = (
+        f"Hello {staff_name}. This is an escalation from Nodemere. "
+        f"Caller: {caller_name}. Reason: {reason}. "
+        "Press 1 to accept and connect. To decline, hang up."
+    )
+    return twiml_response(
+        f'<Gather input="dtmf" numDigits="1" timeout="8" action="{escape_html(response_url, quote=True)}" method="POST">'
+        f"<Say>{escape_html(prompt)}</Say>"
+        "</Gather><Hangup/>"
+    )
+
+
+@app.post("/twilio/escalations/{transfer_id}/staff-response", tags=["Twilio"])
+async def twilio_escalation_staff_response(transfer_id: str, request: Request):
+    expected_url = escalation_transfer_webhook_url(transfer_id, "staff-response")
+    await verify_twilio_webhook_request(request, expected_url)
+    payload = await parse_request_payload(request)
+    transfer_state = get_escalation_transfer(transfer_id)
+    if not transfer_state:
+        return twiml_response("<Hangup/>")
+
+    if str(first_present(payload, "Digits") or "") == "1":
+        save_escalation_transfer(transfer_id, {"status": "accepted", "accepted_at": datetime.now(timezone.utc).isoformat()})
+        return twiml_response("<Say>Connecting you now.</Say>")
+
+    save_escalation_transfer(transfer_id, {"status": "declined", "declined_at": datetime.now(timezone.utc).isoformat()})
+    return twiml_response("<Hangup/>")
+
+
+@app.post("/twilio/escalations/{transfer_id}/dial-status", tags=["Twilio"])
+async def twilio_escalation_dial_status(transfer_id: str, request: Request):
+    expected_url = escalation_transfer_webhook_url(transfer_id, "dial-status")
+    await verify_twilio_webhook_request(request, expected_url)
+    payload = await parse_request_payload(request)
+    status_value = str(first_present(payload, "CallStatus") or "").strip().lower()
+    if status_value:
+        save_escalation_transfer(transfer_id, {"staff_call_status": status_value, "staff_call_sid": first_present(payload, "CallSid")})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.post("/twilio/escalations/{transfer_id}/dial-complete", tags=["Twilio"])
+async def twilio_escalation_dial_complete(transfer_id: str, request: Request):
+    expected_url = escalation_transfer_webhook_url(transfer_id, "dial-complete")
+    await verify_twilio_webhook_request(request, expected_url)
+    payload = await parse_request_payload(request)
+    transfer_state = get_escalation_transfer(transfer_id)
+    dial_status = str(first_present(payload, "DialCallStatus") or "failed").strip().lower()
+    accepted = bool(transfer_state and transfer_state["transfer"].get("status") == "accepted")
+    if accepted and dial_status == "completed":
+        save_escalation_transfer(transfer_id, {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()})
+        return twiml_response("<Hangup/>")
+
+    failure_reason = "The escalation recipient did not accept the call."
+    if dial_status in {"busy", "failed", "no-answer", "canceled"}:
+        failure_reason = f"The escalation call could not be completed ({dial_status})."
+    save_escalation_transfer(transfer_id, {"status": "unavailable", "failure_reason": failure_reason})
+    return twiml_response("<Say>We were unable to reach a staff member right now. Please call back later.</Say><Hangup/>")
 
 @app.post("/api/call/route", tags=["Server Tools"])
 async def route_call_compat(request: Request, _internal: None = Depends(require_internal_tool_authorization)):
@@ -8620,27 +8850,121 @@ async def legacy_server_tool(
         return {"ok": True, "call_log": saved}
 
     if normalized_tool == "transfer-call":
-        target_number = (
-            first_present(payload, "target_number", "phone_number", "transfer_to")
-            or first_present(payload, "escalations_phone_number")
-            or normalize_phone_number((get_escalation_staff_for_business(business.get("id") if business else None) or {}).get("phone"))
+        if not warm_escalations_enabled():
+            return {
+                "ok": False,
+                "status": "disabled",
+                "reason": "Warm escalation transfers are disabled.",
+            }
+
+        call_sid = first_present(
+            payload,
+            "twilio_call_sid",
+            "call_sid",
+            "call_id",
+            "CallSid",
+            "system__call_sid",
         )
-        if not normalize_phone_number(target_number):
+        escalation_staff = get_escalation_staff_for_business(business.get("id") if business else None)
+        target_number = normalize_phone_number((escalation_staff or {}).get("phone"))
+        if not target_number:
             return {
                 "ok": False,
                 "status": "missing_target_number",
                 "reason": "No escalation phone number is configured for this business.",
             }
+        if not call_sid:
+            return {
+                "ok": False,
+                "status": "missing_call_sid",
+                "reason": "This call cannot be transferred because its Twilio call ID is unavailable.",
+            }
+        escalation_open, escalation_reason = is_staff_escalation_window_open(escalation_staff, business)
+        if not escalation_open:
+            return {
+                "ok": False,
+                "status": "recipient_unavailable",
+                "reason": escalation_reason or "The escalation recipient is unavailable.",
+            }
+        if not get_public_backend_base_url() or not get_twilio_auth_tuple() or not twilio_account_sid:
+            return {
+                "ok": False,
+                "status": "transfer_not_configured",
+                "reason": "Twilio warm transfer configuration is incomplete.",
+            }
+
+        transfer_id = str(uuid4())
         transfer_payload = {
+            "id": transfer_id,
             "business_id": business.get("id") if business else None,
             "user_id": user_id,
             "receptionist_id": (receptionist or {}).get("id"),
+            "twilio_call_sid": str(call_sid),
             "target_number": normalize_phone_number(target_number) or target_number,
-            "reason": first_present(payload, "reason"),
+            "staff_id": str((escalation_staff or {}).get("id") or ""),
+            "staff_name": (
+                str((escalation_staff or {}).get("full_name") or "").strip()
+                or " ".join(filter(None, [
+                    str((escalation_staff or {}).get("first_name") or "").strip(),
+                    str((escalation_staff or {}).get("last_name") or "").strip(),
+                ]))
+                or "a staff member"
+            ),
+            "caller_name": str(first_present(payload, "customer_name", "caller_name") or "the caller").strip()[:160],
+            "reason": str(first_present(payload, "reason", "transfer_reason", "summary") or "").strip()[:500],
+            "status": "requested",
             "requested_at": datetime.now(timezone.utc).isoformat(),
         }
+        try:
+            call_logs = []
+            # The inbound webhook persists this row in the background. Give a
+            # just-started call a brief chance to appear before declining it.
+            for attempt in range(4):
+                call_logs = (
+                    supabase.table("call_logs")
+                    .select("id,raw_payload")
+                    .eq("provider_call_sid", str(call_sid))
+                    .eq("business_id", business.get("id") if business else None)
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                    .data
+                    or []
+                )
+                if call_logs or attempt == 3:
+                    break
+                await asyncio.sleep(0.25)
+            if not call_logs:
+                return {
+                    "ok": False,
+                    "status": "call_not_found",
+                    "reason": "The active call could not be found for this business.",
+                }
+            call_log = call_logs[0]
+            raw_payload = dict(call_log.get("raw_payload") or {})
+            raw_payload["escalation_transfer"] = transfer_payload
+            supabase.table("call_logs").update({"raw_payload": raw_payload}).eq("id", call_log["id"]).execute()
+        except Exception:
+            logging.warning("main.legacy_server_tool.transfer_call.event_1")
+            return {
+                "ok": False,
+                "status": "transfer_state_unavailable",
+                "reason": "The escalation transfer could not be prepared.",
+            }
+
+        if not redirect_twilio_call_to_escalation(str(call_sid), transfer_id):
+            save_escalation_transfer(
+                transfer_id,
+                {"status": "failed", "failure_reason": "Twilio could not redirect the active call."},
+            )
+            return {
+                "ok": False,
+                "status": "transfer_failed",
+                "reason": "The escalation transfer could not be started.",
+            }
+        save_escalation_transfer(transfer_id, {"status": "redirected", "redirected_at": datetime.now(timezone.utc).isoformat()})
         push_live_event(
-            "Transfer call requested.",
+            "Warm escalation transfer started.",
             actor="system",
             severity="info",
             event_type="transfer_call",
@@ -8652,14 +8976,22 @@ async def legacy_server_tool(
             user_id=transfer_payload.get("user_id"),
             category="calls",
             event_type="call_transferred",
-            title="Call transferred",
-            message=str(transfer_payload.get("target_number") or ""),
+            title="Warm escalation transfer started",
+            message=str(transfer_payload.get("staff_name") or ""),
             priority="major",
             payload=transfer_payload,
-            source_id=transfer_payload.get("requested_at"),
-            idempotency_key=f"call-transfer:{transfer_payload.get('requested_at')}",
+            source_id=transfer_id,
+            idempotency_key=f"call-transfer:{transfer_id}",
         )
-        return {"ok": True, "status": "queued", "transfer": transfer_payload}
+        return {
+            "ok": True,
+            "status": "initiated",
+            "transfer": {
+                "id": transfer_id,
+                "staff_name": transfer_payload["staff_name"],
+                "status": "redirected",
+            },
+        }
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The request could not be completed')
 

@@ -53,6 +53,8 @@ Required environment variables:
 - `TWILIO_API_SECRET`
 - `TWILIO_PHONE_NUMBER`
 - `TWILIO_VOICE_WEBHOOK_URL`
+- `BACKEND_PUBLIC_URL` = public backend origin used for Twilio escalation callbacks
+- `TWILIO_WARM_ESCALATIONS_ENABLED` = `true` only when the Twilio-controlled warm transfer is deployed
 - `FRONTEND_BASE_URL` = Vercel frontend URL
 - `CORS_ORIGINS` = comma-separated allowed frontend origins, for example `https://nodemere.com,https://your-project.vercel.app`
 - `TEST_MODE` = `false`

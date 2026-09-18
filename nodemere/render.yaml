@@ -30,6 +30,8 @@ services:
       - key: TWILIO_PHONE_NUMBER
       - key: TWILIO_VOICE_WEBHOOK_URL
       - key: BACKEND_PUBLIC_URL
+      # Enables the reversible Twilio-controlled warm escalation path.
+      - key: TWILIO_WARM_ESCALATIONS_ENABLED
       # System Gmail sender for verification and document-upload links.
       # This is separate from customer-managed scenario integrations.
       - key: GOOGLE_CLIENT_ID
