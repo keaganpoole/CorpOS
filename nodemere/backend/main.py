@@ -19,7 +19,7 @@ from uuid import UUID, uuid4
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import date, datetime, timezone, timedelta
 from typing import List, Optional, Literal
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlsplit, urlunsplit
 from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
 from .privacy import (configure_private_logging, correlation_id, event_metadata, remove_secrets,
@@ -845,11 +845,176 @@ def warm_escalations_enabled() -> bool:
     return os.environ.get("TWILIO_WARM_ESCALATIONS_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
+ESCALATION_WHISPER_AUDIO_CACHE: dict[str, dict] = {}
+
+
 def twiml_response(body: str) -> Response:
     return Response(
         content=f'<?xml version="1.0" encoding="UTF-8"?><Response>{body}</Response>',
         media_type="application/xml",
     )
+
+
+def build_escalation_whisper_prompt(staff_name: str, receptionist_name: str, caller_name: str, reason: str, message: Optional[str] = None) -> str:
+    staff_label = str(staff_name or "there").strip()
+    receptionist_label = str(receptionist_name or "the receptionist").strip()
+    caller_label = str(caller_name or "the caller").strip()
+    message_text = re.sub(r"\s+", " ", str(message or "")).strip()
+    if message_text:
+        return f"{message_text[:700]} Press 1 to accept and connect. To decline, hang up."
+    reason_text = re.sub(r"\s+", " ", str(reason or "")).strip()
+    if not reason_text:
+        reason_text = "They asked to speak with a human, but I do not have any extra details yet."
+    if os.environ.get("TEST_CALL_TRANSFERS", "").strip().lower() in {"1", "true", "yes", "on"}:
+        template = os.environ.get("TEST_CALL_TRANSFERS_WHISPER_PROMPT", "").strip()
+        if template:
+            try:
+                return template.format(
+                    staff_member=staff_label,
+                    staff_name=staff_label,
+                    receptionist_name=receptionist_label,
+                    caller_name=caller_label,
+                    reason=reason_text,
+                    message=message_text,
+                )
+            except Exception:
+                logging.warning("main.build_escalation_whisper_prompt.event_1")
+    return (
+        f"Hey {staff_label}, it's {receptionist_label}. "
+        f"I've got {caller_label} on the line. {reason_text} "
+        "Press 1 to accept and connect. To decline, hang up."
+    )
+
+
+def generate_elevenlabs_transfer_audio(voice_id: Optional[str], text: str) -> Optional[bytes]:
+    headers = get_elevenlabs_headers()
+    if not headers or not voice_id or not text:
+        return None
+    model_id = os.environ.get("ELEVENLABS_TRANSFER_TTS_MODEL", "eleven_flash_v2_5")
+    try:
+        response = requests.post(
+            f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+            headers={**headers, "Accept": "audio/mpeg"},
+            params={"output_format": os.environ.get("ELEVENLABS_TRANSFER_TTS_OUTPUT_FORMAT", "mp3_44100_128")},
+            json={
+                "text": text,
+                "model_id": model_id,
+                "voice_settings": {
+                    "stability": float(os.environ.get("ELEVENLABS_TRANSFER_TTS_STABILITY", "0.55")),
+                    "similarity_boost": float(os.environ.get("ELEVENLABS_TRANSFER_TTS_SIMILARITY", "0.85")),
+                },
+            },
+            timeout=float(os.environ.get("ELEVENLABS_TRANSFER_TTS_TIMEOUT_SECONDS", "6")),
+        )
+        if response.ok and response.content:
+            return response.content
+        logging.warning("main.generate_elevenlabs_transfer_audio.event_1")
+    except Exception:
+        logging.warning("main.generate_elevenlabs_transfer_audio.event_2")
+    return None
+
+
+def cache_escalation_whisper_audio(transfer_id: str, audio: bytes) -> Optional[str]:
+    base_url = get_public_backend_base_url()
+    if not base_url or not transfer_id or not audio:
+        return None
+    now = time.time()
+    for key, value in list(ESCALATION_WHISPER_AUDIO_CACHE.items()):
+        if now - float(value.get("created_at") or 0) > 600:
+            ESCALATION_WHISPER_AUDIO_CACHE.pop(key, None)
+    ESCALATION_WHISPER_AUDIO_CACHE[transfer_id] = {
+        "audio": audio,
+        "created_at": now,
+    }
+    return f"{base_url}/twilio/escalations/{transfer_id}/staff-whisper-audio"
+
+
+def get_cached_escalation_whisper_audio_url(transfer_id: str) -> Optional[str]:
+    base_url = get_public_backend_base_url()
+    cached = ESCALATION_WHISPER_AUDIO_CACHE.get(transfer_id)
+    if not base_url or not cached:
+        return None
+    if time.time() - float(cached.get("created_at") or 0) > 600:
+        ESCALATION_WHISPER_AUDIO_CACHE.pop(transfer_id, None)
+        return None
+    return f"{base_url}/twilio/escalations/{transfer_id}/staff-whisper-audio"
+
+
+def prepare_escalation_whisper_audio(transfer_id: str, transfer: dict) -> Optional[str]:
+    voice_id = str((transfer or {}).get("receptionist_voice_id") or "").strip()
+    if not voice_id:
+        return None
+    prompt = build_escalation_whisper_prompt(
+        str((transfer or {}).get("staff_name") or "team member").strip(),
+        str((transfer or {}).get("receptionist_name") or "the receptionist").strip(),
+        str((transfer or {}).get("caller_name") or "the caller").strip(),
+        str((transfer or {}).get("reason") or "").strip(),
+        str((transfer or {}).get("message") or "").strip(),
+    )
+    audio = generate_elevenlabs_transfer_audio(voice_id, prompt)
+    if not audio:
+        return None
+    return cache_escalation_whisper_audio(transfer_id, audio)
+
+
+def mask_transfer_debug_value(value):
+    if value is None:
+        return None
+    text = str(value)
+    if not text:
+        return ""
+    if text.startswith("+") and len(text) >= 5:
+        return f"{text[:2]}***{text[-4:]}"
+    if len(text) > 12:
+        return f"{text[:4]}...{text[-4:]}"
+    return text
+
+
+def transfer_debug_fields(**fields) -> dict:
+    safe = {}
+    for key, value in fields.items():
+        if value is None:
+            continue
+        if key in {"target_number", "caller_number", "to_number", "from_number", "call_sid", "staff_call_sid"}:
+            safe[key] = mask_transfer_debug_value(value)
+        elif isinstance(value, (str, int, bool)):
+            safe[key] = str(value)[:180]
+    return safe
+
+
+def append_escalation_transfer_debug(transfer_id: str, event: str, **fields) -> None:
+    if not transfer_id:
+        return
+    current = get_escalation_transfer(transfer_id)
+    if not current:
+        logging.info("main.escalation_transfer_debug_missing.event_1")
+        return
+    row = current["call_log"]
+    raw_payload = dict(row.get("raw_payload") or {})
+    transfer = dict(current["transfer"] or {})
+    debug_events = list(transfer.get("debug_events") or [])[-49:]
+    debug_events.append({
+        "at": datetime.now(timezone.utc).isoformat(),
+        "event": str(event)[:80],
+        "fields": transfer_debug_fields(**fields),
+    })
+    transfer["debug_events"] = debug_events
+    raw_payload["escalation_transfer"] = transfer
+    try:
+        supabase_admin.table("call_logs").update({"raw_payload": raw_payload}).eq("id", row["id"]).execute()
+    except Exception:
+        logging.warning("main.escalation_transfer_debug_save.event_1")
+
+
+def merge_call_log_raw_payload(existing_row: Optional[dict], next_payload: Optional[dict]) -> dict:
+    existing_payload = existing_row.get("raw_payload") if isinstance(existing_row, dict) else {}
+    merged = dict(existing_payload if isinstance(existing_payload, dict) else {})
+    if isinstance(next_payload, dict):
+        merged.update(next_payload)
+    existing_transfer = merged.get("escalation_transfer")
+    if isinstance(existing_transfer, dict):
+        merged["escalation_transfer"] = existing_transfer
+    return merged
 
 
 def build_inbound_ai_disclosure(business_name: Optional[str], receptionist_name: Optional[str]) -> str:
@@ -859,6 +1024,26 @@ def build_inbound_ai_disclosure(business_name: Optional[str], receptionist_name:
         f"Thank you for calling {business_label}. You are speaking with {assistant_label}, an AI assistant. "
         "This call may be recorded and transcribed. How may I help you?"
     )
+
+
+def twilio_signature_candidate_urls(request: Request, expected_url: Optional[str]) -> list[str]:
+    candidates = []
+    if expected_url:
+        candidates.append(str(expected_url))
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    path_and_query = request.url.path
+    if request.url.query:
+        path_and_query = f"{path_and_query}?{request.url.query}"
+    if forwarded_proto and forwarded_host:
+        candidates.append(f"{forwarded_proto}://{forwarded_host}{request.url.path}")
+        candidates.append(f"{forwarded_proto}://{forwarded_host}{path_and_query}")
+    candidates.append(str(request.url))
+    deduped = []
+    for candidate in candidates:
+        if candidate and candidate not in deduped:
+            deduped.append(candidate)
+    return deduped
 
 
 async def verify_twilio_webhook_request(request: Request, expected_url: Optional[str]) -> None:
@@ -872,9 +1057,20 @@ async def verify_twilio_webhook_request(request: Request, expected_url: Optional
     if not signature:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing Twilio signature.")
     try:
-        form = await request.form()
-        parameters = {key: value for key, value in form.multi_items()}
-        valid = RequestValidator(twilio_auth_token).validate(expected_url, parameters, signature)
+        parameters = {}
+        try:
+            form = await request.form()
+            parameters = {key: value for key, value in form.multi_items()}
+        except Exception:
+            body = await request.body()
+            parameters = {key: value for key, value in parse_qsl(body.decode("utf-8", errors="ignore"), keep_blank_values=True)}
+        if not parameters and request.query_params:
+            parameters = dict(request.query_params.multi_items())
+        validator = RequestValidator(twilio_auth_token)
+        valid = any(
+            validator.validate(candidate_url, parameters, signature)
+            for candidate_url in twilio_signature_candidate_urls(request, expected_url)
+        )
     except Exception as exc:
         logging.warning('main.verify_twilio_webhook_request.event_858')
         valid = False
@@ -4691,8 +4887,23 @@ def get_escalation_transfer(transfer_id: str) -> Optional[dict]:
         )
     except Exception:
         logging.warning("main.get_escalation_transfer.event_1")
-        return None
+        rows = []
+    if not rows and os.environ.get("TEST_CALL_TRANSFERS", "").strip().lower() in {"1", "true", "yes", "on"}:
+        try:
+            rows = (
+                supabase_admin.table("call_logs")
+                .select("id,business_id,provider_call_sid,from_number,to_number,raw_payload")
+                .eq("conversation_id", f"transfer-test:{transfer_id}")
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+        except Exception:
+            logging.warning("main.get_escalation_transfer_test_lookup.event_1")
+            rows = []
     if not rows:
+        logging.info("main.escalation_transfer_lookup_miss.event_1")
         return None
     row = rows[0]
     raw_payload = row.get("raw_payload") if isinstance(row.get("raw_payload"), dict) else {}
@@ -4703,6 +4914,7 @@ def get_escalation_transfer(transfer_id: str) -> Optional[dict]:
 def save_escalation_transfer(transfer_id: str, updates: dict) -> Optional[dict]:
     current = get_escalation_transfer(transfer_id)
     if not current:
+        logging.info("main.escalation_transfer_save_missing.event_1")
         return None
     row = current["call_log"]
     raw_payload = dict(row.get("raw_payload") or {})
@@ -4720,17 +4932,42 @@ def redirect_twilio_call_to_escalation(call_sid: str, transfer_id: str) -> bool:
     auth = get_twilio_auth_tuple()
     transfer_url = escalation_transfer_webhook_url(transfer_id, "dial")
     if not auth or not twilio_account_sid or not transfer_url:
+        append_escalation_transfer_debug(
+            transfer_id,
+            "twilio_redirect_not_configured",
+            has_auth=bool(auth),
+            has_account_sid=bool(twilio_account_sid),
+            has_transfer_url=bool(transfer_url),
+            call_sid=call_sid,
+        )
+        logging.warning("main.escalation_transfer_redirect_config.event_1")
         return False
     try:
+        append_escalation_transfer_debug(transfer_id, "twilio_redirect_request", call_sid=call_sid)
+        logging.info("main.escalation_transfer_redirect_request.event_1")
         response = requests.post(
             f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/Calls/{call_sid}.json",
             data={"Url": transfer_url, "Method": "POST"},
             auth=auth,
             timeout=30,
         )
+        append_escalation_transfer_debug(
+            transfer_id,
+            "twilio_redirect_response",
+            status_code=response.status_code,
+            ok=response.ok,
+        )
         response.raise_for_status()
+        logging.info("main.escalation_transfer_redirect_success.event_1")
         return True
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        response = getattr(exc, "response", None)
+        append_escalation_transfer_debug(
+            transfer_id,
+            "twilio_redirect_failed",
+            status_code=getattr(response, "status_code", None),
+            error_type=exc.__class__.__name__,
+        )
         logging.warning("main.redirect_twilio_call_to_escalation.event_1")
         return False
 
@@ -7406,7 +7643,7 @@ async def twilio_inbound_webhook(request: Request):
         "receptionist_id": receptionist.get("id") if receptionist else None,
         "receptionist_name": get_receptionist_display_name(receptionist),
     }
-    emit_scenario_trigger("incoming_call", event_payload)
+    asyncio.create_task(asyncio.to_thread(emit_scenario_trigger, "incoming_call", event_payload))
 
     register_payload = {
         "agent_id": elevenlabs_agent_id_inbound,
@@ -7425,6 +7662,8 @@ async def twilio_inbound_webhook(request: Request):
                 "elevenlabs_voice_id": receptionist.get("elevenlabs_voice_id") if receptionist else None,
                 "twilio_to_number": to_number,
                 "twilio_call_sid": first_present(payload, "CallSid"),
+                "person_id": "",
+                "customer_name": "",
                 "docs_request_id": "",
                 "required_opening_disclosure": required_opening,
                 "recording_enabled": True,
@@ -7448,30 +7687,10 @@ async def twilio_inbound_webhook(request: Request):
         register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
             "agent": {"prompt": {"knowledge_base": []}},
         }
-    add_people_intake_dynamic_variables(
-        register_payload["conversation_initiation_client_data"]["scenario_context"],
-        business,
-    )
     add_escalation_dynamic_variables(
         register_payload["conversation_initiation_client_data"]["scenario_context"],
         business,
     )
-    matched_person = None
-    if from_number:
-        matched_person = lookup_person_record(
-            phone_number=from_number,
-            business_id=str(business.get("id")) if business and business.get("id") is not None else None,
-            user_id=context.get("user_id") or (business or {}).get("user_id"),
-        )
-    if matched_person:
-        scenario_context = register_payload["conversation_initiation_client_data"]["scenario_context"]
-        scenario_context["person_id"] = str(matched_person.get("id")) if matched_person.get("id") is not None else None
-        scenario_context["customer_name"] = format_person_display_name(matched_person)
-        add_person_custom_dynamic_variables(
-            scenario_context,
-            matched_person,
-            str(business.get("id")) if business and business.get("id") is not None else None,
-        )
     register_payload["conversation_initiation_client_data"]["scenario_context"] = {
         key: value
         for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
@@ -7482,6 +7701,8 @@ async def twilio_inbound_webhook(request: Request):
         for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
         if value is not None
     }
+    register_payload["conversation_initiation_client_data"]["dynamic_variables"]["person_id"] = ""
+    register_payload["conversation_initiation_client_data"]["dynamic_variables"]["customer_name"] = ""
     register_payload["conversation_initiation_client_data"]["dynamic_variables"]["secret__nodemere_context"] = issue_internal_context(internal_tool_secret, business)
     if receptionist and receptionist.get("elevenlabs_voice_id"):
         register_payload["conversation_initiation_client_data"].setdefault("conversation_config_override", {})
@@ -7498,7 +7719,7 @@ async def twilio_inbound_webhook(request: Request):
             "Content-Type": "application/json",
         },
         json=register_payload,
-        timeout=30,
+        timeout=float(os.environ.get("ELEVENLABS_REGISTER_CALL_TIMEOUT_SECONDS", "8")),
     )
     if not response.ok:
         logging.error('main.twilio_inbound_webhook.event_7065')
@@ -7537,9 +7758,15 @@ async def twilio_inbound_webhook(request: Request):
 @app.post("/twilio/escalations/{transfer_id}/dial", tags=["Twilio"])
 async def twilio_escalation_dial(transfer_id: str, request: Request):
     expected_url = escalation_transfer_webhook_url(transfer_id, "dial")
-    await verify_twilio_webhook_request(request, expected_url)
+    try:
+        await verify_twilio_webhook_request(request, expected_url)
+    except HTTPException:
+        append_escalation_transfer_debug(transfer_id, "twilio_signature_rejected", endpoint="dial")
+        raise
+    logging.info("main.escalation_transfer_dial_webhook.event_1")
     transfer_state = get_escalation_transfer(transfer_id)
     if not transfer_state:
+        logging.warning("main.escalation_transfer_dial_missing.event_1")
         return twiml_response("<Say>We are unable to complete that transfer.</Say><Hangup/>")
 
     transfer = transfer_state["transfer"]
@@ -7548,9 +7775,19 @@ async def twilio_escalation_dial(transfer_id: str, request: Request):
     complete_url = escalation_transfer_webhook_url(transfer_id, "dial-complete")
     status_url = escalation_transfer_webhook_url(transfer_id, "dial-status")
     if not target_number or not whisper_url or not complete_url or not status_url:
+        append_escalation_transfer_debug(
+            transfer_id,
+            "dial_config_incomplete",
+            has_target_number=bool(target_number),
+            has_whisper_url=bool(whisper_url),
+            has_complete_url=bool(complete_url),
+            has_status_url=bool(status_url),
+        )
         save_escalation_transfer(transfer_id, {"status": "failed", "failure_reason": "Escalation transfer configuration is incomplete."})
+        logging.warning("main.escalation_transfer_dial_config.event_1")
         return twiml_response("<Say>We are unable to complete that transfer right now.</Say><Hangup/>")
 
+    append_escalation_transfer_debug(transfer_id, "dial_twiml_returned", target_number=target_number)
     save_escalation_transfer(transfer_id, {"status": "dialing", "dial_started_at": datetime.now(timezone.utc).isoformat()})
     caller_id = normalize_phone_number(transfer_state["call_log"].get("to_number"))
     caller_id_attribute = f' callerId="{escape_html(caller_id, quote=True)}"' if caller_id else ""
@@ -7566,15 +7803,24 @@ async def twilio_escalation_dial(transfer_id: str, request: Request):
 @app.post("/twilio/escalations/{transfer_id}/staff-whisper", tags=["Twilio"])
 async def twilio_escalation_staff_whisper(transfer_id: str, request: Request):
     expected_url = escalation_transfer_webhook_url(transfer_id, "staff-whisper")
-    await verify_twilio_webhook_request(request, expected_url)
+    try:
+        await verify_twilio_webhook_request(request, expected_url)
+    except HTTPException:
+        append_escalation_transfer_debug(transfer_id, "twilio_signature_rejected", endpoint="staff-whisper")
+        logging.warning("main.escalation_transfer_staff_whisper_signature.event_1")
+        return twiml_response("<Say>We are unable to complete that transfer right now.</Say><Hangup/>")
     payload = await parse_request_payload(request)
+    logging.info("main.escalation_transfer_staff_whisper.event_1")
     transfer_state = get_escalation_transfer(transfer_id)
     if not transfer_state:
+        logging.warning("main.escalation_transfer_staff_whisper_missing.event_1")
         return twiml_response("<Hangup/>")
 
     transfer = transfer_state["transfer"]
     staff_name = str(transfer.get("staff_name") or "team member").strip()
+    receptionist_name = str(transfer.get("receptionist_name") or "the receptionist").strip()
     caller_name = str(transfer.get("caller_name") or "the caller").strip()
+    message = str(transfer.get("message") or "").strip()
     reason = str(transfer.get("reason") or "No additional details were captured.").strip()
     reason = re.sub(r"\s+", " ", reason)[:500]
     save_escalation_transfer(
@@ -7585,65 +7831,127 @@ async def twilio_escalation_staff_whisper(transfer_id: str, request: Request):
             "staff_answered_at": datetime.now(timezone.utc).isoformat(),
         },
     )
+    append_escalation_transfer_debug(
+        transfer_id,
+        "staff_whisper_answered",
+        staff_call_sid=first_present(payload, "CallSid"),
+    )
     response_url = escalation_transfer_webhook_url(transfer_id, "staff-response")
     if not response_url:
+        append_escalation_transfer_debug(transfer_id, "staff_response_url_missing")
+        logging.warning("main.escalation_transfer_staff_response_url.event_1")
         return twiml_response("<Hangup/>")
     prompt = (
-        f"Hello {staff_name}. This is an escalation from Nodemere. "
-        f"Caller: {caller_name}. Reason: {reason}. "
-        "Press 1 to accept and connect. To decline, hang up."
+        build_escalation_whisper_prompt(staff_name, receptionist_name, caller_name, reason, message)
+    )
+    play_url = get_cached_escalation_whisper_audio_url(transfer_id)
+    voice_id = str(transfer.get("receptionist_voice_id") or "").strip()
+    if not play_url and voice_id:
+        audio = await asyncio.to_thread(generate_elevenlabs_transfer_audio, voice_id, prompt)
+        if audio:
+            play_url = cache_escalation_whisper_audio(transfer_id, audio)
+            append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_ready", has_voice_id=True)
+        else:
+            append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_failed", has_voice_id=True)
+    elif play_url:
+        append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_cache_hit", has_voice_id=bool(voice_id))
+    prompt_twiml = (
+        f'<Play>{escape_html(play_url)}</Play>'
+        if play_url
+        else f"<Say>{escape_html(prompt)}</Say>"
     )
     return twiml_response(
-        f'<Gather input="dtmf" numDigits="1" timeout="8" action="{escape_html(response_url, quote=True)}" method="POST">'
-        f"<Say>{escape_html(prompt)}</Say>"
-        "</Gather><Hangup/>"
+        f'<Gather input="dtmf" numDigits="1" timeout="12" action="{escape_html(response_url, quote=True)}" method="POST">'
+        "<Pause length=\"1\"/>"
+        f"{prompt_twiml}"
+        "<Pause length=\"1\"/>"
+        "<Say>Press 1 now to accept and connect.</Say>"
+        "</Gather><Say>No input received. Goodbye.</Say><Hangup/>"
     )
+
+
+@app.get("/twilio/escalations/{transfer_id}/staff-whisper-audio", tags=["Twilio"])
+async def twilio_escalation_staff_whisper_audio(transfer_id: str):
+    cached = ESCALATION_WHISPER_AUDIO_CACHE.get(transfer_id)
+    if not cached or time.time() - float(cached.get("created_at") or 0) > 600:
+        append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_cache_miss")
+        return Response(status_code=404)
+    append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_served")
+    return Response(content=cached.get("audio") or b"", media_type="audio/mpeg")
 
 
 @app.post("/twilio/escalations/{transfer_id}/staff-response", tags=["Twilio"])
 async def twilio_escalation_staff_response(transfer_id: str, request: Request):
     expected_url = escalation_transfer_webhook_url(transfer_id, "staff-response")
-    await verify_twilio_webhook_request(request, expected_url)
+    try:
+        await verify_twilio_webhook_request(request, expected_url)
+    except HTTPException:
+        append_escalation_transfer_debug(transfer_id, "twilio_signature_rejected", endpoint="staff-response")
+        raise
     payload = await parse_request_payload(request)
+    logging.info("main.escalation_transfer_staff_response.event_1")
     transfer_state = get_escalation_transfer(transfer_id)
     if not transfer_state:
+        logging.warning("main.escalation_transfer_staff_response_missing.event_1")
         return twiml_response("<Hangup/>")
 
-    if str(first_present(payload, "Digits") or "") == "1":
+    digits = str(first_present(payload, "Digits") or "")
+    append_escalation_transfer_debug(transfer_id, "staff_response_digits", digits=digits)
+    if digits == "1":
         save_escalation_transfer(transfer_id, {"status": "accepted", "accepted_at": datetime.now(timezone.utc).isoformat()})
+        logging.info("main.escalation_transfer_staff_accepted.event_1")
         return twiml_response("<Say>Connecting you now.</Say>")
 
     save_escalation_transfer(transfer_id, {"status": "declined", "declined_at": datetime.now(timezone.utc).isoformat()})
+    logging.info("main.escalation_transfer_staff_declined.event_1")
     return twiml_response("<Hangup/>")
 
 
 @app.post("/twilio/escalations/{transfer_id}/dial-status", tags=["Twilio"])
 async def twilio_escalation_dial_status(transfer_id: str, request: Request):
     expected_url = escalation_transfer_webhook_url(transfer_id, "dial-status")
-    await verify_twilio_webhook_request(request, expected_url)
+    try:
+        await verify_twilio_webhook_request(request, expected_url)
+    except HTTPException:
+        append_escalation_transfer_debug(transfer_id, "twilio_signature_rejected", endpoint="dial-status")
+        raise
     payload = await parse_request_payload(request)
     status_value = str(first_present(payload, "CallStatus") or "").strip().lower()
     if status_value:
+        append_escalation_transfer_debug(
+            transfer_id,
+            "staff_call_status",
+            status=status_value,
+            staff_call_sid=first_present(payload, "CallSid"),
+        )
         save_escalation_transfer(transfer_id, {"staff_call_status": status_value, "staff_call_sid": first_present(payload, "CallSid")})
+        logging.info("main.escalation_transfer_dial_status.event_1")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post("/twilio/escalations/{transfer_id}/dial-complete", tags=["Twilio"])
 async def twilio_escalation_dial_complete(transfer_id: str, request: Request):
     expected_url = escalation_transfer_webhook_url(transfer_id, "dial-complete")
-    await verify_twilio_webhook_request(request, expected_url)
+    try:
+        await verify_twilio_webhook_request(request, expected_url)
+    except HTTPException:
+        append_escalation_transfer_debug(transfer_id, "twilio_signature_rejected", endpoint="dial-complete")
+        raise
     payload = await parse_request_payload(request)
     transfer_state = get_escalation_transfer(transfer_id)
     dial_status = str(first_present(payload, "DialCallStatus") or "failed").strip().lower()
     accepted = bool(transfer_state and transfer_state["transfer"].get("status") == "accepted")
+    append_escalation_transfer_debug(transfer_id, "dial_complete", dial_status=dial_status, accepted=accepted)
     if accepted and dial_status == "completed":
         save_escalation_transfer(transfer_id, {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()})
+        logging.info("main.escalation_transfer_completed.event_1")
         return twiml_response("<Hangup/>")
 
     failure_reason = "The escalation recipient did not accept the call."
     if dial_status in {"busy", "failed", "no-answer", "canceled"}:
         failure_reason = f"The escalation call could not be completed ({dial_status})."
     save_escalation_transfer(transfer_id, {"status": "unavailable", "failure_reason": failure_reason})
+    logging.warning("main.escalation_transfer_unavailable.event_1")
     return twiml_response("<Say>We were unable to reach a staff member right now. Please call back later.</Say><Hangup/>")
 
 @app.post("/api/call/route", tags=["Server Tools"])
@@ -8850,7 +9158,9 @@ async def legacy_server_tool(
         return {"ok": True, "call_log": saved}
 
     if normalized_tool == "transfer-call":
+        logging.info("main.escalation_transfer_tool_called.event_1")
         if not warm_escalations_enabled():
+            logging.warning("main.escalation_transfer_disabled.event_1")
             return {
                 "ok": False,
                 "status": "disabled",
@@ -8867,13 +9177,16 @@ async def legacy_server_tool(
         )
         escalation_staff = get_escalation_staff_for_business(business.get("id") if business else None)
         target_number = normalize_phone_number((escalation_staff or {}).get("phone"))
+        logging.info("main.escalation_transfer_staff_resolved.event_1")
         if not target_number:
+            logging.warning("main.escalation_transfer_missing_target.event_1")
             return {
                 "ok": False,
                 "status": "missing_target_number",
                 "reason": "No escalation phone number is configured for this business.",
             }
         if not call_sid:
+            logging.warning("main.escalation_transfer_missing_call_sid.event_1")
             return {
                 "ok": False,
                 "status": "missing_call_sid",
@@ -8881,24 +9194,32 @@ async def legacy_server_tool(
             }
         escalation_open, escalation_reason = is_staff_escalation_window_open(escalation_staff, business)
         if not escalation_open:
+            logging.warning("main.escalation_transfer_schedule_closed.event_1")
             return {
                 "ok": False,
                 "status": "recipient_unavailable",
                 "reason": escalation_reason or "The escalation recipient is unavailable.",
             }
         if not get_public_backend_base_url() or not get_twilio_auth_tuple() or not twilio_account_sid:
+            logging.warning("main.escalation_transfer_config_missing.event_1")
             return {
                 "ok": False,
                 "status": "transfer_not_configured",
                 "reason": "Twilio warm transfer configuration is incomplete.",
             }
 
+        transfer_receptionist = receptionist or find_inbound_receptionist_for_business(
+            business.get("id") if business else None,
+            user_id,
+        )
         transfer_id = str(uuid4())
         transfer_payload = {
             "id": transfer_id,
             "business_id": business.get("id") if business else None,
             "user_id": user_id,
-            "receptionist_id": (receptionist or {}).get("id"),
+            "receptionist_id": (transfer_receptionist or {}).get("id"),
+            "receptionist_name": get_receptionist_display_name(transfer_receptionist) or "the receptionist",
+            "receptionist_voice_id": (transfer_receptionist or {}).get("elevenlabs_voice_id"),
             "twilio_call_sid": str(call_sid),
             "target_number": normalize_phone_number(target_number) or target_number,
             "staff_id": str((escalation_staff or {}).get("id") or ""),
@@ -8911,15 +9232,32 @@ async def legacy_server_tool(
                 or "a staff member"
             ),
             "caller_name": str(first_present(payload, "customer_name", "caller_name") or "the caller").strip()[:160],
+            "message": str(first_present(payload, "message", "handoff_message", "transfer_message") or "").strip()[:700],
             "reason": str(first_present(payload, "reason", "transfer_reason", "summary") or "").strip()[:500],
             "status": "requested",
             "requested_at": datetime.now(timezone.utc).isoformat(),
+            "debug_events": [
+                {
+                    "at": datetime.now(timezone.utc).isoformat(),
+                    "event": "tool_request_received",
+                    "fields": transfer_debug_fields(
+                        business_id=business.get("id") if business else None,
+                        call_sid=call_sid,
+                        target_number=target_number,
+                        staff_id=(escalation_staff or {}).get("id"),
+                        has_receptionist_voice_id=bool((transfer_receptionist or {}).get("elevenlabs_voice_id")),
+                        has_message=bool(first_present(payload, "message", "handoff_message", "transfer_message")),
+                        has_reason=bool(first_present(payload, "reason", "transfer_reason", "summary")),
+                    ),
+                }
+            ],
         }
         try:
             call_logs = []
             # The inbound webhook persists this row in the background. Give a
             # just-started call a brief chance to appear before declining it.
             for attempt in range(4):
+                logging.info("main.escalation_transfer_call_log_lookup.event_1")
                 call_logs = (
                     supabase.table("call_logs")
                     .select("id,raw_payload")
@@ -8935,6 +9273,7 @@ async def legacy_server_tool(
                     break
                 await asyncio.sleep(0.25)
             if not call_logs:
+                logging.warning("main.escalation_transfer_call_log_missing.event_1")
                 return {
                     "ok": False,
                     "status": "call_not_found",
@@ -8944,6 +9283,8 @@ async def legacy_server_tool(
             raw_payload = dict(call_log.get("raw_payload") or {})
             raw_payload["escalation_transfer"] = transfer_payload
             supabase.table("call_logs").update({"raw_payload": raw_payload}).eq("id", call_log["id"]).execute()
+            append_escalation_transfer_debug(transfer_id, "transfer_state_saved", call_log_id=call_log.get("id"))
+            logging.info("main.escalation_transfer_state_saved.event_1")
         except Exception:
             logging.warning("main.legacy_server_tool.transfer_call.event_1")
             return {
@@ -8952,6 +9293,13 @@ async def legacy_server_tool(
                 "reason": "The escalation transfer could not be prepared.",
             }
 
+        if transfer_payload.get("receptionist_voice_id"):
+            play_url = await asyncio.to_thread(prepare_escalation_whisper_audio, transfer_id, transfer_payload)
+            append_escalation_transfer_debug(
+                transfer_id,
+                "elevenlabs_whisper_audio_prepared" if play_url else "elevenlabs_whisper_audio_prepare_failed",
+                has_voice_id=True,
+            )
         if not redirect_twilio_call_to_escalation(str(call_sid), transfer_id):
             save_escalation_transfer(
                 transfer_id,
@@ -8963,6 +9311,8 @@ async def legacy_server_tool(
                 "reason": "The escalation transfer could not be started.",
             }
         save_escalation_transfer(transfer_id, {"status": "redirected", "redirected_at": datetime.now(timezone.utc).isoformat()})
+        append_escalation_transfer_debug(transfer_id, "redirected_to_twilio", call_sid=call_sid)
+        logging.info("main.escalation_transfer_initiated.event_1")
         push_live_event(
             "Warm escalation transfer started.",
             actor="system",
@@ -9104,7 +9454,7 @@ async def persist_elevenlabs_event(payload):
             if not existing and conversation_id:
                 existing = (
                     supabase.table("call_logs")
-                    .select("id")
+                    .select("id,raw_payload")
                     .eq("conversation_id", str(conversation_id))
                     .limit(1)
                     .execute()
@@ -9112,6 +9462,7 @@ async def persist_elevenlabs_event(payload):
                     or []
                 )
             if existing:
+                updates["raw_payload"] = merge_call_log_raw_payload(existing[0], updates.get("raw_payload"))
                 response = supabase.table("call_logs").update(updates).eq("id", existing[0]["id"]).execute()
                 saved = response.data[0] if getattr(response, "data", None) else updates
             else:
@@ -9153,7 +9504,7 @@ async def persist_elevenlabs_event(payload):
         if not existing and call_log.get("conversation_id"):
             existing = (
                 supabase.table("call_logs")
-                .select("id,audio_storage_path,duration_seconds,business_id")
+                .select("id,audio_storage_path,duration_seconds,business_id,raw_payload")
                 .eq("conversation_id", call_log["conversation_id"])
                 .limit(1)
                 .execute()
@@ -9163,7 +9514,7 @@ async def persist_elevenlabs_event(payload):
         if not existing and call_log.get("provider_call_sid"):
             existing = (
                 supabase.table("call_logs")
-                .select("id,audio_storage_path,duration_seconds,business_id")
+                .select("id,audio_storage_path,duration_seconds,business_id,raw_payload")
                 .eq("provider_call_sid", str(call_log["provider_call_sid"]))
                 .limit(1)
                 .execute()
@@ -9173,7 +9524,7 @@ async def persist_elevenlabs_event(payload):
         if not existing and call_log.get("business_id") and call_log.get("from_number"):
             candidates = (
                 supabase.table("call_logs")
-                .select("id,audio_storage_path,duration_seconds,business_id,from_number")
+                .select("id,audio_storage_path,duration_seconds,business_id,from_number,raw_payload")
                 .eq("business_id", str(call_log["business_id"]))
                 .eq("status", "in-progress")
                 .order("started_at", desc=True)
@@ -9193,6 +9544,7 @@ async def persist_elevenlabs_event(payload):
                     call_log[field] = saved_drop.get(field)
             if existing[0].get("audio_storage_path") and not call_log.get("audio_storage_path"):
                 call_log["audio_storage_path"] = existing[0]["audio_storage_path"]
+            call_log["raw_payload"] = merge_call_log_raw_payload(existing[0], call_log.get("raw_payload"))
             response = supabase.table("call_logs").update(call_log).eq("id", existing[0]["id"]).execute()
         else:
             response = supabase.table("call_logs").insert(call_log).execute()

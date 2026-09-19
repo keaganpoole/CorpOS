@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "backend:dev": "node ./start-sonar.js",
+    "backend:calls": "node ./start-sonar.js --no-reload",
     "backend:start": "node ./start-sonar.js",
     "dev": "vite",
     "build": "vite build",

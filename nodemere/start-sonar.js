@@ -4,7 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uvicornArgs = ['-m', 'uvicorn', 'backend.main:app', '--host', '0.0.0.0', '--port', '8000', '--reload'];
+const useReload = process.env.SONAR_RELOAD !== 'false' && !process.argv.includes('--no-reload');
+const uvicornArgs = ['-m', 'uvicorn', 'backend.main:app', '--host', '0.0.0.0', '--port', '8000'];
+if (useReload) {
+  uvicornArgs.push('--reload');
+}
 const commandCandidates = process.platform === 'win32'
   ? ['python', 'py']
   : ['python3', 'python'];
