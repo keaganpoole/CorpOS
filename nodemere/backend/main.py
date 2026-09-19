@@ -68,6 +68,7 @@ from fastapi import FastAPI, HTTPException, status, Depends, Request, Header, Up
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+from starlette.requests import ClientDisconnect
 from gotrue.errors import AuthApiError
 from collections import defaultdict
 from fastapi import BackgroundTasks
@@ -389,7 +390,7 @@ def get_system_config_row() -> dict:
         response = (
             supabase_admin
             .table("system_config")
-            .select("total_allowed_number_purchases,verify_caller_id,test_mode")
+            .select("scheduler_run,total_allowed_number_purchases,verify_caller_id,test_mode")
             .limit(1)
             .execute()
         )
@@ -454,6 +455,13 @@ def get_system_verify_caller_id_enabled() -> bool:
     return str(value).strip().lower() in {"1", "true", "t", "yes", "y", "on"}
 
 
+def get_system_scheduler_run_enabled() -> bool:
+    row = get_system_config_row()
+    if row.get("_system_config_read_error") or not row:
+        return False
+    return _coerce_boolean(row.get("scheduler_run"), default=False)
+
+
 def get_business_number_purchase_count(business: Optional[dict]) -> int:
     if not business:
         return 0
@@ -510,6 +518,7 @@ def persist_business_forwarding_config(business_id: str, config: dict) -> dict:
     )
     if not response.data:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save forwarding settings")
+    clear_inbound_call_boot_cache(business_id)
     return response.data[0]
 
 
@@ -845,6 +854,10 @@ def warm_escalations_enabled() -> bool:
     return os.environ.get("TWILIO_WARM_ESCALATIONS_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def strict_twilio_signature_verification() -> bool:
+    return os.environ.get("TWILIO_STRICT_SIGNATURE_VERIFICATION", "true").strip().lower() not in {"0", "false", "no", "off"}
+
+
 ESCALATION_WHISPER_AUDIO_CACHE: dict[str, dict] = {}
 
 
@@ -1047,23 +1060,30 @@ def twilio_signature_candidate_urls(request: Request, expected_url: Optional[str
 
 
 async def verify_twilio_webhook_request(request: Request, expected_url: Optional[str]) -> None:
+    strict_verification = strict_twilio_signature_verification()
     if not twilio_auth_token or not expected_url or RequestValidator is None:
         logging.error('main.verify_twilio_webhook_request.event_845')
+        if not strict_verification:
+            return
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Twilio webhook verification is not configured.",
         )
     signature = request.headers.get("x-twilio-signature")
     if not signature:
+        if not strict_verification:
+            logging.warning("main.verify_twilio_webhook_request.event_859")
+            return
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing Twilio signature.")
     try:
-        parameters = {}
-        try:
-            form = await request.form()
-            parameters = {key: value for key, value in form.multi_items()}
-        except Exception:
-            body = await request.body()
-            parameters = {key: value for key, value in parse_qsl(body.decode("utf-8", errors="ignore"), keep_blank_values=True)}
+        body = await request.body()
+        parameters = {
+            key: value
+            for key, value in parse_qsl(
+                body.decode("utf-8", errors="ignore"),
+                keep_blank_values=True,
+            )
+        }
         if not parameters and request.query_params:
             parameters = dict(request.query_params.multi_items())
         validator = RequestValidator(twilio_auth_token)
@@ -1072,9 +1092,12 @@ async def verify_twilio_webhook_request(request: Request, expected_url: Optional
             for candidate_url in twilio_signature_candidate_urls(request, expected_url)
         )
     except Exception as exc:
-        logging.warning('main.verify_twilio_webhook_request.event_858')
+        logging.warning('main.verify_twilio_webhook_request.event_858', exc_info=True)
         valid = False
     if not valid:
+        if not strict_verification:
+            logging.warning("main.verify_twilio_webhook_request.event_860")
+            return
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Twilio signature.")
 
 
@@ -1978,7 +2001,8 @@ async def startup_scenario_engine():
     try:
         if scenario_engine:
             await scenario_engine.start()
-            scenario_engine.start_scheduler()
+            if get_system_scheduler_run_enabled():
+                scenario_engine.start_scheduler()
     except Exception as exc:
         logging.error('main.startup_scenario_engine.event_1727')
 
@@ -4622,6 +4646,100 @@ def find_business_by_called_number(called_number: Optional[str]):
                 return hydrate_business_with_purchased_number_data(business)
     return None
 
+
+def get_default_inbound_called_number() -> Optional[str]:
+    explicit = normalize_phone_number(
+        os.environ.get("TWILIO_INBOUND_FALLBACK_TO_NUMBER")
+        or os.environ.get("TWILIO_PHONE_NUMBER")
+    )
+    if explicit:
+        return explicit
+
+    try:
+        response = (
+            supabase
+            .table("purchased_numbers")
+            .select("phone_number,status,is_active,kind")
+            .eq("kind", "assigned_line")
+            .neq("status", "released")
+            .execute()
+        )
+    except Exception:
+        return None
+
+    candidates = [
+        normalize_phone_number(row.get("phone_number"))
+        for row in (response.data or [])
+        if row.get("is_active") is not False and normalize_phone_number(row.get("phone_number"))
+    ]
+    unique_candidates = sorted(set(candidates))
+    return unique_candidates[0] if len(unique_candidates) == 1 else None
+
+
+INBOUND_CALL_BOOT_CACHE: dict[str, dict] = {}
+
+
+def inbound_call_boot_cache_ttl_seconds() -> float:
+    try:
+        return max(1.0, float(os.environ.get("INBOUND_CALL_BOOT_CACHE_TTL_SECONDS", "300")))
+    except ValueError:
+        return 300.0
+
+
+def inbound_call_boot_cache_key(called_number: Optional[str]) -> Optional[str]:
+    normalized = normalize_phone_number(called_number)
+    return normalized or None
+
+
+def clear_inbound_call_boot_cache(business_id=None) -> None:
+    if business_id is None:
+        INBOUND_CALL_BOOT_CACHE.clear()
+        return
+    business_value = str(business_id)
+    for key, value in list(INBOUND_CALL_BOOT_CACHE.items()):
+        business = value.get("business") if isinstance(value, dict) else None
+        if str((business or {}).get("id") or "") == business_value:
+            INBOUND_CALL_BOOT_CACHE.pop(key, None)
+
+
+def get_inbound_call_boot_context(called_number: Optional[str], forwarded_from: Optional[str] = None) -> Optional[dict]:
+    key = inbound_call_boot_cache_key(called_number)
+    if not key:
+        return None
+    now = time.time()
+    cached = INBOUND_CALL_BOOT_CACHE.get(key)
+    if cached and now - float(cached.get("cached_at") or 0) <= inbound_call_boot_cache_ttl_seconds():
+        return {**cached, "cache_hit": True}
+
+    context = resolve_business_context({
+        "to_number": called_number,
+        "called_number": called_number,
+        "forwarded_from": forwarded_from,
+    })
+    business = context.get("business")
+    if not business:
+        return None
+    receptionist = find_inbound_receptionist_for_business(
+        business.get("id"),
+        context.get("user_id") or business.get("user_id"),
+    )
+    escalation_staff = get_escalation_staff_for_business(business.get("id"))
+    snapshot = cached_business_knowledge(business.get("id"), elevenlabs_agent_id_inbound)
+    cached = {
+        "cached_at": now,
+        "business": business,
+        "user_id": context.get("user_id") or str(business.get("user_id") or ""),
+        "receptionist": receptionist,
+        "called_number": normalize_phone_number(called_number),
+        "forwarded_from": normalize_phone_number(forwarded_from),
+        "escalation_staff": escalation_staff,
+        "knowledge_snapshot": snapshot,
+        "cache_hit": False,
+    }
+    INBOUND_CALL_BOOT_CACHE[key] = cached
+    return cached
+
+
 def resolve_business_context(payload: Optional[dict] = None):
     payload = payload or {}
     bound = current_tenant.get()
@@ -4741,7 +4859,20 @@ async def parse_request_payload(request: Request) -> dict:
         except Exception:
             return {}
 
-    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+    if "application/x-www-form-urlencoded" in content_type:
+        try:
+            body = await request.body()
+            return {
+                key: value
+                for key, value in parse_qsl(
+                    body.decode("utf-8", errors="ignore"),
+                    keep_blank_values=True,
+                )
+            }
+        except Exception:
+            return {}
+
+    if "multipart/form-data" in content_type:
         try:
             form = await request.form()
             return {key: value for key, value in form.multi_items()}
@@ -4818,6 +4949,10 @@ def get_escalation_staff_for_business(business_id) -> Optional[dict]:
 
 def add_escalation_dynamic_variables(dynamic_variables: dict, business: Optional[dict]):
     escalation_staff = get_escalation_staff_for_business((business or {}).get("id"))
+    return add_escalation_dynamic_variables_from_staff(dynamic_variables, escalation_staff)
+
+
+def add_escalation_dynamic_variables_from_staff(dynamic_variables: dict, escalation_staff: Optional[dict]):
     if not escalation_staff:
         dynamic_variables["escalations_phone_number"] = ""
         dynamic_variables["escalations_staff_id"] = ""
@@ -7573,12 +7708,32 @@ async def reload_scenarios(current_user: dict = Depends(get_current_user)):
 
 @app.post("/twilio/inbound", tags=["Twilio"])
 async def twilio_inbound_webhook(request: Request):
+    inbound_started = time.perf_counter()
+    last_mark = inbound_started
+
+    def mark(step: str) -> None:
+        nonlocal last_mark
+        now = time.perf_counter()
+        print(
+            f"[InboundTiming] {step} total_ms={int((now - inbound_started) * 1000)} step_ms={int((now - last_mark) * 1000)}",
+            flush=True,
+        )
+        last_mark = now
+
+    mark("route_entry")
     await verify_twilio_webhook_request(request, twilio_voice_webhook_url)
+    mark("twilio_signature_verified")
     payload = await parse_request_payload(request)
+    mark("payload_parsed")
     raw_from_number = first_present(payload, "From", "from", "from_number", "Caller", "caller")
     from_number = normalize_phone_number(raw_from_number)
     caller_identity = from_number or str(raw_from_number or "anonymous").strip() or "anonymous"
     to_number = normalize_phone_number(first_present(payload, "To", "to", "to_number", "Called", "called"))
+    if not to_number:
+        to_number = get_default_inbound_called_number()
+        if to_number:
+            logging.warning("main.twilio_inbound_webhook.missing_to_fallback_used")
+    mark("numbers_normalized")
 
     if not elevenlabs_api_key or not elevenlabs_agent_id_inbound:
         raise HTTPException(
@@ -7586,24 +7741,40 @@ async def twilio_inbound_webhook(request: Request):
             detail="ElevenLabs inbound calling is not configured.",
         )
     if not to_number:
-        logging.error('main.twilio_inbound_webhook.event_6926')
+        logging.error(
+            "main.twilio_inbound_webhook.event_6926 payload_keys=%s content_type=%r",
+            sorted(payload.keys()) if isinstance(payload, dict) else [],
+            request.headers.get("content-type"),
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Twilio inbound webhook requires a To number.",
         )
 
-    context = resolve_business_context({
-        "from_number": from_number,
-        "to_number": to_number,
-        "forwarded_from": first_present(payload, "ForwardedFrom", "forwarded_from"),
-    })
+    forwarded_from = first_present(payload, "ForwardedFrom", "forwarded_from")
+    context = get_inbound_call_boot_context(to_number, forwarded_from)
+    mark("boot_context_loaded")
+    if context:
+        print(
+            f"[InboundTiming] boot_cache_hit={bool(context.get('cache_hit'))}",
+            flush=True,
+        )
+    if not context:
+        context = resolve_business_context({
+            "from_number": from_number,
+            "to_number": to_number,
+            "forwarded_from": forwarded_from,
+        })
+    mark("business_context_resolved")
     business = context.get("business")
     resolved_user_id = context.get("user_id") or (business or {}).get("user_id")
     if not business or not resolved_user_id:
         raise HTTPException(403,'Called number is not assigned to an active business')
     from .authorization import scenario_tenant, tenant_scope
     call_tenant=scenario_tenant(getattr(supabase_admin,'raw',supabase_admin), {'business_id':business['id'],'user_id':resolved_user_id})
+    mark("tenant_resolved")
     inbound_open, inbound_reason = is_business_call_window_open(business, layer="inbound")
+    mark("business_call_window_checked")
     if not inbound_open:
         logging.info('main.twilio_inbound_webhook.event_6945')
         return Response(
@@ -7612,6 +7783,7 @@ async def twilio_inbound_webhook(request: Request):
         )
     try:
         enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
+        mark("call_minutes_checked")
     except HTTPException as exc:
         detail = exc.detail if isinstance(exc.detail, dict) else {}
         logging.warning('main.twilio_inbound_webhook.event_6917')
@@ -7619,21 +7791,25 @@ async def twilio_inbound_webhook(request: Request):
             content="<Response><Say>We are unable to connect this call right now. Please contact the account owner.</Say><Hangup/></Response>",
             media_type="application/xml",
         )
-    receptionist = find_inbound_receptionist_for_business(
-        business.get("id") if business else None,
-        context.get("user_id") or (business or {}).get("user_id"),
-    )
+    receptionist = context.get("receptionist")
+    if not receptionist:
+        receptionist = find_inbound_receptionist_for_business(
+            business.get("id") if business else None,
+            context.get("user_id") or (business or {}).get("user_id"),
+        )
+    mark("inbound_receptionist_resolved")
     required_opening = build_inbound_ai_disclosure(
         business.get("name") if business else None,
         get_receptionist_display_name(receptionist),
     )
+    mark("opening_built")
 
     event_payload = {
         "trigger_key": "incoming_call",
         "call_id": first_present(payload, "CallSid"),
         "from_number": from_number,
         "to_number": to_number,
-        "forwarded_from": normalize_phone_number(first_present(payload, "ForwardedFrom", "forwarded_from")),
+        "forwarded_from": normalize_phone_number(forwarded_from),
         "direction": "inbound",
         "provider": "twilio",
         "received_at": datetime.now(timezone.utc).isoformat(),
@@ -7644,6 +7820,7 @@ async def twilio_inbound_webhook(request: Request):
         "receptionist_name": get_receptionist_display_name(receptionist),
     }
     asyncio.create_task(asyncio.to_thread(emit_scenario_trigger, "incoming_call", event_payload))
+    mark("scenario_trigger_scheduled")
 
     register_payload = {
         "agent_id": elevenlabs_agent_id_inbound,
@@ -7673,7 +7850,10 @@ async def twilio_inbound_webhook(request: Request):
     # Knowledge is synchronized in the background. Use the last successful
     # snapshot immediately; a missing or stale snapshot must never block the
     # Twilio-to-ElevenLabs transfer.
-    knowledge_snapshot = cached_business_knowledge(business.get("id"), elevenlabs_agent_id_inbound)
+    knowledge_snapshot = context.get("knowledge_snapshot")
+    if knowledge_snapshot is None:
+        knowledge_snapshot = cached_business_knowledge(business.get("id"), elevenlabs_agent_id_inbound)
+    mark("knowledge_snapshot_loaded")
     if knowledge_snapshot:
         _knowledge_branch_id, knowledge_override = knowledge_snapshot
         register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
@@ -7687,10 +7867,17 @@ async def twilio_inbound_webhook(request: Request):
         register_payload["conversation_initiation_client_data"]["conversation_config_override"] = {
             "agent": {"prompt": {"knowledge_base": []}},
         }
-    add_escalation_dynamic_variables(
-        register_payload["conversation_initiation_client_data"]["scenario_context"],
-        business,
-    )
+    if "escalation_staff" in context:
+        add_escalation_dynamic_variables_from_staff(
+            register_payload["conversation_initiation_client_data"]["scenario_context"],
+            context.get("escalation_staff"),
+        )
+    else:
+        add_escalation_dynamic_variables(
+            register_payload["conversation_initiation_client_data"]["scenario_context"],
+            business,
+        )
+    mark("escalation_variables_added")
     register_payload["conversation_initiation_client_data"]["scenario_context"] = {
         key: value
         for key, value in register_payload["conversation_initiation_client_data"]["scenario_context"].items()
@@ -7704,6 +7891,7 @@ async def twilio_inbound_webhook(request: Request):
     register_payload["conversation_initiation_client_data"]["dynamic_variables"]["person_id"] = ""
     register_payload["conversation_initiation_client_data"]["dynamic_variables"]["customer_name"] = ""
     register_payload["conversation_initiation_client_data"]["dynamic_variables"]["secret__nodemere_context"] = issue_internal_context(internal_tool_secret, business)
+    mark("dynamic_variables_finalized")
     if receptionist and receptionist.get("elevenlabs_voice_id"):
         register_payload["conversation_initiation_client_data"].setdefault("conversation_config_override", {})
         register_payload["conversation_initiation_client_data"]["conversation_config_override"]["tts"] = {
@@ -7721,6 +7909,7 @@ async def twilio_inbound_webhook(request: Request):
         json=register_payload,
         timeout=float(os.environ.get("ELEVENLABS_REGISTER_CALL_TIMEOUT_SECONDS", "8")),
     )
+    mark("elevenlabs_register_call_returned")
     if not response.ok:
         logging.error('main.twilio_inbound_webhook.event_7065')
         persist_inbound_call_log(
@@ -7752,6 +7941,7 @@ async def twilio_inbound_webhook(request: Request):
         )
     )
     asyncio.create_task(asyncio.to_thread(maybe_auto_verify_business_forwarding, business, called_number=to_number))
+    mark("twilio_response_returning")
     return Response(content=response.text, media_type="application/xml")
 
 
@@ -7823,18 +8013,25 @@ async def twilio_escalation_staff_whisper(transfer_id: str, request: Request):
     message = str(transfer.get("message") or "").strip()
     reason = str(transfer.get("reason") or "No additional details were captured.").strip()
     reason = re.sub(r"\s+", " ", reason)[:500]
-    save_escalation_transfer(
-        transfer_id,
-        {
-            "status": "awaiting_staff_acceptance",
-            "staff_call_sid": first_present(payload, "CallSid"),
-            "staff_answered_at": datetime.now(timezone.utc).isoformat(),
-        },
+    staff_call_sid = first_present(payload, "CallSid")
+    asyncio.create_task(
+        asyncio.to_thread(
+            save_escalation_transfer,
+            transfer_id,
+            {
+                "status": "awaiting_staff_acceptance",
+                "staff_call_sid": staff_call_sid,
+                "staff_answered_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
     )
-    append_escalation_transfer_debug(
-        transfer_id,
-        "staff_whisper_answered",
-        staff_call_sid=first_present(payload, "CallSid"),
+    asyncio.create_task(
+        asyncio.to_thread(
+            append_escalation_transfer_debug,
+            transfer_id,
+            "staff_whisper_answered",
+            staff_call_sid=staff_call_sid,
+        )
     )
     response_url = escalation_transfer_webhook_url(transfer_id, "staff-response")
     if not response_url:
@@ -7846,15 +8043,24 @@ async def twilio_escalation_staff_whisper(transfer_id: str, request: Request):
     )
     play_url = get_cached_escalation_whisper_audio_url(transfer_id)
     voice_id = str(transfer.get("receptionist_voice_id") or "").strip()
-    if not play_url and voice_id:
-        audio = await asyncio.to_thread(generate_elevenlabs_transfer_audio, voice_id, prompt)
-        if audio:
-            play_url = cache_escalation_whisper_audio(transfer_id, audio)
-            append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_ready", has_voice_id=True)
-        else:
-            append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_failed", has_voice_id=True)
-    elif play_url:
-        append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_cache_hit", has_voice_id=bool(voice_id))
+    if play_url:
+        asyncio.create_task(
+            asyncio.to_thread(
+                append_escalation_transfer_debug,
+                transfer_id,
+                "elevenlabs_whisper_audio_cache_hit",
+                has_voice_id=bool(voice_id),
+            )
+        )
+    elif voice_id:
+        asyncio.create_task(
+            asyncio.to_thread(
+                append_escalation_transfer_debug,
+                transfer_id,
+                "elevenlabs_whisper_audio_cache_miss_fallback",
+                has_voice_id=True,
+            )
+        )
     prompt_twiml = (
         f'<Play>{escape_html(play_url)}</Play>'
         if play_url
@@ -7862,7 +8068,6 @@ async def twilio_escalation_staff_whisper(transfer_id: str, request: Request):
     )
     return twiml_response(
         f'<Gather input="dtmf" numDigits="1" timeout="12" action="{escape_html(response_url, quote=True)}" method="POST">'
-        "<Pause length=\"1\"/>"
         f"{prompt_twiml}"
         "<Pause length=\"1\"/>"
         "<Say>Press 1 now to accept and connect.</Say>"
@@ -7874,9 +8079,7 @@ async def twilio_escalation_staff_whisper(transfer_id: str, request: Request):
 async def twilio_escalation_staff_whisper_audio(transfer_id: str):
     cached = ESCALATION_WHISPER_AUDIO_CACHE.get(transfer_id)
     if not cached or time.time() - float(cached.get("created_at") or 0) > 600:
-        append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_cache_miss")
         return Response(status_code=404)
-    append_escalation_transfer_debug(transfer_id, "elevenlabs_whisper_audio_served")
     return Response(content=cached.get("audio") or b"", media_type="audio/mpeg")
 
 
@@ -8214,6 +8417,7 @@ def business_voice_agent_ids() -> list[str]:
 def queue_business_knowledge_refresh(business: Optional[dict], *, reason: str) -> None:
     if not business or business.get("id") is None:
         return
+    clear_inbound_call_boot_cache(business.get("id"))
     schedule_business_knowledge_sync(
         intercom_store(),
         business,
@@ -9351,7 +9555,11 @@ async def elevenlabs_post_call_webhook(
     x_webhook_secret: Optional[str] = Header(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
-    raw_body = await request.body()
+    try:
+        raw_body = await request.body()
+    except ClientDisconnect:
+        logging.info("main.elevenlabs_post_call_webhook.client_disconnected")
+        return Response(status_code=204)
     if not elevenlabs_webhook_secret:
         logging.error('main.elevenlabs_post_call_webhook.event_8142')
         raise HTTPException(
@@ -11942,6 +12150,7 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
             }
         response = supabase.table("hired_receptionists").insert(insert_payload).execute()
         created = response.data[0] if response.data else insert_payload
+        clear_inbound_call_boot_cache(created.get("business_id") or (business_row or {}).get("id"))
         claim_nest_milestone(
             supabase,
             business_id=created.get("business_id") or (business_row or {}).get("id"),
@@ -13657,6 +13866,7 @@ scenario_engine = ScenarioEngine(
     base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
     plan_access_checker=enforce_call_minutes,
     scenario_access_checker=require_scenario_feature_access,
+    scheduler_enabled_checker=get_system_scheduler_run_enabled,
 )
 
 from .drop_ins import build_router as build_drop_ins_router
@@ -16068,6 +16278,7 @@ async def update_business_forwarding(
 
         if not update_response.data:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save forwarding settings")
+        clear_inbound_call_boot_cache(business["id"])
 
         if payload.agent_id and next_status == "verified":
             agent_lookup = (
