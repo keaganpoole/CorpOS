@@ -61,13 +61,6 @@ async function parseApiError(response) {
   return reportApiError(body, response.status);
 }
 
-function logSlowApiCall(method, endpoint, startedAt, status = null) {
-  const duration = Math.round(performance.now() - startedAt);
-  if (duration >= 1500) {
-    console.warn(`[SONAR API slow] ${method} ${endpoint} ${status || ''} ${duration}ms`.trim());
-  }
-}
-
 async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -88,28 +81,19 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
 
 // ─── REST Helpers ───────────────────────────────────────────
 async function fetchJSON(endpoint) {
-  const startedAt = performance.now();
-  let statusCode = null;
   try {
     const headers = await buildAuthHeaders();
     const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers });
-    statusCode = res.status;
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
     console.error("api.js:event_62");
     return null;
-  } finally {
-    logSlowApiCall('GET', endpoint, startedAt, statusCode);
   }
 }
 
 async function strictGetJSON(endpoint) {
-  const startedAt = performance.now();
-  let statusCode = null;
   const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers: await buildAuthHeaders() });
-  statusCode = res.status;
-  logSlowApiCall('GET', endpoint, startedAt, statusCode);
   if (!res.ok) throw await parseApiError(res);
   return res.json();
 }
@@ -228,8 +212,6 @@ export const api = {
 };
 
 async function postJSON(endpoint, body) {
-  const startedAt = performance.now();
-  let statusCode = null;
   try {
     const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
@@ -237,20 +219,15 @@ async function postJSON(endpoint, body) {
       headers,
       body: JSON.stringify(body),
     });
-    statusCode = res.status;
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
     console.error("api.js:event_150");
     throw err;
-  } finally {
-    logSlowApiCall('POST', endpoint, startedAt, statusCode);
   }
 }
 
 async function putJSON(endpoint, body) {
-  const startedAt = performance.now();
-  let statusCode = null;
   try {
     const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
@@ -258,20 +235,15 @@ async function putJSON(endpoint, body) {
       headers,
       body: JSON.stringify(body),
     });
-    statusCode = res.status;
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
     console.error("api.js:event_166");
     throw err;
-  } finally {
-    logSlowApiCall('PUT', endpoint, startedAt, statusCode);
   }
 }
 
 async function patchJSON(endpoint, body) {
-  const startedAt = performance.now();
-  let statusCode = null;
   try {
     const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
@@ -279,34 +251,26 @@ async function patchJSON(endpoint, body) {
       headers,
       body: JSON.stringify(body),
     });
-    statusCode = res.status;
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
     console.error("api.js:event_182");
     throw err;
-  } finally {
-    logSlowApiCall('PATCH', endpoint, startedAt, statusCode);
   }
 }
 
 async function deleteJSON(endpoint) {
-  const startedAt = performance.now();
-  let statusCode = null;
   try {
     const headers = await buildAuthHeaders();
     const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
       method: 'DELETE',
       headers,
     });
-    statusCode = res.status;
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
     console.error("api.js:event_197");
     throw err;
-  } finally {
-    logSlowApiCall('DELETE', endpoint, startedAt, statusCode);
   }
 }
 

@@ -3258,29 +3258,18 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    started_at = time.perf_counter()
     request_id = getattr(request.state, 'audit_event', {}).get('request_id') or uuid4().hex
     correlation_token = correlation_id.set(request_id)
     try:
         response = await call_next(request)
     finally:
         correlation_id.reset(correlation_token)
-    duration_ms = int((time.perf_counter() - started_at) * 1000)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Cache-Control", "private, no-store")
     response.headers.setdefault("X-Request-ID", request_id)
-    response.headers.setdefault("X-Nodemere-Duration-Ms", str(duration_ms))
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    if request.url.path.startswith("/api/") and duration_ms >= 1500:
-        logging.warning(
-            "main.slow_request path=%s method=%s status=%s duration_ms=%s",
-            request.url.path,
-            request.method,
-            getattr(response, "status_code", "?"),
-            duration_ms,
-        )
     return response
 
 
@@ -3352,11 +3341,6 @@ async def require_internal_tool_authorization(request: Request):
 
 @app.middleware("http")
 async def require_authenticated_api_request(request: Request, call_next):
-    protected_started_at = time.perf_counter()
-    auth_duration_ms = 0
-    body_duration_ms = 0
-    handler_duration_ms = 0
-    finalize_duration_ms = 0
     if os.getenv('NODEMERE_RECOVERY_MODE', '').lower() in {'1','true','yes','on'}:
         return JSONResponse(status_code=503, content={"detail":"Isolated recovery mode; application traffic is disabled"})
     path = request.url.path
@@ -3378,7 +3362,6 @@ async def require_authenticated_api_request(request: Request, call_next):
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Authentication required."})
     tenant = None
     try:
-        auth_started_at = time.perf_counter()
         user = await get_current_user_for_workforce_session(SimpleNamespace(credentials=access_token))
         request.state.authenticated_user_id = str(user.id)
         raw_db=getattr(supabase_admin, "raw", supabase_admin)
@@ -3402,7 +3385,6 @@ async def require_authenticated_api_request(request: Request, call_next):
             tenant = replace(tenant,mfa_required=True)
         if not onboarding: require_permission(tenant, route_permission(path, request.method))
         if tenant: begin_audit_request(request, supabase_admin, tenant)
-        auth_duration_ms = int((time.perf_counter() - auth_started_at) * 1000)
     except HTTPException as exc:
         from .audit import denied_request
         try: denied_request(request, supabase_admin, exc.status_code, tenant)
@@ -3416,7 +3398,6 @@ async def require_authenticated_api_request(request: Request, call_next):
     from .audit import request_context
     audit_token = request_context.set(getattr(request.state, 'audit_event', {}).get('request_id'))
     try:
-        body_started_at = time.perf_counter()
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} and "application/json" in request.headers.get("content-type", ""):
             try:
                 body = await request.json()
@@ -3430,30 +3411,8 @@ async def require_authenticated_api_request(request: Request, call_next):
                 return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
             except (ValueError, TypeError):
                 return JSONResponse(status_code=400, content={"detail": "Invalid JSON request"})
-        body_duration_ms = int((time.perf_counter() - body_started_at) * 1000)
-        handler_started_at = time.perf_counter()
         response = await call_next(request)
-        handler_duration_ms = int((time.perf_counter() - handler_started_at) * 1000)
-        finalize_started_at = time.perf_counter()
-        response = await finish_audit_request(request, response, supabase_admin)
-        finalize_duration_ms = int((time.perf_counter() - finalize_started_at) * 1000)
-        total_duration_ms = int((time.perf_counter() - protected_started_at) * 1000)
-        if path.startswith("/api/") and total_duration_ms >= 1500:
-            response.headers.setdefault("X-Nodemere-Auth-Ms", str(auth_duration_ms))
-            response.headers.setdefault("X-Nodemere-Body-Ms", str(body_duration_ms))
-            response.headers.setdefault("X-Nodemere-Handler-Ms", str(handler_duration_ms))
-            response.headers.setdefault("X-Nodemere-Finalize-Ms", str(finalize_duration_ms))
-            logging.warning(
-                "main.slow_protected_request path=%s method=%s total_ms=%s auth_ms=%s body_ms=%s handler_ms=%s finalize_ms=%s",
-                path,
-                request.method,
-                total_duration_ms,
-                auth_duration_ms,
-                body_duration_ms,
-                handler_duration_ms,
-                finalize_duration_ms,
-            )
-        return response
+        return await finish_audit_request(request, response, supabase_admin)
     except HTTPException as exc:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     finally:
