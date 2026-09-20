@@ -43,6 +43,11 @@ const sortPeople = (rows, key, direction) => [...rows].sort((left, right) => {
   return direction === 'asc' ? comparison : -comparison;
 });
 
+const timestampMs = (value) => {
+  const time = Date.parse(value || '');
+  return Number.isFinite(time) ? time : 0;
+};
+
 const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
   const next = { ...payload };
   const now = new Date().toISOString();
@@ -94,6 +99,7 @@ export function useLeads() {
   const [sortDir, setSortDir] = useState('desc');
   const abortRef = useRef(false);
   const pendingInsertPlacementRef = useRef(new Map());
+  const pendingLocalUpdatesRef = useRef(new Map());
   const shimmerTimersRef = useRef(new Map());
 
   const markLeadJustAdded = useCallback((leadId) => {
@@ -129,6 +135,8 @@ export function useLeads() {
       abortRef.current = true;
       shimmerTimersRef.current.forEach((timeout) => clearTimeout(timeout));
       shimmerTimersRef.current.clear();
+      pendingLocalUpdatesRef.current.forEach(({ timeout }) => clearTimeout(timeout));
+      pendingLocalUpdatesRef.current.clear();
     };
   }, [fetchLeads]);
 
@@ -171,6 +179,10 @@ export function useLeads() {
           markLeadJustAdded(payload.new.id);
           notifyBackend('INSERT', {id:payload.new.id}, null);
         } else if (payload.eventType === 'UPDATE') {
+          const pending = pendingLocalUpdatesRef.current.get(payload.new.id);
+          if (pending && timestampMs(payload.new.updated_at) < timestampMs(pending.updated_at)) {
+            return;
+          }
           setLeads((prev) => prev.map((row) => (row.id === payload.new.id ? payload.new : row)));
           notifyBackend('UPDATE', {id:payload.new.id}, null);
         } else if (payload.eventType === 'DELETE') {
@@ -200,23 +212,40 @@ export function useLeads() {
   const updateLead = async (id, updates) => {
     const payload = normalizePayload(updates, { isCreate: false });
     let previousRow = null;
+    let optimisticUpdatedAt = payload.updated_at;
     setError(null);
     setLeads((prev) => prev.map((row) => {
       if (row.id !== id) return row;
       previousRow = row;
       return { ...row, ...payload };
     }));
+    const existingPending = pendingLocalUpdatesRef.current.get(id);
+    if (existingPending?.timeout) clearTimeout(existingPending.timeout);
+    pendingLocalUpdatesRef.current.set(id, {
+      updated_at: optimisticUpdatedAt,
+      timeout: setTimeout(() => pendingLocalUpdatesRef.current.delete(id), 15000),
+    });
 
     let data;
     try {
       data = await api.updatePerson(id, payload);
     } catch (err) {
+      const pending = pendingLocalUpdatesRef.current.get(id);
+      if (pending?.timeout) clearTimeout(pending.timeout);
+      pendingLocalUpdatesRef.current.delete(id);
       if (previousRow) {
         setLeads((prev) => prev.map((row) => (row.id === id ? previousRow : row)));
       }
       throw err;
     }
 
+    const nextUpdatedAt = data?.updated_at || optimisticUpdatedAt;
+    const pending = pendingLocalUpdatesRef.current.get(id);
+    if (pending?.timeout) clearTimeout(pending.timeout);
+    pendingLocalUpdatesRef.current.set(id, {
+      updated_at: nextUpdatedAt,
+      timeout: setTimeout(() => pendingLocalUpdatesRef.current.delete(id), 15000),
+    });
     setLeads((prev) => prev.map((row) => (row.id === id ? data : row)));
     return data;
   };
