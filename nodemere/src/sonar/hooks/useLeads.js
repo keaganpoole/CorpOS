@@ -113,7 +113,8 @@ export function useLeads() {
     setError(null);
     try {
       const data = await api.getPeople(500);
-      if (!abortRef.current) setLeads(data || []);
+      if (!abortRef.current && Array.isArray(data)) setLeads(data);
+      if (!abortRef.current && !Array.isArray(data)) setError('Could not refresh people. Showing the last loaded records.');
     } catch (err) {
       if (!abortRef.current) setError(err.message);
     } finally {

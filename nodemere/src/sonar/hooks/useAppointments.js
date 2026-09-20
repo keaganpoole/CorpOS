@@ -142,9 +142,14 @@ export function useAppointments() {
     setError(null);
     try {
       const appointmentRows = await api.getAppointments(500);
-      if (!abortRef.current) {
-        setAppointments(appointmentRows || []);
+      if (!abortRef.current && Array.isArray(appointmentRows)) {
+        setAppointments(appointmentRows);
         setLoading(false);
+      }
+      if (!abortRef.current && !Array.isArray(appointmentRows)) {
+        setError('Could not refresh appointments. Showing the last loaded records.');
+        setLoading(false);
+        return;
       }
 
       const [peopleResult, servicesResult, agentsResult] = await Promise.allSettled([
@@ -154,11 +159,11 @@ export function useAppointments() {
       ]);
       if (abortRef.current) return;
 
-      const peopleRows = peopleResult.status === 'fulfilled' ? peopleResult.value : [];
-      const serviceRows = servicesResult.status === 'fulfilled' ? servicesResult.value : [];
-      const apiAgents = agentsResult.status === 'fulfilled' ? agentsResult.value : [];
+      const peopleRows = peopleResult.status === 'fulfilled' && Array.isArray(peopleResult.value) ? peopleResult.value : null;
+      const serviceRows = servicesResult.status === 'fulfilled' && Array.isArray(servicesResult.value) ? servicesResult.value : null;
+      const apiAgents = agentsResult.status === 'fulfilled' && Array.isArray(agentsResult.value) ? agentsResult.value : null;
       const receptionistRows = Array.from(
-        new Map((Array.isArray(apiAgents) ? apiAgents : [])
+        new Map((apiAgents || [])
           .map((agent) => ({
             id: agent.id,
             full_name: agent.full_name || agent.name || '',
@@ -176,9 +181,9 @@ export function useAppointments() {
           .map((row) => [String(row.id), row])).values(),
       );
 
-      setPeople(Array.isArray(peopleRows) ? peopleRows : []);
-      setServices(Array.isArray(serviceRows) ? serviceRows : []);
-      setReceptionists(receptionistRows);
+      if (peopleRows) setPeople(peopleRows);
+      if (serviceRows) setServices(serviceRows);
+      if (apiAgents) setReceptionists(receptionistRows);
       setReceptionistCatalog([]);
     } catch (err) {
       if (!abortRef.current) setError(err.message);
