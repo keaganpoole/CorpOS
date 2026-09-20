@@ -241,7 +241,7 @@ def build_router(db, get_user, load_business, executor):
             raise HTTPException(422, 'The assigned receptionist needs an active voice before calling.')
         from .scenario_engine import has_documented_call_consent, receptionist_direction_allows
         if not has_documented_call_consent(person):
-            raise HTTPException(422, 'This customer needs documented calling consent and must not be marked do-not-call.')
+            raise HTTPException(422, 'Outbound AI calls are disabled for this person because Do Not Call is set.')
         if not receptionist_direction_allows('outbound', receptionist.get('direction')):
             raise HTTPException(422, 'Outbound calling is disabled for the assigned receptionist.')
         business = load_business(auth.owner_id) or {}
