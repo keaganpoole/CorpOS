@@ -8829,6 +8829,25 @@ async def legacy_server_tool(
             },
         }
 
+    if normalized_tool in {"get-reports", "get-report", "reports", "business-reports", "business-intelligence-report"}:
+        report = await asyncio.to_thread(get_business_intelligence, supabase, user_id=str(user_id))
+        section = str(first_present(payload, "section", "report_section") or "").strip().lower().replace("-", "_")
+        if section and section not in {"all", "full"}:
+            metrics = report.get("metrics") if isinstance(report.get("metrics"), dict) else {}
+            if section not in metrics:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unknown report section. Available sections: {', '.join(sorted(metrics.keys()))}",
+                )
+            report = {
+                "analysis_updated_at": report.get("analysis_updated_at"),
+                "business": report.get("business"),
+                "availability": report.get("availability"),
+                "section": section,
+                "metrics": {section: metrics.get(section) or []},
+            }
+        return {"ok": True, "report": remove_secrets(report)}
+
     if normalized_tool in {"dispatch-call", "start-outbound-call", "call-customer", "outbound-call"}:
         ensure_no_unresolved_templates(
             payload.get("person_id"),
