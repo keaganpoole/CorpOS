@@ -8699,7 +8699,21 @@ async def legacy_server_tool(
         selected_receptionist = load_receptionist_by_id(requested_receptionist_id) if requested_receptionist_id else None
         if selected_receptionist and int_or_none(selected_receptionist.get("business_id")) != int_or_none(business.get("id")):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receptionist not found")
-        receptionist = selected_receptionist or find_outbound_receptionist_for_business(business.get("id"), user_id) or receptionist
+        if selected_receptionist and not receptionist_direction_allows("outbound", selected_receptionist.get("direction")):
+            return {
+                "ok": False,
+                "success": False,
+                "call_dispatched": False,
+                "error": "The selected receptionist is not enabled for outbound calls. Set a hired receptionist direction to outbound or all, then try again.",
+            }
+        receptionist = selected_receptionist or find_outbound_receptionist_for_business(business.get("id"), user_id)
+        if not receptionist:
+            return {
+                "ok": False,
+                "success": False,
+                "call_dispatched": False,
+                "error": "No hired receptionist is set to outbound or all. Set a receptionist direction to outbound or all before dispatching an outbound call.",
+            }
 
         mission = str(first_present(payload, "mission", "main_content", "instructions") or "").strip()
         if not mission:

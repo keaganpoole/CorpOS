@@ -28,6 +28,20 @@ const hideTranscriptTags = (value) => String(value || '')
   .replace(/\s+/g, ' ')
   .trim();
 
+const isSuccessfulDispatchToolResponse = (response) => {
+  const toolName = String(response?.tool_name || '').trim().toLowerCase().replace(/_/g, '-');
+  if (toolName !== 'dispatch-call') return false;
+  if (response?.is_error) return false;
+  const rawResult = response?.full_tool_result;
+  if (!rawResult) return false;
+  try {
+    const result = typeof rawResult === 'string' ? JSON.parse(rawResult) : rawResult;
+    return Boolean(result?.ok !== false && (result?.call_dispatched || result?.success));
+  } catch {
+    return false;
+  }
+};
+
 const fallbackInitial = (name) => String(name || 'R').trim().slice(0, 1).toUpperCase();
 const receptionistImage = (receptionist) => receptionist?.avatar || receptionist?.banner_url || '';
 
@@ -282,6 +296,11 @@ function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
     },
     onAgentResponseCorrection: ({ corrected_agent_response: corrected }) => {
       if (corrected) setLine((current) => current?.role === 'agent' ? { ...current, text: corrected } : current);
+    },
+    onAgentToolResponse: (response) => {
+      if (isSuccessfulDispatchToolResponse(response)) {
+        endSession();
+      }
     },
   });
   endTransportRef.current = conversation.endSession;
