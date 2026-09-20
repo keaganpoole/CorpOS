@@ -84,6 +84,17 @@ const durationForEvent = (event) => {
   return 7000;
 };
 
+const shownEventKey = (event = {}) => {
+  if (!event || typeof event !== 'object') return '';
+  if (event.dedupe_key) return `dedupe:${event.dedupe_key}`;
+  const milestoneKey = event.milestone_key || event.milestone_keys?.[0] || '';
+  if (milestoneKey) return `milestone:${milestoneKey}`;
+  if (event.source && event.source_id && event.event_type) {
+    return `${event.source}:${event.source_id}:${event.event_type}`;
+  }
+  return event.id ? `id:${event.id}` : '';
+};
+
 const previewNotificationFixture = (key, label, category) => {
   const fixture = {
     category,
@@ -308,10 +319,15 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
   const previewTimerRef = useRef(null);
   const businessKey = businessId || session?.user?.id || 'anonymous';
   const historyStorageKey = `nodemere:nest:history:${businessKey}`;
+  const shownStorageKey = `nodemere:nest:shown:${businessKey}`;
+  const shownRef = useRef(new Set(safeJsonParse(localStorage.getItem(shownStorageKey), [])));
 
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { activeRef.current = activeEvent; }, [activeEvent]);
   useEffect(() => { liveCallRef.current = liveCall; }, [liveCall]);
+  useEffect(() => {
+    shownRef.current = new Set(safeJsonParse(localStorage.getItem(shownStorageKey), []));
+  }, [shownStorageKey]);
 
   useEffect(() => {
     if (!session?.user?.id) return undefined;
@@ -341,6 +357,17 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     });
   }, [persistHistory]);
 
+  const markShown = useCallback((event) => {
+    const key = shownEventKey(event);
+    if (!key) return;
+    shownRef.current.add(key);
+    try {
+      localStorage.setItem(shownStorageKey, JSON.stringify([...shownRef.current].slice(-500)));
+    } catch {
+      // Local storage is optional; in-memory de-dupe still protects this mount.
+    }
+  }, [shownStorageKey]);
+
   const enqueue = useCallback((incoming, { preview = false } = {}) => {
     const notificationKey = incoming?.milestone_key || incoming?.event_type;
     const preferenceGroup = NEST_NOTIFICATION_GROUP_BY_KEY[notificationKey] || incoming?.category;
@@ -349,6 +376,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     if (!preview && incoming?.category === 'workflows' && incoming?.event_type !== 'workflow_failed') return;
     if (!preview && (!categoryEnabled || nestPreferences.notifications?.[notificationKey] === false)) return;
     if (!incoming?.id || (!preview && seenRef.current.has(incoming.id))) return;
+    if (!preview && shownRef.current.has(shownEventKey(incoming))) return;
     const event = {
       priority: 'routine',
       occurred_at: new Date().toISOString(),
@@ -357,6 +385,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     };
     if (!preview) {
       seenRef.current.add(event.id);
+      markShown(event);
       addToHistory(event);
     }
 
@@ -381,7 +410,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       const next = [...current, event];
       return next.sort((a, b) => PRIORITY[b.priority] - PRIORITY[a.priority]);
     });
-  }, [addToHistory, nestPreferences]);
+  }, [addToHistory, markShown, nestPreferences]);
 
   const previewConcept = useCallback((concept, category) => {
     const categoryDefinition = category;
@@ -453,6 +482,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
         .sort((a, b) => String(b.occurred_at || '').localeCompare(String(a.occurred_at || '')))
         .slice(0, MAX_HISTORY);
       merged.forEach((event) => seenRef.current.add(event.id));
+      merged.forEach(markShown);
       setHistory(merged);
       persistHistory(merged);
     });
@@ -578,6 +608,7 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
       if (!tasklistBaselineRef.current.has(key)) {
         enqueue({
           id: `task:${key}:${Date.now()}`, category: 'milestones', event_type: 'task_completed',
+          dedupe_key: `task:${key}`,
           title: 'Setup task completed', message: key.split(':').slice(-1)[0].replaceAll('_', ' '),
           priority: 'routine', occurred_at: new Date().toISOString(),
         });
