@@ -8709,6 +8709,19 @@ async def legacy_server_tool(
             str((person or {}).get("first_name") or "").strip(),
             str((person or {}).get("last_name") or "").strip(),
         ])).strip() or str((person or {}).get("name") or "").strip()
+        to_phone = normalize_phone_number(first_present(payload, "to_phone", "phone", "customer_phone"))
+        if not to_phone:
+            to_phone = normalize_phone_number(
+                (person or {}).get("phone")
+                or (person or {}).get("phone_number")
+                or (appointment or {}).get("customer_phone")
+                or (appointment or {}).get("phone")
+            )
+        if not to_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A phone number is required. Provide to_phone/phone or choose a person record with a phone number.",
+            )
         intercom_claims = getattr(request.state, "internal_claims", None) or {}
         customer_context = {
             "person": person or {},
@@ -8721,7 +8734,7 @@ async def legacy_server_tool(
             "id": "intercom-outbound-call",
             "actionConfig": {
                 "_key": "call_customer",
-                "to_phone": first_present(payload, "to_phone", "phone") or "",
+                "to_phone": to_phone,
                 "main_content": mission,
             },
         }
@@ -8731,8 +8744,8 @@ async def legacy_server_tool(
             "business": business,
             "business_id": business.get("id"),
             "receptionist": receptionist or {},
-            "person": {**(person or {}), "first_name": customer_name or (person or {}).get("first_name") or ""},
-            "customer": {**(person or {}), "first_name": customer_name or (person or {}).get("first_name") or ""},
+            "person": {**(person or {}), "first_name": customer_name or (person or {}).get("first_name") or "", "phone": to_phone},
+            "customer": {**(person or {}), "first_name": customer_name or (person or {}).get("first_name") or "", "phone": to_phone},
             "appointment": appointment or {},
             "service": service or {},
             "_scenario": {},

@@ -2056,6 +2056,11 @@ class ScenarioActionExecutor:
                 timeout=30,
             )
             if not response.ok:
+                logging.warning(
+                    "scenario_engine._call_customer.provider_rejected status=%s body=%s",
+                    response.status_code,
+                    response.text,
+                )
                 return {"success": False, "error": 'The calling provider could not start the call.',
                         'dispatch_unknown': bool(context.get('_drop_in') and response.status_code >= 500)}
             result = response.json()
