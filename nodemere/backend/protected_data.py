@@ -7,7 +7,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 from uuid import uuid4
 from fastapi import HTTPException
-from .envelope import Envelope, encryption_required, is_encrypted, writes_enabled, KeyUnavailable
+from .envelope import Envelope, is_encrypted, KeyUnavailable
 
 FIELDS = {
     'drop_ins': {'prompt': False},
@@ -162,23 +162,6 @@ class ProtectedQuery:
             query = getattr(query, method) if method == 'not_' else getattr(query, method)(*args, **kwargs)
         return query
 
-    def should_encrypt_write(self):
-        if self.name == 'drop_ins' or writes_enabled():
-            return True
-        if self.operation == 'update':
-            return True
-        rows = self.values if isinstance(self.values, list) else [self.values]
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            try:
-                business_id = self.client.business(self.name, row)
-            except Exception:
-                raise KeyUnavailable() from None
-            if encryption_required(self.client.database, business_id):
-                return True
-        return False
-
     def read(self):
         columns = self.columns
         # Extra routing IDs are used only to authenticate ciphertext and removed
@@ -206,7 +189,7 @@ class ProtectedQuery:
         db = self.client.database
         sensitive_write = self.operation in {'insert', 'upsert', 'update'} and any(
             set(row) & FIELDS[self.name].keys() for row in (self.values if isinstance(self.values, list) else [self.values]))
-        if not sensitive_write or not self.should_encrypt_write():
+        if not sensitive_write:
             query = getattr(db.table(self.name), self.operation)(self.values, **self.options) if self.values is not None else db.table(self.name).delete(**self.options)
             result = self.filters(query).execute()
             if isinstance(result.data, list):
