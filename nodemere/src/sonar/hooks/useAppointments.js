@@ -141,21 +141,14 @@ export function useAppointments() {
     setLoading(true);
     setError(null);
     try {
-      const businessId = businessIdRef.current || await getCurrentBusinessId();
-      businessIdRef.current = businessId;
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      const userId = authData?.user?.id || null;
-
-      const [appointmentRows, peopleRows, { data: serviceRows, error: servicesError }] = await Promise.all([
+      const [appointmentRows, peopleRows, serviceRows, apiAgents] = await Promise.all([
         api.getAppointments(500),
         api.getPeople(500),
-        supabase.from('services').select('id,name,category,is_active').eq('business_id', businessId).order('category', { ascending: true }).order('sort_order', { ascending: true }),
+        api.getServices(),
+        api.getAgents(),
       ]);
-      if (servicesError) throw servicesError;
 
       let receptionistRows = [];
-      const apiAgents = await api.getAgents();
       if (Array.isArray(apiAgents) && apiAgents.length > 0) {
         receptionistRows = apiAgents.map((agent) => ({
           id: agent.id,
@@ -167,62 +160,28 @@ export function useAppointments() {
           avatar: agent.avatar || null,
           banner_id: agent.banner_id ?? null,
           catalog_id: agent.catalog_id ?? null,
-          user_id: agent.user_id ?? userId ?? null,
-          business_id: agent.business_id ?? businessId ?? null,
+          user_id: agent.user_id ?? null,
+          business_id: agent.business_id ?? null,
         }));
-      }
-
-      if (receptionistRows.length === 0) {
-        if (businessId && userId) {
-          const combinedResponse = await supabase
-            .from('hired_receptionists')
-            .select('id,full_name,first_name,status,is_active,direction,avatar,banner_id,catalog_id,user_id,business_id')
-            .or(`business_id.eq.${businessId},user_id.eq.${userId}`)
-            .order('full_name', { ascending: true });
-          if (combinedResponse.error) throw combinedResponse.error;
-          receptionistRows = combinedResponse.data || [];
-        } else if (businessId) {
-          const businessResponse = await supabase
-            .from('hired_receptionists')
-            .select('id,full_name,first_name,status,is_active,direction,avatar,banner_id,catalog_id,user_id,business_id')
-            .eq('business_id', businessId)
-            .order('full_name', { ascending: true });
-          if (businessResponse.error) throw businessResponse.error;
-          receptionistRows = businessResponse.data || [];
-        } else if (userId) {
-          const userResponse = await supabase
-            .from('hired_receptionists')
-            .select('id,full_name,first_name,status,is_active,direction,avatar,banner_id,catalog_id,user_id,business_id')
-            .eq('user_id', userId)
-            .order('full_name', { ascending: true });
-          if (userResponse.error) throw userResponse.error;
-          receptionistRows = userResponse.data || [];
-        }
       }
 
       receptionistRows = Array.from(
         new Map((receptionistRows || []).filter((row) => row?.id != null).map((row) => [String(row.id), row])).values(),
       );
 
-      const catalogIds = Array.from(new Set((receptionistRows || []).map((row) => row.catalog_id).filter((value) => value != null)));
-      const { data: receptionistCatalogRows, error: receptionistCatalogError } = catalogIds.length
-        ? await supabase.from('receptionist_catalog').select('id,avatar,banner_id').in('id', catalogIds)
-        : { data: [], error: null };
-      if (receptionistCatalogError) throw receptionistCatalogError;
-
       if (!abortRef.current) {
         setAppointments(appointmentRows || []);
         setPeople(peopleRows || []);
         setServices(serviceRows || []);
         setReceptionists(receptionistRows || []);
-        setReceptionistCatalog(receptionistCatalogRows || []);
+        setReceptionistCatalog([]);
       }
     } catch (err) {
       if (!abortRef.current) setError(err.message);
     } finally {
       if (!abortRef.current) setLoading(false);
     }
-  }, [sortBy, sortDir]);
+  }, []);
 
   useEffect(() => {
     abortRef.current = false;

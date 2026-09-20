@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
 import {
@@ -113,13 +113,13 @@ export function useLeads() {
     setError(null);
     try {
       const data = await api.getPeople(500);
-      if (!abortRef.current) setLeads(sortPeople(data || [], sortBy, sortDir));
+      if (!abortRef.current) setLeads(data || []);
     } catch (err) {
       if (!abortRef.current) setError(err.message);
     } finally {
       if (!abortRef.current) setLoading(false);
     }
-  }, [sortBy, sortDir]);
+  }, []);
 
   useEffect(() => {
     abortRef.current = false;
@@ -226,7 +226,9 @@ export function useLeads() {
     if (selectedId === id) setSelectedId(null);
   };
 
-  const filteredLeads = leads.filter((row) => {
+  const sortedLeads = useMemo(() => sortPeople(leads, sortBy, sortDir), [leads, sortBy, sortDir]);
+
+  const filteredLeads = sortedLeads.filter((row) => {
     if (sourceFilter !== 'All' && titleCase(row.source).toLowerCase() !== sourceFilter.toLowerCase()) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -274,7 +276,7 @@ export function useLeads() {
 
   return {
     leads: filteredLeads,
-    allLeads: leads,
+    allLeads: sortedLeads,
     justAddedLeadIds,
     loading,
     error,
