@@ -8794,6 +8794,41 @@ async def legacy_server_tool(
             row.pop("user_id", None)
         return {"ok": True, "call_logs": rows, "count": len(rows), "limit": safe_limit, "offset": safe_offset}
 
+    if normalized_tool in {"get-call-details", "call-details", "get-call-log-details"}:
+        call_log_id = first_present(payload, "call_log_id", "id")
+        conversation_id = first_present(payload, "conversation_id", "call_id")
+        provider_call_sid = first_present(payload, "provider_call_sid", "call_sid", "CallSid")
+        if not call_log_id and not conversation_id and not provider_call_sid:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="call_log_id, conversation_id, or provider_call_sid is required")
+        query = supabase.table("call_logs").select(
+            "id,conversation_id,provider_call_sid,person_id,caller_name,caller_phone,from_number,to_number,"
+            "started_at,ended_at,duration_seconds,status,outcome,summary,call_successful,failure_reason,"
+            "direction,receptionist_name,agent_name,transcript_jsonb,transcript_text,call_report"
+        )
+        if business and business.get("id"):
+            query = query.eq("business_id", business["id"])
+        elif user_id:
+            query = query.eq("user_id", user_id)
+        if call_log_id:
+            query = query.eq("id", str(call_log_id))
+        elif conversation_id:
+            query = query.eq("conversation_id", str(conversation_id))
+        else:
+            query = query.eq("provider_call_sid", str(provider_call_sid))
+        rows = query.limit(1).execute().data or []
+        if not rows:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call not found")
+        call = remove_secrets(rows[0])
+        transcript_turns = call.get("transcript_jsonb") if isinstance(call.get("transcript_jsonb"), list) else []
+        return {
+            "ok": True,
+            "call": {
+                **call,
+                "dialog": transcript_turns,
+                "transcript": call.get("transcript_text") or stringify_transcript(transcript_turns),
+            },
+        }
+
     if normalized_tool in {"dispatch-call", "start-outbound-call", "call-customer", "outbound-call"}:
         ensure_no_unresolved_templates(
             payload.get("person_id"),
