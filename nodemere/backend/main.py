@@ -1985,14 +1985,14 @@ async def startup_scenario_engine():
     enforced()  # Invalid production mode is a startup failure, not a silent bypass.
     if writes_enabled(): keyring()
     if os.getenv('NODEMERE_RECOVERY_MODE', '').lower() in {'1','true','yes','on'}: return
-    if elevenlabs_api_key and (elevenlabs_agent_id_inbound or elevenlabs_agent_id_intercom):
+    if elevenlabs_api_key and (elevenlabs_agent_id_inbound or elevenlabs_agent_id_intercom or elevenlabs_agent_id_outbound):
         try:
             BUSINESS_KNOWLEDGE_STARTUP_TASK = asyncio.create_task(
                 asyncio.to_thread(
                     queue_all_business_knowledge_sync,
                     intercom_store(),
                     elevenlabs_api_key,
-                    [elevenlabs_agent_id_inbound, elevenlabs_agent_id_intercom],
+                    business_voice_agent_ids(),
                 )
             )
             BUSINESS_KNOWLEDGE_WATCH_TASK = asyncio.create_task(monitor_business_knowledge_sources())
@@ -4597,6 +4597,59 @@ def find_inbound_receptionist_for_business(business_id: Optional[str], user_id: 
     selected = sorted(candidates, key=sort_key, reverse=True)[0]
     logging.info('main.find_inbound_receptionist_for_business.event_4281')
     return selected
+
+def find_outbound_receptionist_for_business(business_id: Optional[str], user_id: Optional[str] = None):
+    business_id_value = int_or_none(business_id)
+    user_id_value = str(user_id).strip() if user_id else None
+    if not business_id_value and not user_id_value:
+        return None
+
+    rows_by_id = {}
+    try:
+        if business_id_value:
+            response = (
+                supabase
+                .table("hired_receptionists")
+                .select("*")
+                .eq("business_id", business_id_value)
+                .execute()
+            )
+            for row in response.data or []:
+                rows_by_id[str(row.get("id"))] = row
+
+        if user_id_value:
+            response = (
+                supabase
+                .table("hired_receptionists")
+                .select("*")
+                .eq("user_id", user_id_value)
+                .execute()
+            )
+            for row in response.data or []:
+                rows_by_id[str(row.get("id"))] = row
+    except Exception:
+        logging.warning('main.find_outbound_receptionist_for_business.event_4146')
+        return None
+
+    candidates = [
+        row
+        for row in rows_by_id.values()
+        if receptionist_direction_allows("outbound", row.get("direction"))
+    ]
+    if not candidates:
+        return None
+
+    def sort_key(row: dict):
+        status_value = str(derive_receptionist_status(
+            row.get("status"),
+            preserve_offline=False,
+            direction=row.get("direction"),
+        )).strip().lower()
+        is_online = status_value not in {"offline", "disabled", "inactive"}
+        hired_at = str(row.get("hired_at") or "")
+        return (is_online, hired_at)
+
+    return sorted(candidates, key=sort_key, reverse=True)[0]
 
 def find_business_by_forwarded_number(forwarded_number: Optional[str]):
     match_values = set(build_phone_match_values(forwarded_number))
@@ -8391,6 +8444,10 @@ async def set_agent_data(request: Request, _internal: None = Depends(require_int
     return {"ok": True, "call_log": saved}
 
 INTERCOM_WRITE_TOOLS = {
+    "dispatch-call",
+    "start-outbound-call",
+    "call-customer",
+    "outbound-call",
     "create-contract-link",
     "request-contract",
     "create-person",
@@ -8411,7 +8468,7 @@ def intercom_store():
 
 
 def business_voice_agent_ids() -> list[str]:
-    return [agent_id for agent_id in (elevenlabs_agent_id_inbound, elevenlabs_agent_id_intercom) if agent_id]
+    return [agent_id for agent_id in (elevenlabs_agent_id_inbound, elevenlabs_agent_id_intercom, elevenlabs_agent_id_outbound) if agent_id]
 
 
 def queue_business_knowledge_refresh(business: Optional[dict], *, reason: str) -> None:
@@ -8568,6 +8625,107 @@ async def legacy_server_tool(
             session_id=session_id,
             business_id=context.get("business_id"),
         )
+
+    if normalized_tool in {"dispatch-call", "start-outbound-call", "call-customer", "outbound-call"}:
+        ensure_no_unresolved_templates(
+            payload.get("person_id"),
+            payload.get("appointment_id"),
+            payload.get("to_phone"),
+            payload.get("mission"),
+            payload.get("main_content"),
+        )
+        enforce_call_minutes(user_id, business, direction="outbound")
+
+        person = None
+        person_id = first_present(payload, "person_id", "customer_id")
+        if person_id:
+            person = first_query_row(
+                supabase.table("people")
+                .select("*")
+                .eq("id", str(person_id))
+                .eq("business_id", business["id"])
+            )
+            if not person:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+
+        appointment = None
+        appointment_id = first_present(payload, "appointment_id")
+        if appointment_id:
+            appointment = first_query_row(
+                supabase.table("appointments")
+                .select("*")
+                .eq("id", str(appointment_id))
+                .eq("business_id", business["id"])
+            )
+            if not appointment:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+            if not person and appointment.get("person_id"):
+                person = first_query_row(
+                    supabase.table("people")
+                    .select("*")
+                    .eq("id", str(appointment.get("person_id")))
+                    .eq("business_id", business["id"])
+                )
+
+        service = None
+        service_id = (appointment or {}).get("service_id") or first_present(payload, "service_id")
+        if service_id:
+            service = first_query_row(
+                supabase.table("services")
+                .select("*")
+                .eq("id", str(service_id))
+                .eq("business_id", business["id"])
+            )
+
+        requested_receptionist_id = first_present(payload, "receptionist_id", "hired_receptionist_id") or (appointment or {}).get("receptionist_id")
+        selected_receptionist = load_receptionist_by_id(requested_receptionist_id) if requested_receptionist_id else None
+        if selected_receptionist and int_or_none(selected_receptionist.get("business_id")) != int_or_none(business.get("id")):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receptionist not found")
+        receptionist = selected_receptionist or find_outbound_receptionist_for_business(business.get("id"), user_id) or receptionist
+
+        mission = str(first_present(payload, "mission", "main_content", "instructions") or "").strip()
+        if not mission:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mission is required")
+
+        customer_name = str(first_present(payload, "customer_name", "person_name", "name") or "").strip() or " ".join(filter(None, [
+            str((person or {}).get("first_name") or "").strip(),
+            str((person or {}).get("last_name") or "").strip(),
+        ])).strip() or str((person or {}).get("name") or "").strip()
+        intercom_claims = getattr(request.state, "internal_claims", None) or {}
+        customer_context = {
+            "person": person or {},
+            "appointment": appointment or {},
+            "service": service or {},
+            "requested_by_intercom": True,
+            "intercom_id": intercom_claims.get("intercom_id"),
+        }
+        node = {
+            "id": "intercom-outbound-call",
+            "actionConfig": {
+                "_key": "call_customer",
+                "to_phone": first_present(payload, "to_phone", "phone") or "",
+                "main_content": mission,
+            },
+        }
+        knowledge_snapshot = cached_business_knowledge(business.get("id"), elevenlabs_agent_id_outbound) if elevenlabs_agent_id_outbound else None
+        call_context = {
+            "user_id": user_id,
+            "business": business,
+            "business_id": business.get("id"),
+            "receptionist": receptionist or {},
+            "person": {**(person or {}), "first_name": customer_name or (person or {}).get("first_name") or ""},
+            "customer": {**(person or {}), "first_name": customer_name or (person or {}).get("first_name") or ""},
+            "appointment": appointment or {},
+            "service": service or {},
+            "_scenario": {},
+            "_intercom_outbound": customer_context,
+            "knowledge_snapshot": knowledge_snapshot,
+        }
+        result = await scenario_engine.action_executor._call_customer(node, call_context)
+        if not result.get("success"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.get("error") or "The call could not be started.")
+        record_intercom_write_action(request, normalized_tool, result)
+        return result.get("data") or result
 
     if normalized_tool in {"request-docs", "document-request", "document-upload-request"}:
         context_payload = {**payload, "business": business, "user_id": user_id}
@@ -13015,7 +13173,7 @@ async def call_customer(payload: dict, current_user: dict = Depends(get_current_
     user_id = business_owner_id(current_user)
     business = load_business_by_user_id(user_id)
     enforce_call_minutes(user_id, business, direction="outbound")
-    receptionist = find_inbound_receptionist_for_business(
+    receptionist = find_outbound_receptionist_for_business(
         (business or {}).get("id"),
         user_id,
     )
@@ -13051,6 +13209,7 @@ async def call_customer(payload: dict, current_user: dict = Depends(get_current_
         "person": person or {},
         "customer": person or {},
         "_scenario": {},
+        "knowledge_snapshot": cached_business_knowledge((business or {}).get("id"), elevenlabs_agent_id_outbound) if elevenlabs_agent_id_outbound else None,
     }
 
     result = await scenario_engine.action_executor._call_customer(node, context)
@@ -13866,7 +14025,6 @@ scenario_engine = ScenarioEngine(
     base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
     plan_access_checker=enforce_call_minutes,
     scenario_access_checker=require_scenario_feature_access,
-    scheduler_enabled_checker=get_system_scheduler_run_enabled,
 )
 
 from .drop_ins import build_router as build_drop_ins_router

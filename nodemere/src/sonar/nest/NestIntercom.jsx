@@ -189,22 +189,9 @@ function NestIntercomInner({ open, onClose }) {
     setSilenceHintVisible(false);
     endingRef.current = true;
     const session = sessionRef.current;
-    if (session?.intercom_id) {
-      try {
-        await api.saveIntercomConversation({
-          intercom_id: session.intercom_id,
-          elevenlabs_conversation_id: session.elevenlabs_conversation_id,
-          agent_id: session.agent_id,
-          receptionist: session.receptionist,
-          transcript: transcriptRef.current,
-          usage: bootstrap?.usage || session.usage || {},
-          started_at: session.started_at,
-          ended_at: new Date().toISOString(),
-        });
-      } catch {
-        // Final user and agent turns are already persisted incrementally.
-      }
-    }
+    const transcript = transcriptRef.current;
+    const usage = bootstrap?.usage || session?.usage || {};
+    const endedAt = new Date().toISOString();
     sessionRef.current = null;
     transcriptRef.current = [];
     agentDraftRef.current = '';
@@ -214,6 +201,20 @@ function NestIntercomInner({ open, onClose }) {
     setPhase('selecting');
     endingRef.current = false;
     if (close) onClose?.();
+    if (session?.intercom_id) {
+      api.saveIntercomConversation({
+        intercom_id: session.intercom_id,
+        elevenlabs_conversation_id: session.elevenlabs_conversation_id,
+        agent_id: session.agent_id,
+        receptionist: session.receptionist,
+        transcript,
+        usage,
+        started_at: session.started_at,
+        ended_at: endedAt,
+      }).catch(() => {
+        // Final user and agent turns are already persisted incrementally.
+      });
+    }
   }, [bootstrap?.usage, clearSilenceHintTimers, onClose, stopMicrophone]);
 
   const conversation = useConversation({
