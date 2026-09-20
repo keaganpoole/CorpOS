@@ -130,7 +130,6 @@ export function useLeads() {
     try {
       const data = await api.getPeople(500);
       if (!abortRef.current && Array.isArray(data)) setLeads(mergePendingRows(data, pendingLocalUpdatesRef.current));
-      if (!abortRef.current && !Array.isArray(data)) setError('Could not refresh people. Showing the last loaded records.');
     } catch (err) {
       if (!abortRef.current) setError(err.message);
     } finally {
