@@ -66,10 +66,10 @@ function PrivacyNotice({ open, busy, onCancel, onAccept }) {
   );
 }
 
-function NestIntercomInner({ open, onClose }) {
+function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
   const { start: startMicrophone, stop: stopMicrophone, sample: sampleMicrophone, setMuted: setMicrophoneMuted } = useIntercomMicrophone();
   const { queueLength, setVoiceActive } = useNest();
-  const [bootstrap, setBootstrap] = useState(null);
+  const [bootstrap, setBootstrap] = useState(initialBootstrap);
   const [selectedId, setSelectedId] = useState('');
   const [phase, setPhase] = useState('selecting');
   const [line, setLine] = useState(null);
@@ -125,6 +125,13 @@ function NestIntercomInner({ open, onClose }) {
     [bootstrap, selectedId],
   );
 
+  useEffect(() => {
+    if (!initialBootstrap) return;
+    setBootstrap(initialBootstrap);
+    const remembered = initialBootstrap?.settings?.last_receptionist_eligible ? initialBootstrap.settings.last_receptionist_id : '';
+    setSelectedId(remembered || initialBootstrap?.receptionists?.[0]?.id || '');
+  }, [initialBootstrap]);
+
   const refreshBootstrap = useCallback(async () => {
     const data = await api.getIntercomBootstrap();
     setBootstrap(data);
@@ -134,9 +141,10 @@ function NestIntercomInner({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return undefined;
+    if (bootstrap) return undefined;
     refreshBootstrap().catch(() => setError('Voice is unavailable right now.'));
     return undefined;
-  }, [open, refreshBootstrap]);
+  }, [bootstrap, open, refreshBootstrap]);
 
   useEffect(() => {
     setVoiceActive(open);
