@@ -72,6 +72,7 @@ async function strictGetJSON(endpoint) {
 
 export const api = {
   getDropIns: () => strictGetJSON('/api/sonar/drop-ins'),
+  getDashboardBootstrap: () => fetchJSON('/api/sonar/dashboard/bootstrap'),
   getDropInTemplates: () => strictGetJSON('/api/sonar/drop-ins/templates'),
   saveDropInBuilder: (builder) => putJSON('/api/sonar/drop-ins/builder', builder),
   createDropIn: (draft) => postJSON('/api/sonar/drop-ins', draft),

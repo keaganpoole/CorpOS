@@ -238,6 +238,21 @@ def get_tenant_session_state(user_id: str) -> dict:
     return TENANT_SESSION_STATES.setdefault(str(user_id), dict(SESSION_STATE))
 
 
+def count_table_rows(table_name: str, column: str, value) -> int:
+    try:
+        response = (
+            supabase.table(table_name)
+            .select("id", count="exact")
+            .eq(column, value)
+            .limit(1)
+            .execute()
+        )
+        count = getattr(response, "count", None)
+        return int(count) if count is not None else len(response.data or [])
+    except Exception:
+        return 0
+
+
 def is_event_visible_to_user(event: dict, user_id: str) -> bool:
     payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
     return str(payload.get("user_id") or event.get("user_id") or "") == str(user_id)
@@ -1975,6 +1990,16 @@ async def monitor_business_knowledge_sources():
             logging.exception('main.business_knowledge_source_refresh.event_1743')
 
 
+async def delayed_startup_business_knowledge_sync(delay_seconds: int = 45):
+    await asyncio.sleep(delay_seconds)
+    await asyncio.to_thread(
+        queue_all_business_knowledge_sync,
+        intercom_store(),
+        elevenlabs_api_key,
+        business_voice_agent_ids(),
+    )
+
+
 @app.on_event("startup")
 async def startup_scenario_engine():
     global BUSINESS_KNOWLEDGE_STARTUP_TASK
@@ -1987,14 +2012,7 @@ async def startup_scenario_engine():
     if os.getenv('NODEMERE_RECOVERY_MODE', '').lower() in {'1','true','yes','on'}: return
     if elevenlabs_api_key and (elevenlabs_agent_id_inbound or elevenlabs_agent_id_intercom or elevenlabs_agent_id_outbound):
         try:
-            BUSINESS_KNOWLEDGE_STARTUP_TASK = asyncio.create_task(
-                asyncio.to_thread(
-                    queue_all_business_knowledge_sync,
-                    intercom_store(),
-                    elevenlabs_api_key,
-                    business_voice_agent_ids(),
-                )
-            )
+            BUSINESS_KNOWLEDGE_STARTUP_TASK = asyncio.create_task(delayed_startup_business_knowledge_sync())
             BUSINESS_KNOWLEDGE_WATCH_TASK = asyncio.create_task(monitor_business_knowledge_sources())
         except Exception:
             logging.exception('main.startup_business_knowledge_sync.event_1742')
@@ -10853,37 +10871,69 @@ async def get_session_state(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/pipeline", tags=["Sonar Controller Compat"])
 async def get_pipeline_state(current_user: dict = Depends(get_current_user)):
-    business = load_business_by_user_id(business_owner_id(current_user))
+    user_id = business_owner_id(current_user)
+    business = load_business_by_user_id(user_id)
     if not business:
         return {"stages": [], "totalRelics": 0, "qualifiedLeads": 0, "activeOutreach": 0}
     business_id = business.get("id")
-    try:
-        people = supabase.table('people').select('id').eq('business_id', business_id).execute().data or []
-    except Exception:
-        people = []
-    try:
-        appointments = supabase.table('appointments').select('id').eq('business_id', business_id).execute().data or []
-    except Exception:
-        appointments = []
-    try:
-        payments = supabase.table('payments').select('id').eq('business_id', business_id).execute().data or []
-    except Exception:
-        payments = []
-    try:
-        call_logs = supabase.table('call_logs').select('id').eq('user_id', business_owner_id(current_user)).execute().data or []
-    except Exception:
-        call_logs = []
+    people_count = count_table_rows("people", "business_id", business_id)
+    appointments_count = count_table_rows("appointments", "business_id", business_id)
+    payments_count = count_table_rows("payments", "business_id", business_id)
+    call_logs_count = count_table_rows("call_logs", "user_id", user_id)
 
     return {
         "stages": [
-            {"id": "calls", "label": "Calls", "count": len(call_logs)},
-            {"id": "people", "label": "People", "count": len(people)},
-            {"id": "appointments", "label": "Appointments", "count": len(appointments)},
-            {"id": "payments", "label": "Payments", "count": len(payments)},
+            {"id": "calls", "label": "Calls", "count": call_logs_count},
+            {"id": "people", "label": "People", "count": people_count},
+            {"id": "appointments", "label": "Appointments", "count": appointments_count},
+            {"id": "payments", "label": "Payments", "count": payments_count},
         ],
-        "totalRelics": len(call_logs),
-        "qualifiedLeads": len(people),
-        "activeOutreach": len(appointments),
+        "totalRelics": call_logs_count,
+        "qualifiedLeads": people_count,
+        "activeOutreach": appointments_count,
+    }
+
+
+@app.get("/api/sonar/dashboard/bootstrap", tags=["Sonar Dashboard"])
+async def get_sonar_dashboard_bootstrap(current_user: dict = Depends(get_current_user)):
+    user_id = business_owner_id(current_user)
+    control = get_tenant_control_state(user_id)
+    session = get_tenant_session_state(user_id)
+    pulse = [
+        event for event in LIVE_PULSE_EVENTS
+        if is_event_visible_to_user(event, user_id)
+    ][:30]
+    logs = [
+        event for event in SYSTEM_LOG_EVENTS
+        if str(event.get("user_id") or "") == user_id
+    ][:50]
+    cron = [job for job in CRON_JOBS if str(job.get("user_id") or "") == user_id]
+    try:
+        reactions = supabase.table('reactions').select('*').eq('user_id', user_id).execute().data or []
+    except Exception:
+        reactions = [item for item in REACTIONS_CACHE if str(item.get("user_id") or "") == user_id]
+    try:
+        settings = (
+            supabase.table('account_settings')
+            .select('id,call_routing')
+            .eq('user_id', user_id)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        account_settings = settings[0] if settings else None
+    except Exception:
+        account_settings = None
+    return {
+        "control": control,
+        "session": session,
+        "live_pulse": pulse,
+        "logs": logs,
+        "pipeline": await get_pipeline_state(current_user),
+        "cron": cron,
+        "reactions": reactions,
+        "account_settings": account_settings,
     }
 
 @app.get("/api/cron", tags=["Sonar Controller Compat"])

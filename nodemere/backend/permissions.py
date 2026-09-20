@@ -37,6 +37,8 @@ def route_permission(path, method):
         return 'operations.read' if read else 'operations.manage'
     if path.startswith('/api/sonar/nest/intercom'):
         return 'operations.read' if read else 'operations.write'
+    if path.startswith('/api/sonar/dashboard/'):
+        return 'operations.read' if read else 'operations.manage'
     if path.startswith('/api/sonar/drop-ins'):
         return 'operations.read' if read else 'operations.manage'
     if path in {'/api/sonar/people/read','/api/sonar/appointments/read'} and method == 'POST':

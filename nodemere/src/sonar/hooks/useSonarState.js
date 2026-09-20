@@ -54,27 +54,26 @@ const [reactions, setReactions] = useState([]);
       setSummary({ ok: activeAgents, warnings: 0, errors: 0, activeAgents, totalAgents: agentsData.length });
     }).catch(() => {}).finally(() => setAgentsLoading(false));
 
-    const [controlData, sessionData, pulseData, logsData, pipelineData, cronData, reactionsData, settingsResponse] = await Promise.all([
-      api.getControlState(),
-      api.getSession(),
-      api.getLivePulse(30),
-      api.getLogs(50),
-      api.getPipeline(),
-      api.getCronJobs(),
-      api.getReactions(),
-      supabase.from('account_settings').select('id, call_routing').limit(1).maybeSingle(),
-    ]);
+    const bootstrap = await api.getDashboardBootstrap();
+    const controlData = bootstrap?.control;
+    const sessionData = bootstrap?.session;
+    const pulseData = bootstrap?.live_pulse;
+    const logsData = bootstrap?.logs;
+    const pipelineData = bootstrap?.pipeline;
+    const cronData = bootstrap?.cron;
+    const reactionsData = bootstrap?.reactions;
+    const accountSettings = bootstrap?.account_settings;
 
     // Note: tasksData removed - Sonar no longer uses tasks
     if (controlData) {
       setControlState(prev => ({ ...prev, ...controlData, calls_filter: prev.calls_filter || 'all' }));
       setIsPaused(controlData.runtime_mode === 'paused');
     }
-    if (!settingsResponse?.error && settingsResponse?.data) {
-      setAccountSettingsId(settingsResponse.data.id || null);
+    if (accountSettings) {
+      setAccountSettingsId(accountSettings.id || null);
       setControlState(prev => ({
         ...prev,
-        calls_filter: String(settingsResponse.data.call_routing || prev.calls_filter || 'all').toLowerCase(),
+        calls_filter: String(accountSettings.call_routing || prev.calls_filter || 'all').toLowerCase(),
       }));
     }
     if (sessionData) setSession(sessionData);
