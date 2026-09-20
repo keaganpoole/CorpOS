@@ -201,6 +201,8 @@ class ProtectedQuery:
         db = self.client.database
         sensitive_write = self.operation in {'insert', 'upsert', 'update'} and any(
             set(row) & FIELDS[self.name].keys() for row in (self.values if isinstance(self.values, list) else [self.values]))
+        if self.operation == 'insert' and self.name in RECORD_ID_FIELDS:
+            sensitive_write = True
         if not sensitive_write:
             query = getattr(db.table(self.name), self.operation)(self.values, **self.options) if self.values is not None else db.table(self.name).delete(**self.options)
             result = self.filters(query).execute()
