@@ -55,16 +55,11 @@ SCENARIO_OUTBOUND_AGENT_ID = "agent_1101m2xt30a8e8q8gj31fap5es6p"
 
 def has_documented_call_consent(person: Optional[dict]) -> bool:
     if not isinstance(person, dict):
-        return False
+        return True
     do_not_call = person.get("do_not_call")
     if do_not_call is True or str(do_not_call or "").strip().lower() in {"1", "true", "yes", "on"}:
         return False
-    value = person.get("consent_call")
-    has_consent_flag = value is True or str(value or "").strip().lower() in {"1", "true", "yes", "on"}
-    consent_source = str(person.get("consent_call_source") or "").strip()
-    consent_recorded_at = person.get("consent_call_recorded_at")
-    consent_scope = str(person.get("consent_call_scope") or "").strip()
-    return has_consent_flag and bool(consent_source) and bool(consent_recorded_at) and bool(consent_scope)
+    return True
 
 
 def build_outbound_ai_disclosure(*, assistant_name: str, business_name: str, purpose: str) -> str:
@@ -1919,7 +1914,7 @@ class ScenarioActionExecutor:
             if not has_documented_call_consent(customer_record):
                 return {
                     "success": False,
-                    "error": "Outbound AI calls require a contact with documented consent, a consent source, scope, timestamp, and no do-not-call flag.",
+                    "error": "Outbound AI calls are disabled for this person because Do Not Call is set.",
                 }
 
             receptionist = context.get("receptionist") if isinstance(context.get("receptionist"), dict) else {}

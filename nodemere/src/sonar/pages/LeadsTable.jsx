@@ -48,10 +48,12 @@ const FIELD_TYPE_ICONS = {
   docs: FileText,
 };
 
+const LOCKED_SYSTEM_COLUMNS = new Set(['do_not_call']);
 const ZONE_META_KEY = '__zones';
 const ZONE_SWATCHES = ['var(--brandGradientStart)', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#f59e0b', '#10b981', '#14b8a6'];
 const isZoneEligibleColumn = (col) => Boolean(col?.label) && col.id !== 'select' && col.id !== 'avatar';
-const isColumnLocked = (column, fieldConfig = {}) => Boolean(column?.locked || fieldConfig[column?.id]?.locked);
+const isColumnLocked = (column, fieldConfig = {}) => Boolean(column?.locked || LOCKED_SYSTEM_COLUMNS.has(column?.id) || fieldConfig[column?.id]?.locked);
+const isColumnHidden = (column, fieldConfig = {}) => !isColumnLocked(column, fieldConfig) && Boolean(fieldConfig[column?.id]?.hidden);
 const sanitizeColorbarRuleList = (rules = []) => (
   (Array.isArray(rules) ? rules : [])
     .filter((rule) => rule && typeof rule === 'object')
@@ -713,7 +715,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
 const buildColumns = (customFields = [], fieldConfig = {}) => [
   { id: 'select', label: '', width: '20px', sortKey: null },
   { id: 'avatar', label: '', width: '24px', sortKey: null },
-  ...TABLE_COLUMNS.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({
+  ...TABLE_COLUMNS.filter((field) => !isColumnHidden({ id: field.key, locked: field.system }, fieldConfig)).map((field) => ({
     id: field.key,
     label: field.label,
     type: field.type,
@@ -730,6 +732,7 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
       textarea: '260px',
     }[field.type] || '160px',
     sortKey: field.key,
+    locked: field.system || LOCKED_SYSTEM_COLUMNS.has(field.key),
   })),
   ...customFields.filter((field) => !fieldConfig[field.key]?.hidden).map((field) => ({
     id: field.key,
@@ -968,7 +971,7 @@ const ColumnsVisibilityPopover = ({ columns, fieldConfig, onSetHidden, onShowAll
       </div>
       <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
         {filtered.map((column) => {
-          const hidden = !!fieldConfig[column.id]?.hidden;
+          const hidden = isColumnHidden(column, fieldConfig);
           return (
             <button key={column.id} type="button" onClick={() => onSetHidden(column.id, !hidden)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04]">
               <span className="w-4">{!hidden && <Check size={12} className="text-white" />}</span>
@@ -1335,6 +1338,7 @@ const LeadsTable = ({
   };
 
   const handleFieldHide = (key) => {
+    if (LOCKED_SYSTEM_COLUMNS.has(key)) return;
     const next = {
       ...fieldConfig,
       [key]: { ...fieldConfig[key], hidden: true },
@@ -1545,6 +1549,7 @@ const LeadsTable = ({
   }, [customFields, fieldConfig]);
 
   const setColumnHidden = useCallback((key, hidden) => {
+    if (LOCKED_SYSTEM_COLUMNS.has(key)) return;
     persistFieldConfig({
       ...fieldConfig,
       [key]: { ...fieldConfig[key], hidden },
@@ -1554,6 +1559,7 @@ const LeadsTable = ({
   const setAllColumnsHidden = useCallback((hidden) => {
     const next = { ...fieldConfig };
     allDataColumns.forEach((column) => {
+      if (isColumnLocked(column, next)) return;
       next[column.id] = { ...next[column.id], hidden };
     });
     persistFieldConfig(next);
@@ -2396,7 +2402,7 @@ const LeadsTable = ({
           </motion.div>
         )}
         {settingsField && (
-          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={handleFieldHide} onClose={() => setSettingsField(null)} intakeEnabledCount={intakeEnabledCount} />
+          <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={LOCKED_SYSTEM_COLUMNS.has(settingsField) ? null : handleFieldHide} onClose={() => setSettingsField(null)} intakeEnabledCount={intakeEnabledCount} />
         )}
         {documentViewer && (
           <PersonDocumentsModal

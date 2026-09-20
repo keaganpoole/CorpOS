@@ -154,7 +154,7 @@ export const LEAD_FIELDS = [
   { key: 'consent_call_source', label: 'AI Call Consent Source', type: 'text', required: false, table: false, section: 'consent', editable: true },
   { key: 'consent_call_recorded_at', label: 'AI Call Consent Timestamp', type: 'timestamp', required: false, table: false, section: 'consent', editable: true },
   { key: 'consent_call_scope', label: 'AI Call Consent Scope', type: 'text', required: false, table: false, section: 'consent', editable: true },
-  { key: 'do_not_call', label: 'Do Not Call', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
+  { key: 'do_not_call', label: 'Do Not Call', type: 'boolean', required: false, table: true, tableWidth: '120px', section: 'consent', editable: true, system: true },
   { key: 'do_not_text', label: 'Do Not Text', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
 
   // CRM
