@@ -9121,6 +9121,7 @@ async def legacy_server_tool(
         phone_source, raw_search_phone = first_present_with_path(
             payload,
             "phone",
+            "phone_number",
             "customer_phone",
             "to_phone",
             "person_phone",
@@ -9626,6 +9627,7 @@ async def legacy_server_tool(
         phone_source, raw_search_phone = first_present_with_path(
             payload,
             "phone",
+            "phone_number",
             "customer_phone",
             "to_phone",
             "person_phone",
