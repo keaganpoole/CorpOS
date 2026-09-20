@@ -341,7 +341,15 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
         setNestPreferences(normalizeNestPreferences(payload?.new?.preferences?.nest));
       })
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    const handlePreferencesUpdated = (event) => {
+      setNestPreferences(normalizeNestPreferences(event?.detail?.preferences?.nest));
+    };
+    window.addEventListener('sonar:preferences-updated', handlePreferencesUpdated);
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+      window.removeEventListener('sonar:preferences-updated', handlePreferencesUpdated);
+    };
   }, [session?.user?.id, workforce?.tenant?.business_id, businessId]);
 
   const persistHistory = useCallback((events) => {
@@ -707,12 +715,13 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     setVoiceActive,
     privacyMode,
     togglePrivacy,
+    nestSoundsMuted: nestPreferences.sounds_muted === true,
     selectedConcepts,
     selectConcept,
     previewConcept,
     previewNotification,
     hideCurrentNotification,
-  }), [activeEvent, displayEvent, displayConcept, hideCurrentNotification, history, historyOpen, introStarted, liveCall, liveCallActions, markIntroStarted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy, voiceActive]);
+  }), [activeEvent, displayEvent, displayConcept, hideCurrentNotification, history, historyOpen, introStarted, liveCall, liveCallActions, markIntroStarted, nestPreferences.sounds_muted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy, voiceActive]);
 
   return <NestContext.Provider value={value}>{children}</NestContext.Provider>;
 };

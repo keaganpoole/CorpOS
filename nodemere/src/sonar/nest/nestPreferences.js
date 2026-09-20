@@ -80,6 +80,7 @@ export const NEST_NOTIFICATION_GROUPS = [
 
 export const DEFAULT_NEST_PREFERENCES = {
   enabled: true,
+  sounds_muted: false,
   categories: Object.fromEntries(NEST_NOTIFICATION_GROUPS.map(({ key }) => [key, true])),
   notifications: Object.fromEntries(
     NEST_NOTIFICATION_GROUPS.flatMap(({ notifications }) => notifications.map(({ key }) => [key, true]))

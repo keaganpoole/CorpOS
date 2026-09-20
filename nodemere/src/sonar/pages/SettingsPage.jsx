@@ -3906,6 +3906,7 @@ const SettingsPage = () => {
       const current = normalizeNestPreferences(prev.preferences?.nest);
       const next = { ...current };
       if (path === 'enabled') next.enabled = value;
+      if (path === 'sounds_muted') next.sounds_muted = value;
       if (path.startsWith('categories.')) {
         next.categories = { ...current.categories, [path.slice('categories.'.length)]: value };
       }
@@ -4125,7 +4126,24 @@ const SettingsPage = () => {
                 <div className="mb-2">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Nest</p>
-                    <p className="mt-1 text-[12px] leading-5 text-zinc-500">Choose which Nest notifications appear in your dashboard.</p>
+                    <p className="mt-1 text-[12px] leading-5 text-zinc-500">Choose how Nest appears and sounds in your dashboard.</p>
+                  </div>
+                </div>
+                <div className="mb-2 rounded-2xl border border-white/[0.05] bg-zinc-950/40 p-5">
+                  <div className="flex items-start justify-between gap-5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Bell size={15} className="settings-icon" />
+                        <h4 className="text-[13px] font-semibold text-zinc-100">Mute Nest sounds</h4>
+                      </div>
+                      <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
+                        Turns off Nest audio cues, including intercom ringing and pickup sounds.
+                      </p>
+                    </div>
+                    <Toggle
+                      value={nestPreferences.sounds_muted === true}
+                      onChange={(value) => updateNestPreference('sounds_muted', value)}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">

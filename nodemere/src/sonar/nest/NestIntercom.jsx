@@ -7,6 +7,8 @@ import { api } from '../lib/api';
 import { useNest } from './NestRuntime';
 import IntercomVoiceLine from './IntercomVoiceLine';
 import useIntercomMicrophone from './useIntercomMicrophone';
+import ringingSound from '../../assets/ringing.mp3';
+import pickupSound from '../../assets/pickup.mp3';
 
 const PRIVACY_COPY = 'Voice conversations may be transcribed and saved so you can review them later.';
 const ACTIVE_PHASES = new Set(['connecting', 'listening', 'speaking']);
@@ -82,7 +84,7 @@ function PrivacyNotice({ open, busy, onCancel, onAccept }) {
 
 function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
   const { start: startMicrophone, stop: stopMicrophone, sample: sampleMicrophone, setMuted: setMicrophoneMuted } = useIntercomMicrophone();
-  const { queueLength, setVoiceActive } = useNest();
+  const { queueLength, setVoiceActive, nestSoundsMuted } = useNest();
   const [bootstrap, setBootstrap] = useState(initialBootstrap);
   const [selectedId, setSelectedId] = useState('');
   const [phase, setPhase] = useState('selecting');
@@ -103,8 +105,21 @@ function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
   const userHasSpokenRef = useRef(false);
   const silenceHintTimerRef = useRef(null);
   const silenceHintHideTimerRef = useRef(null);
+  const ringingAudioRef = useRef(null);
+  const pickupAudioRef = useRef(null);
+  const ringingTimerRef = useRef(null);
 
   useEffect(() => { setMicrophoneMuted(muted); }, [muted, setMicrophoneMuted]);
+
+  const stopNestSounds = useCallback(() => {
+    if (ringingTimerRef.current) window.clearInterval(ringingTimerRef.current);
+    ringingTimerRef.current = null;
+    [ringingAudioRef.current, pickupAudioRef.current].forEach((audio) => {
+      if (!audio) return;
+      audio.pause();
+      audio.currentTime = 0;
+    });
+  }, []);
 
   const clearSilenceHintTimers = useCallback(() => {
     if (silenceHintTimerRef.current) window.clearTimeout(silenceHintTimerRef.current);
@@ -164,6 +179,7 @@ function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
     setVoiceActive(open);
     if (!open) {
       stopMicrophone();
+      stopNestSounds();
       clearSilenceHintTimers();
       setSilenceHintVisible(false);
     }
@@ -173,7 +189,42 @@ function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
       setLine(null);
     }
     return () => setVoiceActive(false);
-  }, [clearSilenceHintTimers, open, setVoiceActive, stopMicrophone]);
+  }, [clearSilenceHintTimers, open, setVoiceActive, stopMicrophone, stopNestSounds]);
+
+  useEffect(() => {
+    ringingAudioRef.current = new Audio(ringingSound);
+    pickupAudioRef.current = new Audio(pickupSound);
+    return () => stopNestSounds();
+  }, [stopNestSounds]);
+
+  useEffect(() => {
+    const shouldRing = open && !nestSoundsMuted && ['calling', 'connecting'].includes(phase);
+    if (!shouldRing) {
+      if (ringingTimerRef.current) window.clearInterval(ringingTimerRef.current);
+      ringingTimerRef.current = null;
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.pause();
+        ringingAudioRef.current.currentTime = 0;
+      }
+      return undefined;
+    }
+    const playRing = () => {
+      const audio = ringingAudioRef.current;
+      if (!audio) return;
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    };
+    playRing();
+    ringingTimerRef.current = window.setInterval(playRing, 5000);
+    return () => {
+      if (ringingTimerRef.current) window.clearInterval(ringingTimerRef.current);
+      ringingTimerRef.current = null;
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.pause();
+        ringingAudioRef.current.currentTime = 0;
+      }
+    };
+  }, [nestSoundsMuted, open, phase]);
 
   const persistLine = useCallback(async (nextLine) => {
     if (!nextLine || !sessionRef.current?.intercom_id) return;
@@ -242,6 +293,16 @@ function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
   const conversation = useConversation({
     micMuted: muted,
     onConnect: ({ conversationId }) => {
+      if (ringingTimerRef.current) window.clearInterval(ringingTimerRef.current);
+      ringingTimerRef.current = null;
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.pause();
+        ringingAudioRef.current.currentTime = 0;
+      }
+      if (!nestSoundsMuted && pickupAudioRef.current) {
+        pickupAudioRef.current.currentTime = 0;
+        pickupAudioRef.current.play().catch(() => {});
+      }
       if (sessionRef.current) {
         sessionRef.current.elevenlabs_conversation_id = conversationId;
         api.recordIntercomTurn({
@@ -413,6 +474,7 @@ function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
 
   const endSession = () => {
     endingRef.current = true;
+    stopNestSounds();
     conversation.endSession();
     endingRef.current = false;
     finalizeSession();
